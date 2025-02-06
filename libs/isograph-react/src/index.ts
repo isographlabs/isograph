@@ -64,7 +64,7 @@ export {
   type ResolverFirstParameter,
   type ReaderImperativelyLoadedField,
   type ReaderLoadableField,
-  type ReaderLinkeField,
+  type ReaderLinkField,
   type StartUpdate,
 } from './core/reader';
 export {

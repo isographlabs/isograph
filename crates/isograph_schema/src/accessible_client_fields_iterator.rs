@@ -1,9 +1,12 @@
 use common_lang_types::WithSpan;
 use isograph_lang_types::ServerFieldSelection;
 
-use crate::{FieldType, ValidatedClientField, ValidatedSchema, ValidatedSelection};
+use crate::{
+    ClientType, FieldType, ValidatedClientField, ValidatedClientPointer, ValidatedSchema,
+    ValidatedSelection,
+};
 
-impl ValidatedClientField {
+impl ClientType<&ValidatedClientField, &ValidatedClientPointer> {
     // This should really be replaced with a proper visitor, or something
     pub fn accessible_client_fields<'a>(
         &'a self,

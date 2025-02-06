@@ -88,13 +88,13 @@ impl VariableContext {
 }
 
 impl<
-        TClientFieldSelectionScalarFieldAssociatedData,
-        TClientFieldSelectionLinkedFieldAssociatedData,
+        TClientTypeSelectionScalarFieldAssociatedData,
+        TClientTypeSelectionLinkedFieldAssociatedData,
         TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
     >
     ClientField<
-        TClientFieldSelectionScalarFieldAssociatedData,
-        TClientFieldSelectionLinkedFieldAssociatedData,
+        TClientTypeSelectionScalarFieldAssociatedData,
+        TClientTypeSelectionLinkedFieldAssociatedData,
         TClientFieldVariableDefinitionAssociatedData,
     >
 {
