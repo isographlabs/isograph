@@ -329,6 +329,8 @@ version = "0.3.0"
 dependencies = [
  "intern",
  "pathdiff",
+ "pico",
+ "pico_macros",
  "serde",
  "string_key_newtype",
 ]
@@ -860,6 +862,8 @@ dependencies = [
  "lazy_static",
  "notify",
  "notify-debouncer-full",
+ "pico",
+ "pico_macros",
  "pretty-duration",
  "regex",
  "thiserror",

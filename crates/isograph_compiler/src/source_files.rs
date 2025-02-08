@@ -1,4 +1,5 @@
 use std::{
+    any::Any,
     collections::HashMap,
     ops::{Deref, DerefMut},
     path::{Path, PathBuf},
@@ -11,9 +12,12 @@ use intern::string_key::Intern;
 use isograph_config::{absolute_and_relative_paths, AbsolutePathAndRelativePath, CompilerConfig};
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_schema::UnvalidatedSchema;
+use pico::{Database, SourceId};
+use pico_macros::{memo, Source};
 
 use crate::{
     batch_compile::BatchCompileError,
+    compiler_state::SchemaSourceFile,
     isograph_literals::{
         parse_iso_literals_in_file_content, process_iso_literals, read_file, read_files_in_folder,
     },
@@ -22,7 +26,7 @@ use crate::{
     watch::{ChangedFileKind, SourceEventKind, SourceFileEvent},
 };
 
-#[derive(Clone, Debug, Eq, PartialEq, Default)]
+#[derive(Clone, Debug)]
 pub struct SourceFiles {
     pub schema: GraphQLTypeSystemDocument,
     pub schema_extensions: HashMap<RelativePathToSourceFile, GraphQLTypeSystemExtensionDocument>,
@@ -30,9 +34,14 @@ pub struct SourceFiles {
 }
 
 impl SourceFiles {
-    pub fn read_and_parse_all_files(config: &CompilerConfig) -> Result<Self, BatchCompileError> {
-        let schema = read_and_parse_graphql_schema(config)?;
-
+    pub fn read_and_parse_all_files(
+        config: &CompilerConfig,
+        database: &Database,
+        schema_source: SourceId<SchemaSourceFile>,
+        text_source_source: SourceId<TextSource>,
+    ) -> Result<Self, BatchCompileError> {
+        let schema =
+            memoizable_read_and_parse_graphql_schema(database, schema_source, text_source_source)?;
         let mut schema_extensions = HashMap::new();
         for schema_extension_path in config.schema_extensions.iter() {
             let (file_path, extensions_document) =
@@ -79,6 +88,7 @@ impl SourceFiles {
         &mut self,
         config: &CompilerConfig,
         changes: &[SourceFileEvent],
+        database: &mut Database,
     ) -> Result<(), BatchCompileError> {
         let errors = changes
             .iter()
@@ -88,16 +98,16 @@ impl SourceFiles {
                         "Unexpected config file change. This is indicative of a bug in Isograph."
                     );
                 }
-                ChangedFileKind::Schema => self.handle_update_schema(config, event).err(),
-                ChangedFileKind::SchemaExtension => {
-                    self.handle_update_schema_extensions(config, event).err()
-                }
-                ChangedFileKind::JavaScriptSourceFile => {
-                    self.handle_update_source_file(config, event).err()
-                }
-                ChangedFileKind::JavaScriptSourceFolder => {
-                    self.handle_update_source_folder(config, event).err()
-                }
+                ChangedFileKind::Schema => self.handle_update_schema(config, event, database).err(),
+                ChangedFileKind::SchemaExtension => self
+                    .handle_update_schema_extensions(config, event, database)
+                    .err(),
+                ChangedFileKind::JavaScriptSourceFile => self
+                    .handle_update_source_file(config, event, database)
+                    .err(),
+                ChangedFileKind::JavaScriptSourceFolder => self
+                    .handle_update_source_folder(config, event, database)
+                    .err(),
             })
             .collect::<Vec<_>>();
         if !errors.is_empty() {
@@ -111,6 +121,7 @@ impl SourceFiles {
         &mut self,
         config: &CompilerConfig,
         event_kind: &SourceEventKind,
+        database: &Database,
     ) -> Result<(), BatchCompileError> {
         match event_kind {
             SourceEventKind::CreateOrModify(_) => {
@@ -130,6 +141,7 @@ impl SourceFiles {
         &mut self,
         config: &CompilerConfig,
         event_kind: &SourceEventKind,
+        database: &Database,
     ) -> Result<(), BatchCompileError> {
         match event_kind {
             SourceEventKind::CreateOrModify(path) => {
@@ -159,6 +171,7 @@ impl SourceFiles {
         &mut self,
         config: &CompilerConfig,
         event_kind: &SourceEventKind,
+        database: &Database,
     ) -> Result<(), BatchCompileError> {
         match event_kind {
             SourceEventKind::CreateOrModify(path) => {
@@ -182,6 +195,7 @@ impl SourceFiles {
         &mut self,
         config: &CompilerConfig,
         event_kind: &SourceEventKind,
+        database: &Database,
     ) -> Result<(), BatchCompileError> {
         match event_kind {
             SourceEventKind::CreateOrModify(path) => {
@@ -292,6 +306,18 @@ fn read_and_parse_graphql_schema(
     let schema = parse_schema(&content, schema_text_source)
         .map_err(|with_span| with_span.to_with_location(schema_text_source))?;
     Ok(schema)
+}
+
+fn memoizable_read_and_parse_graphql_schema(
+    database: &Database,
+    schema_source: SourceId<SchemaSourceFile>,
+    text_source: SourceId<TextSource>,
+) -> Result<GraphQLTypeSystemDocument, BatchCompileError> {
+    let schema = database.get(schema_source);
+    let text_source = database.get(text_source);
+    let result = parse_schema(&schema.text, text_source)
+        .map_err(|with_span| with_span.to_with_location(text_source))?;
+    Ok(result)
 }
 
 fn intern_file_path(path: &Path) -> RelativePathToSourceFile {
