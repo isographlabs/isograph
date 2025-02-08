@@ -109,6 +109,7 @@ export {
   stableIdForFragmentReference,
   type ExtractStartUpdate,
   type VariableValue,
+  type StableIdForFragmentReference,
 } from './core/FragmentReference';
 export {
   type LogMessage,

@@ -3,6 +3,7 @@ import { IsographEntrypoint } from './entrypoint';
 import {
   FragmentReference,
   Variables,
+  type StableIdForFragmentReference,
   type UnknownTReadFromStore,
 } from './FragmentReference';
 import { RetainedQuery } from './garbageCollection';
@@ -14,8 +15,8 @@ import type { ReaderAst } from './reader';
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
 export type ComponentCache = {
-  [key: DataId]: {
-    [key: ComponentOrFieldName]: { [key: StringifiedArgs]: React.FC<any> };
+  [key: StableIdForFragmentReference]: {
+    [key: ComponentOrFieldName]: React.FC<any>;
   };
 };
 
