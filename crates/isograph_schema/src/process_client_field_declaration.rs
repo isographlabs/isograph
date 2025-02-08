@@ -297,7 +297,7 @@ impl UnvalidatedSchema {
 type ProcessClientFieldDeclarationResult<T> =
     Result<T, WithSpan<ProcessClientFieldDeclarationError>>;
 
-#[derive(Error, Debug)]
+#[derive(Error, Eq, PartialEq, Debug)]
 pub enum ProcessClientFieldDeclarationError {
     #[error("`{parent_type_name}` is not a type that has been defined.")]
     ParentTypeNotDefined {

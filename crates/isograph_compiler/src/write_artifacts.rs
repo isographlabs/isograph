@@ -63,7 +63,7 @@ pub(crate) fn write_artifacts_to_disk(
 }
 
 #[allow(clippy::enum_variant_names)]
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub enum GenerateArtifactsError {
     #[error(
         "Unable to write to artifact file at path {path:?}. \
