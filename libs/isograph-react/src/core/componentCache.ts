@@ -15,12 +15,9 @@ export function getOrCreateCachedComponent(
   fragmentReference: FragmentReference<any, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
 ): React.FC<any> {
-  // cachedComponentsById is a three layer cache: id, then component name, then
-  // stringified args. These three, together, uniquely identify a read at a given
-  // time.
-  const cachedComponentsById = environment.componentCache;
+  const cachedComponentsByStableFragmentReferenceId = environment.componentCache;
 
-  const componentsByName = (cachedComponentsById[
+  const componentsByName = (cachedComponentsByStableFragmentReferenceId[
     stableIdForFragmentReference(fragmentReference)
   ] ??= {});
 
