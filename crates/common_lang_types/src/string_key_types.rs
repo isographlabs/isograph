@@ -12,6 +12,9 @@ string_key_newtype!(DirectiveArgumentName);
 // (client-defined linked fields do not exist, but will.)
 string_key_newtype!(SelectableFieldName);
 
+string_key_newtype!(ClientPointerFieldName);
+string_key_conversion!(from: ClientPointerFieldName, to: SelectableFieldName);
+
 string_key_newtype!(InputValueName);
 string_key_conversion!(from: InputValueName, to: VariableName);
 string_key_conversion!(from: InputValueName, to: FieldArgumentName);
@@ -112,7 +115,8 @@ string_key_newtype!(IsographDirectiveName);
 
 string_key_newtype!(FieldArgumentName);
 
-string_key_newtype!(ArtifactFileType);
+string_key_newtype!(ArtifactFilePrefix);
+string_key_newtype!(ArtifactFileName);
 
 string_key_newtype!(JavascriptVariableName);
 

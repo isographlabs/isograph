@@ -10,15 +10,15 @@ use isograph_lang_types::{ClientFieldId, IsographSelectionVariant, ServerObjectI
 use isograph_schema::{
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
-    get_reachable_variables, ClientFieldToCompletedMergeTraversalStateMap, FieldTraversalResult,
-    FieldType, MergedSelectionMap, RootOperationName, RootRefetchedPath,
+    get_reachable_variables, ClientType, FieldToCompletedMergeTraversalStateMap,
+    FieldTraversalResult, FieldType, MergedSelectionMap, RootOperationName, RootRefetchedPath,
     ScalarClientFieldTraversalState, SchemaObject, ValidatedClientField, ValidatedSchema,
     ValidatedVariableDefinition,
 };
 
 use crate::{
     generate_artifacts::{
-        NormalizationAstText, QueryText, RefetchQueryArtifactImport, ENTRYPOINT,
+        NormalizationAstText, QueryText, RefetchQueryArtifactImport, ENTRYPOINT_FILE_NAME,
         RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
     },
     imperatively_loaded_fields::get_artifact_for_imperatively_loaded_field,
@@ -39,7 +39,7 @@ struct EntrypointArtifactInfo<'schema> {
 pub(crate) fn generate_entrypoint_artifacts(
     schema: &ValidatedSchema,
     entrypoint_id: ClientFieldId,
-    encountered_client_field_map: &mut ClientFieldToCompletedMergeTraversalStateMap,
+    encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     file_extensions: GenerateFileExtensionsOption,
 ) -> Vec<ArtifactPathAndContent> {
     let entrypoint = schema.client_field(entrypoint_id);
@@ -52,8 +52,8 @@ pub(crate) fn generate_entrypoint_artifacts(
         schema,
         schema.server_field_data.object(entrypoint.parent_object_id),
         entrypoint.selection_set_for_parent_query(),
-        encountered_client_field_map,
-        FieldType::ClientField(entrypoint.id),
+        encountered_client_type_map,
+        FieldType::ClientField(ClientType::ClientField(entrypoint.id)),
         &entrypoint.initial_variable_context(),
     );
 
@@ -62,7 +62,7 @@ pub(crate) fn generate_entrypoint_artifacts(
         entrypoint,
         &merged_selection_map,
         &traversal_state,
-        encountered_client_field_map,
+        encountered_client_type_map,
         entrypoint
             .variable_definitions
             .iter()
@@ -78,7 +78,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
     entrypoint: &ValidatedClientField,
     merged_selection_map: &MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,
-    encountered_client_field_map: &ClientFieldToCompletedMergeTraversalStateMap,
+    encountered_client_type_map: &FieldToCompletedMergeTraversalStateMap,
     variable_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
     default_root_operation: &Option<(&ServerObjectId, &RootOperationName)>,
     file_extensions: GenerateFileExtensionsOption,
@@ -123,10 +123,10 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
                 IsographSelectionVariant::Loadable(_) => {
                     // Note: it would be cleaner to include a reference to the merged selection set here via
                     // the selection_variant variable, instead of by looking it up like this.
-                    &encountered_client_field_map
-                        .get(&FieldType::ClientField(
+                    &encountered_client_type_map
+                        .get(&FieldType::ClientField(ClientType::ClientField(
                             root_refetch_path.path_to_refetch_field_info.client_field_id,
-                        ))
+                        )))
                         .expect(
                             "Expected field to have been encountered, \
                                 since it is being used as a refetch field.",
@@ -265,7 +265,7 @@ impl EntrypointArtifactInfo<'_> {
 
         ArtifactPathAndContent {
             file_content: self.file_contents(file_extensions),
-            file_name_prefix: *ENTRYPOINT,
+            file_name: *ENTRYPOINT_FILE_NAME,
             type_and_field: Some(ObjectTypeAndFieldName {
                 type_name,
                 field_name,
@@ -304,7 +304,8 @@ impl EntrypointArtifactInfo<'_> {
             }};\n\
             const artifact: IsographEntrypoint<\n\
             {}{entrypoint_params_typename},\n\
-            {}{entrypoint_output_type_name}\n\
+            {}{entrypoint_output_type_name},\n\
+            {}NormalizationAst\n\
             > = {{\n\
             {}kind: \"Entrypoint\",\n\
             {}networkRequestInfo: {{\n\
@@ -320,7 +321,7 @@ impl EntrypointArtifactInfo<'_> {
             {}}},\n\
             }};\n\n\
             export default artifact;\n",
-            "  ","  ","  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ",
+            "  ", "  ", "  ","  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         )
     }
 }

@@ -1,16 +1,28 @@
-import type { ExtractData, ExtractStartUpdate } from './FragmentReference';
+import {
+  stableIdForFragmentReference,
+  type ExtractStartUpdate,
+  type FragmentReference,
+  type UnknownTReadFromStore,
+} from './FragmentReference';
 import type { IsographEnvironment } from './IsographEnvironment';
-import type { StartUpdate } from './reader';
 
-export function startUpdate<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+export function getOrCreateCachedStartUpdate<
+  TReadFromStore extends UnknownTReadFromStore,
 >(
-  _environment: IsographEnvironment,
-  _data: ExtractData<TReadFromStore>,
+  environment: IsographEnvironment,
+  fragmentReference: FragmentReference<TReadFromStore, any>,
+  eagerResolverName: string,
 ): ExtractStartUpdate<TReadFromStore> {
-  return (_updater) => {};
+  return (environment.eagerReaderCache[
+    stableIdForFragmentReference(fragmentReference, eagerResolverName)
+  ] ??= createStartUpdate(environment, fragmentReference));
+}
+
+export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
+  _environment: IsographEnvironment,
+  _fragmentReference: FragmentReference<TReadFromStore, any>,
+): ExtractStartUpdate<TReadFromStore> {
+  return (_updater) => {
+    // TODO start update
+  };
 }

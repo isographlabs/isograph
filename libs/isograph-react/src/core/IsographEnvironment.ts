@@ -1,6 +1,11 @@
 import { ParentCache } from '@isograph/react-disposable-state';
 import { IsographEntrypoint } from './entrypoint';
-import { FragmentReference, Variables } from './FragmentReference';
+import {
+  FragmentReference,
+  Variables,
+  type StableIdForFragmentReference,
+  type UnknownTReadFromStore,
+} from './FragmentReference';
 import { RetainedQuery } from './garbageCollection';
 import { LogFunction, WrappedLogFunction } from './logging';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
@@ -9,53 +14,48 @@ import type { ReaderAst, StartUpdate } from './reader';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
-type ComponentCache = {
-  [key: DataId]: {
-    [key: ComponentOrFieldName]: { [key: StringifiedArgs]: React.FC<any> };
+
+export type FieldCache<T> = {
+  [key: StableIdForFragmentReference]: T;
+};
+
+export type FragmentSubscription<TReadFromStore extends UnknownTReadFromStore> =
+  {
+    readonly kind: 'FragmentSubscription';
+    readonly callback: (
+      newEncounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
+    ) => void;
+    /** The value read out from the previous call to readButDoNotEvaluate */
+    readonly encounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>;
+    readonly fragmentReference: FragmentReference<TReadFromStore, any>;
+    readonly readerAst: ReaderAst<TReadFromStore>;
   };
-};
 
-export type FragmentSubscription<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
-> = {
-  readonly kind: 'FragmentSubscription';
-  readonly callback: (
-    newEncounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
-  ) => void;
-  /** The value read out from the previous call to readButDoNotEvaluate */
-  readonly encounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>;
-  readonly fragmentReference: FragmentReference<TReadFromStore, any>;
-  readonly readerAst: ReaderAst<TReadFromStore>;
-};
-
-type AnyChangesToRecordSubscription = {
+export type AnyChangesToRecordSubscription = {
   readonly kind: 'AnyChangesToRecord';
   readonly callback: () => void;
   readonly recordLink: Link;
 };
 
-type AnyRecordSubscription = {
+export type AnyRecordSubscription = {
   readonly kind: 'AnyRecords';
   readonly callback: () => void;
 };
 
-type Subscription =
+export type Subscription =
   | FragmentSubscription<any>
   | AnyChangesToRecordSubscription
   | AnyRecordSubscription;
-type Subscriptions = Set<Subscription>;
+export type Subscriptions = Set<Subscription>;
 // Should this be a map?
-type CacheMap<T> = { [index: string]: ParentCache<T> };
+export type CacheMap<T> = { [index: string]: ParentCache<T> };
 
 export type IsographEnvironment = {
   readonly store: IsographStore;
   readonly networkFunction: IsographNetworkFunction;
   readonly missingFieldHandler: MissingFieldHandler | null;
-  readonly componentCache: ComponentCache;
+  readonly componentCache: FieldCache<React.FC<any>>;
+  readonly eagerReaderCache: FieldCache<StartUpdate<any> | undefined>;
   readonly subscriptions: Subscriptions;
   // N.B. this must be <any, any>, but all *usages* of this should go through
   // a function that adds type parameters.
@@ -63,7 +63,7 @@ export type IsographEnvironment = {
   // TODO make this a CacheMap and add GC
   readonly entrypointArtifactCache: Map<
     string,
-    PromiseWrapper<IsographEntrypoint<any, any>>
+    PromiseWrapper<IsographEntrypoint<any, any, any>>
   >;
   readonly retainedQueries: Set<RetainedQuery>;
   readonly gcBuffer: Array<RetainedQuery>;
@@ -139,6 +139,7 @@ export function createIsographEnvironment(
     networkFunction,
     missingFieldHandler: missingFieldHandler ?? null,
     componentCache: {},
+    eagerReaderCache: {},
     subscriptions: new Set(),
     fragmentCache: {},
     entrypointArtifactCache: new Map(),
@@ -187,8 +188,8 @@ export function getLink(maybeLink: DataTypeValue): Link | null {
 export function getOrLoadIsographArtifact(
   environment: IsographEnvironment,
   key: string,
-  loader: () => Promise<IsographEntrypoint<any, any>>,
-): PromiseWrapper<IsographEntrypoint<any, any>> {
+  loader: () => Promise<IsographEntrypoint<any, any, any>>,
+): PromiseWrapper<IsographEntrypoint<any, any, any>> {
   const value = environment.entrypointArtifactCache.get(key);
   if (value != null) {
     return value;

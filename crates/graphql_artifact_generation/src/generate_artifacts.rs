@@ -1,13 +1,13 @@
 use common_lang_types::{
-    ArtifactFileType, ArtifactPathAndContent, DescriptionValue, Location, Span, WithLocation,
-    WithSpan,
+    ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent, DescriptionValue, Location, Span,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
 };
 use intern::{string_key::Intern, Lookup};
 
-use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
+use isograph_config::CompilerConfig;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, NonConstantValue, SelectableServerFieldId, SelectionType,
     ServerFieldSelection, TypeAnnotation, UnionVariant, VariableDefinition,
@@ -43,13 +43,24 @@ use crate::{
 };
 
 lazy_static! {
-    pub static ref RESOLVER_READER: ArtifactFileType = "resolver_reader".intern().into();
-    pub static ref REFETCH_READER: ArtifactFileType = "refetch_reader".intern().into();
-    pub static ref RESOLVER_PARAM_TYPE: ArtifactFileType = "param_type".intern().into();
-    pub static ref RESOLVER_PARAMETERS_TYPE: ArtifactFileType = "parameters_type".intern().into();
-    pub static ref RESOLVER_OUTPUT_TYPE: ArtifactFileType = "output_type".intern().into();
-    pub static ref ENTRYPOINT: ArtifactFileType = "entrypoint".intern().into();
-    pub static ref ISO_TS: ArtifactFileType = "iso".intern().into();
+    pub static ref ENTRYPOINT_FILE_NAME: ArtifactFileName = "entrypoint.ts".intern().into();
+    pub static ref ENTRYPOINT: ArtifactFilePrefix = "entrypoint".intern().into();
+    pub static ref ISO_TS_FILE_NAME: ArtifactFileName = "iso.ts".intern().into();
+    pub static ref ISO_TS: ArtifactFilePrefix = "iso".intern().into();
+    pub static ref REFETCH_READER_FILE_NAME: ArtifactFileName = "refetch_reader.ts".intern().into();
+    pub static ref REFETCH_READER: ArtifactFilePrefix = "refetch_reader".intern().into();
+    pub static ref RESOLVER_OUTPUT_TYPE_FILE_NAME: ArtifactFileName =
+        "output_type.ts".intern().into();
+    pub static ref RESOLVER_OUTPUT_TYPE: ArtifactFilePrefix = "output_type".intern().into();
+    pub static ref RESOLVER_PARAM_TYPE_FILE_NAME: ArtifactFileName =
+        "param_type.ts".intern().into();
+    pub static ref RESOLVER_PARAM_TYPE: ArtifactFilePrefix = "param_type".intern().into();
+    pub static ref RESOLVER_PARAMETERS_TYPE_FILE_NAME: ArtifactFileName =
+        "parameters_type.ts".intern().into();
+    pub static ref RESOLVER_PARAMETERS_TYPE: ArtifactFilePrefix = "parameters_type".intern().into();
+    pub static ref RESOLVER_READER_FILE_NAME: ArtifactFileName =
+        "resolver_reader.ts".intern().into();
+    pub static ref RESOLVER_READER: ArtifactFilePrefix = "resolver_reader".intern().into();
 }
 
 /// Get all artifacts according to the following scheme:
@@ -76,10 +87,8 @@ lazy_static! {
 pub fn get_artifact_path_and_content(
     schema: &ValidatedSchema,
     config: &CompilerConfig,
-    file_extensions: GenerateFileExtensionsOption,
-    no_babel_transform: bool,
 ) -> Vec<ArtifactPathAndContent> {
-    let mut encountered_client_field_map = BTreeMap::new();
+    let mut encountered_client_type_map = BTreeMap::new();
     let mut path_and_contents = vec![];
     let mut encountered_output_types = HashSet::<ClientFieldId>::new();
 
@@ -88,8 +97,8 @@ pub fn get_artifact_path_and_content(
         let entrypoint_path_and_content = generate_entrypoint_artifacts(
             schema,
             *entrypoint_id,
-            &mut encountered_client_field_map,
-            file_extensions,
+            &mut encountered_client_type_map,
+            config.options.include_file_extensions_in_import_statements,
         );
         path_and_contents.extend(entrypoint_path_and_content);
 
@@ -105,7 +114,7 @@ pub fn get_artifact_path_and_content(
             was_ever_selected_loadably,
             ..
         },
-    ) in &encountered_client_field_map
+    ) in &encountered_client_type_map
     {
         match encountered_field_id {
             FieldType::ServerField(encountered_server_field_id) => {
@@ -121,13 +130,17 @@ pub fn get_artifact_path_and_content(
                                 encountered_server_field,
                                 inline_fragment,
                                 &traversal_state.refetch_paths,
-                                file_extensions,
+                                config.options.include_file_extensions_in_import_statements,
                             ));
                         }
                     },
                 };
             }
-            FieldType::ClientField(encountered_client_field_id) => {
+
+            FieldType::ClientField(ClientType::ClientPointer(_)) => {
+                todo!("generate client pointer reader artifacts is not implemented")
+            }
+            FieldType::ClientField(ClientType::ClientField(encountered_client_field_id)) => {
                 let encountered_client_field = schema.client_field(*encountered_client_field_id);
 
                 match &encountered_client_field.variant {
@@ -139,7 +152,7 @@ pub fn get_artifact_path_and_content(
                             config,
                             *info,
                             &traversal_state.refetch_paths,
-                            file_extensions,
+                            config.options.include_file_extensions_in_import_statements,
                         ));
 
                         if *was_ever_selected_loadably {
@@ -149,7 +162,7 @@ pub fn get_artifact_path_and_content(
                                 None,
                                 &traversal_state.refetch_paths,
                                 true,
-                                file_extensions,
+                                config.options.include_file_extensions_in_import_statements,
                             ));
 
                             // Everything about this is quite sus
@@ -223,10 +236,10 @@ pub fn get_artifact_path_and_content(
                                     encountered_client_field,
                                     &wrapped_map,
                                     &traversal_state,
-                                    &encountered_client_field_map,
+                                    &encountered_client_type_map,
                                     variable_definitions_iter,
                                     &schema.find_query(),
-                                    file_extensions,
+                                    config.options.include_file_extensions_in_import_statements,
                                 ),
                             );
                         }
@@ -238,7 +251,7 @@ pub fn get_artifact_path_and_content(
                             variant.primary_field_info.as_ref(),
                             &traversal_state.refetch_paths,
                             false,
-                            file_extensions,
+                            config.options.include_file_extensions_in_import_statements,
                         ));
                     }
                 };
@@ -246,22 +259,23 @@ pub fn get_artifact_path_and_content(
         }
     }
 
-    for user_written_client_field in schema.client_fields.iter().flat_map(|field| match field {
+    for user_written_client_type in schema.client_types.iter().flat_map(|field| match field {
+        ClientType::ClientPointer(pointer) => Some(ClientType::ClientPointer(pointer)),
         ClientType::ClientField(field) => match field.variant {
             ClientFieldVariant::Link => None,
-            ClientFieldVariant::UserWritten(_) => Some(field),
+            ClientFieldVariant::UserWritten(_) => Some(ClientType::ClientField(field)),
             ClientFieldVariant::ImperativelyLoadedField(_) => None,
         },
     }) {
-        // For each user-written client field, generate a param type artifact
+        // For each user-written client types, generate a param type artifact
         path_and_contents.push(generate_eager_reader_param_type_artifact(
             schema,
-            user_written_client_field,
-            file_extensions,
+            &user_written_client_type,
+            config.options.include_file_extensions_in_import_statements,
         ));
 
-        match encountered_client_field_map
-            .get(&FieldType::ClientField(user_written_client_field.id))
+        match encountered_client_type_map
+            .get(&FieldType::ClientField(user_written_client_type.id()))
         {
             Some(FieldTraversalResult {
                 traversal_state, ..
@@ -273,8 +287,7 @@ pub fn get_artifact_path_and_content(
             None => {
                 // If this field is not reachable from an entrypoint, we need to
                 // encounter all the client fields
-                for nested_client_field in
-                    user_written_client_field.accessible_client_fields(schema)
+                for nested_client_field in user_written_client_type.accessible_client_fields(schema)
                 {
                     encountered_output_types.insert(nested_client_field.id);
                 }
@@ -292,7 +305,7 @@ pub fn get_artifact_path_and_content(
                     client_field,
                     config,
                     info,
-                    file_extensions,
+                    config.options.include_file_extensions_in_import_statements,
                 ))
             }
             ClientFieldVariant::ImperativelyLoadedField(_) => {
@@ -306,8 +319,8 @@ pub fn get_artifact_path_and_content(
 
     path_and_contents.push(build_iso_overload_artifact(
         schema,
-        file_extensions,
-        no_babel_transform,
+        config.options.include_file_extensions_in_import_statements,
+        config.options.no_babel_transform,
     ));
 
     path_and_contents

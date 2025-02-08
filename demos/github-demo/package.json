@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "tsc": "tsc",
+    "tsc-force": "tsc --build --clean && tsc --build --force",
     "iso": "cross-env ../../target/debug/isograph_cli --config ./isograph.config.json",
     "iso-watch": "cross-env ../../target/debug/isograph_cli --config ./isograph.config.json --watch"
   },

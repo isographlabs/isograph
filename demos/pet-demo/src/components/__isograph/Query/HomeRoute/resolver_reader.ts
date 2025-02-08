@@ -33,7 +33,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  componentName: "Query.HomeRoute",
+  fieldName: "Query.HomeRoute",
   resolver,
   readerAst,
   hasUpdatable: false,

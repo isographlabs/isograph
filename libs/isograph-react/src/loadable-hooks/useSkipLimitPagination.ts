@@ -10,28 +10,23 @@ import {
 import { useState } from 'react';
 import { subscribeToAnyChange } from '../core/cache';
 import { FetchOptions } from '../core/check';
-import { FragmentReference } from '../core/FragmentReference';
+import {
+  FragmentReference,
+  type UnknownTReadFromStore,
+} from '../core/FragmentReference';
 import { getPromiseState, readPromise } from '../core/PromiseWrapper';
 import {
   readButDoNotEvaluate,
   type WithEncounteredRecords,
 } from '../core/read';
-import {
-  LoadableField,
-  type ReaderAst,
-  type StartUpdate,
-} from '../core/reader';
-import { startUpdate } from '../core/startUpdate';
+import { LoadableField, type ReaderAst } from '../core/reader';
+import { getOrCreateCachedStartUpdate } from '../core/startUpdate';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
 import { maybeUnwrapNetworkRequest } from '../react/useResult';
 
-type UseSkipLimitReturnValue<
-  TReadFromStore extends {
-    data: object;
-    parameters: object;
-    startUpdate?: StartUpdate<object>;
-  },
+export type UseSkipLimitReturnValue<
+  TReadFromStore extends UnknownTReadFromStore,
   TItem,
 > =
   | {
@@ -52,11 +47,7 @@ type UseSkipLimitReturnValue<
     };
 
 type ArrayFragmentReference<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TItem,
 > = FragmentReference<TReadFromStore, ReadonlyArray<TItem>>;
 
@@ -82,18 +73,14 @@ function flatten<T>(arr: ReadonlyArray<ReadonlyArray<T>>): ReadonlyArray<T> {
   return outArray;
 }
 
-type UseSkipLimitPaginationArgs = {
+export type UseSkipLimitPaginationArgs = {
   skip: number;
   limit: number;
 };
 
 export function useSkipLimitPagination<
   TItem,
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
 >(
   loadableField: LoadableField<
     TReadFromStore,
@@ -137,7 +124,11 @@ export function useSkipLimitPagination<
         data,
         parameters: fragmentReference.variables,
         startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
-          ? startUpdate(environment, data)
+          ? getOrCreateCachedStartUpdate(
+              environment,
+              fragmentReference,
+              readerWithRefetchQueries.readerArtifact.kind,
+            )
           : undefined,
       };
 

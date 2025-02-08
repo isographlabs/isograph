@@ -1,5 +1,8 @@
 import { getOrCreateCachedComponent } from '../core/componentCache';
-import { FragmentReference } from '../core/FragmentReference';
+import {
+  FragmentReference,
+  type UnknownTReadFromStore,
+} from '../core/FragmentReference';
 import {
   getPromiseState,
   PromiseWrapper,
@@ -9,17 +12,12 @@ import {
   getNetworkRequestOptionsWithDefaults,
   NetworkRequestReaderOptions,
 } from '../core/read';
-import type { StartUpdate } from '../core/reader';
-import { startUpdate } from '../core/startUpdate';
+import { getOrCreateCachedStartUpdate } from '../core/startUpdate';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useReadAndSubscribe } from './useReadAndSubscribe';
 
 export function useResult<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
 >(
   fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>,
@@ -43,7 +41,7 @@ export function useResult<
       // @ts-expect-error
       return getOrCreateCachedComponent(
         environment,
-        readerWithRefetchQueries.readerArtifact.componentName,
+        readerWithRefetchQueries.readerArtifact.fieldName,
         fragmentReference,
         networkRequestOptions,
       );
@@ -58,7 +56,11 @@ export function useResult<
         data: data,
         parameters: fragmentReference.variables,
         startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
-          ? startUpdate(environment, data)
+          ? getOrCreateCachedStartUpdate(
+              environment,
+              fragmentReference,
+              readerWithRefetchQueries.readerArtifact.fieldName,
+            )
           : undefined,
       };
       return readerWithRefetchQueries.readerArtifact.resolver(param);

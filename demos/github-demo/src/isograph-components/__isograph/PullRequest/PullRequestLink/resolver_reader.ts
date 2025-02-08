@@ -46,7 +46,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  componentName: "PullRequest.PullRequestLink",
+  fieldName: "PullRequest.PullRequestLink",
   resolver,
   readerAst,
   hasUpdatable: false,

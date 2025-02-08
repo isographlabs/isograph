@@ -26,6 +26,7 @@ const artifact: EagerReaderArtifact<
   Query__meName__output_type
 > = {
   kind: "EagerReaderArtifact",
+  fieldName: "Query.meName",
   resolver,
   readerAst,
   hasUpdatable: false,

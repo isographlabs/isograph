@@ -22,7 +22,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  componentName: "Pet.PetTaglineCard",
+  fieldName: "Pet.PetTaglineCard",
   resolver,
   readerAst,
   hasUpdatable: false,

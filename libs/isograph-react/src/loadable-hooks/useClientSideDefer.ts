@@ -4,16 +4,13 @@ import { FetchOptions } from '../core/check';
 import {
   ExtractParameters,
   FragmentReference,
+  type UnknownTReadFromStore,
 } from '../core/FragmentReference';
-import { LoadableField, type StartUpdate } from '../core/reader';
+import { LoadableField } from '../core/reader';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 
 export function useClientSideDefer<
-  TReadFromStore extends {
-    data: object;
-    parameters: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TResult,
 >(
   loadableField: LoadableField<
@@ -26,11 +23,7 @@ export function useClientSideDefer<
 ): { fragmentReference: FragmentReference<TReadFromStore, TResult> };
 
 export function useClientSideDefer<
-  TReadFromStore extends {
-    data: object;
-    parameters: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TResult,
   TProvidedArgs extends object,
 >(
@@ -44,11 +37,7 @@ export function useClientSideDefer<
 ): { fragmentReference: FragmentReference<TReadFromStore, TResult> };
 
 export function useClientSideDefer<
-  TReadFromStore extends {
-    data: object;
-    parameters: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TResult,
   TProvidedArgs extends object,
 >(

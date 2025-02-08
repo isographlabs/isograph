@@ -11,6 +11,7 @@ import {
   ExtractParameters,
   FragmentReference,
   type ExtractStartUpdate,
+  type UnknownTReadFromStore,
 } from './FragmentReference';
 import {
   ComponentOrFieldName,
@@ -20,11 +21,7 @@ import {
 import { Arguments } from './util';
 
 export type TopLevelReaderArtifact<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
   TComponentProps extends Record<PropertyKey, never>,
 > =
@@ -32,14 +29,11 @@ export type TopLevelReaderArtifact<
   | ComponentReaderArtifact<TReadFromStore, TComponentProps>;
 
 export type EagerReaderArtifact<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
 > = {
   readonly kind: 'EagerReaderArtifact';
+  readonly fieldName: string;
   readonly readerAst: ReaderAst<TReadFromStore>;
   readonly resolver: (
     data: ResolverFirstParameter<TReadFromStore>,
@@ -48,15 +42,11 @@ export type EagerReaderArtifact<
 };
 
 export type ComponentReaderArtifact<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TComponentProps extends Record<string, unknown> = Record<PropertyKey, never>,
 > = {
   readonly kind: 'ComponentReaderArtifact';
-  readonly componentName: ComponentOrFieldName;
+  readonly fieldName: ComponentOrFieldName;
   readonly readerAst: ReaderAst<TReadFromStore>;
   readonly resolver: (
     data: ResolverFirstParameter<TReadFromStore>,
@@ -66,11 +56,7 @@ export type ComponentReaderArtifact<
 };
 
 export type ResolverFirstParameter<
-  TReadFromStore extends {
-    data: object;
-    parameters: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
 > = {
   data: ExtractData<TReadFromStore>;
   parameters: ExtractParameters<TReadFromStore>;
@@ -104,7 +90,7 @@ export type ReaderAstNode =
   | ReaderNonLoadableResolverField
   | ReaderImperativelyLoadedField
   | ReaderLoadableField
-  | ReaderLinkeField;
+  | ReaderLinkField;
 
 // @ts-ignore
 export type ReaderAst<TReadFromStore> = ReadonlyArray<ReaderAstNode>;
@@ -116,7 +102,7 @@ export type ReaderScalarField = {
   readonly arguments: Arguments | null;
 };
 
-export type ReaderLinkeField = {
+export type ReaderLinkField = {
   readonly kind: 'Link';
   readonly alias: string;
 };
@@ -163,11 +149,11 @@ export type ReaderLoadableField = {
 
   // TODO we should not type these as any
   readonly entrypoint:
-    | IsographEntrypoint<any, any>
+    | IsographEntrypoint<any, any, any>
     | IsographEntrypointLoader<any, any>;
 };
 
-type StableId = string;
+export type StableId = string;
 /// Why is LoadableField the way it is? Let's work backwards.
 ///
 /// We ultimately need a stable id (for deduplication) and a way to produce a
@@ -178,11 +164,7 @@ type StableId = string;
 /// except to stringify the args or whatnot. Calling the factory can be
 /// expensive. For example, doing so will probably trigger a network request.
 export type LoadableField<
-  TReadFromStore extends {
-    data: object;
-    parameters: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TResult,
   TArgs = ExtractParameters<TReadFromStore>,
 > = (

@@ -10,12 +10,14 @@ import { getOrCreateCachedComponent } from './componentCache';
 import {
   IsographEntrypoint,
   RefetchQueryNormalizationArtifactWrapper,
+  type ReaderWithRefetchQueries,
 } from './entrypoint';
 import {
   ExtractData,
   ExtractParameters,
   FragmentReference,
   Variables,
+  type UnknownTReadFromStore,
 } from './FragmentReference';
 import {
   assertLink,
@@ -33,8 +35,8 @@ import {
   wrapPromise,
   wrapResolvedValue,
 } from './PromiseWrapper';
-import { ReaderAst, type StartUpdate } from './reader';
-import { startUpdate } from './startUpdate';
+import { ReaderAst } from './reader';
+import { getOrCreateCachedStartUpdate } from './startUpdate';
 import { Arguments } from './util';
 
 export type WithEncounteredRecords<T> = {
@@ -43,11 +45,7 @@ export type WithEncounteredRecords<T> = {
 };
 
 export function readButDoNotEvaluate<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
 >(
   environment: IsographEnvironment,
   fragmentReference: FragmentReference<TReadFromStore, unknown>,
@@ -266,11 +264,41 @@ function readData<TReadFromStore>(
               recordLink: data.recordLink,
             };
           }
+
+          const readerWithRefetchQueries = {
+            kind: 'ReaderWithRefetchQueries',
+            readerArtifact: field.condition,
+            // TODO this is wrong
+            // should map field.condition.usedRefetchQueries
+            // but it doesn't exist
+            nestedRefetchQueries: [],
+          } satisfies ReaderWithRefetchQueries<any, any>;
+
+          const fragment = {
+            kind: 'FragmentReference',
+            readerWithRefetchQueries: wrapResolvedValue(
+              readerWithRefetchQueries,
+            ),
+            root,
+            variables: generateChildVariableMap(
+              variables,
+              // TODO this is wrong
+              // should use field.condition.variables
+              // but it doesn't exist
+              [],
+            ),
+            networkRequest,
+          } satisfies FragmentReference<any, any>;
+
           const condition = field.condition.resolver({
             data: data.data,
             parameters: {},
             startUpdate: field.condition.hasUpdatable
-              ? startUpdate(environment, data)
+              ? getOrCreateCachedStartUpdate(
+                  environment,
+                  fragment,
+                  readerWithRefetchQueries.readerArtifact.fieldName,
+                )
               : undefined,
           });
           if (condition === true) {
@@ -411,6 +439,20 @@ function readData<TReadFromStore>(
           return resolverRefetchQuery;
         });
 
+        const readerWithRefetchQueries = {
+          kind: 'ReaderWithRefetchQueries',
+          readerArtifact: field.readerArtifact,
+          nestedRefetchQueries: resolverRefetchQueries,
+        } satisfies ReaderWithRefetchQueries<any, any>;
+
+        const fragment = {
+          kind: 'FragmentReference',
+          readerWithRefetchQueries: wrapResolvedValue(readerWithRefetchQueries),
+          root,
+          variables: generateChildVariableMap(variables, field.arguments),
+          networkRequest,
+        } satisfies FragmentReference<any, any>;
+
         switch (field.readerArtifact.kind) {
           case 'EagerReaderArtifact': {
             const data = readData(
@@ -435,7 +477,13 @@ function readData<TReadFromStore>(
               const firstParameter = {
                 data: data.data,
                 parameters: variables,
-                startUpdate: () => {},
+                startUpdate: field.readerArtifact.hasUpdatable
+                  ? getOrCreateCachedStartUpdate(
+                      environment,
+                      fragment,
+                      readerWithRefetchQueries.readerArtifact.fieldName,
+                    )
+                  : undefined,
               };
               target[field.alias] =
                 field.readerArtifact.resolver(firstParameter);
@@ -445,18 +493,8 @@ function readData<TReadFromStore>(
           case 'ComponentReaderArtifact': {
             target[field.alias] = getOrCreateCachedComponent(
               environment,
-              field.readerArtifact.componentName,
-              {
-                kind: 'FragmentReference',
-                readerWithRefetchQueries: wrapResolvedValue({
-                  kind: 'ReaderWithRefetchQueries',
-                  readerArtifact: field.readerArtifact,
-                  nestedRefetchQueries: resolverRefetchQueries,
-                }),
-                root,
-                variables: generateChildVariableMap(variables, field.arguments),
-                networkRequest,
-              } as const,
+              field.readerArtifact.fieldName,
+              fragment,
               networkRequestOptions,
             );
             break;
@@ -522,7 +560,7 @@ function readData<TReadFromStore>(
               // Fetcher
               () => {
                 const fragmentReferenceAndDisposeFromEntrypoint = (
-                  entrypoint: IsographEntrypoint<any, any>,
+                  entrypoint: IsographEntrypoint<any, any, any>,
                 ): [FragmentReference<any, any>, CleanupFn] => {
                   const [networkRequest, disposeNetworkRequest] =
                     maybeMakeNetworkRequest(

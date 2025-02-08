@@ -1,4 +1,5 @@
 import { ReaderWithRefetchQueries } from '../core/entrypoint';
+import { stableCopy } from './cache';
 import { type Link } from './IsographEnvironment';
 import { PromiseWrapper } from './PromiseWrapper';
 import type { StartUpdate } from './reader';
@@ -7,6 +8,12 @@ import type { StartUpdate } from './reader';
 export type VariableValue = string | number | boolean | null | object;
 
 export type Variables = { readonly [index: string]: VariableValue };
+
+export type UnknownTReadFromStore = {
+  parameters: object;
+  data: object;
+  startUpdate?: StartUpdate<object>;
+};
 
 export type ExtractData<T> = T extends {
   data: infer D extends object;
@@ -27,11 +34,7 @@ export type ExtractStartUpdate<
 > = T['startUpdate'];
 
 export type FragmentReference<
-  TReadFromStore extends {
-    parameters: object;
-    data: object;
-    startUpdate?: StartUpdate<object>;
-  },
+  TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
 > = {
   readonly kind: 'FragmentReference';
@@ -43,18 +46,11 @@ export type FragmentReference<
   readonly networkRequest: PromiseWrapper<void, any>;
 };
 
+export type StableIdForFragmentReference = string;
+
 export function stableIdForFragmentReference(
   fragmentReference: FragmentReference<any, any>,
-): string {
-  return `${fragmentReference.root.__typename}/${fragmentReference.root.__link}/TODO_FRAGMENT_NAME/${serializeVariables(fragmentReference.variables ?? {})}`;
-}
-
-function serializeVariables(variables: Variables) {
-  let s = '';
-  const keys = Object.keys(variables);
-  keys.sort();
-  for (const key of keys) {
-    s += `${key}:${variables[key]},`;
-  }
-  return s;
+  fieldName: string,
+): StableIdForFragmentReference {
+  return `${fragmentReference.root.__typename}/${fragmentReference.root.__link}/${fieldName}/${JSON.stringify(stableCopy(fragmentReference.variables))}`;
 }

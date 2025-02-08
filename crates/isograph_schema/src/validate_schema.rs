@@ -7,16 +7,17 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
 use isograph_lang_types::{
-    ClientFieldId, LinkedFieldSelection, LoadableDirectiveParameters, ScalarFieldSelection,
-    SelectableServerFieldId, SelectionFieldArgument, SelectionType, ServerFieldId,
-    ServerFieldSelection, ServerObjectId, ServerScalarId, TypeAnnotation, VariableDefinition,
+    ClientFieldId, ClientPointerId, LinkedFieldSelection, LoadableDirectiveParameters,
+    ScalarFieldSelection, SelectableServerFieldId, SelectionFieldArgument, SelectionType,
+    ServerFieldId, ServerFieldSelection, ServerObjectId, ServerScalarId, TypeAnnotation,
+    VariableDefinition,
 };
 use thiserror::Error;
 
 use crate::{
-    validate_client_field::validate_and_transform_client_fields,
+    validate_client_field::validate_and_transform_client_types,
     validate_server_field::validate_and_transform_server_fields, ClientField, ClientFieldVariant,
-    FieldType, ImperativelyLoadedFieldVariant, Schema, SchemaIdField, SchemaObject,
+    ClientPointer, FieldType, ImperativelyLoadedFieldVariant, Schema, SchemaIdField, SchemaObject,
     SchemaServerField, SchemaValidationState, ServerFieldData, ServerFieldTypeAssociatedData,
     UnvalidatedSchema, UseRefetchFieldRefetchStrategy, ValidateEntrypointDeclarationError,
 };
@@ -27,28 +28,34 @@ pub type ValidatedSchemaServerField = SchemaServerField<
 >;
 
 pub type ValidatedSelection = ServerFieldSelection<
-    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
-    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
 >;
 
 pub type ValidatedLinkedFieldSelection = LinkedFieldSelection<
-    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
-    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
 >;
 pub type ValidatedScalarFieldSelection = ScalarFieldSelection<
-    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
 >;
 
 pub type ValidatedVariableDefinition = VariableDefinition<SelectableServerFieldId>;
 pub type ValidatedClientField = ClientField<
-    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
-    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+>;
+
+pub type ValidatedClientPointer = ClientPointer<
+    <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
 >;
 
 pub type ValidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
-    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionScalarFieldAssociatedData,
-    <ValidatedSchemaState as SchemaValidationState>::ClientFieldSelectionLinkedFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
 >;
 
 /// The validated defined field that shows up in the TScalarField generic.
@@ -59,7 +66,7 @@ pub type ValidatedSchemaIdField = SchemaIdField<ServerScalarId>;
 #[derive(Debug, Clone)]
 pub struct ValidatedLinkedFieldAssociatedData {
     pub parent_object_id: ServerObjectId,
-    pub field_id: FieldType<ServerFieldId, ()>,
+    pub field_id: FieldType<ServerFieldId, ClientPointerId>,
     // N.B. we don't actually support loadable linked fields
     pub selection_variant: ValidatedIsographSelectionVariant,
     /// Some if the object is concrete; None otherwise.
@@ -95,8 +102,8 @@ pub type ValidatedServerFieldTypeAssociatedData = SelectionType<
 pub struct ValidatedSchemaState {}
 impl SchemaValidationState for ValidatedSchemaState {
     type ServerFieldTypeAssociatedData = ValidatedServerFieldTypeAssociatedData;
-    type ClientFieldSelectionScalarFieldAssociatedData = ValidatedScalarFieldAssociatedData;
-    type ClientFieldSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
+    type ClientTypeSelectionScalarFieldAssociatedData = ValidatedScalarFieldAssociatedData;
+    type ClientTypeSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
     type VariableDefinitionInnerType = SelectableServerFieldId;
     type Entrypoint = HashSet<ClientFieldId>;
 }
@@ -130,7 +137,7 @@ impl ValidatedSchema {
 
         let Schema {
             server_fields: fields,
-            client_fields,
+            client_types,
             entrypoints: _,
             server_field_data: schema_data,
             fetchable_types: root_types,
@@ -149,12 +156,12 @@ impl ValidatedSchema {
             }
         };
 
-        let updated_client_fields = match validate_and_transform_client_fields(
-            client_fields,
+        let updated_client_types = match validate_and_transform_client_types(
+            client_types,
             &schema_data,
             &updated_server_fields,
         ) {
-            Ok(client_fields) => client_fields,
+            Ok(client_types) => client_types,
             Err(new_errors) => {
                 errors.extend(new_errors);
                 vec![]
@@ -181,7 +188,7 @@ impl ValidatedSchema {
 
             Ok(Self {
                 server_fields: updated_server_fields,
-                client_fields: updated_client_fields,
+                client_types: updated_client_types,
                 entrypoints: updated_entrypoints,
                 server_field_data: ServerFieldData {
                     server_objects,
@@ -422,55 +429,72 @@ pub enum ValidateSchemaError {
     },
 
     #[error(
-        "In the client field `{client_field_parent_type_name}.{client_field_name}`, \
+        "In the client {client_type} `{client_field_parent_type_name}.{client_field_name}`, \
         the field `{field_parent_type_name}.{field_name}` is selected, but that \
         field does not exist on `{field_parent_type_name}`"
     )]
-    ClientFieldSelectionFieldDoesNotExist {
+    ClientTypeSelectionFieldDoesNotExist {
         client_field_parent_type_name: IsographObjectTypeName,
         client_field_name: SelectableFieldName,
         field_parent_type_name: IsographObjectTypeName,
         field_name: SelectableFieldName,
+        client_type: String,
     },
 
     #[error(
-        "In the client field `{client_field_parent_type_name}.{client_field_name}`, \
+        "In the client {client_type} `{client_field_parent_type_name}.{client_field_name}`, \
         the field `{field_parent_type_name}.{field_name}` is selected as a scalar, \
         but that field's type is `{target_type_name}`, which is {field_type}."
     )]
-    ClientFieldSelectionFieldIsNotScalar {
+    ClientTypeSelectionFieldIsNotScalar {
         client_field_parent_type_name: IsographObjectTypeName,
         client_field_name: SelectableFieldName,
         field_parent_type_name: IsographObjectTypeName,
         field_name: SelectableFieldName,
         field_type: &'static str,
         target_type_name: UnvalidatedTypeName,
+        client_type: String,
     },
 
     #[error(
-        "In the client field `{client_field_parent_type_name}.{client_field_name}`, \
+        "In the client {client_type} `{client_field_parent_type_name}.{client_field_name}`, \
         the field `{field_parent_type_name}.{field_name}` is selected as a linked field, \
         but that field's type is `{target_type_name}`, which is {field_type}."
     )]
-    ClientFieldSelectionFieldIsScalar {
+    ClientTypeSelectionFieldIsScalar {
         client_field_parent_type_name: IsographObjectTypeName,
         client_field_name: SelectableFieldName,
         field_parent_type_name: IsographObjectTypeName,
         field_name: SelectableFieldName,
         field_type: &'static str,
         target_type_name: UnvalidatedTypeName,
+        client_type: String,
     },
 
     #[error(
-        "In the client field `{client_field_parent_type_name}.{client_field_name}`, the \
+        "In the client {client_type} `{client_field_parent_type_name}.{client_field_name}`, the \
         field `{field_parent_type_name}.{field_name}` is selected as a linked field, \
         but that field is a client field, which can only be selected as a scalar."
     )]
-    ClientFieldSelectionClientFieldSelectedAsLinked {
+    ClientTypeSelectionClientFieldSelectedAsLinked {
         client_field_parent_type_name: IsographObjectTypeName,
         client_field_name: SelectableFieldName,
         field_parent_type_name: IsographObjectTypeName,
         field_name: SelectableFieldName,
+        client_type: String,
+    },
+
+    #[error(
+        "In the client {client_type} `{client_field_parent_type_name}.{client_field_name}`, the \
+        pointer `{field_parent_type_name}.{field_name}` is selected as a scalar. \
+        However, client pointers can only be selected as linked fields."
+    )]
+    ClientTypeSelectionClientPointerSelectedAsScalar {
+        client_field_parent_type_name: IsographObjectTypeName,
+        client_field_name: SelectableFieldName,
+        field_parent_type_name: IsographObjectTypeName,
+        field_name: SelectableFieldName,
+        client_type: String,
     },
 
     #[error("`{server_field_name}` is a server field, and cannot be selected with `@loadable`")]

@@ -8,7 +8,7 @@ use isograph_schema::{
     ValidatedSchema,
 };
 
-use crate::generate_artifacts::ISO_TS;
+use crate::generate_artifacts::ISO_TS_FILE_NAME;
 
 fn build_iso_overload_for_entrypoint(
     validated_client_field: &ValidatedClientField,
@@ -173,7 +173,7 @@ type MatchesWhitespaceAndString<
 export function iso(_isographLiteralText: string):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
-  | IsographEntrypoint<any, any>
+  | IsographEntrypoint<any, any, any>
 {\n",
     );
 
@@ -183,8 +183,7 @@ export function iso(_isographLiteralText: string):
       'was not set up, or it failed to identify this call site. Make sure it ' +
       'is being used verbatim as `iso`. If you cannot use the babel transform, ' + 
       'set options.no_babel_transform to true in your Isograph config. ');"
-        }
-        true => {
+        }        true => {
             "  return (clientFieldResolver: any) => clientFieldResolver;"
         }
     });
@@ -194,7 +193,7 @@ export function iso(_isographLiteralText: string):
     imports.push_str(&content);
     ArtifactPathAndContent {
         file_content: imports,
-        file_name_prefix: *ISO_TS,
+        file_name: *ISO_TS_FILE_NAME,
         type_and_field: None,
     }
 }
@@ -271,9 +270,10 @@ fn user_written_fields(
     schema: &ValidatedSchema,
 ) -> impl Iterator<Item = (&ValidatedClientField, UserWrittenComponentVariant)> + '_ {
     schema
-        .client_fields
+        .client_types
         .iter()
         .filter_map(|client_field| match client_field {
+            ClientType::ClientPointer(_) => None,
             ClientType::ClientField(client_field) => match client_field.variant {
                 ClientFieldVariant::Link => None,
                 ClientFieldVariant::UserWritten(info) => {

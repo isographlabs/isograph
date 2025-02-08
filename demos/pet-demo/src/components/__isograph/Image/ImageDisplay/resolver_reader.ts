@@ -16,7 +16,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  componentName: "Image.ImageDisplay",
+  fieldName: "Image.ImageDisplay",
   resolver,
   readerAst,
   hasUpdatable: false,
