@@ -373,7 +373,7 @@ pub fn get_provided_arguments<'a>(
 
 pub(crate) type ValidateSchemaResult<T> = Result<T, WithLocation<ValidateSchemaError>>;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub enum ValidateSchemaError {
     #[error(
         "The field `{parent_type_name}.{field_name}` has inner type `{field_type}`, which does not exist."

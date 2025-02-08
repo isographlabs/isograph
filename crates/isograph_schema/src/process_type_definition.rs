@@ -842,7 +842,7 @@ pub(crate) type ProcessTypeDefinitionResult<T> =
     Result<T, WithLocation<ProcessTypeDefinitionError>>;
 
 /// Errors that make semantic sense when referring to creating a GraphQL schema in-memory representation
-#[derive(Error, Debug)]
+#[derive(Error, Eq, PartialEq, Debug)]
 pub enum ProcessTypeDefinitionError {
     // TODO include info about where the type was previously defined
     // TODO the type_definition_name refers to the second object being defined, which isn't

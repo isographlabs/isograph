@@ -59,7 +59,7 @@ pub fn print_result(
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Eq, PartialEq, Debug)]
 pub enum BatchCompileError {
     #[error("Unable to load schema file at path {path:?}.\nReason: {message}")]
     UnableToLoadSchema { path: PathBuf, message: String },

@@ -6,7 +6,7 @@ use super::peekable_lexer::LowLevelParseError;
 pub(crate) type ParseResult<T> = Result<T, WithSpan<SchemaParseError>>;
 
 /// Errors tha make semantic sense when referring to parsing a GraphQL schema file
-#[derive(Error, Debug)]
+#[derive(Error, Eq, PartialEq, Debug)]
 pub enum SchemaParseError {
     #[error("{error}")]
     ParseError { error: LowLevelParseError },
