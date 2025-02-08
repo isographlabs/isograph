@@ -13,29 +13,9 @@ export function getOrCreateCachedStartUpdate<
   fragmentReference: FragmentReference<TReadFromStore, any>,
   eagerResolverName: string,
 ): ExtractStartUpdate<TReadFromStore> {
-  const cachedStartUpdateByResolver = environment.fieldCache;
-
-  const cacheEntry = (cachedStartUpdateByResolver[
+  return (environment.eagerReaderCache[
     stableIdForFragmentReference(fragmentReference, eagerResolverName)
-  ] ??= {
-    kind: 'EagerReader',
-    startUpdate: undefined,
-  });
-
-  switch (cacheEntry.kind) {
-    case 'EagerReader': {
-      return (cacheEntry.startUpdate ??= createStartUpdate(
-        environment,
-        fragmentReference,
-      ));
-    }
-    case 'Component': {
-      throw new Error(
-        'Called getOrCreateCachedStartUpdate on a component. ' +
-          'This is indicative of a bug in Isograph.',
-      );
-    }
-  }
+  ] ??= createStartUpdate(environment, fragmentReference));
 }
 
 export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(

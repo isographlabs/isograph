@@ -14,18 +14,9 @@ import type { ReaderAst, StartUpdate } from './reader';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
-export type FieldCacheEntry =
-  | {
-      kind: 'Component';
-      component: React.FC<any>;
-    }
-  | {
-      kind: 'EagerReader';
-      startUpdate: StartUpdate<any> | undefined;
-    };
 
-export type FieldCache = {
-  [key: StableIdForFragmentReference]: FieldCacheEntry;
+export type FieldCache<T> = {
+  [key: StableIdForFragmentReference]: T;
 };
 
 export type FragmentSubscription<TReadFromStore extends UnknownTReadFromStore> =
@@ -63,7 +54,8 @@ export type IsographEnvironment = {
   readonly store: IsographStore;
   readonly networkFunction: IsographNetworkFunction;
   readonly missingFieldHandler: MissingFieldHandler | null;
-  readonly fieldCache: FieldCache;
+  readonly componentCache: FieldCache<React.FC<any>>;
+  readonly eagerReaderCache: FieldCache<StartUpdate<any> | undefined>;
   readonly subscriptions: Subscriptions;
   // N.B. this must be <any, any>, but all *usages* of this should go through
   // a function that adds type parameters.
@@ -146,7 +138,8 @@ export function createIsographEnvironment(
     store,
     networkFunction,
     missingFieldHandler: missingFieldHandler ?? null,
-    fieldCache: {},
+    componentCache: {},
+    eagerReaderCache: {},
     subscriptions: new Set(),
     fragmentCache: {},
     entrypointArtifactCache: new Map(),

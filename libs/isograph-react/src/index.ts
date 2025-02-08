@@ -48,7 +48,6 @@ export {
   type AnyRecordSubscription,
   type ComponentOrFieldName,
   type StringifiedArgs,
-  type FieldCacheEntry,
 } from './core/IsographEnvironment';
 export {
   type EagerReaderArtifact,

@@ -18,52 +18,38 @@ export function getOrCreateCachedComponent(
   // We create startUpdate outside of component to make it stable
   const startUpdate = createStartUpdate(environment, fragmentReference);
 
-  const cacheEntry = (environment.fieldCache[
+  return (environment.componentCache[
     stableIdForFragmentReference(fragmentReference, componentName)
-  ] ??= {
-    kind: 'Component',
-    component: (() => {
-      function Component(additionalRuntimeProps: { [key: string]: any }) {
-        const readerWithRefetchQueries = readPromise(
-          fragmentReference.readerWithRefetchQueries,
-        );
+  ] ??= (() => {
+    function Component(additionalRuntimeProps: { [key: string]: any }) {
+      const readerWithRefetchQueries = readPromise(
+        fragmentReference.readerWithRefetchQueries,
+      );
 
-        const data = useReadAndSubscribe(
-          fragmentReference,
-          networkRequestOptions,
-          readerWithRefetchQueries.readerArtifact.readerAst,
-        );
+      const data = useReadAndSubscribe(
+        fragmentReference,
+        networkRequestOptions,
+        readerWithRefetchQueries.readerArtifact.readerAst,
+      );
 
-        logMessage(environment, {
-          kind: 'ComponentRerendered',
-          componentName,
-          rootLink: fragmentReference.root,
-        });
+      logMessage(environment, {
+        kind: 'ComponentRerendered',
+        componentName,
+        rootLink: fragmentReference.root,
+      });
 
-        return readerWithRefetchQueries.readerArtifact.resolver(
-          {
-            data,
-            parameters: fragmentReference.variables,
-            startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
-              ? startUpdate
-              : undefined,
-          },
-          additionalRuntimeProps,
-        );
-      }
-      Component.displayName = `${componentName} (id: ${fragmentReference.root}) @component`;
-      return Component;
-    })(),
-  });
-
-  switch (cacheEntry.kind) {
-    case 'Component': {
-      return cacheEntry.component;
-    }
-    case 'EagerReader': {
-      throw new Error(
-        'Expected component. ' + 'This is indicative of a bug in Isograph.',
+      return readerWithRefetchQueries.readerArtifact.resolver(
+        {
+          data,
+          parameters: fragmentReference.variables,
+          startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
+            ? startUpdate
+            : undefined,
+        },
+        additionalRuntimeProps,
       );
     }
-  }
+    Component.displayName = `${componentName} (id: ${fragmentReference.root}) @component`;
+    return Component;
+  })());
 }
