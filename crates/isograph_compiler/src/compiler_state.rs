@@ -27,7 +27,7 @@ pub struct CompilerState {
 pub struct SchemaSourceFile {
     pub text: String,
     #[key]
-    path: PathBuf,
+    pub path: PathBuf,
 }
 
 impl CompilerState {
@@ -118,8 +118,11 @@ impl CompilerState {
             self.text_source_source_id,
         )?;
         let stats = source_files.contains_iso.stats();
-        let total_artifacts_written =
-            validate_and_create_artifacts_from_source_files(source_files, &self.config)?;
+        let total_artifacts_written = validate_and_create_artifacts_from_source_files(
+            source_files,
+            &self.config,
+            &self.database,
+        )?;
         Ok(CompilationStats {
             client_field_count: stats.client_field_count,
             entrypoint_count: stats.entrypoint_count,
@@ -127,17 +130,20 @@ impl CompilerState {
         })
     }
 
-    pub fn compile(&mut self, database: &Database) -> Result<CompilationStats, BatchCompileError> {
+    pub fn compile(&mut self) -> Result<CompilationStats, BatchCompileError> {
         let source_files = SourceFiles::read_and_parse_all_files(
             &self.config,
-            database,
+            &self.database,
             self.schema_source_id,
             self.text_source_source_id,
         )?;
         let stats = source_files.contains_iso.stats();
         self.source_files = Some(source_files.clone());
-        let total_artifacts_written =
-            validate_and_create_artifacts_from_source_files(source_files, &self.config)?;
+        let total_artifacts_written = validate_and_create_artifacts_from_source_files(
+            source_files,
+            &self.config,
+            &self.database,
+        )?;
         Ok(CompilationStats {
             client_field_count: stats.client_field_count,
             entrypoint_count: stats.entrypoint_count,
@@ -148,12 +154,14 @@ impl CompilerState {
     pub fn update(
         &mut self,
         changes: &[SourceFileEvent],
-        database: &mut Database,
     ) -> Result<CompilationStats, BatchCompileError> {
-        let source_files = self.update_and_clone_source_files(changes, database)?;
+        let source_files = self.update_and_clone_source_files(changes)?;
         let stats = source_files.contains_iso.stats();
-        let total_artifacts_written =
-            validate_and_create_artifacts_from_source_files(source_files, &self.config)?;
+        let total_artifacts_written = validate_and_create_artifacts_from_source_files(
+            source_files,
+            &self.config,
+            &self.database,
+        )?;
         Ok(CompilationStats {
             client_field_count: stats.client_field_count,
             entrypoint_count: stats.entrypoint_count,
@@ -164,17 +172,16 @@ impl CompilerState {
     fn update_and_clone_source_files(
         &mut self,
         changes: &[SourceFileEvent],
-        database: &mut Database,
     ) -> Result<SourceFiles, BatchCompileError> {
         match &mut self.source_files {
             Some(source_files) => {
-                source_files.update(&self.config, changes, database)?;
+                source_files.update(&self.config, changes, &mut self.database)?;
                 Ok(source_files.clone())
             }
             None => {
                 let source_files = SourceFiles::read_and_parse_all_files(
                     &self.config,
-                    database,
+                    &self.database,
                     self.schema_source_id,
                     self.text_source_source_id,
                 )?;
@@ -188,10 +195,11 @@ impl CompilerState {
 pub fn validate_and_create_artifacts_from_source_files(
     source_files: SourceFiles,
     config: &CompilerConfig,
+    database: &Database,
 ) -> Result<usize, BatchCompileError> {
     // Create schema
     let mut unvalidated_schema = UnvalidatedSchema::new();
-    source_files.create_unvalidated_schema(&mut unvalidated_schema, config)?;
+    source_files.create_unvalidated_schema(&mut unvalidated_schema, config, database)?;
 
     // Validate
     let validated_schema = Schema::validate_and_construct(unvalidated_schema)?;

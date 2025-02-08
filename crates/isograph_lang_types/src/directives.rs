@@ -25,7 +25,7 @@ struct GraphQLDirectiveDeserializer<'a> {
     directive: &'a IsographFieldDirective,
 }
 
-#[derive(Debug, Error, Eq, PartialEq)]
+#[derive(Debug, Error, Eq, PartialEq, Clone)]
 pub enum DeserializationError {
     #[error("Error when deserializing.\n\n{0}")]
     Custom(String),

@@ -28,9 +28,11 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub struct SourceFiles {
-    pub schema: GraphQLTypeSystemDocument,
+    // pub schema: GraphQLTypeSystemDocument,
     pub schema_extensions: HashMap<RelativePathToSourceFile, GraphQLTypeSystemExtensionDocument>,
     pub contains_iso: ContainsIso,
+    pub schema_source: SourceId<SchemaSourceFile>,
+    pub text_source_source: SourceId<TextSource>,
 }
 
 impl SourceFiles {
@@ -40,8 +42,8 @@ impl SourceFiles {
         schema_source: SourceId<SchemaSourceFile>,
         text_source_source: SourceId<TextSource>,
     ) -> Result<Self, BatchCompileError> {
-        let schema =
-            memoizable_read_and_parse_graphql_schema(database, schema_source, text_source_source)?;
+        // let schema =
+        //     memoizable_read_and_parse_graphql_schema(database, schema_source, text_source_source)?;
         let mut schema_extensions = HashMap::new();
         for schema_extension_path in config.schema_extensions.iter() {
             let (file_path, extensions_document) =
@@ -58,9 +60,11 @@ impl SourceFiles {
         )?;
 
         Ok(Self {
-            schema,
+            // schema,
             schema_extensions,
             contains_iso,
+            schema_source,
+            text_source_source,
         })
     }
 
@@ -68,8 +72,15 @@ impl SourceFiles {
         self,
         schema: &mut UnvalidatedSchema,
         config: &CompilerConfig,
+        database: &Database,
     ) -> Result<(), BatchCompileError> {
-        let outcome = schema.process_graphql_type_system_document(self.schema, &config.options)?;
+        let type_system_document = memoizable_read_and_parse_graphql_schema(
+            database,
+            self.schema_source,
+            self.text_source_source,
+        )?;
+        let outcome =
+            schema.process_graphql_type_system_document(type_system_document, &config.options)?;
         for extension_document in self.schema_extensions.into_values() {
             let _extension_outcome = schema
                 .process_graphql_type_extension_document(extension_document, &config.options)?;
@@ -121,11 +132,16 @@ impl SourceFiles {
         &mut self,
         config: &CompilerConfig,
         event_kind: &SourceEventKind,
-        database: &Database,
+        database: &mut Database,
     ) -> Result<(), BatchCompileError> {
+        eprintln!("Handling schema update {event_kind:?}");
         match event_kind {
             SourceEventKind::CreateOrModify(_) => {
-                self.schema = read_and_parse_graphql_schema(config)?;
+                let schema = SchemaSourceFile {
+                    text: read_schema_file(&config.schema.absolute_path)?,
+                    path: config.schema.absolute_path.clone(),
+                };
+                self.schema_source = database.set(schema);
             }
             SourceEventKind::Rename((_, target_path)) => {
                 if config.schema.absolute_path != *target_path {
@@ -307,7 +323,7 @@ fn read_and_parse_graphql_schema(
         .map_err(|with_span| with_span.to_with_location(schema_text_source))?;
     Ok(schema)
 }
-
+#[memo]
 fn memoizable_read_and_parse_graphql_schema(
     database: &Database,
     schema_source: SourceId<SchemaSourceFile>,
@@ -317,6 +333,7 @@ fn memoizable_read_and_parse_graphql_schema(
     let text_source = database.get(text_source);
     let result = parse_schema(&schema.text, text_source)
         .map_err(|with_span| with_span.to_with_location(text_source))?;
+    eprintln!("Parsed schema: {result:?}");
     Ok(result)
 }
 

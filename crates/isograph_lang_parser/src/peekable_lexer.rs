@@ -170,7 +170,7 @@ type LowLevelParseResult<T> = Result<T, WithSpan<LowLevelParseError>>;
 
 /// Low-level errors. If peekable_lexer could be made generic (it can't because it needs to know
 /// about EOF), these would belong in a different crate than the parser itself.
-#[derive(Error, Eq, PartialEq, Debug)]
+#[derive(Error, Eq, PartialEq, Debug, Clone)]
 pub enum LowLevelParseError {
     #[error("Expected {expected_kind}, found {found_kind}.")]
     ParseTokenKindError {
