@@ -10,14 +10,13 @@ import { RetainedQuery } from './garbageCollection';
 import { LogFunction, WrappedLogFunction } from './logging';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { WithEncounteredRecords } from './read';
-import type { ReaderAst } from './reader';
+import type { ReaderAst, StartUpdate } from './reader';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
-export type ComponentCache = {
-  [key: StableIdForFragmentReference]: {
-    [key: ComponentOrFieldName]: React.FC<any>;
-  };
+
+export type FieldCache<T> = {
+  [key: StableIdForFragmentReference]: T;
 };
 
 export type FragmentSubscription<TReadFromStore extends UnknownTReadFromStore> =
@@ -55,7 +54,8 @@ export type IsographEnvironment = {
   readonly store: IsographStore;
   readonly networkFunction: IsographNetworkFunction;
   readonly missingFieldHandler: MissingFieldHandler | null;
-  readonly componentCache: ComponentCache;
+  readonly componentCache: FieldCache<React.FC<any>>;
+  readonly eagerReaderCache: FieldCache<StartUpdate<any> | undefined>;
   readonly subscriptions: Subscriptions;
   // N.B. this must be <any, any>, but all *usages* of this should go through
   // a function that adds type parameters.
@@ -139,6 +139,7 @@ export function createIsographEnvironment(
     networkFunction,
     missingFieldHandler: missingFieldHandler ?? null,
     componentCache: {},
+    eagerReaderCache: {},
     subscriptions: new Set(),
     fragmentCache: {},
     entrypointArtifactCache: new Map(),

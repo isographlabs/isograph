@@ -33,6 +33,7 @@ export type EagerReaderArtifact<
   TClientFieldValue,
 > = {
   readonly kind: 'EagerReaderArtifact';
+  readonly fieldName: string;
   readonly readerAst: ReaderAst<TReadFromStore>;
   readonly resolver: (
     data: ResolverFirstParameter<TReadFromStore>,
@@ -45,7 +46,7 @@ export type ComponentReaderArtifact<
   TComponentProps extends Record<string, unknown> = Record<PropertyKey, never>,
 > = {
   readonly kind: 'ComponentReaderArtifact';
-  readonly componentName: ComponentOrFieldName;
+  readonly fieldName: ComponentOrFieldName;
   readonly readerAst: ReaderAst<TReadFromStore>;
   readonly resolver: (
     data: ResolverFirstParameter<TReadFromStore>,

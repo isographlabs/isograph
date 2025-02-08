@@ -39,7 +39,7 @@ export {
   type CacheMap,
   createIsographEnvironment,
   createIsographStore,
-  type ComponentCache,
+  type FieldCache,
   type Subscriptions,
   type Subscription,
   type TypeName,

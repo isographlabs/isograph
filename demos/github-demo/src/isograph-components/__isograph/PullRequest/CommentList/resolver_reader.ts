@@ -77,7 +77,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  componentName: "PullRequest.CommentList",
+  fieldName: "PullRequest.CommentList",
   resolver,
   readerAst,
   hasUpdatable: false,

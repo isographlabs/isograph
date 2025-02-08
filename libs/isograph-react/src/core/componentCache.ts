@@ -7,7 +7,7 @@ import { IsographEnvironment } from './IsographEnvironment';
 import { logMessage } from './logging';
 import { readPromise } from './PromiseWrapper';
 import { NetworkRequestReaderOptions } from './read';
-import { startUpdate } from './startUpdate';
+import { createStartUpdate } from './startUpdate';
 
 export function getOrCreateCachedComponent(
   environment: IsographEnvironment,
@@ -15,14 +15,12 @@ export function getOrCreateCachedComponent(
   fragmentReference: FragmentReference<any, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
 ): React.FC<any> {
-  const cachedComponentsByStableFragmentReferenceId =
-    environment.componentCache;
+  // We create startUpdate outside of component to make it stable
+  const startUpdate = createStartUpdate(environment, fragmentReference);
 
-  const componentsByName = (cachedComponentsByStableFragmentReferenceId[
-    stableIdForFragmentReference(fragmentReference)
-  ] ??= {});
-
-  return (componentsByName[componentName] ??= (() => {
+  return (environment.componentCache[
+    stableIdForFragmentReference(fragmentReference, componentName)
+  ] ??= (() => {
     function Component(additionalRuntimeProps: { [key: string]: any }) {
       const readerWithRefetchQueries = readPromise(
         fragmentReference.readerWithRefetchQueries,
@@ -45,7 +43,7 @@ export function getOrCreateCachedComponent(
           data,
           parameters: fragmentReference.variables,
           startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
-            ? startUpdate(environment, data)
+            ? startUpdate
             : undefined,
         },
         additionalRuntimeProps,

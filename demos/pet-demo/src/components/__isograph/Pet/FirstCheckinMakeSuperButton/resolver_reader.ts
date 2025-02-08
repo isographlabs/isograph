@@ -43,7 +43,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  componentName: "Pet.FirstCheckinMakeSuperButton",
+  fieldName: "Pet.FirstCheckinMakeSuperButton",
   resolver,
   readerAst,
   hasUpdatable: false,

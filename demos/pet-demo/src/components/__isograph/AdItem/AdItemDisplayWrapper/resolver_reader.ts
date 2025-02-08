@@ -29,7 +29,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  componentName: "AdItem.AdItemDisplayWrapper",
+  fieldName: "AdItem.AdItemDisplayWrapper",
   resolver,
   readerAst,
   hasUpdatable: false,

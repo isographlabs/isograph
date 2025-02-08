@@ -50,6 +50,7 @@ export type StableIdForFragmentReference = string;
 
 export function stableIdForFragmentReference(
   fragmentReference: FragmentReference<any, any>,
+  fieldName: string,
 ): StableIdForFragmentReference {
-  return `${fragmentReference.root.__typename}/${fragmentReference.root.__link}/TODO_FRAGMENT_NAME/${JSON.stringify(stableCopy(fragmentReference.variables))}`;
+  return `${fragmentReference.root.__typename}/${fragmentReference.root.__link}/${fieldName}/${JSON.stringify(stableCopy(fragmentReference.variables))}`;
 }
