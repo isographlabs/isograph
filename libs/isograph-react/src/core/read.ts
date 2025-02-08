@@ -270,7 +270,7 @@ function readData<TReadFromStore>(
             readerArtifact: field.condition,
             // TODO this is wrong
             // should map field.condition.usedRefetchQueries
-            //  but it doesnt' exist,
+            // but it doesn't exist
             nestedRefetchQueries: [],
           } satisfies ReaderWithRefetchQueries<any, any>;
 
@@ -284,7 +284,7 @@ function readData<TReadFromStore>(
               variables,
               // TODO this is wrong
               // should use field.condition.variables
-              //  but it doesnt' exist,
+              // but it doesn't exist
               [],
             ),
             networkRequest,
