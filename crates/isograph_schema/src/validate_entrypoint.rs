@@ -112,7 +112,7 @@ impl UnvalidatedSchema {
     }
 }
 
-#[derive(Error, Eq, PartialEq, Debug)]
+#[derive(Error, Eq, PartialEq, Debug, Clone)]
 pub enum ValidateEntrypointDeclarationError {
     #[error("`{parent_type_name}` is not a type that has been defined.")]
     ParentTypeNotDefined {
