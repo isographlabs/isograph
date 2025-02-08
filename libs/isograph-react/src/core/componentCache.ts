@@ -1,6 +1,8 @@
 import { useReadAndSubscribe } from '../react/useReadAndSubscribe';
-import { stableCopy } from './cache';
-import { FragmentReference } from './FragmentReference';
+import {
+  FragmentReference,
+  stableIdForFragmentReference,
+} from './FragmentReference';
 import { IsographEnvironment } from './IsographEnvironment';
 import { logMessage } from './logging';
 import { readPromise } from './PromiseWrapper';
@@ -13,21 +15,14 @@ export function getOrCreateCachedComponent(
   fragmentReference: FragmentReference<any, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
 ): React.FC<any> {
-  // cachedComponentsById is a three layer cache: id, then component name, then
-  // stringified args. These three, together, uniquely identify a read at a given
-  // time.
-  const cachedComponentsById = environment.componentCache;
+  const cachedComponentsByStableFragmentReferenceId =
+    environment.componentCache;
 
-  const recordLink = fragmentReference.root.__link;
+  const componentsByName = (cachedComponentsByStableFragmentReferenceId[
+    stableIdForFragmentReference(fragmentReference)
+  ] ??= {});
 
-  const componentsByName = (cachedComponentsById[recordLink] ??= {});
-
-  const byArgs = (componentsByName[componentName] ??= {});
-
-  const stringifiedArgs = JSON.stringify(
-    stableCopy(fragmentReference.variables),
-  );
-  return (byArgs[stringifiedArgs] ??= (() => {
+  return (componentsByName[componentName] ??= (() => {
     function Component(additionalRuntimeProps: { [key: string]: any }) {
       const readerWithRefetchQueries = readPromise(
         fragmentReference.readerWithRefetchQueries,
