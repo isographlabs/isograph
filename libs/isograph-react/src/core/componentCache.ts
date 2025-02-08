@@ -15,7 +15,8 @@ export function getOrCreateCachedComponent(
   fragmentReference: FragmentReference<any, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
 ): React.FC<any> {
-  const cachedComponentsByStableFragmentReferenceId = environment.componentCache;
+  const cachedComponentsByStableFragmentReferenceId =
+    environment.componentCache;
 
   const componentsByName = (cachedComponentsByStableFragmentReferenceId[
     stableIdForFragmentReference(fragmentReference)
