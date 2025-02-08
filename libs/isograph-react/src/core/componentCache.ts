@@ -13,14 +13,14 @@ export function getOrCreateCachedComponent(
   fragmentReference: FragmentReference<any, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
 ): React.FC<any> {
-  // cachedComponentsByLink is a three layer cache: link, then component name, then
+  // cachedComponentsById is a three layer cache: id, then component name, then
   // stringified args. These three, together, uniquely identify a read at a given
   // time.
-  const cachedComponentsByLink = environment.componentCache;
+  const cachedComponentsById = environment.componentCache;
 
   const recordLink = fragmentReference.root.__link;
 
-  const componentsByName = (cachedComponentsByLink[recordLink] ??= {});
+  const componentsByName = (cachedComponentsById[recordLink] ??= {});
 
   const byArgs = (componentsByName[componentName] ??= {});
 
