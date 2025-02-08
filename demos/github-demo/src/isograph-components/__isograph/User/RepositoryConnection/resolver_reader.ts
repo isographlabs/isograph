@@ -83,6 +83,7 @@ const artifact: EagerReaderArtifact<
   User__RepositoryConnection__output_type
 > = {
   kind: "EagerReaderArtifact",
+  fieldName: "User.RepositoryConnection",
   resolver,
   readerAst,
   hasUpdatable: false,

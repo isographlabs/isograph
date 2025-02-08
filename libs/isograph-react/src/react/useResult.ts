@@ -41,7 +41,7 @@ export function useResult<
       // @ts-expect-error
       return getOrCreateCachedComponent(
         environment,
-        readerWithRefetchQueries.readerArtifact.componentName,
+        readerWithRefetchQueries.readerArtifact.fieldName,
         fragmentReference,
         networkRequestOptions,
       );
@@ -59,7 +59,7 @@ export function useResult<
           ? getOrCreateCachedStartUpdate(
               environment,
               fragmentReference,
-              readerWithRefetchQueries,
+              readerWithRefetchQueries.readerArtifact.fieldName,
             )
           : undefined,
       };

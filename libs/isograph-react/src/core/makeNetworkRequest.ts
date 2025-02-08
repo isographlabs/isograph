@@ -286,7 +286,7 @@ function readDataForOnComplete<
         // TClientFieldValue which is a React.FC<...>
         return getOrCreateCachedComponent(
           environment,
-          readerArtifact.componentName,
+          readerArtifact.fieldName,
           {
             kind: 'FragmentReference',
             readerWithRefetchQueries: wrapResolvedValue({
@@ -310,7 +310,7 @@ function readDataForOnComplete<
             ? getOrCreateCachedStartUpdate(
                 environment,
                 fragment,
-                artifact.readerWithRefetchQueries,
+                artifact.readerWithRefetchQueries.readerArtifact.fieldName,
               )
             : undefined,
         });

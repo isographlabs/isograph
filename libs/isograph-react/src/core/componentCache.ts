@@ -1,11 +1,13 @@
 import { useReadAndSubscribe } from '../react/useReadAndSubscribe';
-import { stableCopy } from './cache';
-import { FragmentReference } from './FragmentReference';
+import {
+  FragmentReference,
+  stableIdForFragmentReference,
+} from './FragmentReference';
 import { IsographEnvironment } from './IsographEnvironment';
 import { logMessage } from './logging';
 import { readPromise } from './PromiseWrapper';
 import { NetworkRequestReaderOptions } from './read';
-import { getOrCreateCachedStartUpdate } from './startUpdate';
+import { createStartUpdate } from './startUpdate';
 
 export function getOrCreateCachedComponent(
   environment: IsographEnvironment,
@@ -13,54 +15,55 @@ export function getOrCreateCachedComponent(
   fragmentReference: FragmentReference<any, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
 ): React.FC<any> {
-  // cachedComponentsById is a three layer cache: id, then component name, then
-  // stringified args. These three, together, uniquely identify a read at a given
-  // time.
-  const cachedComponentsById = environment.componentCache;
+  // We create startUpdate outside of component to make it stable
+  const startUpdate = createStartUpdate(environment, fragmentReference);
 
-  const recordLink = fragmentReference.root.__link;
+  const cacheEntry = (environment.fieldCache[
+    stableIdForFragmentReference(fragmentReference, componentName)
+  ] ??= {
+    kind: 'Component',
+    component: (() => {
+      function Component(additionalRuntimeProps: { [key: string]: any }) {
+        const readerWithRefetchQueries = readPromise(
+          fragmentReference.readerWithRefetchQueries,
+        );
 
-  const componentsByName = (cachedComponentsById[recordLink] ??= {});
+        const data = useReadAndSubscribe(
+          fragmentReference,
+          networkRequestOptions,
+          readerWithRefetchQueries.readerArtifact.readerAst,
+        );
 
-  const byArgs = (componentsByName[componentName] ??= {});
+        logMessage(environment, {
+          kind: 'ComponentRerendered',
+          componentName,
+          rootLink: fragmentReference.root,
+        });
 
-  const stringifiedArgs = JSON.stringify(
-    stableCopy(fragmentReference.variables),
-  );
-  return (byArgs[stringifiedArgs] ??= (() => {
-    function Component(additionalRuntimeProps: { [key: string]: any }) {
-      const readerWithRefetchQueries = readPromise(
-        fragmentReference.readerWithRefetchQueries,
-      );
+        return readerWithRefetchQueries.readerArtifact.resolver(
+          {
+            data,
+            parameters: fragmentReference.variables,
+            startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
+              ? startUpdate
+              : undefined,
+          },
+          additionalRuntimeProps,
+        );
+      }
+      Component.displayName = `${componentName} (id: ${fragmentReference.root}) @component`;
+      return Component;
+    })(),
+  });
 
-      const data = useReadAndSubscribe(
-        fragmentReference,
-        networkRequestOptions,
-        readerWithRefetchQueries.readerArtifact.readerAst,
-      );
-
-      logMessage(environment, {
-        kind: 'ComponentRerendered',
-        componentName,
-        rootLink: fragmentReference.root,
-      });
-
-      return readerWithRefetchQueries.readerArtifact.resolver(
-        {
-          data,
-          parameters: fragmentReference.variables,
-          startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
-            ? getOrCreateCachedStartUpdate(
-                environment,
-                fragmentReference,
-                readerWithRefetchQueries,
-              )
-            : undefined,
-        },
-        additionalRuntimeProps,
+  switch (cacheEntry.kind) {
+    case 'Component': {
+      return cacheEntry.component;
+    }
+    case 'EagerReader': {
+      throw new Error(
+        'Expected component. ' + 'This is indicative of a bug in Isograph.',
       );
     }
-    Component.displayName = `${componentName} (id: ${fragmentReference.root}) @component`;
-    return Component;
-  })());
+  }
 }

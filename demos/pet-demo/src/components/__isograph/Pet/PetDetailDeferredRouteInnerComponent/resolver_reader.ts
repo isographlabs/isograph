@@ -32,7 +32,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  componentName: "Pet.PetDetailDeferredRouteInnerComponent",
+  fieldName: "Pet.PetDetailDeferredRouteInnerComponent",
   resolver,
   readerAst,
   hasUpdatable: false,

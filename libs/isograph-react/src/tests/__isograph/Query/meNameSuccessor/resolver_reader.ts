@@ -50,6 +50,7 @@ const artifact: EagerReaderArtifact<
   Query__meNameSuccessor__output_type
 > = {
   kind: "EagerReaderArtifact",
+  fieldName: "Query.meNameSuccessor",
   resolver,
   readerAst,
   hasUpdatable: false,

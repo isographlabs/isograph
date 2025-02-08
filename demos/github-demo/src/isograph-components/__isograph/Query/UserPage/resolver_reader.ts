@@ -31,7 +31,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  componentName: "Query.UserPage",
+  fieldName: "Query.UserPage",
   resolver,
   readerAst,
   hasUpdatable: false,

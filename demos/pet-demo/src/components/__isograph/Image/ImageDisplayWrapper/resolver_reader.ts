@@ -29,7 +29,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  componentName: "Image.ImageDisplayWrapper",
+  fieldName: "Image.ImageDisplayWrapper",
   resolver,
   readerAst,
   hasUpdatable: false,

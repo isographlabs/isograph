@@ -10,26 +10,23 @@ import { RetainedQuery } from './garbageCollection';
 import { LogFunction, WrappedLogFunction } from './logging';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { WithEncounteredRecords } from './read';
-import type { ReaderAst, StartUpdate, TopLevelReaderArtifact } from './reader';
+import type { ReaderAst, StartUpdate } from './reader';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
-export type ComponentCache = {
-  [key: DataId]: {
-    [key: ComponentOrFieldName]: { [key: StringifiedArgs]: React.FC<any> };
-  };
+export type FieldCacheEntry =
+  | {
+      kind: 'Component';
+      component: React.FC<any>;
+    }
+  | {
+      kind: 'EagerReader';
+      startUpdate: StartUpdate<any> | undefined;
+    };
+
+export type FieldCache = {
+  [key: StableIdForFragmentReference]: FieldCacheEntry;
 };
-
-export type Resolver = TopLevelReaderArtifact<any, any, any>['resolver'];
-
-export type StartUpdateCache = WeakMap<
-  // this is equivalent to CaomponentCache, but we use reference to Resolver
-  // instead of component name, because only components have names
-  Resolver,
-  {
-    [key: StableIdForFragmentReference]: StartUpdate<any>;
-  }
->;
 
 export type FragmentSubscription<TReadFromStore extends UnknownTReadFromStore> =
   {
@@ -66,8 +63,7 @@ export type IsographEnvironment = {
   readonly store: IsographStore;
   readonly networkFunction: IsographNetworkFunction;
   readonly missingFieldHandler: MissingFieldHandler | null;
-  readonly componentCache: ComponentCache;
-  readonly startUpdateCache: StartUpdateCache;
+  readonly fieldCache: FieldCache;
   readonly subscriptions: Subscriptions;
   // N.B. this must be <any, any>, but all *usages* of this should go through
   // a function that adds type parameters.
@@ -150,7 +146,7 @@ export function createIsographEnvironment(
     store,
     networkFunction,
     missingFieldHandler: missingFieldHandler ?? null,
-    componentCache: {},
+    fieldCache: {},
     subscriptions: new Set(),
     fragmentCache: {},
     entrypointArtifactCache: new Map(),
@@ -158,7 +154,6 @@ export function createIsographEnvironment(
     gcBuffer: [],
     gcBufferSize: DEFAULT_GC_BUFFER_SIZE,
     loggers: logFunction != null ? new Set([{ log: logFunction }]) : new Set(),
-    startUpdateCache: new WeakMap(),
   };
 }
 

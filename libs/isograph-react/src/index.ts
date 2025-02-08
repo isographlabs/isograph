@@ -39,7 +39,7 @@ export {
   type CacheMap,
   createIsographEnvironment,
   createIsographStore,
-  type ComponentCache,
+  type FieldCache,
   type Subscriptions,
   type Subscription,
   type TypeName,
@@ -48,8 +48,7 @@ export {
   type AnyRecordSubscription,
   type ComponentOrFieldName,
   type StringifiedArgs,
-  type Resolver,
-  type StartUpdateCache,
+  type FieldCacheEntry,
 } from './core/IsographEnvironment';
 export {
   type EagerReaderArtifact,

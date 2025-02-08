@@ -41,7 +41,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  componentName: "Query.RepositoryPage",
+  fieldName: "Query.RepositoryPage",
   resolver,
   readerAst,
   hasUpdatable: false,

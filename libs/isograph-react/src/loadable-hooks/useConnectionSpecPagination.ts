@@ -133,7 +133,7 @@ export function useConnectionSpecPagination<
           ? getOrCreateCachedStartUpdate(
               environment,
               fragmentReference,
-              readerWithRefetchQueries,
+              readerWithRefetchQueries.readerArtifact.fieldName,
             )
           : undefined,
       };

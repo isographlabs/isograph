@@ -297,7 +297,7 @@ function readData<TReadFromStore>(
               ? getOrCreateCachedStartUpdate(
                   environment,
                   fragment,
-                  readerWithRefetchQueries,
+                  readerWithRefetchQueries.readerArtifact.fieldName,
                 )
               : undefined,
           });
@@ -481,7 +481,7 @@ function readData<TReadFromStore>(
                   ? getOrCreateCachedStartUpdate(
                       environment,
                       fragment,
-                      readerWithRefetchQueries,
+                      readerWithRefetchQueries.readerArtifact.fieldName,
                     )
                   : undefined,
               };
@@ -493,7 +493,7 @@ function readData<TReadFromStore>(
           case 'ComponentReaderArtifact': {
             target[field.alias] = getOrCreateCachedComponent(
               environment,
-              field.readerArtifact.componentName,
+              field.readerArtifact.fieldName,
               fragment,
               networkRequestOptions,
             );

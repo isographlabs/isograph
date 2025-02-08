@@ -1,4 +1,3 @@
-import type { ReaderWithRefetchQueries } from './entrypoint';
 import {
   stableIdForFragmentReference,
   type ExtractStartUpdate,
@@ -11,31 +10,39 @@ export function getOrCreateCachedStartUpdate<
   TReadFromStore extends UnknownTReadFromStore,
 >(
   environment: IsographEnvironment,
-  fragmentReference: FragmentReference<any, any>,
-  readerWithRefetchQueries: ReaderWithRefetchQueries<any, any>,
+  fragmentReference: FragmentReference<TReadFromStore, any>,
+  eagerResolverName: string,
 ): ExtractStartUpdate<TReadFromStore> {
-  const cachedStartUpdateByResolver = environment.startUpdateCache;
+  const cachedStartUpdateByResolver = environment.fieldCache;
 
-  let startUpdateById = cachedStartUpdateByResolver.get(
-    readerWithRefetchQueries.readerArtifact.resolver,
-  );
+  const cacheEntry = (cachedStartUpdateByResolver[
+    stableIdForFragmentReference(fragmentReference, eagerResolverName)
+  ] ??= {
+    kind: 'EagerReader',
+    startUpdate: undefined,
+  });
 
-  if (startUpdateById === undefined) {
-    startUpdateById = {};
-    cachedStartUpdateByResolver.set(
-      readerWithRefetchQueries.readerArtifact.resolver,
-      startUpdateById,
-    );
+  switch (cacheEntry.kind) {
+    case 'EagerReader': {
+      return (cacheEntry.startUpdate ??= createStartUpdate(
+        environment,
+        fragmentReference,
+      ));
+    }
+    case 'Component': {
+      throw new Error(
+        'Called getOrCreateCachedStartUpdate on a component. ' +
+          'This is indicative of a bug in Isograph.',
+      );
+    }
   }
+}
 
-  return (startUpdateById[stableIdForFragmentReference(fragmentReference)] ??=
-    (() => {
-      let startUpdate: ExtractStartUpdate<TReadFromStore> | undefined = (
-        _updater,
-      ) => {
-        // TODO start update
-      };
-
-      return startUpdate;
-    })());
+export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
+  _environment: IsographEnvironment,
+  _fragmentReference: FragmentReference<TReadFromStore, any>,
+): ExtractStartUpdate<TReadFromStore> {
+  return (_updater) => {
+    // TODO start update
+  };
 }

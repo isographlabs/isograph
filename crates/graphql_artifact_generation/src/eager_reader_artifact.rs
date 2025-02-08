@@ -56,6 +56,7 @@ pub(crate) fn generate_eager_reader_artifacts(
 
     let reader_content = if let UserWrittenComponentVariant::Eager = user_written_component_variant
     {
+        let eager_reader_name = format!("{}.{}", parent_type.name, client_field.name);
         let reader_output_type =
             format!("{}__{}__output_type", parent_type.name, client_field.name);
         let param_type_file_name = *RESOLVER_PARAM_TYPE;
@@ -72,12 +73,13 @@ pub(crate) fn generate_eager_reader_artifacts(
             {}{reader_output_type}\n\
             > = {{\n\
             {}kind: \"EagerReaderArtifact\",\n\
+            {}fieldName: \"{eager_reader_name}\",\n\
             {}resolver,\n\
             {}readerAst,\n\
             {}hasUpdatable: false,\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ", "  ",
+            "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         )
     } else {
         let component_name = format!("{}.{}", parent_type.name, client_field.name);
@@ -94,7 +96,7 @@ pub(crate) fn generate_eager_reader_artifacts(
             {}ExtractSecondParam<typeof resolver>\n\
             > = {{\n\
             {}kind: \"ComponentReaderArtifact\",\n\
-            {}componentName: \"{component_name}\",\n\
+            {}fieldName: \"{component_name}\",\n\
             {}resolver,\n\
             {}readerAst,\n\
             {}hasUpdatable: false,\n\
@@ -161,6 +163,8 @@ pub(crate) fn generate_eager_reader_condition_artifact(
     let reader_param_type = "{ data: any, parameters: Record<PropertyKey, never> }";
     let reader_output_type = "Link | null";
 
+    let eager_reader_name = format!("{}.{}", parent_type.name, field_name);
+
     let reader_content = format!(
         "import type {{ EagerReaderArtifact, ReaderAst, Link }} from '@isograph/react';\n\
         {reader_import_statement}\n\
@@ -170,12 +174,13 @@ pub(crate) fn generate_eager_reader_condition_artifact(
         {}{reader_output_type}\n\
         > = {{\n\
         {}kind: \"EagerReaderArtifact\",\n\
+        {}fieldName: \"{eager_reader_name}\",\n\
         {}resolver: ({{ data }}) => data.__typename === \"{concrete_type}\" ? data.link : null,\n\
         {}readerAst,\n\
         {}hasUpdatable: false,\n\
         }};\n\n\
         export default artifact;\n",
-        "  ", "  ", "  ", "  ", "  ", "  ",
+        "  ", "  ", "  ", "  ", "  ", "  ", "  "
     );
 
     ArtifactPathAndContent {
