@@ -1,10 +1,8 @@
-mod arena;
 mod database;
 mod dependency;
 mod derived_node;
 mod dyn_eq;
 mod epoch;
-mod generation;
 mod index;
 pub mod macro_fns;
 mod memo;
