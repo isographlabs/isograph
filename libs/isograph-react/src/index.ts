@@ -39,7 +39,7 @@ export {
   type CacheMap,
   createIsographEnvironment,
   createIsographStore,
-  type ComponentCache,
+  type FieldCache,
   type Subscriptions,
   type Subscription,
   type TypeName,
@@ -64,7 +64,7 @@ export {
   type ResolverFirstParameter,
   type ReaderImperativelyLoadedField,
   type ReaderLoadableField,
-  type ReaderLinkeField,
+  type ReaderLinkField,
   type StartUpdate,
 } from './core/reader';
 export {
@@ -109,6 +109,7 @@ export {
   stableIdForFragmentReference,
   type ExtractStartUpdate,
   type VariableValue,
+  type StableIdForFragmentReference,
 } from './core/FragmentReference';
 export {
   type LogMessage,

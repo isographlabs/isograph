@@ -18,6 +18,7 @@ const artifact: EagerReaderArtifact<
   Link | null
 > = {
   kind: "EagerReaderArtifact",
+  fieldName: "BlogItem.asBlogItem",
   resolver: ({ data }) => data.__typename === "BlogItem" ? data.link : null,
   readerAst,
   hasUpdatable: false,

@@ -1,11 +1,13 @@
 import { useReadAndSubscribe } from '../react/useReadAndSubscribe';
-import { stableCopy } from './cache';
-import { FragmentReference } from './FragmentReference';
+import {
+  FragmentReference,
+  stableIdForFragmentReference,
+} from './FragmentReference';
 import { IsographEnvironment } from './IsographEnvironment';
 import { logMessage } from './logging';
 import { readPromise } from './PromiseWrapper';
 import { NetworkRequestReaderOptions } from './read';
-import { startUpdate } from './startUpdate';
+import { createStartUpdate } from './startUpdate';
 
 export function getOrCreateCachedComponent(
   environment: IsographEnvironment,
@@ -13,21 +15,12 @@ export function getOrCreateCachedComponent(
   fragmentReference: FragmentReference<any, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
 ): React.FC<any> {
-  // cachedComponentsById is a three layer cache: id, then component name, then
-  // stringified args. These three, together, uniquely identify a read at a given
-  // time.
-  const cachedComponentsById = environment.componentCache;
+  // We create startUpdate outside of component to make it stable
+  const startUpdate = createStartUpdate(environment, fragmentReference);
 
-  const recordLink = fragmentReference.root.__link;
-
-  const componentsByName = (cachedComponentsById[recordLink] ??= {});
-
-  const byArgs = (componentsByName[componentName] ??= {});
-
-  const stringifiedArgs = JSON.stringify(
-    stableCopy(fragmentReference.variables),
-  );
-  return (byArgs[stringifiedArgs] ??= (() => {
+  return (environment.componentCache[
+    stableIdForFragmentReference(fragmentReference, componentName)
+  ] ??= (() => {
     function Component(additionalRuntimeProps: { [key: string]: any }) {
       const readerWithRefetchQueries = readPromise(
         fragmentReference.readerWithRefetchQueries,
@@ -50,7 +43,7 @@ export function getOrCreateCachedComponent(
           data,
           parameters: fragmentReference.variables,
           startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
-            ? startUpdate(environment, data)
+            ? startUpdate
             : undefined,
         },
         additionalRuntimeProps,

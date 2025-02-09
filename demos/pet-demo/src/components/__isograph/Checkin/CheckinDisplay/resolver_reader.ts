@@ -30,7 +30,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  componentName: "Checkin.CheckinDisplay",
+  fieldName: "Checkin.CheckinDisplay",
   resolver,
   readerAst,
   hasUpdatable: false,

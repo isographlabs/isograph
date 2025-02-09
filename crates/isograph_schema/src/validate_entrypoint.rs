@@ -89,7 +89,8 @@ impl UnvalidatedSchema {
             .get(&field_name.item.into())
         {
             Some(defined_field) => match defined_field {
-                FieldType::ServerField(_) => Err(WithLocation::new(
+                FieldType::ClientField(ClientType::ClientPointer(_))
+                | FieldType::ServerField(_) => Err(WithLocation::new(
                     ValidateEntrypointDeclarationError::FieldMustBeClientField {
                         parent_type_name: parent_object.name,
                         client_field_name: field_name.item,
@@ -111,7 +112,7 @@ impl UnvalidatedSchema {
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Eq, PartialEq, Debug, Clone)]
 pub enum ValidateEntrypointDeclarationError {
     #[error("`{parent_type_name}` is not a type that has been defined.")]
     ParentTypeNotDefined {

@@ -34,7 +34,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  componentName: "Pokemon.Pokemon",
+  fieldName: "Pokemon.Pokemon",
   resolver,
   readerAst,
   hasUpdatable: false,

@@ -3,8 +3,10 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     from_isograph_field_directive, ClientFieldDeclaration,
     ClientFieldDeclarationWithUnvalidatedDirectives, ClientFieldDeclarationWithValidatedDirectives,
-    IsographFieldDirective, IsographSelectionVariant, LinkedFieldSelection, ScalarFieldSelection,
-    ServerFieldSelection,
+    ClientPointerDeclaration, ClientPointerDeclarationWithUnvalidatedDirectives,
+    ClientPointerDeclarationWithValidatedDirectives, IsographFieldDirective,
+    IsographSelectionVariant, LinkedFieldSelection, ScalarFieldSelection, ServerFieldSelection,
+    UnvalidatedSelection,
 };
 use isograph_schema::ProcessClientFieldDeclarationError;
 use lazy_static::lazy_static;
@@ -21,19 +23,42 @@ pub fn validate_isograph_field_directives(
     WithSpan<ClientFieldDeclarationWithValidatedDirectives>,
     Vec<WithLocation<ProcessClientFieldDeclarationError>>,
 > {
-    let ClientFieldDeclaration {
-        const_export_name,
-        parent_type,
-        client_field_name,
-        description,
-        selection_set,
-        directives,
-        variable_definitions,
-        definition_path,
-        dot,
-        field_keyword,
-    } = client_field.item;
-    let new_selecton_set = and_then_selection_set_and_collect_errors(
+    client_field.and_then(|client_field| {
+        let ClientFieldDeclaration {
+            const_export_name,
+            parent_type,
+            client_field_name,
+            description,
+            selection_set,
+            directives,
+            variable_definitions,
+            definition_path,
+            dot,
+            field_keyword,
+        } = client_field;
+
+        Ok(ClientFieldDeclarationWithValidatedDirectives {
+            const_export_name,
+            parent_type,
+            client_field_name,
+            description,
+            selection_set: validate_isograph_selection_set_directives(selection_set)?,
+            directives,
+            variable_definitions,
+            definition_path,
+            dot,
+            field_keyword,
+        })
+    })
+}
+
+pub fn validate_isograph_selection_set_directives(
+    selection_set: Vec<WithSpan<ServerFieldSelection<(), ()>>>,
+) -> Result<
+    Vec<WithSpan<UnvalidatedSelection>>,
+    Vec<WithLocation<ProcessClientFieldDeclarationError>>,
+> {
+    and_then_selection_set_and_collect_errors(
         selection_set,
         &|scalar_field_selection| {
             let updatable_directive = find_directive_named(
@@ -69,23 +94,46 @@ pub fn validate_isograph_field_directives(
                 Ok(IsographSelectionVariant::Regular)
             }
         },
-        &|_linked_field_selection| Ok(IsographSelectionVariant::Regular),
-    )?;
-    Ok(WithSpan::new(
-        ClientFieldDeclarationWithValidatedDirectives {
+        &|_object_pointer_selection| Ok(IsographSelectionVariant::Regular),
+    )
+}
+
+#[allow(clippy::complexity)]
+pub fn validate_isograph_pointer_directives(
+    client_pointer: WithSpan<ClientPointerDeclarationWithUnvalidatedDirectives>,
+) -> Result<
+    WithSpan<ClientPointerDeclarationWithValidatedDirectives>,
+    Vec<WithLocation<ProcessClientFieldDeclarationError>>,
+> {
+    client_pointer.and_then(|client_pointer| {
+        let ClientPointerDeclaration {
             const_export_name,
             parent_type,
-            client_field_name,
+            client_pointer_name,
             description,
-            selection_set: new_selecton_set,
-            directives,
+            selection_set,
             variable_definitions,
             definition_path,
             dot,
-            field_keyword,
-        },
-        client_field.span,
-    ))
+            pointer_keyword,
+            target_type,
+            directives,
+        } = client_pointer;
+
+        Ok(ClientPointerDeclarationWithValidatedDirectives {
+            const_export_name,
+            parent_type,
+            client_pointer_name,
+            description,
+            selection_set: validate_isograph_selection_set_directives(selection_set)?,
+            variable_definitions,
+            definition_path,
+            dot,
+            pointer_keyword,
+            target_type,
+            directives,
+        })
+    })
 }
 
 fn and_then_selection_set_and_collect_errors<

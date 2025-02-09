@@ -9,7 +9,7 @@ use notify_debouncer_full::{
     new_debouncer, DebounceEventResult, DebouncedEvent, Debouncer, RecommendedCache,
 };
 use std::{path::PathBuf, time::Duration};
-use tokio::{runtime::Handle, sync::mpsc::Receiver, task::JoinError};
+use tokio::{runtime::Handle, sync::mpsc::Receiver};
 use tracing::info;
 
 use crate::{
@@ -21,49 +21,46 @@ const MAX_CHANGED_FILES: usize = 100;
 pub async fn handle_watch_command(
     config_location: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
-) -> Result<Result<(), Vec<Error>>, JoinError> {
+) -> Result<(), Vec<Error>> {
     let mut state = CompilerState::new(config_location, current_working_directory);
     let (mut rx, mut watcher) = create_debounced_file_watcher(&state.config);
 
     info!("{}", "Starting to compile.".cyan());
     let _ = print_result(WithDuration::new(|| state.compile()));
 
-    tokio::spawn(async move {
-        while let Some(res) = rx.recv().await {
-            match res {
-                Ok(events) => {
-                    if let Some(changes) = categorize_and_filter_events(&events, &state.config) {
-                        let result = if has_config_changes(&changes) {
-                            info!(
-                                "{}",
-                                "Config change detected. Starting a full compilation.".cyan()
-                            );
-                            state = CompilerState::new(
-                                state.config.config_location,
-                                current_working_directory,
-                            );
-                            watcher.stop();
-                            (rx, watcher) = create_debounced_file_watcher(&state.config);
-                            WithDuration::new(|| state.compile())
-                        } else if changes.len() < MAX_CHANGED_FILES {
-                            info!("{}", "File changes detected. Starting to compile.".cyan());
-                            WithDuration::new(|| state.update(&changes))
-                        } else {
-                            info!(
-                                "{}",
-                                "Too many changes. Starting a full compilation.".cyan()
-                            );
-                            WithDuration::new(|| state.compile())
-                        };
-                        let _ = print_result(result);
-                    }
+    while let Some(res) = rx.recv().await {
+        match res {
+            Ok(events) => {
+                if let Some(changes) = categorize_and_filter_events(&events, &state.config) {
+                    let result = if has_config_changes(&changes) {
+                        info!(
+                            "{}",
+                            "Config change detected. Starting a full compilation.".cyan()
+                        );
+                        state = CompilerState::new(
+                            state.config.config_location,
+                            current_working_directory,
+                        );
+                        watcher.stop();
+                        (rx, watcher) = create_debounced_file_watcher(&state.config);
+                        WithDuration::new(|| state.compile())
+                    } else if changes.len() < MAX_CHANGED_FILES {
+                        info!("{}", "File changes detected. Starting to compile.".cyan());
+                        WithDuration::new(|| state.update(&changes))
+                    } else {
+                        info!(
+                            "{}",
+                            "Too many changes. Starting a full compilation.".cyan()
+                        );
+                        WithDuration::new(|| state.compile())
+                    };
+                    let _ = print_result(result);
                 }
-                Err(errors) => return Err(errors),
             }
+            Err(errors) => return Err(errors),
         }
-        Ok(())
-    })
-    .await
+    }
+    Ok(())
 }
 
 fn has_config_changes(changes: &[SourceFileEvent]) -> bool {

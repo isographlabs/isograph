@@ -212,7 +212,7 @@ impl UnvalidatedSchema {
                 })
                 .collect::<Vec<_>>();
 
-            let mutation_field_client_field_id = self.client_fields.len().into();
+            let mutation_field_client_field_id = self.client_types.len().into();
             let top_level_arguments = mutation_field_arguments
                 .iter()
                 .map(|input_value_def| {
@@ -286,7 +286,7 @@ impl UnvalidatedSchema {
                     ),
                 )),
             };
-            self.client_fields
+            self.client_types
                 .push(ClientType::ClientField(mutation_client_field));
 
             self.insert_client_field_on_object(

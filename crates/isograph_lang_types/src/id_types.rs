@@ -9,6 +9,8 @@ u32_conversion!(from: ServerStrongIdFieldId, to: ServerFieldId);
 
 u32_newtype!(ClientFieldId);
 
+u32_newtype!(ClientPointerId);
+
 u32_newtype!(ServerObjectId);
 
 u32_newtype!(ServerScalarId);

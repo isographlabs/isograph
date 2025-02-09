@@ -270,9 +270,10 @@ fn user_written_fields(
     schema: &ValidatedSchema,
 ) -> impl Iterator<Item = (&ValidatedClientField, UserWrittenComponentVariant)> + '_ {
     schema
-        .client_fields
+        .client_types
         .iter()
         .filter_map(|client_field| match client_field {
+            ClientType::ClientPointer(_) => None,
             ClientType::ClientField(client_field) => match client_field.variant {
                 ClientFieldVariant::Link => None,
                 ClientFieldVariant::UserWritten(info) => {

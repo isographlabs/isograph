@@ -16,7 +16,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  componentName: "BlogItem.BlogItemMoreDetail",
+  fieldName: "BlogItem.BlogItemMoreDetail",
   resolver,
   readerAst,
   hasUpdatable: false,
