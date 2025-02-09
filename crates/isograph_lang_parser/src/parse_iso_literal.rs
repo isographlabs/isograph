@@ -1,8 +1,6 @@
-use std::{collections::HashSet, ops::ControlFlow};
-
 use common_lang_types::{
-    ClientPointerFieldName, Location, RelativePathToSourceFile, ScalarFieldName, Span, TextSource,
-    UnvalidatedTypeName, WithLocation, WithSpan,
+    ClientPointerFieldName, IsoLiteralText, Location, RelativePathToSourceFile, ScalarFieldName,
+    Span, TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
@@ -16,6 +14,7 @@ use isograph_lang_types::{
     ScalarFieldSelection, SelectionFieldArgument, ServerFieldSelection,
     UnvalidatedSelectionWithUnvalidatedDirectives, VariableDefinition,
 };
+use std::{collections::HashSet, ops::ControlFlow};
 
 use crate::{
     parse_optional_description, IsographLangTokenKind, IsographLiteralParseError,
@@ -42,7 +41,12 @@ pub fn parse_iso_literal(
         .map_err(|err| err.to_with_location(text_source))?;
     match discriminator.item {
         "entrypoint" => Ok(IsoLiteralExtractionResult::EntrypointDeclaration(
-            parse_iso_entrypoint_declaration(&mut tokens, text_source, discriminator.span)?,
+            parse_iso_entrypoint_declaration(
+                &mut tokens,
+                text_source,
+                discriminator.span,
+                iso_literal_text.intern().into(),
+            )?,
         )),
         "field" => Ok(IsoLiteralExtractionResult::ClientFieldDeclaration(
             parse_iso_client_field_declaration(
@@ -73,6 +77,7 @@ fn parse_iso_entrypoint_declaration(
     tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
     entrypoint_keyword: Span,
+    iso_literal_text: IsoLiteralText,
 ) -> ParseResultWithLocation<WithSpan<EntrypointDeclaration>> {
     let entrypoint_declaration = tokens
         .with_span(|tokens| {
@@ -89,6 +94,7 @@ fn parse_iso_entrypoint_declaration(
             Ok(EntrypointDeclaration {
                 parent_type,
                 client_field_name,
+                iso_literal_text,
                 entrypoint_keyword: WithSpan::new((), entrypoint_keyword),
                 dot: dot.map(|_| ()),
             })

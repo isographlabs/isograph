@@ -40,6 +40,9 @@ Ok(
                                     end: 16,
                                 },
                             },
+                            iso_literal_text: IsoLiteralText(
+                                "entrypoint Type.Name",
+                            ),
                         },
                         span: Span {
                             start: 11,
