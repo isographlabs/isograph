@@ -40,12 +40,12 @@ fn drop() {
 
     // it must be safe to drop a generation, it should be recalculeted
     db.increment_epoch();
-    db.drop_epochs(1.into());
+    db.drop_epochs(2.into());
 
     let result = sum(&mut db, left, right);
     assert_eq!(result, 14);
 
-    // every functions has been called againd due to empty storage
+    // every functions has been called again due to empty storage
     assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 2);
     assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 2);
     assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 2);
@@ -73,7 +73,7 @@ fn drop() {
     assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 2);
 
     // drop the oldest generation
-    db.drop_epochs(2.into());
+    db.drop_epochs(3.into());
 
     let result = sum(&mut db, left, right);
     assert_eq!(result, 14);
