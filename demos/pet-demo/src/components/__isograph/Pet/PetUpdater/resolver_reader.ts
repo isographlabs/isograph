@@ -64,7 +64,7 @@ const artifact: ComponentReaderArtifact<
   fieldName: "Pet.PetUpdater",
   resolver,
   readerAst,
-  hasUpdatable: false,
+  hasUpdatable: true,
 };
 
 export default artifact;

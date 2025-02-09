@@ -123,13 +123,15 @@ export function useSkipLimitPagination<
       const firstParameter = {
         data,
         parameters: fragmentReference.variables,
-        startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
-          ? getOrCreateCachedStartUpdate(
-              environment,
-              fragmentReference,
-              readerWithRefetchQueries.readerArtifact.kind,
-            )
-          : undefined,
+        ...(readerWithRefetchQueries.readerArtifact.hasUpdatable
+          ? {
+              startUpdate: getOrCreateCachedStartUpdate(
+                environment,
+                fragmentReference,
+                readerWithRefetchQueries.readerArtifact.kind,
+              ),
+            }
+          : undefined),
       };
 
       if (

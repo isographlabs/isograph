@@ -55,13 +55,15 @@ export function useResult<
       const param = {
         data: data,
         parameters: fragmentReference.variables,
-        startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
-          ? getOrCreateCachedStartUpdate(
-              environment,
-              fragmentReference,
-              readerWithRefetchQueries.readerArtifact.fieldName,
-            )
-          : undefined,
+        ...(readerWithRefetchQueries.readerArtifact.hasUpdatable
+          ? {
+              startUpdate: getOrCreateCachedStartUpdate(
+                environment,
+                fragmentReference,
+                readerWithRefetchQueries.readerArtifact.fieldName,
+              ),
+            }
+          : undefined),
       };
       return readerWithRefetchQueries.readerArtifact.resolver(param);
     }

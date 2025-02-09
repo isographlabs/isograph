@@ -293,13 +293,15 @@ function readData<TReadFromStore>(
           const condition = field.condition.resolver({
             data: data.data,
             parameters: {},
-            startUpdate: field.condition.hasUpdatable
-              ? getOrCreateCachedStartUpdate(
-                  environment,
-                  fragment,
-                  readerWithRefetchQueries.readerArtifact.fieldName,
-                )
-              : undefined,
+            ...(field.condition.hasUpdatable
+              ? {
+                  startUpdate: getOrCreateCachedStartUpdate(
+                    environment,
+                    fragment,
+                    readerWithRefetchQueries.readerArtifact.fieldName,
+                  ),
+                }
+              : undefined),
           });
           if (condition === true) {
             link = root;

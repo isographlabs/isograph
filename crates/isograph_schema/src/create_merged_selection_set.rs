@@ -218,6 +218,7 @@ pub struct ScalarClientFieldTraversalState {
 
     /// Client fields that are directly accessed by this client field
     pub accessible_client_fields: HashSet<ClientFieldId>,
+    pub has_updatable: bool,
 }
 
 impl ScalarClientFieldTraversalState {
@@ -226,6 +227,7 @@ impl ScalarClientFieldTraversalState {
             refetch_paths: BTreeMap::new(),
             traversal_path: vec![],
             accessible_client_fields: HashSet::new(),
+            has_updatable: false,
         }
     }
 
@@ -668,6 +670,14 @@ fn merge_validated_selections_into_selection_map(
             ServerFieldSelection::ScalarField(scalar_field_selection) => {
                 match &scalar_field_selection.associated_data.location {
                     FieldType::ServerField(_) => {
+                        match scalar_field_selection.associated_data.selection_variant {
+                            ValidatedIsographSelectionVariant::Updatable => {
+                                merge_traversal_state.has_updatable = true;
+                            }
+                            ValidatedIsographSelectionVariant::Regular => (),
+                            ValidatedIsographSelectionVariant::Loadable(_) => (),
+                        };
+
                         merge_scalar_server_field(
                             scalar_field_selection,
                             parent_map,
