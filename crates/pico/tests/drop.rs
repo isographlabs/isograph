@@ -38,17 +38,17 @@
 //     assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 1);
 //     assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 1);
 
-//     // it must be safe to drop a generation, it should be recalculeted
-//     db.increment_epoch();
-//     db.drop_epochs(1.into());
+// // it must be safe to drop a generation, it should be recalculeted
+// db.increment_epoch();
+// db.drop_epochs(2.into());
 
 //     let result = sum(&mut db, left, right);
 //     assert_eq!(result, 14);
 
-//     // every functions has been called againd due to empty storage
-//     assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 2);
-//     assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 2);
-//     assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 2);
+// // every functions has been called again due to empty storage
+// assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 2);
+// assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&right).unwrap(), 2);
+// assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 2);
 
 //     // let's update the "left" source with the same eval result.
 //     // It must create only one new derived node in the current generation.
@@ -72,8 +72,8 @@
 //     // "left" and "right" values are the same, so no call
 //     assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 2);
 
-//     // drop the oldest generation
-//     db.drop_epochs(2.into());
+// // drop the oldest generation
+// db.drop_epochs(3.into());
 
 //     let result = sum(&mut db, left, right);
 //     assert_eq!(result, 14);
