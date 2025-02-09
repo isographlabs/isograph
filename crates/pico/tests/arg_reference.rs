@@ -1,4 +1,7 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{
+    ops::Deref,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use calc::{ast::Program, error::Result, eval::eval, lexer::Lexer, parser::Parser};
 use pico::{Database, SourceId};
@@ -110,12 +113,19 @@ fn evaluate_input<'db>(db: &'db Database, id: SourceId<Input>) -> &'db Value {
             Box::new(value)
         }),
     );
-    ::pico::macro_fns::get_derived_node(db, derived_node_id)
+    let x = ::pico::macro_fns::get_derived_node(db, derived_node_id)
         .expect("derived node must exist. This is indicative of a bug in Pico.")
+        .deref()
         .value
         .as_any()
         .downcast_ref::<Value>()
-        .expect("unexpected return type. This is indicative of a bug in Pico.")
+        .expect("ASDF");
+    x
+    // .value;
+    // .as_any()
+    // .downcast_ref::<Value>()
+    // .expect("unexpected return type. This is indicative of a bug in Pico.")
+    // todo!()
 }
 
 #[memo]

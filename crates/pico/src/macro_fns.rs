@@ -3,6 +3,8 @@ use std::{
     hash::{DefaultHasher, Hash, Hasher},
 };
 
+use dashmap::mapref::one::Ref;
+
 use crate::{Database, DerivedNode, DerivedNodeId, ParamId};
 
 pub fn intern_param<T: Hash + Clone + 'static>(db: &Database, param: T) -> ParamId {
@@ -17,7 +19,7 @@ pub fn intern_param<T: Hash + Clone + 'static>(db: &Database, param: T) -> Param
 pub fn get_derived_node<'db>(
     db: &'db Database,
     derived_node_id: DerivedNodeId,
-) -> Option<impl std::ops::Deref<Target = DerivedNode> + 'db> {
+) -> Option<Ref<'db, DerivedNodeId, DerivedNode>> {
     db.get_derived_node(derived_node_id)
 }
 

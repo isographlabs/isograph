@@ -8,7 +8,7 @@ use crate::{
     u64_types::{Key, ParamId},
 };
 use boxcar::Vec as BoxcarVec;
-use dashmap::{DashMap, Entry};
+use dashmap::{mapref::one::Ref, DashMap, Entry};
 use lru::LruCache;
 
 use crate::derived_node::{DerivedNode, DerivedNodeId};
@@ -63,7 +63,7 @@ impl Database {
     pub(crate) fn get_derived_node<'db>(
         &'db self,
         derived_node_id: DerivedNodeId,
-    ) -> Option<impl std::ops::Deref<Target = DerivedNode> + 'db> {
+    ) -> Option<Ref<'db, DerivedNodeId, DerivedNode>> {
         eprintln!("getting {:?}", derived_node_id);
         self.access_vec.push(derived_node_id);
         self.derived_nodes.get(&derived_node_id)
