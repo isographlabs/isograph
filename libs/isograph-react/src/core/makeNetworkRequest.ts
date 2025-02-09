@@ -306,13 +306,15 @@ function readDataForOnComplete<
         return readerArtifact.resolver({
           data: fragmentResult,
           parameters: variables,
-          startUpdate: readerArtifact.hasUpdatable
-            ? getOrCreateCachedStartUpdate(
-                environment,
-                fragment,
-                artifact.readerWithRefetchQueries.readerArtifact.fieldName,
-              )
-            : undefined,
+          ...(readerArtifact.hasUpdatable
+            ? {
+                startUpdate: getOrCreateCachedStartUpdate(
+                  environment,
+                  fragment,
+                  artifact.readerWithRefetchQueries.readerArtifact.fieldName,
+                ),
+              }
+            : undefined),
         });
       }
       default: {

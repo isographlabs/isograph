@@ -31,6 +31,7 @@ pub(crate) fn generate_eager_reader_artifacts(
     info: UserWrittenClientFieldInfo,
     refetched_paths: &RefetchedPathsMap,
     file_extensions: GenerateFileExtensionsOption,
+    has_updatable: bool,
 ) -> Vec<ArtifactPathAndContent> {
     let ts_file_extension = file_extensions.ts();
     let user_written_component_variant = info.user_written_component_variant;
@@ -76,7 +77,7 @@ pub(crate) fn generate_eager_reader_artifacts(
             {}fieldName: \"{eager_reader_name}\",\n\
             {}resolver,\n\
             {}readerAst,\n\
-            {}hasUpdatable: false,\n\
+            {}hasUpdatable: {has_updatable},\n\
             }};\n\n\
             export default artifact;\n",
             "  ", "  ", "  ", "  ", "  ", "  ", "  ",
@@ -99,10 +100,10 @@ pub(crate) fn generate_eager_reader_artifacts(
             {}fieldName: \"{component_name}\",\n\
             {}resolver,\n\
             {}readerAst,\n\
-            {}hasUpdatable: false,\n\
+            {}hasUpdatable: {has_updatable},\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ", "  ", "  ",
+            "  ", "  ", "  ", "  ", "  ", "  ", "  "
         )
     };
 
@@ -206,7 +207,8 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
     let mut param_type_imports = BTreeSet::new();
     let mut loadable_fields = BTreeSet::new();
     let mut link_fields = false;
-    let client_field_parameter_type = generate_client_field_parameter_type(
+    let mut updatable_fields = false;
+    let (client_field_parameter_type, updatable_data_type) = generate_client_field_parameter_type(
         schema,
         client_field.selection_set_for_parent_query(),
         parent_type,
@@ -214,6 +216,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
         &mut loadable_fields,
         1,
         &mut link_fields,
+        &mut updatable_fields,
     );
 
     let param_type_import_statement =
@@ -222,6 +225,12 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
 
     let link_field_imports = if link_fields {
         "import type { Link } from '@isograph/react';\n".to_string()
+    } else {
+        "".to_string()
+    };
+
+    let start_update_imports = if updatable_fields {
+        "import type { StartUpdate } from '@isograph/react';\n".to_string()
     } else {
         "".to_string()
     };
@@ -249,14 +258,25 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
     };
 
     let indent = "  ";
+    let start_update_type = if updatable_fields {
+        format!(
+            "{}readonly startUpdate: StartUpdate<{}>,\n",
+            indent, updatable_data_type
+        )
+    } else {
+        "".to_string()
+    };
+
     let param_type_content = format!(
         "{param_type_import_statement}\
         {link_field_imports}\
+        {start_update_imports}\
         {loadable_field_imports}\
         {parameters_import}\n\
         export type {reader_param_type} = {{\n\
         {indent}readonly data: {client_field_parameter_type},\n\
         {indent}readonly parameters: {parameters_type},\n\
+        {start_update_type}\
         }};\n",
     );
     ArtifactPathAndContent {
