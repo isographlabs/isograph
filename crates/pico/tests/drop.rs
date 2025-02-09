@@ -40,7 +40,7 @@ fn drop() {
 
     // it must be safe to drop a generation, it should be recalculeted
     db.increment_epoch();
-    db.drop_epoch(1.into());
+    db.drop_epochs(1.into());
 
     let result = sum(&mut db, left, right);
     assert_eq!(result, 14);
@@ -73,7 +73,7 @@ fn drop() {
     assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 2);
 
     // drop the oldest generation
-    db.drop_epoch(2.into());
+    db.drop_epochs(2.into());
 
     let result = sum(&mut db, left, right);
     assert_eq!(result, 14);

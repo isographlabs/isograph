@@ -18,6 +18,14 @@ impl Epoch {
         *self = Self::from(self.0.get() + 1);
         *self
     }
+
+    /// An iterator from `self` to `to`, inclusive on the self and exclusive
+    /// on the right.
+    pub fn to(&self, to: Epoch) -> impl Iterator<Item = Epoch> {
+        let left = self.0.get();
+        let right = to.0.get();
+        (left..right).map(Epoch::from)
+    }
 }
 
 impl From<usize> for Epoch {

@@ -18,12 +18,15 @@ use crate::{
 
 #[derive(Debug)]
 pub struct Database {
-    pub(crate) current_epoch: Epoch,
     pub(crate) dependency_stack: DependencyStack,
     pub(crate) param_id_to_index: DashMap<ParamId, Index<ParamId>>,
     pub(crate) derived_node_id_to_index: DashMap<DerivedNodeId, Index<DerivedNodeId>>,
     pub(crate) derived_node_id_to_revision: DashMap<DerivedNodeId, DerivedNodeRevision>,
     pub(crate) source_nodes: DashMap<Key, SourceNode>,
+
+    /// The oldest epoch currently in the epoch to generation map (inclusive)
+    pub(crate) earliest_epoch: Epoch,
+    pub(crate) current_epoch: Epoch,
     pub(crate) epoch_to_generation_map: OnceMap<Epoch, Box<Generation>>,
 }
 
@@ -34,6 +37,7 @@ impl Database {
         epoch_to_generation_map.insert(current_epoch, |_| Box::new(Generation::new()));
         Self {
             current_epoch,
+            earliest_epoch: current_epoch,
             dependency_stack: DependencyStack::new(),
             param_id_to_index: DashMap::new(),
             derived_node_id_to_index: DashMap::new(),
@@ -51,9 +55,21 @@ impl Database {
         next_epoch
     }
 
-    pub fn drop_epoch(&mut self, epoch: Epoch) {
-        debug_assert!(epoch < self.current_epoch, "Cannot drop the current epoch.");
-        self.epoch_to_generation_map.remove(&epoch);
+    /// Drop epochs until first_epoch_to_keep.
+    pub fn drop_epochs(&mut self, first_epoch_to_keep: Epoch) {
+        debug_assert!(
+            first_epoch_to_keep < self.current_epoch,
+            "Cannot drop the current epoch."
+        );
+
+        if first_epoch_to_keep < self.earliest_epoch {
+            return;
+        }
+
+        for epoch_to_drop in self.earliest_epoch.to(first_epoch_to_keep) {
+            self.epoch_to_generation_map.remove(&epoch_to_drop);
+        }
+        self.earliest_epoch = first_epoch_to_keep;
     }
 
     pub(crate) fn contains_param(&self, param_id: ParamId) -> bool {
