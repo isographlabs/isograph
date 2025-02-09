@@ -7,10 +7,8 @@ import {
   RefetchQueryNormalizationArtifactWrapper,
 } from './entrypoint';
 import {
-  ExtractData,
   ExtractParameters,
   FragmentReference,
-  type ExtractStartUpdate,
   type UnknownTReadFromStore,
 } from './FragmentReference';
 import {
@@ -57,11 +55,7 @@ export type ComponentReaderArtifact<
 
 export type ResolverFirstParameter<
   TReadFromStore extends UnknownTReadFromStore,
-> = {
-  data: ExtractData<TReadFromStore>;
-  parameters: ExtractParameters<TReadFromStore>;
-  startUpdate: undefined | ExtractStartUpdate<TReadFromStore>;
-};
+> = Pick<TReadFromStore, 'data' | 'parameters' | 'startUpdate'>;
 
 export type StartUpdate<UpdatableData> = (
   updater: (updatableData: UpdatableData) => void,

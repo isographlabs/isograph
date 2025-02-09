@@ -1,9 +1,3 @@
-use std::{
-    fs::{self, DirEntry},
-    io,
-    path::{Path, PathBuf},
-};
-
 use common_lang_types::{
     relative_path_from_absolute_and_working_directory, Location, RelativePathToSourceFile, Span,
     TextSource, WithLocation,
@@ -15,6 +9,11 @@ use isograph_lang_parser::{
 use isograph_schema::UnvalidatedSchema;
 use lazy_static::lazy_static;
 use regex::Regex;
+use std::{
+    fs::{self, DirEntry},
+    io,
+    path::{Path, PathBuf},
+};
 
 use crate::{
     batch_compile::BatchCompileError,

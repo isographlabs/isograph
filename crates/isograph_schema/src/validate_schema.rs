@@ -1,8 +1,8 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use common_lang_types::{
-    EnumLiteralValue, GraphQLScalarTypeName, IsographObjectTypeName, SelectableFieldName,
-    UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
+    EnumLiteralValue, GraphQLScalarTypeName, IsoLiteralText, IsographObjectTypeName,
+    SelectableFieldName, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
@@ -89,6 +89,7 @@ pub enum ValidatedIsographSelectionVariant {
             MissingArguments,
         ),
     ),
+    Updatable,
 }
 
 pub type MissingArguments = Vec<ValidatedVariableDefinition>;
@@ -105,7 +106,7 @@ impl SchemaValidationState for ValidatedSchemaState {
     type ClientTypeSelectionScalarFieldAssociatedData = ValidatedScalarFieldAssociatedData;
     type ClientTypeSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
     type VariableDefinitionInnerType = SelectableServerFieldId;
-    type Entrypoint = HashSet<ClientFieldId>;
+    type Entrypoint = HashMap<ClientFieldId, IsoLiteralText>;
 }
 
 pub type ValidatedSchema = Schema<ValidatedSchemaState>;
@@ -116,7 +117,7 @@ impl ValidatedSchema {
     ) -> Result<Self, Vec<WithLocation<ValidateSchemaError>>> {
         let mut errors = vec![];
 
-        let mut updated_entrypoints = HashSet::new();
+        let mut updated_entrypoints = HashMap::new();
         for (text_source, entrypoint_type_and_field) in unvalidated_schema.entrypoints.iter() {
             match unvalidated_schema
                 .validate_entrypoint_type_and_field(*text_source, *entrypoint_type_and_field)
@@ -129,7 +130,10 @@ impl ValidatedSchema {
                     )
                 }) {
                 Ok(client_field_id) => {
-                    updated_entrypoints.insert(client_field_id);
+                    updated_entrypoints.insert(
+                        client_field_id,
+                        entrypoint_type_and_field.item.iso_literal_text,
+                    );
                 }
                 Err(e) => errors.push(e),
             }
@@ -342,6 +346,7 @@ pub fn categorize_field_loadability<'a>(
         ClientFieldVariant::Link => None,
         ClientFieldVariant::UserWritten(_) => match selection_variant {
             ValidatedIsographSelectionVariant::Regular => None,
+            ValidatedIsographSelectionVariant::Updatable => None,
             ValidatedIsographSelectionVariant::Loadable((l, _)) => {
                 Some(Loadability::LoadablySelectedField(l))
             }
