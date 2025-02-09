@@ -1,4 +1,4 @@
-use std::{any::Any, num::NonZeroUsize};
+use std::{any::Any, collections::HashMap, num::NonZeroUsize};
 
 use crate::{
     dependency::{Dependency, DependencyStack, NodeKind},
@@ -25,7 +25,7 @@ pub struct Database {
     // record the access in the access_vec. Later, when we garbage collect,
     // we transfer the accesses to the lru cache, and remove remaining
     // nodes from the derived_nodes
-    pub(crate) derived_nodes: DashMap<DerivedNodeId, DerivedNode>,
+    pub(crate) derived_nodes: HashMap<DerivedNodeId, DerivedNode>,
     pub(crate) access_vec: BoxcarVec<DerivedNodeId>,
     pub(crate) derived_node_lru_cache: LruCache<DerivedNodeId, ()>,
 }
@@ -37,7 +37,7 @@ impl Database {
             current_epoch,
             dependency_stack: DependencyStack::new(),
             params: DashMap::new(),
-            derived_nodes: DashMap::new(),
+            derived_nodes: HashMap::new(),
             source_nodes: DashMap::new(),
             access_vec: BoxcarVec::new(),
             derived_node_lru_cache: LruCache::new(NonZeroUsize::try_from(1000).unwrap()),
@@ -63,14 +63,14 @@ impl Database {
     pub(crate) fn get_derived_node<'db>(
         &'db self,
         derived_node_id: DerivedNodeId,
-    ) -> Option<Ref<'db, DerivedNodeId, DerivedNode>> {
+    ) -> Option<&'db DerivedNode> {
         eprintln!("getting {:?}", derived_node_id);
         self.access_vec.push(derived_node_id);
         self.derived_nodes.get(&derived_node_id)
     }
 
     pub(crate) fn get_derived_node_mut<'db>(
-        &'db self,
+        &'db mut self,
         derived_node_id: DerivedNodeId,
     ) -> Option<impl std::ops::DerefMut<Target = DerivedNode> + 'db> {
         eprintln!("getting {:?}", derived_node_id);
@@ -83,7 +83,7 @@ impl Database {
     }
 
     pub(crate) fn insert_derived_node(
-        &self,
+        &mut self,
         derived_node_id: DerivedNodeId,
         derived_node: DerivedNode,
     ) {
