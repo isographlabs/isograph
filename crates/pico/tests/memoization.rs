@@ -19,7 +19,6 @@ static EVAL_COUNTER: LazyLock<Mutex<HashMap<SourceId<Input>, usize>>> =
 #[test]
 fn memoization() {
     let mut db = Database::default();
-    eprintln!("test 1");
 
     let left = db.set(Input {
         key: "left",
@@ -31,9 +30,7 @@ fn memoization() {
         value: "(2 + 2) * 2".to_string(),
     });
 
-    eprintln!("test 2");
     let result = sum(&db, left, right);
-    eprintln!("test 3");
     assert_eq!(result, 14);
 
     // every functions has been called once on the first run
@@ -46,7 +43,6 @@ fn memoization() {
         key: "left",
         value: "3 * 2".to_string(),
     });
-    eprintln!("test 4");
 
     // changing source doesn't cause any recalculation
     assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 1);
@@ -54,7 +50,6 @@ fn memoization() {
     assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 1);
 
     let result = sum(&db, left, right);
-    eprintln!("test 5");
     assert_eq!(result, 14);
 
     // "left" must be called again because the input value has been changed
@@ -69,9 +64,7 @@ fn memoization() {
         key: "left",
         value: "3 * 3".to_string(),
     });
-    eprintln!("test 6");
     let result = sum(&db, left, right);
-    eprintln!("test 7");
     assert_eq!(result, 17);
 
     // "left" must be called again because the input value has been changed
@@ -91,9 +84,7 @@ struct Input {
 
 #[memo]
 fn parse_ast(db: &Database, id: SourceId<Input>) -> Result<Program> {
-    eprintln!("parst ast 1");
     let source_text = db.get(id);
-    eprintln!("parst ast 2");
     let mut lexer = Lexer::new(source_text.value);
     let mut parser = Parser::new(&mut lexer)?;
     parser.parse_program()
@@ -101,21 +92,15 @@ fn parse_ast(db: &Database, id: SourceId<Input>) -> Result<Program> {
 
 #[memo]
 fn evaluate_input(db: &Database, id: SourceId<Input>) -> i64 {
-    eprintln!("eval 1");
     *EVAL_COUNTER.lock().unwrap().entry(id).or_insert(0) += 1;
-    eprintln!("eval 2");
     let ast = parse_ast(db, id).expect("ast must be correct");
-    eprintln!("parse ast failed?");
-    dbg!(eval(ast.expression).expect("value must be evaluated"))
+    eval(ast.expression).expect("value must be evaluated")
 }
 
 #[memo]
 fn sum(db: &Database, left: SourceId<Input>, right: SourceId<Input>) -> i64 {
-    eprintln!("sum 1");
     SUM_COUNTER.fetch_add(1, Ordering::SeqCst);
-    eprintln!("sum 2");
     let left = evaluate_input(db, left);
-    eprintln!("sum 3");
     let right = evaluate_input(db, right);
 
     left + right

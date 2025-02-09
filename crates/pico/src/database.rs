@@ -6,6 +6,7 @@ use crate::{
     epoch::Epoch,
     source::{Source, SourceId, SourceNode},
     u64_types::{Key, ParamId},
+    with_dependency_tracking, DerivedNodeIndex, DidRecalculate, InnerFn,
 };
 use boxcar::Vec as BoxcarVec;
 use dashmap::{mapref::one::Ref, DashMap, Entry};
@@ -28,6 +29,8 @@ pub struct Database {
     pub(crate) derived_nodes: DashMap<DerivedNodeId, DerivedNode>,
     pub(crate) access_vec: BoxcarVec<DerivedNodeId>,
     pub(crate) derived_node_lru_cache: LruCache<DerivedNodeId, ()>,
+
+    pub(crate) derived_node_values: BoxcarVec<Box<dyn DynEq>>,
 }
 
 impl Database {
@@ -41,6 +44,7 @@ impl Database {
             source_nodes: DashMap::new(),
             access_vec: BoxcarVec::new(),
             derived_node_lru_cache: LruCache::new(NonZeroUsize::try_from(1000).unwrap()),
+            derived_node_values: BoxcarVec::new(),
         }
     }
 
@@ -69,6 +73,15 @@ impl Database {
         self.derived_nodes.get(&derived_node_id)
     }
 
+    pub(crate) fn get_derived_node_value(
+        &self,
+        derived_node_index: DerivedNodeIndex,
+    ) -> &Box<dyn DynEq> {
+        self.derived_node_values.get(derived_node_index.0).expect(
+            "Expected value to exist. This is indicative of a bug in pico, or you did some GC",
+        )
+    }
+
     pub(crate) fn get_derived_node_mut<'db>(
         &'db self,
         derived_node_id: DerivedNodeId,
@@ -82,13 +95,30 @@ impl Database {
         // self.derived_node_lru_cache
     }
 
-    pub(crate) fn insert_derived_node(
+    pub(crate) fn create_derived_node(
         &self,
         derived_node_id: DerivedNodeId,
-        derived_node: DerivedNode,
-    ) {
-        eprintln!("insert derived");
+        inner_fn: InnerFn,
+    ) -> (Epoch, DidRecalculate) {
+        eprintln!("create 1");
+        let (value, tracked_dependencies) =
+            with_dependency_tracking(self, derived_node_id.param_id, inner_fn);
+        eprintln!("create 2");
+        let derived_node_index = self.derived_node_values.push(value).into();
+
+        let derived_node = DerivedNode {
+            dependencies: tracked_dependencies.dependencies,
+            inner_fn,
+            derived_node_index,
+            time_updated: tracked_dependencies.max_time_updated,
+            time_verified: self.current_epoch,
+        };
         self.derived_nodes.insert(derived_node_id, derived_node);
+        eprintln!("create 3");
+        (
+            tracked_dependencies.max_time_updated,
+            DidRecalculate::Recalculated,
+        )
     }
 
     pub fn get<T: Clone + 'static>(&self, id: SourceId<T>) -> T {

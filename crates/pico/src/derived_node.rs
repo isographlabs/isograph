@@ -8,6 +8,8 @@ use crate::{
     Database,
 };
 
+pub type DerivedNodeValue = Box<dyn DynEq>;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DerivedNodeId {
     pub key: Key,
@@ -28,19 +30,23 @@ impl InnerFn {
     }
 }
 
+// TODO every time GC is run, derived node indexes get invalidated,
+// so we should keep track of how many times we had run GC (e.g. a
+// GC Generation)
+#[derive(Debug, Clone, Copy)]
+pub struct DerivedNodeIndex(pub usize);
+
+impl From<usize> for DerivedNodeIndex {
+    fn from(value: usize) -> Self {
+        Self(value)
+    }
+}
+
+#[derive(Debug)]
 pub struct DerivedNode {
     pub dependencies: Vec<Dependency>,
     pub inner_fn: InnerFn,
-    pub value: Box<dyn DynEq>,
+    pub derived_node_index: DerivedNodeIndex,
     pub time_updated: Epoch,
     pub time_verified: Epoch,
-}
-
-impl fmt::Debug for DerivedNode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("DerivedNode")
-            .field("dependencies", &self.dependencies)
-            .field("value", &self.value)
-            .finish()
-    }
 }

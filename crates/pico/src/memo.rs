@@ -66,38 +66,12 @@ pub fn memo(db: &Database, derived_node_id: DerivedNodeId, inner_fn: InnerFn) ->
             }
         } else {
             eprintln!("memo 5");
-            create_derived_node(db, derived_node_id, inner_fn)
+            db.create_derived_node(derived_node_id, inner_fn)
         };
     eprintln!("memo 7");
     db.register_dependency_in_parent_memoized_fn(NodeKind::Derived(derived_node_id), time_updated);
     eprintln!("memo 8");
     did_recalculate
-}
-
-fn create_derived_node(
-    db: &Database,
-    derived_node_id: DerivedNodeId,
-    inner_fn: InnerFn,
-) -> (Epoch, DidRecalculate) {
-    eprintln!("create 1");
-    let (value, tracked_dependencies) =
-        with_dependency_tracking(db, derived_node_id.param_id, inner_fn);
-    eprintln!("create 2");
-    db.insert_derived_node(
-        derived_node_id,
-        DerivedNode {
-            dependencies: tracked_dependencies.dependencies,
-            inner_fn,
-            value,
-            time_updated: tracked_dependencies.max_time_updated,
-            time_verified: db.current_epoch,
-        },
-    );
-    eprintln!("create 3");
-    (
-        tracked_dependencies.max_time_updated,
-        DidRecalculate::Recalculated,
-    )
 }
 
 fn update_derived_node(
@@ -110,18 +84,25 @@ fn update_derived_node(
     let (new_value, tracked_dependencies) =
         with_dependency_tracking(db, derived_node_id.param_id, inner_fn);
     eprintln!("update 2");
-    let did_recalculate = if *derived_node.value != *new_value {
+    let existing_value = db.get_derived_node_value(derived_node.derived_node_index);
+    let (did_recalculate, new_index) = if *existing_value != new_value {
         eprintln!("update 3");
         derived_node.time_updated = tracked_dependencies.max_time_updated;
-        DidRecalculate::Recalculated
+
+        let derived_node_index = db.derived_node_values.push(new_value).into();
+
+        (DidRecalculate::Recalculated, derived_node_index)
     } else {
-        DidRecalculate::ReusedMemoizedValue
+        (
+            DidRecalculate::ReusedMemoizedValue,
+            derived_node.derived_node_index,
+        )
     };
     eprintln!("update 4");
     *derived_node = DerivedNode {
         dependencies: tracked_dependencies.dependencies,
         inner_fn,
-        value: new_value,
+        derived_node_index: new_index,
         time_updated: tracked_dependencies.max_time_updated,
         time_verified: db.current_epoch,
     };
@@ -169,7 +150,7 @@ fn derived_node_changed_since(db: &Database, derived_node_id: DerivedNodeId, sin
     matches!(did_recalculate, DidRecalculate::Recalculated)
 }
 
-fn with_dependency_tracking(
+pub(crate) fn with_dependency_tracking(
     db: &Database,
     param_id: ParamId,
     inner_fn: InnerFn,

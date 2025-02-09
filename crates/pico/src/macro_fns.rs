@@ -5,7 +5,7 @@ use std::{
 
 use dashmap::mapref::one::Ref;
 
-use crate::{Database, DerivedNode, DerivedNodeId, ParamId};
+use crate::{Database, DerivedNode, DerivedNodeId, DerivedNodeValue, ParamId};
 
 pub fn intern_param<T: Hash + Clone + 'static>(db: &Database, param: T) -> ParamId {
     let param_id = hash(&param).into();
@@ -16,11 +16,12 @@ pub fn intern_param<T: Hash + Clone + 'static>(db: &Database, param: T) -> Param
     param_id
 }
 
-pub fn get_derived_node<'db>(
-    db: &'db Database,
+pub fn get_derived_node_value(
+    db: &Database,
     derived_node_id: DerivedNodeId,
-) -> Option<Ref<'db, DerivedNodeId, DerivedNode>> {
+) -> Option<&DerivedNodeValue> {
     db.get_derived_node(derived_node_id)
+        .map(|derived_node| db.get_derived_node_value(derived_node.derived_node_index))
 }
 
 pub fn get_param<'db>(
