@@ -66,11 +66,56 @@ fn parse_ast(db: &Database, id: SourceId<Input>) -> Result<Program> {
     parser.parse_program()
 }
 
-#[memo(reference)]
-fn evaluate_input(db: &Database, id: SourceId<Input>) -> Value {
-    let ast = parse_ast(db, id).expect("ast must be correct");
-    let result = eval(ast.expression).expect("value must be evaluated");
-    Value(result)
+// #[memo(reference)]
+// fn evaluate_input(db: &Database, id: SourceId<Input>) -> Value {
+//     let ast = parse_ast(db, id).expect("ast must be correct");
+//     let result = eval(ast.expression).expect("value must be evaluated");
+//     Value(result)
+// }
+fn evaluate_input<'db>(db: &'db Database, id: SourceId<Input>) -> &'db Value {
+    // {
+    //     ::std::io::_eprint(format_args!("about to intern {0:?}\n", (id.clone(),)));
+    // };
+    let param_id = ::pico::macro_fns::intern_param(db, (id.clone(),));
+    let derived_node_id = ::pico::DerivedNodeId::new(9351471516276861273u64.into(), param_id);
+    // {
+    //     ::std::io::_eprint(format_args!("about to call memo\n"));
+    // };
+    ::pico::memo(
+        db,
+        derived_node_id,
+        ::pico::InnerFn::new(|db, param_id| {
+            // {
+            //     ::std::io::_eprint(format_args!("inner function called\n"));
+            // };
+            let param_ref = ::pico::macro_fns::get_param(db, param_id)
+                .expect("param should exist. This is indicative of a bug in Pico.");
+            let (id,) = {
+                let (id,) = param_ref
+                    .downcast_ref::<(SourceId<Input>,)>()
+                    .expect("param type must to be correct. This is indicative of a bug in Pico.");
+                (id.clone(),)
+            };
+            // {
+            //     ::std::io::_eprint(format_args!("now calling actual inner\n"));
+            // };
+            let value: Value = (|| {
+                let ast = parse_ast(db, id).expect("ast must be correct");
+                let result = eval(ast.expression).expect("value must be evaluated");
+                Value(result)
+            })();
+            // {
+            //     ::std::io::_eprint(format_args!("called\n"));
+            // };
+            Box::new(value)
+        }),
+    );
+    ::pico::macro_fns::get_derived_node(db, derived_node_id)
+        .expect("derived node must exist. This is indicative of a bug in Pico.")
+        .value
+        .as_any()
+        .downcast_ref::<Value>()
+        .expect("unexpected return type. This is indicative of a bug in Pico.")
 }
 
 #[memo]

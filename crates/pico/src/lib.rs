@@ -3,7 +3,6 @@ mod dependency;
 mod derived_node;
 mod dyn_eq;
 mod epoch;
-mod index;
 pub mod macro_fns;
 mod memo;
 mod source;

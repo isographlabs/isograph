@@ -1,27 +1,33 @@
-use std::any::Any;
+use std::{any::Any, num::NonZeroUsize};
 
 use crate::{
     dependency::{Dependency, DependencyStack, NodeKind},
     dyn_eq::DynEq,
     epoch::Epoch,
-    index::Index,
     source::{Source, SourceId, SourceNode},
     u64_types::{Key, ParamId},
 };
+use boxcar::Vec as BoxcarVec;
 use dashmap::{DashMap, Entry};
-use once_map::OnceMap;
+use lru::LruCache;
 
-use crate::derived_node::{DerivedNode, DerivedNodeId, DerivedNodeRevision};
+use crate::derived_node::{DerivedNode, DerivedNodeId};
 
 #[derive(Debug)]
 pub struct Database {
     pub(crate) dependency_stack: DependencyStack,
-    pub(crate) param_id_to_index: DashMap<ParamId, Index<ParamId>>,
-    pub(crate) derived_node_id_to_index: DashMap<DerivedNodeId, Index<DerivedNodeId>>,
-    pub(crate) derived_node_id_to_revision: DashMap<DerivedNodeId, DerivedNodeRevision>,
+    pub(crate) params: DashMap<ParamId, Box<dyn Any>>,
     pub(crate) source_nodes: DashMap<Key, SourceNode>,
 
     pub(crate) current_epoch: Epoch,
+
+    // We store the derived nodes in this map, and when accessing them
+    // record the access in the access_vec. Later, when we garbage collect,
+    // we transfer the accesses to the lru cache, and remove remaining
+    // nodes from the derived_nodes
+    pub(crate) derived_nodes: DashMap<DerivedNodeId, DerivedNode>,
+    pub(crate) access_vec: BoxcarVec<DerivedNodeId>,
+    pub(crate) derived_node_lru_cache: LruCache<DerivedNodeId, ()>,
 }
 
 impl Database {
@@ -30,10 +36,11 @@ impl Database {
         Self {
             current_epoch,
             dependency_stack: DependencyStack::new(),
-            param_id_to_index: DashMap::new(),
-            derived_node_id_to_index: DashMap::new(),
-            derived_node_id_to_revision: DashMap::new(),
+            params: DashMap::new(),
+            derived_nodes: DashMap::new(),
             source_nodes: DashMap::new(),
+            access_vec: BoxcarVec::new(),
+            derived_node_lru_cache: LruCache::new(NonZeroUsize::try_from(1000).unwrap()),
         }
     }
 
@@ -43,73 +50,36 @@ impl Database {
     }
 
     pub(crate) fn contains_param(&self, param_id: ParamId) -> bool {
-        if let Some(index) = self.param_id_to_index.get(&param_id) {
-            self.epoch_to_generation_map.contains_key(&index.epoch)
-        } else {
-            false
-        }
+        self.params.contains_key(&param_id)
     }
 
-    pub(crate) fn get_param(&self, param_id: ParamId) -> Option<&Box<dyn Any>> {
-        let index = self.param_id_to_index.get(&param_id)?;
-        Some(
-            self.epoch_to_generation_map
-                .get(&index.epoch)?
-                .get_param(*index),
-        )
+    pub(crate) fn get_param<'db>(
+        &'db self,
+        param_id: ParamId,
+    ) -> Option<impl std::ops::Deref<Target = Box<dyn Any>> + 'db> {
+        self.params.get(&param_id)
     }
 
-    pub(crate) fn get_derived_node(&self, derived_node_id: DerivedNodeId) -> Option<&DerivedNode> {
-        let index = self.derived_node_id_to_index.get(&derived_node_id)?;
-        Some(
-            self.epoch_to_generation_map
-                .get(&index.epoch)?
-                .get_derived_node(*index),
-        )
-    }
-
-    pub(crate) fn set_derive_node_time_updated(
-        &self,
+    pub(crate) fn get_derived_node<'db>(
+        &'db self,
         derived_node_id: DerivedNodeId,
-        time_updated: Epoch,
-    ) {
-        let mut rev = self
-            .derived_node_id_to_revision
-            .get_mut(&derived_node_id)
-            .unwrap();
-        rev.time_updated = time_updated;
+    ) -> Option<impl std::ops::Deref<Target = DerivedNode> + 'db> {
+        eprintln!("getting {:?}", derived_node_id);
+        self.access_vec.push(derived_node_id);
+        self.derived_nodes.get(&derived_node_id)
     }
 
-    pub(crate) fn verify_derived_node(&self, derived_node_id: DerivedNodeId) {
-        let mut rev = self
-            .derived_node_id_to_revision
-            .get_mut(&derived_node_id)
-            .unwrap();
-        rev.time_verified = self.current_epoch;
-    }
-
-    pub(crate) fn get_derived_node_revision(
-        &self,
+    pub(crate) fn get_derived_node_mut<'db>(
+        &'db self,
         derived_node_id: DerivedNodeId,
-    ) -> Option<DerivedNodeRevision> {
-        self.derived_node_id_to_revision
-            .get(&derived_node_id)
-            .map(|rev| *rev)
+    ) -> Option<impl std::ops::DerefMut<Target = DerivedNode> + 'db> {
+        eprintln!("getting {:?}", derived_node_id);
+        self.access_vec.push(derived_node_id);
+        self.derived_nodes.get_mut(&derived_node_id)
     }
 
-    pub(crate) fn insert_derived_node_revision(
-        &self,
-        derived_node_id: DerivedNodeId,
-        time_updated: Epoch,
-        time_verified: Epoch,
-    ) {
-        self.derived_node_id_to_revision.insert(
-            derived_node_id,
-            DerivedNodeRevision {
-                time_updated,
-                time_verified,
-            },
-        );
+    pub(crate) fn garbage_collect(&self) {
+        // self.derived_node_lru_cache
     }
 
     pub(crate) fn insert_derived_node(
@@ -117,13 +87,8 @@ impl Database {
         derived_node_id: DerivedNodeId,
         derived_node: DerivedNode,
     ) {
-        let idx = self
-            .epoch_to_generation_map
-            .get(&self.current_epoch)
-            .unwrap()
-            .insert_derived_node(derived_node);
-        self.derived_node_id_to_index
-            .insert(derived_node_id, Index::new(self.current_epoch, idx));
+        eprintln!("insert derived");
+        self.derived_nodes.insert(derived_node_id, derived_node);
     }
 
     pub fn get<T: Clone + 'static>(&self, id: SourceId<T>) -> T {
@@ -155,8 +120,6 @@ impl Database {
                     // We cannot call self.increment_epoch() because that borrows
                     // the entire struct, but self.source_nodes is already borrowed
                     let next_epoch = self.current_epoch.increment();
-                    self.epoch_to_generation_map
-                        .insert(next_epoch, |_| Box::new(Generation::new()));
                     *(occupied_entry.get_mut()) = SourceNode {
                         time_updated: next_epoch,
                         value: Box::new(source),

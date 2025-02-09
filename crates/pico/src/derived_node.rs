@@ -32,6 +32,8 @@ pub struct DerivedNode {
     pub dependencies: Vec<Dependency>,
     pub inner_fn: InnerFn,
     pub value: Box<dyn DynEq>,
+    pub time_updated: Epoch,
+    pub time_verified: Epoch,
 }
 
 impl fmt::Debug for DerivedNode {
@@ -41,10 +43,4 @@ impl fmt::Debug for DerivedNode {
             .field("value", &self.value)
             .finish()
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct DerivedNodeRevision {
-    pub time_updated: Epoch,
-    pub time_verified: Epoch,
 }

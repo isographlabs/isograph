@@ -3,27 +3,28 @@ use std::{
     hash::{DefaultHasher, Hash, Hasher},
 };
 
-use crate::{index::Index, Database, DerivedNode, DerivedNodeId, ParamId};
+use crate::{Database, DerivedNode, DerivedNodeId, ParamId};
 
 pub fn intern_param<T: Hash + Clone + 'static>(db: &Database, param: T) -> ParamId {
     let param_id = hash(&param).into();
-    if !db.contains_param(param_id) {
-        let idx = db
-            .epoch_to_generation_map
-            .get(&db.current_epoch)
-            .unwrap()
-            .insert_param(Box::new(param));
-        db.param_id_to_index
-            .insert(param_id, Index::new(db.current_epoch, idx));
+    eprintln!("intern, this deadlocks");
+    if !db.params.contains_key(&param_id) {
+        db.params.insert(param_id, Box::new(param));
     }
     param_id
 }
 
-pub fn get_derived_node(db: &Database, derived_node_id: DerivedNodeId) -> Option<&DerivedNode> {
+pub fn get_derived_node<'db>(
+    db: &'db Database,
+    derived_node_id: DerivedNodeId,
+) -> Option<impl std::ops::Deref<Target = DerivedNode> + 'db> {
     db.get_derived_node(derived_node_id)
 }
 
-pub fn get_param(db: &Database, param_id: ParamId) -> Option<&Box<dyn Any>> {
+pub fn get_param<'db>(
+    db: &'db Database,
+    param_id: ParamId,
+) -> Option<impl std::ops::Deref<Target = Box<dyn Any>> + 'db> {
     db.get_param(param_id)
 }
 

@@ -52,7 +52,9 @@ impl DependencyStack {
     }
 
     pub fn enter(&self) -> DependencyStackGuard<'_> {
+        eprintln!("enter 1");
         self.0.borrow_mut().push(TrackedDependencies::new());
+        eprintln!("enter 2");
         DependencyStackGuard {
             stack: self,
             released: false,
