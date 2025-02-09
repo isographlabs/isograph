@@ -336,17 +336,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "compiler-playground"
-version = "0.3.0"
-dependencies = [
- "pico",
- "pico_macros",
- "thiserror",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "crossbeam"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"

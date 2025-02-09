@@ -8,7 +8,7 @@ use crate::{
     source::{Source, SourceId, SourceNode},
     u64_types::{Key, ParamId},
 };
-use dashmap::DashMap;
+use dashmap::{DashMap, Entry};
 use once_map::OnceMap;
 
 use crate::{
@@ -43,11 +43,12 @@ impl Database {
         }
     }
 
+    /// Note: this function is also inlined into [Database::set]
     pub fn increment_epoch(&mut self) -> Epoch {
-        let current_epoch = self.current_epoch.increment();
+        let next_epoch = self.current_epoch.increment();
         self.epoch_to_generation_map
-            .insert(current_epoch, |_| Box::new(Generation::new()));
-        current_epoch
+            .insert(next_epoch, |_| Box::new(Generation::new()));
+        next_epoch
     }
 
     pub fn drop_epoch(&mut self, epoch: Epoch) {
@@ -156,20 +157,35 @@ impl Database {
             .clone()
     }
 
+    /// Sets a source in the database. If there is an existing item and it does not equal
+    /// the new source, increment the current epoch.
     pub fn set<T: Source + DynEq>(&mut self, source: T) -> SourceId<T> {
         let id = SourceId::new(&source);
-        let time_updated = if self.source_nodes.contains_key(&id.key) {
-            self.increment_epoch()
-        } else {
-            self.current_epoch
+        match self.source_nodes.entry(id.key) {
+            Entry::Occupied(mut occupied_entry) => {
+                let existing_node = occupied_entry.get();
+                if !existing_node.value.dyn_eq(&source) {
+                    // [Database::set] has been inlined here!
+                    // We cannot call self.increment_epoch() because that borrows
+                    // the entire struct, but self.source_nodes is already borrowed
+                    let next_epoch = self.current_epoch.increment();
+                    self.epoch_to_generation_map
+                        .insert(next_epoch, |_| Box::new(Generation::new()));
+                    *(occupied_entry.get_mut()) = SourceNode {
+                        time_updated: next_epoch,
+                        value: Box::new(source),
+                    };
+                } else {
+                    occupied_entry.get_mut().time_updated = self.current_epoch;
+                };
+            }
+            Entry::Vacant(vacant_entry) => {
+                vacant_entry.insert(SourceNode {
+                    time_updated: self.current_epoch,
+                    value: Box::new(source),
+                });
+            }
         };
-        self.source_nodes.insert(
-            id.key,
-            SourceNode {
-                time_updated,
-                value: Box::new(source),
-            },
-        );
         id
     }
 
