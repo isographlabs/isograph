@@ -58,7 +58,7 @@ impl Database {
     /// Drop epochs until first_epoch_to_keep.
     pub fn drop_epochs(&mut self, first_epoch_to_keep: Epoch) {
         debug_assert!(
-            first_epoch_to_keep < self.current_epoch,
+            first_epoch_to_keep <= self.current_epoch,
             "Cannot drop the current epoch."
         );
 
