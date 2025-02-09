@@ -3,9 +3,7 @@ use std::{
     hash::{DefaultHasher, Hash, Hasher},
 };
 
-use dashmap::mapref::one::Ref;
-
-use crate::{Database, DerivedNode, DerivedNodeId, DerivedNodeValue, ParamId};
+use crate::{Database, DerivedNodeId, DerivedNodeValue, ParamId};
 
 pub fn intern_param<T: Hash + Clone + 'static>(db: &Database, param: T) -> ParamId {
     let param_id = hash(&param).into();

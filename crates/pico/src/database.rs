@@ -35,6 +35,10 @@ pub struct Database {
 
 impl Database {
     pub fn new() -> Self {
+        Database::new_with_capacity(1000.try_into().unwrap())
+    }
+
+    pub fn new_with_capacity(capacity: NonZeroUsize) -> Self {
         let current_epoch = Epoch::new();
         Self {
             current_epoch,
@@ -43,7 +47,7 @@ impl Database {
             derived_nodes: DashMap::new(),
             source_nodes: DashMap::new(),
             access_vec: BoxcarVec::new(),
-            derived_node_lru_cache: LruCache::new(NonZeroUsize::try_from(1000).unwrap()),
+            derived_node_lru_cache: LruCache::new(capacity),
             derived_node_values: BoxcarVec::new(),
         }
     }
@@ -91,8 +95,42 @@ impl Database {
         self.derived_nodes.get_mut(&derived_node_id)
     }
 
-    pub(crate) fn garbage_collect(&self) {
-        // self.derived_node_lru_cache
+    pub fn garbage_collect(&mut self) {
+        for (_, derived_node_id) in self.access_vec.iter() {
+            self.derived_node_lru_cache.put(*derived_node_id, ());
+        }
+        self.access_vec = BoxcarVec::new();
+
+        let old_derived_nodes = std::mem::replace(&mut self.derived_nodes, DashMap::new());
+        let mut old_derived_nodes_values =
+            std::mem::replace(&mut self.derived_node_values, BoxcarVec::new());
+        // Now, self.derived_nodes and self.derived_node_values are the ones we need to modify
+        // i.e. the ones that contain the derived nodes that survived garbage collection.
+
+        for (retained_id, _) in self.derived_node_lru_cache.iter() {
+            let retained_derived_node = old_derived_nodes.get(retained_id).expect("should exist");
+            let existing_retained_derived_index = retained_derived_node.derived_node_index;
+            let retained_derived_node_value = std::mem::replace(
+                unsafe {
+                    old_derived_nodes_values.get_unchecked_mut(existing_retained_derived_index.0)
+                },
+                Box::new(()),
+            );
+            let derived_node_index = self
+                .derived_node_values
+                .push(retained_derived_node_value)
+                .into();
+            self.derived_nodes.insert(
+                *retained_id,
+                DerivedNode {
+                    dependencies: retained_derived_node.dependencies.clone(),
+                    inner_fn: retained_derived_node.inner_fn,
+                    derived_node_index,
+                    time_updated: retained_derived_node.time_updated,
+                    time_verified: retained_derived_node.time_verified,
+                },
+            );
+        }
     }
 
     pub(crate) fn create_derived_node(

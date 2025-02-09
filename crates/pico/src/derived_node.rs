@@ -1,4 +1,4 @@
-use std::{fmt, hash::Hash};
+use std::hash::Hash;
 
 use crate::{
     dependency::Dependency,
