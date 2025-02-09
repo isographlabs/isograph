@@ -19,7 +19,7 @@ pub fn intern_param<T: Hash + Clone + 'static>(db: &Database, param: T) -> Param
 pub fn get_derived_node<'db>(
     db: &'db Database,
     derived_node_id: DerivedNodeId,
-) -> Option<&'db DerivedNode> {
+) -> Option<Ref<'db, DerivedNodeId, DerivedNode>> {
     db.get_derived_node(derived_node_id)
 }
 

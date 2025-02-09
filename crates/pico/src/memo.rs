@@ -1,6 +1,6 @@
 use crate::{
     database::Database,
-    dependency::{Dependency, NodeKind, TrackedDependencies},
+    dependency::{NodeKind, TrackedDependencies},
     derived_node::{DerivedNode, DerivedNodeId},
     dyn_eq::DynEq,
     epoch::Epoch,
@@ -50,25 +50,19 @@ pub enum DidRecalculate {
 /// After this function is called, we guarantee that a [`DerivedNode`]
 /// (with a value identical to what we would get if we actually invoked the
 /// function) is present in the [`Database`].
-pub fn memo(
-    db: &mut Database,
-    derived_node_id: DerivedNodeId,
-    inner_fn: InnerFn,
-) -> DidRecalculate {
+pub fn memo(db: &Database, derived_node_id: DerivedNodeId, inner_fn: InnerFn) -> DidRecalculate {
     eprintln!("memo 1");
-    let current_epoch = db.current_epoch;
     let (time_updated, did_recalculate) =
         if let Some(mut derived_node) = db.get_derived_node_mut(derived_node_id) {
             eprintln!("memo 2");
-            derived_node.time_verified = current_epoch;
+            derived_node.time_verified = db.current_epoch;
             // db.verify_derived_node(derived_node_id);
             eprintln!("memo 3");
-            let items = (derived_node.dependencies).clone();
-            if any_dependency_changed(db, &items) {
+            if any_dependency_changed(db, &derived_node) {
                 eprintln!("memo 4");
                 update_derived_node(db, derived_node_id, &mut derived_node, inner_fn)
             } else {
-                (current_epoch, DidRecalculate::ReusedMemoizedValue)
+                (db.current_epoch, DidRecalculate::ReusedMemoizedValue)
             }
         } else {
             eprintln!("memo 5");
@@ -135,11 +129,11 @@ fn update_derived_node(
     (tracked_dependencies.max_time_updated, did_recalculate)
 }
 
-fn any_dependency_changed(db: &mut Database, dependencies: &[Dependency]) -> bool {
-    let current_epoch = db.current_epoch;
-    dependencies
+fn any_dependency_changed(db: &Database, derived_node: &DerivedNode) -> bool {
+    derived_node
+        .dependencies
         .iter()
-        .filter(|dep| dep.time_verified_or_updated != current_epoch)
+        .filter(|dep| dep.time_verified_or_updated != db.current_epoch)
         .any(|dependency| match dependency.node_to {
             NodeKind::Source(key) => {
                 eprintln!("any dep getting source {key:?}");
@@ -159,11 +153,7 @@ fn source_node_changed_since(db: &Database, key: Key, since: Epoch) -> bool {
     }
 }
 
-fn derived_node_changed_since(
-    db: &mut Database,
-    derived_node_id: DerivedNodeId,
-    since: Epoch,
-) -> bool {
+fn derived_node_changed_since(db: &Database, derived_node_id: DerivedNodeId, since: Epoch) -> bool {
     if !db.contains_param(derived_node_id.param_id) {
         return true;
     }
