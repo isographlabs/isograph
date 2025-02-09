@@ -1,6 +1,8 @@
 use std::{error::Error, fmt, path::PathBuf};
 
 use intern::string_key::{Intern, Lookup};
+use pico::Source;
+use pico_macros::Source;
 
 use crate::{
     text_with_carats::text_with_carats, CurrentWorkingDirectory, RelativePathToSourceFile, Span,
@@ -14,9 +16,10 @@ use crate::{
 /// TODO consider whether to replace the span with an index,
 /// as this will probably mean that sources are more reusable
 /// during watch mode.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Source)]
 pub struct TextSource {
     pub current_working_directory: CurrentWorkingDirectory,
+    #[key]
     pub relative_path_to_source_file: RelativePathToSourceFile,
     pub span: Option<Span>,
 }
