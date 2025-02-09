@@ -11,6 +11,7 @@ u64_newtypes = { path = "../u64_newtypes" }
 boxcar = { workspace = true }
 dashmap = { workspace = true }
 once_map = { workspace = true }
-serde = { workspace = true } 
+serde = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+lru = { workspace = true }

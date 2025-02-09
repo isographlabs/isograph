@@ -1,159 +1,162 @@
-use std::any::Any;
+use std::{any::Any, num::NonZeroUsize};
 
 use crate::{
     dependency::{Dependency, DependencyStack, NodeKind},
     dyn_eq::DynEq,
     epoch::Epoch,
-    index::Index,
     source::{Source, SourceId, SourceNode},
     u64_types::{Key, ParamId},
+    with_dependency_tracking, DerivedNodeIndex, DidRecalculate, InnerFn,
 };
-use dashmap::{DashMap, Entry};
-use once_map::OnceMap;
+use boxcar::Vec as BoxcarVec;
+use dashmap::{mapref::one::Ref, DashMap, Entry};
+use lru::LruCache;
 
-use crate::{
-    derived_node::{DerivedNode, DerivedNodeId, DerivedNodeRevision},
-    generation::Generation,
-};
+use crate::derived_node::{DerivedNode, DerivedNodeId};
 
 #[derive(Debug)]
 pub struct Database {
     pub(crate) dependency_stack: DependencyStack,
-    pub(crate) param_id_to_index: DashMap<ParamId, Index<ParamId>>,
-    pub(crate) derived_node_id_to_index: DashMap<DerivedNodeId, Index<DerivedNodeId>>,
-    pub(crate) derived_node_id_to_revision: DashMap<DerivedNodeId, DerivedNodeRevision>,
+    pub(crate) params: DashMap<ParamId, Box<dyn Any>>,
     pub(crate) source_nodes: DashMap<Key, SourceNode>,
 
-    /// The oldest epoch currently in the epoch to generation map (inclusive)
-    pub(crate) earliest_epoch: Epoch,
     pub(crate) current_epoch: Epoch,
-    pub(crate) epoch_to_generation_map: OnceMap<Epoch, Box<Generation>>,
+
+    // We store the derived nodes in this map, and when accessing them
+    // record the access in the access_vec. Later, when we garbage collect,
+    // we transfer the accesses to the lru cache, and remove remaining
+    // nodes from the derived_nodes
+    pub(crate) derived_nodes: DashMap<DerivedNodeId, DerivedNode>,
+    pub(crate) access_vec: BoxcarVec<DerivedNodeId>,
+    pub(crate) derived_node_lru_cache: LruCache<DerivedNodeId, ()>,
+
+    pub(crate) derived_node_values: BoxcarVec<Box<dyn DynEq>>,
 }
 
 impl Database {
     pub fn new() -> Self {
-        let epoch_to_generation_map = OnceMap::new();
+        Database::new_with_capacity(1000.try_into().unwrap())
+    }
+
+    pub fn new_with_capacity(capacity: NonZeroUsize) -> Self {
         let current_epoch = Epoch::new();
-        epoch_to_generation_map.insert(current_epoch, |_| Box::new(Generation::new()));
         Self {
             current_epoch,
-            earliest_epoch: current_epoch,
             dependency_stack: DependencyStack::new(),
-            param_id_to_index: DashMap::new(),
-            derived_node_id_to_index: DashMap::new(),
-            derived_node_id_to_revision: DashMap::new(),
+            params: DashMap::new(),
+            derived_nodes: DashMap::new(),
             source_nodes: DashMap::new(),
-            epoch_to_generation_map,
+            access_vec: BoxcarVec::new(),
+            derived_node_lru_cache: LruCache::new(capacity),
+            derived_node_values: BoxcarVec::new(),
         }
     }
 
     /// Note: this function is also inlined into [Database::set]
     pub fn increment_epoch(&mut self) -> Epoch {
-        let next_epoch = self.current_epoch.increment();
-        self.epoch_to_generation_map
-            .insert(next_epoch, |_| Box::new(Generation::new()));
-        next_epoch
-    }
-
-    /// Drop epochs until first_epoch_to_keep.
-    pub fn drop_epochs(&mut self, first_epoch_to_keep: Epoch) {
-        debug_assert!(
-            first_epoch_to_keep <= self.current_epoch,
-            "Cannot drop the current epoch."
-        );
-
-        if first_epoch_to_keep < self.earliest_epoch {
-            return;
-        }
-
-        for epoch_to_drop in self.earliest_epoch.to(first_epoch_to_keep) {
-            self.epoch_to_generation_map.remove(&epoch_to_drop);
-        }
-        self.earliest_epoch = first_epoch_to_keep;
+        self.current_epoch.increment()
     }
 
     pub(crate) fn contains_param(&self, param_id: ParamId) -> bool {
-        if let Some(index) = self.param_id_to_index.get(&param_id) {
-            self.epoch_to_generation_map.contains_key(&index.epoch)
-        } else {
-            false
+        self.params.contains_key(&param_id)
+    }
+
+    pub(crate) fn get_param<'db>(
+        &'db self,
+        param_id: ParamId,
+    ) -> Option<impl std::ops::Deref<Target = Box<dyn Any>> + 'db> {
+        self.params.get(&param_id)
+    }
+
+    pub(crate) fn get_derived_node<'db>(
+        &'db self,
+        derived_node_id: DerivedNodeId,
+    ) -> Option<Ref<'db, DerivedNodeId, DerivedNode>> {
+        eprintln!("getting {:?}", derived_node_id);
+        self.access_vec.push(derived_node_id);
+        self.derived_nodes.get(&derived_node_id)
+    }
+
+    pub(crate) fn get_derived_node_value(
+        &self,
+        derived_node_index: DerivedNodeIndex,
+    ) -> &Box<dyn DynEq> {
+        self.derived_node_values.get(derived_node_index.0).expect(
+            "Expected value to exist. This is indicative of a bug in pico, or you did some GC",
+        )
+    }
+
+    pub(crate) fn get_derived_node_mut<'db>(
+        &'db self,
+        derived_node_id: DerivedNodeId,
+    ) -> Option<impl std::ops::DerefMut<Target = DerivedNode> + 'db> {
+        eprintln!("getting {:?}", derived_node_id);
+        self.access_vec.push(derived_node_id);
+        self.derived_nodes.get_mut(&derived_node_id)
+    }
+
+    pub fn garbage_collect(&mut self) {
+        for (_, derived_node_id) in self.access_vec.iter() {
+            self.derived_node_lru_cache.put(*derived_node_id, ());
+        }
+        self.access_vec = BoxcarVec::new();
+
+        let old_derived_nodes = std::mem::replace(&mut self.derived_nodes, DashMap::new());
+        let mut old_derived_nodes_values =
+            std::mem::replace(&mut self.derived_node_values, BoxcarVec::new());
+        // Now, self.derived_nodes and self.derived_node_values are the ones we need to modify
+        // i.e. the ones that contain the derived nodes that survived garbage collection.
+
+        for (retained_id, _) in self.derived_node_lru_cache.iter() {
+            let retained_derived_node = old_derived_nodes.get(retained_id).expect("should exist");
+            let existing_retained_derived_index = retained_derived_node.derived_node_index;
+            let retained_derived_node_value = std::mem::replace(
+                unsafe {
+                    old_derived_nodes_values.get_unchecked_mut(existing_retained_derived_index.0)
+                },
+                Box::new(()),
+            );
+            let derived_node_index = self
+                .derived_node_values
+                .push(retained_derived_node_value)
+                .into();
+            self.derived_nodes.insert(
+                *retained_id,
+                DerivedNode {
+                    dependencies: retained_derived_node.dependencies.clone(),
+                    inner_fn: retained_derived_node.inner_fn,
+                    derived_node_index,
+                    time_updated: retained_derived_node.time_updated,
+                    time_verified: retained_derived_node.time_verified,
+                },
+            );
         }
     }
 
-    pub(crate) fn get_param(&self, param_id: ParamId) -> Option<&Box<dyn Any>> {
-        let index = self.param_id_to_index.get(&param_id)?;
-        Some(
-            self.epoch_to_generation_map
-                .get(&index.epoch)?
-                .get_param(*index),
+    pub(crate) fn create_derived_node(
+        &self,
+        derived_node_id: DerivedNodeId,
+        inner_fn: InnerFn,
+    ) -> (Epoch, DidRecalculate) {
+        eprintln!("create 1");
+        let (value, tracked_dependencies) =
+            with_dependency_tracking(self, derived_node_id.param_id, inner_fn);
+        eprintln!("create 2");
+        let derived_node_index = self.derived_node_values.push(value).into();
+
+        let derived_node = DerivedNode {
+            dependencies: tracked_dependencies.dependencies,
+            inner_fn,
+            derived_node_index,
+            time_updated: tracked_dependencies.max_time_updated,
+            time_verified: self.current_epoch,
+        };
+        self.derived_nodes.insert(derived_node_id, derived_node);
+        eprintln!("create 3");
+        (
+            tracked_dependencies.max_time_updated,
+            DidRecalculate::Recalculated,
         )
-    }
-
-    pub(crate) fn get_derived_node(&self, derived_node_id: DerivedNodeId) -> Option<&DerivedNode> {
-        let index = self.derived_node_id_to_index.get(&derived_node_id)?;
-        Some(
-            self.epoch_to_generation_map
-                .get(&index.epoch)?
-                .get_derived_node(*index),
-        )
-    }
-
-    pub(crate) fn set_derive_node_time_updated(
-        &self,
-        derived_node_id: DerivedNodeId,
-        time_updated: Epoch,
-    ) {
-        let mut rev = self
-            .derived_node_id_to_revision
-            .get_mut(&derived_node_id)
-            .unwrap();
-        rev.time_updated = time_updated;
-    }
-
-    pub(crate) fn verify_derived_node(&self, derived_node_id: DerivedNodeId) {
-        let mut rev = self
-            .derived_node_id_to_revision
-            .get_mut(&derived_node_id)
-            .unwrap();
-        rev.time_verified = self.current_epoch;
-    }
-
-    pub(crate) fn get_derived_node_revision(
-        &self,
-        derived_node_id: DerivedNodeId,
-    ) -> Option<DerivedNodeRevision> {
-        self.derived_node_id_to_revision
-            .get(&derived_node_id)
-            .map(|rev| *rev)
-    }
-
-    pub(crate) fn insert_derived_node_revision(
-        &self,
-        derived_node_id: DerivedNodeId,
-        time_updated: Epoch,
-        time_verified: Epoch,
-    ) {
-        self.derived_node_id_to_revision.insert(
-            derived_node_id,
-            DerivedNodeRevision {
-                time_updated,
-                time_verified,
-            },
-        );
-    }
-
-    pub(crate) fn insert_derived_node(
-        &self,
-        derived_node_id: DerivedNodeId,
-        derived_node: DerivedNode,
-    ) {
-        let idx = self
-            .epoch_to_generation_map
-            .get(&self.current_epoch)
-            .unwrap()
-            .insert_derived_node(derived_node);
-        self.derived_node_id_to_index
-            .insert(derived_node_id, Index::new(self.current_epoch, idx));
     }
 
     pub fn get<T: Clone + 'static>(&self, id: SourceId<T>) -> T {
@@ -185,8 +188,6 @@ impl Database {
                     // We cannot call self.increment_epoch() because that borrows
                     // the entire struct, but self.source_nodes is already borrowed
                     let next_epoch = self.current_epoch.increment();
-                    self.epoch_to_generation_map
-                        .insert(next_epoch, |_| Box::new(Generation::new()));
                     *(occupied_entry.get_mut()) = SourceNode {
                         time_updated: next_epoch,
                         value: Box::new(source),

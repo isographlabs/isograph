@@ -51,69 +51,62 @@ pub enum DidRecalculate {
 /// (with a value identical to what we would get if we actually invoked the
 /// function) is present in the [`Database`].
 pub fn memo(db: &Database, derived_node_id: DerivedNodeId, inner_fn: InnerFn) -> DidRecalculate {
+    eprintln!("memo 1");
     let (time_updated, did_recalculate) =
-        if let Some(derived_node) = db.get_derived_node(derived_node_id) {
-            db.verify_derived_node(derived_node_id);
-            if any_dependency_changed(db, derived_node) {
-                update_derived_node(db, derived_node_id, derived_node.value.as_ref(), inner_fn)
+        if let Some(mut derived_node) = db.get_derived_node_mut(derived_node_id) {
+            eprintln!("memo 2");
+            derived_node.time_verified = db.current_epoch;
+            // db.verify_derived_node(derived_node_id);
+            eprintln!("memo 3");
+            if any_dependency_changed(db, &derived_node) {
+                eprintln!("memo 4");
+                update_derived_node(db, derived_node_id, &mut derived_node, inner_fn)
             } else {
                 (db.current_epoch, DidRecalculate::ReusedMemoizedValue)
             }
         } else {
-            create_derived_node(db, derived_node_id, inner_fn)
+            eprintln!("memo 5");
+            db.create_derived_node(derived_node_id, inner_fn)
         };
+    eprintln!("memo 7");
     db.register_dependency_in_parent_memoized_fn(NodeKind::Derived(derived_node_id), time_updated);
+    eprintln!("memo 8");
     did_recalculate
-}
-
-fn create_derived_node(
-    db: &Database,
-    derived_node_id: DerivedNodeId,
-    inner_fn: InnerFn,
-) -> (Epoch, DidRecalculate) {
-    let (value, tracked_dependencies) =
-        with_dependency_tracking(db, derived_node_id.param_id, inner_fn);
-    db.insert_derived_node(
-        derived_node_id,
-        DerivedNode {
-            dependencies: tracked_dependencies.dependencies,
-            inner_fn,
-            value,
-        },
-    );
-    db.insert_derived_node_revision(
-        derived_node_id,
-        tracked_dependencies.max_time_updated,
-        db.current_epoch,
-    );
-    (
-        tracked_dependencies.max_time_updated,
-        DidRecalculate::Recalculated,
-    )
 }
 
 fn update_derived_node(
     db: &Database,
     derived_node_id: DerivedNodeId,
-    prev_value: &dyn DynEq,
+    derived_node: &mut DerivedNode,
     inner_fn: InnerFn,
 ) -> (Epoch, DidRecalculate) {
-    let (value, tracked_dependencies) =
+    eprintln!("update 1");
+    let (new_value, tracked_dependencies) =
         with_dependency_tracking(db, derived_node_id.param_id, inner_fn);
-    let did_recalculate = if *prev_value != *value {
-        db.set_derive_node_time_updated(derived_node_id, tracked_dependencies.max_time_updated);
-        DidRecalculate::Recalculated
+    eprintln!("update 2");
+    let existing_value = db.get_derived_node_value(derived_node.derived_node_index);
+    let (did_recalculate, new_index) = if *existing_value != new_value {
+        eprintln!("update 3");
+        derived_node.time_updated = tracked_dependencies.max_time_updated;
+
+        let derived_node_index = db.derived_node_values.push(new_value).into();
+
+        (DidRecalculate::Recalculated, derived_node_index)
     } else {
-        DidRecalculate::ReusedMemoizedValue
+        (
+            DidRecalculate::ReusedMemoizedValue,
+            derived_node.derived_node_index,
+        )
     };
-    db.insert_derived_node(
-        derived_node_id,
-        DerivedNode {
-            dependencies: tracked_dependencies.dependencies,
-            inner_fn,
-            value,
-        },
-    );
+    eprintln!("update 4");
+    *derived_node = DerivedNode {
+        dependencies: tracked_dependencies.dependencies,
+        inner_fn,
+        derived_node_index: new_index,
+        time_updated: tracked_dependencies.max_time_updated,
+        time_verified: db.current_epoch,
+    };
+    eprintln!("update 5");
     (tracked_dependencies.max_time_updated, did_recalculate)
 }
 
@@ -124,9 +117,11 @@ fn any_dependency_changed(db: &Database, derived_node: &DerivedNode) -> bool {
         .filter(|dep| dep.time_verified_or_updated != db.current_epoch)
         .any(|dependency| match dependency.node_to {
             NodeKind::Source(key) => {
+                eprintln!("any dep getting source {key:?}");
                 source_node_changed_since(db, key, dependency.time_verified_or_updated)
             }
             NodeKind::Derived(dep_node_id) => {
+                eprintln!("any dep getting derived {dep_node_id:?}");
                 derived_node_changed_since(db, dep_node_id, dependency.time_verified_or_updated)
             }
         })
@@ -144,11 +139,7 @@ fn derived_node_changed_since(db: &Database, derived_node_id: DerivedNodeId, sin
         return true;
     }
     let inner_fn = if let Some(derived_node) = db.get_derived_node(derived_node_id) {
-        if let Some(rev) = db.get_derived_node_revision(derived_node_id) {
-            if rev.time_updated > since {
-                return true;
-            }
-        } else {
+        if derived_node.time_updated > since {
             return true;
         }
         derived_node.inner_fn
@@ -159,13 +150,15 @@ fn derived_node_changed_since(db: &Database, derived_node_id: DerivedNodeId, sin
     matches!(did_recalculate, DidRecalculate::Recalculated)
 }
 
-fn with_dependency_tracking(
+pub(crate) fn with_dependency_tracking(
     db: &Database,
     param_id: ParamId,
     inner_fn: InnerFn,
 ) -> (Box<dyn DynEq>, TrackedDependencies) {
     let guard = db.dependency_stack.enter();
     let value = inner_fn.0(db, param_id);
+    eprintln!("wdt 1");
     let tracked_dependencies = guard.release();
+    eprintln!("wdt released");
     (value, tracked_dependencies)
 }

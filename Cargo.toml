@@ -18,6 +18,7 @@ dashmap = "6.0.1"
 lazy_static = "1.4"
 log = { version = "0.4.17", features = ["kv_unstable", "kv_unstable_std"] }
 logos = "0.12"
+lru = "0.13.0"
 lsp-server = "0.7.2"
 lsp-types = "0.94.1"
 notify = "7.0.0"
@@ -26,7 +27,7 @@ once_map = "0.4.20"
 pathdiff = "0.2.1"
 pretty-duration = "0.1.1"
 regex = "1.6.0"
-schemars = { version="0.8.11", features=["indexmap1"] }
+schemars = { version = "0.8.11", features = ["indexmap1"] }
 serde = "1.0.197"
 serde_derive = "1.0.197"
 serde_json = "1.0.108"
