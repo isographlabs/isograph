@@ -81,7 +81,7 @@ fn create_derived_node(
             value,
         },
     );
-    db.insert_derived_node_rev(
+    db.insert_derived_node_revision(
         derived_node_id,
         tracked_dependencies.max_time_updated,
         db.current_epoch,
@@ -144,7 +144,7 @@ fn derived_node_changed_since(db: &Database, derived_node_id: DerivedNodeId, sin
         return true;
     }
     let inner_fn = if let Some(derived_node) = db.get_derived_node(derived_node_id) {
-        if let Some(rev) = db.get_derived_node_rev(derived_node_id) {
+        if let Some(rev) = db.get_derived_node_revision(derived_node_id) {
             if rev.time_updated > since {
                 return true;
             }

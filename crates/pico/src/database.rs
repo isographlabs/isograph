@@ -102,7 +102,7 @@ impl Database {
         rev.time_verified = self.current_epoch;
     }
 
-    pub(crate) fn get_derived_node_rev(
+    pub(crate) fn get_derived_node_revision(
         &self,
         derived_node_id: DerivedNodeId,
     ) -> Option<DerivedNodeRevision> {
@@ -111,7 +111,7 @@ impl Database {
             .map(|rev| *rev)
     }
 
-    pub(crate) fn insert_derived_node_rev(
+    pub(crate) fn insert_derived_node_revision(
         &self,
         derived_node_id: DerivedNodeId,
         time_updated: Epoch,
