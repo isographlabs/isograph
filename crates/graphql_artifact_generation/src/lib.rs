@@ -1,3 +1,4 @@
+mod build_combined_graphql_schema;
 mod eager_reader_artifact;
 mod entrypoint_artifact;
 mod format_parameter_type;

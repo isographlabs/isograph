@@ -96,6 +96,40 @@ impl<TInner: Ord + Debug> TypeAnnotation<TInner> {
     }
 }
 
+impl<TInner: std::fmt::Display + Ord + Debug> TypeAnnotation<TInner> {
+    pub fn print_graphql(&self) -> String {
+        match self {
+            TypeAnnotation::Scalar(scalar) => format!("{}!", scalar),
+            TypeAnnotation::Union(union_type_annotation) => {
+                assert!(
+                    union_type_annotation.variants.len() == 1,
+                    "Unimplemented: union types with multiple variants"
+                );
+                let first = union_type_annotation
+                    .variants
+                    .first()
+                    .expect("Expected first variant to exist");
+
+                let maybe_exclamation = if union_type_annotation.nullable {
+                    ""
+                } else {
+                    "!"
+                };
+
+                match first {
+                    UnionVariant::Scalar(scalar) => format!("{}{maybe_exclamation}", scalar),
+                    UnionVariant::Plural(type_annotation) => {
+                        format!("[{}]{maybe_exclamation}", type_annotation.print_graphql())
+                    }
+                }
+            }
+            TypeAnnotation::Plural(type_annotation) => {
+                format!("[{}]", type_annotation.print_graphql())
+            }
+        }
+    }
+}
+
 #[derive(Default, Ord, PartialEq, PartialOrd, Eq, Clone, Debug)]
 pub struct UnionTypeAnnotation<TInner: Ord + Debug> {
     pub variants: BTreeSet<UnionVariant<TInner>>,
