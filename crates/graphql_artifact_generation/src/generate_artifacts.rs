@@ -356,7 +356,8 @@ fn get_serialized_field_argument(
     let indent_3 = "  ".repeat((indentation_level + 3) as usize);
 
     let argument_name = argument.key;
-    let arg_value = match &argument.value {
+
+    match &argument.value {
         NonConstantValue::Variable(variable_name) => {
             format!(
                 "\n\
@@ -446,9 +447,7 @@ fn get_serialized_field_argument(
                 .collect::<Vec<_>>()
                 .join("")
         ),
-    };
-
-    arg_value
+    }
 }
 
 pub(crate) fn generate_output_type(client_field: &ValidatedClientField) -> ClientFieldOutputType {
