@@ -730,13 +730,35 @@ export function getParentRecordKey(
 function getStoreKeyChunkForArgumentValue(
   argumentValue: ArgumentValue,
   variables: Variables,
-) {
+): string {
   switch (argumentValue.kind) {
+    case 'Object': {
+      return JSON.stringify(
+        stableCopy(
+          Object.fromEntries(
+            argumentValue.value.map(([argumentName, argumentValue]) => {
+              return [
+                argumentName,
+                //  substitute variables
+                getStoreKeyChunkForArgumentValue(argumentValue, variables),
+              ];
+            }),
+          ),
+        ),
+      );
+    }
     case 'Literal': {
       return argumentValue.value;
     }
     case 'Variable': {
-      return variables[argumentValue.name] ?? 'null';
+      const value = variables[argumentValue.name];
+      if (value == null) {
+        return 'null';
+      }
+      if (typeof value === 'object') {
+        return JSON.stringify(stableCopy(value));
+      }
+      return value.toString();
     }
     case 'String': {
       return argumentValue.value;
@@ -764,38 +786,50 @@ function getNetworkResponseKey(
 ): string {
   let networkResponseKey = astNode.fieldName;
   const fieldParameters = astNode.arguments;
+
   if (fieldParameters != null) {
-    for (const fieldParameter of fieldParameters) {
-      const [argumentName, argumentValue] = fieldParameter;
-      let argumentValueChunk;
-      switch (argumentValue.kind) {
-        case 'Literal': {
-          argumentValueChunk = 'l_' + argumentValue.value;
-          break;
-        }
-        case 'Variable': {
-          argumentValueChunk = 'v_' + argumentValue.name;
-          break;
-        }
-        case 'String': {
-          argumentValueChunk = 's_' + argumentValue.value;
-          break;
-        }
-        case 'Enum': {
-          argumentValueChunk = 'e_' + argumentValue.value;
-          break;
-        }
-        default: {
-          // Ensure we have covered all variants
-          let _: never = argumentValue;
-          _;
-          throw new Error('Unexpected case');
-        }
-      }
+    for (const [argumentName, argumentValue] of fieldParameters) {
+      let argumentValueChunk = getArgumentValueChunk(argumentValue);
       networkResponseKey += `${FIRST_SPLIT_KEY}${argumentName}${SECOND_SPLIT_KEY}${argumentValueChunk}`;
     }
   }
+  console.log(fieldParameters, networkResponseKey);
+
   return networkResponseKey;
+}
+
+function getArgumentValueChunk(argumentValue: ArgumentValue): string {
+  switch (argumentValue.kind) {
+    case 'Object': {
+      return (
+        'o_' +
+        argumentValue.value
+          .map(([argumentName, argumentValue]) => {
+            return argumentName + '__' + getArgumentValueChunk(argumentValue);
+          })
+          .join('_') +
+        '_c'
+      );
+    }
+    case 'Literal': {
+      return 'l_' + argumentValue.value;
+    }
+    case 'Variable': {
+      return 'v_' + argumentValue.name;
+    }
+    case 'String': {
+      return 's_' + argumentValue.value.replaceAll(/[^_a-zA-Z0-9]/g, '_');
+    }
+    case 'Enum': {
+      return 'e_' + argumentValue.value;
+    }
+    default: {
+      // Ensure we have covered all variants
+      let _: never = argumentValue;
+      _;
+      throw new Error('Unexpected case');
+    }
+  }
 }
 
 // an alias might be pullRequests____first___first____after___cursor
