@@ -43,13 +43,11 @@ const normalizationAst: NormalizationAst = {
               kind: "Scalar",
               fieldName: "__typename",
               arguments: null,
-              isUpdatable: false,
             },
             {
               kind: "Scalar",
               fieldName: "id",
               arguments: null,
-              isUpdatable: false,
             },
             {
               kind: "Linked",
@@ -71,19 +69,16 @@ const normalizationAst: NormalizationAst = {
                   kind: "Scalar",
                   fieldName: "id",
                   arguments: null,
-                  isUpdatable: false,
                 },
                 {
                   kind: "Scalar",
                   fieldName: "location",
                   arguments: null,
-                  isUpdatable: false,
                 },
                 {
                   kind: "Scalar",
                   fieldName: "time",
                   arguments: null,
-                  isUpdatable: false,
                 },
               ],
             },
