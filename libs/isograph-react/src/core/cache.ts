@@ -793,7 +793,6 @@ function getNetworkResponseKey(
       networkResponseKey += `${FIRST_SPLIT_KEY}${argumentName}${SECOND_SPLIT_KEY}${argumentValueChunk}`;
     }
   }
-  console.log(fieldParameters, networkResponseKey);
 
   return networkResponseKey;
 }
