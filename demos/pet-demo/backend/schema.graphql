@@ -1,5 +1,16 @@
+input IntWhere {
+  eq: Int
+  lt: Int
+  gt: Int
+}
+
+input StringWhere {
+  eq: String
+  like: String
+}
+
 type Query {
-  pets: [Pet!]!
+  pets(where: PetsWhere): [Pet!]!
   pet(id: ID!): Pet
   petByName(name: String!): Pet
   node(id: ID!): Node
@@ -39,6 +50,12 @@ type SetPetTaglineResponse {
   pet: Pet!
 }
 
+input PetsWhere {
+  name: StringWhere
+  nickname: StringWhere
+  stats: PetStatsWhere
+}
+
 type Pet implements Node {
   id: ID!
   name: String!
@@ -61,6 +78,10 @@ scalar Url
 type BestFriendRelationship {
   best_friend: Pet!
   picture_together: Url
+}
+
+input PetStatsWhere {
+  weight: IntWhere
 }
 
 type PetStats {

@@ -7,7 +7,6 @@ import { type Checkin__CheckinDisplay__param } from './Checkin/CheckinDisplay/pa
 import { type Image__ImageDisplayWrapper__param } from './Image/ImageDisplayWrapper/param_type';
 import { type Image__ImageDisplay__param } from './Image/ImageDisplay/param_type';
 import { type Mutation__SetTagline__param } from './Mutation/SetTagline/param_type';
-import { type Mutation__objectLiteralTest__param } from './Mutation/objectLiteralTest/param_type';
 import { type NewsfeedItem__NewsfeedAdOrBlog__param } from './NewsfeedItem/NewsfeedAdOrBlog/param_type';
 import { type Pet__FavoritePhraseLoader__param } from './Pet/FavoritePhraseLoader/param_type';
 import { type Pet__FirstCheckinMakeSuperButton__param } from './Pet/FirstCheckinMakeSuperButton/param_type';
@@ -118,10 +117,6 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Mutation.SetTagline', T>
 ): IdentityWithParamComponent<Mutation__SetTagline__param>;
-
-export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'field Mutation.objectLiteralTest', T>
-): IdentityWithParam<Mutation__objectLiteralTest__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field NewsfeedItem.NewsfeedAdOrBlog', T>

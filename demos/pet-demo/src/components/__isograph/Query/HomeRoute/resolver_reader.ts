@@ -8,7 +8,33 @@ const readerAst: ReaderAst<Query__HomeRoute__param> = [
     kind: "Linked",
     fieldName: "pets",
     alias: null,
-    arguments: null,
+    arguments: [
+      [
+        "where",
+        {
+          kind: "Object",
+          value: [
+            [
+              "name",
+              {
+                kind: "Object",
+                value: [
+                  [
+                    "like",
+                    { kind: "Variable", name: "search" },
+                  ],
+
+                ] },
+            ],
+
+            [
+              "stats",
+              { kind: "Variable", name: "statsWhere" },
+            ],
+
+          ] },
+      ],
+    ],
     condition: null,
     selections: [
       {

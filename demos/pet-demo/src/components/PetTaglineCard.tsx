@@ -62,16 +62,3 @@ export const setTagline = iso(`
     </>
   );
 });
-
-export const objectLiteralTest = iso(`
-  field Mutation.objectLiteralTest($tagline: String) {
-    set_pet_tagline(input: {
-      id: 12,
-      tagline: $tagline,
-    }) {
-      pet {
-        tagline
-      }
-    }
-  }
-`)(() => {});
