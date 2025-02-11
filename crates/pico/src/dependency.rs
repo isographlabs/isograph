@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use crate::{derived_node::DerivedNodeId, epoch::Epoch, u64_types::Key};
+use crate::{derived_node::DerivedNodeId, epoch::Epoch, intern::Key};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Dependency {

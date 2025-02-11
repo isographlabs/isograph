@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! u64_newtype {
     ($named:ident) => {
-        #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+        #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Default)]
         pub struct $named(u64);
 
         impl std::fmt::Display for $named {
@@ -33,6 +33,25 @@ macro_rules! u64_newtype {
         impl $named {
             pub fn as_usize(&self) -> usize {
                 self.0 as usize
+            }
+        }
+
+        impl serde::Serialize for $named {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                serializer.serialize_u64(**self)
+            }
+        }
+
+        impl<'de> serde::Deserialize<'de> for $named {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                let v: u64 = serde::Deserialize::deserialize(deserializer)?;
+                Ok($named::from(v))
             }
         }
     };
