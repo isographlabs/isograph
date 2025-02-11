@@ -251,8 +251,9 @@ pub fn value_satisfies_type(
                         )),
                         SelectionType::Object(object_id) => {
                             let _object = schema_data.object(object_id);
-
-                            todo!("Validate object literal. Parser doesn't support object literals yet");
+                            // Let's ignore that for now, I'll typecheck this later
+                            // todo!("Validate object literal. Parser doesn't support object literals yet");
+                            Ok(())
                         }
                     }
                 }
