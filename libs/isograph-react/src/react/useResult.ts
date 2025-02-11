@@ -61,6 +61,7 @@ export function useResult<
                 environment,
                 fragmentReference,
                 readerWithRefetchQueries.readerArtifact.fieldName,
+                networkRequestOptions,
               ),
             }
           : undefined),

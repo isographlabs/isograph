@@ -265,7 +265,7 @@ function withErrorHandling<T>(f: (t: T) => void): (t: T) => void {
   };
 }
 
-function callSubscriptions(
+export function callSubscriptions(
   environment: IsographEnvironment,
   recordsEncounteredWhenNormalizing: EncounteredIds,
 ) {

@@ -111,6 +111,7 @@ export {
   type VariableValue,
   type StableIdForFragmentReference,
 } from './core/FragmentReference';
+export { type Update } from './core/startUpdate';
 export {
   type LogMessage,
   type LogFunction,

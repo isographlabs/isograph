@@ -33,6 +33,9 @@ export type ExtractStartUpdate<
   },
 > = T['startUpdate'];
 
+export type ExtractStartUpdateUpdatableData<T> =
+  T extends StartUpdate<infer D> ? D : never;
+
 export type FragmentReference<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,

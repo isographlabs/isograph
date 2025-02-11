@@ -46,6 +46,7 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
     fieldName: "tagline",
     alias: null,
     arguments: null,
+    isUpdatable: true,
   },
   {
     kind: "ImperativelyLoadedField",

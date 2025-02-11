@@ -29,9 +29,6 @@ export const PetUpdater = iso(`
   // We should find a way to work around this.
 
   const updateTagline = () => {
-    startUpdate((updatableData) => {
-      updatableData.tagline = tagline;
-    });
     pet.set_pet_tagline({ input: { tagline } })[1]();
   };
 
@@ -75,6 +72,16 @@ export const PetUpdater = iso(`
         />
         <Button variant="contained" onClick={updateTagline}>
           Set tagline
+        </Button>
+        <Button
+          variant="contained"
+          onClick={() => {
+            startUpdate((updatableData) => {
+              updatableData.tagline = tagline;
+            });
+          }}
+        >
+          Update cache
         </Button>
         <Button variant="contained" onClick={() => pet.__refetch()[1]()}>
           Refetch pet

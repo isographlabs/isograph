@@ -129,6 +129,7 @@ export function useSkipLimitPagination<
                 environment,
                 fragmentReference,
                 readerWithRefetchQueries.readerArtifact.kind,
+                networkRequestOptions,
               ),
             }
           : undefined),

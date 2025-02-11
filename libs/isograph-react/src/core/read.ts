@@ -299,6 +299,7 @@ function readData<TReadFromStore>(
                     environment,
                     fragment,
                     readerWithRefetchQueries.readerArtifact.fieldName,
+                    networkRequestOptions,
                   ),
                 }
               : undefined),
@@ -484,6 +485,7 @@ function readData<TReadFromStore>(
                       environment,
                       fragment,
                       readerWithRefetchQueries.readerArtifact.fieldName,
+                      networkRequestOptions,
                     )
                   : undefined,
               };
