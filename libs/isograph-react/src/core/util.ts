@@ -24,4 +24,8 @@ export type ArgumentValue =
   | {
       readonly kind: 'Enum';
       readonly value: string;
+    }
+  | {
+      readonly kind: 'Object';
+      readonly value: Arguments;
     };
