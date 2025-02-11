@@ -5,8 +5,8 @@ use crate::{
     dyn_eq::DynEq,
     epoch::Epoch,
     index::Index,
+    intern::{Key, ParamId},
     source::{Source, SourceId, SourceNode},
-    u64_types::{Key, ParamId},
 };
 use dashmap::{DashMap, Entry};
 use once_map::OnceMap;

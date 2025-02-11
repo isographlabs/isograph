@@ -17,15 +17,10 @@ fn return_reference() {
         value: "2 + 2 * 2".to_string(),
     });
 
-    let value_ref = evaluate_input_ref(&db, input);
-    assert_eq!(*value_ref, Value(6));
+    let value = evaluate_input(&db, input);
+    assert_eq!(*value, Value(6));
     // assert that the value was not cloned
     assert_eq!(COUNTER.load(Ordering::SeqCst), 0);
-
-    let value = evaluate_input(&db, input);
-    assert_eq!(value, Value(6));
-    // assert that the value was cloned this time
-    assert_eq!(COUNTER.load(Ordering::SeqCst), 1);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Source)]
@@ -55,14 +50,7 @@ fn parse_ast(db: &Database, id: SourceId<Input>) -> Result<Program> {
 
 #[memo]
 fn evaluate_input(db: &Database, id: SourceId<Input>) -> Value {
-    let ast = parse_ast(db, id).expect("ast must be correct");
-    let result = eval(ast.expression).expect("value must be evaluated");
-    Value(result)
-}
-
-#[memo(reference)]
-fn evaluate_input_ref(db: &Database, id: SourceId<Input>) -> Value {
-    let ast = parse_ast(db, id).expect("ast must be correct");
+    let ast = parse_ast(db, id).to_owned().expect("ast must be correct");
     let result = eval(ast.expression).expect("value must be evaluated");
     Value(result)
 }
