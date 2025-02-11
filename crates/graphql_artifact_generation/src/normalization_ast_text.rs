@@ -27,7 +27,10 @@ fn generate_normalization_ast_node(
     match &item {
         MergedServerSelection::ScalarField(scalar_field) => {
             let MergedScalarFieldSelection {
-                name, arguments, ..
+                name,
+                is_updatable,
+                arguments,
+                ..
             } = scalar_field;
             let indent = "  ".repeat(indentation_level as usize);
             let indent_2 = "  ".repeat((indentation_level + 1) as usize);
@@ -40,6 +43,7 @@ fn generate_normalization_ast_node(
                 {indent_2}kind: \"Scalar\",\n\
                 {indent_2}fieldName: \"{name}\",\n\
                 {indent_2}arguments: {serialized_arguments},\n\
+                {indent_2}isUpdatable: {is_updatable},\n\
                 {indent}}},\n"
             )
         }

@@ -8,12 +8,14 @@ const readerAst: ReaderAst<User__Avatar__param> = [
     fieldName: "name",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
   {
     kind: "Scalar",
     fieldName: "avatarUrl",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
 ];
 

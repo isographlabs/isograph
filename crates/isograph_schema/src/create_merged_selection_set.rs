@@ -93,6 +93,7 @@ pub struct MergedScalarFieldSelection {
     // TODO no location
     pub name: ScalarFieldName,
     pub arguments: Vec<ArgumentKeyAndValue>,
+    pub is_updatable: bool,
 }
 
 impl MergedScalarFieldSelection {
@@ -301,6 +302,7 @@ fn transform_and_merge_child_selection_map_into_parent_map(
                 let transformed = match selection {
                     MergedServerSelection::ScalarField(scalar_field_selection) => {
                         MergedServerSelection::ScalarField(MergedScalarFieldSelection {
+                            is_updatable: scalar_field_selection.is_updatable,
                             name: scalar_field_selection.name,
                             arguments: transform_arguments_with_child_context(
                                 scalar_field_selection.arguments.into_iter(),
@@ -1062,6 +1064,10 @@ fn merge_scalar_server_field(
             vacant_entry.insert(MergedServerSelection::ScalarField(
                 MergedScalarFieldSelection {
                     name: scalar_field.name.item,
+                    is_updatable: matches!(
+                        scalar_field.associated_data.selection_variant,
+                        ValidatedIsographSelectionVariant::Updatable
+                    ),
                     arguments: transform_arguments_with_child_context(
                         scalar_field
                             .arguments
@@ -1111,6 +1117,7 @@ fn select_typename_and_id_fields_in_merged_selection(
                         // major HACK alert
                         name: id_field.name.item.lookup().intern().into(),
                         arguments: vec![],
+                        is_updatable: false,
                     },
                 ));
             }
@@ -1193,6 +1200,7 @@ fn maybe_add_typename_selection(selections: &mut MergedSelectionMap) {
         MergedServerSelection::ScalarField(MergedScalarFieldSelection {
             name: *TYPENAME_FIELD_NAME,
             arguments: vec![],
+            is_updatable: false,
         }),
     );
 }

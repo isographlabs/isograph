@@ -450,7 +450,10 @@ fn server_defined_scalar_field_ast_node(
         ),
         indentation_level + 1,
     );
-
+    let is_updatable = matches!(
+        scalar_field_selection.associated_data.selection_variant,
+        ValidatedIsographSelectionVariant::Updatable
+    );
     let indent_1 = "  ".repeat(indentation_level as usize);
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
 
@@ -460,6 +463,7 @@ fn server_defined_scalar_field_ast_node(
         {indent_2}fieldName: \"{field_name}\",\n\
         {indent_2}alias: {alias},\n\
         {indent_2}arguments: {arguments},\n\
+        {indent_2}isUpdatable: {is_updatable},\n\
         {indent_1}}},\n",
     )
 }

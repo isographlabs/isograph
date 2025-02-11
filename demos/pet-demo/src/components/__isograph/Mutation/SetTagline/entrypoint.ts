@@ -37,11 +37,13 @@ const normalizationAst: NormalizationAst = {
               kind: "Scalar",
               fieldName: "id",
               arguments: null,
+              isUpdatable: false,
             },
             {
               kind: "Scalar",
               fieldName: "tagline",
               arguments: null,
+              isUpdatable: false,
             },
           ],
         },
