@@ -14,6 +14,7 @@ const readerAst: ReaderAst<Image__ImageDisplayWrapper__param> = [
         fieldName: "id",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
     ],
     entrypoint: { 

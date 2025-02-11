@@ -8,6 +8,7 @@ const readerAst: ReaderAst<Pet__FavoritePhraseLoader__param> = [
     fieldName: "id",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
 ];
 

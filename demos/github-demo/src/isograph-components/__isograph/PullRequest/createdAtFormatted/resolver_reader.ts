@@ -9,6 +9,7 @@ const readerAst: ReaderAst<PullRequest__createdAtFormatted__param> = [
     fieldName: "createdAt",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
 ];
 

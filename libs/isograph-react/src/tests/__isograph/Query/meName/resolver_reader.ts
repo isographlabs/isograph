@@ -16,6 +16,7 @@ const readerAst: ReaderAst<Query__meName__param> = [
         fieldName: "name",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
     ],
   },

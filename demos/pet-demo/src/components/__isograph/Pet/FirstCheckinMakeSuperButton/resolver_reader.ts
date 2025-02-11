@@ -33,6 +33,7 @@ const readerAst: ReaderAst<Pet__FirstCheckinMakeSuperButton__param> = [
         fieldName: "location",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
     ],
   },

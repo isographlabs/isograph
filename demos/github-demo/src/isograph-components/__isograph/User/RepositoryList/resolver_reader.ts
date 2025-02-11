@@ -28,6 +28,7 @@ const readerAst: ReaderAst<User__RepositoryList__param> = [
         fieldName: "id",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
     ],
     entrypoint: User__RepositoryConnection__entrypoint,

@@ -16,6 +16,7 @@ const readerAst: ReaderAst<Query__HomeRoute__param> = [
         fieldName: "id",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
       {
         kind: "Resolver",

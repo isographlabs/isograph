@@ -8,12 +8,14 @@ const readerAst: ReaderAst<Starrable__IsStarred__param> = [
     fieldName: "stargazerCount",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
   {
     kind: "Scalar",
     fieldName: "viewerHasStarred",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
 ];
 

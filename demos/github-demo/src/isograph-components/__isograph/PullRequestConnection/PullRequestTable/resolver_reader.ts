@@ -25,6 +25,7 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
             fieldName: "id",
             alias: null,
             arguments: null,
+            isUpdatable: false,
           },
           {
             kind: "Resolver",
@@ -38,12 +39,14 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
             fieldName: "number",
             alias: null,
             arguments: null,
+            isUpdatable: false,
           },
           {
             kind: "Scalar",
             fieldName: "title",
             alias: null,
             arguments: null,
+            isUpdatable: false,
           },
           {
             kind: "Linked",
@@ -64,6 +67,7 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
                 fieldName: "login",
                 alias: null,
                 arguments: null,
+                isUpdatable: false,
               },
             ],
           },
@@ -72,12 +76,14 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
             fieldName: "closed",
             alias: null,
             arguments: null,
+            isUpdatable: false,
           },
           {
             kind: "Scalar",
             fieldName: "totalCommentsCount",
             alias: null,
             arguments: null,
+            isUpdatable: false,
           },
           {
             kind: "Resolver",

@@ -8,12 +8,14 @@ const readerAst: ReaderAst<Repository__RepositoryLink__param> = [
     fieldName: "id",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
   {
     kind: "Scalar",
     fieldName: "name",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
   {
     kind: "Linked",
@@ -27,6 +29,7 @@ const readerAst: ReaderAst<Repository__RepositoryLink__param> = [
         fieldName: "login",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
     ],
   },

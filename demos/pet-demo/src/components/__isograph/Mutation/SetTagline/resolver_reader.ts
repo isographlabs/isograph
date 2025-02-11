@@ -27,6 +27,7 @@ const readerAst: ReaderAst<Mutation__SetTagline__param> = [
             fieldName: "tagline",
             alias: null,
             arguments: null,
+            isUpdatable: false,
           },
         ],
       },

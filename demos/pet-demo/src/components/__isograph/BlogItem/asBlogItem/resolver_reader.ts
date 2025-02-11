@@ -6,6 +6,7 @@ const readerAst: ReaderAst<{ data: any, parameters: Record<PropertyKey, never> }
     fieldName: "__typename",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
   {
     kind: "Link",

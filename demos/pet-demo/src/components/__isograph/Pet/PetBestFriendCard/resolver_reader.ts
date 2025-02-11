@@ -9,6 +9,7 @@ const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
     fieldName: "id",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
   {
     kind: "Resolver",
@@ -29,6 +30,7 @@ const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
         fieldName: "picture_together",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
       {
         kind: "Linked",
@@ -42,18 +44,21 @@ const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
             fieldName: "id",
             alias: null,
             arguments: null,
+            isUpdatable: false,
           },
           {
             kind: "Scalar",
             fieldName: "name",
             alias: null,
             arguments: null,
+            isUpdatable: false,
           },
           {
             kind: "Scalar",
             fieldName: "picture",
             alias: null,
             arguments: null,
+            isUpdatable: false,
           },
         ],
       },

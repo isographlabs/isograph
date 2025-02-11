@@ -40,6 +40,7 @@ const readerAst: ReaderAst<unknown> = [
     fieldName: "id",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
 ];
 

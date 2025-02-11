@@ -35,6 +35,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
         fieldName: "nameWithOwner",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
       {
         kind: "Linked",
@@ -55,6 +56,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
             fieldName: "nameWithOwner",
             alias: null,
             arguments: null,
+            isUpdatable: false,
           },
         ],
       },

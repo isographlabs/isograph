@@ -25,12 +25,14 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
         fieldName: "id",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
       {
         kind: "Scalar",
         fieldName: "name",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
     ],
   },
@@ -46,6 +48,7 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
     fieldName: "tagline",
     alias: null,
     arguments: null,
+    isUpdatable: true,
   },
   {
     kind: "ImperativelyLoadedField",

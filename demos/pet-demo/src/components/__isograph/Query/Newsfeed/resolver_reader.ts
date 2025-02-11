@@ -40,6 +40,7 @@ const readerAst: ReaderAst<Query__Newsfeed__param> = [
             fieldName: "id",
             alias: null,
             arguments: null,
+            isUpdatable: false,
           },
         ],
         entrypoint: Viewer__NewsfeedPaginationComponent__entrypoint,

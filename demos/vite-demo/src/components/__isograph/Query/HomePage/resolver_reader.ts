@@ -26,12 +26,14 @@ const readerAst: ReaderAst<Query__HomePage__param> = [
         fieldName: "key",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
       {
         kind: "Scalar",
         fieldName: "forme",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
       {
         kind: "Resolver",

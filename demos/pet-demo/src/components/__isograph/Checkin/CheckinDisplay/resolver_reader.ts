@@ -9,12 +9,14 @@ const readerAst: ReaderAst<Checkin__CheckinDisplay__param> = [
     fieldName: "location",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
   {
     kind: "Scalar",
     fieldName: "time",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
   {
     kind: "ImperativelyLoadedField",

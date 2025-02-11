@@ -21,6 +21,7 @@ const readerAst: ReaderAst<Query__nodeField__param> = [
         fieldName: "id",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
     ],
   },

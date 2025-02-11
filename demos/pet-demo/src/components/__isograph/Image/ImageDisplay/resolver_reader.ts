@@ -8,6 +8,7 @@ const readerAst: ReaderAst<Image__ImageDisplay__param> = [
     fieldName: "url",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
 ];
 

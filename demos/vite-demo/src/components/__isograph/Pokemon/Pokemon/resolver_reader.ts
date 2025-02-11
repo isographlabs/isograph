@@ -8,24 +8,28 @@ const readerAst: ReaderAst<Pokemon__Pokemon__param> = [
     fieldName: "num",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
   {
     kind: "Scalar",
     fieldName: "species",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
   {
     kind: "Scalar",
     fieldName: "sprite",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
   {
     kind: "Scalar",
     fieldName: "bulbapediaPage",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
 ];
 

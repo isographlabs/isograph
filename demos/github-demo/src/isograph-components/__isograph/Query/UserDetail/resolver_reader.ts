@@ -21,6 +21,7 @@ const readerAst: ReaderAst<Query__UserDetail__param> = [
         fieldName: "name",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
       {
         kind: "Resolver",
