@@ -106,6 +106,8 @@ fn visit_dirs_skipping_isograph(dir: &Path, cb: &mut dyn FnMut(&DirEntry)) -> io
     Ok(())
 }
 
+// TODO this should return a Vec of Results, since a file can contain
+// both valid and invalid iso literals.
 #[allow(clippy::type_complexity)]
 pub fn parse_iso_literals_in_file_content(
     file_path: PathBuf,
