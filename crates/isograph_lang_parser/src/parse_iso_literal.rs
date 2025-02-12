@@ -549,31 +549,21 @@ fn parse_non_constant_value(
         })?;
 
         to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
-            let null: WithSpan<&str> = tokens
+            let bool_or_null = tokens
                 .parse_source_of_kind(IsographLangTokenKind::Identifier)
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
-            let span = null.span;
+            let span = bool_or_null.span;
 
-            null.and_then(|null| match null {
+            bool_or_null.and_then(|bool_or_null| match bool_or_null {
                 "null" => Ok(NonConstantValue::Null),
-                _ => Err(WithSpan::new(IsographLiteralParseError::ExpectedNull, span)),
-            })
-        })?;
-
-        to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
-            let bool = tokens
-                .parse_source_of_kind(IsographLangTokenKind::Identifier)
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
-
-            let span = bool.span;
-
-            bool.and_then(|bool| match bool.parse::<bool>() {
-                Ok(b) => Ok(NonConstantValue::Boolean(b)),
-                Err(_) => Err(WithSpan::new(
-                    IsographLiteralParseError::ExpectedBoolean,
-                    span,
-                )),
+                bool => match bool.parse::<bool>() {
+                    Ok(b) => Ok(NonConstantValue::Boolean(b)),
+                    Err(_) => Err(WithSpan::new(
+                        IsographLiteralParseError::ExpectedBoolean,
+                        span,
+                    )),
+                },
             })
         })?;
 
