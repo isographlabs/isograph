@@ -89,10 +89,17 @@ fn format_field_definition(
                     type_name.clone().map(&mut SelectionType::Scalar)
                 }
             };
+            let is_optional = match &type_annotation {
+                TypeAnnotation::Union(union) => union.nullable,
+                TypeAnnotation::Plural(_) => false,
+                TypeAnnotation::Scalar(_) => false,
+            };
+
             format!(
-                "{}readonly {}: {},\n",
+                "{}readonly {}{}: {},\n",
                 "  ".repeat(indentation_level as usize),
                 name,
+                if is_optional { "?" } else { "" },
                 format_type_annotation(schema, &type_annotation, indentation_level + 1),
             )
         }
