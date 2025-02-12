@@ -337,86 +337,118 @@ pub(crate) fn get_serialized_field_arguments(
     }
 
     let mut s = "[".to_string();
-    let indent_1 = "  ".repeat((indentation_level + 1) as usize);
-    let indent_2 = "  ".repeat((indentation_level + 2) as usize);
 
     for argument in arguments {
-        let argument_name = argument.key;
-        let arg_value = match &argument.value {
-            NonConstantValue::Variable(variable_name) => {
-                format!(
-                    "\n\
-                    {indent_1}[\n\
-                    {indent_2}\"{argument_name}\",\n\
-                    {indent_2}{{ kind: \"Variable\", name: \"{variable_name}\" }},\n\
-                    {indent_1}],\n",
-                )
-            }
-            NonConstantValue::Integer(int_value) => {
-                format!(
-                    "\n\
-                    {indent_1}[\n\
-                    {indent_2}\"{argument_name}\",\n\
-                    {indent_2}{{ kind: \"Literal\", value: {int_value} }},\n\
-                    {indent_1}],\n"
-                )
-            }
-            NonConstantValue::Boolean(bool) => {
-                let bool_string = bool.to_string();
-                format!(
-                    "\n\
-                    {indent_1}[\n\
-                    {indent_2}\"{argument_name}\",\n\
-                    {indent_2}{{ kind: \"Literal\", value: {bool_string} }},\n\
-                    {indent_1}],\n"
-                )
-            }
-            NonConstantValue::String(s) => {
-                format!(
-                    "\n\
-                    {indent_1}[\n\
-                    {indent_2}\"{argument_name}\",\n\
-                    {indent_2}{{ kind: \"String\", value: \"{s}\" }},\n\
-                    {indent_1}],\n"
-                )
-            }
-            NonConstantValue::Float(f) => {
-                let float = f.as_float();
-                format!(
-                    "\n\
-                    {indent_1}[\n\
-                    {indent_2}\"{argument_name}\",\n\
-                    {indent_2}{{ kind: \"Literal\", value: {float} }},\n\
-                    {indent_1}],\n"
-                )
-            }
-            NonConstantValue::Null => {
-                format!(
-                    "\n\
-                    {indent_1}[\n\
-                    {indent_2}\"{argument_name}\",\n\
-                    {indent_2}{{ kind: \"Literal\", value: null }},\n\
-                    {indent_1}],\n"
-                )
-            }
-            NonConstantValue::Enum(e) => {
-                format!(
-                    "\n\
-                    {indent_1}[\n\
-                    {indent_2}\"{argument_name}\",\n\
-                    {indent_2}{{ kind: \"Enum\", value: \"{e}\" }},\n\
-                    {indent_1}],\n"
-                )
-            }
-            NonConstantValue::List(_) => panic!("Lists are not supported here"),
-            NonConstantValue::Object(_) => panic!("Objects not supported here"),
-        };
-
-        s.push_str(&arg_value);
+        s.push_str(&get_serialized_field_argument(argument, indentation_level));
     }
 
     s.push_str(&format!("{}]", "  ".repeat(indentation_level as usize)));
     s
+}
+
+fn get_serialized_field_argument(
+    // TODO make this an iterator
+    argument: &ArgumentKeyAndValue,
+    indentation_level: u8,
+) -> String {
+    let indent_1 = "  ".repeat((indentation_level + 1) as usize);
+    let indent_2 = "  ".repeat((indentation_level + 2) as usize);
+    let indent_3 = "  ".repeat((indentation_level + 3) as usize);
+
+    let argument_name = argument.key;
+
+    match &argument.value {
+        NonConstantValue::Variable(variable_name) => {
+            format!(
+                "\n\
+                {indent_1}[\n\
+                {indent_2}\"{argument_name}\",\n\
+                {indent_2}{{ kind: \"Variable\", name: \"{variable_name}\" }},\n\
+                {indent_1}],\n",
+            )
+        }
+        NonConstantValue::Integer(int_value) => {
+            format!(
+                "\n\
+                {indent_1}[\n\
+                {indent_2}\"{argument_name}\",\n\
+                {indent_2}{{ kind: \"Literal\", value: {int_value} }},\n\
+                {indent_1}],\n"
+            )
+        }
+        NonConstantValue::Boolean(bool) => {
+            let bool_string = bool.to_string();
+            format!(
+                "\n\
+                {indent_1}[\n\
+                {indent_2}\"{argument_name}\",\n\
+                {indent_2}{{ kind: \"Literal\", value: {bool_string} }},\n\
+                {indent_1}],\n"
+            )
+        }
+        NonConstantValue::String(s) => {
+            format!(
+                "\n\
+                {indent_1}[\n\
+                {indent_2}\"{argument_name}\",\n\
+                {indent_2}{{ kind: \"String\", value: \"{s}\" }},\n\
+                {indent_1}],\n"
+            )
+        }
+        NonConstantValue::Float(f) => {
+            let float = f.as_float();
+            format!(
+                "\n\
+                {indent_1}[\n\
+                {indent_2}\"{argument_name}\",\n\
+                {indent_2}{{ kind: \"Literal\", value: {float} }},\n\
+                {indent_1}],\n"
+            )
+        }
+        NonConstantValue::Null => {
+            format!(
+                "\n\
+                {indent_1}[\n\
+                {indent_2}\"{argument_name}\",\n\
+                {indent_2}{{ kind: \"Literal\", value: null }},\n\
+                {indent_1}],\n"
+            )
+        }
+        NonConstantValue::Enum(e) => {
+            format!(
+                "\n\
+                {indent_1}[\n\
+                {indent_2}\"{argument_name}\",\n\
+                {indent_2}{{ kind: \"Enum\", value: \"{e}\" }},\n\
+                {indent_1}],\n"
+            )
+        }
+        NonConstantValue::List(_) => panic!("Lists are not supported here"),
+        NonConstantValue::Object(object) => format!(
+            "\n\
+            {indent_1}[\n\
+            {indent_2}\"{argument_name}\",\n\
+            {indent_2}{{\n\
+            {indent_3}kind: \"Object\",\n\
+            {indent_3}value: [{}\n\
+            {indent_3}]\n\
+            {indent_2}}},\n\
+            {indent_1}],\n",
+            object
+                .iter()
+                .map(|entry| {
+                    get_serialized_field_argument(
+                        &ArgumentKeyAndValue {
+                            key: entry.name.item.lookup().intern().into(),
+                            value: entry.value.item.clone(),
+                        },
+                        indentation_level + 3,
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("")
+        ),
+    }
 }
 
 pub(crate) fn generate_output_type(client_field: &ValidatedClientField) -> ClientFieldOutputType {

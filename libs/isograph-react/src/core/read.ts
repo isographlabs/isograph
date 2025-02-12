@@ -717,7 +717,9 @@ function generateChildVariableMap(
   type Writable<T> = { -readonly [P in keyof T]: T[P] };
   const childVars: Writable<Variables> = {};
   for (const [name, value] of fieldArguments) {
-    if (value.kind === 'Variable') {
+    if (value.kind === 'Object') {
+      childVars[name] = generateChildVariableMap(variables, value.value);
+    } else if (value.kind === 'Variable') {
       const variable = variables[value.name];
       // Variable could be null if it was not provided but has a default case,
       // so we allow the loop to continue rather than throwing an error.
@@ -741,6 +743,14 @@ function writeQueryArgsToVariables(
   }
   for (const [name, argType] of queryArgs) {
     switch (argType.kind) {
+      case 'Object': {
+        writeQueryArgsToVariables(
+          (targetVariables[name] = {}),
+          argType.value,
+          variables,
+        );
+        break;
+      }
       case 'Variable': {
         targetVariables[name] = variables[argType.name];
         break;

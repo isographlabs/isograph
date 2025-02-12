@@ -156,6 +156,17 @@ fn serialize_non_constant_value_for_graphql(value: &NonConstantValue) -> String 
         NonConstantValue::Null => "null".to_string(),
         NonConstantValue::Enum(e) => e.to_string(),
         NonConstantValue::List(_) => panic!("Lists are not supported here"),
-        NonConstantValue::Object(_) => panic!("Objects not supported here"),
+        NonConstantValue::Object(object) => format!(
+            "{{ {} }}",
+            object
+                .iter()
+                .map(|entry| format!(
+                    "{}: {}",
+                    entry.name.item,
+                    serialize_non_constant_value_for_graphql(&entry.value.item)
+                ))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
     }
 }

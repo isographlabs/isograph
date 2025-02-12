@@ -338,7 +338,20 @@ impl NonConstantValue {
             NonConstantValue::Null => "l_null".to_string(),
             NonConstantValue::Enum(e) => format!("e_{e}"),
             NonConstantValue::List(_) => panic!("Lists are not supported here"),
-            NonConstantValue::Object(_) => panic!("Objects not supported here"),
+            NonConstantValue::Object(object) => {
+                format!(
+                    "o_{}_c",
+                    object
+                        .iter()
+                        .map(|pair| format!(
+                            "{}__{}",
+                            pair.name.item,
+                            pair.value.item.to_alias_str_chunk()
+                        ))
+                        .collect::<Vec<_>>()
+                        .join("_")
+                )
+            }
         }
     }
 }

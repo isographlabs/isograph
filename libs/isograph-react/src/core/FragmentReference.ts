@@ -5,7 +5,15 @@ import { PromiseWrapper } from './PromiseWrapper';
 import type { StartUpdate } from './reader';
 
 // TODO type this better
-export type VariableValue = string | number | boolean | null | object;
+export type VariableValue =
+  | string
+  | number
+  | boolean
+  | null
+  | {
+      readonly [index: string]: VariableValue;
+    }
+  | VariableValue[];
 
 export type Variables = { readonly [index: string]: VariableValue };
 
