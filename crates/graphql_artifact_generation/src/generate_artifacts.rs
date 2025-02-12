@@ -431,7 +431,8 @@ fn get_serialized_field_argument(
             {indent_2}{{\n\
             {indent_3}kind: \"Object\",\n\
             {indent_3}value: [{}\n\
-            {indent_3}] }},\n\
+            {indent_3}]\n\
+            {indent_2}}},\n\
             {indent_1}],\n",
             object
                 .iter()

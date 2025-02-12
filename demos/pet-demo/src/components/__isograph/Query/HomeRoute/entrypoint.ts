@@ -4,8 +4,8 @@ import {Query__HomeRoute__output_type} from './output_type';
 import readerResolver from './resolver_reader';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
-const queryText = 'query HomeRoute ($search: String, $statsWhere: PetStatsWhere) {\
-  pets____where___o_name__o_like__v_search_c_stats__v_statsWhere_c: pets(where: { name: { like: $search }, stats: $statsWhere }) {\
+const queryText = 'query HomeRoute  {\
+  pets {\
     id,\
     name,\
     picture,\
@@ -19,33 +19,7 @@ const normalizationAst: NormalizationAst = {
     {
       kind: "Linked",
       fieldName: "pets",
-      arguments: [
-        [
-          "where",
-          {
-            kind: "Object",
-            value: [
-              [
-                "name",
-                {
-                  kind: "Object",
-                  value: [
-                    [
-                      "like",
-                      { kind: "Variable", name: "search" },
-                    ],
-
-                  ] },
-              ],
-
-              [
-                "stats",
-                { kind: "Variable", name: "statsWhere" },
-              ],
-
-            ] },
-        ],
-      ],
+      arguments: null,
       concreteType: "Pet",
       selections: [
         {

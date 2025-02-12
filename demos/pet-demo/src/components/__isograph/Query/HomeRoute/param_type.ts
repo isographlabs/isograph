@@ -1,5 +1,4 @@
 import { type Pet__PetSummaryCard__output_type } from '../../Pet/PetSummaryCard/output_type';
-import type { Query__HomeRoute__parameters } from './parameters_type';
 
 export type Query__HomeRoute__param = {
   readonly data: {
@@ -8,5 +7,5 @@ export type Query__HomeRoute__param = {
       readonly PetSummaryCard: Pet__PetSummaryCard__output_type,
     }>,
   },
-  readonly parameters: Query__HomeRoute__parameters,
+  readonly parameters: Record<PropertyKey, never>,
 };

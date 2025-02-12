@@ -6,8 +6,8 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { FullPageLoading } from './routes';
 
 export const HomeRoute = iso(`
-  field Query.HomeRoute($search: String, $statsWhere: PetStatsWhere) @component {
-    pets(where: { name: { like: $search }, stats: $statsWhere }) {
+  field Query.HomeRoute @component {
+    pets {
       id
       PetSummaryCard
     }
@@ -28,16 +28,6 @@ export const HomeRoute = iso(`
 export function HomeRouteLoader() {
   const { fragmentReference } = useLazyReference(
     iso(`entrypoint Query.HomeRoute`),
-    {
-      search: '',
-      statsWhere: {
-        weight: {
-          gt: 2,
-          eq: null,
-          lt: null,
-        },
-      },
-    },
   );
 
   return (
