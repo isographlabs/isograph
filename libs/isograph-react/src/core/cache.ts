@@ -20,6 +20,7 @@ import {
   FragmentReference,
   Variables,
   type UnknownTReadFromStore,
+  type VariableValue,
 } from './FragmentReference';
 import {
   DataId,
@@ -730,35 +731,24 @@ export function getParentRecordKey(
 function getStoreKeyChunkForArgumentValue(
   argumentValue: ArgumentValue,
   variables: Variables,
-): string {
+): VariableValue {
   switch (argumentValue.kind) {
     case 'Object': {
-      return JSON.stringify(
-        stableCopy(
-          Object.fromEntries(
-            argumentValue.value.map(([argumentName, argumentValue]) => {
-              return [
-                argumentName,
-                //  substitute variables
-                getStoreKeyChunkForArgumentValue(argumentValue, variables),
-              ];
-            }),
-          ),
-        ),
+      return Object.fromEntries(
+        argumentValue.value.map(([argumentName, argumentValue]) => {
+          return [
+            argumentName,
+            //  substitute variables
+            getStoreKeyChunkForArgumentValue(argumentValue, variables),
+          ];
+        }),
       );
     }
     case 'Literal': {
       return argumentValue.value;
     }
     case 'Variable': {
-      const value = variables[argumentValue.name];
-      if (value == null) {
-        return 'null';
-      }
-      if (typeof value === 'object') {
-        return JSON.stringify(stableCopy(value));
-      }
-      return value.toString();
+      return variables[argumentValue.name] ?? 'null';
     }
     case 'String': {
       return argumentValue.value;
@@ -777,7 +767,12 @@ function getStoreKeyChunkForArgumentValue(
 }
 
 function getStoreKeyChunkForArgument(argument: Argument, variables: Variables) {
-  const chunk = getStoreKeyChunkForArgumentValue(argument[1], variables);
+  let chunk = getStoreKeyChunkForArgumentValue(argument[1], variables);
+
+  if (typeof chunk === 'object') {
+    chunk = JSON.stringify(stableCopy(chunk));
+  }
+
   return `${FIRST_SPLIT_KEY}${argument[0]}${SECOND_SPLIT_KEY}${chunk}`;
 }
 
