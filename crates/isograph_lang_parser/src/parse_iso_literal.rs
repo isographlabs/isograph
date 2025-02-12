@@ -557,10 +557,7 @@ fn parse_non_constant_value(
 
             null.and_then(|null| match null {
                 "null" => Ok(NonConstantValue::Null),
-                _ => Err(WithSpan::new(
-                    IsographLiteralParseError::ExpectedNull,
-                    span,
-                )),
+                _ => Err(WithSpan::new(IsographLiteralParseError::ExpectedNull, span)),
             })
         })?;
 
