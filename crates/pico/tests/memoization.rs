@@ -83,17 +83,17 @@ struct Input {
 }
 
 #[memo]
-fn parse_ast(db: &Database, id: &SourceId<Input>) -> Result<Program> {
-    let source_text = db.get(*id);
+fn parse_ast(db: &Database, id: SourceId<Input>) -> Result<Program> {
+    let source_text = db.get(id);
     let mut lexer = Lexer::new(source_text.value);
     let mut parser = Parser::new(&mut lexer)?;
     parser.parse_program()
 }
 
-#[memo]
+#[memo(inner)]
 fn evaluate_input(db: &Database, id: SourceId<Input>) -> i64 {
     *EVAL_COUNTER.lock().unwrap().entry(id).or_insert(0) += 1;
-    let ast = parse_ast(db, &id).to_owned().expect("ast must be correct");
+    let ast = parse_ast(db, id).to_owned().expect("ast must be correct");
     eval(ast.expression).expect("value must be evaluated")
 }
 
@@ -103,5 +103,5 @@ fn sum(db: &Database, left: SourceId<Input>, right: SourceId<Input>) -> i64 {
     let left = evaluate_input(db, left);
     let right = evaluate_input(db, right);
 
-    *left + *right
+    left + right
 }

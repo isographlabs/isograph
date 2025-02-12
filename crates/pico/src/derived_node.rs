@@ -70,7 +70,7 @@ pub struct MemoRef<'db, T> {
     phantom: PhantomData<T>,
 }
 
-impl<'db, T> MemoRef<'db, T> {
+impl<'db, T: 'static + Clone> MemoRef<'db, T> {
     pub fn new(db: &'db Database, derived_node_id: DerivedNodeId) -> Self {
         Self {
             db,
@@ -78,11 +78,23 @@ impl<'db, T> MemoRef<'db, T> {
             phantom: PhantomData,
         }
     }
-}
 
-impl<T: 'static + Clone> MemoRef<'_, T> {
     pub fn to_owned(&self) -> T {
         self.deref().clone()
+    }
+}
+
+impl<T> From<MemoRef<'_, T>> for ParamId {
+    fn from(val: MemoRef<'_, T>) -> Self {
+        let idx: u64 = val.derived_node_id.index().into();
+        ParamId::from(idx)
+    }
+}
+
+impl<T> From<&MemoRef<'_, T>> for ParamId {
+    fn from(val: &MemoRef<'_, T>) -> Self {
+        let idx: u64 = val.derived_node_id.index().into();
+        ParamId::from(idx)
     }
 }
 
