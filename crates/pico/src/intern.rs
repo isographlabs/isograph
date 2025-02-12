@@ -3,7 +3,7 @@ use intern::{intern_struct, InternId};
 use serde::{Deserialize, Serialize};
 use u64_newtypes::u64_newtype;
 
-use crate::{DerivedNodeId, SourceId};
+use crate::SourceId;
 
 u64_newtype!(HashKey);
 
@@ -44,19 +44,6 @@ impl<T> From<SourceId<T>> for ParamId {
 impl<T> From<&SourceId<T>> for ParamId {
     fn from(value: &SourceId<T>) -> Self {
         Self(value.key.0)
-    }
-}
-
-impl From<DerivedNodeId> for ParamId {
-    fn from(value: DerivedNodeId) -> Self {
-        let idx: u64 = value.index().into();
-        Self::from(idx)
-    }
-}
-
-impl From<&DerivedNodeId> for ParamId {
-    fn from(value: &DerivedNodeId) -> Self {
-        Self::from(value.index() as u64)
     }
 }
 

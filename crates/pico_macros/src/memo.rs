@@ -155,11 +155,24 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
         .enumerate()
         .map(|(i, (arg, ty))| {
             match ArgType::parse(ty) {
-                ArgType::Source | ArgType::MemoRef => {
+                ArgType::Source => {
                     let maybe_ref = if matches!(**ty, syn::Type::Reference(_)) {
                         quote! { &param_id.into() }
                     } else {
                         quote! { param_id.into() }
+                    };
+                    quote! {
+                        let #arg: #ty = {
+                            let param_id = derived_node_id.params[#i];
+                            #maybe_ref
+                        };
+                    }
+                }
+                ArgType::MemoRef => {
+                    let maybe_ref = if matches!(**ty, syn::Type::Reference(_)) {
+                        quote! { &::pico::MemoRef::new(#db_arg, param_id.into()) }
+                    } else {
+                        quote! { ::pico::MemoRef::new(#db_arg, param_id.into()) }
                     };
                     quote! {
                         let #arg: #ty = {
