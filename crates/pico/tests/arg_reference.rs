@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use calc::{ast::Program, error::Result, eval::eval, lexer::Lexer, parser::Parser};
-use pico::{Database, SourceId};
+use pico::{Database, MemoRef, SourceId};
 use pico_macros::{memo, Source};
 
 mod calc;
@@ -23,12 +23,11 @@ fn arg_reference() {
     assert_eq!(VALUE.load(Ordering::SeqCst), 0);
 
     let expected = Expected(6);
-    assert_result(&db, value, expected);
-    // assert that the argument of type `&Value` was cloned only once, when it was
-    // inserted into the params store, and then internally used by reference
-    assert_eq!(VALUE.load(Ordering::SeqCst), 1);
-    // compare with the argument of type `Expected` which is cloned twice
-    assert_eq!(EXPECTED.load(Ordering::SeqCst), 2);
+    assert_result(&db, value, &expected);
+    // assert that the argument of type `MemoRef<Value>` was not clone
+    assert_eq!(VALUE.load(Ordering::SeqCst), 0);
+    // compare with the argument of type `Expected` which is cloned once
+    assert_eq!(EXPECTED.load(Ordering::SeqCst), 1);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Source)]
@@ -66,14 +65,14 @@ fn parse_ast(db: &Database, id: SourceId<Input>) -> Result<Program> {
     parser.parse_program()
 }
 
-#[memo(reference)]
+#[memo]
 fn evaluate_input(db: &Database, id: SourceId<Input>) -> Value {
-    let ast = parse_ast(db, id).expect("ast must be correct");
+    let ast = parse_ast(db, id).to_owned().expect("ast must be correct");
     let result = eval(ast.expression).expect("value must be evaluated");
     Value(result)
 }
 
 #[memo]
-fn assert_result(_db: &Database, result: &Value, expected: Expected) -> bool {
+fn assert_result(_db: &Database, result: MemoRef<Value>, expected: &Expected) -> bool {
     result.0 == expected.0
 }

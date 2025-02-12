@@ -30,8 +30,8 @@ fn drop() {
         value: "(2 + 2) * 2".to_string(),
     });
 
-    let result = sum(&mut db, left, right);
-    assert_eq!(result, 14);
+    let result = sum(&db, left, right);
+    assert_eq!(*result, 14);
 
     // every functions has been called once on the first run
     assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 1);
@@ -42,8 +42,8 @@ fn drop() {
     db.increment_epoch();
     db.drop_epochs(2.into());
 
-    let result = sum(&mut db, left, right);
-    assert_eq!(result, 14);
+    let result = sum(&db, left, right);
+    assert_eq!(*result, 14);
 
     // every functions has been called again due to empty storage
     assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 2);
@@ -63,7 +63,7 @@ fn drop() {
     assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 2);
 
     let result = sum(&db, left, right);
-    assert_eq!(result, 14);
+    assert_eq!(*result, 14);
 
     // "left" must be called again because the input value has been changed
     assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 3);
@@ -76,7 +76,7 @@ fn drop() {
     db.drop_epochs(3.into());
 
     let result = sum(&mut db, left, right);
-    assert_eq!(result, 14);
+    assert_eq!(*result, 14);
 
     // "left" exists in the latest epoch, it must not be called again
     assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 3);
@@ -101,10 +101,10 @@ fn parse_ast(db: &Database, id: SourceId<Input>) -> Result<Program> {
     parser.parse_program()
 }
 
-#[memo]
+#[memo(inner)]
 fn evaluate_input(db: &Database, id: SourceId<Input>) -> i64 {
     *EVAL_COUNTER.lock().unwrap().entry(id).or_insert(0) += 1;
-    let ast = parse_ast(db, id).expect("ast must be correct");
+    let ast = parse_ast(db, id).to_owned().expect("ast must be correct");
     eval(ast.expression).expect("value must be evaluated")
 }
 

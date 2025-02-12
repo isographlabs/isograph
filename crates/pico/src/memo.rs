@@ -4,7 +4,7 @@ use crate::{
     derived_node::{DerivedNode, DerivedNodeId},
     dyn_eq::DynEq,
     epoch::Epoch,
-    u64_types::{Key, ParamId},
+    intern::Key,
     InnerFn,
 };
 
@@ -71,8 +71,7 @@ fn create_derived_node(
     derived_node_id: DerivedNodeId,
     inner_fn: InnerFn,
 ) -> (Epoch, DidRecalculate) {
-    let (value, tracked_dependencies) =
-        with_dependency_tracking(db, derived_node_id.param_id, inner_fn);
+    let (value, tracked_dependencies) = with_dependency_tracking(db, derived_node_id, inner_fn);
     db.insert_derived_node(
         derived_node_id,
         DerivedNode {
@@ -98,8 +97,7 @@ fn update_derived_node(
     prev_value: &dyn DynEq,
     inner_fn: InnerFn,
 ) -> (Epoch, DidRecalculate) {
-    let (value, tracked_dependencies) =
-        with_dependency_tracking(db, derived_node_id.param_id, inner_fn);
+    let (value, tracked_dependencies) = with_dependency_tracking(db, derived_node_id, inner_fn);
     let did_recalculate = if *prev_value != *value {
         db.set_derive_node_time_updated(derived_node_id, tracked_dependencies.max_time_updated);
         DidRecalculate::Recalculated
@@ -140,9 +138,6 @@ fn source_node_changed_since(db: &Database, key: Key, since: Epoch) -> bool {
 }
 
 fn derived_node_changed_since(db: &Database, derived_node_id: DerivedNodeId, since: Epoch) -> bool {
-    if !db.contains_param(derived_node_id.param_id) {
-        return true;
-    }
     let inner_fn = if let Some(derived_node) = db.get_derived_node(derived_node_id) {
         if let Some(rev) = db.get_derived_node_revision(derived_node_id) {
             if rev.time_updated > since {
@@ -161,11 +156,11 @@ fn derived_node_changed_since(db: &Database, derived_node_id: DerivedNodeId, sin
 
 fn with_dependency_tracking(
     db: &Database,
-    param_id: ParamId,
+    derived_node_id: DerivedNodeId,
     inner_fn: InnerFn,
 ) -> (Box<dyn DynEq>, TrackedDependencies) {
     let guard = db.dependency_stack.enter();
-    let value = inner_fn.0(db, param_id);
+    let value = inner_fn.0(db, derived_node_id);
     let tracked_dependencies = guard.release();
     (value, tracked_dependencies)
 }

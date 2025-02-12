@@ -16,9 +16,9 @@ fn shared_dependency() {
     });
 
     let result = evaluate(&db, input);
-    assert_eq!(result, 6);
+    assert_eq!(*result, 6);
     let result_exp = evaluate_exp(&db, input, 2);
-    assert_eq!(result_exp, 36);
+    assert_eq!(*result_exp, 36);
 
     let input = db.set(Input {
         key: "input",
@@ -26,9 +26,9 @@ fn shared_dependency() {
     });
 
     let result = evaluate(&db, input);
-    assert_eq!(result, 9);
+    assert_eq!(*result, 9);
     let result_exp = evaluate_exp(&db, input, 2);
-    assert_eq!(result_exp, 81);
+    assert_eq!(*result_exp, 81);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Source)]
@@ -48,13 +48,13 @@ fn parse_ast(db: &Database, id: SourceId<Input>) -> Result<Program> {
 
 #[memo]
 fn evaluate(db: &Database, id: SourceId<Input>) -> i64 {
-    let ast = parse_ast(db, id).expect("ast must be correct");
+    let ast = parse_ast(db, id).to_owned().expect("ast must be correct");
     eval(ast.expression).expect("value must be evaluated")
 }
 
 #[memo]
 fn evaluate_exp(db: &Database, id: SourceId<Input>, exp: u32) -> i64 {
-    let ast = parse_ast(db, id).expect("ast must be correct");
+    let ast = parse_ast(db, id).to_owned().expect("ast must be correct");
     eval(ast.expression)
         .expect("value must be evaluated")
         .pow(exp)
