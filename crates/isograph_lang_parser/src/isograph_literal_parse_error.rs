@@ -73,6 +73,9 @@ pub enum IsographLiteralParseError {
     #[error("Expected a boolean value (true or false).")]
     ExpectedBoolean,
 
+    #[error("Expected a null value.")]
+    ExpectedNull,
+
     #[error("Expected delimited `{delimiter} or `{closing_token}`")]
     ExpectedDelimiterOrClosingToken {
         closing_token: IsographLangTokenKind,
