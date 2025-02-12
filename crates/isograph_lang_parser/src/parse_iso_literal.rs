@@ -549,6 +549,22 @@ fn parse_non_constant_value(
         })?;
 
         to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
+            let null: WithSpan<&str> = tokens
+                .parse_source_of_kind(IsographLangTokenKind::Identifier)
+                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+
+            let span = null.span;
+
+            null.and_then(|null| match null {
+                "null" => Ok(NonConstantValue::Null),
+                _ => Err(WithSpan::new(
+                    IsographLiteralParseError::ExpectedNull,
+                    span,
+                )),
+            })
+        })?;
+
+        to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
             let bool = tokens
                 .parse_source_of_kind(IsographLangTokenKind::Identifier)
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
