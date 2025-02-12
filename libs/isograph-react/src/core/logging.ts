@@ -14,6 +14,7 @@ import {
   type Link,
 } from './IsographEnvironment';
 import { ReadDataResult } from './read';
+import type { Update } from './startUpdate';
 import { Arguments } from './util';
 
 export type LogMessage =
@@ -87,6 +88,10 @@ export type LogMessage =
     }
   | {
       kind: 'EnvironmentCreated';
+    }
+  | {
+      kind: 'AppliedUpdate';
+      update: Update;
     };
 
 export type LogFunction = (logMessage: LogMessage) => void;
