@@ -1,0 +1,30 @@
+Err(
+    WithLocation {
+        location: Embedded(
+            EmbeddedLocation {
+                text_source: TextSource {
+                    current_working_directory: CurrentWorkingDirectory,
+                    relative_path_to_source_file: RelativePathToSourceFile(
+                        "crates/isograph_lang_parser/fixtures/field-args-null.input.js",
+                    ),
+                    span: Some(
+                        Span {
+                            start: 30,
+                            end: 76,
+                        },
+                    ),
+                },
+                span: Span {
+                    start: 0,
+                    end: 0,
+                },
+            },
+        ),
+        item: ExpectedNonConstantValue,
+    },
+)
+
+Expected a valid value, like $foo, 42, "bar", true or false
+crates/isograph_lang_parser/fixtures/field-args-null.input.js
+
+---
