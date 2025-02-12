@@ -799,7 +799,7 @@ function getArgumentValueChunk(argumentValue: ArgumentValue): string {
         'o_' +
         argumentValue.value
           .map(([argumentName, argumentValue]) => {
-            return argumentName + '__' + getArgumentValueChunk(argumentValue);
+            return argumentName + THIRD_SPLIT_KEY + getArgumentValueChunk(argumentValue);
           })
           .join('_') +
         '_c'
@@ -829,6 +829,7 @@ function getArgumentValueChunk(argumentValue: ArgumentValue): string {
 // an alias might be pullRequests____first___first____after___cursor
 export const FIRST_SPLIT_KEY = '____';
 export const SECOND_SPLIT_KEY = '___';
+export const THIRD_SPLIT_KEY = '__';
 
 // Returns a key to look up an item in the store
 function getDataIdOfNetworkResponse(
