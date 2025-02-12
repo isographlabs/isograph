@@ -1,7 +1,7 @@
 Ok(
     (
         RelativePathToSourceFile(
-            "crates/isograph_lang_parser/fixtures/object-literal.input.js",
+            "crates/isograph_lang_parser/fixtures/constant-object-literal.input.js",
         ),
         [
             (
@@ -40,7 +40,7 @@ Ok(
                                                         text_source: TextSource {
                                                             current_working_directory: CurrentWorkingDirectory,
                                                             relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/object-literal.input.js",
+                                                                "crates/isograph_lang_parser/fixtures/constant-object-literal.input.js",
                                                             ),
                                                             span: Some(
                                                                 Span {
@@ -68,7 +68,7 @@ Ok(
                                                             text_source: TextSource {
                                                                 current_working_directory: CurrentWorkingDirectory,
                                                                 relative_path_to_source_file: RelativePathToSourceFile(
-                                                                    "crates/isograph_lang_parser/fixtures/object-literal.input.js",
+                                                                    "crates/isograph_lang_parser/fixtures/constant-object-literal.input.js",
                                                                 ),
                                                                 span: Some(
                                                                     Span {
@@ -99,7 +99,7 @@ Ok(
                                                                     text_source: TextSource {
                                                                         current_working_directory: CurrentWorkingDirectory,
                                                                         relative_path_to_source_file: RelativePathToSourceFile(
-                                                                            "crates/isograph_lang_parser/fixtures/object-literal.input.js",
+                                                                            "crates/isograph_lang_parser/fixtures/constant-object-literal.input.js",
                                                                         ),
                                                                         span: Some(
                                                                             Span {
@@ -123,7 +123,7 @@ Ok(
                                                                                     text_source: TextSource {
                                                                                         current_working_directory: CurrentWorkingDirectory,
                                                                                         relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                            "crates/isograph_lang_parser/fixtures/object-literal.input.js",
+                                                                                            "crates/isograph_lang_parser/fixtures/constant-object-literal.input.js",
                                                                                         ),
                                                                                         span: Some(
                                                                                             Span {
@@ -148,7 +148,7 @@ Ok(
                                                                                     text_source: TextSource {
                                                                                         current_working_directory: CurrentWorkingDirectory,
                                                                                         relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                            "crates/isograph_lang_parser/fixtures/object-literal.input.js",
+                                                                                            "crates/isograph_lang_parser/fixtures/constant-object-literal.input.js",
                                                                                         ),
                                                                                         span: Some(
                                                                                             Span {
@@ -177,7 +177,7 @@ Ok(
                                                                                     text_source: TextSource {
                                                                                         current_working_directory: CurrentWorkingDirectory,
                                                                                         relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                            "crates/isograph_lang_parser/fixtures/object-literal.input.js",
+                                                                                            "crates/isograph_lang_parser/fixtures/constant-object-literal.input.js",
                                                                                         ),
                                                                                         span: Some(
                                                                                             Span {
@@ -202,7 +202,7 @@ Ok(
                                                                                     text_source: TextSource {
                                                                                         current_working_directory: CurrentWorkingDirectory,
                                                                                         relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                            "crates/isograph_lang_parser/fixtures/object-literal.input.js",
+                                                                                            "crates/isograph_lang_parser/fixtures/constant-object-literal.input.js",
                                                                                         ),
                                                                                         span: Some(
                                                                                             Span {
@@ -229,7 +229,7 @@ Ok(
                                                                                     text_source: TextSource {
                                                                                         current_working_directory: CurrentWorkingDirectory,
                                                                                         relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                            "crates/isograph_lang_parser/fixtures/object-literal.input.js",
+                                                                                            "crates/isograph_lang_parser/fixtures/constant-object-literal.input.js",
                                                                                         ),
                                                                                         span: Some(
                                                                                             Span {
@@ -254,7 +254,7 @@ Ok(
                                                                                     text_source: TextSource {
                                                                                         current_working_directory: CurrentWorkingDirectory,
                                                                                         relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                            "crates/isograph_lang_parser/fixtures/object-literal.input.js",
+                                                                                            "crates/isograph_lang_parser/fixtures/constant-object-literal.input.js",
                                                                                         ),
                                                                                         span: Some(
                                                                                             Span {
@@ -278,7 +278,7 @@ Ok(
                                                                                                     text_source: TextSource {
                                                                                                         current_working_directory: CurrentWorkingDirectory,
                                                                                                         relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                                            "crates/isograph_lang_parser/fixtures/object-literal.input.js",
+                                                                                                            "crates/isograph_lang_parser/fixtures/constant-object-literal.input.js",
                                                                                                         ),
                                                                                                         span: Some(
                                                                                                             Span {
@@ -303,7 +303,7 @@ Ok(
                                                                                                     text_source: TextSource {
                                                                                                         current_working_directory: CurrentWorkingDirectory,
                                                                                                         relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                                            "crates/isograph_lang_parser/fixtures/object-literal.input.js",
+                                                                                                            "crates/isograph_lang_parser/fixtures/constant-object-literal.input.js",
                                                                                                         ),
                                                                                                         span: Some(
                                                                                                             Span {
@@ -352,7 +352,7 @@ Ok(
                                                     text_source: TextSource {
                                                         current_working_directory: CurrentWorkingDirectory,
                                                         relative_path_to_source_file: RelativePathToSourceFile(
-                                                            "crates/isograph_lang_parser/fixtures/object-literal.input.js",
+                                                            "crates/isograph_lang_parser/fixtures/constant-object-literal.input.js",
                                                         ),
                                                         span: Some(
                                                             Span {
@@ -393,7 +393,7 @@ Ok(
                                 },
                             ],
                             definition_path: RelativePathToSourceFile(
-                                "crates/isograph_lang_parser/fixtures/object-literal.input.js",
+                                "crates/isograph_lang_parser/fixtures/constant-object-literal.input.js",
                             ),
                             field_keyword: WithSpan {
                                 item: (),
@@ -419,7 +419,7 @@ Ok(
                 TextSource {
                     current_working_directory: CurrentWorkingDirectory,
                     relative_path_to_source_file: RelativePathToSourceFile(
-                        "crates/isograph_lang_parser/fixtures/object-literal.input.js",
+                        "crates/isograph_lang_parser/fixtures/constant-object-literal.input.js",
                     ),
                     span: Some(
                         Span {
