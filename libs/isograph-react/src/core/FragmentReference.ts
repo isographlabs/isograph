@@ -11,7 +11,7 @@ export type VariableValue =
   | boolean
   | null
   | {
-      [key: string]: VariableValue;
+      readonly [index: string]: VariableValue;
     }
   | VariableValue[];
 
