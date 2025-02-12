@@ -799,7 +799,11 @@ function getArgumentValueChunk(argumentValue: ArgumentValue): string {
         'o_' +
         argumentValue.value
           .map(([argumentName, argumentValue]) => {
-            return argumentName + THIRD_SPLIT_KEY + getArgumentValueChunk(argumentValue);
+            return (
+              argumentName +
+              THIRD_SPLIT_KEY +
+              getArgumentValueChunk(argumentValue)
+            );
           })
           .join('_') +
         '_c'
