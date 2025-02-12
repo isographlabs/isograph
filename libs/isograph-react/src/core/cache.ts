@@ -812,7 +812,8 @@ function getArgumentValueChunk(argumentValue: ArgumentValue): string {
       return 'v_' + argumentValue.name;
     }
     case 'String': {
-      return 's_' + argumentValue.value.replaceAll(/[^_a-zA-Z0-9]/g, '_');
+      // replace all non-word characters (alphanumeric & underscore) with underscores
+      return 's_' + argumentValue.value.replaceAll(/\W/g, '_');
     }
     case 'Enum': {
       return 'e_' + argumentValue.value;
