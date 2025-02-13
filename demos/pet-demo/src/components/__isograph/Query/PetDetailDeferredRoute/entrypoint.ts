@@ -9,6 +9,9 @@ const queryText = 'query PetDetailDeferredRoute ($id: ID!) {\
     id,\
     name,\
   },\
+  topLevelField____input___o_name__s_ThisIsJustHereToTestObjectLiterals_c: topLevelField(input: { name: "ThisIsJustHereToTestObjectLiterals" }) {\
+    __typename,\
+  },\
 }';
 
 const normalizationAst: NormalizationAst = {
@@ -33,6 +36,33 @@ const normalizationAst: NormalizationAst = {
         {
           kind: "Scalar",
           fieldName: "name",
+          arguments: null,
+        },
+      ],
+    },
+    {
+      kind: "Linked",
+      fieldName: "topLevelField",
+      arguments: [
+        [
+          "input",
+          {
+            kind: "Object",
+            value: [
+              [
+                "name",
+                { kind: "String", value: "ThisIsJustHereToTestObjectLiterals" },
+              ],
+
+            ]
+          },
+        ],
+      ],
+      concreteType: "TopLevelField",
+      selections: [
+        {
+          kind: "Scalar",
+          fieldName: "__typename",
           arguments: null,
         },
       ],

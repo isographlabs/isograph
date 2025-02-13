@@ -178,6 +178,7 @@ export const schema = createSchema({
           id: 'Viewer',
         };
       },
+      topLevelField: () => null,
     },
     Viewer: {
       newsfeed: (_obj, args) => {

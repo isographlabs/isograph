@@ -25,6 +25,35 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
       },
     ],
   },
+  {
+    kind: "Linked",
+    fieldName: "topLevelField",
+    alias: null,
+    arguments: [
+      [
+        "input",
+        {
+          kind: "Object",
+          value: [
+            [
+              "name",
+              { kind: "String", value: "ThisIsJustHereToTestObjectLiterals" },
+            ],
+
+          ]
+        },
+      ],
+    ],
+    condition: null,
+    selections: [
+      {
+        kind: "Scalar",
+        fieldName: "__typename",
+        alias: null,
+        arguments: null,
+      },
+    ],
+  },
 ];
 
 const artifact: ComponentReaderArtifact<

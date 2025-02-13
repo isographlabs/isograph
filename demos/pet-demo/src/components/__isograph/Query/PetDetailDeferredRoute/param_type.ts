@@ -6,6 +6,9 @@ export type Query__PetDetailDeferredRoute__param = {
     readonly pet: ({
       readonly PetDetailDeferredRouteInnerComponent: Pet__PetDetailDeferredRouteInnerComponent__output_type,
     } | null),
+    readonly topLevelField: ({
+      readonly __typename: string,
+    } | null),
   },
   readonly parameters: Query__PetDetailDeferredRoute__parameters,
 };
