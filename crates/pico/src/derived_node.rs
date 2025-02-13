@@ -35,9 +35,9 @@ impl From<ParamId> for DerivedNodeId {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct InnerFn(pub fn(&Database, DerivedNodeId) -> Box<dyn DynEq>);
+pub struct InnerFn(pub fn(&Database, DerivedNodeId) -> Option<Box<dyn DynEq>>);
 impl InnerFn {
-    pub fn new(inner_fn: fn(&Database, DerivedNodeId) -> Box<dyn DynEq>) -> Self {
+    pub fn new(inner_fn: fn(&Database, DerivedNodeId) -> Option<Box<dyn DynEq>>) -> Self {
         InnerFn(inner_fn)
     }
 }

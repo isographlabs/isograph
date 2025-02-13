@@ -11,6 +11,7 @@ use crate::{
 pub enum DidRecalculate {
     ReusedMemoizedValue,
     Recalculated,
+    Error,
 }
 
 /// Memo is the workhorse function of pico. Given a [`DerivedNodeId`], which
@@ -77,7 +78,7 @@ fn create_derived_node(
         DerivedNode {
             dependencies: tracked_dependencies.dependencies,
             inner_fn,
-            value,
+            value: value.unwrap(),
         },
     );
     db.insert_derived_node_revision(
@@ -98,20 +99,29 @@ fn update_derived_node(
     inner_fn: InnerFn,
 ) -> (Epoch, DidRecalculate) {
     let (value, tracked_dependencies) = with_dependency_tracking(db, derived_node_id, inner_fn);
-    let did_recalculate = if *prev_value != *value {
-        db.set_derive_node_time_updated(derived_node_id, tracked_dependencies.max_time_updated);
-        DidRecalculate::Recalculated
-    } else {
-        DidRecalculate::ReusedMemoizedValue
+    let did_recalculate = match value {
+        Some(v) => {
+            let did_recalculate = if *prev_value != *v {
+                db.set_derive_node_time_updated(
+                    derived_node_id,
+                    tracked_dependencies.max_time_updated,
+                );
+                DidRecalculate::Recalculated
+            } else {
+                DidRecalculate::ReusedMemoizedValue
+            };
+            db.insert_derived_node(
+                derived_node_id,
+                DerivedNode {
+                    dependencies: tracked_dependencies.dependencies,
+                    inner_fn,
+                    value: v,
+                },
+            );
+            did_recalculate
+        }
+        None => DidRecalculate::Error,
     };
-    db.insert_derived_node(
-        derived_node_id,
-        DerivedNode {
-            dependencies: tracked_dependencies.dependencies,
-            inner_fn,
-            value,
-        },
-    );
     (tracked_dependencies.max_time_updated, did_recalculate)
 }
 
@@ -151,14 +161,17 @@ fn derived_node_changed_since(db: &Database, derived_node_id: DerivedNodeId, sin
         return true;
     };
     let did_recalculate = memo(db, derived_node_id, inner_fn);
-    matches!(did_recalculate, DidRecalculate::Recalculated)
+    matches!(
+        did_recalculate,
+        DidRecalculate::Recalculated | DidRecalculate::Error
+    )
 }
 
 fn with_dependency_tracking(
     db: &Database,
     derived_node_id: DerivedNodeId,
     inner_fn: InnerFn,
-) -> (Box<dyn DynEq>, TrackedDependencies) {
+) -> (Option<Box<dyn DynEq>>, TrackedDependencies) {
     let guard = db.dependency_stack.enter();
     let value = inner_fn.0(db, derived_node_id);
     let tracked_dependencies = guard.release();

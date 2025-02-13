@@ -158,10 +158,8 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
                     };
                     quote! {
                         let #arg = {
-                            let param_ref = ::pico::macro_fns::get_param(#db_arg, derived_node_id.params[#i])
-                                .expect("param should exist. This is indicative of a bug in Pico.");
-                            let inner = param_ref.downcast_ref::<#target_type>()
-                                .expect("param type must be correct. This is indicative of a bug in Pico.");
+                            let param_ref = ::pico::macro_fns::get_param(#db_arg, derived_node_id.params[#i])?;
+                            let inner = param_ref.downcast_ref::<#target_type>()?;
                             #binding_expr
                         };
                     }
@@ -182,7 +180,7 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
                     #extract_parameters
                 )*
                 let value: #return_type = (|| #block)();
-                Box::new(value)
+                Some(Box::new(value))
             }));
             #return_expr
         }
