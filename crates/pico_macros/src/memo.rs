@@ -30,7 +30,7 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
     if sig.inputs.is_empty() {
         return Error::new_spanned(
             &sig,
-            "Memoized function must have at least one argument (&mut Database)",
+            "Memoized function must have at least one argument (&Database)",
         )
         .to_compile_error()
         .into();
