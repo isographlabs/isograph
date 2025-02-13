@@ -1,14 +1,11 @@
-use std::hash::DefaultHasher;
-use std::hash::Hash;
-use std::hash::Hasher;
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 use darling::{ast::NestedMeta, FromMeta};
 use proc_macro::TokenStream;
-use quote::quote;
-use quote::ToTokens;
-use syn::Signature;
+use quote::{quote, ToTokens};
 use syn::{
-    parse_macro_input, parse_quote, Error, FnArg, GenericParam, ItemFn, PatType, ReturnType,
+    parse_macro_input, parse_quote, Error, FnArg, GenericParam, ItemFn, Lifetime, PatType,
+    ReturnType, Signature,
 };
 
 #[derive(Debug, FromMeta)]
@@ -77,16 +74,6 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
             }
         });
 
-    let attr_args = match NestedMeta::parse_meta_list(args.into()) {
-        Ok(v) => v,
-        Err(e) => return Error::new_spanned(&sig, e).to_compile_error().into(),
-    };
-
-    let args_ = match MemoArgs::from_list(&attr_args) {
-        Ok(parsed) => parsed,
-        Err(e) => return e.with_span(&sig).write_errors().into(),
-    };
-
     let return_type = match &sig.output {
         ReturnType::Type(_, ty) => ty.clone(),
         ReturnType::Default => parse_quote!(()),
@@ -103,52 +90,30 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
 
     let mut new_sig = sig.clone();
 
-    if args_.inner {
-        return_expr = quote! { #return_expr.clone() };
-    } else if args_.inner_ref {
-        let lifetime = new_sig.generics.params.iter().find_map(|param| {
-            if let GenericParam::Lifetime(lt) = param {
-                Some(&lt.lifetime)
-            } else {
-                None
-            }
-        });
+    let macro_args = match parse_macro_args(args, &sig) {
+        Ok(parsed) => parsed,
+        Err(e) => return e.to_compile_error().into(),
+    };
 
-        if let Some(lt) = lifetime {
-            new_sig.output =
-                ReturnType::Type(parse_quote!(->), Box::new(parse_quote!(&#lt #return_type)));
-        } else {
-            new_sig.generics.params.push(parse_quote!('db));
-            if let FnArg::Typed(PatType { ty, .. }) = &mut new_sig.inputs[0] {
-                if let syn::Type::Reference(ref mut reference) = **ty {
-                    reference.lifetime = Some(parse_quote!('db));
-                } else {
-                    return Error::new_spanned(ty, "Expected a mutable reference type")
-                        .to_compile_error()
-                        .into();
-                }
-            }
-            new_sig.output =
-                ReturnType::Type(parse_quote!(->), Box::new(parse_quote!(&'db #return_type)));
-        }
+    if macro_args.inner {
+        return_expr = quote! { #return_expr.clone() };
     } else {
-        new_sig.generics.params.push(parse_quote!('db));
-        if let FnArg::Typed(PatType { ty, .. }) = &mut new_sig.inputs[0] {
-            if let syn::Type::Reference(ref mut reference) = **ty {
-                reference.lifetime = Some(parse_quote!('db));
-            } else {
-                return Error::new_spanned(ty, "Expected a mutable reference type")
-                    .to_compile_error()
-                    .into();
-            }
+        let lifetime = get_fn_lifetime(&mut new_sig);
+        if let Err(e) = check_db_lifetime(&mut new_sig.inputs[0], lifetime.clone()) {
+            return e.to_compile_error().into();
         }
-        new_sig.output = ReturnType::Type(
-            parse_quote!(->),
-            Box::new(parse_quote!(::pico::MemoRef<'db, #return_type>)),
-        );
-        return_expr = quote! {
-            ::pico::MemoRef::new(#db_arg, derived_node_id)
-        };
+        if macro_args.inner_ref {
+            new_sig.output = ReturnType::Type(
+                parse_quote!(->),
+                Box::new(parse_quote!(&#lifetime #return_type)),
+            );
+        } else {
+            new_sig.output = ReturnType::Type(
+                parse_quote!(->),
+                Box::new(parse_quote!(::pico::MemoRef<#lifetime, #return_type>)),
+            );
+            return_expr = quote! { ::pico::MemoRef::new(#db_arg, derived_node_id) };
+        }
     }
 
     let extract_parameters = other_args.clone().zip(argument_types.clone())
@@ -263,4 +228,44 @@ fn type_is(ty: &syn::Type, target: &'static str) -> bool {
         }
     }
     false
+}
+
+fn get_fn_lifetime(sig: &mut Signature) -> Lifetime {
+    let lt = sig.generics.params.iter().find_map(|param| {
+        if let GenericParam::Lifetime(lt) = param {
+            Some(lt.lifetime.clone())
+        } else {
+            None
+        }
+    });
+    if lt.is_none() {
+        sig.generics.params.push(parse_quote!('db));
+    }
+    lt.unwrap_or(parse_quote!('db))
+}
+
+fn check_db_lifetime(arg: &mut FnArg, lifetime: Lifetime) -> Result<(), syn::Error> {
+    if let FnArg::Typed(PatType { ty, .. }) = arg {
+        if let syn::Type::Reference(ref mut reference) = **ty {
+            if let Some(db_lifetime) = &reference.lifetime {
+                if db_lifetime != &lifetime {
+                    return Err(Error::new_spanned(
+                        ty,
+                        format!("Expected lifetime {lifetime}"),
+                    ));
+                }
+            } else {
+                reference.lifetime = Some(lifetime);
+            }
+        } else {
+            return Err(Error::new_spanned(ty, "Expected a reference"));
+        }
+    }
+    Ok(())
+}
+
+fn parse_macro_args(args: TokenStream, sig: &Signature) -> Result<MemoArgs, syn::Error> {
+    let attr_args =
+        NestedMeta::parse_meta_list(args.into()).map_err(|e| Error::new_spanned(sig, e))?;
+    MemoArgs::from_list(&attr_args).map_err(|e| e.with_span(&sig).into())
 }
