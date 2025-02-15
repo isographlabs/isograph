@@ -3,7 +3,8 @@ use intern::string_key::Intern;
 
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_schema::{
-    FieldMapItem, PrimaryFieldInfo, RefetchedPathsMap, ValidatedClientField, ValidatedSchema,
+    ClientType, FieldMapItem, PrimaryFieldInfo, RefetchedPathsMap, ValidatedClientField,
+    ValidatedSchema,
 };
 
 use crate::{
@@ -50,7 +51,7 @@ pub(crate) fn generate_refetch_reader_artifact(
         },
         0,
         refetched_paths,
-        &client_field.initial_variable_context(),
+        &ClientType::ClientField(client_field).initial_variable_context(),
     );
 
     let reader_import_statement =

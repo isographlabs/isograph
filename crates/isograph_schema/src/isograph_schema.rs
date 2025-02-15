@@ -226,6 +226,23 @@ impl<
             ClientType::ClientField(client_field) => &client_field.variable_definitions,
         }
     }
+    pub fn reader_selection_set(
+        &self,
+    ) -> Option<
+        &Vec<
+            WithSpan<
+                ServerFieldSelection<
+                    TClientTypeSelectionScalarFieldAssociatedData,
+                    TClientTypeSelectionLinkedFieldAssociatedData,
+                >,
+            >,
+        >,
+    > {
+        match self {
+            ClientType::ClientPointer(client_pointer) => Some(&client_pointer.reader_selection_set),
+            ClientType::ClientField(client_field) => client_field.reader_selection_set.as_ref(),
+        }
+    }
 }
 
 impl<TFieldAssociatedData, TClientFieldType> FieldType<TFieldAssociatedData, TClientFieldType> {
