@@ -5,7 +5,7 @@ use common_lang_types::ArtifactPathAndContent;
 use isograph_config::CompilerConfig;
 use isograph_schema::{OutputFormat, Schema, UnvalidatedSchema, ValidatedSchema};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, std::hash::Hash, Default)]
 pub struct GraphqlOutputFormat {}
 
 impl OutputFormat for GraphqlOutputFormat {
