@@ -39,6 +39,7 @@ lazy_static! {
     static ref ID: FieldArgumentName = "id".intern().into();
 }
 
+#[allow(clippy::type_complexity)]
 pub(crate) fn validate_and_transform_client_types<TOutputFormat: OutputFormat>(
     client_types: Vec<
         ClientType<UnvalidatedClientField<TOutputFormat>, UnvalidatedClientPointer<TOutputFormat>>,
