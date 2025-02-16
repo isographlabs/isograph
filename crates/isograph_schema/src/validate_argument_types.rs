@@ -1,18 +1,24 @@
 use common_lang_types::{
-    EnumLiteralValue, Location, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
+    EnumLiteralValue, Location, SelectableFieldName, Span, UnvalidatedTypeName, ValueKeyName,
+    VariableName, WithLocation, WithSpan,
 };
-
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
-    GraphQLTypeAnnotation,
+    GraphQLTypeAnnotation, NameValuePair,
 };
+use intern::Lookup;
+use std::collections::BTreeMap;
+use std::fmt::Debug;
 
 use isograph_lang_types::{
-    NonConstantValue, SelectableServerFieldId, SelectionType, ServerScalarId,
+    ClientFieldId, ClientPointerId, NonConstantValue, SelectableServerFieldId, SelectionType,
+    ServerFieldId, ServerObjectId, ServerScalarId, TypeAnnotation, UnionTypeAnnotation,
+    UnionVariant, VariableDefinition,
 };
 
 use crate::{
-    ServerFieldData, ValidateSchemaError, ValidateSchemaResult, ValidatedVariableDefinition,
+    ClientType, FieldType, SchemaObject, ServerFieldData, ValidateSchemaError,
+    ValidateSchemaResult, ValidatedSchemaServerField, ValidatedVariableDefinition,
 };
 
 fn graphql_type_to_non_null_type<TValue>(
@@ -124,6 +130,7 @@ pub fn value_satisfies_type(
     field_argument_definition_type: &GraphQLTypeAnnotation<SelectableServerFieldId>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     schema_data: &ServerFieldData,
+    server_fields: &[ValidatedSchemaServerField],
 ) -> ValidateSchemaResult<()> {
     match &selection_supplied_argument_value.item {
         NonConstantValue::Variable(variable_name) => {
@@ -213,9 +220,13 @@ pub fn value_satisfies_type(
         }
         NonConstantValue::List(list) => {
             match graphql_type_to_non_null_type(field_argument_definition_type.clone()) {
-                GraphQLNonNullTypeAnnotation::List(list_type) => {
-                    list_satisfies_type(list, list_type, variable_definitions, schema_data)
-                }
+                GraphQLNonNullTypeAnnotation::List(list_type) => list_satisfies_type(
+                    list,
+                    list_type,
+                    variable_definitions,
+                    schema_data,
+                    server_fields,
+                ),
                 GraphQLNonNullTypeAnnotation::Named(_) => Err(WithLocation::new(
                     ValidateSchemaError::ExpectedTypeFoundList {
                         expected: id_annotation_to_typename_annotation(
@@ -227,7 +238,7 @@ pub fn value_satisfies_type(
                 )),
             }
         }
-        NonConstantValue::Object(_object_literal) => {
+        NonConstantValue::Object(object_literal) => {
             match graphql_type_to_non_null_type(field_argument_definition_type.clone()) {
                 GraphQLNonNullTypeAnnotation::List(_) => Err(WithLocation::new(
                     ValidateSchemaError::ExpectedTypeFoundObject {
@@ -238,28 +249,159 @@ pub fn value_satisfies_type(
                     },
                     selection_supplied_argument_value.location,
                 )),
-                GraphQLNonNullTypeAnnotation::Named(named_type) => {
-                    match named_type.0.item {
-                        SelectionType::Scalar(_) => Err(WithLocation::new(
-                            ValidateSchemaError::ExpectedTypeFoundObject {
-                                expected: id_annotation_to_typename_annotation(
-                                    field_argument_definition_type,
-                                    schema_data,
-                                ),
-                            },
-                            selection_supplied_argument_value.location,
-                        )),
-                        SelectionType::Object(object_id) => {
-                            let _object = schema_data.object(object_id);
-                            // Let's ignore that for now, I'll typecheck this later
-                            // todo!("Validate object literal. Parser doesn't support object literals yet");
-                            Ok(())
-                        }
-                    }
-                }
+                GraphQLNonNullTypeAnnotation::Named(named_type) => match named_type.0.item {
+                    SelectionType::Scalar(_) => Err(WithLocation::new(
+                        ValidateSchemaError::ExpectedTypeFoundObject {
+                            expected: id_annotation_to_typename_annotation(
+                                field_argument_definition_type,
+                                schema_data,
+                            ),
+                        },
+                        selection_supplied_argument_value.location,
+                    )),
+                    SelectionType::Object(object_id) => object_satisfies_type(
+                        selection_supplied_argument_value,
+                        variable_definitions,
+                        schema_data,
+                        server_fields,
+                        object_literal,
+                        object_id,
+                    ),
+                },
             }
         }
     }
+}
+
+fn object_satisfies_type(
+    selection_supplied_argument_value: &WithLocation<NonConstantValue>,
+    variable_definitions: &[WithSpan<
+        VariableDefinition<SelectionType<ServerObjectId, ServerScalarId>>,
+    >],
+    schema_data: &ServerFieldData,
+    server_fields: &[ValidatedSchemaServerField],
+    object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
+    object_id: ServerObjectId,
+) -> Result<(), WithLocation<ValidateSchemaError>> {
+    let object = schema_data.object(object_id);
+    validate_no_extraneous_fields(
+        &object.encountered_fields,
+        object_literal,
+        selection_supplied_argument_value.location,
+    )?;
+
+    let missing_fields = get_missing_and_provided_fields(server_fields, object_literal, object)
+        .iter()
+        .filter_map(|field| match field {
+            ObjectLiteralFieldType::Provided(
+                field_type_annotation,
+                selection_supplied_argument_value,
+            ) => match value_satisfies_type(
+                &selection_supplied_argument_value.value,
+                field_type_annotation,
+                variable_definitions,
+                schema_data,
+                server_fields,
+            ) {
+                Ok(_) => None,
+                Err(e) => Some(Err(e)),
+            },
+            ObjectLiteralFieldType::Missing(field_name) => Some(Ok(*field_name)),
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    if missing_fields.is_empty() {
+        Ok(())
+    } else {
+        Err(WithLocation::new(
+            ValidateSchemaError::MissingFields {
+                missing_fields_names: missing_fields,
+            },
+            selection_supplied_argument_value.location,
+        ))
+    }
+}
+
+enum ObjectLiteralFieldType {
+    Provided(
+        GraphQLTypeAnnotation<SelectableServerFieldId>,
+        NameValuePair<ValueKeyName, NonConstantValue>,
+    ),
+    Missing(SelectableFieldName),
+}
+
+fn get_missing_and_provided_fields(
+    server_fields: &[ValidatedSchemaServerField],
+    object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
+    object: &SchemaObject,
+) -> Vec<ObjectLiteralFieldType> {
+    object
+        .encountered_fields
+        .iter()
+        .filter_map(|(field_name, field_type)| {
+            let field = &server_fields[field_type.as_server_field()?.as_usize()];
+
+            let field_type_annotation = match &field.associated_data {
+                SelectionType::Object(associated_data) => associated_data
+                    .type_name
+                    .clone()
+                    .map(&mut |object_id| SelectionType::Object(object_id)),
+                SelectionType::Scalar(type_name) => type_name
+                    .clone()
+                    .map(&mut |scalar_id| SelectionType::Scalar(scalar_id)),
+            };
+            let field_type_annotation =
+                graphl_type_annotation_from_type_annotation(field_type_annotation);
+
+            let object_literal_supplied_field = object_literal
+                .iter()
+                .find(|field| field.name.item.lookup() == field_name.lookup());
+
+            match object_literal_supplied_field {
+                Some(selection_supplied_argument_value) => Some(ObjectLiteralFieldType::Provided(
+                    field_type_annotation,
+                    selection_supplied_argument_value.clone(),
+                )),
+                None => match field_type_annotation {
+                    GraphQLTypeAnnotation::NonNull(_) => {
+                        Some(ObjectLiteralFieldType::Missing(*field_name))
+                    }
+                    GraphQLTypeAnnotation::List(_) | GraphQLTypeAnnotation::Named(_) => None,
+                },
+            }
+        })
+        .collect()
+}
+
+fn validate_no_extraneous_fields(
+    object_fields: &BTreeMap<
+        SelectableFieldName,
+        FieldType<ServerFieldId, ClientType<ClientFieldId, ClientPointerId>>,
+    >,
+    object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
+    location: Location,
+) -> ValidateSchemaResult<()> {
+    let extra_fields: Vec<_> = object_literal
+        .iter()
+        .filter_map(|field| {
+            let is_defined = object_fields
+                .iter()
+                .any(|(field_name, _)| field_name.lookup() == field.name.item.lookup());
+
+            if !is_defined {
+                return Some(field.clone());
+            }
+            None
+        })
+        .collect();
+
+    if !extra_fields.is_empty() {
+        return Err(WithLocation::new(
+            ValidateSchemaError::ExtraneousFields { extra_fields },
+            location,
+        ));
+    }
+    Ok(())
 }
 
 fn id_annotation_to_typename_annotation(
@@ -305,10 +447,65 @@ fn list_satisfies_type(
     list_type: GraphQLListTypeAnnotation<SelectableServerFieldId>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     schema_data: &ServerFieldData,
+    server_fields: &[ValidatedSchemaServerField],
 ) -> ValidateSchemaResult<()> {
     list.iter().try_for_each(|element| {
-        value_satisfies_type(element, &list_type.0, variable_definitions, schema_data)
+        value_satisfies_type(
+            element,
+            &list_type.0,
+            variable_definitions,
+            schema_data,
+            server_fields,
+        )
     })
+}
+
+fn graphl_type_annotation_from_type_annotation<TValue: Ord + Copy + Debug>(
+    other: TypeAnnotation<TValue>,
+) -> GraphQLTypeAnnotation<TValue> {
+    match other {
+        TypeAnnotation::Scalar(scalar_id) => GraphQLTypeAnnotation::Named(
+            GraphQLNamedTypeAnnotation(WithSpan::new(scalar_id, Span::todo_generated())),
+        ),
+        TypeAnnotation::Plural(type_annotation) => {
+            GraphQLTypeAnnotation::List(Box::new(GraphQLListTypeAnnotation(
+                graphl_type_annotation_from_type_annotation(*type_annotation),
+            )))
+        }
+        TypeAnnotation::Union(union_type_annotation) => {
+            graphl_type_annotation_from_union_variant(union_type_annotation)
+        }
+    }
+}
+
+fn graphl_type_annotation_from_union_variant<TValue: Ord + Copy + Debug>(
+    union_type_annotation: UnionTypeAnnotation<TValue>,
+) -> GraphQLTypeAnnotation<TValue> {
+    if union_type_annotation.nullable {
+        return match union_type_annotation.variants.into_iter().next().unwrap() {
+            UnionVariant::Scalar(scalar_id) => GraphQLTypeAnnotation::Named(
+                GraphQLNamedTypeAnnotation(WithSpan::new(scalar_id, Span::todo_generated())),
+            ),
+            UnionVariant::Plural(type_annotation) => {
+                GraphQLTypeAnnotation::List(Box::new(GraphQLListTypeAnnotation(
+                    graphl_type_annotation_from_type_annotation(type_annotation),
+                )))
+            }
+        };
+    }
+
+    GraphQLTypeAnnotation::NonNull(
+        match union_type_annotation.variants.into_iter().next().unwrap() {
+            UnionVariant::Scalar(scalar_id) => Box::new(GraphQLNonNullTypeAnnotation::Named(
+                GraphQLNamedTypeAnnotation(WithSpan::new(scalar_id, Span::todo_generated())),
+            )),
+            UnionVariant::Plural(type_annotation) => Box::new(GraphQLNonNullTypeAnnotation::List(
+                GraphQLListTypeAnnotation(graphl_type_annotation_from_type_annotation(
+                    type_annotation,
+                )),
+            )),
+        },
+    )
 }
 
 fn get_variable_type<'a>(
