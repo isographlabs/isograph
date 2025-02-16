@@ -24,9 +24,10 @@ use crate::{
     ValidateEntrypointDeclarationError,
 };
 
-pub type ValidatedSchemaServerField = SchemaServerField<
+pub type ValidatedSchemaServerField<TOutputFormat> = SchemaServerField<
     <ValidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+    TOutputFormat,
 >;
 
 pub type ValidatedSelection = ServerFieldSelection<

@@ -106,6 +106,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                         ),
                     },
                     is_discriminator: false,
+                    phantom_data: std::marker::PhantomData,
                 };
 
                 self.server_fields.push(server_field);

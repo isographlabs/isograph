@@ -83,6 +83,7 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState, TOutputFormat: 
         SchemaServerField<
             TSchemaValidationState::ServerFieldTypeAssociatedData,
             TSchemaValidationState::VariableDefinitionInnerType,
+            TOutputFormat,
         >,
     >,
     pub client_types: ClientTypes<
@@ -280,6 +281,7 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     ) -> &SchemaServerField<
         TSchemaValidationState::ServerFieldTypeAssociatedData,
         TSchemaValidationState::VariableDefinitionInnerType,
+        TOutputFormat,
     > {
         &self.server_fields[server_field_id.as_usize()]
     }
@@ -478,7 +480,11 @@ pub struct SchemaObject {
 }
 
 #[derive(Debug, Clone)]
-pub struct SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData: Ord + Debug> {
+pub struct SchemaServerField<
+    TData,
+    TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
+    TOutputFormat: OutputFormat,
+> {
     pub description: Option<DescriptionValue>,
     /// The name of the server field and the location where it was defined
     /// (an iso literal or Location::Generated).
@@ -491,15 +497,22 @@ pub struct SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData
         Vec<WithLocation<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
     // TODO remove this. This is indicative of poor modeling.
     pub is_discriminator: bool,
+    pub phantom_data: PhantomData<TOutputFormat>,
 }
 
-impl<TData, TClientFieldVariableDefinitionAssociatedData: Clone + Ord + Debug>
-    SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData>
+impl<
+        TData,
+        TClientFieldVariableDefinitionAssociatedData: Clone + Ord + Debug,
+        TOutputFormat: OutputFormat,
+    > SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>
 {
     pub fn and_then<TData2, E>(
         &self,
         convert: impl FnOnce(&TData) -> Result<TData2, E>,
-    ) -> Result<SchemaServerField<TData2, TClientFieldVariableDefinitionAssociatedData>, E> {
+    ) -> Result<
+        SchemaServerField<TData2, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>,
+        E,
+    > {
         Ok(SchemaServerField {
             description: self.description,
             name: self.name,
@@ -508,13 +521,15 @@ impl<TData, TClientFieldVariableDefinitionAssociatedData: Clone + Ord + Debug>
             parent_type_id: self.parent_type_id,
             arguments: self.arguments.clone(),
             is_discriminator: self.is_discriminator,
+            phantom_data: PhantomData,
         })
     }
 
     pub fn map<TData2, E>(
         &self,
         convert: impl FnOnce(&TData) -> TData2,
-    ) -> SchemaServerField<TData2, TClientFieldVariableDefinitionAssociatedData> {
+    ) -> SchemaServerField<TData2, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>
+    {
         SchemaServerField {
             description: self.description,
             name: self.name,
@@ -523,6 +538,7 @@ impl<TData, TClientFieldVariableDefinitionAssociatedData: Clone + Ord + Debug>
             parent_type_id: self.parent_type_id,
             arguments: self.arguments.clone(),
             is_discriminator: self.is_discriminator,
+            phantom_data: PhantomData,
         }
     }
 }
@@ -539,14 +555,21 @@ pub struct SchemaIdField<TData> {
     // pub directives: Vec<Directive<ConstantValue>>,
 }
 
-impl<TData: Copy, TClientFieldVariableDefinitionAssociatedData: Ord + Debug>
-    TryFrom<SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData>>
+impl<
+        TData: Copy,
+        TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
+        TOutputFormat: OutputFormat,
+    > TryFrom<SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>>
     for SchemaIdField<TData>
 {
     type Error = ();
 
     fn try_from(
-        value: SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData>,
+        value: SchemaServerField<
+            TData,
+            TClientFieldVariableDefinitionAssociatedData,
+            TOutputFormat,
+        >,
     ) -> Result<Self, Self::Error> {
         // If the field is valid as an id field, we succeed, otherwise, fail.
         // Initially, that will mean checking that there are no arguments.
@@ -706,11 +729,16 @@ impl NameAndArguments {
     }
 }
 
-impl<T, VariableDefinitionInnerType: Ord + Debug>
-    SchemaServerField<T, VariableDefinitionInnerType>
+impl<T, VariableDefinitionInnerType: Ord + Debug, TOutputFormat: OutputFormat>
+    SchemaServerField<T, VariableDefinitionInnerType, TOutputFormat>
 {
     // TODO probably unnecessary, and can be replaced with .map and .transpose
-    pub fn split(self) -> (SchemaServerField<(), VariableDefinitionInnerType>, T) {
+    pub fn split(
+        self,
+    ) -> (
+        SchemaServerField<(), VariableDefinitionInnerType, TOutputFormat>,
+        T,
+    ) {
         let Self {
             description,
             name,
@@ -719,6 +747,7 @@ impl<T, VariableDefinitionInnerType: Ord + Debug>
             parent_type_id,
             arguments,
             is_discriminator,
+            phantom_data,
         } = self;
         (
             SchemaServerField {
@@ -729,6 +758,7 @@ impl<T, VariableDefinitionInnerType: Ord + Debug>
                 parent_type_id,
                 arguments,
                 is_discriminator,
+                phantom_data,
             },
             associated_data,
         )

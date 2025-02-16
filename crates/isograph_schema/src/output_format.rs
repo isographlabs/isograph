@@ -3,7 +3,7 @@ use isograph_config::CompilerConfig;
 
 use crate::ValidatedSchema;
 
-pub trait OutputFormat: std::fmt::Debug
+pub trait OutputFormat: std::fmt::Debug + Clone
 where
     Self: Sized,
 {

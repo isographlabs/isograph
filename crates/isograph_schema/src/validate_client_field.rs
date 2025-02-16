@@ -19,11 +19,11 @@ use lazy_static::lazy_static;
 use crate::{
     get_all_errors_or_all_ok, get_all_errors_or_all_ok_as_hashmap, get_all_errors_or_all_ok_iter,
     get_all_errors_or_tuple_ok, validate_argument_types::value_satisfies_type, ClientField,
-    ClientPointer, ClientType, FieldType, RefetchStrategy, SchemaObject, ServerFieldData,
-    UnvalidatedClientField, UnvalidatedClientPointer, UnvalidatedLinkedFieldSelection,
-    UnvalidatedRefetchFieldStrategy, UnvalidatedVariableDefinition, ValidateSchemaError,
-    ValidateSchemaResult, ValidatedClientField, ValidatedClientPointer,
-    ValidatedIsographSelectionVariant, ValidatedLinkedFieldAssociatedData,
+    ClientPointer, ClientType, FieldType, OutputFormat, RefetchStrategy, SchemaObject,
+    ServerFieldData, UnvalidatedClientField, UnvalidatedClientPointer,
+    UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy,
+    UnvalidatedVariableDefinition, ValidateSchemaError, ValidateSchemaResult, ValidatedClientField,
+    ValidatedClientPointer, ValidatedIsographSelectionVariant, ValidatedLinkedFieldAssociatedData,
     ValidatedLinkedFieldSelection, ValidatedRefetchFieldStrategy,
     ValidatedScalarFieldAssociatedData, ValidatedScalarFieldSelection, ValidatedSchemaServerField,
     ValidatedSelection, ValidatedVariableDefinition,
@@ -39,10 +39,10 @@ lazy_static! {
     static ref ID: FieldArgumentName = "id".intern().into();
 }
 
-pub(crate) fn validate_and_transform_client_types(
+pub(crate) fn validate_and_transform_client_types<TOutputFormat: OutputFormat>(
     client_types: Vec<ClientType<UnvalidatedClientField, UnvalidatedClientPointer>>,
     schema_data: &ServerFieldData,
-    server_fields: &[ValidatedSchemaServerField],
+    server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
 ) -> Result<
     Vec<ClientType<ValidatedClientField, ValidatedClientPointer>>,
     Vec<WithLocation<ValidateSchemaError>>,
@@ -120,10 +120,10 @@ pub(crate) fn validate_and_transform_client_types(
     }))
 }
 
-fn validate_all_variables_are_used(
+fn validate_all_variables_are_used<TOutputFormat: OutputFormat>(
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     used_variables: UsedVariables,
-    top_level_client_type_info: &ValidateSchemaSharedInfo<'_>,
+    top_level_client_type_info: &ValidateSchemaSharedInfo<'_, TOutputFormat>,
 ) -> ValidateSchemaResult<()> {
     let unused_variables: Vec<_> = variable_definitions
         .iter()
@@ -156,20 +156,20 @@ fn validate_all_variables_are_used(
 
 // So that we don't have to pass five params to all the time,
 // encapsulate them in a single struct.
-struct ValidateSchemaSharedInfo<'a> {
+struct ValidateSchemaSharedInfo<'a, TOutputFormat: OutputFormat> {
     client_pointer_target_type_map: &'a ClientPointerTargetTypeMap,
     client_type_args: &'a ClientTypeArgsMap,
     client_type_object_type_and_field_name: ObjectTypeAndFieldName,
     client_type_parent_object: &'a SchemaObject,
     schema_data: &'a ServerFieldData,
-    server_fields: &'a [ValidatedSchemaServerField],
+    server_fields: &'a [ValidatedSchemaServerField<TOutputFormat>],
     client_type: ClientType<(), ()>,
 }
 
-fn validate_client_field_selection_set(
+fn validate_client_field_selection_set<TOutputFormat: OutputFormat>(
     schema_data: &ServerFieldData,
     top_level_client_field: UnvalidatedClientField,
-    server_fields: &[ValidatedSchemaServerField],
+    server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
     client_type_args: &ClientTypeArgsMap,
     client_pointer_target_type_map: &ClientPointerTargetTypeMap,
 ) -> Result<ValidatedClientField, Vec<WithLocation<ValidateSchemaError>>> {
@@ -232,10 +232,10 @@ fn validate_client_field_selection_set(
     })
 }
 
-fn validate_client_pointer_selection_set(
+fn validate_client_pointer_selection_set<TOutputFormat: OutputFormat>(
     schema_data: &ServerFieldData,
     top_level_client_pointer: UnvalidatedClientPointer,
-    server_fields: &[ValidatedSchemaServerField],
+    server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
     client_type_args: &ClientTypeArgsMap,
     client_pointer_target_type_map: &ClientPointerTargetTypeMap,
 ) -> Result<ValidatedClientPointer, Vec<WithLocation<ValidateSchemaError>>> {
@@ -292,9 +292,9 @@ fn validate_client_pointer_selection_set(
 
 /// Validate the selection set on the RefetchFieldStrategy, in particular, associate
 /// id's with each selection in the refetch_selection_set
-fn validate_use_refetch_field_strategy(
+fn validate_use_refetch_field_strategy<TOutputFormat: OutputFormat>(
     use_refetch_field_strategy: UnvalidatedRefetchFieldStrategy,
-    top_level_client_type_info: &ValidateSchemaSharedInfo<'_>,
+    top_level_client_type_info: &ValidateSchemaSharedInfo<'_, TOutputFormat>,
 ) -> Result<ValidatedRefetchFieldStrategy, Vec<WithLocation<ValidateSchemaError>>> {
     let refetch_selection_set = validate_client_type_definition_selections_exist_and_types_match(
         use_refetch_field_strategy.refetch_selection_set,
@@ -343,10 +343,10 @@ fn validate_variable_definitions(
         .collect()
 }
 
-fn validate_client_type_definition_selections_exist_and_types_match(
+fn validate_client_type_definition_selections_exist_and_types_match<TOutputFormat: OutputFormat>(
     field_selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     field_variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-    top_level_client_type_info: &ValidateSchemaSharedInfo<'_>,
+    top_level_client_type_info: &ValidateSchemaSharedInfo<'_, TOutputFormat>,
 ) -> Result<Vec<WithSpan<ValidatedSelection>>, Vec<WithLocation<ValidateSchemaError>>> {
     // Currently, we only check that each field exists and has an appropriate type, not that
     // there are no selection conflicts due to aliases or parameters.
@@ -377,12 +377,14 @@ fn validate_client_type_definition_selections_exist_and_types_match(
     Ok(validated_selection_set)
 }
 
-fn validate_client_field_definition_selection_exists_and_type_matches(
+fn validate_client_field_definition_selection_exists_and_type_matches<
+    TOutputFormat: OutputFormat,
+>(
     selection: WithSpan<UnvalidatedSelection>,
     field_parent_object: &SchemaObject,
     used_variables: &mut UsedVariables,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-    top_level_client_type_info: &ValidateSchemaSharedInfo<'_>,
+    top_level_client_type_info: &ValidateSchemaSharedInfo<'_, TOutputFormat>,
 ) -> ValidateSchemaResult<WithSpan<ValidatedSelection>> {
     let mut used_variables2 = BTreeSet::new();
 
@@ -416,12 +418,12 @@ fn validate_client_field_definition_selection_exists_and_type_matches(
 
 /// Given that we selected a scalar field, the field should exist on the parent,
 /// and type should be a client field (which is a scalar) or a server scalar type.
-fn validate_field_type_exists_and_is_scalar(
+fn validate_field_type_exists_and_is_scalar<TOutputFormat: OutputFormat>(
     scalar_field_selection_parent_object: &SchemaObject,
     scalar_field_selection: UnvalidatedScalarFieldSelection,
     used_variables: &mut UsedVariables,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-    top_level_client_type_info: &ValidateSchemaSharedInfo<'_>,
+    top_level_client_type_info: &ValidateSchemaSharedInfo<'_, TOutputFormat>,
 ) -> ValidateSchemaResult<ValidatedScalarFieldSelection> {
     let scalar_field_name = scalar_field_selection.name.item.into();
     match scalar_field_selection_parent_object
@@ -553,12 +555,12 @@ fn validate_field_type_exists_and_is_scalar(
     }
 }
 
-fn validate_client_field(
+fn validate_client_field<TOutputFormat: OutputFormat>(
     client_field_id: &ClientFieldId,
     scalar_field_selection: UnvalidatedScalarFieldSelection,
     used_variables: &mut UsedVariables,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-    top_level_client_type_info: &ValidateSchemaSharedInfo<'_>,
+    top_level_client_type_info: &ValidateSchemaSharedInfo<'_, TOutputFormat>,
 ) -> ValidateSchemaResult<ValidatedScalarFieldSelection> {
     let field_argument_definitions = top_level_client_type_info
         .client_type_args
@@ -611,12 +613,12 @@ fn validate_client_field(
 
 /// Given that we selected a linked field, the field should exist on the parent,
 /// and type should be a server interface, object or union.
-fn validate_field_type_exists_and_is_linked(
+fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
     field_parent_object: &SchemaObject,
     linked_field_selection: UnvalidatedLinkedFieldSelection,
     used_variables: &mut UsedVariables,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-    top_level_client_type_info: &ValidateSchemaSharedInfo<'_>,
+    top_level_client_type_info: &ValidateSchemaSharedInfo<'_, TOutputFormat>,
 ) -> ValidateSchemaResult<ValidatedLinkedFieldSelection> {
     let linked_field_name = linked_field_selection.name.item.into();
     match (field_parent_object.encountered_fields).get(&linked_field_name) {

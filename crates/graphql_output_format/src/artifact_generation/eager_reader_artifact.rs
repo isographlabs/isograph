@@ -4,9 +4,9 @@ use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
 use isograph_schema::{
-    RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment, UserWrittenClientFieldInfo,
-    UserWrittenComponentVariant, ValidatedClientField, ValidatedClientType,
-    ValidatedSchemaServerField,
+    OutputFormat, RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment,
+    UserWrittenClientFieldInfo, UserWrittenComponentVariant, ValidatedClientField,
+    ValidatedClientType, ValidatedSchemaServerField,
 };
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
@@ -139,9 +139,9 @@ pub(crate) fn generate_eager_reader_artifacts(
     path_and_contents
 }
 
-pub(crate) fn generate_eager_reader_condition_artifact(
+pub(crate) fn generate_eager_reader_condition_artifact<TOutputFormat: OutputFormat>(
     schema: &ValidatedGraphqlSchema,
-    encountered_server_field: &ValidatedSchemaServerField,
+    encountered_server_field: &ValidatedSchemaServerField<TOutputFormat>,
     inline_fragment: &ServerFieldTypeAssociatedDataInlineFragment,
     refetch_paths: &RefetchedPathsMap,
     file_extensions: GenerateFileExtensionsOption,

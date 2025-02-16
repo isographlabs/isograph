@@ -5,7 +5,7 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    get_all_errors_or_all_ok, get_all_errors_or_all_ok_iter, SchemaServerField,
+    get_all_errors_or_all_ok, get_all_errors_or_all_ok_iter, OutputFormat, SchemaServerField,
     SchemaServerFieldVariant, SchemaValidationState, ServerFieldData,
     ServerFieldTypeAssociatedData, ServerFieldTypeAssociatedDataInlineFragment,
     UnvalidatedSchemaSchemaField, UnvalidatedSchemaState, UnvalidatedVariableDefinition,
@@ -13,10 +13,11 @@ use crate::{
     ValidatedVariableDefinition,
 };
 
-pub(crate) fn validate_and_transform_server_fields(
-    fields: Vec<UnvalidatedSchemaSchemaField>,
+pub(crate) fn validate_and_transform_server_fields<TOutputFormat: OutputFormat>(
+    fields: Vec<UnvalidatedSchemaSchemaField<TOutputFormat>>,
     schema_data: &ServerFieldData,
-) -> Result<Vec<ValidatedSchemaServerField>, Vec<WithLocation<ValidateSchemaError>>> {
+) -> Result<Vec<ValidatedSchemaServerField<TOutputFormat>>, Vec<WithLocation<ValidateSchemaError>>>
+{
     get_all_errors_or_all_ok_iter(
         fields
             .into_iter()
@@ -24,10 +25,13 @@ pub(crate) fn validate_and_transform_server_fields(
     )
 }
 
-fn validate_and_transform_server_field(
-    field: UnvalidatedSchemaSchemaField,
+fn validate_and_transform_server_field<TOutputFormat: OutputFormat>(
+    field: UnvalidatedSchemaSchemaField<TOutputFormat>,
     schema_data: &ServerFieldData,
-) -> Result<ValidatedSchemaServerField, impl Iterator<Item = WithLocation<ValidateSchemaError>>> {
+) -> Result<
+    ValidatedSchemaServerField<TOutputFormat>,
+    impl Iterator<Item = WithLocation<ValidateSchemaError>>,
+> {
     // TODO rewrite as field.map(...).transpose()
     let (empty_field, server_field) = field.split();
 
@@ -93,6 +97,7 @@ fn validate_and_transform_server_field(
                 parent_type_id: empty_field.parent_type_id,
                 arguments: valid_arguments,
                 is_discriminator: empty_field.is_discriminator,
+                phantom_data: std::marker::PhantomData,
             });
         }
     }
@@ -100,12 +105,13 @@ fn validate_and_transform_server_field(
     Err(errors.into_iter())
 }
 
-fn validate_server_field_type_exists(
+fn validate_server_field_type_exists<TOutputFormat: OutputFormat>(
     schema_data: &ServerFieldData,
     server_field_type: &GraphQLTypeAnnotation<UnvalidatedTypeName>,
     field: &SchemaServerField<
         (),
         <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+        TOutputFormat,
     >,
 ) -> ValidateSchemaResult<
     SelectionType<TypeAnnotation<ServerObjectId>, TypeAnnotation<ServerScalarId>>,

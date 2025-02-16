@@ -65,9 +65,10 @@ pub type UnvalidatedSchema<TOutputFormat> = Schema<UnvalidatedSchemaState, TOutp
 pub type UnvalidatedObjectFieldInfo =
     FieldType<ServerFieldId, ClientType<ClientFieldId, ClientPointerId>>;
 
-pub(crate) type UnvalidatedSchemaSchemaField = SchemaServerField<
+pub(crate) type UnvalidatedSchemaSchemaField<TOutputFormat> = SchemaServerField<
     <UnvalidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+    TOutputFormat,
 >;
 
 pub type UnvalidatedVariableDefinition = VariableDefinition<

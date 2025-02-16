@@ -569,8 +569,8 @@ fn get_typename_type(
     )))
 }
 
-struct FieldObjectIdsEtc {
-    unvalidated_schema_fields: Vec<UnvalidatedSchemaSchemaField>,
+struct FieldObjectIdsEtc<TOutputFormat: OutputFormat> {
+    unvalidated_schema_fields: Vec<UnvalidatedSchemaSchemaField<TOutputFormat>>,
     // TODO this should be BTreeMap<_, WithLocation<_>> or something
     encountered_fields: BTreeMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
     // TODO this should not be a ServerFieldId, but a special type
@@ -579,7 +579,7 @@ struct FieldObjectIdsEtc {
 
 /// Given a vector of fields from the schema AST all belonging to the same object/interface,
 /// return a vector of unvalidated fields and a set of field names.
-fn get_field_objects_ids_and_names(
+fn get_field_objects_ids_and_names<TOutputFormat: OutputFormat>(
     new_fields: Vec<WithLocation<GraphQLFieldDefinition>>,
     next_field_id: usize,
     parent_type_id: ServerObjectId,
@@ -588,7 +588,7 @@ fn get_field_objects_ids_and_names(
     // TODO this is hacky
     may_have_field_id: bool,
     options: &CompilerConfigOptions,
-) -> ProcessTypeDefinitionResult<FieldObjectIdsEtc> {
+) -> ProcessTypeDefinitionResult<FieldObjectIdsEtc<TOutputFormat>> {
     let new_field_count = new_fields.len();
     let mut encountered_fields = BTreeMap::new();
     let mut unvalidated_fields = Vec::with_capacity(new_field_count);
@@ -631,6 +631,7 @@ fn get_field_objects_ids_and_names(
                         .map(graphql_input_value_definition_to_variable_definition)
                         .collect::<Result<Vec<_>, _>>()?,
                     is_discriminator: false,
+                    phantom_data: std::marker::PhantomData,
                 });
                 server_field_ids.push(next_server_field_id);
             }
@@ -666,6 +667,7 @@ fn get_field_objects_ids_and_names(
         parent_type_id,
         arguments: vec![],
         is_discriminator: true,
+        phantom_data: std::marker::PhantomData,
     });
 
     if encountered_fields
