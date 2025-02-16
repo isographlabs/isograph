@@ -36,7 +36,7 @@ import {
   wrapResolvedValue,
 } from './PromiseWrapper';
 import { ReaderAst } from './reader';
-import { getOrCreateCachedStartUpdate } from './startUpdate';
+import { getOrCreateCachedStartUpdate, LINK } from './startUpdate';
 import { Arguments } from './util';
 
 export type WithEncounteredRecords<T> = {
@@ -162,7 +162,7 @@ function readData<TReadFromStore>(
     };
   }
 
-  let target: { [index: string]: any } = {};
+  let target: { [index: PropertyKey]: any } = { [LINK]: root };
 
   for (const field of ast) {
     switch (field.kind) {

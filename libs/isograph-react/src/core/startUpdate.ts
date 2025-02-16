@@ -1,8 +1,8 @@
 import {
   callSubscriptions,
   getParentRecordKey,
-  insertIfNotExists,
   type EncounteredIds,
+  type NetworkResponseScalarValue,
 } from './cache';
 import {
   stableIdForFragmentReference,
@@ -11,15 +11,19 @@ import {
   type ExtractStartUpdateUpdatableData,
   type FragmentReference,
   type UnknownTReadFromStore,
-  type Variables,
 } from './FragmentReference';
 import {
   assertLink,
-  type DataTypeValue,
+  type DataId,
   type IsographEnvironment,
   type Link,
+  type StoreRecord,
+  type TypeName,
 } from './IsographEnvironment';
-import { logMessage } from './logging';
+import {
+  applyAndQueueStartUpdate,
+  type MutableStorePatch,
+} from './optimisitcUpdate';
 import { readPromise } from './PromiseWrapper';
 import { readButDoNotEvaluate, type NetworkRequestReaderOptions } from './read';
 import type { ReaderAst } from './reader';
@@ -41,88 +45,82 @@ export function getOrCreateCachedStartUpdate<
   ));
 }
 
-export type Update = {
-  root: Link;
-  variables: Variables;
-  storeRecordName: string;
-  newValue: DataTypeValue;
-  oldValue: DataTypeValue;
-};
-
 export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
   environment: IsographEnvironment,
-  fragmentReference: FragmentReference<TReadFromStore, any>,
+  fragmentReference: FragmentReference<TReadFromStore, unknown>,
   networkRequestOptions: NetworkRequestReaderOptions,
 ): ExtractStartUpdate<TReadFromStore> {
   return (updater) => {
-    const mutableUpdates: Update[] = [];
     const readerWithRefetchQueries = readPromise(
       fragmentReference.readerWithRefetchQueries,
     );
 
-    const data = proxyUpdatableData(
-      environment,
-      readerWithRefetchQueries.readerArtifact.readerAst,
-      fragmentReference.root,
-      fragmentReference.variables ?? {},
-      readButDoNotEvaluate(
+    const apply = () => {
+      const mutablePatch: StorePatch = {};
+      const data = proxyUpdatableData(
         environment,
-        fragmentReference,
-        networkRequestOptions,
-      ).item,
-      mutableUpdates,
-    ) as ExtractStartUpdateUpdatableData<ExtractStartUpdate<TReadFromStore>>;
+        readerWithRefetchQueries.readerArtifact.readerAst,
+        fragmentReference.variables ?? {},
+        readButDoNotEvaluate(
+          environment,
+          fragmentReference,
+          networkRequestOptions,
+        ).item,
+        mutablePatch,
+      ) as ExtractStartUpdateUpdatableData<ExtractStartUpdate<TReadFromStore>>;
 
-    updater(data);
+      updater(data);
+
+      return mutablePatch;
+    };
 
     let mutableEncounteredIds: EncounteredIds = new Map();
-    applyUpdates(environment, mutableUpdates, mutableEncounteredIds);
+    applyAndQueueStartUpdate(environment, apply, mutableEncounteredIds);
+
     callSubscriptions(environment, mutableEncounteredIds);
   };
 }
 
-function applyUpdates(
-  environment: IsographEnvironment,
-  updates: Update[],
-  mutableEncounteredIds: EncounteredIds,
-) {
-  for (const update of updates) {
-    const storeRecord = ((environment.store[update.root.__typename] ??= {})[
-      update.root.__link
-    ] ??= {});
+export type StorePatch = {
+  readonly [index: TypeName]:
+    | {
+        // we extend IsographStore to include `undefined`
+        // `undefined` means record needs to be deleted
+        readonly [index: DataId]: StoreRecord | null | undefined;
+      }
+    | null
+    | undefined;
+};
 
-    storeRecord[update.storeRecordName] = update.newValue;
-    logMessage(environment, {
-      kind: 'AppliedUpdate',
-      update,
-    });
+export const LINK = Symbol('link');
 
-    let encounteredRecordsIds = insertIfNotExists(
-      mutableEncounteredIds,
-      update.root.__typename,
-    );
-    encounteredRecordsIds.add(update.root.__link);
-  }
+type ReadData = {
+  [LINK]: Link;
+  [key: PropertyKey]: unknown;
+};
+
+function isReadData(value: unknown): value is ReadData {
+  console.log(value);
+  return typeof value === 'object' && value !== null && LINK in value;
 }
 
 function proxyUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
   environment: IsographEnvironment,
   ast: ReaderAst<TReadFromStore>,
-  root: Link,
   variables: ExtractParameters<TReadFromStore>,
-  readData: object,
-  mutableUpdates: Update[],
+  readData: unknown,
+  mutableUpdate: MutableStorePatch,
 ) {
+  if (!isReadData(readData)) {
+    throw new Error(
+      'Expected readData to be a Record with a LINK property. ' +
+        'This is indicative of a bug in Isograph.',
+    );
+  }
+
+  const root = readData[LINK];
+
   let updatableData: Record<PropertyKey, typeof Reflect.set> = {};
-
-  let storeRecord = environment.store[root.__typename]?.[root.__link];
-  if (storeRecord === undefined) {
-    throw new Error('Expected record for root ' + root.__link);
-  }
-
-  if (storeRecord === null) {
-    return null;
-  }
 
   for (const field of ast) {
     switch (field.kind) {
@@ -133,16 +131,13 @@ function proxyUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
           updatableData[key] = (
             target: object,
             propertyKey: PropertyKey,
-            value: DataTypeValue,
+            value: NetworkResponseScalarValue,
             receiver?: unknown,
           ) => {
-            mutableUpdates.push({
-              storeRecordName,
-              newValue: value,
-              oldValue: Reflect.get(target, propertyKey, receiver),
-              root,
-              variables,
-            });
+            const recordsById = (mutableUpdate[root.__typename] ??= {});
+            const newStoreRecord = (recordsById[root.__link] ??= {});
+            newStoreRecord[storeRecordName] = value;
+
             return Reflect.set(target, propertyKey, value, receiver);
           };
         }
@@ -150,88 +145,29 @@ function proxyUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
       }
       case 'Linked': {
         const key = field.alias ?? field.fieldName;
-        const storeRecordName = getParentRecordKey(field, variables);
-        const storeValue = storeRecord[storeRecordName];
-        if (Array.isArray(storeValue)) {
-          const results = [];
-          for (let i = 0; i < storeValue.length; i++) {
-            const link = assertLink(storeValue[i]);
-            if (link === undefined) {
-              throw new Error(
-                'Expected link for ' +
-                  storeRecordName +
-                  ' on root ' +
-                  root.__link +
-                  '. Link is ' +
-                  JSON.stringify(storeValue[i]),
-              );
-            } else if (link === null) {
-              results.push(null);
-              continue;
-            }
 
-            // @ts-expect-error
-            const value = readData[key][i];
-
-            const result = proxyUpdatableData(
+        if (Array.isArray(readData[key])) {
+          for (let i = 0; i < readData[key].length; i++) {
+            readData[key][i] = proxyUpdatableData(
               environment,
               field.selections,
-              link,
               variables,
-              value,
-              mutableUpdates,
+              readData[key][i],
+              mutableUpdate,
             );
-
-            results.push(result);
           }
-          // @ts-expect-error
-          readData[key] = results;
-          break;
-        }
-        let link = assertLink(storeValue);
 
-        if (link === undefined) {
-          const missingFieldHandler = environment.missingFieldHandler;
-
-          const altLink = missingFieldHandler?.(
-            storeRecord,
-            root,
-            field.fieldName,
-            field.arguments,
-            variables,
-          );
-
-          if (altLink === undefined) {
-            throw new Error(
-              'Expected link for ' +
-                storeRecordName +
-                ' on root ' +
-                root.__link +
-                '. Link is ' +
-                JSON.stringify(storeValue),
-            );
-          } else {
-            link = altLink;
-          }
-        }
-
-        if (link === null) {
           break;
         }
 
-        // @ts-expect-error
-        const value = readData[key];
-
-        const mergedValue = proxyUpdatableData(
+        const proxiedValue = proxyUpdatableData(
           environment,
           field.selections,
-          link,
           variables,
-          value,
-          mutableUpdates,
+          readData[key],
+          mutableUpdate,
         );
-        // @ts-expect-error
-        readData[key] = mergedValue;
+        readData[key] = proxiedValue;
         break;
       }
       case 'Resolver':
