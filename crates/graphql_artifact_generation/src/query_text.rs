@@ -1,8 +1,9 @@
 use common_lang_types::{QueryOperationName, UnvalidatedTypeName};
 use graphql_lang_types::GraphQLTypeAnnotation;
+use graphql_output_format::ValidatedGraphqlSchema;
 use isograph_lang_types::{ArgumentKeyAndValue, NonConstantValue};
 use isograph_schema::{
-    get_name, MergedSelectionMap, MergedServerSelection, RootOperationName, ValidatedSchema,
+    get_name, MergedSelectionMap, MergedServerSelection, RootOperationName,
     ValidatedVariableDefinition,
 };
 
@@ -10,7 +11,7 @@ use crate::generate_artifacts::QueryText;
 
 pub(crate) fn generate_query_text<'a>(
     query_name: QueryOperationName,
-    schema: &ValidatedSchema,
+    schema: &ValidatedGraphqlSchema,
     selection_map: &MergedSelectionMap,
     query_variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
     root_operation_name: &RootOperationName,
@@ -29,7 +30,7 @@ pub(crate) fn generate_query_text<'a>(
 }
 
 fn write_variables_to_string<'a>(
-    schema: &ValidatedSchema,
+    schema: &ValidatedGraphqlSchema,
     variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
 ) -> String {
     let mut empty = true;

@@ -4,14 +4,14 @@ use intern::string_key::Intern;
 use isograph_lang_types::{ScalarFieldSelection, ServerFieldSelection};
 
 use crate::{
-    ClientType, FieldType, ProcessTypeDefinitionError, ProcessTypeDefinitionResult, SchemaObject,
-    SchemaServerField, SchemaServerFieldVariant, ServerFieldTypeAssociatedData,
+    ClientType, FieldType, OutputFormat, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
+    SchemaObject, SchemaServerField, SchemaServerFieldVariant, ServerFieldTypeAssociatedData,
     ServerFieldTypeAssociatedDataInlineFragment, UnvalidatedSchema,
     ValidatedIsographSelectionVariant, ValidatedScalarFieldAssociatedData,
     ValidatedTypeRefinementMap, LINK_FIELD_NAME,
 };
 use common_lang_types::Location;
-impl UnvalidatedSchema {
+impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     /// For each supertype (e.g. Node), add the pointers for each subtype (e.g. User implements Node)
     /// to supertype (e.g. creating Node.asUser).
     pub fn add_pointers_to_supertypes(

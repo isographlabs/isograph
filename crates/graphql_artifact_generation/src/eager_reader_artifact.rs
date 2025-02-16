@@ -1,11 +1,12 @@
 use common_lang_types::{ArtifactPathAndContent, ObjectTypeAndFieldName};
+use graphql_output_format::ValidatedGraphqlSchema;
 use intern::Lookup;
 
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
 use isograph_schema::{
     RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment, UserWrittenClientFieldInfo,
-    UserWrittenComponentVariant, ValidatedClientField, ValidatedClientType, ValidatedSchema,
+    UserWrittenComponentVariant, ValidatedClientField, ValidatedClientType,
     ValidatedSchemaServerField,
 };
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
@@ -25,7 +26,7 @@ use crate::{
 };
 
 pub(crate) fn generate_eager_reader_artifacts(
-    schema: &ValidatedSchema,
+    schema: &ValidatedGraphqlSchema,
     client_field: &ValidatedClientField,
     config: &CompilerConfig,
     info: UserWrittenClientFieldInfo,
@@ -137,7 +138,7 @@ pub(crate) fn generate_eager_reader_artifacts(
 }
 
 pub(crate) fn generate_eager_reader_condition_artifact(
-    schema: &ValidatedSchema,
+    schema: &ValidatedGraphqlSchema,
     encountered_server_field: &ValidatedSchemaServerField,
     inline_fragment: &ServerFieldTypeAssociatedDataInlineFragment,
     refetch_paths: &RefetchedPathsMap,
@@ -195,7 +196,7 @@ pub(crate) fn generate_eager_reader_condition_artifact(
 }
 
 pub(crate) fn generate_eager_reader_param_type_artifact(
-    schema: &ValidatedSchema,
+    schema: &ValidatedGraphqlSchema,
     client_field: &ValidatedClientType,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
@@ -290,7 +291,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
 }
 
 pub(crate) fn generate_eager_reader_output_type_artifact(
-    schema: &ValidatedSchema,
+    schema: &ValidatedGraphqlSchema,
     client_field: &ValidatedClientField,
     config: &CompilerConfig,
     info: UserWrittenClientFieldInfo,

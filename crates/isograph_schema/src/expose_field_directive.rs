@@ -12,11 +12,12 @@ use isograph_lang_types::{
     ScalarFieldSelection, SelectableServerFieldId, ServerFieldId, ServerFieldSelection,
     ServerObjectId,
 };
+
 use serde::Deserialize;
 
 use crate::{
     generate_refetch_field_strategy, ArgumentMap, ClientField, ClientFieldVariant, ClientType,
-    FieldMapItem, FieldType, ImperativelyLoadedFieldVariant, PrimaryFieldInfo,
+    FieldMapItem, FieldType, ImperativelyLoadedFieldVariant, OutputFormat, PrimaryFieldInfo,
     ProcessTypeDefinitionError, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
     UnvalidatedSchema, UnvalidatedVariableDefinition,
 };
@@ -64,7 +65,7 @@ pub enum RequiresRefinement {
     No,
 }
 
-impl UnvalidatedSchema {
+impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     /// Add magical mutation fields.
     ///
     /// Using the MagicMutationFieldInfo (derived from @exposeField directives),
@@ -384,9 +385,9 @@ impl UnvalidatedSchema {
     }
 }
 
-fn skip_arguments_contained_in_field_map(
+fn skip_arguments_contained_in_field_map<TOutputFormat: OutputFormat>(
     // TODO move this to impl Schema
-    schema: &mut UnvalidatedSchema,
+    schema: &mut UnvalidatedSchema<TOutputFormat>,
     arguments: Vec<WithLocation<UnvalidatedVariableDefinition>>,
     primary_type_name: IsographObjectTypeName,
     mutation_object_name: IsographObjectTypeName,

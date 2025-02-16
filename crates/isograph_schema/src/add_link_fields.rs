@@ -1,11 +1,11 @@
 use crate::{
-    ClientField, ClientFieldVariant, ClientType, FieldType, ProcessTypeDefinitionError,
-    ProcessTypeDefinitionResult, UnvalidatedSchema, LINK_FIELD_NAME,
+    ClientField, ClientFieldVariant, ClientType, FieldType, OutputFormat,
+    ProcessTypeDefinitionError, ProcessTypeDefinitionResult, UnvalidatedSchema, LINK_FIELD_NAME,
 };
 use common_lang_types::{Location, ObjectTypeAndFieldName, WithLocation};
 use intern::string_key::Intern;
 
-impl UnvalidatedSchema {
+impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     pub fn add_link_fields(&mut self) -> ProcessTypeDefinitionResult<()> {
         for object in &mut self.server_field_data.server_objects {
             let field_name = (*LINK_FIELD_NAME).into();

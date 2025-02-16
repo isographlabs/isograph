@@ -546,6 +546,7 @@ version = "0.3.0"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
+ "graphql_output_format",
  "intern",
  "isograph_config",
  "isograph_lang_types",
@@ -563,6 +564,13 @@ dependencies = [
  "serde",
  "strum",
  "thiserror",
+]
+
+[[package]]
+name = "graphql_output_format"
+version = "0.3.0"
+dependencies = [
+ "isograph_schema",
 ]
 
 [[package]]
@@ -760,6 +768,7 @@ dependencies = [
  "common_lang_types",
  "graphql_artifact_generation",
  "graphql_lang_types",
+ "graphql_output_format",
  "graphql_schema_parser",
  "intern",
  "isograph_config",

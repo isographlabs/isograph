@@ -2,15 +2,15 @@ use common_lang_types::WithSpan;
 use isograph_lang_types::ServerFieldSelection;
 
 use crate::{
-    ClientType, FieldType, ValidatedClientField, ValidatedClientPointer, ValidatedSchema,
-    ValidatedSelection,
+    ClientType, FieldType, OutputFormat, ValidatedClientField, ValidatedClientPointer,
+    ValidatedSchema, ValidatedSelection,
 };
 
 impl ClientType<&ValidatedClientField, &ValidatedClientPointer> {
     // This should really be replaced with a proper visitor, or something
-    pub fn accessible_client_fields<'a>(
+    pub fn accessible_client_fields<'a, TOutputFormat: OutputFormat>(
         &'a self,
-        schema: &'a ValidatedSchema,
+        schema: &'a ValidatedSchema<TOutputFormat>,
     ) -> impl Iterator<Item = &'a ValidatedClientField> + 'a {
         AccessibleClientFieldIterator {
             selection_set: self.selection_set_for_parent_query(),
@@ -20,14 +20,16 @@ impl ClientType<&ValidatedClientField, &ValidatedClientPointer> {
         }
     }
 }
-struct AccessibleClientFieldIterator<'a> {
+struct AccessibleClientFieldIterator<'a, TOutputFormat: OutputFormat> {
     selection_set: &'a Vec<WithSpan<ValidatedSelection>>,
-    schema: &'a ValidatedSchema,
+    schema: &'a ValidatedSchema<TOutputFormat>,
     index: usize,
-    sub_iterator: Option<Box<AccessibleClientFieldIterator<'a>>>,
+    sub_iterator: Option<Box<AccessibleClientFieldIterator<'a, TOutputFormat>>>,
 }
 
-impl<'a> Iterator for AccessibleClientFieldIterator<'a> {
+impl<'a, TOutputFormat: OutputFormat> Iterator
+    for AccessibleClientFieldIterator<'a, TOutputFormat>
+{
     type Item = &'a ValidatedClientField;
 
     fn next(&mut self) -> Option<Self::Item> {

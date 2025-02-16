@@ -13,8 +13,9 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ClientField, ClientPointer, ClientType, FieldType, Schema, SchemaScalar, SchemaServerField,
-    SchemaValidationState, ServerFieldData, UseRefetchFieldRefetchStrategy, ValidatedSelection,
+    ClientField, ClientPointer, ClientType, FieldType, OutputFormat, Schema, SchemaScalar,
+    SchemaServerField, SchemaValidationState, ServerFieldData, UseRefetchFieldRefetchStrategy,
+    ValidatedSelection,
 };
 use lazy_static::lazy_static;
 
@@ -56,7 +57,7 @@ pub struct ServerFieldTypeAssociatedDataInlineFragment {
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 }
 
-pub type UnvalidatedSchema = Schema<UnvalidatedSchemaState>;
+pub type UnvalidatedSchema<TOutputFormat> = Schema<UnvalidatedSchemaState, TOutputFormat>;
 
 /// On unvalidated schema objects, the encountered types are either a type annotation
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the
@@ -95,13 +96,13 @@ pub type UnvalidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
     <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
 >;
 
-impl Default for UnvalidatedSchema {
+impl<TOutputFormat: OutputFormat> Default for UnvalidatedSchema<TOutputFormat> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl UnvalidatedSchema {
+impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     pub fn new() -> Self {
         // TODO add __typename
         let fields = vec![];
@@ -167,6 +168,7 @@ impl UnvalidatedSchema {
                 null_type_id,
             },
             fetchable_types: BTreeMap::new(),
+            output_format: std::marker::PhantomData,
         }
     }
 }

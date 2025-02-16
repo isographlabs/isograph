@@ -5,6 +5,7 @@ use common_lang_types::{
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
 };
+use graphql_output_format::ValidatedGraphqlSchema;
 use intern::{string_key::Intern, Lookup};
 
 use isograph_config::CompilerConfig;
@@ -16,8 +17,7 @@ use isograph_schema::{
     get_provided_arguments, selection_map_wrapped, ClientFieldVariant, ClientType,
     FieldTraversalResult, FieldType, NameAndArguments, NormalizationKey, RequiresRefinement,
     SchemaObject, SchemaServerFieldVariant, UserWrittenComponentVariant, ValidatedClientField,
-    ValidatedIsographSelectionVariant, ValidatedSchema, ValidatedSelection,
-    ValidatedVariableDefinition,
+    ValidatedIsographSelectionVariant, ValidatedSelection, ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -84,8 +84,10 @@ lazy_static! {
 /// Also, for each user-written resolver, we must generate a param_type artifact.
 /// For each resolver that is reachable from a reader, we must also generate an
 /// output_type artifact.
+///
+/// TODO this should go through OutputFormat
 pub fn get_artifact_path_and_content(
-    schema: &ValidatedSchema,
+    schema: &ValidatedGraphqlSchema,
     config: &CompilerConfig,
 ) -> Vec<ArtifactPathAndContent> {
     let mut encountered_client_type_map = BTreeMap::new();
@@ -478,7 +480,7 @@ pub(crate) fn generate_output_type(client_field: &ValidatedClientField) -> Clien
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn generate_client_field_parameter_type(
-    schema: &ValidatedSchema,
+    schema: &ValidatedGraphqlSchema,
     selection_map: &[WithSpan<ValidatedSelection>],
     parent_type: &SchemaObject,
     nested_client_field_imports: &mut ParamTypeImports,
@@ -551,7 +553,7 @@ impl<'a> DualStringProxy<'a> {
 
 #[allow(clippy::too_many_arguments)]
 fn write_param_type_from_selection(
-    schema: &ValidatedSchema,
+    schema: &ValidatedGraphqlSchema,
     query_type_declaration: &mut DualStringProxy,
     selection: &WithSpan<ValidatedSelection>,
     parent_type: &SchemaObject,
@@ -755,7 +757,7 @@ fn write_param_type_from_selection(
 }
 
 fn get_loadable_field_type_from_arguments(
-    schema: &ValidatedSchema,
+    schema: &ValidatedGraphqlSchema,
     arguments: Vec<ValidatedVariableDefinition>,
 ) -> String {
     let mut loadable_field_type = "{".to_string();
@@ -778,7 +780,7 @@ fn get_loadable_field_type_from_arguments(
 }
 
 fn format_type_for_js(
-    schema: &ValidatedSchema,
+    schema: &ValidatedGraphqlSchema,
     type_: GraphQLTypeAnnotation<SelectableServerFieldId>,
 ) -> String {
     let new_type = type_.map(
@@ -820,7 +822,7 @@ fn format_type_for_js_inner(
 }
 
 pub(crate) fn generate_parameters<'a>(
-    schema: &ValidatedSchema,
+    schema: &ValidatedGraphqlSchema,
     argument_definitions: impl Iterator<Item = &'a VariableDefinition<SelectableServerFieldId>>,
 ) -> String {
     let mut s = "{\n".to_string();

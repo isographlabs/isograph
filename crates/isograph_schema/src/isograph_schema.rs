@@ -1,6 +1,7 @@
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Debug,
+    marker::PhantomData,
 };
 
 use common_lang_types::{
@@ -21,7 +22,7 @@ use isograph_lang_types::{
 use lazy_static::lazy_static;
 
 use crate::{
-    refetch_strategy::RefetchStrategy, ClientFieldVariant, NormalizationKey,
+    refetch_strategy::RefetchStrategy, ClientFieldVariant, NormalizationKey, OutputFormat,
     ServerFieldTypeAssociatedData, ValidatedClientField, ValidatedClientPointer,
 };
 
@@ -66,14 +67,18 @@ pub struct RootOperationName(pub String);
 
 /// The in-memory representation of a schema.
 ///
-/// The type param with which the Schema type is instantiated vary based on
-/// how far along in the validation pipeline the schema is.
+/// The TSchemaValidationState type param varies based on how far along in the
+/// validation pipeline the schema instance is, i.e. validating the schema means
+/// consuming an instance and creating a new instance with another
+/// TSchemaValidationState.
+///
+/// The TOutputFormat type param will stay constant as the schema is validated.
 ///
 /// Invariant: a schema is append-only, because pointers into the Schema are in the
 /// form of newtype wrappers around u32 indexes (e.g. FieldId, etc.) As a result,
 /// the schema does not support removing items.
 #[derive(Debug)]
-pub struct Schema<TSchemaValidationState: SchemaValidationState> {
+pub struct Schema<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat> {
     pub server_fields: Vec<
         SchemaServerField<
             TSchemaValidationState::ServerFieldTypeAssociatedData,
@@ -91,6 +96,8 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState> {
 
     /// These are root types like Query, Mutation, Subscription
     pub fetchable_types: BTreeMap<ServerObjectId, RootOperationName>,
+
+    pub output_format: PhantomData<TOutputFormat>,
 }
 
 type ClientTypes<
@@ -112,7 +119,9 @@ type ClientTypes<
     >,
 >;
 
-impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationState> {
+impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
+    Schema<TSchemaValidationState, TOutputFormat>
+{
     /// This is a smell, and we should refactor away from it, or all schema's
     /// should have a root type.
     pub fn query_id(&self) -> ServerObjectId {
@@ -261,7 +270,9 @@ pub struct ServerFieldData {
     pub null_type_id: ServerScalarId,
 }
 
-impl<TSchemaValidationState: SchemaValidationState> Schema<TSchemaValidationState> {
+impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
+    Schema<TSchemaValidationState, TOutputFormat>
+{
     /// Get a reference to a given server field by its id.
     pub fn server_field(
         &self,
@@ -319,7 +330,8 @@ impl<
                 TypeAnnotation<TScalarFieldAssociatedData>,
             >,
         >,
-    > Schema<TSchemaValidationState>
+        TOutputFormat: OutputFormat,
+    > Schema<TSchemaValidationState, TOutputFormat>
 {
     // This should not be this complicated!
     /// Get a reference to a given id field by its id.

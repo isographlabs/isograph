@@ -1,3 +1,4 @@
+use graphql_output_format::ValidatedGraphqlSchema;
 use intern::Lookup;
 use isograph_config::GenerateFileExtensionsOption;
 use std::cmp::Ordering;
@@ -5,7 +6,6 @@ use std::cmp::Ordering;
 use common_lang_types::{ArtifactPathAndContent, IsoLiteralText, SelectableFieldName};
 use isograph_schema::{
     ClientFieldVariant, ClientType, UserWrittenComponentVariant, ValidatedClientField,
-    ValidatedSchema,
 };
 
 use crate::generate_artifacts::ISO_TS_FILE_NAME;
@@ -79,7 +79,7 @@ export function iso<T>(
 }
 
 pub(crate) fn build_iso_overload_artifact(
-    schema: &ValidatedSchema,
+    schema: &ValidatedGraphqlSchema,
     file_extensions: GenerateFileExtensionsOption,
     no_babel_transform: bool,
 ) -> ArtifactPathAndContent {
@@ -208,7 +208,7 @@ export function iso(isographLiteralText: string):
 }
 
 fn sorted_user_written_fields(
-    schema: &ValidatedSchema,
+    schema: &ValidatedGraphqlSchema,
 ) -> Vec<(&ValidatedClientField, UserWrittenComponentVariant)> {
     let mut fields = user_written_fields(schema).collect::<Vec<_>>();
     fields.sort_by(|client_field_1, client_field_2| {
@@ -229,7 +229,9 @@ fn sorted_user_written_fields(
     fields
 }
 
-fn sorted_entrypoints(schema: &ValidatedSchema) -> Vec<(&ValidatedClientField, &IsoLiteralText)> {
+fn sorted_entrypoints(
+    schema: &ValidatedGraphqlSchema,
+) -> Vec<(&ValidatedClientField, &IsoLiteralText)> {
     let mut entrypoints = schema
         .entrypoints
         .iter()
@@ -278,7 +280,7 @@ fn sort_field_name(field_1: SelectableFieldName, field_2: SelectableFieldName) -
 }
 
 fn user_written_fields(
-    schema: &ValidatedSchema,
+    schema: &ValidatedGraphqlSchema,
 ) -> impl Iterator<Item = (&ValidatedClientField, UserWrittenComponentVariant)> + '_ {
     schema
         .client_types

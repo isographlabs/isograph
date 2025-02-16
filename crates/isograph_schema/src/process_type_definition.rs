@@ -1,10 +1,11 @@
 use std::collections::{hash_map::Entry, BTreeMap, HashMap};
 
 use crate::{
-    EncounteredRootTypes, FieldType, IsographObjectTypeDefinition, ProcessedRootTypes,
-    RootOperationName, RootTypes, Schema, SchemaObject, SchemaScalar, SchemaServerField,
-    SchemaServerFieldVariant, ServerFieldTypeAssociatedData, UnvalidatedObjectFieldInfo,
-    UnvalidatedSchema, UnvalidatedSchemaSchemaField, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
+    EncounteredRootTypes, FieldType, IsographObjectTypeDefinition, OutputFormat,
+    ProcessedRootTypes, RootOperationName, RootTypes, Schema, SchemaObject, SchemaScalar,
+    SchemaServerField, SchemaServerFieldVariant, ServerFieldTypeAssociatedData,
+    UnvalidatedObjectFieldInfo, UnvalidatedSchema, UnvalidatedSchemaSchemaField, ID_GRAPHQL_TYPE,
+    STRING_JAVASCRIPT_TYPE,
 };
 use common_lang_types::{
     GraphQLObjectTypeName, GraphQLScalarTypeName, IsographObjectTypeName, Location,
@@ -24,6 +25,7 @@ use isograph_lang_types::{
     SelectableServerFieldId, ServerObjectId, ServerStrongIdFieldId, VariableDefinition,
 };
 use lazy_static::lazy_static;
+
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -53,7 +55,7 @@ pub struct ProcessObjectTypeDefinitionOutcome {
     pub encountered_root_kind: Option<RootOperationKind>,
 }
 
-impl UnvalidatedSchema {
+impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     pub fn process_graphql_type_system_document(
         &mut self,
         type_system_document: GraphQLTypeSystemDocument,

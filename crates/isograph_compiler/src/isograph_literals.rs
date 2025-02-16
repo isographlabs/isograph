@@ -6,7 +6,7 @@ use isograph_config::CompilerConfig;
 use isograph_lang_parser::{
     parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
 };
-use isograph_schema::UnvalidatedSchema;
+use isograph_schema::{OutputFormat, UnvalidatedSchema};
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::{
@@ -149,8 +149,8 @@ pub fn parse_iso_literals_in_file_content(
     }
 }
 
-pub(crate) fn process_iso_literals(
-    schema: &mut UnvalidatedSchema,
+pub(crate) fn process_iso_literals<TOutputFormat: OutputFormat>(
+    schema: &mut UnvalidatedSchema<TOutputFormat>,
     contains_iso: ContainsIso,
 ) -> Result<(), BatchCompileError> {
     let mut errors = vec![];

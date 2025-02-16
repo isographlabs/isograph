@@ -7,8 +7,9 @@ license = { workspace = true }
 [dependencies]
 thiserror = "1.0.40"
 intern = { path = "../../relay-crates/intern" }
-graphql_schema_parser = { path = "../graphql_schema_parser" }
 graphql_lang_types = { path = "../graphql_lang_types" }
+graphql_output_format = { path = "../graphql_output_format" }
+graphql_schema_parser = { path = "../graphql_schema_parser" }
 isograph_config = { path = "../isograph_config" }
 isograph_schema = { path = "../isograph_schema" }
 isograph_lang_parser = { path = "../isograph_lang_parser" }

@@ -19,10 +19,11 @@ use crate::{
     categorize_field_loadability, create_transformed_name_and_arguments,
     expose_field_directive::RequiresRefinement, transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context, ClientFieldVariant, ClientType,
-    FieldType, ImperativelyLoadedFieldVariant, Loadability, NameAndArguments, PathToRefetchField,
-    RootOperationName, SchemaObject, SchemaServerFieldVariant, UnvalidatedVariableDefinition,
-    ValidatedClientField, ValidatedIsographSelectionVariant, ValidatedScalarFieldSelection,
-    ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection, VariableContext,
+    FieldType, ImperativelyLoadedFieldVariant, Loadability, NameAndArguments, OutputFormat,
+    PathToRefetchField, RootOperationName, SchemaObject, SchemaServerFieldVariant,
+    UnvalidatedVariableDefinition, ValidatedClientField, ValidatedIsographSelectionVariant,
+    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection,
+    VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -399,8 +400,10 @@ fn transform_child_map_with_parent_context(
     transformed_child_map
 }
 
-pub fn create_merged_selection_map_for_field_and_insert_into_global_map(
-    schema: &ValidatedSchema,
+pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
+    TOutputFormat: OutputFormat,
+>(
+    schema: &ValidatedSchema<TOutputFormat>,
     parent_type: &SchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
@@ -444,8 +447,8 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map(
     }
 }
 
-pub fn get_imperatively_loaded_artifact_info(
-    schema: &ValidatedSchema,
+pub fn get_imperatively_loaded_artifact_info<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     entrypoint: &ValidatedClientField,
     root_refetch_path: RootRefetchedPath,
     nested_selection_map: &MergedSelectionMap,
@@ -485,8 +488,8 @@ pub fn get_reachable_variables(selection_map: &MergedSelectionMap) -> BTreeSet<V
 }
 
 #[allow(clippy::too_many_arguments)]
-fn process_imperatively_loaded_field(
-    schema: &ValidatedSchema,
+fn process_imperatively_loaded_field<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     variant: ImperativelyLoadedFieldVariant,
     refetch_field_parent_id: ServerObjectId,
     selection_map: &MergedSelectionMap,
@@ -634,8 +637,8 @@ fn get_used_variable_definitions(
         .collect::<Vec<_>>()
 }
 
-fn create_selection_map_with_merge_traversal_state(
-    schema: &ValidatedSchema,
+fn create_selection_map_with_merge_traversal_state<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     parent_type: &SchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
@@ -656,8 +659,8 @@ fn create_selection_map_with_merge_traversal_state(
     merged_selection_map
 }
 
-fn merge_validated_selections_into_selection_map(
-    schema: &ValidatedSchema,
+fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     parent_map: &mut MergedSelectionMap,
     parent_type: &SchemaObject,
     validated_selections: &[WithSpan<ValidatedSelection>],
@@ -922,8 +925,8 @@ fn merge_validated_selections_into_selection_map(
     select_typename_and_id_fields_in_merged_selection(schema, parent_map, parent_type);
 }
 
-fn insert_imperative_field_into_refetch_paths(
-    schema: &ValidatedSchema,
+fn insert_imperative_field_into_refetch_paths<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     newly_encountered_scalar_client_field: &ValidatedClientField,
@@ -984,9 +987,9 @@ fn filter_id_fields(field: &&WithSpan<ValidatedSelection>) -> bool {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn merge_non_loadable_scalar_client_field(
+fn merge_non_loadable_scalar_client_field<TOutputFormat: OutputFormat>(
     parent_type: &SchemaObject,
-    schema: &ValidatedSchema,
+    schema: &ValidatedSchema<TOutputFormat>,
     parent_map: &mut MergedSelectionMap,
     parent_merge_traversal_state: &mut ScalarClientFieldTraversalState,
     newly_encountered_scalar_client_field: &ValidatedClientField,
@@ -1075,8 +1078,8 @@ fn merge_scalar_server_field(
     }
 }
 
-fn select_typename_and_id_fields_in_merged_selection(
-    schema: &ValidatedSchema,
+fn select_typename_and_id_fields_in_merged_selection<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     merged_selection_map: &mut MergedSelectionMap,
     parent_type: &SchemaObject,
 ) {

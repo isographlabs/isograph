@@ -1,12 +1,13 @@
+use graphql_output_format::ValidatedGraphqlSchema;
 use isograph_schema::{
     MergedInlineFragmentSelection, MergedLinkedFieldSelection, MergedScalarFieldSelection,
-    MergedServerSelection, ValidatedSchema,
+    MergedServerSelection,
 };
 
 use crate::generate_artifacts::{get_serialized_field_arguments, NormalizationAstText};
 
 pub(crate) fn generate_normalization_ast_text<'schema, 'a>(
-    schema: &'schema ValidatedSchema,
+    schema: &'schema ValidatedGraphqlSchema,
     selection_map: impl Iterator<Item = &'a MergedServerSelection> + 'a,
     indentation_level: u8,
 ) -> NormalizationAstText {
@@ -21,7 +22,7 @@ pub(crate) fn generate_normalization_ast_text<'schema, 'a>(
 
 fn generate_normalization_ast_node(
     item: &MergedServerSelection,
-    schema: &ValidatedSchema,
+    schema: &ValidatedGraphqlSchema,
     indentation_level: u8,
 ) -> String {
     match &item {

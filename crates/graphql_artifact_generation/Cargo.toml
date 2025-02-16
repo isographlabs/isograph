@@ -9,6 +9,7 @@ license = { workspace = true }
 [dependencies]
 pathdiff = { workspace = true }
 lazy_static = { workspace = true }
+graphql_output_format = { path = "../graphql_output_format" }
 isograph_schema = { path = "../isograph_schema" }
 isograph_config = { path = "../isograph_config" }
 isograph_lang_types = { path = "../isograph_lang_types" }

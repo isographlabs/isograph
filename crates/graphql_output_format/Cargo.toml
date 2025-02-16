@@ -1,0 +1,8 @@
+[package]
+name = "graphql_output_format"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+isograph_schema = { path = "../isograph_schema" }

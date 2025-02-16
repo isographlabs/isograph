@@ -9,7 +9,7 @@ use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{SelectableServerFieldId, ServerFieldId};
 
 use crate::{
-    FieldMapItem, FieldType, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
+    FieldMapItem, FieldType, OutputFormat, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
     ProcessedFieldMapItem, UnvalidatedSchema, UnvalidatedVariableDefinition,
 };
 
@@ -27,13 +27,13 @@ impl ArgumentMap {
         }
     }
 
-    pub(crate) fn remove_field_map_item(
+    pub(crate) fn remove_field_map_item<TOutputFormat: OutputFormat>(
         &mut self,
         field_map_item: FieldMapItem,
         primary_type_name: IsographObjectTypeName,
         mutation_object_name: IsographObjectTypeName,
         mutation_field_name: SelectableFieldName,
-        schema: &mut UnvalidatedSchema,
+        schema: &mut UnvalidatedSchema<TOutputFormat>,
     ) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem> {
         let split_to_arg = field_map_item.split_to_arg();
         let (index_of_argument, argument) = self
@@ -194,9 +194,9 @@ impl ModifiedArgument {
     /// an existing object.
     ///
     /// This panics if unmodified's type is a scalar.
-    pub fn from_unmodified(
+    pub fn from_unmodified<TOutputFormat: OutputFormat>(
         unmodified: &UnvalidatedVariableDefinition,
-        schema: &UnvalidatedSchema,
+        schema: &UnvalidatedSchema<TOutputFormat>,
     ) -> Self {
         // TODO I think we have validated that the item exists already.
         // But we should double check that, and return an error if necessary
@@ -239,9 +239,9 @@ impl ModifiedArgument {
         }
     }
 
-    pub fn remove_to_field(
+    pub fn remove_to_field<TOutputFormat: OutputFormat>(
         &mut self,
-        schema: &UnvalidatedSchema,
+        schema: &UnvalidatedSchema<TOutputFormat>,
         first: StringLiteralValue,
         rest: &[StringLiteralValue],
         primary_type_name: IsographObjectTypeName,

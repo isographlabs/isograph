@@ -10,7 +10,7 @@ use graphql_schema_parser::{parse_schema, parse_schema_extensions};
 use intern::string_key::Intern;
 use isograph_config::{absolute_and_relative_paths, AbsolutePathAndRelativePath, CompilerConfig};
 use isograph_lang_parser::IsoLiteralExtractionResult;
-use isograph_schema::UnvalidatedSchema;
+use isograph_schema::{OutputFormat, UnvalidatedSchema};
 
 use crate::{
     batch_compile::BatchCompileError,
@@ -55,9 +55,9 @@ impl SourceFiles {
         })
     }
 
-    pub fn create_unvalidated_schema(
+    pub fn create_unvalidated_schema<TOutputFormat: OutputFormat>(
         self,
-        schema: &mut UnvalidatedSchema,
+        schema: &mut UnvalidatedSchema<TOutputFormat>,
         config: &CompilerConfig,
     ) -> Result<(), BatchCompileError> {
         let outcome = schema.process_graphql_type_system_document(self.schema, &config.options)?;
@@ -329,7 +329,9 @@ fn get_canonicalized_root_path(project_root: &PathBuf) -> Result<PathBuf, BatchC
 /// Here, we are processing exposeAs fields. Note that we only process these
 /// directives on root objects (Query, Mutation, Subscription) and we should
 /// validate that no other types have exposeAs directives.
-fn process_exposed_fields(schema: &mut UnvalidatedSchema) -> Result<(), BatchCompileError> {
+fn process_exposed_fields<TOutputFormat: OutputFormat>(
+    schema: &mut UnvalidatedSchema<TOutputFormat>,
+) -> Result<(), BatchCompileError> {
     let fetchable_types: Vec<_> = schema.fetchable_types.keys().copied().collect();
     for fetchable_object_id in fetchable_types.into_iter() {
         schema.add_exposed_fields_to_parent_object_types(fetchable_object_id)?;

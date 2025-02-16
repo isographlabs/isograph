@@ -1,10 +1,9 @@
 use common_lang_types::{ArtifactPathAndContent, ObjectTypeAndFieldName};
+use graphql_output_format::ValidatedGraphqlSchema;
 use intern::string_key::Intern;
 
 use isograph_config::GenerateFileExtensionsOption;
-use isograph_schema::{
-    FieldMapItem, PrimaryFieldInfo, RefetchedPathsMap, ValidatedClientField, ValidatedSchema,
-};
+use isograph_schema::{FieldMapItem, PrimaryFieldInfo, RefetchedPathsMap, ValidatedClientField};
 
 use crate::{
     generate_artifacts::{
@@ -16,7 +15,7 @@ use crate::{
 };
 
 pub(crate) fn generate_refetch_reader_artifact(
-    schema: &ValidatedSchema,
+    schema: &ValidatedGraphqlSchema,
     client_field: &ValidatedClientField,
     primary_field_info: Option<&PrimaryFieldInfo>,
     refetched_paths: &RefetchedPathsMap,
@@ -82,7 +81,7 @@ pub(crate) fn generate_refetch_reader_artifact(
 }
 
 pub(crate) fn generate_refetch_output_type_artifact(
-    schema: &ValidatedSchema,
+    schema: &ValidatedGraphqlSchema,
     client_field: &ValidatedClientField,
 ) -> ArtifactPathAndContent {
     let parent_type = schema

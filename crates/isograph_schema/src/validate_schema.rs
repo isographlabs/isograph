@@ -12,14 +12,16 @@ use isograph_lang_types::{
     ServerFieldId, ServerFieldSelection, ServerObjectId, ServerScalarId, TypeAnnotation,
     VariableDefinition,
 };
+
 use thiserror::Error;
 
 use crate::{
     validate_client_field::validate_and_transform_client_types,
     validate_server_field::validate_and_transform_server_fields, ClientField, ClientFieldVariant,
-    ClientPointer, FieldType, ImperativelyLoadedFieldVariant, Schema, SchemaIdField, SchemaObject,
-    SchemaServerField, SchemaValidationState, ServerFieldData, ServerFieldTypeAssociatedData,
-    UnvalidatedSchema, UseRefetchFieldRefetchStrategy, ValidateEntrypointDeclarationError,
+    ClientPointer, FieldType, ImperativelyLoadedFieldVariant, OutputFormat, Schema, SchemaIdField,
+    SchemaObject, SchemaServerField, SchemaValidationState, ServerFieldData,
+    ServerFieldTypeAssociatedData, UnvalidatedSchema, UseRefetchFieldRefetchStrategy,
+    ValidateEntrypointDeclarationError,
 };
 
 pub type ValidatedSchemaServerField = SchemaServerField<
@@ -109,11 +111,11 @@ impl SchemaValidationState for ValidatedSchemaState {
     type Entrypoint = HashMap<ClientFieldId, IsoLiteralText>;
 }
 
-pub type ValidatedSchema = Schema<ValidatedSchemaState>;
+pub type ValidatedSchema<TOutputFormat> = Schema<ValidatedSchemaState, TOutputFormat>;
 
-impl ValidatedSchema {
+impl<TOutputFormat: OutputFormat> ValidatedSchema<TOutputFormat> {
     pub fn validate_and_construct(
-        unvalidated_schema: UnvalidatedSchema,
+        unvalidated_schema: UnvalidatedSchema<TOutputFormat>,
     ) -> Result<Self, Vec<WithLocation<ValidateSchemaError>>> {
         let mut errors = vec![];
 
@@ -145,6 +147,7 @@ impl ValidatedSchema {
             entrypoints: _,
             server_field_data: schema_data,
             fetchable_types: root_types,
+            output_format,
         } = unvalidated_schema;
 
         let updated_server_fields = match validate_and_transform_server_fields(fields, &schema_data)
@@ -207,6 +210,7 @@ impl ValidatedSchema {
                     null_type_id,
                 },
                 fetchable_types: root_types,
+                output_format,
             })
         } else {
             Err(errors)

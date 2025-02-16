@@ -1,11 +1,11 @@
 use common_lang_types::{Location, WithLocation};
 
 use crate::{
-    ProcessTypeDefinitionError, ProcessTypeDefinitionResult, UnvalidatedSchema,
+    OutputFormat, ProcessTypeDefinitionError, ProcessTypeDefinitionResult, UnvalidatedSchema,
     ValidatedTypeRefinementMap,
 };
 
-impl UnvalidatedSchema {
+impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     /// For each supertype (e.g. Node), add the fields defined on it (e.g. Node.MyComponent)
     /// to subtypes (e.g. creating User.MyComponent).
     ///

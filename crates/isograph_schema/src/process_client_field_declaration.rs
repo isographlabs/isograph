@@ -10,15 +10,16 @@ use isograph_lang_types::{
     NonConstantValue, SelectableServerFieldId, ServerObjectId, TypeAnnotation,
 };
 use lazy_static::lazy_static;
+
 use thiserror::Error;
 
 use crate::{
     refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
-    ClientField, ClientPointer, ClientType, FieldMapItem, FieldType, RequiresRefinement,
-    UnvalidatedSchema, UnvalidatedVariableDefinition, NODE_FIELD_NAME,
+    ClientField, ClientPointer, ClientType, FieldMapItem, FieldType, OutputFormat,
+    RequiresRefinement, UnvalidatedSchema, UnvalidatedVariableDefinition, NODE_FIELD_NAME,
 };
 
-impl UnvalidatedSchema {
+impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     pub fn process_client_field_declaration(
         &mut self,
         client_field_declaration: WithSpan<ClientFieldDeclarationWithValidatedDirectives>,

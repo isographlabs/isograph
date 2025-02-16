@@ -4,6 +4,7 @@ use common_lang_types::{
     ArtifactPathAndContent, IsographObjectTypeName, ObjectTypeAndFieldName, QueryOperationName,
     VariableName,
 };
+use graphql_output_format::ValidatedGraphqlSchema;
 use intern::{string_key::Intern, Lookup};
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{ClientFieldId, IsographSelectionVariant, ServerObjectId};
@@ -12,7 +13,7 @@ use isograph_schema::{
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
     get_reachable_variables, ClientType, FieldToCompletedMergeTraversalStateMap,
     FieldTraversalResult, FieldType, MergedSelectionMap, RootOperationName, RootRefetchedPath,
-    ScalarClientFieldTraversalState, SchemaObject, ValidatedClientField, ValidatedSchema,
+    ScalarClientFieldTraversalState, SchemaObject, ValidatedClientField,
     ValidatedVariableDefinition,
 };
 
@@ -37,7 +38,7 @@ struct EntrypointArtifactInfo<'schema> {
 }
 
 pub(crate) fn generate_entrypoint_artifacts(
-    schema: &ValidatedSchema,
+    schema: &ValidatedGraphqlSchema,
     entrypoint_id: ClientFieldId,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     file_extensions: GenerateFileExtensionsOption,
@@ -74,7 +75,7 @@ pub(crate) fn generate_entrypoint_artifacts(
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'a>(
-    schema: &ValidatedSchema,
+    schema: &ValidatedGraphqlSchema,
     entrypoint: &ValidatedClientField,
     merged_selection_map: &MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,

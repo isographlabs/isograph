@@ -1,9 +1,10 @@
 use common_lang_types::{
     ArtifactPathAndContent, IsographObjectTypeName, ObjectTypeAndFieldName, SelectableFieldName,
 };
+use graphql_output_format::ValidatedGraphqlSchema;
 use intern::string_key::Intern;
 use isograph_lang_types::RefetchQueryIndex;
-use isograph_schema::{ImperativelyLoadedFieldArtifactInfo, ValidatedSchema, REFETCH_FIELD_NAME};
+use isograph_schema::{ImperativelyLoadedFieldArtifactInfo, REFETCH_FIELD_NAME};
 
 use crate::{
     generate_artifacts::{NormalizationAstText, QueryText},
@@ -89,7 +90,7 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
 }
 
 pub(crate) fn get_artifact_for_imperatively_loaded_field(
-    schema: &ValidatedSchema,
+    schema: &ValidatedGraphqlSchema,
     imperatively_loaded_field_artifact_info: ImperativelyLoadedFieldArtifactInfo,
 ) -> ArtifactPathAndContent {
     let ImperativelyLoadedFieldArtifactInfo {
