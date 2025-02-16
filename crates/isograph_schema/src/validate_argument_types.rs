@@ -158,7 +158,25 @@ pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
             field_argument_definition_type,
             schema_data,
             selection_supplied_argument_value.location,
-        ),
+        )
+        .or_else(|error| {
+            scalar_literal_satisfies_type(
+                &schema_data.float_type_id,
+                field_argument_definition_type,
+                schema_data,
+                selection_supplied_argument_value.location,
+            )
+            .map_err(|_| error)
+        })
+        .or_else(|error| {
+            scalar_literal_satisfies_type(
+                &schema_data.id_type_id,
+                field_argument_definition_type,
+                schema_data,
+                selection_supplied_argument_value.location,
+            )
+            .map_err(|_| error)
+        }),
         NonConstantValue::Boolean(_) => scalar_literal_satisfies_type(
             &schema_data.boolean_type_id,
             field_argument_definition_type,
@@ -170,7 +188,16 @@ pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
             field_argument_definition_type,
             schema_data,
             selection_supplied_argument_value.location,
-        ),
+        )
+        .or_else(|error| {
+            scalar_literal_satisfies_type(
+                &schema_data.id_type_id,
+                field_argument_definition_type,
+                schema_data,
+                selection_supplied_argument_value.location,
+            )
+            .map_err(|_| error)
+        }),
         NonConstantValue::Float(_) => scalar_literal_satisfies_type(
             &schema_data.float_type_id,
             field_argument_definition_type,
