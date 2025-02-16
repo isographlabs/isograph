@@ -1,6 +1,5 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
-use darling::{ast::NestedMeta, FromMeta};
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{
@@ -8,15 +7,7 @@ use syn::{
     ReturnType, Signature,
 };
 
-#[derive(Debug, FromMeta)]
-struct MemoArgs {
-    #[darling(default)]
-    inner: bool,
-    #[darling(default)]
-    inner_ref: bool,
-}
-
-pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
+pub(crate) fn memo(_args: TokenStream, item: TokenStream) -> TokenStream {
     let ItemFn {
         sig,
         vis,
@@ -55,8 +46,12 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
         .zip(argument_types.clone())
         .map(|(arg, ty)| match ArgType::parse(ty) {
             ArgType::Source | ArgType::MemoRef => {
+                let param_arg = match **ty {
+                    syn::Type::Reference(_) => quote!((*(#arg))),
+                    _ => quote!(#arg),
+                };
                 quote! {
-                    param_ids.push(#arg.into());
+                    param_ids.push(#param_arg.into());
                 }
             }
             ArgType::Other => {
@@ -65,10 +60,7 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
                     _ => quote!(&#arg),
                 };
                 quote! {
-                    let param_id: ::pico::ParamId = ::pico::macro_fns::hash(#param_arg).into();
-                    if !::pico::macro_fns::param_exists(#db_arg, param_id) {
-                        ::pico::macro_fns::intern_param(#db_arg, param_id, #arg.clone());
-                    }
+                    let param_id = ::pico::macro_fns::intern_param(#db_arg, #param_arg);
                     param_ids.push(param_id);
                 }
             }
@@ -79,87 +71,55 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
         ReturnType::Default => parse_quote!(()),
     };
 
-    let mut return_expr = quote! {
-        ::pico::macro_fns::get_derived_node(#db_arg, derived_node_id)
-            .expect("derived node must exist. This is indicative of a bug in Pico.")
-            .value
-            .as_any()
-            .downcast_ref::<#return_type>()
-            .expect("unexpected return type. This is indicative of a bug in Pico.")
-    };
-
     let mut new_sig = sig.clone();
-
-    let macro_args = match parse_macro_args(args, &sig) {
-        Ok(parsed) => parsed,
-        Err(e) => return e.to_compile_error().into(),
-    };
-
-    if macro_args.inner {
-        return_expr = quote! { #return_expr.clone() };
-    } else {
-        let lifetime = get_fn_lifetime(&mut new_sig);
-        if let Err(e) = check_db_lifetime(&mut new_sig.inputs[0], lifetime.clone()) {
-            return e.to_compile_error().into();
-        }
-        if macro_args.inner_ref {
-            new_sig.output = ReturnType::Type(
-                parse_quote!(->),
-                Box::new(parse_quote!(&#lifetime #return_type)),
-            );
-        } else {
-            new_sig.output = ReturnType::Type(
-                parse_quote!(->),
-                Box::new(parse_quote!(::pico::MemoRef<#lifetime, #return_type>)),
-            );
-            return_expr = quote! { ::pico::MemoRef::new(#db_arg, derived_node_id) };
-        }
+    let lifetime = get_or_create_fn_lifetime(&mut new_sig);
+    if let Err(e) = check_db_lifetime(&mut new_sig.inputs[0], lifetime.clone()) {
+        return e.to_compile_error().into();
     }
+    new_sig.output = ReturnType::Type(
+        parse_quote!(->),
+        Box::new(parse_quote!(::pico::MemoRef<#lifetime, #return_type>)),
+    );
 
     let extract_parameters = other_args.clone().zip(argument_types.clone())
         .enumerate()
         .map(|(i, (arg, ty))| {
             match ArgType::parse(ty) {
                 ArgType::Source => {
-                    let maybe_ref = if matches!(**ty, syn::Type::Reference(_)) {
-                        quote! { &param_id.into() }
-                    } else {
-                        quote! { param_id.into() }
+                    let binding_expr = match **ty {
+                        syn::Type::Reference(_) => quote!(&param_id.into()),
+                        _ => quote!(param_id.into()),
                     };
                     quote! {
                         let #arg: #ty = {
                             let param_id = derived_node_id.params[#i];
-                            #maybe_ref
+                            #binding_expr
                         };
                     }
                 }
                 ArgType::MemoRef => {
-                    let maybe_ref = if matches!(**ty, syn::Type::Reference(_)) {
-                        quote! { &::pico::MemoRef::new(#db_arg, param_id.into()) }
-                    } else {
-                        quote! { ::pico::MemoRef::new(#db_arg, param_id.into()) }
+                    let binding_expr = match **ty {
+                        syn::Type::Reference(_) => quote!(&::pico::MemoRef::new(#db_arg, param_id.into())),
+                        _ => quote!(::pico::MemoRef::new(#db_arg, param_id.into())),
                     };
                     quote! {
                         let #arg: #ty = {
                             let param_id = derived_node_id.params[#i];
-                            #maybe_ref
+                            #binding_expr
                         };
                     }
                 }
                 ArgType::Other => {
-                    let target_type = if let syn::Type::Reference(ref reference) = **ty {
-                        &reference.elem
-                    } else {
-                        ty
-                    };
-                    let binding_expr = match **ty {
-                        syn::Type::Reference(_) => quote!(inner),
-                        _ => quote!(inner.clone()),
+                    let (target_type, binding_expr) = match **ty {
+                        syn::Type::Reference(ref reference) => (&reference.elem, quote!(inner)),
+                        _ => (ty, quote!(inner.clone())),
                     };
                     quote! {
-                        let #arg = {
+                        let #arg: #ty = {
                             let param_ref = ::pico::macro_fns::get_param(#db_arg, derived_node_id.params[#i])?;
-                            let inner = param_ref.downcast_ref::<#target_type>()?;
+                            let inner = param_ref
+                                .downcast_ref::<#target_type>()
+                                .expect("unexpecred param type. This is indicative of a bug in Pico.");
                             #binding_expr
                         };
                     }
@@ -175,14 +135,15 @@ pub(crate) fn memo(args: TokenStream, item: TokenStream) -> TokenStream {
                 #param_ids_blocks
             )*
             let derived_node_id = ::pico::DerivedNodeId::new(#fn_hash.into(), param_ids);
-            ::pico::memo(#db_arg, derived_node_id, ::pico::InnerFn::new(|#db_arg, derived_node_id| {
+            let did_recalculated = ::pico::memo(#db_arg, derived_node_id, ::pico::InnerFn::new(|#db_arg, derived_node_id| {
                 #(
                     #extract_parameters
                 )*
                 let value: #return_type = (|| #block)();
                 Some(Box::new(value))
             }));
-            #return_expr
+            debug_assert!(!matches!(did_recalculated, pico::DidRecalculate::Error), "Unexpected memo result. This is indicative of a bug in Pico.");
+            ::pico::MemoRef::new(#db_arg, derived_node_id)
         }
     };
 
@@ -214,12 +175,10 @@ impl ArgType {
 }
 
 fn type_is(ty: &syn::Type, target: &'static str) -> bool {
-    let inner = if let syn::Type::Reference(r) = ty {
-        &*r.elem
-    } else {
-        ty
+    let inner = match ty {
+        syn::Type::Reference(r) => &*r.elem,
+        _ => ty,
     };
-
     if let syn::Type::Path(type_path) = inner {
         if let Some(segment) = type_path.path.segments.last() {
             return segment.ident == target;
@@ -228,18 +187,18 @@ fn type_is(ty: &syn::Type, target: &'static str) -> bool {
     false
 }
 
-fn get_fn_lifetime(sig: &mut Signature) -> Lifetime {
-    let lt = sig.generics.params.iter().find_map(|param| {
-        if let GenericParam::Lifetime(lt) = param {
-            Some(lt.lifetime.clone())
-        } else {
-            None
-        }
-    });
-    if lt.is_none() {
-        sig.generics.params.push(parse_quote!('db));
-    }
-    lt.unwrap_or(parse_quote!('db))
+fn get_or_create_fn_lifetime(sig: &mut Signature) -> Lifetime {
+    sig.generics
+        .params
+        .iter()
+        .find_map(|param| match param {
+            GenericParam::Lifetime(lt) => Some(lt.lifetime.clone()),
+            _ => None,
+        })
+        .unwrap_or_else(|| {
+            sig.generics.params.push(parse_quote!('db));
+            parse_quote!('db)
+        })
 }
 
 fn check_db_lifetime(arg: &mut FnArg, lifetime: Lifetime) -> Result<(), syn::Error> {
@@ -260,10 +219,4 @@ fn check_db_lifetime(arg: &mut FnArg, lifetime: Lifetime) -> Result<(), syn::Err
         }
     }
     Ok(())
-}
-
-fn parse_macro_args(args: TokenStream, sig: &Signature) -> Result<MemoArgs, syn::Error> {
-    let attr_args =
-        NestedMeta::parse_meta_list(args.into()).map_err(|e| Error::new_spanned(sig, e))?;
-    MemoArgs::from_list(&attr_args).map_err(|e| e.with_span(&sig).into())
 }

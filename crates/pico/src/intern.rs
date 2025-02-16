@@ -41,12 +41,6 @@ impl<T> From<SourceId<T>> for ParamId {
     }
 }
 
-impl<T> From<&SourceId<T>> for ParamId {
-    fn from(value: &SourceId<T>) -> Self {
-        Self(value.key.0)
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub struct Key(HashId);
 

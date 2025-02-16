@@ -72,13 +72,16 @@ fn create_derived_node(
     derived_node_id: DerivedNodeId,
     inner_fn: InnerFn,
 ) -> (Epoch, DidRecalculate) {
-    let (value, tracked_dependencies) = with_dependency_tracking(db, derived_node_id, inner_fn);
+    let (value, tracked_dependencies) = with_dependency_tracking(db, derived_node_id, inner_fn)
+        .expect(
+            "InnerFn call cannot fail for a new derived node. This is indicative of a bug in Pico.",
+        );
     db.insert_derived_node(
         derived_node_id,
         DerivedNode {
             dependencies: tracked_dependencies.dependencies,
             inner_fn,
-            value: value.unwrap(),
+            value,
         },
     );
     db.insert_derived_node_revision(
@@ -98,10 +101,9 @@ fn update_derived_node(
     prev_value: &dyn DynEq,
     inner_fn: InnerFn,
 ) -> (Epoch, DidRecalculate) {
-    let (value, tracked_dependencies) = with_dependency_tracking(db, derived_node_id, inner_fn);
-    let did_recalculate = match value {
-        Some(v) => {
-            let did_recalculate = if *prev_value != *v {
+    match with_dependency_tracking(db, derived_node_id, inner_fn) {
+        Some((value, tracked_dependencies)) => {
+            let did_recalculate = if *prev_value != *value {
                 db.set_derive_node_time_updated(
                     derived_node_id,
                     tracked_dependencies.max_time_updated,
@@ -115,14 +117,13 @@ fn update_derived_node(
                 DerivedNode {
                     dependencies: tracked_dependencies.dependencies,
                     inner_fn,
-                    value: v,
+                    value,
                 },
             );
-            did_recalculate
+            (tracked_dependencies.max_time_updated, did_recalculate)
         }
-        None => DidRecalculate::Error,
-    };
-    (tracked_dependencies.max_time_updated, did_recalculate)
+        None => (Epoch::new(), DidRecalculate::Error),
+    }
 }
 
 fn any_dependency_changed(db: &Database, derived_node: &DerivedNode) -> bool {
@@ -171,9 +172,7 @@ fn with_dependency_tracking(
     db: &Database,
     derived_node_id: DerivedNodeId,
     inner_fn: InnerFn,
-) -> (Option<Box<dyn DynEq>>, TrackedDependencies) {
+) -> Option<(Box<dyn DynEq>, TrackedDependencies)> {
     let guard = db.dependency_stack.enter();
-    let value = inner_fn.0(db, derived_node_id);
-    let tracked_dependencies = guard.release();
-    (value, tracked_dependencies)
+    inner_fn.0(db, derived_node_id).map(|v| (v, guard.release()))
 }

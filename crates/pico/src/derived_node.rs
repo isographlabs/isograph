@@ -91,13 +91,6 @@ impl<T> From<MemoRef<'_, T>> for ParamId {
     }
 }
 
-impl<T> From<&MemoRef<'_, T>> for ParamId {
-    fn from(val: &MemoRef<'_, T>) -> Self {
-        let idx: u64 = val.derived_node_id.index().into();
-        ParamId::from(idx)
-    }
-}
-
 impl<T: 'static> Deref for MemoRef<'_, T> {
     type Target = T;
 

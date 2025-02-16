@@ -101,7 +101,7 @@ fn parse_ast(db: &Database, id: SourceId<Input>) -> Result<Program> {
     parser.parse_program()
 }
 
-#[memo(inner)]
+#[memo]
 fn evaluate_input(db: &Database, id: SourceId<Input>) -> i64 {
     *EVAL_COUNTER.lock().unwrap().entry(id).or_insert(0) += 1;
     let ast = parse_ast(db, id).to_owned().expect("ast must be correct");
@@ -113,5 +113,5 @@ fn sum(db: &Database, left: SourceId<Input>, right: SourceId<Input>) -> i64 {
     SUM_COUNTER.fetch_add(1, Ordering::SeqCst);
     let left = evaluate_input(db, left);
     let right = evaluate_input(db, right);
-    left + right
+    *left + *right
 }
