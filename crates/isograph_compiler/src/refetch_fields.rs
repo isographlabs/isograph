@@ -31,7 +31,7 @@ pub fn add_refetch_fields_to_objects<TOutputFormat: OutputFormat>(
 }
 
 fn add_refetch_field_to_object<TOutputFormat: OutputFormat>(
-    object: &mut SchemaObject,
+    object: &mut SchemaObject<TOutputFormat>,
     client_fields: &mut Vec<
         ClientType<UnvalidatedClientField<TOutputFormat>, UnvalidatedClientPointer<TOutputFormat>>,
     >,

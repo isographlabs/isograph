@@ -43,7 +43,7 @@ pub(crate) fn validate_and_transform_client_types<TOutputFormat: OutputFormat>(
     client_types: Vec<
         ClientType<UnvalidatedClientField<TOutputFormat>, UnvalidatedClientPointer<TOutputFormat>>,
     >,
-    schema_data: &ServerFieldData,
+    schema_data: &ServerFieldData<TOutputFormat>,
     server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
 ) -> Result<
     Vec<ClientType<ValidatedClientField<TOutputFormat>, ValidatedClientPointer<TOutputFormat>>>,
@@ -162,14 +162,14 @@ struct ValidateSchemaSharedInfo<'a, TOutputFormat: OutputFormat> {
     client_pointer_target_type_map: &'a ClientPointerTargetTypeMap,
     client_type_args: &'a ClientTypeArgsMap,
     client_type_object_type_and_field_name: ObjectTypeAndFieldName,
-    client_type_parent_object: &'a SchemaObject,
-    schema_data: &'a ServerFieldData,
+    client_type_parent_object: &'a SchemaObject<TOutputFormat>,
+    schema_data: &'a ServerFieldData<TOutputFormat>,
     server_fields: &'a [ValidatedSchemaServerField<TOutputFormat>],
     client_type: ClientType<(), ()>,
 }
 
 fn validate_client_field_selection_set<TOutputFormat: OutputFormat>(
-    schema_data: &ServerFieldData,
+    schema_data: &ServerFieldData<TOutputFormat>,
     top_level_client_field: UnvalidatedClientField<TOutputFormat>,
     server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
     client_type_args: &ClientTypeArgsMap,
@@ -236,7 +236,7 @@ fn validate_client_field_selection_set<TOutputFormat: OutputFormat>(
 }
 
 fn validate_client_pointer_selection_set<TOutputFormat: OutputFormat>(
-    schema_data: &ServerFieldData,
+    schema_data: &ServerFieldData<TOutputFormat>,
     top_level_client_pointer: UnvalidatedClientPointer<TOutputFormat>,
     server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
     client_type_args: &ClientTypeArgsMap,
@@ -314,8 +314,8 @@ fn validate_use_refetch_field_strategy<TOutputFormat: OutputFormat>(
     })
 }
 
-fn validate_variable_definitions(
-    schema_data: &ServerFieldData,
+fn validate_variable_definitions<TOutputFormat: OutputFormat>(
+    schema_data: &ServerFieldData<TOutputFormat>,
     variable_definitions: Vec<WithSpan<UnvalidatedVariableDefinition>>,
 ) -> ValidateSchemaResult<Vec<WithSpan<ValidatedVariableDefinition>>> {
     variable_definitions
@@ -385,7 +385,7 @@ fn validate_client_field_definition_selection_exists_and_type_matches<
     TOutputFormat: OutputFormat,
 >(
     selection: WithSpan<UnvalidatedSelection>,
-    field_parent_object: &SchemaObject,
+    field_parent_object: &SchemaObject<TOutputFormat>,
     used_variables: &mut UsedVariables,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     top_level_client_type_info: &ValidateSchemaSharedInfo<'_, TOutputFormat>,
@@ -423,7 +423,7 @@ fn validate_client_field_definition_selection_exists_and_type_matches<
 /// Given that we selected a scalar field, the field should exist on the parent,
 /// and type should be a client field (which is a scalar) or a server scalar type.
 fn validate_field_type_exists_and_is_scalar<TOutputFormat: OutputFormat>(
-    scalar_field_selection_parent_object: &SchemaObject,
+    scalar_field_selection_parent_object: &SchemaObject<TOutputFormat>,
     scalar_field_selection: UnvalidatedScalarFieldSelection,
     used_variables: &mut UsedVariables,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
@@ -618,7 +618,7 @@ fn validate_client_field<TOutputFormat: OutputFormat>(
 /// Given that we selected a linked field, the field should exist on the parent,
 /// and type should be a server interface, object or union.
 fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
-    field_parent_object: &SchemaObject,
+    field_parent_object: &SchemaObject<TOutputFormat>,
     linked_field_selection: UnvalidatedLinkedFieldSelection,
     used_variables: &mut UsedVariables,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
@@ -866,8 +866,8 @@ fn assert_no_missing_arguments(
     Ok(())
 }
 
-fn get_missing_arguments_and_validate_argument_types<'a>(
-    schema_data: &ServerFieldData,
+fn get_missing_arguments_and_validate_argument_types<'a, TOutputFormat: OutputFormat>(
+    schema_data: &ServerFieldData<TOutputFormat>,
     field_argument_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
     selection_supplied_arguments: &[WithLocation<SelectionFieldArgument>],
     include_optional_args: bool,

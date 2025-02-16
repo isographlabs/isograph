@@ -169,6 +169,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                 float_type_id,
                 boolean_type_id,
                 null_type_id,
+                output_format: std::marker::PhantomData,
             },
             fetchable_types: BTreeMap::new(),
             output_format: std::marker::PhantomData,
@@ -176,8 +177,8 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     }
 }
 
-fn add_schema_defined_scalar_type(
-    scalars: &mut Vec<SchemaScalar>,
+fn add_schema_defined_scalar_type<TOutputFormat: OutputFormat>(
+    scalars: &mut Vec<SchemaScalar<TOutputFormat>>,
     defined_types: &mut HashMap<UnvalidatedTypeName, SelectableServerFieldId>,
     field_name: &'static str,
     javascript_name: JavascriptName,
@@ -193,6 +194,7 @@ fn add_schema_defined_scalar_type(
         name: typename,
         id: scalar_id,
         javascript_name,
+        output_format: std::marker::PhantomData,
     });
     defined_types.insert(
         typename.item.into(),

@@ -15,8 +15,8 @@ use isograph_lang_types::{
 use isograph_schema::{
     get_provided_arguments, selection_map_wrapped, ClientFieldVariant, ClientType,
     FieldTraversalResult, FieldType, NameAndArguments, NormalizationKey, RequiresRefinement,
-    SchemaObject, SchemaServerFieldVariant, UserWrittenComponentVariant,
-    ValidatedIsographSelectionVariant, ValidatedSelection, ValidatedVariableDefinition,
+    SchemaServerFieldVariant, UserWrittenComponentVariant, ValidatedIsographSelectionVariant,
+    ValidatedSelection, ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -41,7 +41,7 @@ use crate::{
             generate_refetch_output_type_artifact, generate_refetch_reader_artifact,
         },
     },
-    ValidatedGraphqlClientField, ValidatedGraphqlSchema,
+    GraphqlSchemaObject, ValidatedGraphqlClientField, ValidatedGraphqlSchema,
 };
 
 lazy_static! {
@@ -486,7 +486,7 @@ pub(crate) fn generate_output_type(
 pub(crate) fn generate_client_field_parameter_type(
     schema: &ValidatedGraphqlSchema,
     selection_map: &[WithSpan<ValidatedSelection>],
-    parent_type: &SchemaObject,
+    parent_type: &GraphqlSchemaObject,
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
@@ -560,7 +560,7 @@ fn write_param_type_from_selection(
     schema: &ValidatedGraphqlSchema,
     query_type_declaration: &mut DualStringProxy,
     selection: &WithSpan<ValidatedSelection>,
-    parent_type: &SchemaObject,
+    parent_type: &GraphqlSchemaObject,
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,

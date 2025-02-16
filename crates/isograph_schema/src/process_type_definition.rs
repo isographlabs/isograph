@@ -413,6 +413,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     id_field,
                     directives: object_type_definition.directives,
                     concrete_type,
+                    output_format: std::marker::PhantomData,
                 });
 
                 schema_fields.extend(unvalidated_schema_fields);
@@ -464,6 +465,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     name: scalar_type_definition.name,
                     id: next_scalar_id,
                     javascript_name: *STRING_JAVASCRIPT_TYPE,
+                    output_format: std::marker::PhantomData,
                 });
 
                 vacant.insert(SelectableServerFieldId::Scalar(next_scalar_id));

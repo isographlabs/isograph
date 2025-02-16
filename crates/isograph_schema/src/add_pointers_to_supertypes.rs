@@ -5,7 +5,7 @@ use isograph_lang_types::{ScalarFieldSelection, ServerFieldSelection};
 
 use crate::{
     ClientType, FieldType, OutputFormat, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
-    SchemaObject, SchemaServerField, SchemaServerFieldVariant, ServerFieldTypeAssociatedData,
+    SchemaServerField, SchemaServerFieldVariant, ServerFieldTypeAssociatedData,
     ServerFieldTypeAssociatedDataInlineFragment, UnvalidatedSchema,
     ValidatedIsographSelectionVariant, ValidatedScalarFieldAssociatedData,
     ValidatedTypeRefinementMap, LINK_FIELD_NAME,
@@ -19,7 +19,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         subtype_to_supertype_map: &ValidatedTypeRefinementMap,
     ) -> ProcessTypeDefinitionResult<()> {
         for (subtype_id, supertype_ids) in subtype_to_supertype_map {
-            let subtype: &SchemaObject = self.server_field_data.object(*subtype_id);
+            let subtype = self.server_field_data.object(*subtype_id);
 
             if let Some(concrete_type) = subtype.concrete_type {
                 let field_name: SelectableFieldName = format!("as{}", subtype.name).intern().into();

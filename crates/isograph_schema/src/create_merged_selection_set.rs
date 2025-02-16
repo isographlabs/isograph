@@ -404,7 +404,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     TOutputFormat: OutputFormat,
 >(
     schema: &ValidatedSchema<TOutputFormat>,
-    parent_type: &SchemaObject,
+    parent_type: &SchemaObject<TOutputFormat>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     root_field_id: FieldType<ServerFieldId, ClientType<ClientFieldId, ClientPointerId>>,
@@ -639,7 +639,7 @@ fn get_used_variable_definitions<TOutputFormat: OutputFormat>(
 
 fn create_selection_map_with_merge_traversal_state<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
-    parent_type: &SchemaObject,
+    parent_type: &SchemaObject<TOutputFormat>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
@@ -662,7 +662,7 @@ fn create_selection_map_with_merge_traversal_state<TOutputFormat: OutputFormat>(
 fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
     parent_map: &mut MergedSelectionMap,
-    parent_type: &SchemaObject,
+    parent_type: &SchemaObject<TOutputFormat>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
@@ -930,7 +930,7 @@ fn insert_imperative_field_into_refetch_paths<TOutputFormat: OutputFormat>(
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     newly_encountered_scalar_client_field: &ValidatedClientField<TOutputFormat>,
-    parent_type: &SchemaObject,
+    parent_type: &SchemaObject<TOutputFormat>,
     variant: &ImperativelyLoadedFieldVariant,
 ) {
     let path = PathToRefetchField {
@@ -988,7 +988,7 @@ fn filter_id_fields(field: &&WithSpan<ValidatedSelection>) -> bool {
 
 #[allow(clippy::too_many_arguments)]
 fn merge_non_loadable_scalar_client_field<TOutputFormat: OutputFormat>(
-    parent_type: &SchemaObject,
+    parent_type: &SchemaObject<TOutputFormat>,
     schema: &ValidatedSchema<TOutputFormat>,
     parent_map: &mut MergedSelectionMap,
     parent_merge_traversal_state: &mut ScalarClientFieldTraversalState,
@@ -1081,7 +1081,7 @@ fn merge_scalar_server_field(
 fn select_typename_and_id_fields_in_merged_selection<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
     merged_selection_map: &mut MergedSelectionMap,
-    parent_type: &SchemaObject,
+    parent_type: &SchemaObject<TOutputFormat>,
 ) {
     if parent_type.concrete_type.is_none() {
         maybe_add_typename_selection(merged_selection_map)

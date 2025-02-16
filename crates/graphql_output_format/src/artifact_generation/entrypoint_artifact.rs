@@ -11,8 +11,8 @@ use isograph_schema::{
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
     get_reachable_variables, ClientType, FieldToCompletedMergeTraversalStateMap,
-    FieldTraversalResult, FieldType, MergedSelectionMap, RootOperationName, RootRefetchedPath,
-    ScalarClientFieldTraversalState, SchemaObject, ValidatedVariableDefinition,
+    FieldTraversalResult, FieldType, MergedSelectionMap, OutputFormat, RootOperationName,
+    RootRefetchedPath, ScalarClientFieldTraversalState, SchemaObject, ValidatedVariableDefinition,
 };
 
 use crate::{
@@ -29,9 +29,9 @@ use crate::{
 };
 
 #[derive(Debug)]
-struct EntrypointArtifactInfo<'schema> {
+struct EntrypointArtifactInfo<'schema, TOutputFormat: OutputFormat> {
     query_name: QueryOperationName,
-    parent_type: &'schema SchemaObject,
+    parent_type: &'schema SchemaObject<TOutputFormat>,
     query_text: QueryText,
     normalization_ast_text: NormalizationAstText,
     refetch_query_artifact_import: RefetchQueryArtifactImport,
@@ -252,7 +252,7 @@ fn generate_refetch_query_artifact_import(
     RefetchQueryArtifactImport(output)
 }
 
-impl EntrypointArtifactInfo<'_> {
+impl<TOutputFormat: OutputFormat> EntrypointArtifactInfo<'_, TOutputFormat> {
     fn path_and_content(
         self,
         file_extensions: GenerateFileExtensionsOption,

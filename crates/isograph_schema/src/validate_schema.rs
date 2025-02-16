@@ -150,7 +150,7 @@ impl<TOutputFormat: OutputFormat> ValidatedSchema<TOutputFormat> {
             entrypoints: _,
             server_field_data: schema_data,
             fetchable_types: root_types,
-            output_format,
+            ..
         } = unvalidated_schema;
 
         let updated_server_fields = match validate_and_transform_server_fields(fields, &schema_data)
@@ -188,6 +188,7 @@ impl<TOutputFormat: OutputFormat> ValidatedSchema<TOutputFormat> {
             boolean_type_id,
             int_type_id,
             null_type_id,
+            ..
         } = schema_data;
 
         if errors.is_empty() {
@@ -211,9 +212,10 @@ impl<TOutputFormat: OutputFormat> ValidatedSchema<TOutputFormat> {
                     boolean_type_id,
                     int_type_id,
                     null_type_id,
+                    output_format: std::marker::PhantomData,
                 },
                 fetchable_types: root_types,
-                output_format,
+                output_format: std::marker::PhantomData,
             })
         } else {
             Err(errors)
@@ -221,7 +223,9 @@ impl<TOutputFormat: OutputFormat> ValidatedSchema<TOutputFormat> {
     }
 }
 
-fn transform_object_field_ids(unvalidated_object: SchemaObject) -> SchemaObject {
+fn transform_object_field_ids<TOutputFormat: OutputFormat>(
+    unvalidated_object: SchemaObject<TOutputFormat>,
+) -> SchemaObject<TOutputFormat> {
     let SchemaObject {
         name,
         description,
@@ -230,6 +234,7 @@ fn transform_object_field_ids(unvalidated_object: SchemaObject) -> SchemaObject 
         id_field,
         directives,
         concrete_type,
+        output_format,
     } = unvalidated_object;
 
     let validated_encountered_fields = unvalidated_encountered_fields
@@ -253,6 +258,7 @@ fn transform_object_field_ids(unvalidated_object: SchemaObject) -> SchemaObject 
         id_field,
         directives,
         concrete_type,
+        output_format,
     }
 }
 

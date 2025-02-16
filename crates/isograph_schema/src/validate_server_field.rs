@@ -15,7 +15,7 @@ use crate::{
 
 pub(crate) fn validate_and_transform_server_fields<TOutputFormat: OutputFormat>(
     fields: Vec<UnvalidatedSchemaSchemaField<TOutputFormat>>,
-    schema_data: &ServerFieldData,
+    schema_data: &ServerFieldData<TOutputFormat>,
 ) -> Result<Vec<ValidatedSchemaServerField<TOutputFormat>>, Vec<WithLocation<ValidateSchemaError>>>
 {
     get_all_errors_or_all_ok_iter(
@@ -27,7 +27,7 @@ pub(crate) fn validate_and_transform_server_fields<TOutputFormat: OutputFormat>(
 
 fn validate_and_transform_server_field<TOutputFormat: OutputFormat>(
     field: UnvalidatedSchemaSchemaField<TOutputFormat>,
-    schema_data: &ServerFieldData,
+    schema_data: &ServerFieldData<TOutputFormat>,
 ) -> Result<
     ValidatedSchemaServerField<TOutputFormat>,
     impl Iterator<Item = WithLocation<ValidateSchemaError>>,
@@ -106,7 +106,7 @@ fn validate_and_transform_server_field<TOutputFormat: OutputFormat>(
 }
 
 fn validate_server_field_type_exists<TOutputFormat: OutputFormat>(
-    schema_data: &ServerFieldData,
+    schema_data: &ServerFieldData<TOutputFormat>,
     server_field_type: &GraphQLTypeAnnotation<UnvalidatedTypeName>,
     field: &SchemaServerField<
         (),
@@ -142,9 +142,9 @@ fn validate_server_field_type_exists<TOutputFormat: OutputFormat>(
     }
 }
 
-fn validate_server_field_argument(
+fn validate_server_field_argument<TOutputFormat: OutputFormat>(
     argument: WithLocation<UnvalidatedVariableDefinition>,
-    schema_data: &ServerFieldData,
+    schema_data: &ServerFieldData<TOutputFormat>,
     parent_type_id: ServerObjectId,
     name: WithLocation<SelectableFieldName>,
 ) -> ValidateSchemaResult<WithLocation<ValidatedVariableDefinition>> {

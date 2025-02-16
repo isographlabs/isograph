@@ -94,7 +94,7 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState, TOutputFormat: 
     >,
     // TODO consider whether this belongs here. It could just be a free variable.
     pub entrypoints: TSchemaValidationState::Entrypoint,
-    pub server_field_data: ServerFieldData,
+    pub server_field_data: ServerFieldData<TOutputFormat>,
 
     /// These are root types like Query, Mutation, Subscription
     pub fetchable_types: BTreeMap<ServerObjectId, RootOperationName>,
@@ -263,9 +263,9 @@ impl<TFieldAssociatedData, TClientFieldType> FieldType<TFieldAssociatedData, TCl
 }
 
 #[derive(Debug)]
-pub struct ServerFieldData {
-    pub server_objects: Vec<SchemaObject>,
-    pub server_scalars: Vec<SchemaScalar>,
+pub struct ServerFieldData<TOutputFormat: OutputFormat> {
+    pub server_objects: Vec<SchemaObject<TOutputFormat>>,
+    pub server_scalars: Vec<SchemaScalar<TOutputFormat>>,
     pub defined_types: HashMap<UnvalidatedTypeName, SelectableServerFieldId>,
 
     // Well known types
@@ -277,6 +277,8 @@ pub struct ServerFieldData {
     // TODO restructure UnionTypeAnnotation to not have a nullable field, but to instead
     // include null in its variants.
     pub null_type_id: ServerScalarId,
+
+    pub output_format: PhantomData<TOutputFormat>,
 }
 
 impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
@@ -377,13 +379,16 @@ impl<
     }
 }
 
-impl ServerFieldData {
+impl<TOutputFormat: OutputFormat> ServerFieldData<TOutputFormat> {
     /// Get a reference to a given scalar type by its id.
-    pub fn scalar(&self, scalar_id: ServerScalarId) -> &SchemaScalar {
+    pub fn scalar(&self, scalar_id: ServerScalarId) -> &SchemaScalar<TOutputFormat> {
         &self.server_scalars[scalar_id.as_usize()]
     }
 
-    pub fn lookup_unvalidated_type(&self, type_id: SelectableServerFieldId) -> SchemaType {
+    pub fn lookup_unvalidated_type(
+        &self,
+        type_id: SelectableServerFieldId,
+    ) -> SchemaType<TOutputFormat> {
         match type_id {
             SelectableServerFieldId::Object(id) => {
                 SchemaType::Object(self.server_objects.get(id.as_usize()).unwrap())
@@ -395,19 +400,22 @@ impl ServerFieldData {
     }
 
     /// Get a reference to a given object type by its id.
-    pub fn object(&self, object_id: ServerObjectId) -> &SchemaObject {
+    pub fn object(&self, object_id: ServerObjectId) -> &SchemaObject<TOutputFormat> {
         &self.server_objects[object_id.as_usize()]
     }
 
     /// Get a mutable reference to a given object type by its id.
-    pub fn object_mut(&mut self, object_id: ServerObjectId) -> &mut SchemaObject {
+    pub fn object_mut(&mut self, object_id: ServerObjectId) -> &mut SchemaObject<TOutputFormat> {
         &mut self.server_objects[object_id.as_usize()]
     }
 }
 
-pub type SchemaType<'a> = SelectionType<&'a SchemaObject, &'a SchemaScalar>;
+pub type SchemaType<'a, TOutputFormat> =
+    SelectionType<&'a SchemaObject<TOutputFormat>, &'a SchemaScalar<TOutputFormat>>;
 
-pub fn get_name(schema_type: SchemaType<'_>) -> UnvalidatedTypeName {
+pub fn get_name<TOutputFormat: OutputFormat>(
+    schema_type: SchemaType<'_, TOutputFormat>,
+) -> UnvalidatedTypeName {
     match schema_type {
         SelectionType::Object(object) => object.name.into(),
         SelectionType::Scalar(scalar) => scalar.name.item.into(),
@@ -472,7 +480,7 @@ impl From<GraphQLInputObjectTypeDefinition> for IsographObjectTypeDefinition {
 
 /// An object type in the schema.
 #[derive(Debug)]
-pub struct SchemaObject {
+pub struct SchemaObject<TOutputFormat: OutputFormat> {
     pub description: Option<DescriptionValue>,
     pub name: IsographObjectTypeName,
     pub id: ServerObjectId,
@@ -487,6 +495,8 @@ pub struct SchemaObject {
     >,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
+
+    pub output_format: PhantomData<TOutputFormat>,
 }
 
 #[derive(Debug, Clone)]
@@ -784,9 +794,10 @@ impl<T, VariableDefinitionInnerType: Ord + Debug, TOutputFormat: OutputFormat>
 
 /// A scalar type in the schema.
 #[derive(Debug)]
-pub struct SchemaScalar {
+pub struct SchemaScalar<TOutputFormat: OutputFormat> {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<GraphQLScalarTypeName>,
     pub id: ServerScalarId,
     pub javascript_name: JavascriptName,
+    pub output_format: PhantomData<TOutputFormat>,
 }

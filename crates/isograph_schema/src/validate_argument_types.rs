@@ -12,7 +12,8 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ServerFieldData, ValidateSchemaError, ValidateSchemaResult, ValidatedVariableDefinition,
+    OutputFormat, ServerFieldData, ValidateSchemaError, ValidateSchemaResult,
+    ValidatedVariableDefinition,
 };
 
 fn graphql_type_to_non_null_type<TValue>(
@@ -34,10 +35,10 @@ fn graphql_type_to_nullable_type<TValue>(
     }
 }
 
-fn scalar_literal_satisfies_type(
+fn scalar_literal_satisfies_type<TOutputFormat: OutputFormat>(
     scalar_literal: &ServerScalarId,
     type_: &GraphQLTypeAnnotation<SelectableServerFieldId>,
-    schema_data: &ServerFieldData,
+    schema_data: &ServerFieldData<TOutputFormat>,
     location: Location,
 ) -> Result<(), WithLocation<ValidateSchemaError>> {
     match graphql_type_to_non_null_type(type_.clone()) {
@@ -119,11 +120,11 @@ fn variable_type_satisfies_argument_type(
     }
 }
 
-pub fn value_satisfies_type(
+pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
     field_argument_definition_type: &GraphQLTypeAnnotation<SelectableServerFieldId>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-    schema_data: &ServerFieldData,
+    schema_data: &ServerFieldData<TOutputFormat>,
 ) -> ValidateSchemaResult<()> {
     match &selection_supplied_argument_value.item {
         NonConstantValue::Variable(variable_name) => {
@@ -262,9 +263,9 @@ pub fn value_satisfies_type(
     }
 }
 
-fn id_annotation_to_typename_annotation(
+fn id_annotation_to_typename_annotation<TOutputFormat: OutputFormat>(
     type_: &GraphQLTypeAnnotation<SelectableServerFieldId>,
-    schema_data: &ServerFieldData,
+    schema_data: &ServerFieldData<TOutputFormat>,
 ) -> GraphQLTypeAnnotation<UnvalidatedTypeName> {
     type_.clone().map(|type_id| match type_id {
         SelectionType::Scalar(scalar_id) => schema_data.scalar(scalar_id).name.item.into(),
@@ -272,10 +273,10 @@ fn id_annotation_to_typename_annotation(
     })
 }
 
-fn enum_satisfies_type(
+fn enum_satisfies_type<TOutputFormat: OutputFormat>(
     enum_literal_value: &EnumLiteralValue,
     enum_type: &GraphQLNamedTypeAnnotation<SelectableServerFieldId>,
-    schema_data: &ServerFieldData,
+    schema_data: &ServerFieldData<TOutputFormat>,
     location: Location,
 ) -> ValidateSchemaResult<()> {
     match enum_type.item {
@@ -300,11 +301,11 @@ fn enum_satisfies_type(
     }
 }
 
-fn list_satisfies_type(
+fn list_satisfies_type<TOutputFormat: OutputFormat>(
     list: &[WithLocation<NonConstantValue>],
     list_type: GraphQLListTypeAnnotation<SelectableServerFieldId>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-    schema_data: &ServerFieldData,
+    schema_data: &ServerFieldData<TOutputFormat>,
 ) -> ValidateSchemaResult<()> {
     list.iter().try_for_each(|element| {
         value_satisfies_type(element, &list_type.0, variable_definitions, schema_data)

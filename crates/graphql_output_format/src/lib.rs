@@ -4,7 +4,7 @@ use artifact_generation::generate_artifacts::get_artifact_path_and_content;
 use common_lang_types::ArtifactPathAndContent;
 use isograph_config::CompilerConfig;
 use isograph_schema::{
-    OutputFormat, Schema, UnvalidatedSchema, ValidatedClientField, ValidatedSchema,
+    OutputFormat, Schema, SchemaObject, UnvalidatedSchema, ValidatedClientField, ValidatedSchema,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, std::hash::Hash, Default)]
@@ -25,3 +25,5 @@ pub type GraphqlSchema<TSchemaValidationState> =
 pub type UnvalidatedGraphqlSchema = UnvalidatedSchema<GraphqlOutputFormat>;
 
 pub type ValidatedGraphqlClientField = ValidatedClientField<GraphqlOutputFormat>;
+
+pub type GraphqlSchemaObject = SchemaObject<GraphqlOutputFormat>;
