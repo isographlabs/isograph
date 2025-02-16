@@ -343,9 +343,9 @@ fn process_exposed_fields<TOutputFormat: OutputFormat>(
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
-pub struct ContainsIso(
-    pub HashMap<RelativePathToSourceFile, Vec<(IsoLiteralExtractionResult, TextSource)>>,
-);
+pub struct ContainsIso {
+    pub files: HashMap<RelativePathToSourceFile, Vec<(IsoLiteralExtractionResult, TextSource)>>,
+}
 
 impl ContainsIso {
     pub fn stats(&self) -> ContainsIsoStats {
@@ -377,13 +377,13 @@ impl Deref for ContainsIso {
     type Target = HashMap<RelativePathToSourceFile, Vec<(IsoLiteralExtractionResult, TextSource)>>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.files
     }
 }
 
 impl DerefMut for ContainsIso {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.files
     }
 }
 
