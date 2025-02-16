@@ -15,6 +15,10 @@ pub struct SourceId<T> {
     phantom: PhantomData<T>,
 }
 
+// We have to implement Clone and Copy ourselves. Otherwise,
+// Clone and Copy would only be implemented if T: Clone or T: Copy,
+// which is not correct! T only appears as part of PhantomData,
+// so a SourceId is cloneable/copiable, regardless of what T is.
 impl<T> Clone for SourceId<T> {
     fn clone(&self) -> Self {
         *self
