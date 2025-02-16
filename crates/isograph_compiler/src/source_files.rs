@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    error::Error,
     marker::PhantomData,
     ops::{Deref, DerefMut},
     path::{Path, PathBuf},
@@ -32,7 +33,7 @@ pub struct SourceFiles<TOutputFormat: OutputFormat> {
 }
 
 impl<TOutputFormat: OutputFormat> SourceFiles<TOutputFormat> {
-    pub fn read_and_parse_all_files(config: &CompilerConfig) -> Result<Self, BatchCompileError> {
+    pub fn read_and_parse_all_files(config: &CompilerConfig) -> Result<Self, Box<dyn Error>> {
         let schema = read_and_parse_graphql_schema(config)?;
 
         let mut schema_extensions = HashMap::new();

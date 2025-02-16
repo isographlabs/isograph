@@ -21,7 +21,7 @@ pub struct CompilationStats {
 pub fn compile_and_print<TOutputFormat: OutputFormat>(
     config_location: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
-) -> Result<(), BatchCompileError> {
+) -> Result<(), Box<dyn std::error::Error>> {
     info!("{}", "Starting to compile.".cyan());
     print_result(WithDuration::new(|| {
         CompilerState::<TOutputFormat>::new(config_location, current_working_directory)
@@ -30,8 +30,8 @@ pub fn compile_and_print<TOutputFormat: OutputFormat>(
 }
 
 pub fn print_result(
-    result: WithDuration<Result<CompilationStats, BatchCompileError>>,
-) -> Result<(), BatchCompileError> {
+    result: WithDuration<Result<CompilationStats, Box<dyn std::error::Error>>>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let elapsed_time = result.elapsed_time;
     match result.item {
         Ok(stats) => {
