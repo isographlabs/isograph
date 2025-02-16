@@ -15,7 +15,7 @@ use isograph_lang_types::{
 use isograph_schema::{
     get_provided_arguments, selection_map_wrapped, ClientFieldVariant, ClientType,
     FieldTraversalResult, FieldType, NameAndArguments, NormalizationKey, RequiresRefinement,
-    SchemaObject, SchemaServerFieldVariant, UserWrittenComponentVariant, ValidatedClientField,
+    SchemaObject, SchemaServerFieldVariant, UserWrittenComponentVariant,
     ValidatedIsographSelectionVariant, ValidatedSelection, ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -41,7 +41,7 @@ use crate::{
             generate_refetch_output_type_artifact, generate_refetch_reader_artifact,
         },
     },
-    ValidatedGraphqlSchema,
+    ValidatedGraphqlClientField, ValidatedGraphqlSchema,
 };
 
 lazy_static! {
@@ -455,7 +455,9 @@ fn get_serialized_field_argument(
     }
 }
 
-pub(crate) fn generate_output_type(client_field: &ValidatedClientField) -> ClientFieldOutputType {
+pub(crate) fn generate_output_type(
+    client_field: &ValidatedGraphqlClientField,
+) -> ClientFieldOutputType {
     let variant = &client_field.variant;
     match variant {
         ClientFieldVariant::Link => ClientFieldOutputType("Link".to_string()),

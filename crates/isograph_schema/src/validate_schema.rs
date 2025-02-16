@@ -44,16 +44,18 @@ pub type ValidatedScalarFieldSelection = ScalarFieldSelection<
 >;
 
 pub type ValidatedVariableDefinition = VariableDefinition<SelectableServerFieldId>;
-pub type ValidatedClientField = ClientField<
+pub type ValidatedClientField<TOutputFormat> = ClientField<
     <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+    TOutputFormat,
 >;
 
-pub type ValidatedClientPointer = ClientPointer<
+pub type ValidatedClientPointer<TOutputFormat> = ClientPointer<
     <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+    TOutputFormat,
 >;
 
 pub type ValidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
@@ -343,8 +345,8 @@ pub enum Loadability<'a> {
 /// as an immediate follow-up request. Once we do this, there will always be one
 /// source of truth for whether a field is fetched imperatively: the presence of the
 /// @loadable directive.
-pub fn categorize_field_loadability<'a>(
-    client_field: &'a ValidatedClientField,
+pub fn categorize_field_loadability<'a, TOutputFormat: OutputFormat>(
+    client_field: &'a ValidatedClientField<TOutputFormat>,
     selection_variant: &'a ValidatedIsographSelectionVariant,
 ) -> Option<Loadability<'a>> {
     match &client_field.variant {

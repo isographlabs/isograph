@@ -3,14 +3,15 @@ use isograph_config::GenerateFileExtensionsOption;
 use std::cmp::Ordering;
 
 use common_lang_types::{ArtifactPathAndContent, IsoLiteralText, SelectableFieldName};
-use isograph_schema::{
-    ClientFieldVariant, ClientType, UserWrittenComponentVariant, ValidatedClientField,
+use isograph_schema::{ClientFieldVariant, ClientType, UserWrittenComponentVariant};
+
+use crate::{
+    artifact_generation::generate_artifacts::ISO_TS_FILE_NAME, ValidatedGraphqlClientField,
+    ValidatedGraphqlSchema,
 };
 
-use crate::{artifact_generation::generate_artifacts::ISO_TS_FILE_NAME, ValidatedGraphqlSchema};
-
 fn build_iso_overload_for_entrypoint(
-    validated_client_field: &ValidatedClientField,
+    validated_client_field: &ValidatedGraphqlClientField,
     file_extensions: GenerateFileExtensionsOption,
 ) -> (String, String) {
     let formatted_field = format!(
@@ -39,7 +40,7 @@ export function iso<T>(
 }
 
 fn build_iso_overload_for_client_defined_field(
-    client_field_and_variant: (&ValidatedClientField, UserWrittenComponentVariant),
+    client_field_and_variant: (&ValidatedGraphqlClientField, UserWrittenComponentVariant),
     file_extensions: GenerateFileExtensionsOption,
 ) -> (String, String) {
     let (client_field, variant) = client_field_and_variant;
@@ -208,7 +209,7 @@ export function iso(isographLiteralText: string):
 
 fn sorted_user_written_fields(
     schema: &ValidatedGraphqlSchema,
-) -> Vec<(&ValidatedClientField, UserWrittenComponentVariant)> {
+) -> Vec<(&ValidatedGraphqlClientField, UserWrittenComponentVariant)> {
     let mut fields = user_written_fields(schema).collect::<Vec<_>>();
     fields.sort_by(|client_field_1, client_field_2| {
         match client_field_1
@@ -230,7 +231,7 @@ fn sorted_user_written_fields(
 
 fn sorted_entrypoints(
     schema: &ValidatedGraphqlSchema,
-) -> Vec<(&ValidatedClientField, &IsoLiteralText)> {
+) -> Vec<(&ValidatedGraphqlClientField, &IsoLiteralText)> {
     let mut entrypoints = schema
         .entrypoints
         .iter()
@@ -280,7 +281,7 @@ fn sort_field_name(field_1: SelectableFieldName, field_2: SelectableFieldName) -
 
 fn user_written_fields(
     schema: &ValidatedGraphqlSchema,
-) -> impl Iterator<Item = (&ValidatedClientField, UserWrittenComponentVariant)> + '_ {
+) -> impl Iterator<Item = (&ValidatedGraphqlClientField, UserWrittenComponentVariant)> + '_ {
     schema
         .client_types
         .iter()

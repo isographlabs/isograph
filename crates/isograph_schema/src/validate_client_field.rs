@@ -40,11 +40,13 @@ lazy_static! {
 }
 
 pub(crate) fn validate_and_transform_client_types<TOutputFormat: OutputFormat>(
-    client_types: Vec<ClientType<UnvalidatedClientField, UnvalidatedClientPointer>>,
+    client_types: Vec<
+        ClientType<UnvalidatedClientField<TOutputFormat>, UnvalidatedClientPointer<TOutputFormat>>,
+    >,
     schema_data: &ServerFieldData,
     server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
 ) -> Result<
-    Vec<ClientType<ValidatedClientField, ValidatedClientPointer>>,
+    Vec<ClientType<ValidatedClientField<TOutputFormat>, ValidatedClientPointer<TOutputFormat>>>,
     Vec<WithLocation<ValidateSchemaError>>,
 > {
     // TODO this smells. We probably should do this in two passes instead of doing it this
@@ -168,11 +170,11 @@ struct ValidateSchemaSharedInfo<'a, TOutputFormat: OutputFormat> {
 
 fn validate_client_field_selection_set<TOutputFormat: OutputFormat>(
     schema_data: &ServerFieldData,
-    top_level_client_field: UnvalidatedClientField,
+    top_level_client_field: UnvalidatedClientField<TOutputFormat>,
     server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
     client_type_args: &ClientTypeArgsMap,
     client_pointer_target_type_map: &ClientPointerTargetTypeMap,
-) -> Result<ValidatedClientField, Vec<WithLocation<ValidateSchemaError>>> {
+) -> Result<ValidatedClientField<TOutputFormat>, Vec<WithLocation<ValidateSchemaError>>> {
     let top_level_client_type_info = ValidateSchemaSharedInfo {
         client_type_args,
         client_type_object_type_and_field_name: top_level_client_field.type_and_field,
@@ -229,16 +231,17 @@ fn validate_client_field_selection_set<TOutputFormat: OutputFormat>(
         type_and_field: top_level_client_field.type_and_field,
         parent_object_id: top_level_client_field.parent_object_id,
         refetch_strategy,
+        output_format: std::marker::PhantomData,
     })
 }
 
 fn validate_client_pointer_selection_set<TOutputFormat: OutputFormat>(
     schema_data: &ServerFieldData,
-    top_level_client_pointer: UnvalidatedClientPointer,
+    top_level_client_pointer: UnvalidatedClientPointer<TOutputFormat>,
     server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
     client_type_args: &ClientTypeArgsMap,
     client_pointer_target_type_map: &ClientPointerTargetTypeMap,
-) -> Result<ValidatedClientPointer, Vec<WithLocation<ValidateSchemaError>>> {
+) -> Result<ValidatedClientPointer<TOutputFormat>, Vec<WithLocation<ValidateSchemaError>>> {
     let top_level_client_pointer_info = ValidateSchemaSharedInfo {
         client_type_args,
         client_type_object_type_and_field_name: top_level_client_pointer.type_and_field,
@@ -287,6 +290,7 @@ fn validate_client_pointer_selection_set<TOutputFormat: OutputFormat>(
         type_and_field: top_level_client_pointer.type_and_field,
         parent_object_id: top_level_client_pointer.parent_object_id,
         refetch_strategy,
+        output_format: std::marker::PhantomData,
     })
 }
 

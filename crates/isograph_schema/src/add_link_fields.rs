@@ -27,6 +27,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     type_name: object.name,
                 },
                 refetch_strategy: None,
+                output_format: std::marker::PhantomData,
             }));
 
             if object

@@ -286,6 +286,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                         primary_field_concrete_type,
                     ),
                 )),
+                output_format: std::marker::PhantomData,
             };
             self.client_types
                 .push(ClientType::ClientField(mutation_client_field));

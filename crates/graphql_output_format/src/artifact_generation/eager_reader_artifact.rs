@@ -5,8 +5,8 @@ use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
 use isograph_schema::{
     OutputFormat, RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment,
-    UserWrittenClientFieldInfo, UserWrittenComponentVariant, ValidatedClientField,
-    ValidatedClientType, ValidatedSchemaServerField,
+    UserWrittenClientFieldInfo, UserWrittenComponentVariant, ValidatedClientType,
+    ValidatedSchemaServerField,
 };
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
@@ -24,12 +24,12 @@ use crate::{
         },
         reader_ast::generate_reader_ast,
     },
-    ValidatedGraphqlSchema,
+    ValidatedGraphqlClientField, ValidatedGraphqlSchema,
 };
 
 pub(crate) fn generate_eager_reader_artifacts(
     schema: &ValidatedGraphqlSchema,
-    client_field: &ValidatedClientField,
+    client_field: &ValidatedGraphqlClientField,
     config: &CompilerConfig,
     info: UserWrittenClientFieldInfo,
     refetched_paths: &RefetchedPathsMap,
@@ -197,9 +197,9 @@ pub(crate) fn generate_eager_reader_condition_artifact<TOutputFormat: OutputForm
     }
 }
 
-pub(crate) fn generate_eager_reader_param_type_artifact(
+pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFormat>(
     schema: &ValidatedGraphqlSchema,
-    client_field: &ValidatedClientType,
+    client_field: &ValidatedClientType<TOutputFormat>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
     let ts_file_extension = file_extensions.ts();
@@ -294,7 +294,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
 
 pub(crate) fn generate_eager_reader_output_type_artifact(
     schema: &ValidatedGraphqlSchema,
-    client_field: &ValidatedClientField,
+    client_field: &ValidatedGraphqlClientField,
     config: &CompilerConfig,
     info: UserWrittenClientFieldInfo,
     file_extensions: GenerateFileExtensionsOption,

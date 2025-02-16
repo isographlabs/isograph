@@ -90,6 +90,7 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState, TOutputFormat: 
         TSchemaValidationState::ClientTypeSelectionScalarFieldAssociatedData,
         TSchemaValidationState::ClientTypeSelectionLinkedFieldAssociatedData,
         TSchemaValidationState::VariableDefinitionInnerType,
+        TOutputFormat,
     >,
     // TODO consider whether this belongs here. It could just be a free variable.
     pub entrypoints: TSchemaValidationState::Entrypoint,
@@ -105,17 +106,20 @@ type ClientTypes<
     TClientTypeSelectionScalarFieldAssociatedData,
     TClientTypeSelectionLinkedFieldAssociatedData,
     TClientFieldVariableDefinitionAssociatedData,
+    TOutputFormat,
 > = Vec<
     ClientType<
         ClientField<
             TClientTypeSelectionScalarFieldAssociatedData,
             TClientTypeSelectionLinkedFieldAssociatedData,
             TClientFieldVariableDefinitionAssociatedData,
+            TOutputFormat,
         >,
         ClientPointer<
             TClientTypeSelectionScalarFieldAssociatedData,
             TClientTypeSelectionLinkedFieldAssociatedData,
             TClientFieldVariableDefinitionAssociatedData,
+            TOutputFormat,
         >,
     >,
 >;
@@ -169,23 +173,27 @@ pub enum ClientType<TField, TPointer> {
     ClientPointer(TPointer),
 }
 
-pub type ValidatedClientType<'a> = ClientType<&'a ValidatedClientField, &'a ValidatedClientPointer>;
+pub type ValidatedClientType<'a, TOutputFormat> =
+    ClientType<&'a ValidatedClientField<TOutputFormat>, &'a ValidatedClientPointer<TOutputFormat>>;
 
 impl<
         TClientTypeSelectionScalarFieldAssociatedData,
         TClientTypeSelectionLinkedFieldAssociatedData,
         TClientTypeVariableDefinitionAssociatedData: Ord + Debug,
+        TOutputFormat: OutputFormat,
     >
     ClientType<
         &ClientField<
             TClientTypeSelectionScalarFieldAssociatedData,
             TClientTypeSelectionLinkedFieldAssociatedData,
             TClientTypeVariableDefinitionAssociatedData,
+            TOutputFormat,
         >,
         &ClientPointer<
             TClientTypeSelectionScalarFieldAssociatedData,
             TClientTypeSelectionLinkedFieldAssociatedData,
             TClientTypeVariableDefinitionAssociatedData,
+            TOutputFormat,
         >,
     >
 {
@@ -294,6 +302,7 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
         TSchemaValidationState::ClientTypeSelectionScalarFieldAssociatedData,
         TSchemaValidationState::ClientTypeSelectionLinkedFieldAssociatedData,
         TSchemaValidationState::VariableDefinitionInnerType,
+        TOutputFormat,
     > {
         match &self.client_types[client_field_id.as_usize()] {
             ClientType::ClientField(client_field) => client_field,
@@ -312,6 +321,7 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
         TSchemaValidationState::ClientTypeSelectionScalarFieldAssociatedData,
         TSchemaValidationState::ClientTypeSelectionLinkedFieldAssociatedData,
         TSchemaValidationState::VariableDefinitionInnerType,
+        TOutputFormat,
     > {
         match &self.client_types[client_pointer_id.as_usize()] {
             ClientType::ClientPointer(client_pointer) => client_pointer,
@@ -598,6 +608,7 @@ pub struct ClientPointer<
     TClientTypeSelectionScalarFieldAssociatedData,
     TClientTypeSelectionLinkedFieldAssociatedData,
     TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
+    TOutputFormat: OutputFormat,
 > {
     pub description: Option<DescriptionValue>,
     pub name: ClientPointerFieldName,
@@ -625,6 +636,8 @@ pub struct ClientPointer<
     pub type_and_field: ObjectTypeAndFieldName,
 
     pub parent_object_id: ServerObjectId,
+
+    pub output_format: PhantomData<TOutputFormat>,
 }
 
 #[derive(Debug)]
@@ -632,6 +645,7 @@ pub struct ClientField<
     TClientTypeSelectionScalarFieldAssociatedData,
     TClientTypeSelectionLinkedFieldAssociatedData,
     TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
+    TOutputFormat: OutputFormat,
 > {
     pub description: Option<DescriptionValue>,
     // TODO make this a ClientFieldName that can be converted into a SelectableFieldName
@@ -669,17 +683,20 @@ pub struct ClientField<
     pub type_and_field: ObjectTypeAndFieldName,
 
     pub parent_object_id: ServerObjectId,
+    pub output_format: PhantomData<TOutputFormat>,
 }
 
 impl<
         TClientTypeSelectionScalarFieldAssociatedData,
         TClientTypeSelectionLinkedFieldAssociatedData,
         TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
+        TOutputFormat: OutputFormat,
     >
     ClientField<
         TClientTypeSelectionScalarFieldAssociatedData,
         TClientTypeSelectionLinkedFieldAssociatedData,
         TClientFieldVariableDefinitionAssociatedData,
+        TOutputFormat,
     >
 {
     pub fn selection_set_for_parent_query(

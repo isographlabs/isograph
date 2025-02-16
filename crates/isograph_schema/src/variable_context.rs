@@ -91,11 +91,13 @@ impl<
         TClientTypeSelectionScalarFieldAssociatedData,
         TClientTypeSelectionLinkedFieldAssociatedData,
         TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
+        TOutputFormat: OutputFormat,
     >
     ClientField<
         TClientTypeSelectionScalarFieldAssociatedData,
         TClientTypeSelectionLinkedFieldAssociatedData,
         TClientFieldVariableDefinitionAssociatedData,
+        TOutputFormat,
     >
 {
     pub fn initial_variable_context(&self) -> VariableContext {

@@ -75,16 +75,18 @@ pub type UnvalidatedVariableDefinition = VariableDefinition<
     <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
 >;
 
-pub type UnvalidatedClientField = ClientField<
+pub type UnvalidatedClientField<TOutputFormat> = ClientField<
     <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+    TOutputFormat,
 >;
 
-pub type UnvalidatedClientPointer = ClientPointer<
+pub type UnvalidatedClientPointer<TOutputFormat> = ClientPointer<
     <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+    TOutputFormat,
 >;
 
 pub type UnvalidatedLinkedFieldSelection = LinkedFieldSelection<

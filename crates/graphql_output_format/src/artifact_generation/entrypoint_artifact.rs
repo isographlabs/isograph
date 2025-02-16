@@ -12,8 +12,7 @@ use isograph_schema::{
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
     get_reachable_variables, ClientType, FieldToCompletedMergeTraversalStateMap,
     FieldTraversalResult, FieldType, MergedSelectionMap, RootOperationName, RootRefetchedPath,
-    ScalarClientFieldTraversalState, SchemaObject, ValidatedClientField,
-    ValidatedVariableDefinition,
+    ScalarClientFieldTraversalState, SchemaObject, ValidatedVariableDefinition,
 };
 
 use crate::{
@@ -26,7 +25,7 @@ use crate::{
         normalization_ast_text::generate_normalization_ast_text,
         query_text::generate_query_text,
     },
-    ValidatedGraphqlSchema,
+    ValidatedGraphqlClientField, ValidatedGraphqlSchema,
 };
 
 #[derive(Debug)]
@@ -78,7 +77,7 @@ pub(crate) fn generate_entrypoint_artifacts(
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'a>(
     schema: &ValidatedGraphqlSchema,
-    entrypoint: &ValidatedClientField,
+    entrypoint: &ValidatedGraphqlClientField,
     merged_selection_map: &MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,
     encountered_client_type_map: &FieldToCompletedMergeTraversalStateMap,

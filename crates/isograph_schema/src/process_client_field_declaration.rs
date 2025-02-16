@@ -197,6 +197,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     None,
                 ))
             }),
+            output_format: std::marker::PhantomData,
         }));
         Ok(())
     }
@@ -270,6 +271,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     }
                 }?,
                 to: to_object_id,
+                output_format: std::marker::PhantomData,
             }));
 
         let parent_object = self.server_field_data.object_mut(parent_object_id);

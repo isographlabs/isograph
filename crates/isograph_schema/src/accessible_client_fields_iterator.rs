@@ -6,12 +6,14 @@ use crate::{
     ValidatedSchema, ValidatedSelection,
 };
 
-impl ClientType<&ValidatedClientField, &ValidatedClientPointer> {
+impl<TOutputFormat: OutputFormat>
+    ClientType<&ValidatedClientField<TOutputFormat>, &ValidatedClientPointer<TOutputFormat>>
+{
     // This should really be replaced with a proper visitor, or something
-    pub fn accessible_client_fields<'a, TOutputFormat: OutputFormat>(
+    pub fn accessible_client_fields<'a>(
         &'a self,
         schema: &'a ValidatedSchema<TOutputFormat>,
-    ) -> impl Iterator<Item = &'a ValidatedClientField> + 'a {
+    ) -> impl Iterator<Item = &'a ValidatedClientField<TOutputFormat>> + 'a {
         AccessibleClientFieldIterator {
             selection_set: self.selection_set_for_parent_query(),
             index: 0,
@@ -30,7 +32,7 @@ struct AccessibleClientFieldIterator<'a, TOutputFormat: OutputFormat> {
 impl<'a, TOutputFormat: OutputFormat> Iterator
     for AccessibleClientFieldIterator<'a, TOutputFormat>
 {
-    type Item = &'a ValidatedClientField;
+    type Item = &'a ValidatedClientField<TOutputFormat>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(iterator) = &mut self.sub_iterator {

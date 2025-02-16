@@ -449,7 +449,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
 
 pub fn get_imperatively_loaded_artifact_info<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
-    entrypoint: &ValidatedClientField,
+    entrypoint: &ValidatedClientField<TOutputFormat>,
     root_refetch_path: RootRefetchedPath,
     nested_selection_map: &MergedSelectionMap,
     reachable_variables: &BTreeSet<VariableName>,
@@ -493,10 +493,10 @@ fn process_imperatively_loaded_field<TOutputFormat: OutputFormat>(
     variant: ImperativelyLoadedFieldVariant,
     refetch_field_parent_id: ServerObjectId,
     selection_map: &MergedSelectionMap,
-    entrypoint: &ValidatedClientField,
+    entrypoint: &ValidatedClientField<TOutputFormat>,
     index: usize,
     reachable_variables: &BTreeSet<VariableName>,
-    client_field: &ValidatedClientField,
+    client_field: &ValidatedClientField<TOutputFormat>,
 ) -> ImperativelyLoadedFieldArtifactInfo {
     let ImperativelyLoadedFieldVariant {
         client_field_scalar_selection_name,
@@ -605,9 +605,9 @@ fn process_imperatively_loaded_field<TOutputFormat: OutputFormat>(
     }
 }
 
-fn get_used_variable_definitions(
+fn get_used_variable_definitions<TOutputFormat: OutputFormat>(
     reachable_variables: &BTreeSet<VariableName>,
-    entrypoint: &ValidatedClientField,
+    entrypoint: &ValidatedClientField<TOutputFormat>,
 ) -> Vec<WithSpan<VariableDefinition<SelectableServerFieldId>>> {
     reachable_variables
         .iter()
@@ -929,7 +929,7 @@ fn insert_imperative_field_into_refetch_paths<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    newly_encountered_scalar_client_field: &ValidatedClientField,
+    newly_encountered_scalar_client_field: &ValidatedClientField<TOutputFormat>,
     parent_type: &SchemaObject,
     variant: &ImperativelyLoadedFieldVariant,
 ) {
@@ -992,7 +992,7 @@ fn merge_non_loadable_scalar_client_field<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
     parent_map: &mut MergedSelectionMap,
     parent_merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    newly_encountered_scalar_client_field: &ValidatedClientField,
+    newly_encountered_scalar_client_field: &ValidatedClientField<TOutputFormat>,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     parent_variable_context: &VariableContext,
     selection_arguments: &[WithLocation<SelectionFieldArgument>],

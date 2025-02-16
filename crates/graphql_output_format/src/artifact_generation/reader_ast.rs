@@ -7,9 +7,9 @@ use isograph_lang_types::{
 use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, ClientFieldVariant,
     FieldType, Loadability, NameAndArguments, NormalizationKey, PathToRefetchField,
-    RefetchedPathsMap, SchemaServerFieldVariant, ValidatedClientField,
-    ValidatedIsographSelectionVariant, ValidatedLinkedFieldSelection,
-    ValidatedScalarFieldSelection, ValidatedSelection, VariableContext,
+    RefetchedPathsMap, SchemaServerFieldVariant, ValidatedIsographSelectionVariant,
+    ValidatedLinkedFieldSelection, ValidatedScalarFieldSelection, ValidatedSelection,
+    VariableContext,
 };
 
 use crate::{
@@ -17,7 +17,7 @@ use crate::{
         generate_artifacts::{get_serialized_field_arguments, ReaderAst},
         import_statements::{ImportedFileCategory, ReaderImports},
     },
-    ValidatedGraphqlSchema,
+    ValidatedGraphqlClientField, ValidatedGraphqlSchema,
 };
 
 // Can we do this when visiting the client field in when generating entrypoints?
@@ -171,7 +171,7 @@ fn linked_field_ast_node(
 fn scalar_client_defined_field_ast_node(
     scalar_field_selection: &ValidatedScalarFieldSelection,
     schema: &ValidatedGraphqlSchema,
-    client_field: &ValidatedClientField,
+    client_field: &ValidatedGraphqlClientField,
     indentation_level: u8,
     path: &mut Vec<NormalizationKey>,
     root_refetched_paths: &RefetchedPathsMap,
@@ -248,7 +248,7 @@ fn link_variant_ast_node(
 fn user_written_variant_ast_node(
     scalar_field_selection: &ValidatedScalarFieldSelection,
     indentation_level: u8,
-    nested_client_field: &ValidatedClientField,
+    nested_client_field: &ValidatedGraphqlClientField,
     schema: &ValidatedGraphqlSchema,
     path: &mut Vec<NormalizationKey>,
     root_refetched_paths: &RefetchedPathsMap,
@@ -311,7 +311,7 @@ fn user_written_variant_ast_node(
 
 #[allow(clippy::too_many_arguments)]
 fn imperatively_loaded_variant_ast_node(
-    nested_client_field: &ValidatedClientField,
+    nested_client_field: &ValidatedGraphqlClientField,
     reader_imports: &mut ReaderImports,
     root_refetched_paths: &RefetchedPathsMap,
     path: &[NormalizationKey],
@@ -357,7 +357,7 @@ fn imperatively_loaded_variant_ast_node(
 
 fn loadably_selected_field_ast_node(
     schema: &ValidatedGraphqlSchema,
-    client_field: &ValidatedClientField,
+    client_field: &ValidatedGraphqlClientField,
     reader_imports: &mut ReaderImports,
     indentation_level: u8,
     scalar_field_selection: &ValidatedScalarFieldSelection,
@@ -575,7 +575,7 @@ pub(crate) fn generate_reader_ast<'schema>(
 }
 
 fn refetched_paths_for_client_field(
-    nested_client_field: &ValidatedClientField,
+    nested_client_field: &ValidatedGraphqlClientField,
     schema: &ValidatedGraphqlSchema,
     path: &mut Vec<NormalizationKey>,
     client_field_variable_context: &VariableContext,
