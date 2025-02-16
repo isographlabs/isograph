@@ -760,7 +760,6 @@ dependencies = [
  "colored",
  "common_lang_types",
  "graphql_lang_types",
- "graphql_output_format",
  "graphql_schema_parser",
  "intern",
  "isograph_config",
