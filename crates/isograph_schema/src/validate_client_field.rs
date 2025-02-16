@@ -443,6 +443,7 @@ fn validate_field_type_exists_and_is_scalar(
                     scalar_field_selection.name.location,
                     used_variables,
                     variable_definitions,
+                    top_level_client_type_info,
                 )?;
 
                 match &server_field.associated_data {
@@ -577,6 +578,7 @@ fn validate_client_field(
         scalar_field_selection.name.location,
         used_variables,
         variable_definitions,
+        top_level_client_type_info,
     )?;
 
     Ok(ScalarFieldSelection {
@@ -667,6 +669,7 @@ fn validate_field_type_exists_and_is_linked(
                             linked_field_selection.name.location,
                             used_variables,
                             variable_definitions,
+                            top_level_client_type_info,
                         )?;
 
                         Ok(LinkedFieldSelection {
@@ -753,6 +756,7 @@ fn validate_field_type_exists_and_is_linked(
                         linked_field_selection.name.location,
                         used_variables,
                         variable_definitions,
+                        top_level_client_type_info,
                     )?;
 
                     Ok(LinkedFieldSelection {
@@ -860,6 +864,7 @@ fn assert_no_missing_arguments(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn get_missing_arguments_and_validate_argument_types<'a>(
     schema_data: &ServerFieldData,
     field_argument_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
@@ -868,6 +873,7 @@ fn get_missing_arguments_and_validate_argument_types<'a>(
     location: Location,
     used_variables: &mut UsedVariables,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
+    top_level_client_type_info: &ValidateSchemaSharedInfo<'_>,
 ) -> ValidateSchemaResult<Vec<ValidatedVariableDefinition>> {
     let reachable_variables = validate_no_undefined_variables_and_get_reachable_variables(
         selection_supplied_arguments,
@@ -897,6 +903,7 @@ fn get_missing_arguments_and_validate_argument_types<'a>(
                 &field_argument_definition.type_,
                 variable_definitions,
                 schema_data,
+                top_level_client_type_info.server_fields,
             ) {
                 Ok(_) => None,
                 Err(e) => Some(Err(e)),
