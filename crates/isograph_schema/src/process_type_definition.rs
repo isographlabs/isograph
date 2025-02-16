@@ -45,7 +45,7 @@ pub struct TypeRefinementMaps {
     pub supertype_to_subtype_map: ValidatedTypeRefinementMap,
 }
 
-pub struct ProcessGraphQLDocumentOutcome {
+pub struct ProcessTypeSystemDocumentOutcome {
     pub type_refinement_maps: TypeRefinementMaps,
     pub root_types: EncounteredRootTypes,
 }
@@ -60,7 +60,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         &mut self,
         type_system_document: GraphQLTypeSystemDocument,
         options: &CompilerConfigOptions,
-    ) -> ProcessTypeDefinitionResult<ProcessGraphQLDocumentOutcome> {
+    ) -> ProcessTypeDefinitionResult<ProcessTypeSystemDocumentOutcome> {
         // In the schema, interfaces, unions and objects are the same type of object (SchemaType),
         // with e.g. interfaces "simply" being objects that can be refined to other
         // concrete objects.
@@ -203,7 +203,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         }
         // TODO add support for subscriptions
 
-        Ok(ProcessGraphQLDocumentOutcome {
+        Ok(ProcessTypeSystemDocumentOutcome {
             root_types,
             type_refinement_maps: type_refinement_map,
         })
@@ -283,7 +283,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         &mut self,
         extension_document: GraphQLTypeSystemExtensionDocument,
         options: &CompilerConfigOptions,
-    ) -> ProcessTypeDefinitionResult<ProcessGraphQLDocumentOutcome> {
+    ) -> ProcessTypeDefinitionResult<ProcessTypeSystemDocumentOutcome> {
         let mut definitions = Vec::with_capacity(extension_document.0.len());
         let mut extensions = Vec::with_capacity(extension_document.0.len());
 
