@@ -151,7 +151,7 @@ pub fn parse_iso_literals_in_file_content(
 
 pub(crate) fn process_iso_literals<TOutputFormat: OutputFormat>(
     schema: &mut UnvalidatedSchema<TOutputFormat>,
-    contains_iso: ContainsIso,
+    contains_iso: ContainsIso<TOutputFormat>,
 ) -> Result<(), BatchCompileError> {
     let mut errors = vec![];
     for iso_literals in contains_iso.files.into_values() {
