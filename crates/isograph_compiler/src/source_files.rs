@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    marker::PhantomData,
     ops::{Deref, DerefMut},
     path::{Path, PathBuf},
 };
@@ -23,13 +24,14 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
-pub struct SourceFiles {
+pub struct SourceFiles<TOutputFormat: OutputFormat> {
     pub schema: GraphQLTypeSystemDocument,
     pub schema_extensions: HashMap<RelativePathToSourceFile, GraphQLTypeSystemExtensionDocument>,
     pub contains_iso: ContainsIso,
+    pub output_format: PhantomData<TOutputFormat>,
 }
 
-impl SourceFiles {
+impl<TOutputFormat: OutputFormat> SourceFiles<TOutputFormat> {
     pub fn read_and_parse_all_files(config: &CompilerConfig) -> Result<Self, BatchCompileError> {
         let schema = read_and_parse_graphql_schema(config)?;
 
@@ -52,10 +54,11 @@ impl SourceFiles {
             schema,
             schema_extensions,
             contains_iso,
+            output_format: PhantomData,
         })
     }
 
-    pub fn create_unvalidated_schema<TOutputFormat: OutputFormat>(
+    pub fn create_unvalidated_schema(
         self,
         schema: &mut UnvalidatedSchema<TOutputFormat>,
         config: &CompilerConfig,

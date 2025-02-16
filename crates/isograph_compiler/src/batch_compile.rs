@@ -24,8 +24,8 @@ pub fn compile_and_print<TOutputFormat: OutputFormat>(
 ) -> Result<(), BatchCompileError> {
     info!("{}", "Starting to compile.".cyan());
     print_result(WithDuration::new(|| {
-        CompilerState::new(config_location, current_working_directory)
-            .batch_compile::<TOutputFormat>()
+        CompilerState::<TOutputFormat>::new(config_location, current_working_directory)
+            .batch_compile()
     }))
 }
 
