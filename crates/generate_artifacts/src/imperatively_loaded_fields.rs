@@ -1,17 +1,16 @@
 use common_lang_types::{
-    ArtifactPathAndContent, IsographObjectTypeName, ObjectTypeAndFieldName, SelectableFieldName,
+    ArtifactPathAndContent, IsographObjectTypeName, ObjectTypeAndFieldName, QueryText,
+    SelectableFieldName,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::RefetchQueryIndex;
-use isograph_schema::{ImperativelyLoadedFieldArtifactInfo, REFETCH_FIELD_NAME};
+use isograph_schema::{
+    ImperativelyLoadedFieldArtifactInfo, OutputFormat, ValidatedSchema, REFETCH_FIELD_NAME,
+};
 
 use crate::{
-    artifact_generation::{
-        generate_artifacts::{NormalizationAstText, QueryText},
-        normalization_ast_text::generate_normalization_ast_text,
-        query_text::generate_query_text,
-    },
-    ValidatedGraphqlSchema,
+    generate_artifacts::NormalizationAstText,
+    normalization_ast_text::generate_normalization_ast_text,
 };
 
 #[derive(Debug)]
@@ -91,8 +90,8 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
     }
 }
 
-pub(crate) fn get_artifact_for_imperatively_loaded_field(
-    schema: &ValidatedGraphqlSchema,
+pub(crate) fn get_artifact_for_imperatively_loaded_field<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     imperatively_loaded_field_artifact_info: ImperativelyLoadedFieldArtifactInfo,
 ) -> ArtifactPathAndContent {
     let ImperativelyLoadedFieldArtifactInfo {
@@ -106,7 +105,7 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field(
         concrete_type,
     } = imperatively_loaded_field_artifact_info;
 
-    let query_text = generate_query_text(
+    let query_text = TOutputFormat::generate_query_text(
         query_name,
         schema,
         &merged_selection_set,

@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use common_lang_types::CurrentWorkingDirectory;
+use generate_artifacts::get_artifact_path_and_content;
 use isograph_config::{create_config, CompilerConfig};
 use isograph_schema::{OutputFormat, Schema, UnvalidatedSchema};
 
@@ -155,7 +156,7 @@ pub fn validate_and_create_artifacts_from_source_files<TOutputFormat: OutputForm
     // disk can be as fast as possible and we minimize the chance that changes to the file
     // system occur while we're writing and we get unpredictable results.
 
-    let artifacts = TOutputFormat::generate_artifact_path_and_content(&validated_schema, config);
+    let artifacts = get_artifact_path_and_content(&validated_schema, config);
 
     let total_artifacts_written =
         write_artifacts_to_disk(artifacts, &config.artifact_directory.absolute_path)?;

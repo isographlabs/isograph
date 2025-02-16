@@ -5,12 +5,10 @@ use isograph_lang_types::{
     ClientFieldId, ClientPointerId, SelectableServerFieldId, SelectionType, ServerFieldId,
     TypeAnnotation, UnionVariant,
 };
-use isograph_schema::{ClientType, FieldType};
+use isograph_schema::{ClientType, FieldType, OutputFormat, ValidatedSchema};
 
-use crate::ValidatedGraphqlSchema;
-
-pub(crate) fn format_parameter_type(
-    schema: &ValidatedGraphqlSchema,
+pub(crate) fn format_parameter_type<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     type_: GraphQLTypeAnnotation<SelectableServerFieldId>,
     indentation_level: u8,
 ) -> String {
@@ -41,8 +39,8 @@ pub(crate) fn format_parameter_type(
     }
 }
 
-fn format_server_field_type(
-    schema: &ValidatedGraphqlSchema,
+fn format_server_field_type<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     field: SelectableServerFieldId,
     indentation_level: u8,
 ) -> String {
@@ -74,8 +72,8 @@ fn format_server_field_type(
     }
 }
 
-fn format_field_definition(
-    schema: &ValidatedGraphqlSchema,
+fn format_field_definition<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     name: &SelectableFieldName,
     type_: &FieldType<ServerFieldId, ClientType<ClientFieldId, ClientPointerId>>,
     indentation_level: u8,
@@ -114,8 +112,8 @@ fn format_field_definition(
     }
 }
 
-fn format_type_annotation(
-    schema: &ValidatedGraphqlSchema,
+fn format_type_annotation<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     type_annotation: &TypeAnnotation<SelectableServerFieldId>,
     indentation_level: u8,
 ) -> String {

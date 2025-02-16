@@ -492,6 +492,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "generate_artifacts"
+version = "0.3.0"
+dependencies = [
+ "common_lang_types",
+ "graphql_lang_types",
+ "intern",
+ "isograph_config",
+ "isograph_lang_types",
+ "isograph_schema",
+ "lazy_static",
+ "pathdiff",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -759,6 +773,7 @@ version = "0.3.0"
 dependencies = [
  "colored",
  "common_lang_types",
+ "generate_artifacts",
  "graphql_lang_types",
  "graphql_schema_parser",
  "intern",

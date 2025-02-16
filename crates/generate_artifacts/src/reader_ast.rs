@@ -6,24 +6,21 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, ClientFieldVariant,
-    FieldType, Loadability, NameAndArguments, NormalizationKey, PathToRefetchField,
-    RefetchedPathsMap, SchemaServerFieldVariant, ValidatedIsographSelectionVariant,
-    ValidatedLinkedFieldSelection, ValidatedScalarFieldSelection, ValidatedSelection,
-    VariableContext,
+    FieldType, Loadability, NameAndArguments, NormalizationKey, OutputFormat, PathToRefetchField,
+    RefetchedPathsMap, SchemaServerFieldVariant, ValidatedClientField,
+    ValidatedIsographSelectionVariant, ValidatedLinkedFieldSelection,
+    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSelection, VariableContext,
 };
 
 use crate::{
-    artifact_generation::{
-        generate_artifacts::{get_serialized_field_arguments, ReaderAst},
-        import_statements::{ImportedFileCategory, ReaderImports},
-    },
-    ValidatedGraphqlClientField, ValidatedGraphqlSchema,
+    generate_artifacts::{get_serialized_field_arguments, ReaderAst},
+    import_statements::{ImportedFileCategory, ReaderImports},
 };
 
 // Can we do this when visiting the client field in when generating entrypoints?
-fn generate_reader_ast_node(
+fn generate_reader_ast_node<TOutputFormat: OutputFormat>(
     selection: &WithSpan<ValidatedSelection>,
-    schema: &ValidatedGraphqlSchema,
+    schema: &ValidatedSchema<TOutputFormat>,
     indentation_level: u8,
     reader_imports: &mut ReaderImports,
     // TODO use this to generate usedRefetchQueries
@@ -97,8 +94,8 @@ fn generate_reader_ast_node(
     }
 }
 
-fn linked_field_ast_node(
-    schema: &ValidatedGraphqlSchema,
+fn linked_field_ast_node<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     linked_field: &ValidatedLinkedFieldSelection,
     indentation_level: u8,
     inner_reader_ast: ReaderAst,
@@ -168,10 +165,10 @@ fn linked_field_ast_node(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn scalar_client_defined_field_ast_node(
+fn scalar_client_defined_field_ast_node<TOutputFormat: OutputFormat>(
     scalar_field_selection: &ValidatedScalarFieldSelection,
-    schema: &ValidatedGraphqlSchema,
-    client_field: &ValidatedGraphqlClientField,
+    schema: &ValidatedSchema<TOutputFormat>,
+    client_field: &ValidatedClientField<TOutputFormat>,
     indentation_level: u8,
     path: &mut Vec<NormalizationKey>,
     root_refetched_paths: &RefetchedPathsMap,
@@ -245,11 +242,11 @@ fn link_variant_ast_node(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn user_written_variant_ast_node(
+fn user_written_variant_ast_node<TOutputFormat: OutputFormat>(
     scalar_field_selection: &ValidatedScalarFieldSelection,
     indentation_level: u8,
-    nested_client_field: &ValidatedGraphqlClientField,
-    schema: &ValidatedGraphqlSchema,
+    nested_client_field: &ValidatedClientField<TOutputFormat>,
+    schema: &ValidatedSchema<TOutputFormat>,
     path: &mut Vec<NormalizationKey>,
     root_refetched_paths: &RefetchedPathsMap,
     reader_imports: &mut ReaderImports,
@@ -310,8 +307,8 @@ fn user_written_variant_ast_node(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn imperatively_loaded_variant_ast_node(
-    nested_client_field: &ValidatedGraphqlClientField,
+fn imperatively_loaded_variant_ast_node<TOutputFormat: OutputFormat>(
+    nested_client_field: &ValidatedClientField<TOutputFormat>,
     reader_imports: &mut ReaderImports,
     root_refetched_paths: &RefetchedPathsMap,
     path: &[NormalizationKey],
@@ -355,9 +352,9 @@ fn imperatively_loaded_variant_ast_node(
     )
 }
 
-fn loadably_selected_field_ast_node(
-    schema: &ValidatedGraphqlSchema,
-    client_field: &ValidatedGraphqlClientField,
+fn loadably_selected_field_ast_node<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
+    client_field: &ValidatedClientField<TOutputFormat>,
     reader_imports: &mut ReaderImports,
     indentation_level: u8,
     scalar_field_selection: &ValidatedScalarFieldSelection,
@@ -471,8 +468,8 @@ fn server_defined_scalar_field_ast_node(
     )
 }
 
-fn generate_reader_ast_with_path<'schema>(
-    schema: &'schema ValidatedGraphqlSchema,
+fn generate_reader_ast_with_path<'schema, TOutputFormat: OutputFormat>(
+    schema: &'schema ValidatedSchema<TOutputFormat>,
     selection_set: &'schema Vec<WithSpan<ValidatedSelection>>,
     indentation_level: u8,
     nested_client_field_imports: &mut ReaderImports,
@@ -550,8 +547,8 @@ fn find_imperatively_fetchable_query_index(
         .expect("Expected refetch query to be found")
 }
 
-pub(crate) fn generate_reader_ast<'schema>(
-    schema: &'schema ValidatedGraphqlSchema,
+pub(crate) fn generate_reader_ast<'schema, TOutputFormat: OutputFormat>(
+    schema: &'schema ValidatedSchema<TOutputFormat>,
     selection_set: &'schema Vec<WithSpan<ValidatedSelection>>,
     indentation_level: u8,
     // N.B. this is not root_refetched_paths when we're generating an entrypoint :(
@@ -574,9 +571,9 @@ pub(crate) fn generate_reader_ast<'schema>(
     (reader_ast, client_field_imports)
 }
 
-fn refetched_paths_for_client_field(
-    nested_client_field: &ValidatedGraphqlClientField,
-    schema: &ValidatedGraphqlSchema,
+fn refetched_paths_for_client_field<TOutputFormat: OutputFormat>(
+    nested_client_field: &ValidatedClientField<TOutputFormat>,
+    schema: &ValidatedSchema<TOutputFormat>,
     path: &mut Vec<NormalizationKey>,
     client_field_variable_context: &VariableContext,
 ) -> Vec<PathToRefetchField> {
@@ -596,9 +593,9 @@ fn refetched_paths_for_client_field(
     paths
 }
 
-fn refetched_paths_with_path(
+fn refetched_paths_with_path<TOutputFormat: OutputFormat>(
     selection_set: &[WithSpan<ValidatedSelection>],
-    schema: &ValidatedGraphqlSchema,
+    schema: &ValidatedSchema<TOutputFormat>,
     path: &mut Vec<NormalizationKey>,
     initial_variable_context: &VariableContext,
 ) -> HashSet<PathToRefetchField> {

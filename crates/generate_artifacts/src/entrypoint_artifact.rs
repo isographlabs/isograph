@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use common_lang_types::{
     ArtifactPathAndContent, IsographObjectTypeName, ObjectTypeAndFieldName, QueryOperationName,
-    VariableName,
+    QueryText, VariableName,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_config::GenerateFileExtensionsOption;
@@ -12,20 +12,17 @@ use isograph_schema::{
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
     get_reachable_variables, ClientType, FieldToCompletedMergeTraversalStateMap,
     FieldTraversalResult, FieldType, MergedSelectionMap, OutputFormat, RootOperationName,
-    RootRefetchedPath, ScalarClientFieldTraversalState, SchemaObject, ValidatedVariableDefinition,
+    RootRefetchedPath, ScalarClientFieldTraversalState, SchemaObject, ValidatedClientField,
+    ValidatedSchema, ValidatedVariableDefinition,
 };
 
 use crate::{
-    artifact_generation::{
-        generate_artifacts::{
-            NormalizationAstText, QueryText, RefetchQueryArtifactImport, ENTRYPOINT_FILE_NAME,
-            RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
-        },
-        imperatively_loaded_fields::get_artifact_for_imperatively_loaded_field,
-        normalization_ast_text::generate_normalization_ast_text,
-        query_text::generate_query_text,
+    generate_artifacts::{
+        NormalizationAstText, RefetchQueryArtifactImport, ENTRYPOINT_FILE_NAME,
+        RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
     },
-    ValidatedGraphqlClientField, ValidatedGraphqlSchema,
+    imperatively_loaded_fields::get_artifact_for_imperatively_loaded_field,
+    normalization_ast_text::generate_normalization_ast_text,
 };
 
 #[derive(Debug)]
@@ -38,8 +35,8 @@ struct EntrypointArtifactInfo<'schema, TOutputFormat: OutputFormat> {
     concrete_type: IsographObjectTypeName,
 }
 
-pub(crate) fn generate_entrypoint_artifacts(
-    schema: &ValidatedGraphqlSchema,
+pub(crate) fn generate_entrypoint_artifacts<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     entrypoint_id: ClientFieldId,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     file_extensions: GenerateFileExtensionsOption,
@@ -75,9 +72,12 @@ pub(crate) fn generate_entrypoint_artifacts(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'a>(
-    schema: &ValidatedGraphqlSchema,
-    entrypoint: &ValidatedGraphqlClientField,
+pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
+    'a,
+    TOutputFormat: OutputFormat,
+>(
+    schema: &ValidatedSchema<TOutputFormat>,
+    entrypoint: &ValidatedClientField<TOutputFormat>,
     merged_selection_map: &MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,
     encountered_client_type_map: &FieldToCompletedMergeTraversalStateMap,
@@ -107,7 +107,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<'
         });
 
     let parent_object = schema.server_field_data.object(entrypoint.parent_object_id);
-    let query_text = generate_query_text(
+    let query_text = TOutputFormat::generate_query_text(
         query_name,
         schema,
         merged_selection_map,

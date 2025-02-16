@@ -1,6 +1,6 @@
 use common_lang_types::{
-    ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent, DescriptionValue, Location, Span,
-    WithLocation, WithSpan,
+    derive_display, ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent, DescriptionValue,
+    Location, Span, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
@@ -14,34 +14,32 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     get_provided_arguments, selection_map_wrapped, ClientFieldVariant, ClientType,
-    FieldTraversalResult, FieldType, NameAndArguments, NormalizationKey, RequiresRefinement,
-    SchemaServerFieldVariant, UserWrittenComponentVariant, ValidatedIsographSelectionVariant,
-    ValidatedSelection, ValidatedVariableDefinition,
+    FieldTraversalResult, FieldType, NameAndArguments, NormalizationKey, OutputFormat,
+    RequiresRefinement, SchemaObject, SchemaServerFieldVariant, UserWrittenComponentVariant,
+    ValidatedClientField, ValidatedIsographSelectionVariant, ValidatedSchema, ValidatedSelection,
+    ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 use std::{
     collections::{BTreeMap, HashSet},
-    fmt::{self, Debug, Display},
+    fmt::{Debug, Display},
 };
 
 use crate::{
-    artifact_generation::{
-        eager_reader_artifact::{
-            generate_eager_reader_artifacts, generate_eager_reader_condition_artifact,
-            generate_eager_reader_output_type_artifact, generate_eager_reader_param_type_artifact,
-        },
-        entrypoint_artifact::{
-            generate_entrypoint_artifacts,
-            generate_entrypoint_artifacts_with_client_field_traversal_result,
-        },
-        format_parameter_type::format_parameter_type,
-        import_statements::{LinkImports, ParamTypeImports, UpdatableImports},
-        iso_overload_file::build_iso_overload_artifact,
-        refetch_reader_artifact::{
-            generate_refetch_output_type_artifact, generate_refetch_reader_artifact,
-        },
+    eager_reader_artifact::{
+        generate_eager_reader_artifacts, generate_eager_reader_condition_artifact,
+        generate_eager_reader_output_type_artifact, generate_eager_reader_param_type_artifact,
     },
-    GraphqlSchemaObject, ValidatedGraphqlClientField, ValidatedGraphqlSchema,
+    entrypoint_artifact::{
+        generate_entrypoint_artifacts,
+        generate_entrypoint_artifacts_with_client_field_traversal_result,
+    },
+    format_parameter_type::format_parameter_type,
+    import_statements::{LinkImports, ParamTypeImports, UpdatableImports},
+    iso_overload_file::build_iso_overload_artifact,
+    refetch_reader_artifact::{
+        generate_refetch_output_type_artifact, generate_refetch_reader_artifact,
+    },
 };
 
 lazy_static! {
@@ -88,8 +86,8 @@ lazy_static! {
 /// output_type artifact.
 ///
 /// TODO this should go through OutputFormat
-pub fn get_artifact_path_and_content(
-    schema: &ValidatedGraphqlSchema,
+pub fn get_artifact_path_and_content<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     config: &CompilerConfig,
 ) -> Vec<ArtifactPathAndContent> {
     let mut encountered_client_type_map = BTreeMap::new();
@@ -455,8 +453,8 @@ fn get_serialized_field_argument(
     }
 }
 
-pub(crate) fn generate_output_type(
-    client_field: &ValidatedGraphqlClientField,
+pub(crate) fn generate_output_type<TOutputFormat: OutputFormat>(
+    client_field: &ValidatedClientField<TOutputFormat>,
 ) -> ClientFieldOutputType {
     let variant = &client_field.variant;
     match variant {
@@ -483,10 +481,10 @@ pub(crate) fn generate_output_type(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn generate_client_field_parameter_type(
-    schema: &ValidatedGraphqlSchema,
+pub(crate) fn generate_client_field_parameter_type<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     selection_map: &[WithSpan<ValidatedSelection>],
-    parent_type: &GraphqlSchemaObject,
+    parent_type: &SchemaObject<TOutputFormat>,
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
@@ -556,11 +554,11 @@ impl<'a> DualStringProxy<'a> {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn write_param_type_from_selection(
-    schema: &ValidatedGraphqlSchema,
+fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     query_type_declaration: &mut DualStringProxy,
     selection: &WithSpan<ValidatedSelection>,
-    parent_type: &GraphqlSchemaObject,
+    parent_type: &SchemaObject<TOutputFormat>,
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
@@ -760,8 +758,8 @@ fn write_param_type_from_selection(
     }
 }
 
-fn get_loadable_field_type_from_arguments(
-    schema: &ValidatedGraphqlSchema,
+fn get_loadable_field_type_from_arguments<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     arguments: Vec<ValidatedVariableDefinition>,
 ) -> String {
     let mut loadable_field_type = "{".to_string();
@@ -783,8 +781,8 @@ fn get_loadable_field_type_from_arguments(
     loadable_field_type
 }
 
-fn format_type_for_js(
-    schema: &ValidatedGraphqlSchema,
+fn format_type_for_js<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     type_: GraphQLTypeAnnotation<SelectableServerFieldId>,
 ) -> String {
     let new_type = type_.map(
@@ -825,8 +823,8 @@ fn format_type_for_js_inner(
     }
 }
 
-pub(crate) fn generate_parameters<'a>(
-    schema: &ValidatedGraphqlSchema,
+pub(crate) fn generate_parameters<'a, TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     argument_definitions: impl Iterator<Item = &'a VariableDefinition<SelectableServerFieldId>>,
 ) -> String {
     let mut s = "{\n".to_string();
@@ -927,16 +925,6 @@ fn print_javascript_type_declaration_impl<T: Display + Ord + Debug>(
     }
 }
 
-macro_rules! derive_display {
-    ($type:ident) => {
-        impl fmt::Display for $type {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                fmt::Display::fmt(&self.0, f)
-            }
-        }
-    };
-}
-
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct ClientFieldParameterType(pub String);
 derive_display!(ClientFieldParameterType);
@@ -944,10 +932,6 @@ derive_display!(ClientFieldParameterType);
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct ClientFieldUpdatableDataType(pub String);
 derive_display!(ClientFieldUpdatableDataType);
-
-#[derive(Debug)]
-pub(crate) struct QueryText(pub String);
-derive_display!(QueryText);
 
 #[derive(Debug)]
 pub(crate) struct ClientFieldFunctionImportStatement(pub String);

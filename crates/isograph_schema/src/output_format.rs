@@ -1,9 +1,8 @@
 use std::{fmt::Debug, hash::Hash};
 
-use common_lang_types::ArtifactPathAndContent;
-use isograph_config::CompilerConfig;
+use common_lang_types::{QueryOperationName, QueryText};
 
-use crate::ValidatedSchema;
+use crate::{MergedSelectionMap, RootOperationName, ValidatedSchema, ValidatedVariableDefinition};
 
 pub trait OutputFormat:
     Debug + Clone + Copy + Eq + PartialEq + Ord + PartialOrd + Hash + Default
@@ -15,8 +14,11 @@ where
     type TypeSystemDocument: Debug;
     type TypeSystemExtensionDocument: Debug;
 
-    fn generate_artifact_path_and_content(
+    fn generate_query_text<'a>(
+        query_name: QueryOperationName,
         schema: &ValidatedSchema<Self>,
-        config: &CompilerConfig,
-    ) -> Vec<ArtifactPathAndContent>;
+        selection_map: &MergedSelectionMap,
+        query_variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
+        root_operation_name: &RootOperationName,
+    ) -> QueryText;
 }
