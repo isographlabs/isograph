@@ -2,6 +2,7 @@ mod artifact_generation;
 
 use artifact_generation::generate_artifacts::get_artifact_path_and_content;
 use common_lang_types::ArtifactPathAndContent;
+use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDocument};
 use isograph_config::CompilerConfig;
 use isograph_schema::{
     OutputFormat, Schema, SchemaObject, UnvalidatedSchema, ValidatedClientField, ValidatedSchema,
@@ -11,6 +12,9 @@ use isograph_schema::{
 pub struct GraphqlOutputFormat {}
 
 impl OutputFormat for GraphqlOutputFormat {
+    type TypeSystemDocument = GraphQLTypeSystemDocument;
+    type TypeSystemExtensionDocument = GraphQLTypeSystemExtensionDocument;
+
     fn generate_artifact_path_and_content(
         schema: &ValidatedGraphqlSchema,
         config: &CompilerConfig,
