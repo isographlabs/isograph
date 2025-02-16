@@ -11,6 +11,7 @@ mod process_client_field_declaration;
 mod process_type_definition;
 mod refetch_strategy;
 mod root_types;
+mod schema_validation_state;
 mod unvalidated_schema;
 mod validate_argument_types;
 mod validate_client_field;

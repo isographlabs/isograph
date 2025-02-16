@@ -16,12 +16,12 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
+    schema_validation_state::SchemaValidationState,
     validate_client_field::validate_and_transform_client_types,
     validate_server_field::validate_and_transform_server_fields, ClientField, ClientFieldVariant,
     ClientPointer, FieldType, ImperativelyLoadedFieldVariant, OutputFormat, Schema, SchemaIdField,
-    SchemaObject, SchemaServerField, SchemaValidationState, ServerFieldData,
-    ServerFieldTypeAssociatedData, UnvalidatedSchema, UseRefetchFieldRefetchStrategy,
-    ValidateEntrypointDeclarationError,
+    SchemaObject, SchemaServerField, ServerFieldData, ServerFieldTypeAssociatedData,
+    UnvalidatedSchema, UseRefetchFieldRefetchStrategy, ValidateEntrypointDeclarationError,
 };
 
 pub type ValidatedSchemaServerField<TOutputFormat> = SchemaServerField<

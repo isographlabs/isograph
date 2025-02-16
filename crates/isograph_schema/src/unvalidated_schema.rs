@@ -13,9 +13,9 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ClientField, ClientPointer, ClientType, FieldType, OutputFormat, Schema, SchemaScalar,
-    SchemaServerField, SchemaValidationState, ServerFieldData, UseRefetchFieldRefetchStrategy,
-    ValidatedSelection,
+    schema_validation_state::SchemaValidationState, ClientField, ClientPointer, ClientType,
+    FieldType, OutputFormat, Schema, SchemaScalar, SchemaServerField, ServerFieldData,
+    UseRefetchFieldRefetchStrategy, ValidatedSelection,
 };
 use lazy_static::lazy_static;
 

@@ -5,12 +5,12 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    get_all_errors_or_all_ok, get_all_errors_or_all_ok_iter, OutputFormat, SchemaServerField,
-    SchemaServerFieldVariant, SchemaValidationState, ServerFieldData,
-    ServerFieldTypeAssociatedData, ServerFieldTypeAssociatedDataInlineFragment,
-    UnvalidatedSchemaSchemaField, UnvalidatedSchemaState, UnvalidatedVariableDefinition,
-    ValidateSchemaError, ValidateSchemaResult, ValidatedSchemaServerField,
-    ValidatedVariableDefinition,
+    get_all_errors_or_all_ok, get_all_errors_or_all_ok_iter,
+    schema_validation_state::SchemaValidationState, OutputFormat, SchemaServerField,
+    SchemaServerFieldVariant, ServerFieldData, ServerFieldTypeAssociatedData,
+    ServerFieldTypeAssociatedDataInlineFragment, UnvalidatedSchemaSchemaField,
+    UnvalidatedSchemaState, UnvalidatedVariableDefinition, ValidateSchemaError,
+    ValidateSchemaResult, ValidatedSchemaServerField, ValidatedVariableDefinition,
 };
 
 pub(crate) fn validate_and_transform_server_fields<TOutputFormat: OutputFormat>(
