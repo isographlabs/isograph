@@ -61,21 +61,23 @@ impl<TOutputFormat: OutputFormat> SourceFiles<TOutputFormat> {
 
     pub fn create_unvalidated_schema(
         self,
-        schema: &mut UnvalidatedSchema<TOutputFormat>,
+        unvalidated_isograph_schema: &mut UnvalidatedSchema<TOutputFormat>,
         config: &CompilerConfig,
     ) -> Result<(), BatchCompileError> {
-        let outcome = schema.process_graphql_type_system_document(self.schema, &config.options)?;
+        let outcome = unvalidated_isograph_schema
+            .process_graphql_type_system_document(self.schema, &config.options)?;
         for extension_document in self.schema_extensions.into_values() {
-            let _extension_outcome = schema
+            let _extension_outcome = unvalidated_isograph_schema
                 .process_graphql_type_extension_document(extension_document, &config.options)?;
         }
-        process_iso_literals(schema, self.contains_iso)?;
-        process_exposed_fields(schema)?;
-        schema.add_fields_to_subtypes(&outcome.type_refinement_maps.supertype_to_subtype_map)?;
-        schema.add_link_fields()?;
-        schema
+        process_iso_literals(unvalidated_isograph_schema, self.contains_iso)?;
+        process_exposed_fields(unvalidated_isograph_schema)?;
+        unvalidated_isograph_schema
+            .add_fields_to_subtypes(&outcome.type_refinement_maps.supertype_to_subtype_map)?;
+        unvalidated_isograph_schema.add_link_fields()?;
+        unvalidated_isograph_schema
             .add_pointers_to_supertypes(&outcome.type_refinement_maps.subtype_to_supertype_map)?;
-        add_refetch_fields_to_objects(schema)?;
+        add_refetch_fields_to_objects(unvalidated_isograph_schema)?;
         Ok(())
     }
 
