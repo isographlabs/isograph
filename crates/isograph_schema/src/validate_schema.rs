@@ -212,10 +212,8 @@ impl<TOutputFormat: OutputFormat> ValidatedSchema<TOutputFormat> {
                     boolean_type_id,
                     int_type_id,
                     null_type_id,
-                    output_format: std::marker::PhantomData,
                 },
                 fetchable_types: root_types,
-                output_format: std::marker::PhantomData,
             })
         } else {
             Err(errors)

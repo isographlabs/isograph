@@ -98,8 +98,6 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState, TOutputFormat: 
 
     /// These are root types like Query, Mutation, Subscription
     pub fetchable_types: BTreeMap<ServerObjectId, RootOperationName>,
-
-    pub output_format: PhantomData<TOutputFormat>,
 }
 
 type ClientTypes<
@@ -277,8 +275,6 @@ pub struct ServerFieldData<TOutputFormat: OutputFormat> {
     // TODO restructure UnionTypeAnnotation to not have a nullable field, but to instead
     // include null in its variants.
     pub null_type_id: ServerScalarId,
-
-    pub output_format: PhantomData<TOutputFormat>,
 }
 
 impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>

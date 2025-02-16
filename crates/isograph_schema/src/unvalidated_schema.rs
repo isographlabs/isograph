@@ -169,10 +169,8 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                 float_type_id,
                 boolean_type_id,
                 null_type_id,
-                output_format: std::marker::PhantomData,
             },
             fetchable_types: BTreeMap::new(),
-            output_format: std::marker::PhantomData,
         }
     }
 }
