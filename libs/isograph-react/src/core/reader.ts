@@ -94,6 +94,7 @@ export type ReaderScalarField = {
   readonly fieldName: string;
   readonly alias: string | null;
   readonly arguments: Arguments | null;
+  readonly isUpdatable: boolean;
 };
 
 export type ReaderLinkField = {

@@ -9,6 +9,7 @@ const readerAst: ReaderAst<Pet__PetCheckinsCard__param> = [
     fieldName: "id",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
   {
     kind: "Linked",
@@ -39,6 +40,7 @@ const readerAst: ReaderAst<Pet__PetCheckinsCard__param> = [
         fieldName: "id",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
     ],
   },

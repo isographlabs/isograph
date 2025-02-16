@@ -9,18 +9,21 @@ const readerAst: ReaderAst<BlogItem__BlogItemDisplay__param> = [
     fieldName: "author",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
   {
     kind: "Scalar",
     fieldName: "title",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
   {
     kind: "Scalar",
     fieldName: "content",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
   {
     kind: "LoadablySelectedField",
@@ -33,6 +36,7 @@ const readerAst: ReaderAst<BlogItem__BlogItemDisplay__param> = [
         fieldName: "id",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
     ],
     entrypoint: { 

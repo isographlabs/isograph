@@ -28,6 +28,7 @@ const readerAst: ReaderAst<Query__subquery__param> = [
             fieldName: "id",
             alias: null,
             arguments: null,
+            isUpdatable: false,
           },
         ],
       },

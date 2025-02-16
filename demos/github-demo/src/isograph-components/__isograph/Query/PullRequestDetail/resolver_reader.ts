@@ -38,12 +38,14 @@ const readerAst: ReaderAst<Query__PullRequestDetail__param> = [
             fieldName: "title",
             alias: null,
             arguments: null,
+            isUpdatable: false,
           },
           {
             kind: "Scalar",
             fieldName: "bodyHTML",
             alias: null,
             arguments: null,
+            isUpdatable: false,
           },
           {
             kind: "Resolver",
