@@ -27,7 +27,7 @@ use crate::{
 pub struct SourceFiles<TOutputFormat: OutputFormat> {
     pub schema: GraphQLTypeSystemDocument,
     pub schema_extensions: HashMap<RelativePathToSourceFile, GraphQLTypeSystemExtensionDocument>,
-    pub contains_iso: ContainsIso<TOutputFormat>,
+    pub contains_iso: ContainsIso,
     pub output_format: PhantomData<TOutputFormat>,
 }
 
@@ -251,8 +251,8 @@ impl<TOutputFormat: OutputFormat> SourceFiles<TOutputFormat> {
     }
 }
 
-fn read_and_parse_iso_literals_from_folder<TOutputFormat: OutputFormat>(
-    contains_iso: &mut ContainsIso<TOutputFormat>,
+fn read_and_parse_iso_literals_from_folder(
+    contains_iso: &mut ContainsIso,
     folder: &Path,
     project_root: &PathBuf,
     config: &CompilerConfig,
@@ -343,17 +343,16 @@ fn process_exposed_fields<TOutputFormat: OutputFormat>(
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
-pub struct ContainsIso<TOutputFormat: OutputFormat> {
+pub struct ContainsIso {
     pub files: HashMap<RelativePathToSourceFile, Vec<(IsoLiteralExtractionResult, TextSource)>>,
-    output_format: PhantomData<TOutputFormat>,
 }
 
-impl<TOutputFormat: OutputFormat> ContainsIso<TOutputFormat> {
+impl ContainsIso {
     pub fn stats(&self) -> ContainsIsoStats {
         let mut client_field_count: usize = 0;
         let mut client_pointer_count: usize = 0;
         let mut entrypoint_count: usize = 0;
-        for iso_literals in self.files.values() {
+        for iso_literals in self.values() {
             for (iso_literal, ..) in iso_literals {
                 match iso_literal {
                     IsoLiteralExtractionResult::ClientFieldDeclaration(_) => {
@@ -374,7 +373,7 @@ impl<TOutputFormat: OutputFormat> ContainsIso<TOutputFormat> {
     }
 }
 
-impl<TOutputFormat: OutputFormat> Deref for ContainsIso<TOutputFormat> {
+impl Deref for ContainsIso {
     type Target = HashMap<RelativePathToSourceFile, Vec<(IsoLiteralExtractionResult, TextSource)>>;
 
     fn deref(&self) -> &Self::Target {
@@ -382,7 +381,7 @@ impl<TOutputFormat: OutputFormat> Deref for ContainsIso<TOutputFormat> {
     }
 }
 
-impl<TOutputFormat: OutputFormat> DerefMut for ContainsIso<TOutputFormat> {
+impl DerefMut for ContainsIso {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.files
     }
