@@ -864,6 +864,7 @@ fn assert_no_missing_arguments(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn get_missing_arguments_and_validate_argument_types<'a>(
     schema_data: &ServerFieldData,
     field_argument_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
