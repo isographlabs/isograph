@@ -1,10 +1,14 @@
-use graphql_output_format::ValidatedGraphqlSchema;
 use isograph_schema::{
     MergedInlineFragmentSelection, MergedLinkedFieldSelection, MergedScalarFieldSelection,
     MergedServerSelection,
 };
 
-use crate::generate_artifacts::{get_serialized_field_arguments, NormalizationAstText};
+use crate::{
+    artifact_generation::generate_artifacts::{
+        get_serialized_field_arguments, NormalizationAstText,
+    },
+    ValidatedGraphqlSchema,
+};
 
 pub(crate) fn generate_normalization_ast_text<'schema, 'a>(
     schema: &'schema ValidatedGraphqlSchema,

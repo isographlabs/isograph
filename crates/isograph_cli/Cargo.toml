@@ -6,6 +6,7 @@ license = { workspace = true }
 
 [dependencies]
 common_lang_types = { path = "../common_lang_types" }
+graphql_output_format = { path = "../graphql_output_format" }
 intern = { path = "../../relay-crates/intern" }
 isograph_compiler = { path = "../isograph_compiler" }
 isograph_config = { path = "../isograph_config" }

@@ -1,15 +1,17 @@
 use common_lang_types::{
     ArtifactPathAndContent, IsographObjectTypeName, ObjectTypeAndFieldName, SelectableFieldName,
 };
-use graphql_output_format::ValidatedGraphqlSchema;
 use intern::string_key::Intern;
 use isograph_lang_types::RefetchQueryIndex;
 use isograph_schema::{ImperativelyLoadedFieldArtifactInfo, REFETCH_FIELD_NAME};
 
 use crate::{
-    generate_artifacts::{NormalizationAstText, QueryText},
-    normalization_ast_text::generate_normalization_ast_text,
-    query_text::generate_query_text,
+    artifact_generation::{
+        generate_artifacts::{NormalizationAstText, QueryText},
+        normalization_ast_text::generate_normalization_ast_text,
+        query_text::generate_query_text,
+    },
+    ValidatedGraphqlSchema,
 };
 
 #[derive(Debug)]

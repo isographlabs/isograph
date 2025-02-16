@@ -5,4 +5,11 @@ edition = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+common_lang_types = { path = "../common_lang_types" }
+graphql_lang_types = { path = "../graphql_lang_types" }
+intern = { path = "../../relay-crates/intern" }
+isograph_config = { path = "../isograph_config" }
+isograph_lang_types = { path = "../isograph_lang_types" }
 isograph_schema = { path = "../isograph_schema" }
+lazy_static = { workspace = true }
+pathdiff = { workspace = true }

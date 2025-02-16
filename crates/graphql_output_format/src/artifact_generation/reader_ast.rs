@@ -1,7 +1,6 @@
 use std::collections::{BTreeSet, HashSet};
 
 use common_lang_types::{ObjectTypeAndFieldName, SelectableFieldName, WithSpan};
-use graphql_output_format::ValidatedGraphqlSchema;
 use isograph_lang_types::{
     LoadableDirectiveParameters, RefetchQueryIndex, SelectionType, ServerFieldSelection,
 };
@@ -14,8 +13,11 @@ use isograph_schema::{
 };
 
 use crate::{
-    generate_artifacts::{get_serialized_field_arguments, ReaderAst},
-    import_statements::{ImportedFileCategory, ReaderImports},
+    artifact_generation::{
+        generate_artifacts::{get_serialized_field_arguments, ReaderAst},
+        import_statements::{ImportedFileCategory, ReaderImports},
+    },
+    ValidatedGraphqlSchema,
 };
 
 // Can we do this when visiting the client field in when generating entrypoints?

@@ -1,5 +1,4 @@
 use common_lang_types::{ArtifactPathAndContent, ObjectTypeAndFieldName};
-use graphql_output_format::ValidatedGraphqlSchema;
 use intern::Lookup;
 
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
@@ -12,17 +11,20 @@ use isograph_schema::{
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
 use crate::{
-    generate_artifacts::{
-        generate_client_field_parameter_type, generate_output_type, generate_parameters,
-        ClientFieldFunctionImportStatement, RESOLVER_OUTPUT_TYPE, RESOLVER_OUTPUT_TYPE_FILE_NAME,
-        RESOLVER_PARAMETERS_TYPE_FILE_NAME, RESOLVER_PARAM_TYPE, RESOLVER_PARAM_TYPE_FILE_NAME,
-        RESOLVER_READER_FILE_NAME,
+    artifact_generation::{
+        generate_artifacts::{
+            generate_client_field_parameter_type, generate_output_type, generate_parameters,
+            ClientFieldFunctionImportStatement, RESOLVER_OUTPUT_TYPE,
+            RESOLVER_OUTPUT_TYPE_FILE_NAME, RESOLVER_PARAMETERS_TYPE_FILE_NAME,
+            RESOLVER_PARAM_TYPE, RESOLVER_PARAM_TYPE_FILE_NAME, RESOLVER_READER_FILE_NAME,
+        },
+        import_statements::{
+            param_type_imports_to_import_param_statement, param_type_imports_to_import_statement,
+            reader_imports_to_import_statement,
+        },
+        reader_ast::generate_reader_ast,
     },
-    import_statements::{
-        param_type_imports_to_import_param_statement, param_type_imports_to_import_statement,
-        reader_imports_to_import_statement,
-    },
-    reader_ast::generate_reader_ast,
+    ValidatedGraphqlSchema,
 };
 
 pub(crate) fn generate_eager_reader_artifacts(

@@ -51,6 +51,7 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
         fieldName: "__typename",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
     ],
   },

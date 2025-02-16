@@ -1,13 +1,12 @@
 use common_lang_types::{QueryOperationName, UnvalidatedTypeName};
 use graphql_lang_types::GraphQLTypeAnnotation;
-use graphql_output_format::ValidatedGraphqlSchema;
 use isograph_lang_types::{ArgumentKeyAndValue, NonConstantValue};
 use isograph_schema::{
     get_name, MergedSelectionMap, MergedServerSelection, RootOperationName,
     ValidatedVariableDefinition,
 };
 
-use crate::generate_artifacts::QueryText;
+use crate::{artifact_generation::generate_artifacts::QueryText, ValidatedGraphqlSchema};
 
 pub(crate) fn generate_query_text<'a>(
     query_name: QueryOperationName,

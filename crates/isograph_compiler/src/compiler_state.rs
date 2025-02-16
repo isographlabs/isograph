@@ -1,9 +1,8 @@
 use std::path::PathBuf;
 
 use common_lang_types::CurrentWorkingDirectory;
-use graphql_artifact_generation::get_artifact_path_and_content;
 use isograph_config::{create_config, CompilerConfig};
-use isograph_schema::{Schema, UnvalidatedSchema};
+use isograph_schema::{OutputFormat, Schema, UnvalidatedSchema};
 
 use crate::{
     batch_compile::{BatchCompileError, CompilationStats},
@@ -80,11 +79,14 @@ impl CompilerState {
     /// leaves (e.g. a given file changed), and invalidate everything that depends on that
     /// leaf. Then, when we need a result (e.g. the errors to show on a given file), we
     /// re-evaluate (or re-use the cached value) of everything from that result on down.
-    pub fn batch_compile(self) -> Result<CompilationStats, BatchCompileError> {
+    pub fn batch_compile<TOutputFormat: OutputFormat>(
+        self,
+    ) -> Result<CompilationStats, BatchCompileError> {
         let source_files = SourceFiles::read_and_parse_all_files(&self.config)?;
         let stats = source_files.contains_iso.stats();
-        let total_artifacts_written =
-            validate_and_create_artifacts_from_source_files(source_files, &self.config)?;
+        let total_artifacts_written = validate_and_create_artifacts_from_source_files::<
+            TOutputFormat,
+        >(source_files, &self.config)?;
         Ok(CompilationStats {
             client_field_count: stats.client_field_count,
             entrypoint_count: stats.entrypoint_count,
@@ -92,12 +94,15 @@ impl CompilerState {
         })
     }
 
-    pub fn compile(&mut self) -> Result<CompilationStats, BatchCompileError> {
+    pub fn compile<TOutputFormat: OutputFormat>(
+        &mut self,
+    ) -> Result<CompilationStats, BatchCompileError> {
         let source_files = SourceFiles::read_and_parse_all_files(&self.config)?;
         let stats = source_files.contains_iso.stats();
         self.source_files = Some(source_files.clone());
-        let total_artifacts_written =
-            validate_and_create_artifacts_from_source_files(source_files, &self.config)?;
+        let total_artifacts_written = validate_and_create_artifacts_from_source_files::<
+            TOutputFormat,
+        >(source_files, &self.config)?;
         Ok(CompilationStats {
             client_field_count: stats.client_field_count,
             entrypoint_count: stats.entrypoint_count,
@@ -105,14 +110,15 @@ impl CompilerState {
         })
     }
 
-    pub fn update(
+    pub fn update<TOutputFormat: OutputFormat>(
         &mut self,
         changes: &[SourceFileEvent],
     ) -> Result<CompilationStats, BatchCompileError> {
         let source_files = self.update_and_clone_source_files(changes)?;
         let stats = source_files.contains_iso.stats();
-        let total_artifacts_written =
-            validate_and_create_artifacts_from_source_files(source_files, &self.config)?;
+        let total_artifacts_written = validate_and_create_artifacts_from_source_files::<
+            TOutputFormat,
+        >(source_files, &self.config)?;
         Ok(CompilationStats {
             client_field_count: stats.client_field_count,
             entrypoint_count: stats.entrypoint_count,
@@ -138,12 +144,12 @@ impl CompilerState {
     }
 }
 
-pub fn validate_and_create_artifacts_from_source_files(
+pub fn validate_and_create_artifacts_from_source_files<TOutputFormat: OutputFormat>(
     source_files: SourceFiles,
     config: &CompilerConfig,
 ) -> Result<usize, BatchCompileError> {
     // Create schema
-    let mut unvalidated_schema = UnvalidatedSchema::new();
+    let mut unvalidated_schema = UnvalidatedSchema::<TOutputFormat>::new();
     source_files.create_unvalidated_schema(&mut unvalidated_schema, config)?;
 
     // Validate
@@ -152,7 +158,8 @@ pub fn validate_and_create_artifacts_from_source_files(
     // Note: we calculate all of the artifact paths and contents first, so that writing to
     // disk can be as fast as possible and we minimize the chance that changes to the file
     // system occur while we're writing and we get unpredictable results.
-    let artifacts = get_artifact_path_and_content(&validated_schema, config);
+
+    let artifacts = TOutputFormat::generate_artifact_path_and_content(&validated_schema, config);
 
     let total_artifacts_written =
         write_artifacts_to_disk(artifacts, &config.artifact_directory.absolute_path)?;

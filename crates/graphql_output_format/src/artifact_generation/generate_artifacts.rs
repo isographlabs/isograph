@@ -5,7 +5,6 @@ use common_lang_types::{
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
 };
-use graphql_output_format::ValidatedGraphqlSchema;
 use intern::{string_key::Intern, Lookup};
 
 use isograph_config::CompilerConfig;
@@ -26,20 +25,23 @@ use std::{
 };
 
 use crate::{
-    eager_reader_artifact::{
-        generate_eager_reader_artifacts, generate_eager_reader_condition_artifact,
-        generate_eager_reader_output_type_artifact, generate_eager_reader_param_type_artifact,
+    artifact_generation::{
+        eager_reader_artifact::{
+            generate_eager_reader_artifacts, generate_eager_reader_condition_artifact,
+            generate_eager_reader_output_type_artifact, generate_eager_reader_param_type_artifact,
+        },
+        entrypoint_artifact::{
+            generate_entrypoint_artifacts,
+            generate_entrypoint_artifacts_with_client_field_traversal_result,
+        },
+        format_parameter_type::format_parameter_type,
+        import_statements::{LinkImports, ParamTypeImports, UpdatableImports},
+        iso_overload_file::build_iso_overload_artifact,
+        refetch_reader_artifact::{
+            generate_refetch_output_type_artifact, generate_refetch_reader_artifact,
+        },
     },
-    entrypoint_artifact::{
-        generate_entrypoint_artifacts,
-        generate_entrypoint_artifacts_with_client_field_traversal_result,
-    },
-    format_parameter_type::format_parameter_type,
-    import_statements::{LinkImports, ParamTypeImports, UpdatableImports},
-    iso_overload_file::build_iso_overload_artifact,
-    refetch_reader_artifact::{
-        generate_refetch_output_type_artifact, generate_refetch_reader_artifact,
-    },
+    ValidatedGraphqlSchema,
 };
 
 lazy_static! {

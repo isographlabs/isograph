@@ -4,7 +4,6 @@ use common_lang_types::{
     ArtifactPathAndContent, IsographObjectTypeName, ObjectTypeAndFieldName, QueryOperationName,
     VariableName,
 };
-use graphql_output_format::ValidatedGraphqlSchema;
 use intern::{string_key::Intern, Lookup};
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{ClientFieldId, IsographSelectionVariant, ServerObjectId};
@@ -18,13 +17,16 @@ use isograph_schema::{
 };
 
 use crate::{
-    generate_artifacts::{
-        NormalizationAstText, QueryText, RefetchQueryArtifactImport, ENTRYPOINT_FILE_NAME,
-        RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
+    artifact_generation::{
+        generate_artifacts::{
+            NormalizationAstText, QueryText, RefetchQueryArtifactImport, ENTRYPOINT_FILE_NAME,
+            RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
+        },
+        imperatively_loaded_fields::get_artifact_for_imperatively_loaded_field,
+        normalization_ast_text::generate_normalization_ast_text,
+        query_text::generate_query_text,
     },
-    imperatively_loaded_fields::get_artifact_for_imperatively_loaded_field,
-    normalization_ast_text::generate_normalization_ast_text,
-    query_text::generate_query_text,
+    ValidatedGraphqlSchema,
 };
 
 #[derive(Debug)]

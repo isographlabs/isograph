@@ -1,4 +1,3 @@
-use graphql_output_format::ValidatedGraphqlSchema;
 use intern::Lookup;
 use isograph_config::GenerateFileExtensionsOption;
 use std::cmp::Ordering;
@@ -8,7 +7,7 @@ use isograph_schema::{
     ClientFieldVariant, ClientType, UserWrittenComponentVariant, ValidatedClientField,
 };
 
-use crate::generate_artifacts::ISO_TS_FILE_NAME;
+use crate::{artifact_generation::generate_artifacts::ISO_TS_FILE_NAME, ValidatedGraphqlSchema};
 
 fn build_iso_overload_for_entrypoint(
     validated_client_field: &ValidatedClientField,

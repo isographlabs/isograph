@@ -5,7 +5,7 @@ use colored::Colorize;
 use common_lang_types::{CurrentWorkingDirectory, WithLocation};
 use graphql_schema_parser::SchemaParseError;
 use isograph_lang_parser::IsographLiteralParseError;
-use isograph_schema::{ProcessClientFieldDeclarationError, ValidateSchemaError};
+use isograph_schema::{OutputFormat, ProcessClientFieldDeclarationError, ValidateSchemaError};
 use pretty_duration::pretty_duration;
 use thiserror::Error;
 use tracing::{error, info};
@@ -18,13 +18,14 @@ pub struct CompilationStats {
     pub total_artifacts_written: usize,
 }
 
-pub fn compile_and_print(
+pub fn compile_and_print<TOutputFormat: OutputFormat>(
     config_location: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(), BatchCompileError> {
     info!("{}", "Starting to compile.".cyan());
     print_result(WithDuration::new(|| {
-        CompilerState::new(config_location, current_working_directory).batch_compile()
+        CompilerState::new(config_location, current_working_directory)
+            .batch_compile::<TOutputFormat>()
     }))
 }
 

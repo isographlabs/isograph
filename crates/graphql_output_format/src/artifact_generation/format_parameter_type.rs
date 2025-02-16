@@ -1,12 +1,13 @@
 use common_lang_types::SelectableFieldName;
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 
-use graphql_output_format::ValidatedGraphqlSchema;
 use isograph_lang_types::{
     ClientFieldId, ClientPointerId, SelectableServerFieldId, SelectionType, ServerFieldId,
     TypeAnnotation, UnionVariant,
 };
 use isograph_schema::{ClientType, FieldType};
+
+use crate::ValidatedGraphqlSchema;
 
 pub(crate) fn format_parameter_type(
     schema: &ValidatedGraphqlSchema,

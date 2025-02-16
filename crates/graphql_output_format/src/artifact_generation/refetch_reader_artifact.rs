@@ -1,17 +1,19 @@
 use common_lang_types::{ArtifactPathAndContent, ObjectTypeAndFieldName};
-use graphql_output_format::ValidatedGraphqlSchema;
 use intern::string_key::Intern;
 
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_schema::{FieldMapItem, PrimaryFieldInfo, RefetchedPathsMap, ValidatedClientField};
 
 use crate::{
-    generate_artifacts::{
-        generate_output_type, ClientFieldFunctionImportStatement, REFETCH_READER_FILE_NAME,
-        RESOLVER_OUTPUT_TYPE_FILE_NAME,
+    artifact_generation::{
+        generate_artifacts::{
+            generate_output_type, ClientFieldFunctionImportStatement, REFETCH_READER_FILE_NAME,
+            RESOLVER_OUTPUT_TYPE_FILE_NAME,
+        },
+        import_statements::reader_imports_to_import_statement,
+        reader_ast::generate_reader_ast,
     },
-    import_statements::reader_imports_to_import_statement,
-    reader_ast::generate_reader_ast,
+    ValidatedGraphqlSchema,
 };
 
 pub(crate) fn generate_refetch_reader_artifact(
