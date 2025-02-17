@@ -26,6 +26,8 @@ where
         config: &CompilerConfig,
     ) -> Result<(RelativePathToSourceFile, Self::TypeSystemExtensionDocument), Box<dyn Error>>;
 
+    // TODO refactor this to return a Vec or Iterator of IsographObjectDefinition or the like,
+    // instead of mutating the UnvalidatedSchema
     fn process_type_system_document(
         schema: &mut UnvalidatedSchema<Self>,
         type_system_document: Self::TypeSystemDocument,
