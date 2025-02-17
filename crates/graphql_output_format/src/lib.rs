@@ -16,9 +16,9 @@ use query_text::generate_query_text;
 use read_schema::{read_and_parse_graphql_schema, read_and_parse_schema_extensions};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, std::hash::Hash, Default)]
-pub struct GraphqlOutputFormat {}
+pub struct GraphQLOutputFormat {}
 
-impl OutputFormat for GraphqlOutputFormat {
+impl OutputFormat for GraphQLOutputFormat {
     type TypeSystemDocument = GraphQLTypeSystemDocument;
     type TypeSystemExtensionDocument = GraphQLTypeSystemExtensionDocument;
 
@@ -80,11 +80,11 @@ impl OutputFormat for GraphqlOutputFormat {
     }
 }
 
-pub type ValidatedGraphqlSchema = ValidatedSchema<GraphqlOutputFormat>;
+pub type ValidatedGraphqlSchema = ValidatedSchema<GraphQLOutputFormat>;
 pub type GraphqlSchema<TSchemaValidationState> =
-    Schema<TSchemaValidationState, GraphqlOutputFormat>;
-pub type UnvalidatedGraphqlSchema = UnvalidatedSchema<GraphqlOutputFormat>;
+    Schema<TSchemaValidationState, GraphQLOutputFormat>;
+pub type UnvalidatedGraphqlSchema = UnvalidatedSchema<GraphQLOutputFormat>;
 
-pub type ValidatedGraphqlClientField = ValidatedClientField<GraphqlOutputFormat>;
+pub type ValidatedGraphqlClientField = ValidatedClientField<GraphQLOutputFormat>;
 
-pub type GraphqlSchemaObject = SchemaObject<GraphqlOutputFormat>;
+pub type GraphqlSchemaObject = SchemaObject<GraphQLOutputFormat>;
