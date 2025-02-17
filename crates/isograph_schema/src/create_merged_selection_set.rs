@@ -9,9 +9,9 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, ClientPointerId, IsographSelectionVariant,
-    NonConstantValue, RefetchQueryIndex, SelectableServerFieldId, SelectionFieldArgument,
-    SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId, VariableDefinition,
+    ArgumentKeyAndValue, ClientFieldId, IsographSelectionVariant, NonConstantValue,
+    RefetchQueryIndex, SelectableServerFieldId, SelectionFieldArgument, SelectionType,
+    ServerFieldId, ServerFieldSelection, ServerObjectId, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -19,8 +19,8 @@ use crate::{
     categorize_field_loadability, create_transformed_name_and_arguments,
     expose_field_directive::RequiresRefinement, transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context, ClientFieldVariant, ClientType,
-    FieldType, ImperativelyLoadedFieldVariant, Loadability, NameAndArguments, OutputFormat,
-    PathToRefetchField, RootOperationName, SchemaObject, SchemaServerFieldVariant,
+    ClientTypeId, FieldType, ImperativelyLoadedFieldVariant, Loadability, NameAndArguments,
+    OutputFormat, PathToRefetchField, RootOperationName, SchemaObject, SchemaServerFieldVariant,
     UnvalidatedVariableDefinition, ValidatedClientField, ValidatedIsographSelectionVariant,
     ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection,
     VariableContext,
@@ -29,10 +29,8 @@ use crate::{
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
 
 // Maybe this should be FNVHashMap? We don't really need stable iteration order
-pub type FieldToCompletedMergeTraversalStateMap = BTreeMap<
-    FieldType<ServerFieldId, ClientType<ClientFieldId, ClientPointerId>>,
-    FieldTraversalResult,
->;
+pub type FieldToCompletedMergeTraversalStateMap =
+    BTreeMap<FieldType<ServerFieldId, ClientTypeId>, FieldTraversalResult>;
 
 #[derive(Clone, Debug)]
 pub struct FieldTraversalResult {
@@ -407,7 +405,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     parent_type: &SchemaObject<TOutputFormat>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
-    root_field_id: FieldType<ServerFieldId, ClientType<ClientFieldId, ClientPointerId>>,
+    root_field_id: FieldType<ServerFieldId, ClientTypeId>,
     variable_context: &VariableContext,
     // TODO return Cow?
 ) -> FieldTraversalResult {

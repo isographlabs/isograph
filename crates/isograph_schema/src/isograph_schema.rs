@@ -140,6 +140,8 @@ pub enum ClientType<TField, TPointer> {
     ClientPointer(TPointer),
 }
 
+pub type ClientTypeId = ClientType<ClientFieldId, ClientPointerId>;
+
 pub type ValidatedClientType<'a, TOutputFormat> =
     ClientType<&'a ValidatedClientField<TOutputFormat>, &'a ValidatedClientPointer<TOutputFormat>>;
 
@@ -194,7 +196,7 @@ impl<
         }
     }
 
-    pub fn id(&self) -> ClientType<ClientFieldId, ClientPointerId> {
+    pub fn id(&self) -> ClientTypeId {
         match self {
             ClientType::ClientField(client_field) => ClientType::ClientField(client_field.id),
             ClientType::ClientPointer(client_pointer) => {
@@ -454,10 +456,7 @@ pub struct SchemaObject<TOutputFormat: OutputFormat> {
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
     /// to something else.
     pub id_field: Option<ServerStrongIdFieldId>,
-    pub encountered_fields: BTreeMap<
-        SelectableFieldName,
-        FieldType<ServerFieldId, ClientType<ClientFieldId, ClientPointerId>>,
-    >,
+    pub encountered_fields: BTreeMap<SelectableFieldName, FieldType<ServerFieldId, ClientTypeId>>,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 

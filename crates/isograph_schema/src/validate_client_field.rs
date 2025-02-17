@@ -19,8 +19,8 @@ use lazy_static::lazy_static;
 use crate::{
     get_all_errors_or_all_ok, get_all_errors_or_all_ok_as_hashmap, get_all_errors_or_all_ok_iter,
     get_all_errors_or_tuple_ok, validate_argument_types::value_satisfies_type, ClientField,
-    ClientPointer, ClientType, FieldType, OutputFormat, RefetchStrategy, SchemaObject,
-    ServerFieldData, UnvalidatedClientField, UnvalidatedClientPointer,
+    ClientPointer, ClientType, ClientTypeId, FieldType, OutputFormat, RefetchStrategy,
+    SchemaObject, ServerFieldData, UnvalidatedClientField, UnvalidatedClientPointer,
     UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy,
     UnvalidatedVariableDefinition, ValidateSchemaError, ValidateSchemaResult, ValidatedClientField,
     ValidatedClientPointer, ValidatedIsographSelectionVariant, ValidatedLinkedFieldAssociatedData,
@@ -30,8 +30,7 @@ use crate::{
 };
 
 type UsedVariables = BTreeSet<VariableName>;
-type ClientTypeArgsMap =
-    HashMap<ClientType<ClientFieldId, ClientPointerId>, Vec<WithSpan<ValidatedVariableDefinition>>>;
+type ClientTypeArgsMap = HashMap<ClientTypeId, Vec<WithSpan<ValidatedVariableDefinition>>>;
 
 type ClientPointerTargetTypeMap = HashMap<ClientPointerId, ServerObjectId>;
 

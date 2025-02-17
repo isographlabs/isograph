@@ -7,13 +7,12 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ClientFieldId, ClientPointerId, EntrypointDeclaration, IsographSelectionVariant,
-    LinkedFieldSelection, SelectableServerFieldId, ServerFieldId, ServerScalarId,
-    VariableDefinition,
+    EntrypointDeclaration, IsographSelectionVariant, LinkedFieldSelection, SelectableServerFieldId,
+    ServerFieldId, ServerScalarId, VariableDefinition,
 };
 
 use crate::{
-    schema_validation_state::SchemaValidationState, ClientField, ClientPointer, ClientType,
+    schema_validation_state::SchemaValidationState, ClientField, ClientPointer, ClientTypeId,
     FieldType, OutputFormat, Schema, SchemaScalar, SchemaServerField, ServerFieldData,
     UseRefetchFieldRefetchStrategy, ValidatedSelection,
 };
@@ -62,8 +61,7 @@ pub type UnvalidatedSchema<TOutputFormat> = Schema<UnvalidatedSchemaState, TOutp
 /// On unvalidated schema objects, the encountered types are either a type annotation
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the
 /// client field.)
-pub type UnvalidatedObjectFieldInfo =
-    FieldType<ServerFieldId, ClientType<ClientFieldId, ClientPointerId>>;
+pub type UnvalidatedObjectFieldInfo = FieldType<ServerFieldId, ClientTypeId>;
 
 pub type UnvalidatedSchemaSchemaField<TOutputFormat> = SchemaServerField<
     <UnvalidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,
