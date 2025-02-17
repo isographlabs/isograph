@@ -24,7 +24,7 @@ impl OutputFormat for GraphQLOutputFormat {
     type TypeSystemDocument = GraphQLTypeSystemDocument;
     type TypeSystemExtensionDocument = GraphQLTypeSystemExtensionDocument;
 
-    type SchemaObjectAssociatedData = ();
+    type SchemaObjectAssociatedData = GraphQLSchemaObjectAssociatedData;
 
     fn read_and_parse_type_system_document(
         config: &CompilerConfig,
@@ -78,5 +78,29 @@ impl OutputFormat for GraphQLOutputFormat {
             query_variables,
             root_operation_name,
         )
+    }
+}
+
+#[derive(Debug)]
+pub struct GraphQLSchemaObjectAssociatedData {
+    pub original_definition_type: GraphQLSchemaOriginalDefinitionType,
+}
+
+#[derive(Debug)]
+pub enum GraphQLSchemaOriginalDefinitionType {
+    InputObject,
+    Object,
+    Interface,
+    Union,
+}
+
+impl GraphQLSchemaOriginalDefinitionType {
+    pub fn sdl_keyword(&self) -> &'static str {
+        match self {
+            GraphQLSchemaOriginalDefinitionType::InputObject => "input",
+            GraphQLSchemaOriginalDefinitionType::Object => "object",
+            GraphQLSchemaOriginalDefinitionType::Interface => "interface",
+            GraphQLSchemaOriginalDefinitionType::Union => "union",
+        }
     }
 }

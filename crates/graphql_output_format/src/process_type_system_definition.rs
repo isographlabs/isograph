@@ -26,7 +26,10 @@ use isograph_schema::{
 use lazy_static::lazy_static;
 use thiserror::Error;
 
-use crate::UnvalidatedGraphqlSchema;
+use crate::{
+    GraphQLSchemaObjectAssociatedData, GraphQLSchemaOriginalDefinitionType,
+    UnvalidatedGraphqlSchema,
+};
 
 lazy_static! {
     static ref QUERY_TYPE: IsographObjectTypeName = "Query".intern().into();
@@ -82,6 +85,9 @@ pub fn process_graphql_type_system_document(
                     true,
                     options,
                     concrete_type,
+                    GraphQLSchemaObjectAssociatedData {
+                        original_definition_type: GraphQLSchemaOriginalDefinitionType::Object,
+                    },
                 )?;
                 if let Some(encountered_root_kind) = outcome.encountered_root_kind {
                     encountered_root_types.set_root_type(encountered_root_kind, outcome.object_id);
@@ -98,6 +104,9 @@ pub fn process_graphql_type_system_document(
                     true,
                     options,
                     None,
+                    GraphQLSchemaObjectAssociatedData {
+                        original_definition_type: GraphQLSchemaOriginalDefinitionType::Interface,
+                    },
                 )?;
                 // N.B. we assume that Mutation will be an object, not an interface
             }
@@ -112,6 +121,9 @@ pub fn process_graphql_type_system_document(
                     options,
                     // Shouldn't really matter what we pass here
                     concrete_type,
+                    GraphQLSchemaObjectAssociatedData {
+                        original_definition_type: GraphQLSchemaOriginalDefinitionType::InputObject,
+                    },
                 )?;
             }
             GraphQLTypeSystemDefinition::DirectiveDefinition(_) => {
@@ -143,6 +155,9 @@ pub fn process_graphql_type_system_document(
                     false,
                     options,
                     None,
+                    GraphQLSchemaObjectAssociatedData {
+                        original_definition_type: GraphQLSchemaOriginalDefinitionType::Union,
+                    },
                 )?;
 
                 for union_member_type in union_definition.union_member_types {
@@ -319,6 +334,7 @@ pub(crate) fn process_object_type_definition(
     may_have_id_field: bool,
     options: &CompilerConfigOptions,
     concrete_type: Option<IsographObjectTypeName>,
+    associated_data: GraphQLSchemaObjectAssociatedData,
 ) -> ProcessTypeDefinitionResult<ProcessObjectTypeDefinitionOutcome> {
     let &mut Schema {
         server_fields: ref mut schema_fields,
@@ -365,7 +381,7 @@ pub(crate) fn process_object_type_definition(
                 id_field,
                 directives: object_type_definition.directives,
                 concrete_type,
-                output_associated_data: (),
+                output_associated_data: associated_data,
             });
 
             schema_fields.extend(unvalidated_schema_fields);
