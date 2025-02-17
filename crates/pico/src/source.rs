@@ -3,7 +3,7 @@ use std::{
     marker::PhantomData,
 };
 
-use crate::{dyn_eq::DynEq, epoch::Epoch, u64_types::Key};
+use crate::{dyn_eq::DynEq, epoch::Epoch, intern::Key, ParamId};
 
 pub trait Source {
     fn get_key(&self) -> Key;
@@ -37,6 +37,15 @@ impl<T> SourceId<T> {
     pub fn new(source: &impl Source) -> Self {
         Self {
             key: source.get_key(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<T> From<ParamId> for SourceId<T> {
+    fn from(value: ParamId) -> Self {
+        Self {
+            key: value.inner().into(),
             phantom: PhantomData,
         }
     }
