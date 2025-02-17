@@ -300,6 +300,34 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
             ),
         }
     }
+
+    #[allow(clippy::type_complexity)]
+    pub fn client_type(
+        &self,
+        client_type_id: ClientTypeId,
+    ) -> ClientType<
+        &ClientField<
+            TSchemaValidationState::ClientTypeSelectionScalarFieldAssociatedData,
+            TSchemaValidationState::ClientTypeSelectionLinkedFieldAssociatedData,
+            TSchemaValidationState::VariableDefinitionInnerType,
+            TOutputFormat,
+        >,
+        &ClientPointer<
+            TSchemaValidationState::ClientTypeSelectionScalarFieldAssociatedData,
+            TSchemaValidationState::ClientTypeSelectionLinkedFieldAssociatedData,
+            TSchemaValidationState::VariableDefinitionInnerType,
+            TOutputFormat,
+        >,
+    > {
+        match client_type_id {
+            ClientType::ClientField(client_field_id) => {
+                ClientType::ClientField(self.client_field(client_field_id))
+            }
+            ClientType::ClientPointer(client_pointer_id) => {
+                ClientType::ClientPointer(self.client_pointer(client_pointer_id))
+            }
+        }
+    }
 }
 
 impl<
