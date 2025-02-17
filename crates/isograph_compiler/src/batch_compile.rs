@@ -1,10 +1,10 @@
 use std::{path::PathBuf, str::Utf8Error};
 
-use crate::{with_duration::WithDuration, write_artifacts::GenerateArtifactsError};
+use crate::with_duration::WithDuration;
 use colored::Colorize;
 use common_lang_types::{CurrentWorkingDirectory, WithLocation};
 use isograph_lang_parser::IsographLiteralParseError;
-use isograph_schema::{OutputFormat, ProcessClientFieldDeclarationError, ValidateSchemaError};
+use isograph_schema::{OutputFormat, ProcessClientFieldDeclarationError};
 use pretty_duration::pretty_duration;
 use thiserror::Error;
 use tracing::{error, info};
@@ -64,9 +64,6 @@ pub enum BatchCompileError {
     #[error("Unable to load schema file at path {path:?}.\nReason: {message}")]
     UnableToLoadSchema { path: PathBuf, message: String },
 
-    #[error("Attempted to load the graphql schema at the following path: {path:?}, but that is not a file.")]
-    SchemaNotAFile { path: PathBuf },
-
     #[error("Schema file not found. Cannot proceed without a schema.")]
     SchemaNotFound,
 
@@ -91,7 +88,7 @@ pub enum BatchCompileError {
         messages: Vec<WithLocation<IsographLiteralParseError>>,
     },
 
-    #[error("Unable to create schema.\nReason: {0}")]
+    #[error("Error when doing additional schema processing.\nReason: {0}")]
     UnableToCreateSchema(#[from] WithLocation<isograph_schema::CreateAdditionalFieldsError>),
 
     #[error(
@@ -110,11 +107,6 @@ pub enum BatchCompileError {
         messages: Vec<WithLocation<isograph_schema::ProcessClientFieldDeclarationError>>,
     },
 
-    #[error("Error when processing an entrypoint declaration.\nReason: {0}")]
-    ErrorWhenProcessingEntrypointDeclaration(
-        #[from] WithLocation<isograph_schema::ValidateEntrypointDeclarationError>,
-    ),
-
     #[error("Unable to strip prefix.\nReason: {0}")]
     UnableToStripPrefix(#[from] std::path::StripPrefixError),
 
@@ -129,9 +121,6 @@ pub enum BatchCompileError {
     UnableToValidateSchema {
         messages: Vec<WithLocation<isograph_schema::ValidateSchemaError>>,
     },
-
-    #[error("Unable to print.\nReason: {0}")]
-    UnableToPrint(#[from] GenerateArtifactsError),
 
     #[error("Unable to convert file {path:?} to utf8.\nDetailed reason: {reason}")]
     UnableToConvertToString { path: PathBuf, reason: Utf8Error },
@@ -154,12 +143,6 @@ pub enum BatchCompileError {
 impl From<Vec<WithLocation<IsographLiteralParseError>>> for BatchCompileError {
     fn from(messages: Vec<WithLocation<IsographLiteralParseError>>) -> Self {
         BatchCompileError::UnableToParseIsographLiterals { messages }
-    }
-}
-
-impl From<Vec<WithLocation<ValidateSchemaError>>> for BatchCompileError {
-    fn from(messages: Vec<WithLocation<ValidateSchemaError>>) -> Self {
-        BatchCompileError::UnableToValidateSchema { messages }
     }
 }
 
