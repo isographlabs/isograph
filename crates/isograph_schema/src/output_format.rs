@@ -18,6 +18,8 @@ where
     type TypeSystemDocument: Debug + Clone;
     type TypeSystemExtensionDocument: Debug + Clone;
 
+    type SchemaObjectAssociatedData: Debug;
+
     fn read_and_parse_type_system_document(
         config: &CompilerConfig,
     ) -> Result<Self::TypeSystemDocument, Box<dyn Error>>;

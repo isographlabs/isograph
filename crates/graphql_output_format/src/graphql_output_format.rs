@@ -24,6 +24,8 @@ impl OutputFormat for GraphQLOutputFormat {
     type TypeSystemDocument = GraphQLTypeSystemDocument;
     type TypeSystemExtensionDocument = GraphQLTypeSystemExtensionDocument;
 
+    type SchemaObjectAssociatedData = ();
+
     fn read_and_parse_type_system_document(
         config: &CompilerConfig,
     ) -> Result<Self::TypeSystemDocument, Box<dyn Error>> {

@@ -461,7 +461,7 @@ pub struct SchemaObject<TOutputFormat: OutputFormat> {
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 
-    pub output_format: PhantomData<TOutputFormat>,
+    pub output_associated_data: TOutputFormat::SchemaObjectAssociatedData,
 }
 
 #[derive(Debug, Clone)]

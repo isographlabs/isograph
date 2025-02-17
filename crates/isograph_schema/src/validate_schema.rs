@@ -232,7 +232,7 @@ fn transform_object_field_ids<TOutputFormat: OutputFormat>(
         id_field,
         directives,
         concrete_type,
-        output_format,
+        output_associated_data,
     } = unvalidated_object;
 
     let validated_encountered_fields = unvalidated_encountered_fields
@@ -256,7 +256,7 @@ fn transform_object_field_ids<TOutputFormat: OutputFormat>(
         id_field,
         directives,
         concrete_type,
-        output_format,
+        output_associated_data,
     }
 }
 

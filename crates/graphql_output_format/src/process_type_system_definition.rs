@@ -365,7 +365,7 @@ pub(crate) fn process_object_type_definition(
                 id_field,
                 directives: object_type_definition.directives,
                 concrete_type,
-                output_format: std::marker::PhantomData,
+                output_associated_data: (),
             });
 
             schema_fields.extend(unvalidated_schema_fields);
