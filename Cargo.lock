@@ -571,12 +571,14 @@ version = "0.3.0"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
+ "graphql_schema_parser",
  "intern",
  "isograph_config",
  "isograph_lang_types",
  "isograph_schema",
  "lazy_static",
  "pathdiff",
+ "thiserror",
 ]
 
 [[package]]
@@ -775,7 +777,6 @@ dependencies = [
  "common_lang_types",
  "generate_artifacts",
  "graphql_lang_types",
- "graphql_schema_parser",
  "intern",
  "isograph_config",
  "isograph_lang_parser",

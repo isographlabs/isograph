@@ -3,7 +3,6 @@ use std::{path::PathBuf, str::Utf8Error};
 use crate::{with_duration::WithDuration, write_artifacts::GenerateArtifactsError};
 use colored::Colorize;
 use common_lang_types::{CurrentWorkingDirectory, WithLocation};
-use graphql_schema_parser::SchemaParseError;
 use isograph_lang_parser::IsographLiteralParseError;
 use isograph_schema::{OutputFormat, ProcessClientFieldDeclarationError, ValidateSchemaError};
 use pretty_duration::pretty_duration;
@@ -80,9 +79,6 @@ pub enum BatchCompileError {
     #[error("Unable to traverse directory.\nReason: {message}")]
     UnableToTraverseDirectory { message: String },
 
-    #[error("Unable to parse schema.\n\n{0}")]
-    UnableToParseSchema(#[from] WithLocation<SchemaParseError>),
-
     #[error(
         "{}{}",
         if messages.len() == 1 { "Unable to parse Isograph literal:" } else { "Unable to parse Isograph literals:" },
@@ -96,7 +92,7 @@ pub enum BatchCompileError {
     },
 
     #[error("Unable to create schema.\nReason: {0}")]
-    UnableToCreateSchema(#[from] WithLocation<isograph_schema::ProcessTypeDefinitionError>),
+    UnableToCreateSchema(#[from] WithLocation<isograph_schema::CreateAdditionalFieldsError>),
 
     #[error(
         "{}{}",
@@ -150,7 +146,9 @@ pub enum BatchCompileError {
             output
         })
     )]
-    MultipleErrors { messages: Vec<BatchCompileError> },
+    MultipleErrors {
+        messages: Vec<Box<dyn std::error::Error>>,
+    },
 }
 
 impl From<Vec<WithLocation<IsographLiteralParseError>>> for BatchCompileError {

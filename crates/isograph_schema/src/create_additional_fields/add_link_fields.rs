@@ -1,9 +1,13 @@
 use crate::{
-    ClientField, ClientFieldVariant, ClientType, FieldType, OutputFormat,
-    ProcessTypeDefinitionError, ProcessTypeDefinitionResult, UnvalidatedSchema, LINK_FIELD_NAME,
+    ClientField, ClientFieldVariant, ClientType, FieldType, OutputFormat, UnvalidatedSchema,
+    LINK_FIELD_NAME,
 };
 use common_lang_types::{Location, ObjectTypeAndFieldName, WithLocation};
 use intern::string_key::Intern;
+
+use super::create_additional_fields_error::{
+    CreateAdditionalFieldsError, ProcessTypeDefinitionResult,
+};
 
 impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     pub fn add_link_fields(&mut self) -> ProcessTypeDefinitionResult<()> {
@@ -39,7 +43,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                 .is_some()
             {
                 return Err(WithLocation::new(
-                    ProcessTypeDefinitionError::FieldExistsOnType {
+                    CreateAdditionalFieldsError::FieldExistsOnType {
                         field_name,
                         parent_type: object.name,
                     },

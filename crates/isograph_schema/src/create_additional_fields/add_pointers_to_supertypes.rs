@@ -4,13 +4,15 @@ use intern::string_key::Intern;
 use isograph_lang_types::{ScalarFieldSelection, ServerFieldSelection};
 
 use crate::{
-    ClientType, FieldType, OutputFormat, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
-    SchemaServerField, SchemaServerFieldVariant, ServerFieldTypeAssociatedData,
-    ServerFieldTypeAssociatedDataInlineFragment, UnvalidatedSchema,
-    ValidatedIsographSelectionVariant, ValidatedScalarFieldAssociatedData,
-    ValidatedTypeRefinementMap, LINK_FIELD_NAME,
+    ClientType, FieldType, OutputFormat, SchemaServerField, SchemaServerFieldVariant,
+    ServerFieldTypeAssociatedData, ServerFieldTypeAssociatedDataInlineFragment, UnvalidatedSchema,
+    ValidatedIsographSelectionVariant, ValidatedScalarFieldAssociatedData, LINK_FIELD_NAME,
 };
 use common_lang_types::Location;
+
+use super::create_additional_fields_error::{
+    CreateAdditionalFieldsError, ProcessTypeDefinitionResult, ValidatedTypeRefinementMap,
+};
 impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     /// For each supertype (e.g. Node), add the pointers for each subtype (e.g. User implements Node)
     /// to supertype (e.g. creating Node.asUser).
@@ -120,7 +122,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                         .is_some()
                     {
                         return Err(WithLocation::new(
-                            ProcessTypeDefinitionError::FieldExistsOnType {
+                            CreateAdditionalFieldsError::FieldExistsOnType {
                                 field_name,
                                 parent_type: supertype.name,
                             },

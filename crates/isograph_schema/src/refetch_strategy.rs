@@ -11,7 +11,8 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    get_reachable_variables, selection_map_wrapped, MergedSelectionMap, RequiresRefinement,
+    expose_field_directive::RequiresRefinement, get_reachable_variables, selection_map_wrapped,
+    MergedSelectionMap,
 };
 
 #[derive(Debug)]

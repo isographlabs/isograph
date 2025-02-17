@@ -1,12 +1,19 @@
+mod process_type_system_definition;
 mod query_text;
+mod read_schema;
 
-use common_lang_types::{QueryOperationName, QueryText};
+use common_lang_types::{QueryOperationName, QueryText, RelativePathToSourceFile};
 use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDocument};
+use isograph_config::{AbsolutePathAndRelativePath, CompilerConfig};
 use isograph_schema::{
     MergedSelectionMap, OutputFormat, RootOperationName, Schema, SchemaObject, UnvalidatedSchema,
     ValidatedClientField, ValidatedSchema, ValidatedVariableDefinition,
 };
+use process_type_system_definition::{
+    process_graphql_type_extension_document, process_graphql_type_system_document,
+};
 use query_text::generate_query_text;
+use read_schema::{read_and_parse_graphql_schema, read_and_parse_schema_extensions};
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, std::hash::Hash, Default)]
 pub struct GraphqlOutputFormat {}
@@ -14,6 +21,47 @@ pub struct GraphqlOutputFormat {}
 impl OutputFormat for GraphqlOutputFormat {
     type TypeSystemDocument = GraphQLTypeSystemDocument;
     type TypeSystemExtensionDocument = GraphQLTypeSystemExtensionDocument;
+
+    fn read_and_parse_type_system_document(
+        config: &CompilerConfig,
+    ) -> Result<Self::TypeSystemDocument, Box<dyn std::error::Error>> {
+        Ok(read_and_parse_graphql_schema(config)?)
+    }
+    fn read_and_parse_type_system_extension_document(
+        schema_extension_path: &AbsolutePathAndRelativePath,
+        config: &CompilerConfig,
+    ) -> Result<
+        (RelativePathToSourceFile, Self::TypeSystemExtensionDocument),
+        Box<dyn std::error::Error>,
+    > {
+        Ok(read_and_parse_schema_extensions(
+            schema_extension_path,
+            config,
+        )?)
+    }
+
+    fn process_type_system_document(
+        schema: &mut UnvalidatedSchema<Self>,
+        type_system_document: Self::TypeSystemDocument,
+        options: &isograph_config::CompilerConfigOptions,
+    ) -> Result<isograph_schema::ProcessTypeSystemDocumentOutcome, Box<dyn std::error::Error>> {
+        Ok(process_graphql_type_system_document(
+            schema,
+            type_system_document,
+            options,
+        )?)
+    }
+    fn process_type_system_extension_document(
+        schema: &mut UnvalidatedSchema<Self>,
+        type_system_extension_document: Self::TypeSystemExtensionDocument,
+        options: &isograph_config::CompilerConfigOptions,
+    ) -> Result<isograph_schema::ProcessTypeSystemDocumentOutcome, Box<dyn std::error::Error>> {
+        Ok(process_graphql_type_extension_document(
+            schema,
+            type_system_extension_document,
+            options,
+        )?)
+    }
 
     fn generate_query_text<'a>(
         query_name: QueryOperationName,

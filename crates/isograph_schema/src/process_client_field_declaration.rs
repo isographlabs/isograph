@@ -14,9 +14,10 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
+    expose_field_directive::RequiresRefinement,
     refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
     ClientField, ClientPointer, ClientType, FieldMapItem, FieldType, OutputFormat,
-    RequiresRefinement, UnvalidatedSchema, UnvalidatedVariableDefinition, NODE_FIELD_NAME,
+    UnvalidatedSchema, UnvalidatedVariableDefinition, NODE_FIELD_NAME,
 };
 
 impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {

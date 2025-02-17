@@ -144,13 +144,14 @@ impl<TOutputFormat: OutputFormat> CompilerState<TOutputFormat> {
 pub fn validate_and_create_artifacts_from_source_files<TOutputFormat: OutputFormat>(
     source_files: SourceFiles<TOutputFormat>,
     config: &CompilerConfig,
-) -> Result<usize, BatchCompileError> {
+) -> Result<usize, Box<dyn Error>> {
     // Create schema
     let mut unvalidated_schema = UnvalidatedSchema::<TOutputFormat>::new();
     source_files.create_unvalidated_schema(&mut unvalidated_schema, config)?;
 
     // Validate
-    let validated_schema = Schema::validate_and_construct(unvalidated_schema)?;
+    let validated_schema = Schema::validate_and_construct(unvalidated_schema)
+        .map_err(|messages| BatchCompileError::UnableToValidateSchema { messages })?;
 
     // Note: we calculate all of the artifact paths and contents first, so that writing to
     // disk can be as fast as possible and we minimize the chance that changes to the file

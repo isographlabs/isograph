@@ -8,9 +8,10 @@ use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{SelectableServerFieldId, ServerFieldId};
 
-use crate::{
-    FieldMapItem, FieldType, OutputFormat, ProcessTypeDefinitionError, ProcessTypeDefinitionResult,
-    ProcessedFieldMapItem, UnvalidatedSchema, UnvalidatedVariableDefinition,
+use crate::{FieldType, OutputFormat, UnvalidatedSchema, UnvalidatedVariableDefinition};
+
+use super::create_additional_fields_error::{
+    CreateAdditionalFieldsError, FieldMapItem, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
 };
 
 pub(crate) struct ArgumentMap {
@@ -51,7 +52,7 @@ impl ArgumentMap {
             })
             .ok_or_else(|| {
                 WithLocation::new(
-                    ProcessTypeDefinitionError::PrimaryDirectiveArgumentDoesNotExistOnField {
+                    CreateAdditionalFieldsError::PrimaryDirectiveArgumentDoesNotExistOnField {
                         primary_type_name,
                         mutation_object_name,
                         mutation_field_name,
@@ -75,7 +76,7 @@ impl ArgumentMap {
                         {
                             Some(defined_type) => match defined_type {
                                 SelectableServerFieldId::Object(_) => return Err(WithLocation::new(
-                                    ProcessTypeDefinitionError::PrimaryDirectiveCannotRemapObject {
+                                    CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
                                         primary_type_name,
                                         field_name: split_to_arg
                                             .to_argument_name
@@ -118,7 +119,7 @@ impl ArgumentMap {
                         // A modified argument will always have an object type, and cannot be remapped
                         // at the object level.
                         return Err(WithLocation::new(
-                            ProcessTypeDefinitionError::PrimaryDirectiveCannotRemapObject {
+                            CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
                                 primary_type_name,
                                 field_name: split_to_arg.to_argument_name.to_string(),
                             },
@@ -288,7 +289,7 @@ impl ModifiedArgument {
                                     Some(type_) => match type_ {
                                         SelectableServerFieldId::Object(_) => {
                                             // Otherwise, formatting breaks :(
-                                            use ProcessTypeDefinitionError::PrimaryDirectiveCannotRemapObject;
+                                            use CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject;
                                             return Err(WithLocation::new(
                                                 PrimaryDirectiveCannotRemapObject {
                                                     primary_type_name,
@@ -312,7 +313,7 @@ impl ModifiedArgument {
                             PotentiallyModifiedField::Modified(_) => {
                                 // A field can only be modified if it has an object type
                                 return Err(WithLocation::new(
-                                    ProcessTypeDefinitionError::PrimaryDirectiveCannotRemapObject {
+                                    CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
                                         primary_type_name,
                                         field_name: key.to_string(),
                                     },
@@ -325,7 +326,7 @@ impl ModifiedArgument {
             }
             None => {
                 return Err(WithLocation::new(
-                    ProcessTypeDefinitionError::PrimaryDirectiveFieldNotFound {
+                    CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
                         primary_type_name,
                         field_name: first,
                     },
