@@ -8,6 +8,7 @@ There are three major places to make changes to Isograph:
 - to the TypeScript runtime, which consumes the generated files, and
 - to the Rust language server
 
+
 ## Global setup
 
 ### node and `pnpm`
@@ -115,6 +116,10 @@ pnpm i
 ```
 
 ### Build the Isograph JavaScript libraries for use in demos
+
+:::warn
+If you are on Windows, you need to use a linux-based terminal, or else `pnpm watch-libs` will not work, because `rm` is not a command. As a temporary workaround, you can search-and-replace `rm -rf dist/* && ` with an empty string.
+:::
 
 ```sh
 pnpm watch-libs
