@@ -33,7 +33,13 @@ These commands will install the appropriate node.js and pnpm version used by Iso
 
 Isograph is built (in CI) using the latest stable version. Rust is fairly stable and we don't rely on anything crazy, so it should be safe to keep your `rustc` up-to-date.
 
-You should also install [`bacon`](https://dystroy.org/bacon/) via `cargo install --locked bacon`.
+You should also install [`bacon`](https://dystroy.org/bacon/) via 
+
+```sh
+cargo install bacon@3.1.1
+```
+
+Versions newer than 3.6 will not work. (This is fixable, but we haven't yet needed to.)
 
 ## Commands related to the compiler and Rust
 
