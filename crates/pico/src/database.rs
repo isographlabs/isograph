@@ -110,6 +110,13 @@ impl Database {
         rev.time_updated = time_updated;
     }
 
+    pub(crate) fn node_verified_in_current_epoch(&self, derived_node_id: DerivedNodeId) -> bool {
+        self.derived_node_id_to_revision
+            .get(&derived_node_id)
+            .map(|rev| rev.time_verified == self.current_epoch)
+            .unwrap()
+    }
+
     pub(crate) fn verify_derived_node(&self, derived_node_id: DerivedNodeId) {
         let mut rev = self
             .derived_node_id_to_revision

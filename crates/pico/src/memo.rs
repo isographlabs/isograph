@@ -54,11 +54,15 @@ pub enum DidRecalculate {
 pub fn memo(db: &Database, derived_node_id: DerivedNodeId, inner_fn: InnerFn) -> DidRecalculate {
     let (time_updated, did_recalculate) =
         if let Some(derived_node) = db.get_derived_node(derived_node_id) {
-            db.verify_derived_node(derived_node_id);
-            if any_dependency_changed(db, derived_node) {
-                update_derived_node(db, derived_node_id, derived_node.value.as_ref(), inner_fn)
-            } else {
+            if db.node_verified_in_current_epoch(derived_node_id) {
                 (db.current_epoch, DidRecalculate::ReusedMemoizedValue)
+            } else {
+                db.verify_derived_node(derived_node_id);
+                if any_dependency_changed(db, derived_node) {
+                    update_derived_node(db, derived_node_id, derived_node.value.as_ref(), inner_fn)
+                } else {
+                    (db.current_epoch, DidRecalculate::ReusedMemoizedValue)
+                }
             }
         } else {
             create_derived_node(db, derived_node_id, inner_fn)
