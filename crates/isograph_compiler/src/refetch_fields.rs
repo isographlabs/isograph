@@ -6,14 +6,14 @@ use isograph_lang_types::ServerObjectId;
 use isograph_schema::{
     generate_refetch_field_strategy, id_arguments, id_selection, id_top_level_arguments,
     ClientField, ClientFieldVariant, ClientType, FieldType, ImperativelyLoadedFieldVariant,
-    RefetchStrategy, RequiresRefinement, SchemaObject, UnvalidatedClientField,
+    OutputFormat, RefetchStrategy, RequiresRefinement, SchemaObject, UnvalidatedClientField,
     UnvalidatedClientPointer, UnvalidatedSchema, NODE_FIELD_NAME, REFETCH_FIELD_NAME,
 };
 
 use crate::batch_compile::BatchCompileError;
 
-pub fn add_refetch_fields_to_objects(
-    schema: &mut UnvalidatedSchema,
+pub fn add_refetch_fields_to_objects<TOutputFormat: OutputFormat>(
+    schema: &mut UnvalidatedSchema<TOutputFormat>,
 ) -> Result<(), BatchCompileError> {
     let query_id = schema.query_id();
 
@@ -30,9 +30,11 @@ pub fn add_refetch_fields_to_objects(
     Ok(())
 }
 
-fn add_refetch_field_to_object(
-    object: &mut SchemaObject,
-    client_fields: &mut Vec<ClientType<UnvalidatedClientField, UnvalidatedClientPointer>>,
+fn add_refetch_field_to_object<TOutputFormat: OutputFormat>(
+    object: &mut SchemaObject<TOutputFormat>,
+    client_fields: &mut Vec<
+        ClientType<UnvalidatedClientField<TOutputFormat>, UnvalidatedClientPointer<TOutputFormat>>,
+    >,
     query_id: ServerObjectId,
 ) -> Option<Result<(), BatchCompileError>> {
     match object
@@ -87,6 +89,7 @@ fn add_refetch_field_to_object(
                         None,
                     ))
                 }),
+                output_format: std::marker::PhantomData,
             }));
         }
     }

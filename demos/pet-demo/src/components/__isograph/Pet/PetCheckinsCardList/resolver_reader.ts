@@ -34,6 +34,7 @@ const readerAst: ReaderAst<Pet__PetCheckinsCardList__param> = [
         fieldName: "id",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
     ],
   },

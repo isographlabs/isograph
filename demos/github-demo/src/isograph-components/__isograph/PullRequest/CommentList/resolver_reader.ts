@@ -35,12 +35,14 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
                 fieldName: "id",
                 alias: null,
                 arguments: null,
+                isUpdatable: false,
               },
               {
                 kind: "Scalar",
                 fieldName: "bodyText",
                 alias: null,
                 arguments: null,
+                isUpdatable: false,
               },
               {
                 kind: "Resolver",
@@ -61,6 +63,7 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
                     fieldName: "login",
                     alias: null,
                     arguments: null,
+                    isUpdatable: false,
                   },
                 ],
               },

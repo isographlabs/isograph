@@ -8,12 +8,14 @@ const readerAst: ReaderAst<Pet__PetTaglineCard__param> = [
     fieldName: "id",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
   {
     kind: "Scalar",
     fieldName: "tagline",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
 ];
 

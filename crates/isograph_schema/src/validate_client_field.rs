@@ -12,37 +12,41 @@ use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     reachable_variables, ClientFieldId, ClientPointerId, IsographSelectionVariant,
     LinkedFieldSelection, ScalarFieldSelection, SelectionFieldArgument, SelectionType,
-    UnvalidatedScalarFieldSelection, UnvalidatedSelection, VariableDefinition,
+    ServerObjectId, UnvalidatedScalarFieldSelection, UnvalidatedSelection, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
 use crate::{
     get_all_errors_or_all_ok, get_all_errors_or_all_ok_as_hashmap, get_all_errors_or_all_ok_iter,
     get_all_errors_or_tuple_ok, validate_argument_types::value_satisfies_type, ClientField,
-    ClientPointer, ClientType, FieldType, RefetchStrategy, SchemaObject, ServerFieldData,
-    UnvalidatedClientField, UnvalidatedClientPointer, UnvalidatedLinkedFieldSelection,
-    UnvalidatedRefetchFieldStrategy, UnvalidatedVariableDefinition, ValidateSchemaError,
-    ValidateSchemaResult, ValidatedClientField, ValidatedClientPointer,
-    ValidatedIsographSelectionVariant, ValidatedLinkedFieldAssociatedData,
+    ClientPointer, ClientType, ClientTypeId, FieldType, OutputFormat, RefetchStrategy,
+    SchemaObject, ServerFieldData, UnvalidatedClientField, UnvalidatedClientPointer,
+    UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy,
+    UnvalidatedVariableDefinition, ValidateSchemaError, ValidateSchemaResult, ValidatedClientField,
+    ValidatedClientPointer, ValidatedIsographSelectionVariant, ValidatedLinkedFieldAssociatedData,
     ValidatedLinkedFieldSelection, ValidatedRefetchFieldStrategy,
     ValidatedScalarFieldAssociatedData, ValidatedScalarFieldSelection, ValidatedSchemaServerField,
     ValidatedSelection, ValidatedVariableDefinition,
 };
 
 type UsedVariables = BTreeSet<VariableName>;
-type ClientTypeArgsMap =
-    HashMap<ClientType<ClientFieldId, ClientPointerId>, Vec<WithSpan<ValidatedVariableDefinition>>>;
+type ClientTypeArgsMap = HashMap<ClientTypeId, Vec<WithSpan<ValidatedVariableDefinition>>>;
+
+type ClientPointerTargetTypeMap = HashMap<ClientPointerId, ServerObjectId>;
 
 lazy_static! {
     static ref ID: FieldArgumentName = "id".intern().into();
 }
 
-pub(crate) fn validate_and_transform_client_types(
-    client_types: Vec<ClientType<UnvalidatedClientField, UnvalidatedClientPointer>>,
-    schema_data: &ServerFieldData,
-    server_fields: &[ValidatedSchemaServerField],
+#[allow(clippy::type_complexity)]
+pub(crate) fn validate_and_transform_client_types<TOutputFormat: OutputFormat>(
+    client_types: Vec<
+        ClientType<UnvalidatedClientField<TOutputFormat>, UnvalidatedClientPointer<TOutputFormat>>,
+    >,
+    schema_data: &ServerFieldData<TOutputFormat>,
+    server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
 ) -> Result<
-    Vec<ClientType<ValidatedClientField, ValidatedClientPointer>>,
+    Vec<ClientType<ValidatedClientField<TOutputFormat>, ValidatedClientPointer<TOutputFormat>>>,
     Vec<WithLocation<ValidateSchemaError>>,
 > {
     // TODO this smells. We probably should do this in two passes instead of doing it this
@@ -78,13 +82,30 @@ pub(crate) fn validate_and_transform_client_types(
             }
         }))?;
 
-    get_all_errors_or_all_ok_iter(client_types.into_iter().map(|client_type| {
-        match client_type {
+    let client_pointer_target_type = client_types
+        .iter()
+        .filter_map(|unvalidated_client_type| match unvalidated_client_type {
+            ClientType::ClientPointer(unvalidated_client_pointer) => {
+                Some(unvalidated_client_pointer)
+            }
+            ClientType::ClientField(_) => None,
+        })
+        .map(|unvalidated_client_pointer| {
+            (
+                unvalidated_client_pointer.id,
+                unvalidated_client_pointer.to.inner(),
+            )
+        })
+        .collect::<ClientPointerTargetTypeMap>();
+
+    get_all_errors_or_all_ok_iter(client_types.into_iter().map(|client_field| {
+        match client_field {
             ClientType::ClientPointer(client_pointer) => validate_client_pointer_selection_set(
                 schema_data,
                 client_pointer,
                 server_fields,
                 &client_type_args,
+                &client_pointer_target_type,
             )
             .map(ClientType::ClientPointer)
             .map_err(|err| err.into_iter()),
@@ -93,6 +114,7 @@ pub(crate) fn validate_and_transform_client_types(
                 client_field,
                 server_fields,
                 &client_type_args,
+                &client_pointer_target_type,
             )
             .map(ClientType::ClientField)
             .map_err(|err| err.into_iter()),
@@ -100,10 +122,10 @@ pub(crate) fn validate_and_transform_client_types(
     }))
 }
 
-fn validate_all_variables_are_used(
+fn validate_all_variables_are_used<TOutputFormat: OutputFormat>(
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     used_variables: UsedVariables,
-    top_level_client_type_info: &ValidateSchemaSharedInfo<'_>,
+    top_level_client_type_info: &ValidateSchemaSharedInfo<'_, TOutputFormat>,
 ) -> ValidateSchemaResult<()> {
     let unused_variables: Vec<_> = variable_definitions
         .iter()
@@ -136,27 +158,30 @@ fn validate_all_variables_are_used(
 
 // So that we don't have to pass five params to all the time,
 // encapsulate them in a single struct.
-struct ValidateSchemaSharedInfo<'a> {
+struct ValidateSchemaSharedInfo<'a, TOutputFormat: OutputFormat> {
+    client_pointer_target_type_map: &'a ClientPointerTargetTypeMap,
     client_type_args: &'a ClientTypeArgsMap,
     client_type_object_type_and_field_name: ObjectTypeAndFieldName,
-    client_type_parent_object: &'a SchemaObject,
-    schema_data: &'a ServerFieldData,
-    server_fields: &'a [ValidatedSchemaServerField],
+    client_type_parent_object: &'a SchemaObject<TOutputFormat>,
+    schema_data: &'a ServerFieldData<TOutputFormat>,
+    server_fields: &'a [ValidatedSchemaServerField<TOutputFormat>],
     client_type: ClientType<(), ()>,
 }
 
-fn validate_client_field_selection_set(
-    schema_data: &ServerFieldData,
-    top_level_client_field: UnvalidatedClientField,
-    server_fields: &[ValidatedSchemaServerField],
+fn validate_client_field_selection_set<TOutputFormat: OutputFormat>(
+    schema_data: &ServerFieldData<TOutputFormat>,
+    top_level_client_field: UnvalidatedClientField<TOutputFormat>,
+    server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
     client_type_args: &ClientTypeArgsMap,
-) -> Result<ValidatedClientField, Vec<WithLocation<ValidateSchemaError>>> {
+    client_pointer_target_type_map: &ClientPointerTargetTypeMap,
+) -> Result<ValidatedClientField<TOutputFormat>, Vec<WithLocation<ValidateSchemaError>>> {
     let top_level_client_type_info = ValidateSchemaSharedInfo {
         client_type_args,
         client_type_object_type_and_field_name: top_level_client_field.type_and_field,
         client_type_parent_object: schema_data.object(top_level_client_field.parent_object_id),
         schema_data,
         server_fields,
+        client_pointer_target_type_map,
         client_type: ClientType::ClientField(()),
     };
 
@@ -206,21 +231,24 @@ fn validate_client_field_selection_set(
         type_and_field: top_level_client_field.type_and_field,
         parent_object_id: top_level_client_field.parent_object_id,
         refetch_strategy,
+        output_format: std::marker::PhantomData,
     })
 }
 
-fn validate_client_pointer_selection_set(
-    schema_data: &ServerFieldData,
-    top_level_client_pointer: UnvalidatedClientPointer,
-    server_fields: &[ValidatedSchemaServerField],
+fn validate_client_pointer_selection_set<TOutputFormat: OutputFormat>(
+    schema_data: &ServerFieldData<TOutputFormat>,
+    top_level_client_pointer: UnvalidatedClientPointer<TOutputFormat>,
+    server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
     client_type_args: &ClientTypeArgsMap,
-) -> Result<ValidatedClientPointer, Vec<WithLocation<ValidateSchemaError>>> {
+    client_pointer_target_type_map: &ClientPointerTargetTypeMap,
+) -> Result<ValidatedClientPointer<TOutputFormat>, Vec<WithLocation<ValidateSchemaError>>> {
     let top_level_client_pointer_info = ValidateSchemaSharedInfo {
         client_type_args,
         client_type_object_type_and_field_name: top_level_client_pointer.type_and_field,
         client_type_parent_object: schema_data.object(top_level_client_pointer.parent_object_id),
         schema_data,
         server_fields,
+        client_pointer_target_type_map,
         client_type: ClientType::ClientPointer(()),
     };
 
@@ -262,14 +290,15 @@ fn validate_client_pointer_selection_set(
         type_and_field: top_level_client_pointer.type_and_field,
         parent_object_id: top_level_client_pointer.parent_object_id,
         refetch_strategy,
+        output_format: std::marker::PhantomData,
     })
 }
 
 /// Validate the selection set on the RefetchFieldStrategy, in particular, associate
 /// id's with each selection in the refetch_selection_set
-fn validate_use_refetch_field_strategy(
+fn validate_use_refetch_field_strategy<TOutputFormat: OutputFormat>(
     use_refetch_field_strategy: UnvalidatedRefetchFieldStrategy,
-    top_level_client_type_info: &ValidateSchemaSharedInfo<'_>,
+    top_level_client_type_info: &ValidateSchemaSharedInfo<'_, TOutputFormat>,
 ) -> Result<ValidatedRefetchFieldStrategy, Vec<WithLocation<ValidateSchemaError>>> {
     let refetch_selection_set = validate_client_type_definition_selections_exist_and_types_match(
         use_refetch_field_strategy.refetch_selection_set,
@@ -285,8 +314,8 @@ fn validate_use_refetch_field_strategy(
     })
 }
 
-fn validate_variable_definitions(
-    schema_data: &ServerFieldData,
+fn validate_variable_definitions<TOutputFormat: OutputFormat>(
+    schema_data: &ServerFieldData<TOutputFormat>,
     variable_definitions: Vec<WithSpan<UnvalidatedVariableDefinition>>,
 ) -> ValidateSchemaResult<Vec<WithSpan<ValidatedVariableDefinition>>> {
     variable_definitions
@@ -318,10 +347,10 @@ fn validate_variable_definitions(
         .collect()
 }
 
-fn validate_client_type_definition_selections_exist_and_types_match(
+fn validate_client_type_definition_selections_exist_and_types_match<TOutputFormat: OutputFormat>(
     field_selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     field_variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-    top_level_client_type_info: &ValidateSchemaSharedInfo<'_>,
+    top_level_client_type_info: &ValidateSchemaSharedInfo<'_, TOutputFormat>,
 ) -> Result<Vec<WithSpan<ValidatedSelection>>, Vec<WithLocation<ValidateSchemaError>>> {
     // Currently, we only check that each field exists and has an appropriate type, not that
     // there are no selection conflicts due to aliases or parameters.
@@ -352,12 +381,14 @@ fn validate_client_type_definition_selections_exist_and_types_match(
     Ok(validated_selection_set)
 }
 
-fn validate_client_field_definition_selection_exists_and_type_matches(
+fn validate_client_field_definition_selection_exists_and_type_matches<
+    TOutputFormat: OutputFormat,
+>(
     selection: WithSpan<UnvalidatedSelection>,
-    field_parent_object: &SchemaObject,
+    field_parent_object: &SchemaObject<TOutputFormat>,
     used_variables: &mut UsedVariables,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-    top_level_client_type_info: &ValidateSchemaSharedInfo<'_>,
+    top_level_client_type_info: &ValidateSchemaSharedInfo<'_, TOutputFormat>,
 ) -> ValidateSchemaResult<WithSpan<ValidatedSelection>> {
     let mut used_variables2 = BTreeSet::new();
 
@@ -391,12 +422,12 @@ fn validate_client_field_definition_selection_exists_and_type_matches(
 
 /// Given that we selected a scalar field, the field should exist on the parent,
 /// and type should be a client field (which is a scalar) or a server scalar type.
-fn validate_field_type_exists_and_is_scalar(
-    scalar_field_selection_parent_object: &SchemaObject,
+fn validate_field_type_exists_and_is_scalar<TOutputFormat: OutputFormat>(
+    scalar_field_selection_parent_object: &SchemaObject<TOutputFormat>,
     scalar_field_selection: UnvalidatedScalarFieldSelection,
     used_variables: &mut UsedVariables,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-    top_level_client_type_info: &ValidateSchemaSharedInfo<'_>,
+    top_level_client_type_info: &ValidateSchemaSharedInfo<'_, TOutputFormat>,
 ) -> ValidateSchemaResult<ValidatedScalarFieldSelection> {
     let scalar_field_name = scalar_field_selection.name.item.into();
     match scalar_field_selection_parent_object
@@ -528,12 +559,12 @@ fn validate_field_type_exists_and_is_scalar(
     }
 }
 
-fn validate_client_field(
+fn validate_client_field<TOutputFormat: OutputFormat>(
     client_field_id: &ClientFieldId,
     scalar_field_selection: UnvalidatedScalarFieldSelection,
     used_variables: &mut UsedVariables,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-    top_level_client_type_info: &ValidateSchemaSharedInfo<'_>,
+    top_level_client_type_info: &ValidateSchemaSharedInfo<'_, TOutputFormat>,
 ) -> ValidateSchemaResult<ValidatedScalarFieldSelection> {
     let field_argument_definitions = top_level_client_type_info
         .client_type_args
@@ -586,12 +617,12 @@ fn validate_client_field(
 
 /// Given that we selected a linked field, the field should exist on the parent,
 /// and type should be a server interface, object or union.
-fn validate_field_type_exists_and_is_linked(
-    field_parent_object: &SchemaObject,
+fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
+    field_parent_object: &SchemaObject<TOutputFormat>,
     linked_field_selection: UnvalidatedLinkedFieldSelection,
     used_variables: &mut UsedVariables,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-    top_level_client_type_info: &ValidateSchemaSharedInfo<'_>,
+    top_level_client_type_info: &ValidateSchemaSharedInfo<'_, TOutputFormat>,
 ) -> ValidateSchemaResult<ValidatedLinkedFieldSelection> {
     let linked_field_name = linked_field_selection.name.item.into();
     match (field_parent_object.encountered_fields).get(&linked_field_name) {
@@ -647,34 +678,48 @@ fn validate_field_type_exists_and_is_linked(
                         Ok(LinkedFieldSelection {
                             name: linked_field_selection.name,
                             reader_alias: linked_field_selection.reader_alias,
-                            selection_set: linked_field_selection.selection_set.into_iter().map(
-                                |selection| {
+                            selection_set: linked_field_selection
+                                .selection_set
+                                .into_iter()
+                                .map(|selection| {
                                     validate_client_field_definition_selection_exists_and_type_matches(
                                         selection,
                                         linked_field_target_object,
                                         used_variables,
                                         variable_definitions,
-                                        top_level_client_type_info
+                                        top_level_client_type_info,
                                     )
-                                },
-                            ).collect::<Result<Vec<_>, _>>()?,
+                                })
+                                .collect::<Result<Vec<_>, _>>()?,
                             associated_data: ValidatedLinkedFieldAssociatedData {
                                 concrete_type: linked_field_target_object.concrete_type,
                                 parent_object_id: object_id.type_name.inner_non_null(),
                                 field_id: FieldType::ServerField(server_field.id),
                                 selection_variant: match linked_field_selection.associated_data {
                                     IsographSelectionVariant::Regular => {
-                                        assert_no_missing_arguments(missing_arguments, linked_field_selection.name.location)?;
+                                        assert_no_missing_arguments(
+                                            missing_arguments,
+                                            linked_field_selection.name.location,
+                                        )?;
                                         ValidatedIsographSelectionVariant::Regular
-                                    },
+                                    }
                                     IsographSelectionVariant::Updatable => {
-                                        assert_no_missing_arguments(missing_arguments, linked_field_selection.name.location)?;
+                                        assert_no_missing_arguments(
+                                            missing_arguments,
+                                            linked_field_selection.name.location,
+                                        )?;
                                         ValidatedIsographSelectionVariant::Updatable
-                                    },
+                                    }
                                     IsographSelectionVariant::Loadable(l) => {
-                                        server_field_cannot_be_selected_loadably(linked_field_name, linked_field_selection.name.location)?;
-                                        ValidatedIsographSelectionVariant::Loadable((l, missing_arguments))
-                                    },
+                                        server_field_cannot_be_selected_loadably(
+                                            linked_field_name,
+                                            linked_field_selection.name.location,
+                                        )?;
+                                        ValidatedIsographSelectionVariant::Loadable((
+                                            l,
+                                            missing_arguments,
+                                        ))
+                                    }
                                 },
                             },
                             arguments: linked_field_selection.arguments,
@@ -683,23 +728,100 @@ fn validate_field_type_exists_and_is_linked(
                     }
                 }
             }
-            FieldType::ClientField(_) => Err(WithLocation::new(
-                ValidateSchemaError::ClientTypeSelectionClientFieldSelectedAsLinked {
-                    field_parent_type_name: field_parent_object.name,
-                    field_name: linked_field_name,
-                    client_field_parent_type_name: top_level_client_type_info
-                        .client_type_object_type_and_field_name
-                        .type_name,
-                    client_field_name: top_level_client_type_info
-                        .client_type_object_type_and_field_name
-                        .field_name,
-                    client_type: match top_level_client_type_info.client_type {
-                        ClientType::ClientField(_) => "field".to_string(),
-                        ClientType::ClientPointer(_) => "pointer".to_string(),
+            FieldType::ClientField(client_type) => match client_type {
+                ClientType::ClientPointer(client_pointer_id) => {
+                    let object_id = top_level_client_type_info
+                        .client_pointer_target_type_map
+                        .get(client_pointer_id)
+                        .expect(
+                            "Expected client pointer to exist in map.\
+                                     This is indicative of a bug in Isograph.",
+                        );
+
+                    let linked_field_target_object =
+                        top_level_client_type_info.schema_data.object(*object_id);
+
+                    let field_argument_definitions = top_level_client_type_info
+                        .client_type_args
+                        .get(&ClientType::ClientPointer(*client_pointer_id))
+                        .expect(
+                            "Expected client pointer to exist in map. \
+                            This is indicative of a bug in Isograph.",
+                        );
+
+                    let missing_arguments = get_missing_arguments_and_validate_argument_types(
+                        top_level_client_type_info.schema_data,
+                        field_argument_definitions
+                            .iter()
+                            .map(|variable_definition| &variable_definition.item),
+                        &linked_field_selection.arguments,
+                        false,
+                        linked_field_selection.name.location,
+                        used_variables,
+                        variable_definitions,
+                    )?;
+
+                    Ok(LinkedFieldSelection {
+                        name: linked_field_selection.name,
+                        reader_alias: linked_field_selection.reader_alias,
+                        selection_set: linked_field_selection
+                            .selection_set
+                            .into_iter()
+                            .map(|selection| {
+                                validate_client_field_definition_selection_exists_and_type_matches(
+                                    selection,
+                                    linked_field_target_object,
+                                    used_variables,
+                                    variable_definitions,
+                                    top_level_client_type_info,
+                                )
+                            })
+                            .collect::<Result<Vec<_>, _>>()?,
+                        associated_data: ValidatedLinkedFieldAssociatedData {
+                            concrete_type: linked_field_target_object.concrete_type,
+                            parent_object_id: *object_id,
+                            field_id: FieldType::ClientField(*client_pointer_id),
+                            selection_variant: match linked_field_selection.associated_data {
+                                IsographSelectionVariant::Regular => {
+                                    assert_no_missing_arguments(
+                                        missing_arguments,
+                                        linked_field_selection.name.location,
+                                    )?;
+                                    ValidatedIsographSelectionVariant::Regular
+                                }
+                                IsographSelectionVariant::Loadable(l) => {
+                                    ValidatedIsographSelectionVariant::Loadable((
+                                        l,
+                                        missing_arguments,
+                                    ))
+                                }
+                                IsographSelectionVariant::Updatable => {
+                                    ValidatedIsographSelectionVariant::Updatable
+                                }
+                            },
+                        },
+                        arguments: linked_field_selection.arguments,
+                        directives: linked_field_selection.directives,
+                    })
+                }
+                ClientType::ClientField(_) => Err(WithLocation::new(
+                    ValidateSchemaError::ClientTypeSelectionClientFieldSelectedAsLinked {
+                        field_parent_type_name: field_parent_object.name,
+                        field_name: linked_field_name,
+                        client_field_parent_type_name: top_level_client_type_info
+                            .client_type_object_type_and_field_name
+                            .type_name,
+                        client_field_name: top_level_client_type_info
+                            .client_type_object_type_and_field_name
+                            .field_name,
+                        client_type: match top_level_client_type_info.client_type {
+                            ClientType::ClientField(_) => "field".to_string(),
+                            ClientType::ClientPointer(_) => "pointer".to_string(),
+                        },
                     },
-                },
-                linked_field_selection.name.location,
-            )),
+                    linked_field_selection.name.location,
+                )),
+            },
         },
         None => Err(WithLocation::new(
             ValidateSchemaError::ClientTypeSelectionFieldDoesNotExist {
@@ -744,8 +866,8 @@ fn assert_no_missing_arguments(
     Ok(())
 }
 
-fn get_missing_arguments_and_validate_argument_types<'a>(
-    schema_data: &ServerFieldData,
+fn get_missing_arguments_and_validate_argument_types<'a, TOutputFormat: OutputFormat>(
+    schema_data: &ServerFieldData<TOutputFormat>,
     field_argument_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
     selection_supplied_arguments: &[WithLocation<SelectionFieldArgument>],
     include_optional_args: bool,

@@ -9,6 +9,7 @@ const readerAst: ReaderAst<IssueComment__formattedCommentCreationDate__param> = 
     fieldName: "createdAt",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
 ];
 

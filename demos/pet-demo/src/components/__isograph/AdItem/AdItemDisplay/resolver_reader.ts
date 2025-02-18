@@ -8,12 +8,14 @@ const readerAst: ReaderAst<AdItem__AdItemDisplay__param> = [
     fieldName: "advertiser",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
   {
     kind: "Scalar",
     fieldName: "message",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
 ];
 

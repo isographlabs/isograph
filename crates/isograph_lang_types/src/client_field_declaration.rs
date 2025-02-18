@@ -1,5 +1,3 @@
-use std::fmt::Debug;
-
 use common_lang_types::{
     ClientPointerFieldName, ConstExportName, DescriptionValue, EnumLiteralValue, FieldArgumentName,
     FieldNameOrAlias, LinkedFieldAlias, LinkedFieldName, RelativePathToSourceFile,
@@ -7,7 +5,9 @@ use common_lang_types::{
     VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{FloatValue, GraphQLTypeAnnotation, NameValuePair};
+use intern::string_key::Lookup;
 use serde::Deserialize;
+use std::fmt::Debug;
 
 use crate::IsographFieldDirective;
 
@@ -319,16 +319,39 @@ impl NonConstantValue {
             // l for literal, i.e. this is shared with others
             NonConstantValue::Integer(int_value) => format!("l_{}", int_value),
             NonConstantValue::Boolean(bool) => format!("l_{}", bool),
-            // N.B. This clearly isn't correct, the string can (for example) include
-            // spaces, which would break things.
-            // TODO get a solution or validate
-            NonConstantValue::String(string) => format!("s_{}", string),
+            NonConstantValue::String(string) => format!(
+                "s_{}",
+                string
+                    .lookup()
+                    .chars()
+                    .map(|c| match c {
+                        'A'..='Z' | 'a'..='z' | '0'..='9' | '_' => c,
+                        // N.B. This clearly isn't correct, the string can (for example) include
+                        // spaces, which would break things.
+                        // TODO get a solution or validate
+                        _ => '_',
+                    })
+                    .collect::<String>(),
+            ),
             // Also not correct
             NonConstantValue::Float(f) => format!("l_{}", f.as_float()),
             NonConstantValue::Null => "l_null".to_string(),
             NonConstantValue::Enum(e) => format!("e_{e}"),
             NonConstantValue::List(_) => panic!("Lists are not supported here"),
-            NonConstantValue::Object(_) => panic!("Objects not supported here"),
+            NonConstantValue::Object(object) => {
+                format!(
+                    "o_{}_c",
+                    object
+                        .iter()
+                        .map(|pair| format!(
+                            "{}__{}",
+                            pair.name.item,
+                            pair.value.item.to_alias_str_chunk()
+                        ))
+                        .collect::<Vec<_>>()
+                        .join("_")
+                )
+            }
         }
     }
 }

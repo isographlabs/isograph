@@ -5,11 +5,12 @@ use common_lang_types::{
 use isograph_lang_types::{
     ClientFieldId, EntrypointDeclaration, SelectableServerFieldId, ServerObjectId,
 };
+
 use thiserror::Error;
 
-use crate::{ClientType, FieldType, UnvalidatedSchema};
+use crate::{ClientType, FieldType, OutputFormat, UnvalidatedSchema};
 
-impl UnvalidatedSchema {
+impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     pub fn validate_entrypoint_type_and_field(
         &self,
         text_source: TextSource,

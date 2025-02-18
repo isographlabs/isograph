@@ -8,6 +8,7 @@ const readerAst: ReaderAst<PullRequest__PullRequestLink__param> = [
     fieldName: "number",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
   {
     kind: "Linked",
@@ -21,6 +22,7 @@ const readerAst: ReaderAst<PullRequest__PullRequestLink__param> = [
         fieldName: "name",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
       {
         kind: "Linked",
@@ -34,6 +36,7 @@ const readerAst: ReaderAst<PullRequest__PullRequestLink__param> = [
             fieldName: "login",
             alias: null,
             arguments: null,
+            isUpdatable: false,
           },
         ],
       },

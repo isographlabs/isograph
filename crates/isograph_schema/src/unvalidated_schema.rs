@@ -7,14 +7,14 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ClientFieldId, ClientPointerId, EntrypointDeclaration, IsographSelectionVariant,
-    LinkedFieldSelection, SelectableServerFieldId, ServerFieldId, ServerScalarId,
-    VariableDefinition,
+    EntrypointDeclaration, IsographSelectionVariant, LinkedFieldSelection, SelectableServerFieldId,
+    ServerFieldId, ServerScalarId, VariableDefinition,
 };
 
 use crate::{
-    ClientField, ClientPointer, ClientType, FieldType, Schema, SchemaScalar, SchemaServerField,
-    SchemaValidationState, ServerFieldData, UseRefetchFieldRefetchStrategy, ValidatedSelection,
+    schema_validation_state::SchemaValidationState, ClientField, ClientPointer, ClientTypeId,
+    FieldType, OutputFormat, Schema, SchemaScalar, SchemaServerField, ServerFieldData,
+    UseRefetchFieldRefetchStrategy, ValidatedSelection,
 };
 use lazy_static::lazy_static;
 
@@ -56,33 +56,35 @@ pub struct ServerFieldTypeAssociatedDataInlineFragment {
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 }
 
-pub type UnvalidatedSchema = Schema<UnvalidatedSchemaState>;
+pub type UnvalidatedSchema<TOutputFormat> = Schema<UnvalidatedSchemaState, TOutputFormat>;
 
 /// On unvalidated schema objects, the encountered types are either a type annotation
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the
 /// client field.)
-pub type UnvalidatedObjectFieldInfo =
-    FieldType<ServerFieldId, ClientType<ClientFieldId, ClientPointerId>>;
+pub type UnvalidatedObjectFieldInfo = FieldType<ServerFieldId, ClientTypeId>;
 
-pub(crate) type UnvalidatedSchemaSchemaField = SchemaServerField<
+pub type UnvalidatedSchemaSchemaField<TOutputFormat> = SchemaServerField<
     <UnvalidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+    TOutputFormat,
 >;
 
 pub type UnvalidatedVariableDefinition = VariableDefinition<
     <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
 >;
 
-pub type UnvalidatedClientField = ClientField<
+pub type UnvalidatedClientField<TOutputFormat> = ClientField<
     <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+    TOutputFormat,
 >;
 
-pub type UnvalidatedClientPointer = ClientPointer<
+pub type UnvalidatedClientPointer<TOutputFormat> = ClientPointer<
     <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+    TOutputFormat,
 >;
 
 pub type UnvalidatedLinkedFieldSelection = LinkedFieldSelection<
@@ -95,13 +97,13 @@ pub type UnvalidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
     <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
 >;
 
-impl Default for UnvalidatedSchema {
+impl<TOutputFormat: OutputFormat> Default for UnvalidatedSchema<TOutputFormat> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl UnvalidatedSchema {
+impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     pub fn new() -> Self {
         // TODO add __typename
         let fields = vec![];
@@ -171,8 +173,8 @@ impl UnvalidatedSchema {
     }
 }
 
-fn add_schema_defined_scalar_type(
-    scalars: &mut Vec<SchemaScalar>,
+fn add_schema_defined_scalar_type<TOutputFormat: OutputFormat>(
+    scalars: &mut Vec<SchemaScalar<TOutputFormat>>,
     defined_types: &mut HashMap<UnvalidatedTypeName, SelectableServerFieldId>,
     field_name: &'static str,
     javascript_name: JavascriptName,
@@ -188,6 +190,7 @@ fn add_schema_defined_scalar_type(
         name: typename,
         id: scalar_id,
         javascript_name,
+        output_format: std::marker::PhantomData,
     });
     defined_types.insert(
         typename.item.into(),

@@ -6,7 +6,7 @@ use isograph_config::CompilerConfig;
 use isograph_lang_parser::{
     parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
 };
-use isograph_schema::UnvalidatedSchema;
+use isograph_schema::{OutputFormat, UnvalidatedSchema};
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::{
@@ -106,6 +106,8 @@ fn visit_dirs_skipping_isograph(dir: &Path, cb: &mut dyn FnMut(&DirEntry)) -> io
     Ok(())
 }
 
+// TODO this should return a Vec of Results, since a file can contain
+// both valid and invalid iso literals.
 #[allow(clippy::type_complexity)]
 pub fn parse_iso_literals_in_file_content(
     file_path: PathBuf,
@@ -147,12 +149,12 @@ pub fn parse_iso_literals_in_file_content(
     }
 }
 
-pub(crate) fn process_iso_literals(
-    schema: &mut UnvalidatedSchema,
+pub(crate) fn process_iso_literals<TOutputFormat: OutputFormat>(
+    schema: &mut UnvalidatedSchema<TOutputFormat>,
     contains_iso: ContainsIso,
 ) -> Result<(), BatchCompileError> {
     let mut errors = vec![];
-    for iso_literals in contains_iso.0.into_values() {
+    for iso_literals in contains_iso.files.into_values() {
         for (extraction_result, text_source) in iso_literals {
             match extraction_result {
                 IsoLiteralExtractionResult::ClientFieldDeclaration(client_field_declaration) => {

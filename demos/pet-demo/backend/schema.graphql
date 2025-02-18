@@ -4,6 +4,15 @@ type Query {
   petByName(name: String!): Pet
   node(id: ID!): Node
   viewer: Viewer!
+  topLevelField(input: TopLevelFieldInput): TopLevelField
+}
+
+input TopLevelFieldInput {
+  name: String
+}
+
+type TopLevelField {
+  name: String
 }
 
 type Viewer implements Node {

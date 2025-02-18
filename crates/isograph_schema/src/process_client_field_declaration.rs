@@ -10,15 +10,17 @@ use isograph_lang_types::{
     NonConstantValue, SelectableServerFieldId, ServerObjectId, TypeAnnotation,
 };
 use lazy_static::lazy_static;
+
 use thiserror::Error;
 
 use crate::{
+    expose_field_directive::RequiresRefinement,
     refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
-    ClientField, ClientPointer, ClientType, FieldMapItem, FieldType, RequiresRefinement,
+    ClientField, ClientPointer, ClientType, FieldMapItem, FieldType, OutputFormat,
     UnvalidatedSchema, UnvalidatedVariableDefinition, NODE_FIELD_NAME,
 };
 
-impl UnvalidatedSchema {
+impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     pub fn process_client_field_declaration(
         &mut self,
         client_field_declaration: WithSpan<ClientFieldDeclarationWithValidatedDirectives>,
@@ -196,6 +198,7 @@ impl UnvalidatedSchema {
                     None,
                 ))
             }),
+            output_format: std::marker::PhantomData,
         }));
         Ok(())
     }
@@ -269,6 +272,7 @@ impl UnvalidatedSchema {
                     }
                 }?,
                 to: to_object_id,
+                output_format: std::marker::PhantomData,
             }));
 
         let parent_object = self.server_field_data.object_mut(parent_object_id);
