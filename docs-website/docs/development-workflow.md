@@ -8,7 +8,6 @@ There are three major places to make changes to Isograph:
 - to the TypeScript runtime, which consumes the generated files, and
 - to the Rust language server
 
-
 ## Global setup
 
 ### node and `pnpm`
@@ -34,7 +33,7 @@ These commands will install the appropriate node.js and pnpm version used by Iso
 
 Isograph is built (in CI) using the latest stable version. Rust is fairly stable and we don't rely on anything crazy, so it should be safe to keep your `rustc` up-to-date.
 
-You should also install [`bacon`](https://dystroy.org/bacon/) via 
+You should also install [`bacon`](https://dystroy.org/bacon/) via
 
 ```sh
 cargo install bacon@3.1.1
