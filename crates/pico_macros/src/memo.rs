@@ -111,7 +111,7 @@ pub(crate) fn memo(_args: TokenStream, item: TokenStream) -> TokenStream {
                             let param_ref = ::pico::macro_fns::get_param(#db_arg, derived_node_id.params[#i])?;
                             let inner = param_ref
                                 .downcast_ref::<#target_type>()
-                                .expect("unexpecred param type. This is indicative of a bug in Pico.");
+                                .expect("Unexpected param type. This is indicative of a bug in Pico.");
                             #binding_expr
                         };
                     }
