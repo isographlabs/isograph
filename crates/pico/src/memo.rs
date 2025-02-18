@@ -174,5 +174,7 @@ fn with_dependency_tracking(
     inner_fn: InnerFn,
 ) -> Option<(Box<dyn DynEq>, TrackedDependencies)> {
     let guard = db.dependency_stack.enter();
-    inner_fn.0(db, derived_node_id).map(|v| (v, guard.release()))
+    let result = inner_fn.0(db, derived_node_id);
+    let dependencies = guard.release();
+    Some((result?, dependencies))
 }
