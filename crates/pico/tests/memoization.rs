@@ -31,7 +31,7 @@ fn memoization() {
     });
 
     let result = sum(&db, left, right);
-    assert_eq!(result, 14);
+    assert_eq!(*result, 14);
 
     // every functions has been called once on the first run
     assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 1);
@@ -50,7 +50,7 @@ fn memoization() {
     assert_eq!(SUM_COUNTER.load(Ordering::SeqCst), 1);
 
     let result = sum(&db, left, right);
-    assert_eq!(result, 14);
+    assert_eq!(*result, 14);
 
     // "left" must be called again because the input value has been changed
     assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 2);
@@ -65,7 +65,7 @@ fn memoization() {
         value: "3 * 3".to_string(),
     });
     let result = sum(&db, left, right);
-    assert_eq!(result, 17);
+    assert_eq!(*result, 17);
 
     // "left" must be called again because the input value has been changed
     assert_eq!(*EVAL_COUNTER.lock().unwrap().get(&left).unwrap(), 3);
@@ -93,7 +93,7 @@ fn parse_ast(db: &Database, id: SourceId<Input>) -> Result<Program> {
 #[memo]
 fn evaluate_input(db: &Database, id: SourceId<Input>) -> i64 {
     *EVAL_COUNTER.lock().unwrap().entry(id).or_insert(0) += 1;
-    let ast = parse_ast(db, id).expect("ast must be correct");
+    let ast = parse_ast(db, id).to_owned().expect("ast must be correct");
     eval(ast.expression).expect("value must be evaluated")
 }
 
@@ -103,5 +103,5 @@ fn sum(db: &Database, left: SourceId<Input>, right: SourceId<Input>) -> i64 {
     let left = evaluate_input(db, left);
     let right = evaluate_input(db, right);
 
-    left + right
+    *left + *right
 }

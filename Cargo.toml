@@ -13,7 +13,6 @@ clap = { version = "4.5.18", features = ["derive"] }
 colored = "2.0.4"
 colorize = "0.1.0"
 crossbeam = "0.8"
-darling = "0.20.10"
 dashmap = "6.0.1"
 lazy_static = "1.4"
 log = { version = "0.4.17", features = ["kv_unstable", "kv_unstable_std"] }

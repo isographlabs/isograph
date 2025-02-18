@@ -4,13 +4,14 @@ use crate::{
     derived_node::{DerivedNode, DerivedNodeId},
     dyn_eq::DynEq,
     epoch::Epoch,
-    u64_types::{Key, ParamId},
+    intern::Key,
     InnerFn,
 };
 
 pub enum DidRecalculate {
     ReusedMemoizedValue,
     Recalculated,
+    Error,
 }
 
 /// Memo is the workhorse function of pico. Given a [`DerivedNodeId`], which
@@ -71,8 +72,10 @@ fn create_derived_node(
     derived_node_id: DerivedNodeId,
     inner_fn: InnerFn,
 ) -> (Epoch, DidRecalculate) {
-    let (value, tracked_dependencies) =
-        with_dependency_tracking(db, derived_node_id.param_id, inner_fn);
+    let (value, tracked_dependencies) = with_dependency_tracking(db, derived_node_id, inner_fn)
+        .expect(
+            "InnerFn call cannot fail for a new derived node. This is indicative of a bug in Pico.",
+        );
     db.insert_derived_node(
         derived_node_id,
         DerivedNode {
@@ -98,23 +101,29 @@ fn update_derived_node(
     prev_value: &dyn DynEq,
     inner_fn: InnerFn,
 ) -> (Epoch, DidRecalculate) {
-    let (value, tracked_dependencies) =
-        with_dependency_tracking(db, derived_node_id.param_id, inner_fn);
-    let did_recalculate = if *prev_value != *value {
-        db.set_derive_node_time_updated(derived_node_id, tracked_dependencies.max_time_updated);
-        DidRecalculate::Recalculated
-    } else {
-        DidRecalculate::ReusedMemoizedValue
-    };
-    db.insert_derived_node(
-        derived_node_id,
-        DerivedNode {
-            dependencies: tracked_dependencies.dependencies,
-            inner_fn,
-            value,
-        },
-    );
-    (tracked_dependencies.max_time_updated, did_recalculate)
+    match with_dependency_tracking(db, derived_node_id, inner_fn) {
+        Some((value, tracked_dependencies)) => {
+            let did_recalculate = if *prev_value != *value {
+                db.set_derive_node_time_updated(
+                    derived_node_id,
+                    tracked_dependencies.max_time_updated,
+                );
+                DidRecalculate::Recalculated
+            } else {
+                DidRecalculate::ReusedMemoizedValue
+            };
+            db.insert_derived_node(
+                derived_node_id,
+                DerivedNode {
+                    dependencies: tracked_dependencies.dependencies,
+                    inner_fn,
+                    value,
+                },
+            );
+            (tracked_dependencies.max_time_updated, did_recalculate)
+        }
+        None => (Epoch::new(), DidRecalculate::Error),
+    }
 }
 
 fn any_dependency_changed(db: &Database, derived_node: &DerivedNode) -> bool {
@@ -140,9 +149,6 @@ fn source_node_changed_since(db: &Database, key: Key, since: Epoch) -> bool {
 }
 
 fn derived_node_changed_since(db: &Database, derived_node_id: DerivedNodeId, since: Epoch) -> bool {
-    if !db.contains_param(derived_node_id.param_id) {
-        return true;
-    }
     let inner_fn = if let Some(derived_node) = db.get_derived_node(derived_node_id) {
         if let Some(rev) = db.get_derived_node_revision(derived_node_id) {
             if rev.time_updated > since {
@@ -156,16 +162,17 @@ fn derived_node_changed_since(db: &Database, derived_node_id: DerivedNodeId, sin
         return true;
     };
     let did_recalculate = memo(db, derived_node_id, inner_fn);
-    matches!(did_recalculate, DidRecalculate::Recalculated)
+    matches!(
+        did_recalculate,
+        DidRecalculate::Recalculated | DidRecalculate::Error
+    )
 }
 
 fn with_dependency_tracking(
     db: &Database,
-    param_id: ParamId,
+    derived_node_id: DerivedNodeId,
     inner_fn: InnerFn,
-) -> (Box<dyn DynEq>, TrackedDependencies) {
+) -> Option<(Box<dyn DynEq>, TrackedDependencies)> {
     let guard = db.dependency_stack.enter();
-    let value = inner_fn.0(db, param_id);
-    let tracked_dependencies = guard.release();
-    (value, tracked_dependencies)
+    inner_fn.0(db, derived_node_id).map(|v| (v, guard.release()))
 }

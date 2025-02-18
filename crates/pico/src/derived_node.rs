@@ -1,29 +1,43 @@
-use std::{fmt, hash::Hash};
+use std::{fmt, hash::Hash, marker::PhantomData, ops::Deref};
+
+use intern::{intern_struct, InternId};
+use serde::{Deserialize, Serialize};
+use tinyvec::ArrayVec;
 
 use crate::{
     dependency::Dependency,
     dyn_eq::DynEq,
     epoch::Epoch,
-    u64_types::{Key, ParamId},
+    intern::{Key, ParamId},
     Database,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct DerivedNodeId {
+#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub struct DerivedNodeDescriptor {
     pub key: Key,
-    pub param_id: ParamId,
+    pub params: ArrayVec<[ParamId; 8]>,
+}
+
+intern_struct! {
+    pub struct DerivedNodeId = Intern<DerivedNodeDescriptor> {}
 }
 
 impl DerivedNodeId {
-    pub fn new(key: Key, param_id: ParamId) -> Self {
-        Self { key, param_id }
+    pub fn new(key: Key, params: ArrayVec<[ParamId; 8]>) -> Self {
+        Self::intern(DerivedNodeDescriptor { key, params })
+    }
+}
+
+impl From<ParamId> for DerivedNodeId {
+    fn from(value: ParamId) -> Self {
+        DerivedNodeId::from_index_checked(**value.inner() as u32).unwrap()
     }
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct InnerFn(pub fn(&Database, ParamId) -> Box<dyn DynEq>);
+pub struct InnerFn(pub fn(&Database, DerivedNodeId) -> Option<Box<dyn DynEq>>);
 impl InnerFn {
-    pub fn new(inner_fn: fn(&Database, ParamId) -> Box<dyn DynEq>) -> Self {
+    pub fn new(inner_fn: fn(&Database, DerivedNodeId) -> Option<Box<dyn DynEq>>) -> Self {
         InnerFn(inner_fn)
     }
 }
@@ -47,4 +61,46 @@ impl fmt::Debug for DerivedNode {
 pub struct DerivedNodeRevision {
     pub time_updated: Epoch,
     pub time_verified: Epoch,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct MemoRef<'db, T> {
+    db: &'db Database,
+    derived_node_id: DerivedNodeId,
+    phantom: PhantomData<T>,
+}
+
+impl<'db, T: 'static + Clone> MemoRef<'db, T> {
+    pub fn new(db: &'db Database, derived_node_id: DerivedNodeId) -> Self {
+        Self {
+            db,
+            derived_node_id,
+            phantom: PhantomData,
+        }
+    }
+
+    pub fn to_owned(&self) -> T {
+        self.deref().clone()
+    }
+}
+
+impl<T> From<MemoRef<'_, T>> for ParamId {
+    fn from(val: MemoRef<'_, T>) -> Self {
+        let idx: u64 = val.derived_node_id.index().into();
+        ParamId::from(idx)
+    }
+}
+
+impl<T: 'static> Deref for MemoRef<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.db
+            .get_derived_node(self.derived_node_id)
+            .unwrap()
+            .value
+            .as_any()
+            .downcast_ref::<T>()
+            .unwrap()
+    }
 }
