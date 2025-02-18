@@ -135,14 +135,17 @@ pub(crate) fn memo(_args: TokenStream, item: TokenStream) -> TokenStream {
                 #param_ids_blocks
             )*
             let derived_node_id = ::pico::DerivedNodeId::new(#fn_hash.into(), param_ids);
-            let did_recalculated = ::pico::memo(#db_arg, derived_node_id, ::pico::InnerFn::new(|#db_arg, derived_node_id| {
+            let did_recalculate = ::pico::memo(#db_arg, derived_node_id, ::pico::InnerFn::new(|#db_arg, derived_node_id| {
                 #(
                     #extract_parameters
                 )*
                 let value: #return_type = (|| #block)();
                 Some(Box::new(value))
             }));
-            debug_assert!(!matches!(did_recalculated, pico::DidRecalculate::Error), "Unexpected memo result. This is indicative of a bug in Pico.");
+            debug_assert!(
+                !matches!(did_recalculate, pico::DidRecalculate::Error),
+                "Unexpected memo result. This is indicative of a bug in Pico."
+            );
             ::pico::MemoRef::new(#db_arg, derived_node_id)
         }
     };
