@@ -31,40 +31,32 @@ pub(crate) fn memo(_args: TokenStream, item: TokenStream) -> TokenStream {
         _ => unreachable!(),
     };
 
-    let other_args = sig.inputs.iter().skip(1).map(|arg| match arg {
-        FnArg::Typed(PatType { pat, .. }) => pat,
+    let args = sig.inputs.iter().skip(1).map(|arg| match arg {
+        FnArg::Typed(PatType { pat, ty, .. }) => (pat, ty),
         _ => unreachable!(),
     });
 
-    let argument_types = sig.inputs.iter().skip(1).map(|arg| match arg {
-        FnArg::Typed(PatType { ty, .. }) => ty,
-        _ => unreachable!(),
+    let param_ids_blocks = args.clone().map(|(arg, ty)| match ArgType::parse(ty) {
+        ArgType::Source | ArgType::MemoRef => {
+            let param_arg = match **ty {
+                syn::Type::Reference(_) => quote!((*(#arg))),
+                _ => quote!(#arg),
+            };
+            quote! {
+                param_ids.push(#param_arg.into());
+            }
+        }
+        ArgType::Other => {
+            let param_arg = match **ty {
+                syn::Type::Reference(_) => quote!(#arg),
+                _ => quote!(&#arg),
+            };
+            quote! {
+                let param_id = ::pico::macro_fns::intern_param(#db_arg, #param_arg);
+                param_ids.push(param_id);
+            }
+        }
     });
-
-    let param_ids_blocks = other_args
-        .clone()
-        .zip(argument_types.clone())
-        .map(|(arg, ty)| match ArgType::parse(ty) {
-            ArgType::Source | ArgType::MemoRef => {
-                let param_arg = match **ty {
-                    syn::Type::Reference(_) => quote!((*(#arg))),
-                    _ => quote!(#arg),
-                };
-                quote! {
-                    param_ids.push(#param_arg.into());
-                }
-            }
-            ArgType::Other => {
-                let param_arg = match **ty {
-                    syn::Type::Reference(_) => quote!(#arg),
-                    _ => quote!(&#arg),
-                };
-                quote! {
-                    let param_id = ::pico::macro_fns::intern_param(#db_arg, #param_arg);
-                    param_ids.push(param_id);
-                }
-            }
-        });
 
     let return_type = match &sig.output {
         ReturnType::Type(_, ty) => ty.clone(),
@@ -81,7 +73,7 @@ pub(crate) fn memo(_args: TokenStream, item: TokenStream) -> TokenStream {
         Box::new(parse_quote!(::pico::MemoRef<#lifetime, #return_type>)),
     );
 
-    let extract_parameters = other_args.clone().zip(argument_types.clone())
+    let extract_parameters = args
         .enumerate()
         .map(|(i, (arg, ty))| {
             match ArgType::parse(ty) {
