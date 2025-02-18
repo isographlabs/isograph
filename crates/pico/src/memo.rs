@@ -32,7 +32,7 @@ pub enum DidRecalculate {
 ///
 /// **Checking whether we can reuse a previous invocation**:
 ///   - This is done by checking whether
-///     [any dependency has changed](`any_dependency_changed`) since this
+///     [any dependency has changed][`any_dependency_changed`] since this
 ///     [`DerivedNode`] was last verified.
 ///   - Memoized functions are assumed to be pure functions of their params
 ///     and the dependencies that they read. So, if no dependency has
