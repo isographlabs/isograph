@@ -48,7 +48,7 @@ impl Database {
     }
 
     /// Note: this function is also inlined into [Database::set]
-    pub fn increment_epoch(&mut self) -> Epoch {
+    pub(crate) fn increment_epoch(&mut self) -> Epoch {
         let next_epoch = self.current_epoch.increment();
         self.epoch_to_generation_map
             .insert(next_epoch, |_| Box::new(Generation::new()));
