@@ -144,7 +144,10 @@ fn any_dependency_changed(db: &Database, derived_node: &DerivedNode) -> bool {
 fn source_node_changed_since(db: &Database, key: Key, since: Epoch) -> bool {
     match db.source_nodes.get(&key) {
         Some(source) => source.time_updated > since,
-        None => panic!("Source node not found. This may occur if `SourceId` is used after the source node has been removed."),
+        None => panic!(
+            "Source node not found. This may occur if \
+            a `SourceId` is used after the source node has been removed."
+        ),
     }
 }
 
