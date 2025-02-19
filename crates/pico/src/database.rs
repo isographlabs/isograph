@@ -17,7 +17,6 @@ use crate::derived_node::{DerivedNode, DerivedNodeId, DerivedNodeRevision};
 pub struct Database {
     pub(crate) dependency_stack: DependencyStack,
     pub(crate) param_id_to_index: DashMap<ParamId, Index<ParamId>>,
-    pub(crate) derived_node_id_to_index: DashMap<DerivedNodeId, Index<DerivedNodeId>>,
     pub(crate) derived_node_id_to_revision: DashMap<DerivedNodeId, DerivedNodeRevision>,
     pub(crate) source_nodes: DashMap<Key, SourceNode>,
 
@@ -33,7 +32,6 @@ impl Database {
         Self {
             dependency_stack: DependencyStack::new(),
             param_id_to_index: DashMap::new(),
-            derived_node_id_to_index: DashMap::new(),
             derived_node_id_to_revision: DashMap::new(),
 
             source_nodes: DashMap::new(),
@@ -58,23 +56,14 @@ impl Database {
     }
 
     pub(crate) fn get_derived_node(&self, derived_node_id: DerivedNodeId) -> Option<&DerivedNode> {
-        let index = self.derived_node_id_to_index.get(&derived_node_id)?;
+        let index = self
+            .derived_node_id_to_revision
+            .get(&derived_node_id)?
+            .index;
         Some(self.derived_nodes.get(index.idx).expect(
             "indexes should always be valid. \
                 This is indicative of a bug in Isograph.",
         ))
-    }
-
-    pub(crate) fn set_derive_node_time_updated(
-        &self,
-        derived_node_id: DerivedNodeId,
-        time_updated: Epoch,
-    ) {
-        let mut rev = self
-            .derived_node_id_to_revision
-            .get_mut(&derived_node_id)
-            .unwrap();
-        rev.time_updated = time_updated;
     }
 
     pub(crate) fn node_verified_in_current_epoch(&self, derived_node_id: DerivedNodeId) -> bool {
@@ -106,24 +95,20 @@ impl Database {
         derived_node_id: DerivedNodeId,
         time_updated: Epoch,
         time_verified: Epoch,
+        index: Index<DerivedNodeId>,
     ) {
         self.derived_node_id_to_revision.insert(
             derived_node_id,
             DerivedNodeRevision {
                 time_updated,
                 time_verified,
+                index,
             },
         );
     }
 
-    pub(crate) fn insert_derived_node(
-        &self,
-        derived_node_id: DerivedNodeId,
-        derived_node: DerivedNode,
-    ) {
-        let idx = self.derived_nodes.push(derived_node);
-        self.derived_node_id_to_index
-            .insert(derived_node_id, Index::new(idx));
+    pub(crate) fn insert_derived_node(&self, derived_node: DerivedNode) -> Index<DerivedNodeId> {
+        Index::new(self.derived_nodes.push(derived_node))
     }
 
     pub fn get<T: Clone + 'static>(&self, id: SourceId<T>) -> T {
