@@ -7,7 +7,7 @@ use tinyvec::ArrayVec;
 use crate::{
     dependency::Dependency,
     dyn_eq::DynEq,
-    epoch::Epoch,
+    epoch::{Epoch, GcEpoch},
     intern::{Key, ParamId},
     Database,
 };
@@ -68,6 +68,7 @@ pub struct MemoRef<'db, T> {
     db: &'db Database,
     derived_node_id: DerivedNodeId,
     phantom: PhantomData<T>,
+    valid_during_gc_epoch: GcEpoch,
 }
 
 impl<'db, T: 'static + Clone> MemoRef<'db, T> {
@@ -76,6 +77,7 @@ impl<'db, T: 'static + Clone> MemoRef<'db, T> {
             db,
             derived_node_id,
             phantom: PhantomData,
+            valid_during_gc_epoch: db.gc_epoch,
         }
     }
 
@@ -95,6 +97,13 @@ impl<T: 'static> Deref for MemoRef<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
+        if self.db.gc_epoch != self.valid_during_gc_epoch {
+            panic!(
+                "Attempted to dereference MemoRef after garbage collection. \
+                This is disallowed."
+            )
+        }
+
         self.db
             .get_derived_node(self.derived_node_id)
             .unwrap()

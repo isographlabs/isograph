@@ -3,18 +3,15 @@ use std::any::Any;
 use crate::{
     dependency::{Dependency, DependencyStack, NodeKind},
     dyn_eq::DynEq,
-    epoch::Epoch,
+    epoch::{Epoch, GcEpoch},
     index::Index,
     intern::{Key, ParamId},
     source::{Source, SourceId, SourceNode},
 };
+use boxcar::Vec as BoxcarVec;
 use dashmap::{DashMap, Entry};
-use once_map::OnceMap;
 
-use crate::{
-    derived_node::{DerivedNode, DerivedNodeId, DerivedNodeRevision},
-    generation::Generation,
-};
+use crate::derived_node::{DerivedNode, DerivedNodeId, DerivedNodeRevision};
 
 #[derive(Debug)]
 pub struct Database {
@@ -24,78 +21,48 @@ pub struct Database {
     pub(crate) derived_node_id_to_revision: DashMap<DerivedNodeId, DerivedNodeRevision>,
     pub(crate) source_nodes: DashMap<Key, SourceNode>,
 
-    /// The oldest epoch currently in the epoch to generation map (inclusive)
-    pub(crate) earliest_epoch: Epoch,
+    pub(crate) derived_nodes: BoxcarVec<DerivedNode>,
+    pub(crate) params: BoxcarVec<Box<dyn Any>>,
     pub(crate) current_epoch: Epoch,
-    pub(crate) epoch_to_generation_map: OnceMap<Epoch, Box<Generation>>,
+    pub(crate) gc_epoch: GcEpoch,
 }
 
 impl Database {
     pub fn new() -> Self {
-        let epoch_to_generation_map = OnceMap::new();
         let current_epoch = Epoch::new();
-        epoch_to_generation_map.insert(current_epoch, |_| Box::new(Generation::new()));
         Self {
-            current_epoch,
-            earliest_epoch: current_epoch,
             dependency_stack: DependencyStack::new(),
             param_id_to_index: DashMap::new(),
             derived_node_id_to_index: DashMap::new(),
             derived_node_id_to_revision: DashMap::new(),
+
             source_nodes: DashMap::new(),
-            epoch_to_generation_map,
+            derived_nodes: BoxcarVec::new(),
+            params: BoxcarVec::new(),
+
+            current_epoch,
+            gc_epoch: GcEpoch::new(),
         }
     }
 
-    /// Note: this function is also inlined into [Database::set]
     pub(crate) fn increment_epoch(&mut self) -> Epoch {
-        let next_epoch = self.current_epoch.increment();
-        self.epoch_to_generation_map
-            .insert(next_epoch, |_| Box::new(Generation::new()));
-        next_epoch
-    }
-
-    /// Drop epochs until first_epoch_to_keep.
-    pub fn drop_epochs(&mut self, first_epoch_to_keep: Epoch) {
-        debug_assert!(
-            first_epoch_to_keep <= self.current_epoch,
-            "Cannot drop the current epoch."
-        );
-
-        if first_epoch_to_keep < self.earliest_epoch {
-            return;
-        }
-
-        for epoch_to_drop in self.earliest_epoch.to(first_epoch_to_keep) {
-            self.epoch_to_generation_map.remove(&epoch_to_drop);
-        }
-        self.earliest_epoch = first_epoch_to_keep;
-    }
-
-    pub(crate) fn contains_param(&self, param_id: ParamId) -> bool {
-        if let Some(index) = self.param_id_to_index.get(&param_id) {
-            self.epoch_to_generation_map.contains_key(&index.epoch)
-        } else {
-            false
-        }
+        self.current_epoch.increment()
     }
 
     pub(crate) fn get_param(&self, param_id: ParamId) -> Option<&Box<dyn Any>> {
         let index = self.param_id_to_index.get(&param_id)?;
-        Some(
-            self.epoch_to_generation_map
-                .get(&index.epoch)?
-                .get_param(*index),
-        )
+        Some(self.params.get(index.idx).expect(
+            "indexes should always be valid. \
+                This is indicative of a bug in Isograph.",
+        ))
     }
 
     pub(crate) fn get_derived_node(&self, derived_node_id: DerivedNodeId) -> Option<&DerivedNode> {
         let index = self.derived_node_id_to_index.get(&derived_node_id)?;
-        Some(
-            self.epoch_to_generation_map
-                .get(&index.epoch)?
-                .get_derived_node(*index),
-        )
+        Some(self.derived_nodes.get(index.idx).expect(
+            "indexes should always be valid. \
+                This is indicative of a bug in Isograph.",
+        ))
     }
 
     pub(crate) fn set_derive_node_time_updated(
@@ -154,13 +121,9 @@ impl Database {
         derived_node_id: DerivedNodeId,
         derived_node: DerivedNode,
     ) {
-        let idx = self
-            .epoch_to_generation_map
-            .get(&self.current_epoch)
-            .unwrap()
-            .insert_derived_node(derived_node);
+        let idx = self.derived_nodes.push(derived_node);
         self.derived_node_id_to_index
-            .insert(derived_node_id, Index::new(self.current_epoch, idx));
+            .insert(derived_node_id, Index::new(idx));
     }
 
     pub fn get<T: Clone + 'static>(&self, id: SourceId<T>) -> T {
@@ -188,12 +151,10 @@ impl Database {
             Entry::Occupied(mut occupied_entry) => {
                 let existing_node = occupied_entry.get();
                 if !existing_node.value.dyn_eq(&source) {
-                    // [Database::set] has been inlined here!
                     // We cannot call self.increment_epoch() because that borrows
                     // the entire struct, but self.source_nodes is already borrowed
                     let next_epoch = self.current_epoch.increment();
-                    self.epoch_to_generation_map
-                        .insert(next_epoch, |_| Box::new(Generation::new()));
+
                     *(occupied_entry.get_mut()) = SourceNode {
                         time_updated: next_epoch,
                         value: Box::new(source),
