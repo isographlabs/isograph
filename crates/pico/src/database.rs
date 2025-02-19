@@ -3,7 +3,7 @@ use std::any::Any;
 use crate::{
     dependency::{Dependency, DependencyStack, NodeKind},
     dyn_eq::DynEq,
-    epoch::{Epoch, GcEpoch},
+    epoch::Epoch,
     index::Index,
     intern::{Key, ParamId},
     source::{Source, SourceId, SourceNode},
@@ -23,7 +23,6 @@ pub struct Database {
     pub(crate) derived_nodes: BoxcarVec<DerivedNode>,
     pub(crate) params: BoxcarVec<Box<dyn Any>>,
     pub(crate) current_epoch: Epoch,
-    pub(crate) gc_epoch: GcEpoch,
 }
 
 impl Database {
@@ -39,7 +38,6 @@ impl Database {
             params: BoxcarVec::new(),
 
             current_epoch,
-            gc_epoch: GcEpoch::new(),
         }
     }
 
