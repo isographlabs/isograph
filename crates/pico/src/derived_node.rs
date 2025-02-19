@@ -8,6 +8,7 @@ use crate::{
     dependency::Dependency,
     dyn_eq::DynEq,
     epoch::Epoch,
+    index::Index,
     intern::{Key, ParamId},
     Database,
 };
@@ -61,6 +62,7 @@ impl fmt::Debug for DerivedNode {
 pub struct DerivedNodeRevision {
     pub time_updated: Epoch,
     pub time_verified: Epoch,
+    pub index: Index<DerivedNodeId>,
 }
 
 #[derive(Debug, Clone, Copy)]

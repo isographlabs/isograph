@@ -3,9 +3,10 @@ use std::{
     hash::{DefaultHasher, Hash, Hasher},
 };
 
+use dashmap::Entry;
 use tinyvec::ArrayVec;
 
-use crate::{index::Index, Database, DerivedNode, DerivedNodeId, ParamId};
+use crate::{index::Index, Database, ParamId};
 
 pub fn init_param_vec() -> ArrayVec<[ParamId; 8]> {
     ArrayVec::<[ParamId; 8]>::default()
@@ -13,20 +14,11 @@ pub fn init_param_vec() -> ArrayVec<[ParamId; 8]> {
 
 pub fn intern_param<T: Hash + Clone + 'static>(db: &Database, param: &T) -> ParamId {
     let param_id = hash(param).into();
-    if !db.contains_param(param_id) {
-        let idx = db
-            .epoch_to_generation_map
-            .get(&db.current_epoch)
-            .unwrap()
-            .insert_param(Box::new(param.clone()));
-        db.param_id_to_index
-            .insert(param_id, Index::new(db.current_epoch, idx));
+    if let Entry::Vacant(v) = db.param_id_to_index.entry(param_id) {
+        let idx = db.params.push(Box::new(param.clone()));
+        v.insert(Index::new(idx));
     }
     param_id
-}
-
-pub fn get_derived_node(db: &Database, derived_node_id: DerivedNodeId) -> Option<&DerivedNode> {
-    db.get_derived_node(derived_node_id)
 }
 
 pub fn get_param(db: &Database, param_id: ParamId) -> Option<&Box<dyn Any>> {

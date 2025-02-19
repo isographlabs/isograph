@@ -1,3 +1,5 @@
+use dashmap::Entry;
+
 use crate::{
     database::Database,
     dependency::{NodeKind, TrackedDependencies},
@@ -80,18 +82,16 @@ fn create_derived_node(
         .expect(
             "InnerFn call cannot fail for a new derived node. This is indicative of a bug in Pico.",
         );
-    db.insert_derived_node(
-        derived_node_id,
-        DerivedNode {
-            dependencies: tracked_dependencies.dependencies,
-            inner_fn,
-            value,
-        },
-    );
+    let index = db.insert_derived_node(DerivedNode {
+        dependencies: tracked_dependencies.dependencies,
+        inner_fn,
+        value,
+    });
     db.insert_derived_node_revision(
         derived_node_id,
         tracked_dependencies.max_time_updated,
         db.current_epoch,
+        index,
     );
     (
         tracked_dependencies.max_time_updated,
@@ -107,23 +107,29 @@ fn update_derived_node(
 ) -> (Epoch, DidRecalculate) {
     match with_dependency_tracking(db, derived_node_id, inner_fn) {
         Some((value, tracked_dependencies)) => {
+            let mut occupied = if let Entry::Occupied(occupied) =
+                db.derived_node_id_to_revision.entry(derived_node_id)
+            {
+                occupied
+            } else {
+                panic!("Expected derived_node_id_to_revision to not be empty at this time");
+            };
+
             let did_recalculate = if *prev_value != *value {
-                db.set_derive_node_time_updated(
-                    derived_node_id,
-                    tracked_dependencies.max_time_updated,
-                );
+                occupied.get_mut().time_updated = tracked_dependencies.max_time_updated;
                 DidRecalculate::Recalculated
             } else {
                 DidRecalculate::ReusedMemoizedValue
             };
-            db.insert_derived_node(
-                derived_node_id,
-                DerivedNode {
-                    dependencies: tracked_dependencies.dependencies,
-                    inner_fn,
-                    value,
-                },
-            );
+
+            let index = db.insert_derived_node(DerivedNode {
+                dependencies: tracked_dependencies.dependencies,
+                inner_fn,
+                value,
+            });
+
+            occupied.get_mut().index = index;
+
             (tracked_dependencies.max_time_updated, did_recalculate)
         }
         None => (Epoch::new(), DidRecalculate::Error),
