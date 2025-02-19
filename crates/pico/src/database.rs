@@ -41,10 +41,6 @@ impl Database {
         }
     }
 
-    pub(crate) fn increment_epoch(&mut self) -> Epoch {
-        self.current_epoch.increment()
-    }
-
     pub(crate) fn get_param(&self, param_id: ParamId) -> Option<&Box<dyn Any>> {
         let index = self.param_id_to_index.get(&param_id)?;
         Some(self.params.get(index.idx).expect(
@@ -157,7 +153,7 @@ impl Database {
     }
 
     pub fn remove<T>(&mut self, id: SourceId<T>) {
-        self.increment_epoch();
+        self.current_epoch.increment();
         self.source_nodes.remove(&id.key);
     }
 
