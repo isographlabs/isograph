@@ -19,6 +19,7 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
     alias: null,
     arguments: null,
     condition: null,
+    isUpdatable: false,
     selections: [
       {
         kind: "Scalar",

@@ -22,6 +22,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
       ],
     ],
     condition: null,
+    isUpdatable: false,
     selections: [
       {
         kind: "Resolver",
@@ -43,6 +44,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
         alias: null,
         arguments: null,
         condition: null,
+        isUpdatable: false,
         selections: [
           {
             kind: "Resolver",
@@ -71,6 +73,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
           ],
         ],
         condition: null,
+        isUpdatable: false,
         selections: [
           {
             kind: "Resolver",

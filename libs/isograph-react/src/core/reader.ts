@@ -112,6 +112,7 @@ export type ReaderLinkedField = {
     { data: object; parameters: any; startUpdate?: StartUpdate<object> },
     boolean | Link | null
   > | null;
+  readonly isUpdatable: boolean;
 };
 
 export type ReaderNonLoadableResolverField = {

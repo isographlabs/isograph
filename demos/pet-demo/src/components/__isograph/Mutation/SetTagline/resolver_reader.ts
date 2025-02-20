@@ -14,6 +14,7 @@ const readerAst: ReaderAst<Mutation__SetTagline__param> = [
       ],
     ],
     condition: null,
+    isUpdatable: false,
     selections: [
       {
         kind: "Linked",
@@ -21,6 +22,7 @@ const readerAst: ReaderAst<Mutation__SetTagline__param> = [
         alias: null,
         arguments: null,
         condition: null,
+        isUpdatable: false,
         selections: [
           {
             kind: "Scalar",

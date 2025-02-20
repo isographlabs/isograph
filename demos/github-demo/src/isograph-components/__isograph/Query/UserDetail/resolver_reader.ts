@@ -15,6 +15,7 @@ const readerAst: ReaderAst<Query__UserDetail__param> = [
       ],
     ],
     condition: null,
+    isUpdatable: false,
     selections: [
       {
         kind: "Scalar",

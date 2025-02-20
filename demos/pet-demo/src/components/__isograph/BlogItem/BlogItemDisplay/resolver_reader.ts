@@ -51,6 +51,7 @@ const readerAst: ReaderAst<BlogItem__BlogItemDisplay__param> = [
     alias: null,
     arguments: null,
     condition: null,
+    isUpdatable: false,
     selections: [
       {
         kind: "Resolver",

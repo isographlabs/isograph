@@ -23,6 +23,7 @@ const readerAst: ReaderAst<Repository__RepositoryLink__param> = [
     alias: null,
     arguments: null,
     condition: null,
+    isUpdatable: false,
     selections: [
       {
         kind: "Scalar",

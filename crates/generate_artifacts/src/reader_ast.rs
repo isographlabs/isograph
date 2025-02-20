@@ -152,6 +152,11 @@ fn linked_field_ast_node<TOutputFormat: OutputFormat>(
         }
     };
 
+    let is_updatable = matches!(
+        linked_field.associated_data.selection_variant,
+        ValidatedIsographSelectionVariant::Updatable
+    );
+
     format!(
         "{indent_1}{{\n\
         {indent_2}kind: \"Linked\",\n\
@@ -159,6 +164,7 @@ fn linked_field_ast_node<TOutputFormat: OutputFormat>(
         {indent_2}alias: {alias},\n\
         {indent_2}arguments: {arguments},\n\
         {indent_2}condition: {condition},\n\
+        {indent_2}isUpdatable: {is_updatable},\n\
         {indent_2}selections: {inner_reader_ast},\n\
         {indent_1}}},\n",
     )

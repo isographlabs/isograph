@@ -10,6 +10,7 @@ const readerAst: ReaderAst<Query__meNameSuccessor__param> = [
     alias: null,
     arguments: null,
     condition: null,
+    isUpdatable: false,
     selections: [
       {
         kind: "Scalar",
@@ -24,6 +25,7 @@ const readerAst: ReaderAst<Query__meNameSuccessor__param> = [
         alias: null,
         arguments: null,
         condition: null,
+        isUpdatable: false,
         selections: [
           {
             kind: "Linked",
@@ -31,6 +33,7 @@ const readerAst: ReaderAst<Query__meNameSuccessor__param> = [
             alias: null,
             arguments: null,
             condition: null,
+            isUpdatable: false,
             selections: [
               {
                 kind: "Scalar",

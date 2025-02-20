@@ -15,6 +15,7 @@ const readerAst: ReaderAst<Query__PetByName__param> = [
       ],
     ],
     condition: null,
+    isUpdatable: false,
     selections: [
       {
         kind: "Resolver",

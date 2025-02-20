@@ -17,6 +17,7 @@ const readerAst: ReaderAst<Actor__UserLink__param> = [
     alias: null,
     arguments: null,
     condition: User__asUser__resolver_reader,
+    isUpdatable: false,
     selections: [
       {
         kind: "Scalar",
