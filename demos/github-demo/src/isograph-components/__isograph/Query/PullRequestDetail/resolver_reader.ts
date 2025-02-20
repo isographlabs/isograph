@@ -20,6 +20,7 @@ const readerAst: ReaderAst<Query__PullRequestDetail__param> = [
       ],
     ],
     condition: null,
+    isUpdatable: false,
     selections: [
       {
         kind: "Linked",
@@ -32,6 +33,7 @@ const readerAst: ReaderAst<Query__PullRequestDetail__param> = [
           ],
         ],
         condition: null,
+        isUpdatable: false,
         selections: [
           {
             kind: "Scalar",

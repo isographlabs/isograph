@@ -23,6 +23,7 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
       ],
     ],
     condition: null,
+    isUpdatable: false,
     selections: [
       {
         kind: "Linked",
@@ -30,6 +31,7 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
         alias: null,
         arguments: null,
         condition: AdItem__asAdItem__resolver_reader,
+        isUpdatable: false,
         selections: [
           {
             kind: "Scalar",
@@ -46,6 +48,7 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
         alias: null,
         arguments: null,
         condition: BlogItem__asBlogItem__resolver_reader,
+        isUpdatable: false,
         selections: [
           {
             kind: "Scalar",
