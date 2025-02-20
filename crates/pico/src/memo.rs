@@ -55,15 +55,21 @@ pub enum DidRecalculate {
 /// function) is present in the [`Database`].
 pub fn memo(db: &Database, derived_node_id: DerivedNodeId, inner_fn: InnerFn) -> DidRecalculate {
     let (time_updated, did_recalculate) =
-        if let Some(derived_node) = db.get_derived_node(derived_node_id) {
-            if db.node_verified_in_current_epoch(derived_node_id) {
-                (db.current_epoch, DidRecalculate::ReusedMemoizedValue)
+        if let Some(derived_node) = db.storage.get_derived_node(derived_node_id) {
+            if db.storage.node_verified_in_current_epoch(derived_node_id) {
+                (
+                    db.storage.current_epoch,
+                    DidRecalculate::ReusedMemoizedValue,
+                )
             } else {
-                db.verify_derived_node(derived_node_id);
+                db.storage.verify_derived_node(derived_node_id);
                 if any_dependency_changed(db, derived_node) {
                     update_derived_node(db, derived_node_id, derived_node.value.as_ref(), inner_fn)
                 } else {
-                    (db.current_epoch, DidRecalculate::ReusedMemoizedValue)
+                    (
+                        db.storage.current_epoch,
+                        DidRecalculate::ReusedMemoizedValue,
+                    )
                 }
             }
         } else {
@@ -82,15 +88,15 @@ fn create_derived_node(
         .expect(
             "InnerFn call cannot fail for a new derived node. This is indicative of a bug in Pico.",
         );
-    let index = db.insert_derived_node(DerivedNode {
+    let index = db.storage.insert_derived_node(DerivedNode {
         dependencies: tracked_dependencies.dependencies,
         inner_fn,
         value,
     });
-    db.insert_derived_node_revision(
+    db.storage.insert_derived_node_revision(
         derived_node_id,
         tracked_dependencies.max_time_updated,
-        db.current_epoch,
+        db.storage.current_epoch,
         index,
     );
     (
@@ -107,8 +113,10 @@ fn update_derived_node(
 ) -> (Epoch, DidRecalculate) {
     match with_dependency_tracking(db, derived_node_id, inner_fn) {
         Some((value, tracked_dependencies)) => {
-            let mut occupied = if let Entry::Occupied(occupied) =
-                db.derived_node_id_to_revision.entry(derived_node_id)
+            let mut occupied = if let Entry::Occupied(occupied) = db
+                .storage
+                .derived_node_id_to_revision
+                .entry(derived_node_id)
             {
                 occupied
             } else {
@@ -122,7 +130,7 @@ fn update_derived_node(
                 DidRecalculate::ReusedMemoizedValue
             };
 
-            let index = db.insert_derived_node(DerivedNode {
+            let index = db.storage.insert_derived_node(DerivedNode {
                 dependencies: tracked_dependencies.dependencies,
                 inner_fn,
                 value,
@@ -140,7 +148,7 @@ fn any_dependency_changed(db: &Database, derived_node: &DerivedNode) -> bool {
     derived_node
         .dependencies
         .iter()
-        .filter(|dep| dep.time_verified_or_updated != db.current_epoch)
+        .filter(|dep| dep.time_verified_or_updated != db.storage.current_epoch)
         .any(|dependency| match dependency.node_to {
             NodeKind::Source(key) => {
                 source_node_changed_since(db, key, dependency.time_verified_or_updated)
@@ -152,7 +160,7 @@ fn any_dependency_changed(db: &Database, derived_node: &DerivedNode) -> bool {
 }
 
 fn source_node_changed_since(db: &Database, key: Key, since: Epoch) -> bool {
-    match db.source_nodes.get(&key) {
+    match db.storage.source_nodes.get(&key) {
         Some(source) => source.time_updated > since,
         None => panic!(
             "Source node not found. This may occur if \
@@ -162,8 +170,8 @@ fn source_node_changed_since(db: &Database, key: Key, since: Epoch) -> bool {
 }
 
 fn derived_node_changed_since(db: &Database, derived_node_id: DerivedNodeId, since: Epoch) -> bool {
-    let inner_fn = if let Some(derived_node) = db.get_derived_node(derived_node_id) {
-        if let Some(rev) = db.get_derived_node_revision(derived_node_id) {
+    let inner_fn = if let Some(derived_node) = db.storage.get_derived_node(derived_node_id) {
+        if let Some(rev) = db.storage.get_derived_node_revision(derived_node_id) {
             if rev.time_updated > since {
                 return true;
             }

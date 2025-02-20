@@ -98,6 +98,7 @@ impl<T: 'static> Deref for MemoRef<'_, T> {
 
     fn deref(&self) -> &Self::Target {
         self.db
+            .storage
             .get_derived_node(self.derived_node_id)
             .unwrap()
             .value
