@@ -70,8 +70,9 @@ impl DependencyStack {
         if let Some(entry) = self.0.borrow_mut().last_mut() {
             entry.push(dependency, time_updated);
         } else {
-            // Dependency stack is empty for the outermost memoized function.
-            // We don't need to register dependencies for it.
+            // If the dependency stack is empty, this function call is the outermost invocation
+            // (i.e., the user directly called the memoized function). So, there's no parent
+            // memoized function call where this call must be registered as a dependency.
         }
     }
 }
