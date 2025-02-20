@@ -45,7 +45,7 @@ impl Database {
         let index = self.param_id_to_index.get(&param_id)?;
         Some(self.params.get(index.idx).expect(
             "indexes should always be valid. \
-                This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         ))
     }
 
@@ -56,7 +56,7 @@ impl Database {
             .index;
         Some(self.derived_nodes.get(index.idx).expect(
             "indexes should always be valid. \
-                This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         ))
     }
 
