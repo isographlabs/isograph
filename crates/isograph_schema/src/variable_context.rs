@@ -7,7 +7,7 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ClientField, NameAndArguments, OutputFormat, SchemaServerField,
+    ClientField, ClientPointer, ClientType, NameAndArguments, OutputFormat, SchemaServerField,
     ValidatedIsographSelectionVariant, ValidatedVariableDefinition,
 };
 
@@ -93,11 +93,19 @@ impl<
         TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
         TOutputFormat: OutputFormat,
     >
-    ClientField<
-        TClientTypeSelectionScalarFieldAssociatedData,
-        TClientTypeSelectionLinkedFieldAssociatedData,
-        TClientFieldVariableDefinitionAssociatedData,
-        TOutputFormat,
+    ClientType<
+        &ClientField<
+            TClientTypeSelectionScalarFieldAssociatedData,
+            TClientTypeSelectionLinkedFieldAssociatedData,
+            TClientFieldVariableDefinitionAssociatedData,
+            TOutputFormat,
+        >,
+        &ClientPointer<
+            TClientTypeSelectionScalarFieldAssociatedData,
+            TClientTypeSelectionLinkedFieldAssociatedData,
+            TClientFieldVariableDefinitionAssociatedData,
+            TOutputFormat,
+        >,
     >
 {
     pub fn initial_variable_context(&self) -> VariableContext {
@@ -119,7 +127,7 @@ impl<
         // This makes sense, but seems somewhat superfluous. Perhaps we can refactor code such
         // that we do not need to call this.
         let variable_context = self
-            .variable_definitions
+            .variable_definitions()
             .iter()
             .map(|variable_definition| {
                 (
