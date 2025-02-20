@@ -94,18 +94,7 @@ pub fn validate_isograph_selection_set_directives(
                 Ok(IsographSelectionVariant::Regular)
             }
         },
-        &|linked_field_selection| {
-            let updatable_directive = find_directive_named(
-                &linked_field_selection.directives,
-                *UPDATABLE_DIRECTIVE_NAME,
-            );
-
-            Ok(if updatable_directive.is_some() {
-                IsographSelectionVariant::Updatable
-            } else {
-                IsographSelectionVariant::Regular
-            })
-        },
+        &|_object_pointer_selection| Ok(IsographSelectionVariant::Regular),
     )
 }
 
