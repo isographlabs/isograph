@@ -4,32 +4,29 @@ use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
 use isograph_schema::{
-    RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment, UserWrittenClientFieldInfo,
-    UserWrittenComponentVariant, ValidatedClientField, ValidatedClientType,
-    ValidatedSchemaServerField,
+    OutputFormat, RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment,
+    UserWrittenClientFieldInfo, UserWrittenComponentVariant, ValidatedClientField,
+    ValidatedClientType, ValidatedSchema, ValidatedSchemaServerField,
 };
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
 use crate::{
-    artifact_generation::{
-        generate_artifacts::{
-            generate_client_field_parameter_type, generate_output_type, generate_parameters,
-            ClientFieldFunctionImportStatement, RESOLVER_OUTPUT_TYPE,
-            RESOLVER_OUTPUT_TYPE_FILE_NAME, RESOLVER_PARAMETERS_TYPE_FILE_NAME,
-            RESOLVER_PARAM_TYPE, RESOLVER_PARAM_TYPE_FILE_NAME, RESOLVER_READER_FILE_NAME,
-        },
-        import_statements::{
-            param_type_imports_to_import_param_statement, param_type_imports_to_import_statement,
-            reader_imports_to_import_statement,
-        },
-        reader_ast::generate_reader_ast,
+    generate_artifacts::{
+        generate_client_field_parameter_type, generate_output_type, generate_parameters,
+        ClientFieldFunctionImportStatement, RESOLVER_OUTPUT_TYPE, RESOLVER_OUTPUT_TYPE_FILE_NAME,
+        RESOLVER_PARAMETERS_TYPE_FILE_NAME, RESOLVER_PARAM_TYPE, RESOLVER_PARAM_TYPE_FILE_NAME,
+        RESOLVER_READER_FILE_NAME,
     },
-    ValidatedGraphqlSchema,
+    import_statements::{
+        param_type_imports_to_import_param_statement, param_type_imports_to_import_statement,
+        reader_imports_to_import_statement,
+    },
+    reader_ast::generate_reader_ast,
 };
 
-pub(crate) fn generate_eager_reader_artifacts(
-    schema: &ValidatedGraphqlSchema,
-    client_field: &ValidatedClientField,
+pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
+    client_field: &ValidatedClientField<TOutputFormat>,
     config: &CompilerConfig,
     info: UserWrittenClientFieldInfo,
     refetched_paths: &RefetchedPathsMap,
@@ -139,9 +136,9 @@ pub(crate) fn generate_eager_reader_artifacts(
     path_and_contents
 }
 
-pub(crate) fn generate_eager_reader_condition_artifact(
-    schema: &ValidatedGraphqlSchema,
-    encountered_server_field: &ValidatedSchemaServerField,
+pub(crate) fn generate_eager_reader_condition_artifact<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
+    encountered_server_field: &ValidatedSchemaServerField<TOutputFormat>,
     inline_fragment: &ServerFieldTypeAssociatedDataInlineFragment,
     refetch_paths: &RefetchedPathsMap,
     file_extensions: GenerateFileExtensionsOption,
@@ -197,9 +194,9 @@ pub(crate) fn generate_eager_reader_condition_artifact(
     }
 }
 
-pub(crate) fn generate_eager_reader_param_type_artifact(
-    schema: &ValidatedGraphqlSchema,
-    client_field: &ValidatedClientType,
+pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
+    client_field: &ValidatedClientType<TOutputFormat>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
     let ts_file_extension = file_extensions.ts();
@@ -292,9 +289,9 @@ pub(crate) fn generate_eager_reader_param_type_artifact(
     }
 }
 
-pub(crate) fn generate_eager_reader_output_type_artifact(
-    schema: &ValidatedGraphqlSchema,
-    client_field: &ValidatedClientField,
+pub(crate) fn generate_eager_reader_output_type_artifact<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
+    client_field: &ValidatedClientField<TOutputFormat>,
     config: &CompilerConfig,
     info: UserWrittenClientFieldInfo,
     file_extensions: GenerateFileExtensionsOption,

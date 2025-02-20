@@ -2,23 +2,23 @@ use common_lang_types::{ArtifactPathAndContent, ObjectTypeAndFieldName};
 use intern::string_key::Intern;
 
 use isograph_config::GenerateFileExtensionsOption;
-use isograph_schema::{FieldMapItem, PrimaryFieldInfo, RefetchedPathsMap, ValidatedClientField};
-
-use crate::{
-    artifact_generation::{
-        generate_artifacts::{
-            generate_output_type, ClientFieldFunctionImportStatement, REFETCH_READER_FILE_NAME,
-            RESOLVER_OUTPUT_TYPE_FILE_NAME,
-        },
-        import_statements::reader_imports_to_import_statement,
-        reader_ast::generate_reader_ast,
-    },
-    ValidatedGraphqlSchema,
+use isograph_schema::{
+    FieldMapItem, OutputFormat, PrimaryFieldInfo, RefetchedPathsMap, ValidatedClientField,
+    ValidatedSchema,
 };
 
-pub(crate) fn generate_refetch_reader_artifact(
-    schema: &ValidatedGraphqlSchema,
-    client_field: &ValidatedClientField,
+use crate::{
+    generate_artifacts::{
+        generate_output_type, ClientFieldFunctionImportStatement, REFETCH_READER_FILE_NAME,
+        RESOLVER_OUTPUT_TYPE_FILE_NAME,
+    },
+    import_statements::reader_imports_to_import_statement,
+    reader_ast::generate_reader_ast,
+};
+
+pub(crate) fn generate_refetch_reader_artifact<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
+    client_field: &ValidatedClientField<TOutputFormat>,
     primary_field_info: Option<&PrimaryFieldInfo>,
     refetched_paths: &RefetchedPathsMap,
     was_selected_loadably: bool,
@@ -82,9 +82,9 @@ pub(crate) fn generate_refetch_reader_artifact(
     }
 }
 
-pub(crate) fn generate_refetch_output_type_artifact(
-    schema: &ValidatedGraphqlSchema,
-    client_field: &ValidatedClientField,
+pub(crate) fn generate_refetch_output_type_artifact<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
+    client_field: &ValidatedClientField<TOutputFormat>,
 ) -> ArtifactPathAndContent {
     let parent_type = schema
         .server_field_data

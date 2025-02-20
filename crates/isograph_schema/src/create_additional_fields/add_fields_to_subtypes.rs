@@ -1,8 +1,9 @@
 use common_lang_types::{Location, WithLocation};
 
-use crate::{
-    OutputFormat, ProcessTypeDefinitionError, ProcessTypeDefinitionResult, UnvalidatedSchema,
-    ValidatedTypeRefinementMap,
+use crate::{OutputFormat, UnvalidatedSchema};
+
+use super::create_additional_fields_error::{
+    CreateAdditionalFieldsError, ProcessTypeDefinitionResult, ValidatedTypeRefinementMap,
 };
 
 impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
@@ -42,7 +43,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                                 .is_some()
                             {
                                 return Err(WithLocation::new(
-                                    ProcessTypeDefinitionError::FieldExistsOnType {
+                                    CreateAdditionalFieldsError::FieldExistsOnType {
                                         field_name: *supertype_field_name,
                                         parent_type: subtype.name,
                                     },

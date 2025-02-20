@@ -14,9 +14,10 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
+    expose_field_directive::RequiresRefinement,
     refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
     ClientField, ClientPointer, ClientType, FieldMapItem, FieldType, OutputFormat,
-    RequiresRefinement, UnvalidatedSchema, UnvalidatedVariableDefinition, NODE_FIELD_NAME,
+    UnvalidatedSchema, UnvalidatedVariableDefinition, NODE_FIELD_NAME,
 };
 
 impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
@@ -197,6 +198,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     None,
                 ))
             }),
+            output_format: std::marker::PhantomData,
         }));
         Ok(())
     }
@@ -270,6 +272,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     }
                 }?,
                 to: to_object_id,
+                output_format: std::marker::PhantomData,
             }));
 
         let parent_object = self.server_field_data.object_mut(parent_object_id);

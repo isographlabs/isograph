@@ -30,9 +30,11 @@ pub fn add_refetch_fields_to_objects<TOutputFormat: OutputFormat>(
     Ok(())
 }
 
-fn add_refetch_field_to_object(
-    object: &mut SchemaObject,
-    client_fields: &mut Vec<ClientType<UnvalidatedClientField, UnvalidatedClientPointer>>,
+fn add_refetch_field_to_object<TOutputFormat: OutputFormat>(
+    object: &mut SchemaObject<TOutputFormat>,
+    client_fields: &mut Vec<
+        ClientType<UnvalidatedClientField<TOutputFormat>, UnvalidatedClientPointer<TOutputFormat>>,
+    >,
     query_id: ServerObjectId,
 ) -> Option<Result<(), BatchCompileError>> {
     match object
@@ -87,6 +89,7 @@ fn add_refetch_field_to_object(
                         None,
                     ))
                 }),
+                output_format: std::marker::PhantomData,
             }));
         }
     }

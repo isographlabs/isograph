@@ -16,12 +16,19 @@ use isograph_lang_types::{
 use serde::Deserialize;
 
 use crate::{
-    generate_refetch_field_strategy, ArgumentMap, ClientField, ClientFieldVariant, ClientType,
-    FieldMapItem, FieldType, ImperativelyLoadedFieldVariant, OutputFormat, PrimaryFieldInfo,
-    ProcessTypeDefinitionError, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
-    UnvalidatedSchema, UnvalidatedVariableDefinition,
+    generate_refetch_field_strategy, ClientField, ClientFieldVariant, ClientType, FieldType,
+    ImperativelyLoadedFieldVariant, OutputFormat, PrimaryFieldInfo, UnvalidatedSchema,
+    UnvalidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
+
+use super::{
+    argument_map::ArgumentMap,
+    create_additional_fields_error::{
+        CreateAdditionalFieldsError, FieldMapItem, ProcessTypeDefinitionResult,
+        ProcessedFieldMapItem,
+    },
+};
 
 lazy_static! {
     static ref EXPOSE_FIELD_DIRECTIVE: DirectiveName = "exposeField".intern().into();
@@ -111,7 +118,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         expose_field_directive: &ExposeFieldDirective,
         parent_object_name: IsographObjectTypeName,
         parent_object_id: ServerObjectId,
-    ) -> Result<(), WithLocation<ProcessTypeDefinitionError>> {
+    ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
         let ExposeFieldDirective {
             expose_as,
             path,
@@ -178,13 +185,13 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                             Ok((*client_field_parent_object_id, *inner))
                         } else {
                             Err(WithLocation::new(
-                                ProcessTypeDefinitionError::InvalidMutationField,
+                                CreateAdditionalFieldsError::InvalidMutationField,
                                 Location::generated(),
                             ))
                         }
                     }
                     _ => Err(WithLocation::new(
-                        ProcessTypeDefinitionError::InvalidMutationField,
+                        CreateAdditionalFieldsError::InvalidMutationField,
                         Location::generated(),
                     )),
                 }?;
@@ -286,6 +293,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                         primary_field_concrete_type,
                     ),
                 )),
+                output_format: std::marker::PhantomData,
             };
             self.client_types
                 .push(ClientType::ClientField(mutation_client_field));
@@ -307,7 +315,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         client_field_parent_object_id: ServerObjectId,
         client_field_id: ClientFieldId,
         payload_object_name: IsographObjectTypeName,
-    ) -> Result<(), WithLocation<ProcessTypeDefinitionError>> {
+    ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
         let client_field_parent = self
             .server_field_data
             .object_mut(client_field_parent_object_id);
@@ -321,7 +329,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         {
             return Err(WithLocation::new(
                 // TODO use a more generic error message when making this
-                ProcessTypeDefinitionError::FieldExistsOnType {
+                CreateAdditionalFieldsError::FieldExistsOnType {
                     field_name: mutation_field_name,
                     parent_type: payload_object_name,
                 },
@@ -340,7 +348,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         if d.name.item == *EXPOSE_FIELD_DIRECTIVE {
             let expose_field_directive = from_graph_ql_directive(d).map_err(|err| match err {
                 DeserializationError::Custom(err) => WithLocation::new(
-                    ProcessTypeDefinitionError::FailedToDeserialize(err),
+                    CreateAdditionalFieldsError::FailedToDeserialize(err),
                     d.name.location.into(), // TODO: use location of the entire directive
                 ),
             })?;
@@ -375,7 +383,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             })
             .ok_or_else(|| {
                 WithLocation::new(
-                    ProcessTypeDefinitionError::InvalidField,
+                    CreateAdditionalFieldsError::InvalidField,
                     // TODO
                     Location::generated(),
                 )

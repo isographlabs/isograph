@@ -1,14 +1,14 @@
 use std::{
     collections::HashMap,
+    error::Error,
+    marker::PhantomData,
     ops::{Deref, DerefMut},
     path::{Path, PathBuf},
 };
 
 use common_lang_types::{RelativePathToSourceFile, TextSource};
-use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDocument};
-use graphql_schema_parser::{parse_schema, parse_schema_extensions};
 use intern::string_key::Intern;
-use isograph_config::{absolute_and_relative_paths, AbsolutePathAndRelativePath, CompilerConfig};
+use isograph_config::{absolute_and_relative_paths, CompilerConfig};
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_schema::{OutputFormat, UnvalidatedSchema};
 
@@ -18,25 +18,29 @@ use crate::{
         parse_iso_literals_in_file_content, process_iso_literals, read_file, read_files_in_folder,
     },
     refetch_fields::add_refetch_fields_to_objects,
-    schema::read_schema_file,
     watch::{ChangedFileKind, SourceEventKind, SourceFileEvent},
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
-pub struct SourceFiles {
-    pub schema: GraphQLTypeSystemDocument,
-    pub schema_extensions: HashMap<RelativePathToSourceFile, GraphQLTypeSystemExtensionDocument>,
+pub struct SourceFiles<TOutputFormat: OutputFormat> {
+    pub schema: TOutputFormat::TypeSystemDocument,
+    pub schema_extensions:
+        HashMap<RelativePathToSourceFile, TOutputFormat::TypeSystemExtensionDocument>,
     pub contains_iso: ContainsIso,
+    pub output_format: PhantomData<TOutputFormat>,
 }
 
-impl SourceFiles {
-    pub fn read_and_parse_all_files(config: &CompilerConfig) -> Result<Self, BatchCompileError> {
-        let schema = read_and_parse_graphql_schema(config)?;
+impl<TOutputFormat: OutputFormat> SourceFiles<TOutputFormat> {
+    pub fn read_and_parse_all_files(config: &CompilerConfig) -> Result<Self, Box<dyn Error>> {
+        let schema = TOutputFormat::read_and_parse_type_system_document(config)?;
 
         let mut schema_extensions = HashMap::new();
         for schema_extension_path in config.schema_extensions.iter() {
             let (file_path, extensions_document) =
-                read_and_parse_schema_extensions(schema_extension_path, config)?;
+                TOutputFormat::read_and_parse_type_system_extension_document(
+                    schema_extension_path,
+                    config,
+                )?;
             schema_extensions.insert(file_path, extensions_document);
         }
 
@@ -52,26 +56,35 @@ impl SourceFiles {
             schema,
             schema_extensions,
             contains_iso,
+            output_format: PhantomData,
         })
     }
 
-    pub fn create_unvalidated_schema<TOutputFormat: OutputFormat>(
+    pub fn create_unvalidated_schema(
         self,
-        schema: &mut UnvalidatedSchema<TOutputFormat>,
+        unvalidated_isograph_schema: &mut UnvalidatedSchema<TOutputFormat>,
         config: &CompilerConfig,
-    ) -> Result<(), BatchCompileError> {
-        let outcome = schema.process_graphql_type_system_document(self.schema, &config.options)?;
+    ) -> Result<(), Box<dyn Error>> {
+        let outcome = TOutputFormat::process_type_system_document(
+            unvalidated_isograph_schema,
+            self.schema,
+            &config.options,
+        )?;
         for extension_document in self.schema_extensions.into_values() {
-            let _extension_outcome = schema
-                .process_graphql_type_extension_document(extension_document, &config.options)?;
+            TOutputFormat::process_type_system_extension_document(
+                unvalidated_isograph_schema,
+                extension_document,
+                &config.options,
+            )?;
         }
-        process_iso_literals(schema, self.contains_iso)?;
-        process_exposed_fields(schema)?;
-        schema.add_fields_to_subtypes(&outcome.type_refinement_maps.supertype_to_subtype_map)?;
-        schema.add_link_fields()?;
-        schema
+        process_iso_literals(unvalidated_isograph_schema, self.contains_iso)?;
+        process_exposed_fields(unvalidated_isograph_schema)?;
+        unvalidated_isograph_schema
+            .add_fields_to_subtypes(&outcome.type_refinement_maps.supertype_to_subtype_map)?;
+        unvalidated_isograph_schema.add_link_fields()?;
+        unvalidated_isograph_schema
             .add_pointers_to_supertypes(&outcome.type_refinement_maps.subtype_to_supertype_map)?;
-        add_refetch_fields_to_objects(schema)?;
+        add_refetch_fields_to_objects(unvalidated_isograph_schema)?;
         Ok(())
     }
 
@@ -79,7 +92,7 @@ impl SourceFiles {
         &mut self,
         config: &CompilerConfig,
         changes: &[SourceFileEvent],
-    ) -> Result<(), BatchCompileError> {
+    ) -> Result<(), Box<dyn Error>> {
         let errors = changes
             .iter()
             .filter_map(|(event, change_kind)| match change_kind {
@@ -101,7 +114,7 @@ impl SourceFiles {
             })
             .collect::<Vec<_>>();
         if !errors.is_empty() {
-            Err(BatchCompileError::MultipleErrors { messages: errors })
+            Err(BatchCompileError::MultipleErrors { messages: errors }.into())
         } else {
             Ok(())
         }
@@ -111,17 +124,17 @@ impl SourceFiles {
         &mut self,
         config: &CompilerConfig,
         event_kind: &SourceEventKind,
-    ) -> Result<(), BatchCompileError> {
+    ) -> Result<(), Box<dyn Error>> {
         match event_kind {
             SourceEventKind::CreateOrModify(_) => {
-                self.schema = read_and_parse_graphql_schema(config)?;
+                self.schema = TOutputFormat::read_and_parse_type_system_document(config)?;
             }
             SourceEventKind::Rename((_, target_path)) => {
                 if config.schema.absolute_path != *target_path {
-                    return Err(BatchCompileError::SchemaNotFound);
+                    return Err(Box::new(BatchCompileError::SchemaNotFound));
                 }
             }
-            SourceEventKind::Remove(_) => return Err(BatchCompileError::SchemaNotFound),
+            SourceEventKind::Remove(_) => return Err(Box::new(BatchCompileError::SchemaNotFound)),
         }
         Ok(())
     }
@@ -130,7 +143,7 @@ impl SourceFiles {
         &mut self,
         config: &CompilerConfig,
         event_kind: &SourceEventKind,
-    ) -> Result<(), BatchCompileError> {
+    ) -> Result<(), Box<dyn Error>> {
         match event_kind {
             SourceEventKind::CreateOrModify(path) => {
                 self.create_or_update_schema_extension(path, config)?;
@@ -159,7 +172,7 @@ impl SourceFiles {
         &mut self,
         config: &CompilerConfig,
         event_kind: &SourceEventKind,
-    ) -> Result<(), BatchCompileError> {
+    ) -> Result<(), Box<dyn Error>> {
         match event_kind {
             SourceEventKind::CreateOrModify(path) => {
                 self.create_or_update_iso_literals(&config.project_root, path, config)?;
@@ -182,7 +195,7 @@ impl SourceFiles {
         &mut self,
         config: &CompilerConfig,
         event_kind: &SourceEventKind,
-    ) -> Result<(), BatchCompileError> {
+    ) -> Result<(), Box<dyn Error>> {
         match event_kind {
             SourceEventKind::CreateOrModify(path) => {
                 read_and_parse_iso_literals_from_folder(
@@ -216,11 +229,13 @@ impl SourceFiles {
         &mut self,
         path: &Path,
         config: &CompilerConfig,
-    ) -> Result<(), BatchCompileError> {
+    ) -> Result<(), Box<dyn Error>> {
         let absolute_and_relative =
             absolute_and_relative_paths(config.current_working_directory, path.to_path_buf());
-        let (file_path, document) =
-            read_and_parse_schema_extensions(&absolute_and_relative, config)?;
+        let (file_path, document) = TOutputFormat::read_and_parse_type_system_extension_document(
+            &absolute_and_relative,
+            config,
+        )?;
         self.schema_extensions.insert(file_path, document);
         Ok(())
     }
@@ -280,39 +295,8 @@ fn read_and_parse_iso_literals_from_folder(
     }
 }
 
-fn read_and_parse_graphql_schema(
-    config: &CompilerConfig,
-) -> Result<GraphQLTypeSystemDocument, BatchCompileError> {
-    let content = read_schema_file(&config.schema.absolute_path)?;
-    let schema_text_source = TextSource {
-        relative_path_to_source_file: config.schema.relative_path,
-        span: None,
-        current_working_directory: config.current_working_directory,
-    };
-    let schema = parse_schema(&content, schema_text_source)
-        .map_err(|with_span| with_span.to_with_location(schema_text_source))?;
-    Ok(schema)
-}
-
 fn intern_file_path(path: &Path) -> RelativePathToSourceFile {
     path.to_string_lossy().into_owned().intern().into()
-}
-
-pub fn read_and_parse_schema_extensions(
-    schema_extension_path: &AbsolutePathAndRelativePath,
-    config: &CompilerConfig,
-) -> Result<(RelativePathToSourceFile, GraphQLTypeSystemExtensionDocument), BatchCompileError> {
-    let extension_content = read_schema_file(&schema_extension_path.absolute_path)?;
-    let extension_text_source = TextSource {
-        relative_path_to_source_file: schema_extension_path.relative_path,
-        span: None,
-        current_working_directory: config.current_working_directory,
-    };
-
-    let schema_extensions = parse_schema_extensions(&extension_content, extension_text_source)
-        .map_err(|with_span| with_span.to_with_location(extension_text_source))?;
-
-    Ok((schema_extension_path.relative_path, schema_extensions))
 }
 
 fn get_canonicalized_root_path(project_root: &PathBuf) -> Result<PathBuf, BatchCompileError> {
@@ -340,9 +324,9 @@ fn process_exposed_fields<TOutputFormat: OutputFormat>(
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
-pub struct ContainsIso(
-    pub HashMap<RelativePathToSourceFile, Vec<(IsoLiteralExtractionResult, TextSource)>>,
-);
+pub struct ContainsIso {
+    pub files: HashMap<RelativePathToSourceFile, Vec<(IsoLiteralExtractionResult, TextSource)>>,
+}
 
 impl ContainsIso {
     pub fn stats(&self) -> ContainsIsoStats {
@@ -374,13 +358,13 @@ impl Deref for ContainsIso {
     type Target = HashMap<RelativePathToSourceFile, Vec<(IsoLiteralExtractionResult, TextSource)>>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.files
     }
 }
 
 impl DerefMut for ContainsIso {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.files
     }
 }
 

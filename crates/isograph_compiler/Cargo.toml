@@ -5,16 +5,15 @@ edition = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-thiserror = "1.0.40"
-intern = { path = "../../relay-crates/intern" }
+generate_artifacts = { path = "../generate_artifacts" }
 graphql_lang_types = { path = "../graphql_lang_types" }
-graphql_output_format = { path = "../graphql_output_format" }
-graphql_schema_parser = { path = "../graphql_schema_parser" }
 isograph_config = { path = "../isograph_config" }
 isograph_schema = { path = "../isograph_schema" }
 isograph_lang_parser = { path = "../isograph_lang_parser" }
 isograph_lang_types = { path = "../isograph_lang_types" }
 common_lang_types = { path = "../common_lang_types" }
+thiserror = "1.0.40"
+intern = { path = "../../relay-crates/intern" }
 lazy_static = { workspace = true }
 regex = { workspace = true }
 colored = { workspace = true }

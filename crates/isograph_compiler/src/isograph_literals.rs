@@ -154,7 +154,7 @@ pub(crate) fn process_iso_literals<TOutputFormat: OutputFormat>(
     contains_iso: ContainsIso,
 ) -> Result<(), BatchCompileError> {
     let mut errors = vec![];
-    for iso_literals in contains_iso.0.into_values() {
+    for iso_literals in contains_iso.files.into_values() {
         for (extraction_result, text_source) in iso_literals {
             match extraction_result {
                 IsoLiteralExtractionResult::ClientFieldDeclaration(client_field_declaration) => {

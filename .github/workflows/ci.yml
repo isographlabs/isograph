@@ -69,7 +69,7 @@ jobs:
       - name: Make artifact executable
         run: chmod +x ./artifacts/linux-x64/isograph_cli
       - name: 'Build project'
-        run: ./artifacts/linux-x64/isograph_cli --config ./demos/${{ matrix.target.folder }}/isograph.config.json
+        run: cd ./demos/${{ matrix.target.folder }} && ../../artifacts/linux-x64/isograph_cli --config ./isograph.config.json
       - name: 'Check working directory status'
         run: './scripts/check-git-status.sh'
 

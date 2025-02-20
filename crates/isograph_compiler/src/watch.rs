@@ -23,11 +23,11 @@ pub async fn handle_watch_command<TOutputFormat: OutputFormat>(
     config_location: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(), Vec<Error>> {
-    let mut state = CompilerState::new(config_location, current_working_directory);
+    let mut state = CompilerState::<TOutputFormat>::new(config_location, current_working_directory);
     let (mut rx, mut watcher) = create_debounced_file_watcher(&state.config);
 
     info!("{}", "Starting to compile.".cyan());
-    let _ = print_result(WithDuration::new(|| state.compile::<TOutputFormat>()));
+    let _ = print_result(WithDuration::new(|| state.compile()));
 
     while let Some(res) = rx.recv().await {
         match res {
@@ -44,16 +44,16 @@ pub async fn handle_watch_command<TOutputFormat: OutputFormat>(
                         );
                         watcher.stop();
                         (rx, watcher) = create_debounced_file_watcher(&state.config);
-                        WithDuration::new(|| state.compile::<TOutputFormat>())
+                        WithDuration::new(|| state.compile())
                     } else if changes.len() < MAX_CHANGED_FILES {
                         info!("{}", "File changes detected. Starting to compile.".cyan());
-                        WithDuration::new(|| state.update::<TOutputFormat>(&changes))
+                        WithDuration::new(|| state.update(&changes))
                     } else {
                         info!(
                             "{}",
                             "Too many changes. Starting a full compilation.".cyan()
                         );
-                        WithDuration::new(|| state.compile::<TOutputFormat>())
+                        WithDuration::new(|| state.compile())
                     };
                     let _ = print_result(result);
                 }

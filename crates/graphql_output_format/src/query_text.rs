@@ -1,4 +1,4 @@
-use common_lang_types::{QueryOperationName, UnvalidatedTypeName};
+use common_lang_types::{QueryOperationName, QueryText, UnvalidatedTypeName};
 use graphql_lang_types::GraphQLTypeAnnotation;
 use isograph_lang_types::{ArgumentKeyAndValue, NonConstantValue};
 use isograph_schema::{
@@ -6,7 +6,7 @@ use isograph_schema::{
     ValidatedVariableDefinition,
 };
 
-use crate::{artifact_generation::generate_artifacts::QueryText, ValidatedGraphqlSchema};
+use crate::ValidatedGraphqlSchema;
 
 pub(crate) fn generate_query_text<'a>(
     query_name: QueryOperationName,

@@ -1,23 +1,18 @@
-mod artifact_generation;
+mod graphql_output_format;
+mod process_type_system_definition;
+mod query_text;
+mod read_schema;
 
-use artifact_generation::generate_artifacts::get_artifact_path_and_content;
-use common_lang_types::ArtifactPathAndContent;
-use isograph_config::CompilerConfig;
-use isograph_schema::{OutputFormat, Schema, UnvalidatedSchema, ValidatedSchema};
+pub use graphql_output_format::*;
+use isograph_schema::{
+    Schema, SchemaObject, UnvalidatedSchema, ValidatedClientField, ValidatedSchema,
+};
 
-#[derive(Debug)]
-pub struct GraphqlOutputFormat {}
-
-impl OutputFormat for GraphqlOutputFormat {
-    fn generate_artifact_path_and_content(
-        schema: &ValidatedGraphqlSchema,
-        config: &CompilerConfig,
-    ) -> Vec<ArtifactPathAndContent> {
-        get_artifact_path_and_content(schema, config)
-    }
-}
-
-pub type ValidatedGraphqlSchema = ValidatedSchema<GraphqlOutputFormat>;
+pub type ValidatedGraphqlSchema = ValidatedSchema<GraphQLOutputFormat>;
 pub type GraphqlSchema<TSchemaValidationState> =
-    Schema<TSchemaValidationState, GraphqlOutputFormat>;
-pub type UnvalidatedGraphqlSchema = UnvalidatedSchema<GraphqlOutputFormat>;
+    Schema<TSchemaValidationState, GraphQLOutputFormat>;
+pub type UnvalidatedGraphqlSchema = UnvalidatedSchema<GraphQLOutputFormat>;
+
+pub type ValidatedGraphqlClientField = ValidatedClientField<GraphQLOutputFormat>;
+
+pub type GraphqlSchemaObject = SchemaObject<GraphQLOutputFormat>;

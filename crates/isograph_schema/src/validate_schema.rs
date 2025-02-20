@@ -16,17 +16,18 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
+    schema_validation_state::SchemaValidationState,
     validate_client_field::validate_and_transform_client_types,
     validate_server_field::validate_and_transform_server_fields, ClientField, ClientFieldVariant,
     ClientPointer, FieldType, ImperativelyLoadedFieldVariant, OutputFormat, Schema, SchemaIdField,
-    SchemaObject, SchemaServerField, SchemaValidationState, ServerFieldData,
-    ServerFieldTypeAssociatedData, UnvalidatedSchema, UseRefetchFieldRefetchStrategy,
-    ValidateEntrypointDeclarationError,
+    SchemaObject, SchemaServerField, ServerFieldData, ServerFieldTypeAssociatedData,
+    UnvalidatedSchema, UseRefetchFieldRefetchStrategy, ValidateEntrypointDeclarationError,
 };
 
-pub type ValidatedSchemaServerField = SchemaServerField<
+pub type ValidatedSchemaServerField<TOutputFormat> = SchemaServerField<
     <ValidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+    TOutputFormat,
 >;
 
 pub type ValidatedSelection = ServerFieldSelection<
@@ -43,16 +44,18 @@ pub type ValidatedScalarFieldSelection = ScalarFieldSelection<
 >;
 
 pub type ValidatedVariableDefinition = VariableDefinition<SelectableServerFieldId>;
-pub type ValidatedClientField = ClientField<
+pub type ValidatedClientField<TOutputFormat> = ClientField<
     <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+    TOutputFormat,
 >;
 
-pub type ValidatedClientPointer = ClientPointer<
+pub type ValidatedClientPointer<TOutputFormat> = ClientPointer<
     <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+    TOutputFormat,
 >;
 
 pub type ValidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
@@ -147,7 +150,7 @@ impl<TOutputFormat: OutputFormat> ValidatedSchema<TOutputFormat> {
             entrypoints: _,
             server_field_data: schema_data,
             fetchable_types: root_types,
-            output_format,
+            ..
         } = unvalidated_schema;
 
         let updated_server_fields = match validate_and_transform_server_fields(fields, &schema_data)
@@ -185,6 +188,7 @@ impl<TOutputFormat: OutputFormat> ValidatedSchema<TOutputFormat> {
             boolean_type_id,
             int_type_id,
             null_type_id,
+            ..
         } = schema_data;
 
         if errors.is_empty() {
@@ -210,7 +214,6 @@ impl<TOutputFormat: OutputFormat> ValidatedSchema<TOutputFormat> {
                     null_type_id,
                 },
                 fetchable_types: root_types,
-                output_format,
             })
         } else {
             Err(errors)
@@ -218,7 +221,9 @@ impl<TOutputFormat: OutputFormat> ValidatedSchema<TOutputFormat> {
     }
 }
 
-fn transform_object_field_ids(unvalidated_object: SchemaObject) -> SchemaObject {
+fn transform_object_field_ids<TOutputFormat: OutputFormat>(
+    unvalidated_object: SchemaObject<TOutputFormat>,
+) -> SchemaObject<TOutputFormat> {
     let SchemaObject {
         name,
         description,
@@ -227,6 +232,7 @@ fn transform_object_field_ids(unvalidated_object: SchemaObject) -> SchemaObject 
         id_field,
         directives,
         concrete_type,
+        output_associated_data,
     } = unvalidated_object;
 
     let validated_encountered_fields = unvalidated_encountered_fields
@@ -250,6 +256,7 @@ fn transform_object_field_ids(unvalidated_object: SchemaObject) -> SchemaObject 
         id_field,
         directives,
         concrete_type,
+        output_associated_data,
     }
 }
 
@@ -342,8 +349,8 @@ pub enum Loadability<'a> {
 /// as an immediate follow-up request. Once we do this, there will always be one
 /// source of truth for whether a field is fetched imperatively: the presence of the
 /// @loadable directive.
-pub fn categorize_field_loadability<'a>(
-    client_field: &'a ValidatedClientField,
+pub fn categorize_field_loadability<'a, TOutputFormat: OutputFormat>(
+    client_field: &'a ValidatedClientField<TOutputFormat>,
     selection_variant: &'a ValidatedIsographSelectionVariant,
 ) -> Option<Loadability<'a>> {
     match &client_field.variant {
