@@ -16,6 +16,7 @@ const readerAst: ReaderAst<Query__meNameSuccessor__param> = [
         fieldName: "name",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
       {
         kind: "Linked",
@@ -36,6 +37,7 @@ const readerAst: ReaderAst<Query__meNameSuccessor__param> = [
                 fieldName: "name",
                 alias: null,
                 arguments: null,
+                isUpdatable: false,
               },
             ],
           },

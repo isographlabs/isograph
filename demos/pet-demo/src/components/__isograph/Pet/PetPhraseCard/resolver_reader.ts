@@ -8,12 +8,14 @@ const readerAst: ReaderAst<Pet__PetPhraseCard__param> = [
     fieldName: "id",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
   {
     kind: "Scalar",
     fieldName: "favorite_phrase",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
 ];
 

@@ -14,6 +14,7 @@ const readerAst: ReaderAst<AdItem__AdItemDisplayWrapper__param> = [
         fieldName: "id",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
     ],
     entrypoint: { 

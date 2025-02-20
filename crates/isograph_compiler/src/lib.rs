@@ -3,7 +3,6 @@ mod compiler_state;
 mod field_directives;
 mod isograph_literals;
 mod refetch_fields;
-mod schema;
 mod source_files;
 pub mod watch;
 mod with_duration;

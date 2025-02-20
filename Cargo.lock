@@ -492,6 +492,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "generate_artifacts"
+version = "0.3.0"
+dependencies = [
+ "common_lang_types",
+ "graphql_lang_types",
+ "intern",
+ "isograph_config",
+ "isograph_lang_types",
+ "isograph_schema",
+ "lazy_static",
+ "pathdiff",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -541,20 +555,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "graphql_artifact_generation"
-version = "0.3.0"
-dependencies = [
- "common_lang_types",
- "graphql_lang_types",
- "intern",
- "isograph_config",
- "isograph_lang_types",
- "isograph_schema",
- "lazy_static",
- "pathdiff",
-]
-
-[[package]]
 name = "graphql_lang_types"
 version = "0.3.0"
 dependencies = [
@@ -562,6 +562,22 @@ dependencies = [
  "intern",
  "serde",
  "strum",
+ "thiserror",
+]
+
+[[package]]
+name = "graphql_output_format"
+version = "0.3.0"
+dependencies = [
+ "common_lang_types",
+ "graphql_lang_types",
+ "graphql_schema_parser",
+ "intern",
+ "isograph_config",
+ "isograph_lang_types",
+ "isograph_schema",
+ "lazy_static",
+ "pathdiff",
  "thiserror",
 ]
 
@@ -737,6 +753,7 @@ dependencies = [
  "clap 4.5.18",
  "colored",
  "common_lang_types",
+ "graphql_output_format",
  "intern",
  "isograph_compiler",
  "isograph_config",
@@ -758,9 +775,8 @@ version = "0.3.0"
 dependencies = [
  "colored",
  "common_lang_types",
- "graphql_artifact_generation",
+ "generate_artifacts",
  "graphql_lang_types",
- "graphql_schema_parser",
  "intern",
  "isograph_config",
  "isograph_lang_parser",

@@ -1,6 +1,7 @@
 use colored::Colorize;
 use common_lang_types::CurrentWorkingDirectory;
 use isograph_config::CompilerConfig;
+use isograph_schema::OutputFormat;
 use notify::{
     event::{CreateKind, ModifyKind, RemoveKind, RenameMode},
     Error, EventKind, RecommendedWatcher, RecursiveMode,
@@ -18,11 +19,11 @@ use crate::{
 
 const MAX_CHANGED_FILES: usize = 100;
 
-pub async fn handle_watch_command(
+pub async fn handle_watch_command<TOutputFormat: OutputFormat>(
     config_location: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(), Vec<Error>> {
-    let mut state = CompilerState::new(config_location, current_working_directory);
+    let mut state = CompilerState::<TOutputFormat>::new(config_location, current_working_directory);
     let (mut rx, mut watcher) = create_debounced_file_watcher(&state.config);
 
     info!("{}", "Starting to compile.".cyan());

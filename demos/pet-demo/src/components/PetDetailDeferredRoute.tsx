@@ -18,6 +18,9 @@ export const PetDetailDeferredRouteComponent = iso(`
     pet(id: $id) {
       PetDetailDeferredRouteInnerComponent
     }
+    topLevelField(input: { name: "ThisIsJustHereToTestObjectLiterals" }) {
+      __typename
+    }
   }
 `)(function PetDetailRouteComponent({ data }) {
   const { pet } = data;

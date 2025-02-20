@@ -9,6 +9,7 @@ const readerAst: ReaderAst<Pet__PetDetailDeferredRouteInnerComponent__param> = [
     fieldName: "name",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
   {
     kind: "LoadablySelectedField",
@@ -21,6 +22,7 @@ const readerAst: ReaderAst<Pet__PetDetailDeferredRouteInnerComponent__param> = [
         fieldName: "id",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
     ],
     entrypoint: Pet__PetCheckinsCard__entrypoint,

@@ -8,6 +8,7 @@ const readerAst: ReaderAst<BlogItem__BlogItemMoreDetail__param> = [
     fieldName: "moreContent",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
 ];
 

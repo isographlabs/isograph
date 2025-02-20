@@ -28,6 +28,7 @@ const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
         fieldName: "name",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
       {
         kind: "LoadablySelectedField",
@@ -40,6 +41,7 @@ const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
             fieldName: "id",
             alias: null,
             arguments: null,
+            isUpdatable: false,
           },
         ],
         entrypoint: { 

@@ -9,6 +9,7 @@ const readerAst: ReaderAst<Actor__UserLink__param> = [
     fieldName: "login",
     alias: null,
     arguments: null,
+    isUpdatable: false,
   },
   {
     kind: "Linked",
@@ -22,12 +23,14 @@ const readerAst: ReaderAst<Actor__UserLink__param> = [
         fieldName: "id",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
       {
         kind: "Scalar",
         fieldName: "twitterUsername",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
     ],
   },

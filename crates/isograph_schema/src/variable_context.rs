@@ -7,7 +7,7 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ClientField, ClientPointer, ClientType, NameAndArguments, SchemaServerField,
+    ClientField, ClientPointer, ClientType, NameAndArguments, OutputFormat, SchemaServerField,
     ValidatedIsographSelectionVariant, ValidatedVariableDefinition,
 };
 
@@ -91,17 +91,20 @@ impl<
         TClientTypeSelectionScalarFieldAssociatedData,
         TClientTypeSelectionLinkedFieldAssociatedData,
         TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
+        TOutputFormat: OutputFormat,
     >
     ClientType<
         &ClientField<
             TClientTypeSelectionScalarFieldAssociatedData,
             TClientTypeSelectionLinkedFieldAssociatedData,
             TClientFieldVariableDefinitionAssociatedData,
+            TOutputFormat,
         >,
         &ClientPointer<
             TClientTypeSelectionScalarFieldAssociatedData,
             TClientTypeSelectionLinkedFieldAssociatedData,
             TClientFieldVariableDefinitionAssociatedData,
+            TOutputFormat,
         >,
     >
 {
@@ -137,8 +140,11 @@ impl<
     }
 }
 
-impl<TData, TClientFieldVariableDefinitionAssociatedData: Ord + Debug>
-    SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData>
+impl<
+        TData,
+        TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
+        TOutputFormat: OutputFormat,
+    > SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>
 {
     pub fn initial_variable_context(&self) -> VariableContext {
         let variable_context = self

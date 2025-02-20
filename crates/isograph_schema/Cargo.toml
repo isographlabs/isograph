@@ -8,10 +8,10 @@ license = { workspace = true }
 
 [dependencies]
 common_lang_types = { path = "../common_lang_types" }
-isograph_lang_types = { path = "../isograph_lang_types" }
-isograph_config = { path = "../isograph_config" }
 graphql_lang_types = { path = "../graphql_lang_types" }
 intern = { path = "../../relay-crates/intern" }
+isograph_lang_types = { path = "../isograph_lang_types" }
+isograph_config = { path = "../isograph_config" }
 thiserror = { workspace = true }
 lazy_static = { workspace = true }
 colorize = { workspace = true }

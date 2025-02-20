@@ -9,9 +9,9 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, ClientPointerId, IsographSelectionVariant,
-    NonConstantValue, RefetchQueryIndex, SelectableServerFieldId, SelectionFieldArgument,
-    SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId, VariableDefinition,
+    ArgumentKeyAndValue, ClientFieldId, IsographSelectionVariant, NonConstantValue,
+    RefetchQueryIndex, SelectableServerFieldId, SelectionFieldArgument, SelectionType,
+    ServerFieldId, ServerFieldSelection, ServerObjectId, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -19,20 +19,18 @@ use crate::{
     categorize_field_loadability, create_transformed_name_and_arguments,
     expose_field_directive::RequiresRefinement, transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context, ClientFieldVariant, ClientType,
-    FieldType, ImperativelyLoadedFieldVariant, Loadability, NameAndArguments, PathToRefetchField,
-    RootOperationName, SchemaObject, SchemaServerFieldVariant, UnvalidatedVariableDefinition,
-    ValidatedClientField, ValidatedClientPointer, ValidatedIsographSelectionVariant,
-    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection,
-    VariableContext,
+    ClientTypeId, FieldType, ImperativelyLoadedFieldVariant, Loadability, NameAndArguments,
+    OutputFormat, PathToRefetchField, RootOperationName, SchemaObject, SchemaServerFieldVariant,
+    UnvalidatedVariableDefinition, ValidatedClientField, ValidatedClientPointer,
+    ValidatedIsographSelectionVariant, ValidatedScalarFieldSelection, ValidatedSchema,
+    ValidatedSchemaIdField, ValidatedSelection, VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
 
 // Maybe this should be FNVHashMap? We don't really need stable iteration order
-pub type FieldToCompletedMergeTraversalStateMap = BTreeMap<
-    FieldType<ServerFieldId, ClientType<ClientFieldId, ClientPointerId>>,
-    FieldTraversalResult,
->;
+pub type FieldToCompletedMergeTraversalStateMap =
+    BTreeMap<FieldType<ServerFieldId, ClientTypeId>, FieldTraversalResult>;
 
 #[derive(Clone, Debug)]
 pub struct FieldTraversalResult {
@@ -400,12 +398,14 @@ fn transform_child_map_with_parent_context(
     transformed_child_map
 }
 
-pub fn create_merged_selection_map_for_field_and_insert_into_global_map(
-    schema: &ValidatedSchema,
-    parent_type: &SchemaObject,
+pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
+    TOutputFormat: OutputFormat,
+>(
+    schema: &ValidatedSchema<TOutputFormat>,
+    parent_type: &SchemaObject<TOutputFormat>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
-    root_field_id: FieldType<ServerFieldId, ClientType<ClientFieldId, ClientPointerId>>,
+    root_field_id: FieldType<ServerFieldId, ClientTypeId>,
     variable_context: &VariableContext,
     // TODO return Cow?
 ) -> FieldTraversalResult {
@@ -445,9 +445,9 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map(
     }
 }
 
-pub fn get_imperatively_loaded_artifact_info(
-    schema: &ValidatedSchema,
-    entrypoint: &ValidatedClientField,
+pub fn get_imperatively_loaded_artifact_info<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
+    entrypoint: &ValidatedClientField<TOutputFormat>,
     root_refetch_path: RootRefetchedPath,
     nested_selection_map: &MergedSelectionMap,
     reachable_variables: &BTreeSet<VariableName>,
@@ -486,15 +486,15 @@ pub fn get_reachable_variables(selection_map: &MergedSelectionMap) -> BTreeSet<V
 }
 
 #[allow(clippy::too_many_arguments)]
-fn process_imperatively_loaded_field(
-    schema: &ValidatedSchema,
+fn process_imperatively_loaded_field<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     variant: ImperativelyLoadedFieldVariant,
     refetch_field_parent_id: ServerObjectId,
     selection_map: &MergedSelectionMap,
-    entrypoint: &ValidatedClientField,
+    entrypoint: &ValidatedClientField<TOutputFormat>,
     index: usize,
     reachable_variables: &BTreeSet<VariableName>,
-    client_field: &ValidatedClientField,
+    client_field: &ValidatedClientField<TOutputFormat>,
 ) -> ImperativelyLoadedFieldArtifactInfo {
     let ImperativelyLoadedFieldVariant {
         client_field_scalar_selection_name,
@@ -603,9 +603,9 @@ fn process_imperatively_loaded_field(
     }
 }
 
-fn get_used_variable_definitions(
+fn get_used_variable_definitions<TOutputFormat: OutputFormat>(
     reachable_variables: &BTreeSet<VariableName>,
-    entrypoint: &ValidatedClientField,
+    entrypoint: &ValidatedClientField<TOutputFormat>,
 ) -> Vec<WithSpan<VariableDefinition<SelectableServerFieldId>>> {
     reachable_variables
         .iter()
@@ -635,9 +635,9 @@ fn get_used_variable_definitions(
         .collect::<Vec<_>>()
 }
 
-fn create_selection_map_with_merge_traversal_state(
-    schema: &ValidatedSchema,
-    parent_type: &SchemaObject,
+fn create_selection_map_with_merge_traversal_state<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
+    parent_type: &SchemaObject<TOutputFormat>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
@@ -657,10 +657,10 @@ fn create_selection_map_with_merge_traversal_state(
     merged_selection_map
 }
 
-fn merge_validated_selections_into_selection_map(
-    schema: &ValidatedSchema,
+fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     parent_map: &mut MergedSelectionMap,
-    parent_type: &SchemaObject,
+    parent_type: &SchemaObject<TOutputFormat>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
@@ -939,12 +939,12 @@ fn merge_validated_selections_into_selection_map(
     select_typename_and_id_fields_in_merged_selection(schema, parent_map, parent_type);
 }
 
-fn insert_imperative_field_into_refetch_paths(
-    schema: &ValidatedSchema,
+fn insert_imperative_field_into_refetch_paths<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    newly_encountered_scalar_client_field: &ValidatedClientField,
-    parent_type: &SchemaObject,
+    newly_encountered_scalar_client_field: &ValidatedClientField<TOutputFormat>,
+    parent_type: &SchemaObject<TOutputFormat>,
     variant: &ImperativelyLoadedFieldVariant,
 ) {
     let path = PathToRefetchField {
@@ -1001,12 +1001,15 @@ fn filter_id_fields(field: &&WithSpan<ValidatedSelection>) -> bool {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn merge_non_loadable_client_type(
-    parent_type: &SchemaObject,
-    schema: &ValidatedSchema,
+fn merge_non_loadable_client_type<TOutputFormat: OutputFormat>(
+    parent_type: &SchemaObject<TOutputFormat>,
+    schema: &ValidatedSchema<TOutputFormat>,
     parent_map: &mut MergedSelectionMap,
     parent_merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    newly_encountered_client_type: ClientType<&ValidatedClientField, &ValidatedClientPointer>,
+    newly_encountered_client_type: ClientType<
+        &ValidatedClientField<TOutputFormat>,
+        &ValidatedClientPointer<TOutputFormat>,
+    >,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     parent_variable_context: &VariableContext,
     selection_arguments: &[WithLocation<SelectionFieldArgument>],
@@ -1090,10 +1093,10 @@ fn merge_scalar_server_field(
     }
 }
 
-fn select_typename_and_id_fields_in_merged_selection(
-    schema: &ValidatedSchema,
+fn select_typename_and_id_fields_in_merged_selection<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
     merged_selection_map: &mut MergedSelectionMap,
-    parent_type: &SchemaObject,
+    parent_type: &SchemaObject<TOutputFormat>,
 ) {
     if parent_type.concrete_type.is_none() {
         maybe_add_typename_selection(merged_selection_map)

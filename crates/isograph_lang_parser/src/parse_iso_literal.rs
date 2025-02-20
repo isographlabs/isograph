@@ -1,10 +1,10 @@
 use common_lang_types::{
     ClientPointerFieldName, IsoLiteralText, Location, RelativePathToSourceFile, ScalarFieldName,
-    Span, TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
+    Span, TextSource, UnvalidatedTypeName, ValueKeyName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
-    GraphQLTypeAnnotation,
+    GraphQLTypeAnnotation, NameValuePair,
 };
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
@@ -357,19 +357,19 @@ fn parse_delimited_list<'a, TResult>(
     parse_item: impl Fn(&mut PeekableLexer<'a>) -> ParseResultWithSpan<TResult> + 'a,
     delimiter: IsographLangTokenKind,
     closing_token: IsographLangTokenKind,
-) -> ParseResultWithSpan<Vec<TResult>> {
+) -> ParseResultWithSpan<WithSpan<Vec<TResult>>> {
     let mut items = vec![];
 
     // Handle empty list case
-    if tokens.parse_token_of_kind(closing_token).is_ok() {
-        return Ok(items);
+    if let Ok(end_span) = tokens.parse_token_of_kind(closing_token) {
+        return Ok(end_span.map(|_| items));
     }
 
     loop {
         items.push(parse_item(tokens)?);
 
-        if tokens.parse_token_of_kind(closing_token).is_ok() {
-            break;
+        if let Ok(end_span) = tokens.parse_token_of_kind(closing_token) {
+            return Ok(end_span.map(|_| items));
         }
 
         if tokens.parse_token_of_kind(delimiter).is_err() {
@@ -383,12 +383,10 @@ fn parse_delimited_list<'a, TResult>(
         }
 
         // Check if the next token is the closing token (allows for trailing delimiter)
-        if tokens.parse_token_of_kind(closing_token).is_ok() {
-            break;
+        if let Ok(end_span) = tokens.parse_token_of_kind(closing_token) {
+            return Ok(end_span.map(|_| items));
         }
     }
-
-    Ok(items)
 }
 
 fn parse_comma_line_break_or_curly(tokens: &mut PeekableLexer<'_>) -> ParseResultWithSpan<()> {
@@ -500,7 +498,8 @@ fn parse_optional_arguments(
             move |tokens| parse_argument(tokens, text_source),
             IsographLangTokenKind::Comma,
             IsographLangTokenKind::CloseParen,
-        )?;
+        )?
+        .item;
 
         Ok(arguments)
     } else {
@@ -519,7 +518,7 @@ fn parse_argument(
         tokens
             .parse_token_of_kind(IsographLangTokenKind::Colon)
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
-        let value = parse_non_constant_value(tokens)?.to_with_location(text_source);
+        let value = parse_non_constant_value(tokens, text_source)?.to_with_location(text_source);
         Ok::<_, WithSpan<IsographLiteralParseError>>(SelectionFieldArgument { name, value })
     })?;
     Ok(argument.to_with_location(text_source))
@@ -527,6 +526,7 @@ fn parse_argument(
 
 fn parse_non_constant_value(
     tokens: &mut PeekableLexer,
+    text_source: TextSource,
 ) -> ParseResultWithSpan<WithSpan<NonConstantValue>> {
     from_control_flow(|| {
         to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
@@ -540,6 +540,21 @@ fn parse_non_constant_value(
         })?;
 
         to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
+            let string = tokens
+                .parse_source_of_kind(IsographLangTokenKind::StringLiteral)
+                .map(|parsed_str| {
+                    parsed_str.map(|source_with_quotes| {
+                        source_with_quotes[1..source_with_quotes.len() - 1]
+                            .intern()
+                            .into()
+                    })
+                })
+                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+
+            Ok(string.map(NonConstantValue::String))
+        })?;
+
+        to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
             let number = tokens
                 .parse_source_of_kind(IsographLangTokenKind::IntegerLiteral)
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
@@ -549,18 +564,42 @@ fn parse_non_constant_value(
         })?;
 
         to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
-            let bool = tokens
+            let open = tokens
+                .parse_token_of_kind(IsographLangTokenKind::OpenBrace)
+                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+
+            let entries = parse_delimited_list(
+                tokens,
+                move |tokens| parse_object_entry(tokens, text_source),
+                IsographLangTokenKind::Comma,
+                IsographLangTokenKind::CloseBrace,
+            )?;
+
+            Ok(WithSpan::new(
+                NonConstantValue::Object(entries.item),
+                Span {
+                    start: open.span.start,
+                    end: entries.span.end,
+                },
+            ))
+        })?;
+
+        to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
+            let bool_or_null = tokens
                 .parse_source_of_kind(IsographLangTokenKind::Identifier)
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
-            let span = bool.span;
+            let span = bool_or_null.span;
 
-            bool.and_then(|bool| match bool.parse::<bool>() {
-                Ok(b) => Ok(NonConstantValue::Boolean(b)),
-                Err(_) => Err(WithSpan::new(
-                    IsographLiteralParseError::ExpectedBoolean,
-                    span,
-                )),
+            bool_or_null.and_then(|bool_or_null| match bool_or_null {
+                "null" => Ok(NonConstantValue::Null),
+                bool => match bool.parse::<bool>() {
+                    Ok(b) => Ok(NonConstantValue::Boolean(b)),
+                    Err(_) => Err(WithSpan::new(
+                        IsographLiteralParseError::ExpectedBoolean,
+                        span,
+                    )),
+                },
             })
         })?;
 
@@ -569,6 +608,24 @@ fn parse_non_constant_value(
             Span::todo_generated(),
         ))
     })
+}
+
+fn parse_object_entry(
+    tokens: &mut PeekableLexer,
+    text_source: TextSource,
+) -> ParseResultWithSpan<NameValuePair<ValueKeyName, NonConstantValue>> {
+    let name = tokens
+        .parse_string_key_type(IsographLangTokenKind::Identifier)
+        .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?
+        .to_with_location(text_source);
+
+    tokens
+        .parse_token_of_kind(IsographLangTokenKind::Colon)
+        .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+
+    let value = parse_non_constant_value(tokens, text_source)?.to_with_location(text_source);
+
+    Ok(NameValuePair { name, value })
 }
 
 fn parse_variable_definitions(
@@ -584,7 +641,8 @@ fn parse_variable_definitions(
             move |item| parse_variable_definition(item, text_source),
             IsographLangTokenKind::Comma,
             IsographLangTokenKind::CloseParen,
-        )?;
+        )?
+        .item;
 
         Ok(variable_definitions)
     } else {
@@ -628,7 +686,7 @@ fn parse_optional_default_value(
         .parse_token_of_kind(IsographLangTokenKind::Equals)
         .is_ok()
     {
-        let non_constant_value = parse_non_constant_value(tokens)?;
+        let non_constant_value = parse_non_constant_value(tokens, text_source)?;
         let constant_value: ConstantValue = non_constant_value.item.try_into().map_err(|_| {
             WithSpan::new(
                 IsographLiteralParseError::UnexpectedVariable,

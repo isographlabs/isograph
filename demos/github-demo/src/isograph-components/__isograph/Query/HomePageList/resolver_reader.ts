@@ -17,12 +17,14 @@ const readerAst: ReaderAst<Query__HomePageList__param> = [
         fieldName: "login",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
       {
         kind: "Scalar",
         fieldName: "name",
         alias: null,
         arguments: null,
+        isUpdatable: false,
       },
       {
         kind: "Resolver",
