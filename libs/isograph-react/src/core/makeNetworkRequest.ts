@@ -28,7 +28,7 @@ import {
   wrapResolvedValue,
 } from './PromiseWrapper';
 import { readButDoNotEvaluate } from './read';
-import { startUpdate } from './startUpdate';
+import { getOrCreateCachedStartUpdate } from './startUpdate';
 
 let networkRequestId = 0;
 
@@ -286,7 +286,7 @@ function readDataForOnComplete<
         // TClientFieldValue which is a React.FC<...>
         return getOrCreateCachedComponent(
           environment,
-          readerArtifact.componentName,
+          readerArtifact.fieldName,
           {
             kind: 'FragmentReference',
             readerWithRefetchQueries: wrapResolvedValue({
@@ -306,9 +306,15 @@ function readDataForOnComplete<
         return readerArtifact.resolver({
           data: fragmentResult,
           parameters: variables,
-          startUpdate: readerArtifact.hasUpdatable
-            ? startUpdate(environment, fragmentResult)
-            : undefined,
+          ...(readerArtifact.hasUpdatable
+            ? {
+                startUpdate: getOrCreateCachedStartUpdate(
+                  environment,
+                  fragment,
+                  artifact.readerWithRefetchQueries.readerArtifact.fieldName,
+                ),
+              }
+            : undefined),
         });
       }
       default: {

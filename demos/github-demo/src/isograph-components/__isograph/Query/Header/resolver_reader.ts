@@ -33,7 +33,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  componentName: "Query.Header",
+  fieldName: "Query.Header",
   resolver,
   readerAst,
   hasUpdatable: false,

@@ -23,6 +23,7 @@ impl ImportedFileCategory {
 pub(crate) type ReaderImports = BTreeSet<(ObjectTypeAndFieldName, ImportedFileCategory)>;
 pub(crate) type ParamTypeImports = BTreeSet<ObjectTypeAndFieldName>;
 pub(crate) type LinkImports = bool;
+pub(crate) type UpdatableImports = bool;
 
 pub(crate) fn reader_imports_to_import_statement(
     reader_imports: &ReaderImports,

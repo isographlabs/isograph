@@ -17,6 +17,7 @@ const artifact: EagerReaderArtifact<
   IssueComment__formattedCommentCreationDate__output_type
 > = {
   kind: "EagerReaderArtifact",
+  fieldName: "IssueComment.formattedCommentCreationDate",
   resolver,
   readerAst,
   hasUpdatable: false,

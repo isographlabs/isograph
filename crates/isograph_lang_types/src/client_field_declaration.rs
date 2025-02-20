@@ -73,6 +73,7 @@ pub type ClientPointerDeclarationWithValidatedDirectives =
 pub enum IsographSelectionVariant {
     Regular,
     Loadable(LoadableDirectiveParameters),
+    Updatable,
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy)]

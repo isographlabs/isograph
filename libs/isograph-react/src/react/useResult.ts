@@ -12,7 +12,7 @@ import {
   getNetworkRequestOptionsWithDefaults,
   NetworkRequestReaderOptions,
 } from '../core/read';
-import { startUpdate } from '../core/startUpdate';
+import { getOrCreateCachedStartUpdate } from '../core/startUpdate';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 import { useReadAndSubscribe } from './useReadAndSubscribe';
 
@@ -41,7 +41,7 @@ export function useResult<
       // @ts-expect-error
       return getOrCreateCachedComponent(
         environment,
-        readerWithRefetchQueries.readerArtifact.componentName,
+        readerWithRefetchQueries.readerArtifact.fieldName,
         fragmentReference,
         networkRequestOptions,
       );
@@ -55,9 +55,15 @@ export function useResult<
       const param = {
         data: data,
         parameters: fragmentReference.variables,
-        startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
-          ? startUpdate(environment, data)
-          : undefined,
+        ...(readerWithRefetchQueries.readerArtifact.hasUpdatable
+          ? {
+              startUpdate: getOrCreateCachedStartUpdate(
+                environment,
+                fragmentReference,
+                readerWithRefetchQueries.readerArtifact.fieldName,
+              ),
+            }
+          : undefined),
       };
       return readerWithRefetchQueries.readerArtifact.resolver(param);
     }

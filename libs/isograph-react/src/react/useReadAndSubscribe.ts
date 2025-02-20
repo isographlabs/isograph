@@ -6,6 +6,7 @@ import {
   stableIdForFragmentReference,
   type UnknownTReadFromStore,
 } from '../core/FragmentReference';
+import { readPromise } from '../core/PromiseWrapper';
 import {
   NetworkRequestReaderOptions,
   readButDoNotEvaluate,
@@ -73,9 +74,15 @@ export function useSubscribeToMultiple<
     // TODO find out
     [
       items
-        .map(({ fragmentReference }) =>
-          stableIdForFragmentReference(fragmentReference),
-        )
+        .map(({ fragmentReference }) => {
+          const readerWithRefetchQueries = readPromise(
+            fragmentReference.readerWithRefetchQueries,
+          );
+          stableIdForFragmentReference(
+            fragmentReference,
+            readerWithRefetchQueries.readerArtifact.fieldName,
+          );
+        })
         .join('.'),
     ],
   );

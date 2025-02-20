@@ -1,4 +1,5 @@
 import { ReaderWithRefetchQueries } from '../core/entrypoint';
+import { stableCopy } from './cache';
 import { type Link } from './IsographEnvironment';
 import { PromiseWrapper } from './PromiseWrapper';
 import type { StartUpdate } from './reader';
@@ -45,18 +46,11 @@ export type FragmentReference<
   readonly networkRequest: PromiseWrapper<void, any>;
 };
 
+export type StableIdForFragmentReference = string;
+
 export function stableIdForFragmentReference(
   fragmentReference: FragmentReference<any, any>,
-): string {
-  return `${fragmentReference.root.__typename}/${fragmentReference.root.__link}/TODO_FRAGMENT_NAME/${serializeVariables(fragmentReference.variables ?? {})}`;
-}
-
-function serializeVariables(variables: Variables) {
-  let s = '';
-  const keys = Object.keys(variables);
-  keys.sort();
-  for (const key of keys) {
-    s += `${key}:${variables[key]},`;
-  }
-  return s;
+  fieldName: string,
+): StableIdForFragmentReference {
+  return `${fragmentReference.root.__typename}/${fragmentReference.root.__link}/${fieldName}/${JSON.stringify(stableCopy(fragmentReference.variables))}`;
 }

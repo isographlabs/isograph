@@ -7,10 +7,8 @@ import {
   RefetchQueryNormalizationArtifactWrapper,
 } from './entrypoint';
 import {
-  ExtractData,
   ExtractParameters,
   FragmentReference,
-  type ExtractStartUpdate,
   type UnknownTReadFromStore,
 } from './FragmentReference';
 import {
@@ -33,6 +31,7 @@ export type EagerReaderArtifact<
   TClientFieldValue,
 > = {
   readonly kind: 'EagerReaderArtifact';
+  readonly fieldName: string;
   readonly readerAst: ReaderAst<TReadFromStore>;
   readonly resolver: (
     data: ResolverFirstParameter<TReadFromStore>,
@@ -45,7 +44,7 @@ export type ComponentReaderArtifact<
   TComponentProps extends Record<string, unknown> = Record<PropertyKey, never>,
 > = {
   readonly kind: 'ComponentReaderArtifact';
-  readonly componentName: ComponentOrFieldName;
+  readonly fieldName: ComponentOrFieldName;
   readonly readerAst: ReaderAst<TReadFromStore>;
   readonly resolver: (
     data: ResolverFirstParameter<TReadFromStore>,
@@ -56,11 +55,7 @@ export type ComponentReaderArtifact<
 
 export type ResolverFirstParameter<
   TReadFromStore extends UnknownTReadFromStore,
-> = {
-  data: ExtractData<TReadFromStore>;
-  parameters: ExtractParameters<TReadFromStore>;
-  startUpdate: undefined | ExtractStartUpdate<TReadFromStore>;
-};
+> = Pick<TReadFromStore, 'data' | 'parameters' | 'startUpdate'>;
 
 export type StartUpdate<UpdatableData> = (
   updater: (updatableData: UpdatableData) => void,

@@ -2,7 +2,7 @@ use intern::Lookup;
 use isograph_config::GenerateFileExtensionsOption;
 use std::cmp::Ordering;
 
-use common_lang_types::{ArtifactPathAndContent, SelectableFieldName};
+use common_lang_types::{ArtifactPathAndContent, IsoLiteralText, SelectableFieldName};
 use isograph_schema::{
     ClientFieldVariant, ClientType, UserWrittenComponentVariant, ValidatedClientField,
     ValidatedSchema,
@@ -13,45 +13,30 @@ use crate::generate_artifacts::ISO_TS_FILE_NAME;
 fn build_iso_overload_for_entrypoint(
     validated_client_field: &ValidatedClientField,
     file_extensions: GenerateFileExtensionsOption,
-    no_babel_transform: bool,
-) -> (Option<String>, String) {
+) -> (String, String) {
     let formatted_field = format!(
         "entrypoint {}.{}",
         validated_client_field.type_and_field.type_name,
         validated_client_field.type_and_field.field_name
     );
-    match no_babel_transform {
-        true => (
-            None,
-            format!(
-                "
-export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'{}', T>
-): void;\n",
-                formatted_field
-            ),
-        ),
-        false => {
-            let mut s: String = "".to_string();
-            let import = format!(
-                "import entrypoint_{} from '../__isograph/{}/{}/entrypoint{}';\n",
-                validated_client_field.type_and_field.underscore_separated(),
-                validated_client_field.type_and_field.type_name,
-                validated_client_field.type_and_field.field_name,
-                file_extensions.ts()
-            );
+    let mut s: String = "".to_string();
+    let import = format!(
+        "import entrypoint_{} from '../__isograph/{}/{}/entrypoint{}';\n",
+        validated_client_field.type_and_field.underscore_separated(),
+        validated_client_field.type_and_field.type_name,
+        validated_client_field.type_and_field.field_name,
+        file_extensions.ts()
+    );
 
-            s.push_str(&format!(
-                "
+    s.push_str(&format!(
+        "
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'{}', T>
 ): typeof entrypoint_{};\n",
-                formatted_field,
-                validated_client_field.type_and_field.underscore_separated(),
-            ));
-            (Some(import), s)
-        }
-    }
+        formatted_field,
+        validated_client_field.type_and_field.underscore_separated(),
+    ));
+    (import, s)
 }
 
 fn build_iso_overload_for_client_defined_field(
@@ -160,35 +145,59 @@ type MatchesWhitespaceAndString<
 
     let entrypoint_overloads = sorted_entrypoints(schema)
         .into_iter()
-        .map(|field| build_iso_overload_for_entrypoint(field, file_extensions, no_babel_transform));
+        .map(|(field, _)| build_iso_overload_for_entrypoint(field, file_extensions));
     for (import, entrypoint_overload) in entrypoint_overloads {
-        if let Some(import) = import {
-            imports.push_str(&import);
-        }
+        imports.push_str(&import);
         content.push_str(&entrypoint_overload);
     }
 
-    content.push_str(
-        "
+    (match no_babel_transform {
+        false => {
+            content.push_str(
+                "
 export function iso(_isographLiteralText: string):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
   | IsographEntrypoint<any, any, any>
 {\n",
-    );
-
-    content.push_str(match no_babel_transform {
-        false => {
-"  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
+            );
+            content.push_str("  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
       'was not set up, or it failed to identify this call site. Make sure it ' +
       'is being used verbatim as `iso`. If you cannot use the babel transform, ' + 
-      'set options.no_babel_transform to true in your Isograph config. ');"
-        }        true => {
-            "  return (clientFieldResolver: any) => clientFieldResolver;"
+      'set options.no_babel_transform to true in your Isograph config. ');\n}")
+        }
+        true => {
+            let switch_cases =
+                sorted_entrypoints(schema)
+                    .into_iter()
+                    .map(|(field, iso_literal_text)| {
+                        format!(
+                            "    case '{}':
+      return entrypoint_{};\n",
+                            iso_literal_text,
+                            field.type_and_field.underscore_separated()
+                        )
+                    });
+
+            content.push_str(
+                "
+export function iso(isographLiteralText: string):
+  | IdentityWithParam<any>
+  | IdentityWithParamComponent<any>
+  | IsographEntrypoint<any, any>
+{
+  switch (isographLiteralText) {\n",
+            );
+
+            for switch_case in switch_cases {
+                content.push_str(&switch_case);
+            }
+            content.push_str(
+                "  } 
+  return (clientFieldResolver: any) => clientFieldResolver;\n}",
+            )
         }
     });
-
-    content.push_str("\n}");
 
     imports.push_str(&content);
     ArtifactPathAndContent {
@@ -220,13 +229,15 @@ fn sorted_user_written_fields(
     fields
 }
 
-fn sorted_entrypoints(schema: &ValidatedSchema) -> Vec<&ValidatedClientField> {
+fn sorted_entrypoints(schema: &ValidatedSchema) -> Vec<(&ValidatedClientField, &IsoLiteralText)> {
     let mut entrypoints = schema
         .entrypoints
         .iter()
-        .map(|client_field_id| schema.client_field(*client_field_id))
+        .map(|(client_field_id, iso_literal_text)| {
+            (schema.client_field(*client_field_id), iso_literal_text)
+        })
         .collect::<Vec<_>>();
-    entrypoints.sort_by(|client_field_1, client_field_2| {
+    entrypoints.sort_by(|(client_field_1, _), (client_field_2, _)| {
         match client_field_1
             .type_and_field
             .type_name

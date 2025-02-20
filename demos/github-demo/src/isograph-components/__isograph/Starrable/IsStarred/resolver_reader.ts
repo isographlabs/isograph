@@ -22,7 +22,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  componentName: "Starrable.IsStarred",
+  fieldName: "Starrable.IsStarred",
   resolver,
   readerAst,
   hasUpdatable: false,

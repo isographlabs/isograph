@@ -39,7 +39,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  componentName: "Mutation.SetTagline",
+  fieldName: "Mutation.SetTagline",
   resolver,
   readerAst,
   hasUpdatable: false,

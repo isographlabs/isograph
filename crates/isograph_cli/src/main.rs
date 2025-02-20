@@ -37,17 +37,11 @@ async fn start_compiler(
 
     if compile_command.watch {
         match handle_watch_command(config_location, current_working_directory).await {
-            Ok(res) => match res {
-                Ok(_) => {
-                    info!("{}", "Successfully watched. Exiting.\n")
-                }
-                Err(err) => {
-                    error!("{}\n{:?}", "Error in watch process of some sort.\n", err);
-                    std::process::exit(1);
-                }
-            },
+            Ok(_) => {
+                info!("{}", "Successfully watched. Exiting.\n")
+            }
             Err(err) => {
-                error!("{}\n{}", "Error in watch process of some sort.\n", err);
+                error!("{}\n{:?}", "Error in watch process of some sort.\n", err);
                 std::process::exit(1);
             }
         };
