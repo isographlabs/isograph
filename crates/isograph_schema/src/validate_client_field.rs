@@ -796,6 +796,10 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
                                     ))
                                 }
                                 IsographSelectionVariant::Updatable => {
+                                    assert_no_missing_arguments(
+                                        missing_arguments,
+                                        linked_field_selection.name.location,
+                                    )?;
                                     ValidatedIsographSelectionVariant::Updatable
                                 }
                             },
