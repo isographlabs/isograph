@@ -75,6 +75,10 @@ impl DependencyStack {
             // memoized function call where this call must be registered as a dependency.
         }
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.borrow().is_empty()
+    }
 }
 
 pub struct DependencyStackGuard<'a> {

@@ -74,11 +74,20 @@ impl Database {
     }
 
     pub fn set<T: Source + DynEq>(&mut self, source: T) -> SourceId<T> {
+        self.assert_empty_dependency_stack();
         self.storage.set_source(source)
     }
 
     pub fn remove<T>(&mut self, id: SourceId<T>) {
+        self.assert_empty_dependency_stack();
         self.storage.remove_source(id)
+    }
+
+    fn assert_empty_dependency_stack(&self) {
+        assert!(
+            self.dependency_stack.is_empty(),
+            "Cannot modify database while a memoized function is being invoked."
+        );
     }
 }
 
