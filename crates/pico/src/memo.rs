@@ -54,6 +54,14 @@ pub enum DidRecalculate {
 /// (with a value identical to what we would get if we actually invoked the
 /// function) is present in the [`Database`].
 pub fn memo(db: &Database, derived_node_id: DerivedNodeId, inner_fn: InnerFn) -> DidRecalculate {
+    if db.dependency_stack.is_empty() {
+        // This is the outermost call to a memoized function. Keep track of all top_level_calls
+        // for the purposes of later garbage collection. (Note that we also cannot update the LRU
+        // cache right now, as that would require a mutable reference to the Database, which we do
+        // not have.)
+        db.top_level_calls.push(derived_node_id);
+    }
+
     let (time_updated, did_recalculate) =
         if let Some(derived_node) = db.storage.get_derived_node(derived_node_id) {
             if db.storage.node_verified_in_current_epoch(derived_node_id) {
