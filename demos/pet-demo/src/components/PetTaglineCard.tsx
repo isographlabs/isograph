@@ -22,7 +22,7 @@ export const PetTaglineCard = iso(`
       <CardContent>
         <h2>Tagline</h2>
         <p>&quot;{pet.tagline}&quot;</p>
-        {mutationRef === null ? (
+        {mutationRef === null || pet.tagline !== 'SUPER DOG' ? (
           <Button
             onClick={() => {
               loadMutation({

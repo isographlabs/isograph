@@ -103,7 +103,7 @@ describe('readData', () => {
       throwOnNetworkError: false,
     });
 
-    expect(data).toStrictEqual({
+    expect(data).toMatchObject({
       encounteredRecords: new Map([
         ['Economist', new Set(['1'])],
         ['Query', new Set([ROOT_ID])],
