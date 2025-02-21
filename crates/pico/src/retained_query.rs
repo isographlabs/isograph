@@ -11,11 +11,12 @@ use crate::{Database, DerivedNodeId, MemoRef};
 /// - To **stop retaining** the query (i.e. allowing garbage collection),
 ///   call [`db.clear_retain()`][Database::clear_retain].
 /// - To **permanently retain** the query (prevent garbage collection
-///   indefinitely), call [`retained_query.persist()`][RetainedQuery::persist].
+///   indefinitely), call
+///   [`retained_query.never_garbage_collect()`][RetainedQuery::never_garbage_collect].
 ///
 /// ### Critical Behavior
 /// The `RetainedQuery` **will panic if dropped** without first calling
-/// either [`persist()`][RetainedQuery::persist] or
+/// either [`never_garbage_collect()`][RetainedQuery::never_garbage_collect] or
 /// [`clear_retain()`][Database::clear_retain].
 pub struct RetainedQuery {
     pub derived_node_id: DerivedNodeId,
@@ -24,7 +25,7 @@ pub struct RetainedQuery {
 
 impl RetainedQuery {
     /// This causes the query to be permanently retained in the database.
-    pub fn persist(mut self) {
+    pub fn never_garbage_collect(mut self) {
         // set cleared to true so that we don't panic when dropping the RetainedQuery
         self.cleared = true;
     }
@@ -35,7 +36,7 @@ impl std::ops::Drop for RetainedQuery {
         if !self.cleared {
             panic!(
                 "RetainedQuery dropped while still retained. Either call Database::clear_retain \
-                or RetainedQuery::persist."
+                or RetainedQuery::never_garbage_collect."
             )
         }
     }

@@ -18,7 +18,7 @@ fn basic_retained() {
     assert_eq!(B_COUNTER.load(Ordering::SeqCst), 1);
 
     let retain = db.retain(&memo_ref_a);
-    retain.persist();
+    retain.never_garbage_collect();
 
     memoized_a(&db);
 
