@@ -1,7 +1,4 @@
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    LazyLock, Mutex,
-};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use pico::Database;
 use pico_macros::memo;
@@ -9,24 +6,24 @@ use pico_macros::memo;
 static A_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static B_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-static RUN_SERIALLY: LazyLock<Mutex<()>> = LazyLock::new(Mutex::default);
-
 #[test]
 fn basic() {
     // When we garbage collect, we will only keep the most recently called top-level field
-    let mut db = Database::new_with_capacity(1.try_into().unwrap());
+    let mut db = Database::new_with_capacity(2.try_into().unwrap());
 
     memoized_a(&db);
     assert_eq!(A_COUNTER.load(Ordering::SeqCst), 1);
 
     memoized_b(&db);
     assert_eq!(B_COUNTER.load(Ordering::SeqCst), 1);
+    memoized_b(&db);
 
-    // Run GC. memoized_b is retained, but not memoized_a.
+    // Run GC. Even though memoized_b has been called twice, memoized_a is still retained,
+    // because the internal LRU cache does not double-count the call to memoized_b
     db.run_garbage_collection();
 
     memoized_a(&db);
-    assert_eq!(A_COUNTER.load(Ordering::SeqCst), 2);
+    assert_eq!(A_COUNTER.load(Ordering::SeqCst), 1);
 
     memoized_b(&db);
     assert_eq!(B_COUNTER.load(Ordering::SeqCst), 1);
