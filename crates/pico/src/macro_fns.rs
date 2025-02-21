@@ -14,15 +14,15 @@ pub fn init_param_vec() -> ArrayVec<[ParamId; 8]> {
 
 pub fn intern_param<T: Hash + Clone + 'static>(db: &Database, param: &T) -> ParamId {
     let param_id = hash(param).into();
-    if let Entry::Vacant(v) = db.param_id_to_index.entry(param_id) {
-        let idx = db.params.push(Box::new(param.clone()));
+    if let Entry::Vacant(v) = db.storage.param_id_to_index.entry(param_id) {
+        let idx = db.storage.params.push(Box::new(param.clone()));
         v.insert(Index::new(idx));
     }
     param_id
 }
 
 pub fn get_param(db: &Database, param_id: ParamId) -> Option<&Box<dyn Any>> {
-    db.get_param(param_id)
+    db.storage.get_param(param_id)
 }
 
 pub fn hash<T: Hash + 'static>(value: &T) -> u64 {

@@ -16,6 +16,11 @@ use crate::derived_node::{DerivedNode, DerivedNodeId, DerivedNodeRevision};
 #[derive(Debug)]
 pub struct Database {
     pub(crate) dependency_stack: DependencyStack,
+    pub(crate) storage: DatabaseStorage,
+}
+
+#[derive(Debug)]
+pub(crate) struct DatabaseStorage {
     pub(crate) param_id_to_index: DashMap<ParamId, Index<ParamId>>,
     pub(crate) derived_node_id_to_revision: DashMap<DerivedNodeId, DerivedNodeRevision>,
     pub(crate) source_nodes: DashMap<Key, SourceNode>,
@@ -30,17 +35,54 @@ impl Database {
         let current_epoch = Epoch::new();
         Self {
             dependency_stack: DependencyStack::new(),
-            param_id_to_index: DashMap::new(),
-            derived_node_id_to_revision: DashMap::new(),
+            storage: DatabaseStorage {
+                param_id_to_index: DashMap::new(),
+                derived_node_id_to_revision: DashMap::new(),
 
-            source_nodes: DashMap::new(),
-            derived_nodes: BoxcarVec::new(),
-            params: BoxcarVec::new(),
+                source_nodes: DashMap::new(),
+                derived_nodes: BoxcarVec::new(),
+                params: BoxcarVec::new(),
 
-            current_epoch,
+                current_epoch,
+            },
         }
     }
 
+    pub(crate) fn register_dependency_in_parent_memoized_fn(
+        &self,
+        node: NodeKind,
+        time_updated: Epoch,
+    ) {
+        self.dependency_stack.push_if_not_empty(
+            Dependency {
+                node_to: node,
+                time_verified_or_updated: self.storage.current_epoch,
+            },
+            time_updated,
+        );
+    }
+
+    pub fn get<T: Clone + 'static>(&self, id: SourceId<T>) -> T {
+        let time_updated = self
+            .storage
+            .source_nodes
+            .get(&id.key)
+            .expect("node should exist. This is indicative of a bug in Pico.")
+            .time_updated;
+        self.register_dependency_in_parent_memoized_fn(NodeKind::Source(id.key), time_updated);
+        self.storage.get_source(id)
+    }
+
+    pub fn set<T: Source + DynEq>(&mut self, source: T) -> SourceId<T> {
+        self.storage.set_source(source)
+    }
+
+    pub fn remove<T>(&mut self, id: SourceId<T>) {
+        self.storage.remove_source(id)
+    }
+}
+
+impl DatabaseStorage {
     pub(crate) fn get_param(&self, param_id: ParamId) -> Option<&Box<dyn Any>> {
         let index = self.param_id_to_index.get(&param_id)?;
         Some(self.params.get(index.idx).expect(
@@ -105,13 +147,7 @@ impl Database {
         Index::new(self.derived_nodes.push(derived_node))
     }
 
-    pub fn get<T: Clone + 'static>(&self, id: SourceId<T>) -> T {
-        let time_updated = self
-            .source_nodes
-            .get(&id.key)
-            .expect("node should exist. This is indicative of a bug in Pico.")
-            .time_updated;
-        self.register_dependency_in_parent_memoized_fn(NodeKind::Source(id.key), time_updated);
+    pub fn get_source<T: Clone + 'static>(&self, id: SourceId<T>) -> T {
         self.source_nodes
             .get(&id.key)
             .expect("value should exist. This is indicative of a bug in Pico.")
@@ -124,7 +160,7 @@ impl Database {
 
     /// Sets a source in the database. If there is an existing item and it does not equal
     /// the new source, increment the current epoch.
-    pub fn set<T: Source + DynEq>(&mut self, source: T) -> SourceId<T> {
+    pub fn set_source<T: Source + DynEq>(&mut self, source: T) -> SourceId<T> {
         let id = SourceId::new(&source);
         match self.source_nodes.entry(id.key) {
             Entry::Occupied(mut occupied_entry) => {
@@ -152,23 +188,9 @@ impl Database {
         id
     }
 
-    pub fn remove<T>(&mut self, id: SourceId<T>) {
+    pub fn remove_source<T>(&mut self, id: SourceId<T>) {
         self.current_epoch.increment();
         self.source_nodes.remove(&id.key);
-    }
-
-    pub(crate) fn register_dependency_in_parent_memoized_fn(
-        &self,
-        node: NodeKind,
-        time_updated: Epoch,
-    ) {
-        self.dependency_stack.push_if_not_empty(
-            Dependency {
-                node_to: node,
-                time_verified_or_updated: self.current_epoch,
-            },
-            time_updated,
-        );
     }
 }
 
