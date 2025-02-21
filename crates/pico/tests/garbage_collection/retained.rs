@@ -18,7 +18,7 @@ fn basic_retained() {
     assert_eq!(B_COUNTER.load(Ordering::SeqCst), 1);
 
     let retain = db.retain(&memo_ref_a);
-    retain.permanently_retain_query();
+    retain.persist();
 
     // Run GC. both are retained — b, because of the LRU cache, and a, because of
     // the permanent retain.

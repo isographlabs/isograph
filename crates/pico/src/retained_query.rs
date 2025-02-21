@@ -2,17 +2,21 @@ use dashmap::Entry;
 
 use crate::{Database, DerivedNodeId, MemoRef};
 
-/// When you call [`db.retain(&result_of_calling_memoized_function)`][Database::retain],
-/// you receive a [RetainedQuery]. As long as this RetainedQuery exists, the memoized
-/// function and its dependencies will not be garbage collected from the database.
+/// Calling [`db.retain(&memoized_result)`][Database::retain] returns a
+/// [`RetainedQuery`] object. **This object acts as a temporary guard**
+/// — as long as it exists, the memoized function and its dependencies
+/// will not be garbage collected.
 ///
-/// You can call [`db.clear_retain`][Database::clear_retain] to stop retaining
-/// the query, and you can call
-/// [`retained_query.forget`][RetainedQuery::permanently_retain_query] to
-/// cause the underlying memoized call to never be garbage collected.
+/// ### Managing Retention
+/// - To **stop retaining** the query (i.e. allowing garbage collection),
+///   call [`db.clear_retain()`][Database::clear_retain].
+/// - To **permanently retain** the query (prevent garbage collection
+///   indefinitely), call [`retained_query.persist()`][RetainedQuery::persist].
 ///
-/// RetainedQuery will panic if dropped without either having been passed to
-/// `permanently_retain_query` or `clear_retain`.
+/// ### Critical Behavior
+/// The `RetainedQuery` **will panic if dropped** without first calling
+/// either [`persist()`][RetainedQuery::persist] or
+/// [`clear_retain()`][Database::clear_retain].
 pub struct RetainedQuery {
     pub derived_node_id: DerivedNodeId,
     pub cleared: bool,
@@ -20,7 +24,7 @@ pub struct RetainedQuery {
 
 impl RetainedQuery {
     /// This causes the query to be permanently retained in the database.
-    pub fn permanently_retain_query(mut self) {
+    pub fn persist(mut self) {
         // set cleared to true so that we don't panic when dropping the RetainedQuery
         self.cleared = true;
     }
