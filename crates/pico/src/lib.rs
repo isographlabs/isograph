@@ -8,6 +8,7 @@ mod index;
 mod intern;
 pub mod macro_fns;
 mod memo;
+mod retained_query;
 mod source;
 
 pub use database::*;

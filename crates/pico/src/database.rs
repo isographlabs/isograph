@@ -20,6 +20,7 @@ pub struct Database {
     pub(crate) storage: DatabaseStorage,
     pub(crate) top_level_calls: BoxcarVec<DerivedNodeId>,
     pub(crate) top_level_call_lru_cache: LruCache<DerivedNodeId, ()>,
+    pub(crate) retained_calls: DashMap<DerivedNodeId, usize>,
 }
 
 #[derive(Debug)]
@@ -55,6 +56,7 @@ impl Database {
             },
             top_level_calls: BoxcarVec::new(),
             top_level_call_lru_cache: LruCache::new(capacity),
+            retained_calls: DashMap::new(),
         }
     }
 
@@ -112,8 +114,14 @@ impl Database {
             return;
         }
 
+        // Retain the queries in the LRU cache and the queries that are permanently retained.
+        let retained_derived_node_ids = self
+            .top_level_call_lru_cache
+            .iter()
+            .map(|(k, _v)| *k)
+            .chain(self.retained_calls.iter().map(|ref_multi| *ref_multi.key()));
         self.storage
-            .run_garbage_collection(self.top_level_call_lru_cache.iter().map(|(k, _v)| *k));
+            .run_garbage_collection(retained_derived_node_ids);
     }
 
     fn assert_empty_dependency_stack(&self) {

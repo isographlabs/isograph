@@ -67,8 +67,8 @@ pub struct DerivedNodeRevision {
 
 #[derive(Debug, Clone, Copy)]
 pub struct MemoRef<'db, T> {
-    db: &'db Database,
-    derived_node_id: DerivedNodeId,
+    pub(crate) db: &'db Database,
+    pub(crate) derived_node_id: DerivedNodeId,
     phantom: PhantomData<T>,
 }
 
