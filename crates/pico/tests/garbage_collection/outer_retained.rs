@@ -1,7 +1,4 @@
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    LazyLock, Mutex,
-};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use pico::Database;
 use pico_macros::memo;
