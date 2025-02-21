@@ -1,10 +1,15 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    LazyLock, Mutex,
+};
 
 use pico::Database;
 use pico_macros::memo;
 
 static A_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static B_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+static RUN_SERIALLY: LazyLock<Mutex<()>> = LazyLock::new(Mutex::default);
 
 #[test]
 fn basic() {
