@@ -1,4 +1,4 @@
-use std::any::Any;
+use std::{any::Any, num::NonZeroUsize};
 
 use crate::{
     dependency::{Dependency, DependencyStack, NodeKind},
@@ -10,6 +10,7 @@ use crate::{
 };
 use boxcar::Vec as BoxcarVec;
 use dashmap::{DashMap, Entry};
+use lru::LruCache;
 
 use crate::derived_node::{DerivedNode, DerivedNodeId, DerivedNodeRevision};
 
@@ -17,6 +18,8 @@ use crate::derived_node::{DerivedNode, DerivedNodeId, DerivedNodeRevision};
 pub struct Database {
     pub(crate) dependency_stack: DependencyStack,
     pub(crate) storage: DatabaseStorage,
+    pub(crate) top_level_calls: BoxcarVec<DerivedNodeId>,
+    pub(crate) top_level_call_lru_cache: LruCache<DerivedNodeId, ()>,
 }
 
 #[derive(Debug)]
@@ -30,9 +33,14 @@ pub(crate) struct DatabaseStorage {
     pub(crate) current_epoch: Epoch,
 }
 
+static DEFAULT_CAPACITY: usize = 10_000;
+
 impl Database {
     pub fn new() -> Self {
-        let current_epoch = Epoch::new();
+        Database::new_with_capacity(DEFAULT_CAPACITY.try_into().unwrap())
+    }
+
+    pub fn new_with_capacity(capacity: NonZeroUsize) -> Self {
         Self {
             dependency_stack: DependencyStack::new(),
             storage: DatabaseStorage {
@@ -43,8 +51,10 @@ impl Database {
                 derived_nodes: BoxcarVec::new(),
                 params: BoxcarVec::new(),
 
-                current_epoch,
+                current_epoch: Epoch::new(),
             },
+            top_level_calls: BoxcarVec::new(),
+            top_level_call_lru_cache: LruCache::new(capacity),
         }
     }
 
@@ -81,6 +91,29 @@ impl Database {
     pub fn remove<T>(&mut self, id: SourceId<T>) {
         self.assert_empty_dependency_stack();
         self.storage.remove_source(id)
+    }
+
+    pub fn run_garbage_collection(&mut self) {
+        self.assert_empty_dependency_stack();
+
+        // GC will be a noop if there's no possibility that a top-level call will be evicted
+        // from the cache. If so, we bail early.
+        let gc_will_be_noop = self.top_level_calls.count() + self.top_level_call_lru_cache.len()
+            < self.top_level_call_lru_cache.cap().into();
+
+        let top_level_function_calls =
+            std::mem::replace(&mut self.top_level_calls, BoxcarVec::new());
+
+        for derived_node_id in top_level_function_calls {
+            self.top_level_call_lru_cache.put(derived_node_id, ());
+        }
+
+        if gc_will_be_noop {
+            return;
+        }
+
+        self.storage
+            .run_garbage_collection(self.top_level_call_lru_cache.iter().map(|(k, _v)| *k));
     }
 
     fn assert_empty_dependency_stack(&self) {

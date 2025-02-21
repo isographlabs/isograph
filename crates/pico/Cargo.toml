@@ -10,9 +10,10 @@ pico_macros = { path = "../pico_macros" }
 u64_newtypes = { path = "../u64_newtypes" }
 boxcar = { workspace = true }
 dashmap = { workspace = true }
+lru = { workspace = true }
 once_map = { workspace = true }
-serde = { workspace = true } 
-thiserror = { workspace = true }
-tracing = { workspace = true }
+serde = { workspace = true }
 serde_derive = { workspace = true }
-tinyvec = { version = "1.8.1", features = ["serde"] }
+thiserror = { workspace = true }
+tinyvec = { workspace = true, features = ["serde"] }
+tracing = { workspace = true }
