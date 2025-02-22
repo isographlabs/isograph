@@ -37,6 +37,7 @@ impl From<u64> for ParamId {
 
 impl<T> From<SourceId<T>> for ParamId {
     fn from(value: SourceId<T>) -> Self {
+        eprintln!("from source id {:?}", value.key.0);
         Self(value.key.0)
     }
 }
