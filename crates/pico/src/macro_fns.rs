@@ -12,10 +12,19 @@ pub fn init_param_vec() -> ArrayVec<[ParamId; 8]> {
     ArrayVec::<[ParamId; 8]>::default()
 }
 
-pub fn intern_param<T: Hash + Clone + 'static>(db: &Database, param: &T) -> ParamId {
+pub fn intern_borrowed_param<T: Hash + Clone + 'static>(db: &Database, param: &T) -> ParamId {
     let param_id = hash(param).into();
     if let Entry::Vacant(v) = db.storage.param_id_to_index.entry(param_id) {
         let idx = db.storage.params.push(Box::new(param.clone()));
+        v.insert(Index::new(idx));
+    }
+    param_id
+}
+
+pub fn intern_owned_param<T: Hash + Clone + 'static>(db: &Database, param: T) -> ParamId {
+    let param_id = hash(&param).into();
+    if let Entry::Vacant(v) = db.storage.param_id_to_index.entry(param_id) {
+        let idx = db.storage.params.push(Box::new(param));
         v.insert(Index::new(idx));
     }
     param_id
