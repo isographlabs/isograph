@@ -16,9 +16,9 @@ pub enum DidRecalculate {
     Error,
 }
 
-/// [`memo`] is the workhorse function of pico. Given a [`DerivedNodeId`], which
-/// uniquely identifies the function being called along with the parameters
-/// passed, it:
+/// [`execute_memoized_function`] is the workhorse function of pico. Given
+/// a [`DerivedNodeId`], which uniquely identifies the function being called
+/// along with the parameters passed, it:
 ///
 /// - checks if we have an available [`DerivedNode`] (i.e. if this function
 ///   has previously been invoked, and the [`DerivedNode`] has not been
@@ -55,7 +55,11 @@ pub enum DidRecalculate {
 /// After this function is called, we guarantee that a [`DerivedNode`]
 /// (with a value identical to what we would get if we actually invoked the
 /// function) is present in the [`Database`].
-pub fn memo(db: &Database, derived_node_id: DerivedNodeId, inner_fn: InnerFn) -> DidRecalculate {
+pub fn execute_memoized_function(
+    db: &Database,
+    derived_node_id: DerivedNodeId,
+    inner_fn: InnerFn,
+) -> DidRecalculate {
     if db.dependency_stack.is_empty() {
         // This is the outermost call to a memoized function. Keep track of all top_level_calls
         // for the purposes of later garbage collection. (Note that we also cannot update the LRU
@@ -192,7 +196,7 @@ fn derived_node_changed_since(db: &Database, derived_node_id: DerivedNodeId, sin
     } else {
         return true;
     };
-    let did_recalculate = memo(db, derived_node_id, inner_fn);
+    let did_recalculate = execute_memoized_function(db, derived_node_id, inner_fn);
     matches!(
         did_recalculate,
         DidRecalculate::Recalculated | DidRecalculate::Error
