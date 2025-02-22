@@ -6,7 +6,7 @@ use std::{
 use dashmap::Entry;
 use tinyvec::ArrayVec;
 
-use crate::{index::Index, Database, ParamId};
+use crate::{index::Index, Database, DerivedNodeId, DidRecalculate, InnerFn, ParamId};
 
 pub fn init_param_vec() -> ArrayVec<[ParamId; 8]> {
     ArrayVec::<[ParamId; 8]>::default()
@@ -23,6 +23,14 @@ pub fn intern_param<T: Hash + Clone + 'static>(db: &Database, param: &T) -> Para
 
 pub fn get_param(db: &Database, param_id: ParamId) -> Option<&Box<dyn Any>> {
     db.storage.get_param(param_id)
+}
+
+pub fn execute_memoized_function(
+    db: &Database,
+    derived_node_id: DerivedNodeId,
+    inner_fn: InnerFn,
+) -> DidRecalculate {
+    db.execute_memoized_function(derived_node_id, inner_fn)
 }
 
 pub fn hash<T: Hash + 'static>(value: &T) -> u64 {

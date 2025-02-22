@@ -127,7 +127,7 @@ pub(crate) fn memo(_args: TokenStream, item: TokenStream) -> TokenStream {
                 #param_ids_blocks
             )*
             let derived_node_id = ::pico::DerivedNodeId::new(#fn_hash.into(), param_ids);
-            let did_recalculate = ::pico::execute_memoized_function(
+            let did_recalculate = ::pico::macro_fns::execute_memoized_function(
                 #db_arg,
                 derived_node_id,
                 ::pico::InnerFn::new(|#db_arg, derived_node_id| {

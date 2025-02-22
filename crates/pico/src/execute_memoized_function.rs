@@ -55,42 +55,52 @@ pub enum DidRecalculate {
 /// After this function is called, we guarantee that a [`DerivedNode`]
 /// (with a value identical to what we would get if we actually invoked the
 /// function) is present in the [`Database`].
-pub fn execute_memoized_function(
-    db: &Database,
-    derived_node_id: DerivedNodeId,
-    inner_fn: InnerFn,
-) -> DidRecalculate {
-    if db.dependency_stack.is_empty() {
-        // This is the outermost call to a memoized function. Keep track of all top_level_calls
-        // for the purposes of later garbage collection. (Note that we also cannot update the LRU
-        // cache right now, as that would require a mutable reference to the Database, which we do
-        // not have.)
-        db.top_level_calls.push(derived_node_id);
-    }
+impl Database {
+    pub(crate) fn execute_memoized_function(
+        &self,
+        derived_node_id: DerivedNodeId,
+        inner_fn: InnerFn,
+    ) -> DidRecalculate {
+        if self.dependency_stack.is_empty() {
+            // This is the outermost call to a memoized function. Keep track of all top_level_calls
+            // for the purposes of later garbage collection. (Note that we also cannot update the LRU
+            // cache right now, as that would require a mutable reference to the Database, which we do
+            // not have.)
+            self.top_level_calls.push(derived_node_id);
+        }
 
-    let (time_updated, did_recalculate) =
-        if let Some(derived_node) = db.storage.get_derived_node(derived_node_id) {
-            if db.storage.node_verified_in_current_epoch(derived_node_id) {
-                (
-                    db.storage.current_epoch,
-                    DidRecalculate::ReusedMemoizedValue,
-                )
-            } else {
-                db.storage.verify_derived_node(derived_node_id);
-                if any_dependency_changed(db, derived_node) {
-                    update_derived_node(db, derived_node_id, derived_node.value.as_ref(), inner_fn)
-                } else {
+        let (time_updated, did_recalculate) =
+            if let Some(derived_node) = self.storage.get_derived_node(derived_node_id) {
+                if self.storage.node_verified_in_current_epoch(derived_node_id) {
                     (
-                        db.storage.current_epoch,
+                        self.storage.current_epoch,
                         DidRecalculate::ReusedMemoizedValue,
                     )
+                } else {
+                    self.storage.verify_derived_node(derived_node_id);
+                    if any_dependency_changed(self, derived_node) {
+                        update_derived_node(
+                            self,
+                            derived_node_id,
+                            derived_node.value.as_ref(),
+                            inner_fn,
+                        )
+                    } else {
+                        (
+                            self.storage.current_epoch,
+                            DidRecalculate::ReusedMemoizedValue,
+                        )
+                    }
                 }
-            }
-        } else {
-            create_derived_node(db, derived_node_id, inner_fn)
-        };
-    db.register_dependency_in_parent_memoized_fn(NodeKind::Derived(derived_node_id), time_updated);
-    did_recalculate
+            } else {
+                create_derived_node(self, derived_node_id, inner_fn)
+            };
+        self.register_dependency_in_parent_memoized_fn(
+            NodeKind::Derived(derived_node_id),
+            time_updated,
+        );
+        did_recalculate
+    }
 }
 
 fn create_derived_node(
@@ -196,7 +206,7 @@ fn derived_node_changed_since(db: &Database, derived_node_id: DerivedNodeId, sin
     } else {
         return true;
     };
-    let did_recalculate = execute_memoized_function(db, derived_node_id, inner_fn);
+    let did_recalculate = db.execute_memoized_function(derived_node_id, inner_fn);
     matches!(
         did_recalculate,
         DidRecalculate::Recalculated | DidRecalculate::Error
