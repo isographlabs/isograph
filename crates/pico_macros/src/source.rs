@@ -49,7 +49,11 @@ pub(crate) fn source(item: TokenStream) -> TokenStream {
     let output = quote! {
         impl ::pico::Source for #struct_name {
             fn get_key(&self) -> ::pico::Key {
-                ::pico::macro_fns::hash(&self.#field_name).into()
+                use ::std::hash::{Hash, Hasher, DefaultHasher};
+                let mut s = DefaultHasher::new();
+                ::core::any::TypeId::of::<#struct_name>().hash(&mut s);
+                self.#field_name.hash(&mut s);
+                s.finish().into()
             }
         }
     };
