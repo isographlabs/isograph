@@ -7,7 +7,7 @@ static A_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static B_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 #[test]
-fn basic() {
+fn basic_gc() {
     // When we garbage collect, we will only keep the most recently called top-level field
     let mut db = Database::new_with_capacity(1.try_into().unwrap());
 
