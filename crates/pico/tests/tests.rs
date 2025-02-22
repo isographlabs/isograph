@@ -6,3 +6,9 @@ mod garbage_collection {
     mod retained;
     mod retained_and_in_lru;
 }
+
+mod params {
+    mod memo_ref_never_cloned;
+    mod other_param_cloned_on_execute;
+    mod source_id_cloned_on_get;
+}
