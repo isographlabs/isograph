@@ -94,8 +94,8 @@ fn create_derived_node(
     derived_node_id: DerivedNodeId,
     inner_fn: InnerFn,
 ) -> (Epoch, DidRecalculate) {
-    let (value, tracked_dependencies) = with_dependency_tracking(db, derived_node_id, inner_fn)
-        .expect(
+    let (value, tracked_dependencies) =
+        invoke_with_dependency_tracking(db, derived_node_id, inner_fn).expect(
             "InnerFn call cannot fail for a new derived node. This is indicative of a bug in Pico.",
         );
     let index = db.storage.insert_derived_node(DerivedNode {
@@ -121,7 +121,7 @@ fn update_derived_node(
     prev_value: &dyn DynEq,
     inner_fn: InnerFn,
 ) -> (Epoch, DidRecalculate) {
-    match with_dependency_tracking(db, derived_node_id, inner_fn) {
+    match invoke_with_dependency_tracking(db, derived_node_id, inner_fn) {
         Some((value, tracked_dependencies)) => {
             let mut occupied = if let Entry::Occupied(occupied) = db
                 .storage
@@ -199,7 +199,7 @@ fn derived_node_changed_since(db: &Database, derived_node_id: DerivedNodeId, sin
     )
 }
 
-fn with_dependency_tracking(
+fn invoke_with_dependency_tracking(
     db: &Database,
     derived_node_id: DerivedNodeId,
     inner_fn: InnerFn,
