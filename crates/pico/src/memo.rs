@@ -204,7 +204,7 @@ fn invoke_with_dependency_tracking(
     derived_node_id: DerivedNodeId,
     inner_fn: InnerFn,
 ) -> Option<(Box<dyn DynEq>, TrackedDependencies)> {
-    let guard = db.dependency_stack.enter();
+    let guard = db.dependency_stack.enter(derived_node_id);
     let result = inner_fn.0(db, derived_node_id);
     let dependencies = guard.release();
     Some((result?, dependencies))

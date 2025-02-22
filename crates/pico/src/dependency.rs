@@ -18,13 +18,15 @@ pub enum NodeKind {
 pub struct TrackedDependencies {
     pub dependencies: Vec<Dependency>,
     pub max_time_updated: Epoch,
+    pub derived_node_id: DerivedNodeId,
 }
 
 impl TrackedDependencies {
-    pub fn new() -> Self {
+    pub fn new(derived_node_id: DerivedNodeId) -> Self {
         Self {
             dependencies: vec![],
             max_time_updated: Epoch::new(),
+            derived_node_id,
         }
     }
 
@@ -51,8 +53,12 @@ impl DependencyStack {
         Self(RefCell::new(Vec::new()))
     }
 
-    pub fn enter(&self) -> DependencyStackGuard<'_> {
-        self.0.borrow_mut().push(TrackedDependencies::new());
+    pub fn enter(&self, derived_node_id: DerivedNodeId) -> DependencyStackGuard<'_> {
+        self.assert_no_cycles(derived_node_id);
+
+        self.0
+            .borrow_mut()
+            .push(TrackedDependencies::new(derived_node_id));
         DependencyStackGuard {
             stack: self,
             released: false,
@@ -78,6 +84,14 @@ impl DependencyStack {
 
     pub fn is_empty(&self) -> bool {
         self.0.borrow().is_empty()
+    }
+
+    fn assert_no_cycles(&self, derived_node_id: DerivedNodeId) {
+        for parent_tracked_call in self.0.borrow().iter() {
+            if parent_tracked_call.derived_node_id == derived_node_id {
+                panic!("Cyclic dependency detected. This is not supported in pico.")
+            }
+        }
     }
 }
 
