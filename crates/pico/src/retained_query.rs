@@ -68,7 +68,7 @@ impl Database {
                 }
             }
             Entry::Vacant(_) => {
-                panic!("RetainedQuery not found in databse. This is indicative of a bug in Pico.")
+                panic!("RetainedQuery not found in database. This is indicative of a bug in Pico.")
             }
         }
         retained_query.cleared = true;
