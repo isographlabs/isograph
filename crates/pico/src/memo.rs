@@ -16,7 +16,7 @@ pub enum DidRecalculate {
     Error,
 }
 
-/// Memo is the workhorse function of pico. Given a [`DerivedNodeId`], which
+/// [`memo`] is the workhorse function of pico. Given a [`DerivedNodeId`], which
 /// uniquely identifies the function being called along with the parameters
 /// passed, it:
 ///
@@ -29,13 +29,15 @@ pub enum DidRecalculate {
 ///       the `DerivedNode`.
 ///   - if not, execute this function. Create and store a [`DerivedNode`].
 ///
-/// In all cases, we set the [`DerivedNode`]'s `verified_at` to the current
-/// epoch.
+/// In all cases, we the [`DerivedNode`]'s `verified_at` will end up being the
+/// current epoch.
 ///
 /// **Checking whether we can reuse a previous invocation**:
-///   - This is done by checking whether
-///     [any dependency has changed][`any_dependency_changed`] since this
-///     [`DerivedNode`] was last verified.
+///   - This is done by checking:
+///     - whether the dependency was
+///       [verified in the current epoch][crate::DatabaseStorage::node_verified_in_current_epoch], or
+///     - whether [any dependency has changed][any_dependency_changed]
+///       since this [`DerivedNode`] was last verified.
 ///   - Memoized functions are assumed to be pure functions of their params
 ///     and the dependencies that they read. So, if no dependency has
 ///     changed, we know we can reuse the value from the previous invocation.
