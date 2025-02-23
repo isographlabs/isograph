@@ -214,7 +214,7 @@ pub fn get_artifact_path_and_content<TOutputFormat: OutputFormat>(
                             let variable_definitions_iter = encountered_client_field
                                 .variable_definitions
                                 .iter()
-                                .map(|variable_defition| &variable_defition.item)
+                                .map(|variable_definition| &variable_definition.item)
                                 .chain(std::iter::once(&id_var));
                             let mut traversal_state = traversal_state.clone();
                             traversal_state.refetch_paths = traversal_state
