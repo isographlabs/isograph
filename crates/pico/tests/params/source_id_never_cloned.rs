@@ -7,7 +7,7 @@ static INPUT_CLONE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static ASSERT_INPUT_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 #[test]
-fn source_id_cloned_on_get() {
+fn source_id_never_cloned() {
     let mut db = Database::default();
     let input_id = db.set(Input {
         key: "key",
@@ -56,5 +56,5 @@ fn assert_input_cloned(db: &Database, input_id: SourceId<Input>) {
 
     let clone_count = INPUT_CLONE_COUNTER.load(Ordering::SeqCst);
     db.get(input_id);
-    assert_eq!(INPUT_CLONE_COUNTER.load(Ordering::SeqCst), clone_count + 1);
+    assert_eq!(INPUT_CLONE_COUNTER.load(Ordering::SeqCst), clone_count);
 }
