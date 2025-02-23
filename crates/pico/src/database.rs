@@ -98,11 +98,6 @@ impl Database {
     pub fn run_garbage_collection(&mut self) {
         self.assert_empty_dependency_stack();
 
-        // GC will be a noop if there's no possibility that a top-level call will be evicted
-        // from the cache. If so, we bail early.
-        let gc_will_be_noop = self.top_level_calls.count() + self.top_level_call_lru_cache.len()
-            < self.top_level_call_lru_cache.cap().into();
-
         let top_level_function_calls =
             std::mem::replace(&mut self.top_level_calls, BoxcarVec::new());
 
@@ -110,16 +105,17 @@ impl Database {
             self.top_level_call_lru_cache.put(derived_node_id, ());
         }
 
-        if gc_will_be_noop {
-            return;
-        }
-
-        // Retain the queries in the LRU cache and the queries that are permanently retained.
+        // Retain the queries in the LRU cache and the queries that are permanently retained,
+        // and everything reachable from them.
+        //
+        // If we have a functon f(input) -> X, then input changed values, and f(input) -> Y,
+        // then the X node is inaccessible and will be garbage collected.
         let retained_derived_node_ids = self
             .top_level_call_lru_cache
             .iter()
             .map(|(k, _v)| *k)
             .chain(self.retained_calls.iter().map(|ref_multi| *ref_multi.key()));
+
         self.storage
             .run_garbage_collection(retained_derived_node_ids);
     }
