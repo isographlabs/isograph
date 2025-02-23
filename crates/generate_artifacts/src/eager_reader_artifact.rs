@@ -4,7 +4,7 @@ use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
 use isograph_schema::{
-    OutputFormat, RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment,
+    ClientType, OutputFormat, RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment,
     UserWrittenClientFieldInfo, UserWrittenComponentVariant, ValidatedClientField,
     ValidatedClientType, ValidatedSchema, ValidatedSchemaServerField,
 };
@@ -44,7 +44,7 @@ pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
         client_field.selection_set_for_parent_query(),
         0,
         refetched_paths,
-        &client_field.initial_variable_context(),
+        &ClientType::ClientField(client_field).initial_variable_context(),
     );
 
     let function_import_statement =
