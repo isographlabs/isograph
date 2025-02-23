@@ -9,7 +9,7 @@ use crate::{
     source::{Source, SourceId, SourceNode},
 };
 use boxcar::Vec as BoxcarVec;
-use dashmap::{DashMap, Entry};
+use dashmap::DashMap;
 use lru::LruCache;
 
 use crate::derived_node::{DerivedNode, DerivedNodeId, DerivedNodeRevision};
@@ -27,9 +27,10 @@ pub struct Database {
 pub(crate) struct DatabaseStorage {
     pub(crate) param_id_to_index: DashMap<ParamId, Index<ParamId>>,
     pub(crate) derived_node_id_to_revision: DashMap<DerivedNodeId, DerivedNodeRevision>,
-    pub(crate) source_nodes: DashMap<Key, SourceNode>,
+    pub(crate) source_node_key_to_index: DashMap<Key, Index<SourceNode>>,
 
     pub(crate) derived_nodes: BoxcarVec<DerivedNode>,
+    pub(crate) source_nodes: BoxcarVec<Option<SourceNode>>,
     pub(crate) params: BoxcarVec<Box<dyn Any>>,
     pub(crate) current_epoch: Epoch,
 }
@@ -47,8 +48,9 @@ impl Database {
             storage: DatabaseStorage {
                 param_id_to_index: DashMap::new(),
                 derived_node_id_to_revision: DashMap::new(),
+                source_node_key_to_index: DashMap::new(),
 
-                source_nodes: DashMap::new(),
+                source_nodes: BoxcarVec::new(),
                 derived_nodes: BoxcarVec::new(),
                 params: BoxcarVec::new(),
 
@@ -74,15 +76,19 @@ impl Database {
         );
     }
 
-    pub fn get<T: Clone + 'static>(&self, id: SourceId<T>) -> T {
-        let time_updated = self
+    pub fn get<T: 'static>(&self, id: SourceId<T>) -> &T {
+        let source_node = self
             .storage
-            .source_nodes
-            .get(&id.key)
-            .expect("node should exist. This is indicative of a bug in Pico.")
-            .time_updated;
-        self.register_dependency_in_parent_memoized_fn(NodeKind::Source(id.key), time_updated);
-        self.storage.get_source(id)
+            .get_source_node(id.key)
+            .expect("source node should exist. This is indicative of a bug in Pico.");
+        self.register_dependency_in_parent_memoized_fn(
+            NodeKind::Source(id.key),
+            source_node.time_updated,
+        );
+        source_node.value.as_any().downcast_ref::<T>().expect(
+            "unexpected struct type. \
+            This is indicative of a bug in Pico.",
+        )
     }
 
     pub fn set<T: Source + DynEq>(&mut self, source: T) -> SourceId<T> {
@@ -133,7 +139,7 @@ impl DatabaseStorage {
         let index = self.param_id_to_index.get(&param_id)?;
         Some(self.params.get(index.idx).expect(
             "indexes should always be valid. \
-            This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Pico.",
         ))
     }
 
@@ -144,7 +150,7 @@ impl DatabaseStorage {
             .index;
         Some(self.derived_nodes.get(index.idx).expect(
             "indexes should always be valid. \
-            This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Pico.",
         ))
     }
 
@@ -193,50 +199,70 @@ impl DatabaseStorage {
         Index::new(self.derived_nodes.push(derived_node))
     }
 
-    pub fn get_source<T: Clone + 'static>(&self, id: SourceId<T>) -> T {
+    pub fn get_source_node(&self, key: Key) -> Option<&SourceNode> {
+        let index = self.source_node_key_to_index.get(&key)?;
         self.source_nodes
-            .get(&id.key)
-            .expect("value should exist. This is indicative of a bug in Pico.")
-            .value
-            .as_any()
-            .downcast_ref::<T>()
-            .expect("unexpected struct type. This is indicative of a bug in Pico.")
-            .clone()
+            .get(index.idx)
+            .expect(
+                "indexes should always be valid. \
+                This is indicative of a bug in Pico.",
+            )
+            .as_ref()
+    }
+
+    pub(crate) fn insert_source_node(&self, source_node: SourceNode) -> Index<SourceNode> {
+        Index::new(self.source_nodes.push(Some(source_node)))
     }
 
     /// Sets a source in the database. If there is an existing item and it does not equal
     /// the new source, increment the current epoch.
     pub fn set_source<T: Source + DynEq>(&mut self, source: T) -> SourceId<T> {
         let id = SourceId::new(&source);
-        match self.source_nodes.entry(id.key) {
-            Entry::Occupied(mut occupied_entry) => {
-                let existing_node = occupied_entry.get();
-                if !existing_node.value.dyn_eq(&source) {
-                    // We cannot call self.increment_epoch() because that borrows
-                    // the entire struct, but self.source_nodes is already borrowed
-                    let next_epoch = self.current_epoch.increment();
-
-                    *(occupied_entry.get_mut()) = SourceNode {
-                        time_updated: next_epoch,
-                        value: Box::new(source),
-                    };
-                } else {
-                    occupied_entry.get_mut().time_updated = self.current_epoch;
-                };
-            }
-            Entry::Vacant(vacant_entry) => {
-                vacant_entry.insert(SourceNode {
-                    time_updated: self.current_epoch,
+        if let Some(index) = self.source_node_key_to_index.get(&id.key) {
+            let source_node = self
+                .source_nodes
+                .get_mut(index.idx)
+                .expect(
+                    "indexes should always be valid. \
+                    This is indicative of a bug in Pico.",
+                )
+                .as_mut()
+                .expect(
+                    "indexes should always point to a non-empty source node. \
+                    This is indicative of a bug in Pico.",
+                );
+            if !source_node.value.dyn_eq(&source) {
+                // We cannot call self.increment_epoch() because that borrows
+                // the entire struct, but self.source_nodes is already borrowed
+                let next_epoch = self.current_epoch.increment();
+                *source_node = SourceNode {
+                    time_updated: next_epoch,
                     value: Box::new(source),
-                });
+                };
+            } else {
+                source_node.time_updated = self.current_epoch;
             }
-        };
+        } else {
+            let index = self.insert_source_node(SourceNode {
+                time_updated: self.current_epoch,
+                value: Box::new(source),
+            });
+            self.source_node_key_to_index.insert(id.key, index);
+        }
         id
     }
 
     pub fn remove_source<T>(&mut self, id: SourceId<T>) {
-        self.current_epoch.increment();
-        self.source_nodes.remove(&id.key);
+        if let Some((_, index)) = self.source_node_key_to_index.remove(&id.key) {
+            self.current_epoch.increment();
+            self.source_nodes
+                .get_mut(index.idx)
+                .expect(
+                    "indexes should always be valid. \
+                    This is indicative of a bug in Pico.",
+                )
+                .take();
+        }
     }
 }
 
