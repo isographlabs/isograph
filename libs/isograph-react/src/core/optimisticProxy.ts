@@ -1,6 +1,5 @@
 import type {
   DataId,
-  DataTypeValue,
   IsographEnvironment,
   IsographStore,
   StoreRecord,
