@@ -65,6 +65,22 @@ describe('optimisticProxy', () => {
     });
   });
 
+  test('reads from optimistic layer if record is undefined', () => {
+    environment.optimisticLayer.Economist = {
+      1: {
+        __typename: 'Economist',
+        id: '1',
+        name: 'John Stuart Mill',
+      },
+    };
+
+    expect(environment.optimisticStore.Economist![1]).toStrictEqual({
+      __typename: 'Economist',
+      id: '1',
+      name: 'John Stuart Mill',
+    });
+  });
+
   describe('mergeOptimisticLayer', () => {
     test('merges optimistic layer with store', () => {
       environment.optimisticStore.Economist![0]!.name =

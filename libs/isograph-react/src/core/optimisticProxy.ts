@@ -1,5 +1,6 @@
 import type {
   DataId,
+  DataTypeValue,
   IsographEnvironment,
   IsographStore,
   StoreRecord,
@@ -13,7 +14,11 @@ function createLayerProxy<T>(
   optimisticObject: {
     [key: string]: T | null;
   },
-  getter: (value: T, optimisticValue: T | undefined, p: string) => T,
+  getter: (
+    value: T | null | undefined,
+    optimisticValue: T | undefined,
+    p: string,
+  ) => T | null | undefined,
 ): {
   [key: string]: T | null;
 } {
@@ -27,7 +32,7 @@ function createLayerProxy<T>(
 
       const value = object[p];
 
-      if (value == null) {
+      if (optimisticValue === undefined && value == null) {
         return value;
       }
 
@@ -65,12 +70,12 @@ export function createOptimisticProxy(
     (recordsById, optimisticRecordsById, p) => {
       optimisticRecordsById = optimisticLayer[p] ??= {};
       return createLayerProxy(
-        recordsById,
+        recordsById ?? {},
         optimisticRecordsById,
         (storeRecord, optimisticStoreRecord, p) => {
           optimisticStoreRecord = optimisticRecordsById[p] ??= {};
           return createLayerProxy(
-            storeRecord,
+            storeRecord ?? {},
             optimisticStoreRecord,
             (value, optimisticValue) =>
               optimisticValue === undefined ? value : optimisticValue,
