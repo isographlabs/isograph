@@ -18,7 +18,6 @@ describe('optimisticProxy', () => {
           __typename: 'Economist',
           id: '0',
           name: 'Jeremy Bentham',
-          successor: { __link: '1', __typename: 'Economist' },
         },
       },
     };
@@ -33,7 +32,16 @@ describe('optimisticProxy', () => {
       __typename: 'Economist',
       id: '0',
       name: 'Jeremy Bentham',
-      successor: { __link: '1', __typename: 'Economist' },
+    });
+  });
+
+  test('writes update proxy', () => {
+    environment.optimisticStore.Economist![0]!.name = 'Updated Jeremy Bentham';
+
+    expect(environment.optimisticStore.Economist![0]).toStrictEqual({
+      __typename: 'Economist',
+      id: '0',
+      name: 'Updated Jeremy Bentham',
     });
   });
 
@@ -47,16 +55,28 @@ describe('optimisticProxy', () => {
     });
   });
 
-  test('mergeOptimisticLayer', () => {
+  test('writes keep store intact', () => {
     environment.optimisticStore.Economist![0]!.name = 'Updated Jeremy Bentham';
 
-    mergeOptimisticLayer(environment);
-    expect(environment.optimisticLayer).toStrictEqual({});
-    expect(environment.optimisticStore.Economist?.[0]).toStrictEqual({
+    expect(environment.store.Economist?.[0]).toStrictEqual({
       __typename: 'Economist',
       id: '0',
-      name: 'Updated Jeremy Bentham',
-      successor: { __link: '1', __typename: 'Economist' },
+      name: 'Jeremy Bentham',
+    });
+  });
+
+  describe('mergeOptimisticLayer', () => {
+    test('merges optimistic layer with store', () => {
+      environment.optimisticStore.Economist![0]!.name =
+        'Updated Jeremy Bentham';
+
+      mergeOptimisticLayer(environment);
+      expect(environment.optimisticLayer).toStrictEqual({});
+      expect(environment.optimisticStore.Economist?.[0]).toStrictEqual({
+        __typename: 'Economist',
+        id: '0',
+        name: 'Updated Jeremy Bentham',
+      });
     });
   });
 });
