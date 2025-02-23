@@ -33,6 +33,15 @@ export function createOptimisticRecord(
       };
       return Reflect.ownKeys(merged);
     },
+    set(target, p: string, value: any) {
+      return Reflect.set(target, p, value);
+    },
+    getOwnPropertyDescriptor(target, p: string) {
+      return (
+        Reflect.getOwnPropertyDescriptor(target, p) ??
+        Reflect.getOwnPropertyDescriptor(storeRecord, p)
+      );
+    },
   });
 }
 
@@ -68,6 +77,15 @@ export function createOptimisticRecordsById(
       };
       return Reflect.ownKeys(merged);
     },
+    set(target, p: string, value: any) {
+      return Reflect.set(target, p, value);
+    },
+    getOwnPropertyDescriptor(target, p: string) {
+      return (
+        Reflect.getOwnPropertyDescriptor(target, p) ??
+        Reflect.getOwnPropertyDescriptor(recordsById, p)
+      );
+    },
   });
 }
 
@@ -102,6 +120,15 @@ export function createOptimisticProxy(
         ...target,
       };
       return Reflect.ownKeys(merged);
+    },
+    set(target, p: string, value: any) {
+      return Reflect.set(target, p, value);
+    },
+    getOwnPropertyDescriptor(target, p: string) {
+      return (
+        Reflect.getOwnPropertyDescriptor(target, p) ??
+        Reflect.getOwnPropertyDescriptor(store, p)
+      );
     },
   });
 }
