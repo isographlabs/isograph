@@ -908,23 +908,10 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                                 name_or_alias,
                                 print_javascript_type_declaration(&type_annotation),
                             ));
-                            let setter_type_annotation =
-                                associated_data
-                                    .type_name
-                                    .clone()
-                                    .map(&mut |output_type_id| {
-                                        let object_id = output_type_id;
-                                        let object = schema.server_field_data.object(object_id);
-                                        generate_updatable_data_setter_type(
-                                            schema,
-                                            &linked_field.selection_set,
-                                            object,
-                                            nested_client_field_imports,
-                                            loadable_fields,
-                                            indentation_level,
-                                            link_fields,
-                                        )
-                                    });
+                            let setter_type_annotation = associated_data
+                                .type_name
+                                .clone()
+                                .map(&mut |_| "{ link: Link }");
                             query_type_declaration
                                 .push_str(&"  ".repeat(indentation_level as usize).to_string());
                             query_type_declaration.push_str(&format!(
