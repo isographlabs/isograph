@@ -6,29 +6,39 @@ import type {
   TypeName,
 } from './IsographEnvironment';
 
-type RecordsById = {
-  [index: DataId]: StoreRecord | null;
-};
-
-export function createOptimisticRecord(
-  storeRecord: StoreRecord,
-  optimisticStoreRecord: StoreRecord,
-): StoreRecord {
-  return new Proxy(optimisticStoreRecord, {
+function createLayerProxy<T>(
+  object: {
+    [key: string]: T | null;
+  },
+  optimisticObject: {
+    [key: string]: T | null;
+  },
+  getter: (value: T, optimisticValue: T | undefined, p: string) => T,
+): {
+  [key: string]: T | null;
+} {
+  return new Proxy(optimisticObject, {
     get(target, p: string) {
-      const optimisticValue = target[p];
+      let optimisticValue = target[p];
 
-      if (optimisticValue === undefined) {
-        return storeRecord[p];
+      if (optimisticValue === null) {
+        return optimisticValue;
       }
-      return optimisticValue;
+
+      const value = object[p];
+
+      if (value == null) {
+        return value;
+      }
+
+      return getter(value, optimisticValue, p);
     },
     has(target, p) {
-      return Reflect.has(target, p) || Reflect.has(storeRecord, p);
+      return Reflect.has(target, p) || Reflect.has(object, p);
     },
     ownKeys(target) {
       const merged = {
-        ...storeRecord,
+        ...object,
         ...target,
       };
       return Reflect.ownKeys(merged);
@@ -39,51 +49,7 @@ export function createOptimisticRecord(
     getOwnPropertyDescriptor(target, p: string) {
       return (
         Reflect.getOwnPropertyDescriptor(target, p) ??
-        Reflect.getOwnPropertyDescriptor(storeRecord, p)
-      );
-    },
-  });
-}
-
-export function createOptimisticRecordsById(
-  recordsById: RecordsById,
-  optimisticRecordsById: RecordsById,
-): RecordsById {
-  return new Proxy(optimisticRecordsById, {
-    get(target, p: string) {
-      let optimisticStoreRecord = target[p];
-
-      if (optimisticStoreRecord === null) {
-        return optimisticStoreRecord;
-      }
-
-      const storeRecord = recordsById[p];
-
-      if (storeRecord == null) {
-        return storeRecord;
-      }
-
-      optimisticStoreRecord = target[p] ??= {};
-
-      return createOptimisticRecord(storeRecord, optimisticStoreRecord);
-    },
-    has(target, p) {
-      return Reflect.has(target, p) || Reflect.has(recordsById, p);
-    },
-    ownKeys(target) {
-      const merged = {
-        ...recordsById,
-        ...target,
-      };
-      return Reflect.ownKeys(merged);
-    },
-    set(target, p: string, value: any) {
-      return Reflect.set(target, p, value);
-    },
-    getOwnPropertyDescriptor(target, p: string) {
-      return (
-        Reflect.getOwnPropertyDescriptor(target, p) ??
-        Reflect.getOwnPropertyDescriptor(recordsById, p)
+        Reflect.getOwnPropertyDescriptor(object, p)
       );
     },
   });
@@ -93,44 +59,26 @@ export function createOptimisticProxy(
   store: IsographStore,
   optimisticLayer: OptimisticLayer,
 ): OptimisticLayer {
-  return new Proxy(optimisticLayer, {
-    get(target, p: string) {
-      let optimisticRecordsById = target[p];
-
-      if (optimisticRecordsById === null) {
-        return optimisticRecordsById;
-      }
-
-      const recordsById = store[p];
-
-      if (recordsById == null) {
-        return recordsById;
-      }
-
-      optimisticRecordsById = target[p] ??= {};
-
-      return createOptimisticRecordsById(recordsById, optimisticRecordsById);
-    },
-    has(target, p) {
-      return Reflect.has(target, p) || Reflect.has(store, p);
-    },
-    ownKeys(target) {
-      const merged = {
-        ...store,
-        ...target,
-      };
-      return Reflect.ownKeys(merged);
-    },
-    set(target, p: string, value: any) {
-      return Reflect.set(target, p, value);
-    },
-    getOwnPropertyDescriptor(target, p: string) {
-      return (
-        Reflect.getOwnPropertyDescriptor(target, p) ??
-        Reflect.getOwnPropertyDescriptor(store, p)
+  return createLayerProxy(
+    store,
+    optimisticLayer,
+    (recordsById, optimisticRecordsById, p) => {
+      optimisticRecordsById = optimisticLayer[p] ??= {};
+      return createLayerProxy(
+        recordsById,
+        optimisticRecordsById,
+        (storeRecord, optimisticStoreRecord, p) => {
+          optimisticStoreRecord = optimisticRecordsById[p] ??= {};
+          return createLayerProxy(
+            storeRecord,
+            optimisticStoreRecord,
+            (value, optimisticValue) =>
+              optimisticValue === undefined ? value : optimisticValue,
+          );
+        },
       );
     },
-  });
+  );
 }
 
 export type OptimisticLayer = {
