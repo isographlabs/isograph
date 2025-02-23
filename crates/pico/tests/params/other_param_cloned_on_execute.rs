@@ -26,9 +26,9 @@ fn owned_param() {
     accepts_owned_param(&db, input_id, Param {});
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 1);
 
-    // We clone twice: once when storing the parameter, once when executing the
-    // memoized function.
-    assert_eq!(PARAM_CLONE_COUNTER.load(Ordering::SeqCst), 2);
+    // When the parameter is stored, we do not clone it. We only clone it when
+    // calling the memoized function.
+    assert_eq!(PARAM_CLONE_COUNTER.load(Ordering::SeqCst), 1);
 
     db.set(Input {
         key: "key",
@@ -38,9 +38,8 @@ fn owned_param() {
     accepts_owned_param(&db, input_id, Param {});
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 2);
 
-    // The param is already stored, so we don't need to clone to store it. Instead,
-    // we just clone when executing the function.
-    assert_eq!(PARAM_CLONE_COUNTER.load(Ordering::SeqCst), 3);
+    // We clone the param when executing the function again.
+    assert_eq!(PARAM_CLONE_COUNTER.load(Ordering::SeqCst), 2);
 }
 
 #[test]

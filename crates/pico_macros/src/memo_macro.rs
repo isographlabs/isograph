@@ -47,12 +47,14 @@ pub(crate) fn memo(_args: TokenStream, item: TokenStream) -> TokenStream {
             }
         }
         ArgType::Other => {
-            let param_arg = match **ty {
-                syn::Type::Reference(_) => quote!(#arg),
-                _ => quote!(&#arg),
+            let intern_param = match **ty {
+                syn::Type::Reference(_) => {
+                    quote!(::pico::macro_fns::intern_borrowed_param(#db_arg, #arg))
+                }
+                _ => quote!(::pico::macro_fns::intern_owned_param(#db_arg, #arg)),
             };
             quote! {
-                let param_id = ::pico::macro_fns::intern_param(#db_arg, #param_arg);
+                let param_id = #intern_param;
                 param_ids.push(param_id);
             }
         }
