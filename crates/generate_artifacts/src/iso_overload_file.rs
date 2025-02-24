@@ -143,12 +143,15 @@ type MatchesWhitespaceAndString<
 > = Whitespace<T> extends `${TString}${string}` ? T : never;\n",
     );
 
-    let client_defined_type_overloads = sorted_user_written_types(schema)
-        .into_iter()
-        .map(|field| build_iso_overload_for_client_defined_type(field, file_extensions));
-    for (import, field_overload) in client_defined_type_overloads {
+    let client_defined_type_overloads =
+        sorted_user_written_types(schema)
+            .into_iter()
+            .map(|client_type| {
+                build_iso_overload_for_client_defined_type(client_type, file_extensions)
+            });
+    for (import, client_type_overload) in client_defined_type_overloads {
         imports.push_str(&import);
-        content.push_str(&field_overload);
+        content.push_str(&client_type_overload);
     }
 
     let entrypoint_overloads = sorted_entrypoints(schema)
@@ -301,7 +304,7 @@ fn user_written_fields<TOutputFormat: OutputFormat>(
     schema
         .client_types
         .iter()
-        .filter_map(|client_field| match client_field {
+        .filter_map(|client_type| match client_type {
             ClientType::ClientPointer(client_pointer) => Some((
                 ClientType::ClientPointer(client_pointer),
                 UserWrittenComponentVariant::Eager,
