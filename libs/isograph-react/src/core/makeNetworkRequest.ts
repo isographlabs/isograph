@@ -312,6 +312,7 @@ function readDataForOnComplete<
                   environment,
                   fragment,
                   artifact.readerWithRefetchQueries.readerArtifact.fieldName,
+                  fakeNetworkRequestOptions,
                 ),
               }
             : undefined),
