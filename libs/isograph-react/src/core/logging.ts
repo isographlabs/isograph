@@ -100,12 +100,15 @@ export type WrappedLogFunction = {
 
 export function logMessage(
   environment: IsographEnvironment,
-  message: LogMessage,
+  getMessage: () => LogMessage,
 ) {
-  for (const logger of environment.loggers) {
-    try {
-      logger.log(message);
-    } catch {}
+  if (environment.loggers.size > 0) {
+    const message = getMessage();
+    for (const logger of environment.loggers) {
+      try {
+        logger.log(message);
+      } catch {}
+    }
   }
 }
 

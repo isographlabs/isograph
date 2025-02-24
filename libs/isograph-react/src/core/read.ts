@@ -77,12 +77,12 @@ export function readButDoNotEvaluate<
     mutableEncounteredRecords,
   );
 
-  logMessage(environment, {
+  logMessage(environment, () => ({
     kind: 'DoneReading',
     response,
     fieldName: readerWithRefetchQueries.readerArtifact.fieldName,
     root: fragmentReference.root,
-  });
+  }));
 
   if (response.kind === 'MissingData') {
     // There are two cases here that we care about:
@@ -766,14 +766,14 @@ export function readLinkedFieldData(
       field.arguments,
       variables,
     );
-    logMessage(environment, {
+    logMessage(environment, () => ({
       kind: 'MissingFieldHandlerCalled',
       root,
       storeRecord,
       fieldName: field.fieldName,
       arguments: field.arguments,
       variables,
-    });
+    }));
 
     if (altLink === undefined) {
       return {

@@ -51,12 +51,12 @@ export function getOrCreateItemInSuspenseCache<
   factory: Factory<FragmentReference<TReadFromStore, TClientFieldValue>>,
 ): ParentCache<FragmentReference<TReadFromStore, TClientFieldValue>> {
   // TODO this is probably a useless message, we should remove it
-  logMessage(environment, {
+  logMessage(environment, () => ({
     kind: 'GettingSuspenseCacheItem',
     index,
     availableCacheItems: Object.keys(environment.fragmentCache),
     found: !!environment.fragmentCache[index],
-  });
+  }));
   if (environment.fragmentCache[index] == null) {
     environment.fragmentCache[index] = new ParentCache(factory);
   }
@@ -159,12 +159,12 @@ export function normalizeData(
 ): EncounteredIds {
   const encounteredIds: EncounteredIds = new Map();
 
-  logMessage(environment, {
+  logMessage(environment, () => ({
     kind: 'AboutToNormalize',
     normalizationAst,
     networkResponse,
     variables,
-  });
+  }));
 
   const recordsById = (environment.store[root.__typename] ??= {});
   const newStoreRecord = (recordsById[root.__link] ??= {});
@@ -180,11 +180,11 @@ export function normalizeData(
     encounteredIds,
   );
 
-  logMessage(environment, {
+  logMessage(environment, () => ({
     kind: 'AfterNormalization',
     store: environment.store,
     encounteredIds,
-  });
+  }));
 
   callSubscriptions(environment, encounteredIds);
   return encounteredIds;
@@ -310,14 +310,14 @@ function callSubscriptions(
               newEncounteredDataAndRecords.item,
             );
 
-            logMessage(environment, {
+            logMessage(environment, () => ({
               kind: 'DeepEqualityCheck',
               fragmentReference: subscription.fragmentReference,
               old: subscription.encounteredDataAndRecords.item,
               new: newEncounteredDataAndRecords.item,
               deeplyEqual:
                 mergedItem === subscription.encounteredDataAndRecords.item,
-            });
+            }));
 
             if (mergedItem !== subscription.encounteredDataAndRecords.item) {
               subscription.callback(newEncounteredDataAndRecords);
