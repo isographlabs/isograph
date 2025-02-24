@@ -40,6 +40,7 @@ import {
   ReaderAst,
   type ReaderImperativelyLoadedField,
   type ReaderLinkedField,
+  type ReaderNonLoadableResolverField,
   type ReaderScalarField,
 } from './reader';
 import { getOrCreateCachedStartUpdate } from './startUpdate';
@@ -229,83 +230,20 @@ function readData<TReadFromStore>(
         break;
       }
       case 'Resolver': {
-        const usedRefetchQueries = field.usedRefetchQueries;
-        const resolverRefetchQueries = usedRefetchQueries.map((index) => {
-          const resolverRefetchQuery = nestedRefetchQueries[index];
-          if (resolverRefetchQuery == null) {
-            throw new Error(
-              'resolverRefetchQuery is null in Resolver. This is indicative of a bug in Isograph.',
-            );
-          }
-          return resolverRefetchQuery;
-        });
-
-        const readerWithRefetchQueries = {
-          kind: 'ReaderWithRefetchQueries',
-          readerArtifact: field.readerArtifact,
-          nestedRefetchQueries: resolverRefetchQueries,
-        } satisfies ReaderWithRefetchQueries<any, any>;
-
-        const fragment = {
-          kind: 'FragmentReference',
-          readerWithRefetchQueries: wrapResolvedValue(readerWithRefetchQueries),
+        const data = readResolverFieldData(
+          environment,
+          field,
           root,
-          variables: generateChildVariableMap(variables, field.arguments),
+          variables,
+          nestedRefetchQueries,
           networkRequest,
-        } satisfies FragmentReference<any, any>;
-
-        switch (field.readerArtifact.kind) {
-          case 'EagerReaderArtifact': {
-            const data = readData(
-              environment,
-              field.readerArtifact.readerAst,
-              root,
-              generateChildVariableMap(variables, field.arguments),
-              resolverRefetchQueries,
-              networkRequest,
-              networkRequestOptions,
-              mutableEncounteredRecords,
-            );
-            if (data.kind === 'MissingData') {
-              return {
-                kind: 'MissingData',
-                reason:
-                  'Missing data for ' + field.alias + ' on root ' + root.__link,
-                nestedReason: data,
-                recordLink: data.recordLink,
-              };
-            } else {
-              const firstParameter = {
-                data: data.data,
-                parameters: variables,
-                startUpdate: field.readerArtifact.hasUpdatable
-                  ? getOrCreateCachedStartUpdate(
-                      environment,
-                      fragment,
-                      readerWithRefetchQueries.readerArtifact.fieldName,
-                    )
-                  : undefined,
-              };
-              target[field.alias] =
-                field.readerArtifact.resolver(firstParameter);
-            }
-            break;
-          }
-          case 'ComponentReaderArtifact': {
-            target[field.alias] = getOrCreateCachedComponent(
-              environment,
-              field.readerArtifact.fieldName,
-              fragment,
-              networkRequestOptions,
-            );
-            break;
-          }
-          default: {
-            let _: never = field.readerArtifact;
-            _;
-            throw new Error('Unexpected kind');
-          }
+          networkRequestOptions,
+          mutableEncounteredRecords,
+        );
+        if (data.kind === 'MissingData') {
+          return data;
         }
+        target[field.alias] = data.data;
         break;
       }
       case 'LoadablySelectedField': {
@@ -570,6 +508,96 @@ function writeQueryArgsToVariables(
         _;
         throw new Error('Unexpected case');
       }
+    }
+  }
+}
+
+export function readResolverFieldData(
+  environment: IsographEnvironment,
+  field: ReaderNonLoadableResolverField,
+  root: Link,
+  variables: Variables,
+  nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
+  networkRequest: PromiseWrapper<void, any>,
+  networkRequestOptions: NetworkRequestReaderOptions,
+  mutableEncounteredRecords: EncounteredIds,
+): ReadDataResult<unknown> {
+  const usedRefetchQueries = field.usedRefetchQueries;
+  const resolverRefetchQueries = usedRefetchQueries.map((index) => {
+    const resolverRefetchQuery = nestedRefetchQueries[index];
+    if (resolverRefetchQuery == null) {
+      throw new Error(
+        'resolverRefetchQuery is null in Resolver. This is indicative of a bug in Isograph.',
+      );
+    }
+    return resolverRefetchQuery;
+  });
+
+  const readerWithRefetchQueries = {
+    kind: 'ReaderWithRefetchQueries',
+    readerArtifact: field.readerArtifact,
+    nestedRefetchQueries: resolverRefetchQueries,
+  } satisfies ReaderWithRefetchQueries<any, any>;
+
+  const fragment = {
+    kind: 'FragmentReference',
+    readerWithRefetchQueries: wrapResolvedValue(readerWithRefetchQueries),
+    root,
+    variables: generateChildVariableMap(variables, field.arguments),
+    networkRequest,
+  } satisfies FragmentReference<any, any>;
+
+  switch (field.readerArtifact.kind) {
+    case 'EagerReaderArtifact': {
+      const data = readData(
+        environment,
+        field.readerArtifact.readerAst,
+        root,
+        generateChildVariableMap(variables, field.arguments),
+        resolverRefetchQueries,
+        networkRequest,
+        networkRequestOptions,
+        mutableEncounteredRecords,
+      );
+      if (data.kind === 'MissingData') {
+        return {
+          kind: 'MissingData',
+          reason: 'Missing data for ' + field.alias + ' on root ' + root.__link,
+          nestedReason: data,
+          recordLink: data.recordLink,
+        };
+      }
+      const firstParameter = {
+        data: data.data,
+        parameters: variables,
+        startUpdate: field.readerArtifact.hasUpdatable
+          ? getOrCreateCachedStartUpdate(
+              environment,
+              fragment,
+              readerWithRefetchQueries.readerArtifact.fieldName,
+            )
+          : undefined,
+      };
+      return {
+        kind: 'Success',
+        data: field.readerArtifact.resolver(firstParameter),
+      };
+    }
+    case 'ComponentReaderArtifact': {
+      return {
+        kind: 'Success',
+        data: getOrCreateCachedComponent(
+          environment,
+          field.readerArtifact.fieldName,
+          fragment,
+          networkRequestOptions,
+        ),
+      };
+    }
+    default: {
+      let _: never = field.readerArtifact;
+      _;
+      throw new Error('Unexpected kind');
     }
   }
 }
