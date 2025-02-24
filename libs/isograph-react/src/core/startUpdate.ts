@@ -20,7 +20,9 @@ import {
 } from './IsographEnvironment';
 import { readPromise, type PromiseWrapper } from './PromiseWrapper';
 import {
+  readImperativelyLoadedField,
   readLinkedFieldData,
+  readResolverFieldData,
   readScalarFieldData,
   type NetworkRequestReaderOptions,
   type ReadDataResultSuccess,
@@ -237,9 +239,47 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
         break;
       }
       case 'ImperativelyLoadedField': {
+        defineCachedProperty(target, field.alias, {
+          mutableState,
+          get() {
+            const data = readImperativelyLoadedField(
+              environment,
+              field,
+              root,
+              variables,
+              nestedRefetchQueries,
+              networkRequest,
+              networkRequestOptions,
+              new Map(),
+            );
+            if (data.kind === 'MissingData') {
+              throw new Error(data.reason);
+            }
+            return data.data;
+          },
+        });
         break;
       }
       case 'Resolver': {
+        defineCachedProperty(target, field.alias, {
+          mutableState,
+          get() {
+            const data = readResolverFieldData(
+              environment,
+              field,
+              root,
+              variables,
+              nestedRefetchQueries,
+              networkRequest,
+              networkRequestOptions,
+              new Map(),
+            );
+            if (data.kind === 'MissingData') {
+              throw new Error(data.reason);
+            }
+            return data.data;
+          },
+        });
         break;
       }
       case 'LoadablySelectedField': {
