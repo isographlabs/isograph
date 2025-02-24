@@ -901,10 +901,10 @@ fn write_getter_and_setter(
     >,
     type_annotation: &TypeAnnotation<ClientFieldUpdatableDataType>,
 ) {
-    query_type_declaration.push_str(format!(
+    query_type_declaration.push_str(&format!(
         "get {}(): {},\n",
         name_or_alias,
-        print_javascript_type_declaration(&type_annotation),
+        print_javascript_type_declaration(type_annotation),
     ));
     let setter_type_annotation = associated_data
         .type_name
