@@ -135,6 +135,7 @@ export function useConnectionSpecPagination<
                 environment,
                 fragmentReference,
                 readerWithRefetchQueries.readerArtifact.fieldName,
+                networkRequestOptions,
               ),
             }
           : undefined),
