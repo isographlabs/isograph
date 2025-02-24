@@ -122,7 +122,13 @@ fn linked_field_ast_node<TOutputFormat: OutputFormat>(
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
 
     let condition = match linked_field.associated_data.field_id {
-        FieldType::ClientField(_) => todo!(),
+        FieldType::ClientField(client_pointer_id) => {
+            let client_pointer = schema.client_pointer(client_pointer_id);
+            format!(
+                "{}__resolver_reader",
+                client_pointer.type_and_field.underscore_separated()
+            )
+        }
         FieldType::ServerField(server_field_id) => {
             match &schema.server_field(server_field_id).associated_data {
                 SelectionType::Scalar(_) => panic!("Expected object"),

@@ -24,7 +24,7 @@ use lazy_static::lazy_static;
 use crate::{
     refetch_strategy::RefetchStrategy, schema_validation_state::SchemaValidationState,
     ClientFieldVariant, NormalizationKey, OutputFormat, ServerFieldTypeAssociatedData,
-    ValidatedClientField, ValidatedClientPointer,
+    ValidatedClientField, ValidatedClientPointer, ValidatedSchemaServerField,
 };
 
 lazy_static! {
@@ -134,10 +134,77 @@ pub enum FieldType<TServer, TClient> {
     ClientField(TClient),
 }
 
+pub type LinkedType<
+    'a,
+    ServerFieldTypeAssociatedData,
+    ClientTypeSelectionScalarFieldAssociatedData,
+    ClientTypeSelectionLinkedFieldAssociatedData,
+    VariableDefinitionInnerType,
+    TOutputFormat,
+> = FieldType<
+    &'a SchemaServerField<
+        ServerFieldTypeAssociatedData,
+        VariableDefinitionInnerType,
+        TOutputFormat,
+    >,
+    &'a ClientPointer<
+        ClientTypeSelectionScalarFieldAssociatedData,
+        ClientTypeSelectionLinkedFieldAssociatedData,
+        VariableDefinitionInnerType,
+        TOutputFormat,
+    >,
+>;
+
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq, Hash)]
 pub enum ClientType<TField, TPointer> {
     ClientField(TField),
     ClientPointer(TPointer),
+}
+
+impl<
+        ServerFieldTypeAssociatedData,
+        TClientTypeSelectionScalarFieldAssociatedData,
+        TClientTypeSelectionLinkedFieldAssociatedData,
+        TClientTypeVariableDefinitionAssociatedData: Ord + Debug,
+        TOutputFormat: OutputFormat,
+    >
+    FieldType<
+        &SchemaServerField<
+            ServerFieldTypeAssociatedData,
+            TClientTypeVariableDefinitionAssociatedData,
+            TOutputFormat,
+        >,
+        &ClientPointer<
+            TClientTypeSelectionScalarFieldAssociatedData,
+            TClientTypeSelectionLinkedFieldAssociatedData,
+            TClientTypeVariableDefinitionAssociatedData,
+            TOutputFormat,
+        >,
+    >
+{
+    pub fn description(&self) -> Option<DescriptionValue> {
+        match self {
+            FieldType::ServerField(server_field) => server_field.description,
+            FieldType::ClientField(client_field) => client_field.description,
+        }
+    }
+}
+
+impl<TOutputFormat: OutputFormat>
+    FieldType<&ValidatedSchemaServerField<TOutputFormat>, &ValidatedClientPointer<TOutputFormat>>
+{
+    pub fn output_type_annotation(&self) -> TypeAnnotation<ServerObjectId> {
+        match self {
+            FieldType::ClientField(client_pointer) => client_pointer.to.clone(),
+            FieldType::ServerField(server_field) => match &server_field.associated_data {
+                SelectionType::Scalar(_) => panic!(
+                    "output_type_id should be an object. \
+                                       This is indicative of a bug in Isograph.",
+                ),
+                SelectionType::Object(associated_data) => associated_data.type_name.clone(),
+            },
+        }
+    }
 }
 
 pub type ClientTypeId = ClientType<ClientFieldId, ClientPointerId>;
@@ -296,6 +363,26 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
                 "encountered ClientPointer under ClientFieldId. \
                 This is indicative of a bug in Isograph."
             ),
+        }
+    }
+
+    pub fn linked_type(
+        &self,
+        field_id: FieldType<ServerFieldId, ClientPointerId>,
+    ) -> LinkedType<
+        TSchemaValidationState::ServerFieldTypeAssociatedData,
+        TSchemaValidationState::ClientTypeSelectionScalarFieldAssociatedData,
+        TSchemaValidationState::ClientTypeSelectionLinkedFieldAssociatedData,
+        TSchemaValidationState::VariableDefinitionInnerType,
+        TOutputFormat,
+    > {
+        match field_id {
+            FieldType::ServerField(server_field_id) => {
+                FieldType::ServerField(self.server_field(server_field_id))
+            }
+            FieldType::ClientField(client_pointer_id) => {
+                FieldType::ClientField(self.client_pointer(client_pointer_id))
+            }
         }
     }
 
