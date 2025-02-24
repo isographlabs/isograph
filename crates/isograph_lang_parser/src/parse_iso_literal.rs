@@ -416,10 +416,10 @@ fn parse_selection(
         // TODO distinguish field groups
         let arguments = parse_optional_arguments(tokens, text_source)?;
 
+        let directives = parse_directives(tokens, text_source)?;
+
         // If we encounter a selection set, we are parsing a linked field. Otherwise, a scalar field.
         let selection_set = parse_optional_selection_set(tokens, text_source)?;
-
-        let directives = parse_directives(tokens, text_source)?;
 
         parse_comma_line_break_or_curly(tokens)?;
 

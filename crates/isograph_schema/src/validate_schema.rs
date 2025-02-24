@@ -2,15 +2,15 @@ use std::collections::HashMap;
 
 use common_lang_types::{
     EnumLiteralValue, GraphQLScalarTypeName, IsoLiteralText, IsographObjectTypeName,
-    SelectableFieldName, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
+    SelectableFieldName, UnvalidatedTypeName, ValueKeyName, VariableName, WithLocation, WithSpan,
 };
-use graphql_lang_types::GraphQLTypeAnnotation;
+use graphql_lang_types::{GraphQLTypeAnnotation, NameValuePair};
 use intern::Lookup;
 use isograph_lang_types::{
     ClientFieldId, ClientPointerId, LinkedFieldSelection, LoadableDirectiveParameters,
-    ScalarFieldSelection, SelectableServerFieldId, SelectionFieldArgument, SelectionType,
-    ServerFieldId, ServerFieldSelection, ServerObjectId, ServerScalarId, TypeAnnotation,
-    VariableDefinition,
+    NonConstantValue, ScalarFieldSelection, SelectableServerFieldId, SelectionFieldArgument,
+    SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId, ServerScalarId,
+    TypeAnnotation, VariableDefinition,
 };
 
 use thiserror::Error;
@@ -525,6 +525,14 @@ pub enum ValidateSchemaError {
     MissingArguments { missing_arguments: MissingArguments },
 
     #[error(
+        "This object has missing fields: {0}",
+        missing_fields_names.iter().map(|field_name| format!("${}", field_name)).collect::<Vec<_>>().join(", ")
+    )]
+    MissingFields {
+        missing_fields_names: Vec<SelectableFieldName>,
+    },
+
+    #[error(
         "The variable `{variable_name}` has type `{type_}`, but the inner type \
         `{inner_type}` does not exist."
     )]
@@ -545,6 +553,14 @@ pub enum ValidateSchemaError {
     )]
     ExtraneousArgument {
         extra_arguments: Vec<WithLocation<SelectionFieldArgument>>,
+    },
+
+    #[error(
+        "This object has extra fields: {0}",
+        extra_fields.iter().map(|field| format!("{}", field.name.item)).collect::<Vec<_>>().join(", ")
+    )]
+    ExtraneousFields {
+        extra_fields: Vec<NameValuePair<ValueKeyName, NonConstantValue>>,
     },
 
     #[error(
