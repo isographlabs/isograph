@@ -2,8 +2,11 @@
 
 use std::{collections::BTreeSet, fmt::Debug};
 
-use common_lang_types::WithSpan;
-use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
+use common_lang_types::{Span, WithSpan};
+use graphql_lang_types::{
+    GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
+    GraphQLTypeAnnotation,
+};
 
 /// This is annoying! We should find a better way to model lists.
 /// This gets us closer to a good solution, so it's fine.
@@ -129,4 +132,52 @@ impl<TInner: Ord + Copy + Debug> UnionTypeAnnotation<TInner> {
 pub enum UnionVariant<TInner: Ord + Debug> {
     Scalar(TInner),
     Plural(TypeAnnotation<TInner>),
+}
+
+fn graphql_type_annotation_from_union_variant<TValue: Ord + Copy + Debug>(
+    union_type_annotation: UnionTypeAnnotation<TValue>,
+) -> GraphQLTypeAnnotation<TValue> {
+    if union_type_annotation.nullable {
+        return match union_type_annotation.variants.into_iter().next().unwrap() {
+            UnionVariant::Scalar(scalar_id) => GraphQLTypeAnnotation::Named(
+                GraphQLNamedTypeAnnotation(WithSpan::new(scalar_id, Span::todo_generated())),
+            ),
+            UnionVariant::Plural(type_annotation) => {
+                GraphQLTypeAnnotation::List(Box::new(GraphQLListTypeAnnotation(
+                    graphql_type_annotation_from_type_annotation(type_annotation),
+                )))
+            }
+        };
+    }
+
+    GraphQLTypeAnnotation::NonNull(
+        match union_type_annotation.variants.into_iter().next().unwrap() {
+            UnionVariant::Scalar(scalar_id) => Box::new(GraphQLNonNullTypeAnnotation::Named(
+                GraphQLNamedTypeAnnotation(WithSpan::new(scalar_id, Span::todo_generated())),
+            )),
+            UnionVariant::Plural(type_annotation) => Box::new(GraphQLNonNullTypeAnnotation::List(
+                GraphQLListTypeAnnotation(graphql_type_annotation_from_type_annotation(
+                    type_annotation,
+                )),
+            )),
+        },
+    )
+}
+
+pub fn graphql_type_annotation_from_type_annotation<TValue: Ord + Copy + Debug>(
+    other: TypeAnnotation<TValue>,
+) -> GraphQLTypeAnnotation<TValue> {
+    match other {
+        TypeAnnotation::Scalar(scalar_id) => GraphQLTypeAnnotation::Named(
+            GraphQLNamedTypeAnnotation(WithSpan::new(scalar_id, Span::todo_generated())),
+        ),
+        TypeAnnotation::Plural(type_annotation) => {
+            GraphQLTypeAnnotation::List(Box::new(GraphQLListTypeAnnotation(
+                graphql_type_annotation_from_type_annotation(*type_annotation),
+            )))
+        }
+        TypeAnnotation::Union(union_type_annotation) => {
+            graphql_type_annotation_from_union_variant(union_type_annotation)
+        }
+    }
 }
