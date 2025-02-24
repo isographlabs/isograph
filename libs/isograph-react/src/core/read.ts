@@ -39,6 +39,7 @@ import {
 import {
   ReaderAst,
   type ReaderLinkedField,
+  type ReaderLoadableField,
   type ReaderScalarField,
 } from './reader';
 import { getOrCreateCachedStartUpdate } from './startUpdate';
@@ -346,172 +347,19 @@ function readData<TReadFromStore>(
         break;
       }
       case 'LoadablySelectedField': {
-        const refetchReaderParams = readData(
+        const data = readLoadablySelectedFieldData(
           environment,
-          field.refetchReaderAst,
+          field,
           root,
           variables,
-          // Refetch fields just read the id, and don't need refetch query artifacts
-          [],
           networkRequest,
           networkRequestOptions,
           mutableEncounteredRecords,
         );
-        if (refetchReaderParams.kind === 'MissingData') {
-          return {
-            kind: 'MissingData',
-            reason:
-              'Missing data for ' + field.alias + ' on root ' + root.__link,
-            nestedReason: refetchReaderParams,
-            recordLink: refetchReaderParams.recordLink,
-          };
-        } else {
-          target[field.alias] = (
-            args: any,
-            // TODO get the associated type for FetchOptions from the loadably selected field
-            fetchOptions?: FetchOptions<any>,
-          ) => {
-            // TODO we should use the reader AST for this
-            const includeReadOutData = (variables: any, readOutData: any) => {
-              variables.id = readOutData.id;
-              return variables;
-            };
-            const localVariables = includeReadOutData(
-              args ?? {},
-              refetchReaderParams.data,
-            );
-            writeQueryArgsToVariables(
-              localVariables,
-              field.queryArguments,
-              variables,
-            );
-
-            return [
-              // Stable id
-              root.__typename +
-                ':' +
-                root.__link +
-                '/' +
-                field.name +
-                '/' +
-                stableStringifyArgs(localVariables),
-              // Fetcher
-              () => {
-                const fragmentReferenceAndDisposeFromEntrypoint = (
-                  entrypoint: IsographEntrypoint<any, any, any>,
-                ): [FragmentReference<any, any>, CleanupFn] => {
-                  const [networkRequest, disposeNetworkRequest] =
-                    maybeMakeNetworkRequest(
-                      environment,
-                      entrypoint,
-                      localVariables,
-                      fetchOptions,
-                    );
-
-                  const fragmentReference: FragmentReference<any, any> = {
-                    kind: 'FragmentReference',
-                    readerWithRefetchQueries: wrapResolvedValue({
-                      kind: 'ReaderWithRefetchQueries',
-                      readerArtifact:
-                        entrypoint.readerWithRefetchQueries.readerArtifact,
-                      nestedRefetchQueries:
-                        entrypoint.readerWithRefetchQueries
-                          .nestedRefetchQueries,
-                    } as const),
-
-                    // TODO localVariables is not guaranteed to have an id field
-                    root,
-                    variables: localVariables,
-                    networkRequest,
-                  };
-                  return [fragmentReference, disposeNetworkRequest];
-                };
-
-                if (field.entrypoint.kind === 'Entrypoint') {
-                  return fragmentReferenceAndDisposeFromEntrypoint(
-                    field.entrypoint,
-                  );
-                } else {
-                  const isographArtifactPromiseWrapper =
-                    getOrLoadIsographArtifact(
-                      environment,
-                      field.entrypoint.typeAndField,
-                      field.entrypoint.loader,
-                    );
-                  const state = getPromiseState(isographArtifactPromiseWrapper);
-                  if (state.kind === 'Ok') {
-                    return fragmentReferenceAndDisposeFromEntrypoint(
-                      state.value,
-                    );
-                  } else {
-                    // Promise is pending or thrown
-
-                    let entrypointLoaderState:
-                      | {
-                          kind: 'EntrypointNotLoaded';
-                        }
-                      | {
-                          kind: 'NetworkRequestStarted';
-                          disposeNetworkRequest: CleanupFn;
-                        }
-                      | { kind: 'Disposed' } = { kind: 'EntrypointNotLoaded' };
-
-                    const networkRequest = wrapPromise(
-                      isographArtifactPromiseWrapper.promise.then(
-                        (entrypoint) => {
-                          if (
-                            entrypointLoaderState.kind === 'EntrypointNotLoaded'
-                          ) {
-                            const [networkRequest, disposeNetworkRequest] =
-                              maybeMakeNetworkRequest(
-                                environment,
-                                entrypoint,
-                                localVariables,
-                                fetchOptions,
-                              );
-                            entrypointLoaderState = {
-                              kind: 'NetworkRequestStarted',
-                              disposeNetworkRequest,
-                            };
-                            return networkRequest.promise;
-                          }
-                        },
-                      ),
-                    );
-                    const readerWithRefetchPromise =
-                      isographArtifactPromiseWrapper.promise.then(
-                        (entrypoint) => entrypoint.readerWithRefetchQueries,
-                      );
-
-                    const fragmentReference: FragmentReference<any, any> = {
-                      kind: 'FragmentReference',
-                      readerWithRefetchQueries: wrapPromise(
-                        readerWithRefetchPromise,
-                      ),
-
-                      // TODO localVariables is not guaranteed to have an id field
-                      root,
-                      variables: localVariables,
-                      networkRequest,
-                    };
-
-                    return [
-                      fragmentReference,
-                      () => {
-                        if (
-                          entrypointLoaderState.kind === 'NetworkRequestStarted'
-                        ) {
-                          entrypointLoaderState.disposeNetworkRequest();
-                        }
-                        entrypointLoaderState = { kind: 'Disposed' };
-                      },
-                    ];
-                  }
-                }
-              },
-            ];
-          };
+        if (data.kind === 'MissingData') {
+          return data;
         }
+        target[field.alias] = data.data;
         break;
       }
 
@@ -526,6 +374,172 @@ function readData<TReadFromStore>(
   return {
     kind: 'Success',
     data: target as any,
+  };
+}
+
+export function readLoadablySelectedFieldData(
+  environment: IsographEnvironment,
+  field: ReaderLoadableField,
+  root: Link,
+  variables: Variables,
+  networkRequest: PromiseWrapper<void, any>,
+  networkRequestOptions: NetworkRequestReaderOptions,
+  mutableEncounteredRecords: EncounteredIds,
+): ReadDataResult<unknown> {
+  const refetchReaderParams = readData(
+    environment,
+    field.refetchReaderAst,
+    root,
+    variables,
+    // Refetch fields just read the id, and don't need refetch query artifacts
+    [],
+    networkRequest,
+    networkRequestOptions,
+    mutableEncounteredRecords,
+  );
+
+  if (refetchReaderParams.kind === 'MissingData') {
+    return {
+      kind: 'MissingData',
+      reason: 'Missing data for ' + field.alias + ' on root ' + root.__link,
+      nestedReason: refetchReaderParams,
+      recordLink: refetchReaderParams.recordLink,
+    };
+  }
+
+  return {
+    kind: 'Success',
+    data: (
+      args: any,
+      // TODO get the associated type for FetchOptions from the loadably selected field
+      fetchOptions?: FetchOptions<any>,
+    ) => {
+      // TODO we should use the reader AST for this
+      const includeReadOutData = (variables: any, readOutData: any) => {
+        variables.id = readOutData.id;
+        return variables;
+      };
+      const localVariables = includeReadOutData(
+        args ?? {},
+        refetchReaderParams.data,
+      );
+      writeQueryArgsToVariables(
+        localVariables,
+        field.queryArguments,
+        variables,
+      );
+
+      return [
+        // Stable id
+        root.__typename +
+          ':' +
+          root.__link +
+          '/' +
+          field.name +
+          '/' +
+          stableStringifyArgs(localVariables),
+        // Fetcher
+        () => {
+          const fragmentReferenceAndDisposeFromEntrypoint = (
+            entrypoint: IsographEntrypoint<any, any, any>,
+          ): [FragmentReference<any, any>, CleanupFn] => {
+            const [networkRequest, disposeNetworkRequest] =
+              maybeMakeNetworkRequest(
+                environment,
+                entrypoint,
+                localVariables,
+                fetchOptions,
+              );
+
+            const fragmentReference: FragmentReference<any, any> = {
+              kind: 'FragmentReference',
+              readerWithRefetchQueries: wrapResolvedValue({
+                kind: 'ReaderWithRefetchQueries',
+                readerArtifact:
+                  entrypoint.readerWithRefetchQueries.readerArtifact,
+                nestedRefetchQueries:
+                  entrypoint.readerWithRefetchQueries.nestedRefetchQueries,
+              } as const),
+
+              // TODO localVariables is not guaranteed to have an id field
+              root,
+              variables: localVariables,
+              networkRequest,
+            };
+            return [fragmentReference, disposeNetworkRequest];
+          };
+
+          if (field.entrypoint.kind === 'Entrypoint') {
+            return fragmentReferenceAndDisposeFromEntrypoint(field.entrypoint);
+          } else {
+            const isographArtifactPromiseWrapper = getOrLoadIsographArtifact(
+              environment,
+              field.entrypoint.typeAndField,
+              field.entrypoint.loader,
+            );
+            const state = getPromiseState(isographArtifactPromiseWrapper);
+            if (state.kind === 'Ok') {
+              return fragmentReferenceAndDisposeFromEntrypoint(state.value);
+            } else {
+              // Promise is pending or thrown
+
+              let entrypointLoaderState:
+                | {
+                    kind: 'EntrypointNotLoaded';
+                  }
+                | {
+                    kind: 'NetworkRequestStarted';
+                    disposeNetworkRequest: CleanupFn;
+                  }
+                | { kind: 'Disposed' } = { kind: 'EntrypointNotLoaded' };
+
+              const networkRequest = wrapPromise(
+                isographArtifactPromiseWrapper.promise.then((entrypoint) => {
+                  if (entrypointLoaderState.kind === 'EntrypointNotLoaded') {
+                    const [networkRequest, disposeNetworkRequest] =
+                      maybeMakeNetworkRequest(
+                        environment,
+                        entrypoint,
+                        localVariables,
+                        fetchOptions,
+                      );
+                    entrypointLoaderState = {
+                      kind: 'NetworkRequestStarted',
+                      disposeNetworkRequest,
+                    };
+                    return networkRequest.promise;
+                  }
+                }),
+              );
+              const readerWithRefetchPromise =
+                isographArtifactPromiseWrapper.promise.then(
+                  (entrypoint) => entrypoint.readerWithRefetchQueries,
+                );
+
+              const fragmentReference: FragmentReference<any, any> = {
+                kind: 'FragmentReference',
+                readerWithRefetchQueries: wrapPromise(readerWithRefetchPromise),
+
+                // TODO localVariables is not guaranteed to have an id field
+                root,
+                variables: localVariables,
+                networkRequest,
+              };
+
+              return [
+                fragmentReference,
+                () => {
+                  if (entrypointLoaderState.kind === 'NetworkRequestStarted') {
+                    entrypointLoaderState.disposeNetworkRequest();
+                  }
+                  entrypointLoaderState = { kind: 'Disposed' };
+                },
+              ];
+            }
+          }
+        },
+      ];
+    },
   };
 }
 
