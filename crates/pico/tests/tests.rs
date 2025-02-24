@@ -10,5 +10,5 @@ mod garbage_collection {
 mod params {
     mod memo_ref_never_cloned;
     mod other_param_cloned_on_execute;
-    mod source_id_cloned_on_get;
+    mod source_id_never_cloned;
 }

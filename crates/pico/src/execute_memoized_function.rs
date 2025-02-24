@@ -184,7 +184,7 @@ fn any_dependency_changed(db: &Database, derived_node: &DerivedNode) -> bool {
 }
 
 fn source_node_changed_since(db: &Database, key: Key, since: Epoch) -> bool {
-    match db.storage.source_nodes.get(&key) {
+    match db.storage.get_source_node(key) {
         Some(source) => source.time_updated > since,
         None => panic!(
             "Source node not found. This may occur if \
