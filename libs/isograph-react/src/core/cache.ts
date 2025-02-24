@@ -50,13 +50,6 @@ export function getOrCreateItemInSuspenseCache<
   index: string,
   factory: Factory<FragmentReference<TReadFromStore, TClientFieldValue>>,
 ): ParentCache<FragmentReference<TReadFromStore, TClientFieldValue>> {
-  // TODO this is probably a useless message, we should remove it
-  logMessage(environment, () => ({
-    kind: 'GettingSuspenseCacheItem',
-    index,
-    availableCacheItems: Object.keys(environment.fragmentCache),
-    found: !!environment.fragmentCache[index],
-  }));
   if (environment.fragmentCache[index] == null) {
     environment.fragmentCache[index] = new ParentCache(factory);
   }

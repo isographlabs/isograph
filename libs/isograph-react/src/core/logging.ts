@@ -18,12 +18,6 @@ import { Arguments } from './util';
 
 export type LogMessage =
   | {
-      kind: 'GettingSuspenseCacheItem';
-      index: string;
-      availableCacheItems: ReadonlyArray<string>;
-      found: boolean;
-    }
-  | {
       kind: 'AboutToNormalize';
       normalizationAst: NormalizationAstNodes;
       networkResponse: NetworkResponseObject;
