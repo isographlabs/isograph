@@ -22,6 +22,7 @@ import { readPromise, type PromiseWrapper } from './PromiseWrapper';
 import {
   readImperativelyLoadedField,
   readLinkedFieldData,
+  readLoadablySelectedFieldData,
   readResolverFieldData,
   readScalarFieldData,
   type NetworkRequestReaderOptions,
@@ -283,6 +284,24 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
         break;
       }
       case 'LoadablySelectedField': {
+        defineCachedProperty(target, field.alias, {
+          mutableState,
+          get() {
+            const data = readLoadablySelectedFieldData(
+              environment,
+              field,
+              root,
+              variables,
+              networkRequest,
+              networkRequestOptions,
+              new Map(),
+            );
+            if (data.kind === 'MissingData') {
+              throw new Error(data.reason);
+            }
+            return data.data;
+          },
+        });
         break;
       }
       case 'Link': {
