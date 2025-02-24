@@ -173,6 +173,13 @@ impl<
         }
     }
 
+    pub fn type_and_field(&self) -> &ObjectTypeAndFieldName {
+        match self {
+            ClientType::ClientField(client_field) => &client_field.type_and_field,
+            ClientType::ClientPointer(client_pointer) => &client_pointer.type_and_field,
+        }
+    }
+
     pub fn selection_set_for_parent_query(
         &self,
     ) -> &Vec<
