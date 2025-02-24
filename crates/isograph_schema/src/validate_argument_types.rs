@@ -1,5 +1,5 @@
 use common_lang_types::{
-    EnumLiteralValue, Location, SelectableFieldName, Span, UnvalidatedTypeName, ValueKeyName,
+    EnumLiteralValue, Location, SelectableFieldName, UnvalidatedTypeName, ValueKeyName,
     VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
@@ -8,12 +8,11 @@ use graphql_lang_types::{
 };
 use intern::Lookup;
 use std::collections::BTreeMap;
-use std::fmt::Debug;
 
 use isograph_lang_types::{
-    ClientFieldId, ClientPointerId, NonConstantValue, SelectableServerFieldId, SelectionType,
-    ServerFieldId, ServerObjectId, ServerScalarId, TypeAnnotation, UnionTypeAnnotation,
-    UnionVariant, VariableDefinition,
+    graphql_type_annotation_from_type_annotation, ClientFieldId, ClientPointerId, NonConstantValue,
+    SelectableServerFieldId, SelectionType, ServerFieldId, ServerObjectId, ServerScalarId,
+    VariableDefinition,
 };
 
 use crate::{
@@ -317,25 +316,26 @@ fn object_satisfies_type<TOutputFormat: OutputFormat>(
         selection_supplied_argument_value.location,
     )?;
 
-    let missing_fields = get_non_nullable_missing_and_provided_fields(server_fields, object_literal, object)
-        .iter()
-        .filter_map(|field| match field {
-            ObjectLiteralFieldType::Provided(
-                field_type_annotation,
-                selection_supplied_argument_value,
-            ) => match value_satisfies_type(
-                &selection_supplied_argument_value.value,
-                field_type_annotation,
-                variable_definitions,
-                schema_data,
-                server_fields,
-            ) {
-                Ok(_) => None,
-                Err(e) => Some(Err(e)),
-            },
-            ObjectLiteralFieldType::Missing(field_name) => Some(Ok(*field_name)),
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+    let missing_fields =
+        get_non_nullable_missing_and_provided_fields(server_fields, object_literal, object)
+            .iter()
+            .filter_map(|field| match field {
+                ObjectLiteralFieldType::Provided(
+                    field_type_annotation,
+                    selection_supplied_argument_value,
+                ) => match value_satisfies_type(
+                    &selection_supplied_argument_value.value,
+                    field_type_annotation,
+                    variable_definitions,
+                    schema_data,
+                    server_fields,
+                ) {
+                    Ok(_) => None,
+                    Err(e) => Some(Err(e)),
+                },
+                ObjectLiteralFieldType::Missing(field_name) => Some(Ok(*field_name)),
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
     if missing_fields.is_empty() {
         Ok(())
@@ -485,54 +485,6 @@ fn list_satisfies_type<TOutputFormat: OutputFormat>(
             server_fields,
         )
     })
-}
-
-fn graphql_type_annotation_from_type_annotation<TValue: Ord + Copy + Debug>(
-    other: TypeAnnotation<TValue>,
-) -> GraphQLTypeAnnotation<TValue> {
-    match other {
-        TypeAnnotation::Scalar(scalar_id) => GraphQLTypeAnnotation::Named(
-            GraphQLNamedTypeAnnotation(WithSpan::new(scalar_id, Span::todo_generated())),
-        ),
-        TypeAnnotation::Plural(type_annotation) => {
-            GraphQLTypeAnnotation::List(Box::new(GraphQLListTypeAnnotation(
-                graphql_type_annotation_from_type_annotation(*type_annotation),
-            )))
-        }
-        TypeAnnotation::Union(union_type_annotation) => {
-            graphql_type_annotation_from_union_variant(union_type_annotation)
-        }
-    }
-}
-
-fn graphql_type_annotation_from_union_variant<TValue: Ord + Copy + Debug>(
-    union_type_annotation: UnionTypeAnnotation<TValue>,
-) -> GraphQLTypeAnnotation<TValue> {
-    if union_type_annotation.nullable {
-        return match union_type_annotation.variants.into_iter().next().unwrap() {
-            UnionVariant::Scalar(scalar_id) => GraphQLTypeAnnotation::Named(
-                GraphQLNamedTypeAnnotation(WithSpan::new(scalar_id, Span::todo_generated())),
-            ),
-            UnionVariant::Plural(type_annotation) => {
-                GraphQLTypeAnnotation::List(Box::new(GraphQLListTypeAnnotation(
-                    graphql_type_annotation_from_type_annotation(type_annotation),
-                )))
-            }
-        };
-    }
-
-    GraphQLTypeAnnotation::NonNull(
-        match union_type_annotation.variants.into_iter().next().unwrap() {
-            UnionVariant::Scalar(scalar_id) => Box::new(GraphQLNonNullTypeAnnotation::Named(
-                GraphQLNamedTypeAnnotation(WithSpan::new(scalar_id, Span::todo_generated())),
-            )),
-            UnionVariant::Plural(type_annotation) => Box::new(GraphQLNonNullTypeAnnotation::List(
-                GraphQLListTypeAnnotation(graphql_type_annotation_from_type_annotation(
-                    type_annotation,
-                )),
-            )),
-        },
-    )
 }
 
 fn get_variable_type<'a>(
