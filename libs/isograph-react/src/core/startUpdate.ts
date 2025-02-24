@@ -60,7 +60,6 @@ export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
     );
 
     updater(data);
-
     callSubscriptions(environment, mutableUpdatedIds);
   };
 }
