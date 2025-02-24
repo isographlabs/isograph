@@ -378,7 +378,7 @@ fn get_missing_and_provided_fields<TOutputFormat: OutputFormat>(
                     .map(&mut |scalar_id| SelectionType::Scalar(scalar_id)),
             };
             let field_type_annotation =
-                graphl_type_annotation_from_type_annotation(field_type_annotation);
+                graphql_type_annotation_from_type_annotation(field_type_annotation);
 
             let object_literal_supplied_field = object_literal
                 .iter()
@@ -487,7 +487,7 @@ fn list_satisfies_type<TOutputFormat: OutputFormat>(
     })
 }
 
-fn graphl_type_annotation_from_type_annotation<TValue: Ord + Copy + Debug>(
+fn graphql_type_annotation_from_type_annotation<TValue: Ord + Copy + Debug>(
     other: TypeAnnotation<TValue>,
 ) -> GraphQLTypeAnnotation<TValue> {
     match other {
@@ -496,16 +496,16 @@ fn graphl_type_annotation_from_type_annotation<TValue: Ord + Copy + Debug>(
         ),
         TypeAnnotation::Plural(type_annotation) => {
             GraphQLTypeAnnotation::List(Box::new(GraphQLListTypeAnnotation(
-                graphl_type_annotation_from_type_annotation(*type_annotation),
+                graphql_type_annotation_from_type_annotation(*type_annotation),
             )))
         }
         TypeAnnotation::Union(union_type_annotation) => {
-            graphl_type_annotation_from_union_variant(union_type_annotation)
+            graphql_type_annotation_from_union_variant(union_type_annotation)
         }
     }
 }
 
-fn graphl_type_annotation_from_union_variant<TValue: Ord + Copy + Debug>(
+fn graphql_type_annotation_from_union_variant<TValue: Ord + Copy + Debug>(
     union_type_annotation: UnionTypeAnnotation<TValue>,
 ) -> GraphQLTypeAnnotation<TValue> {
     if union_type_annotation.nullable {
@@ -515,7 +515,7 @@ fn graphl_type_annotation_from_union_variant<TValue: Ord + Copy + Debug>(
             ),
             UnionVariant::Plural(type_annotation) => {
                 GraphQLTypeAnnotation::List(Box::new(GraphQLListTypeAnnotation(
-                    graphl_type_annotation_from_type_annotation(type_annotation),
+                    graphql_type_annotation_from_type_annotation(type_annotation),
                 )))
             }
         };
@@ -527,7 +527,7 @@ fn graphl_type_annotation_from_union_variant<TValue: Ord + Copy + Debug>(
                 GraphQLNamedTypeAnnotation(WithSpan::new(scalar_id, Span::todo_generated())),
             )),
             UnionVariant::Plural(type_annotation) => Box::new(GraphQLNonNullTypeAnnotation::List(
-                GraphQLListTypeAnnotation(graphl_type_annotation_from_type_annotation(
+                GraphQLListTypeAnnotation(graphql_type_annotation_from_type_annotation(
                     type_annotation,
                 )),
             )),
