@@ -38,6 +38,7 @@ import {
 } from './PromiseWrapper';
 import {
   ReaderAst,
+  type ReaderImperativelyLoadedField,
   type ReaderLinkedField,
   type ReaderScalarField,
 } from './reader';
@@ -211,58 +212,20 @@ function readData<TReadFromStore>(
         break;
       }
       case 'ImperativelyLoadedField': {
-        // First, we read the data using the refetch reader AST (i.e. read out the
-        // id field).
-        const data = readData(
+        const data = readImperativelyLoadedField(
           environment,
-          field.refetchReaderArtifact.readerAst,
+          field,
           root,
           variables,
-          // Refetch fields just read the id, and don't need refetch query artifacts
-          [],
-          // This is probably indicative of the fact that we are doing redundant checks
-          // on the status of this network request...
+          nestedRefetchQueries,
           networkRequest,
           networkRequestOptions,
           mutableEncounteredRecords,
         );
         if (data.kind === 'MissingData') {
-          return {
-            kind: 'MissingData',
-            reason:
-              'Missing data for ' + field.alias + ' on root ' + root.__link,
-            nestedReason: data,
-            recordLink: data.recordLink,
-          };
-        } else {
-          const refetchQueryIndex = field.refetchQuery;
-          const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
-          if (refetchQuery == null) {
-            throw new Error(
-              'refetchQuery is null in RefetchField. This is indicative of a bug in Isograph.',
-            );
-          }
-          const refetchQueryArtifact = refetchQuery.artifact;
-          const allowedVariables = refetchQuery.allowedVariables;
-
-          // Second, we allow the user to call the resolver, which will ultimately
-          // use the resolver reader AST to get the resolver parameters.
-          target[field.alias] = (args: any) => [
-            // Stable id
-            root.__link + '__' + field.name,
-            // Fetcher
-            field.refetchReaderArtifact.resolver(
-              environment,
-              refetchQueryArtifact,
-              data.data,
-              filterVariables({ ...args, ...variables }, allowedVariables),
-              root,
-              // TODO these params should be removed
-              null,
-              [],
-            ),
-          ];
+          return data;
         }
+        target[field.alias] = data.data;
         break;
       }
       case 'Resolver': {
@@ -829,4 +792,70 @@ function stableStringifyArgs(args: object) {
     s += `${key}=${JSON.stringify(args[key])};`;
   }
   return s;
+}
+
+export function readImperativelyLoadedField(
+  environment: IsographEnvironment,
+  field: ReaderImperativelyLoadedField,
+  root: Link,
+  variables: Variables,
+  nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
+  networkRequest: PromiseWrapper<void, any>,
+  networkRequestOptions: NetworkRequestReaderOptions,
+  mutableEncounteredRecords: EncounteredIds,
+): ReadDataResult<unknown> {
+  // First, we read the data using the refetch reader AST (i.e. read out the
+  // id field).
+  const data = readData(
+    environment,
+    field.refetchReaderArtifact.readerAst,
+    root,
+    variables,
+    // Refetch fields just read the id, and don't need refetch query artifacts
+    [],
+    // This is probably indicative of the fact that we are doing redundant checks
+    // on the status of this network request...
+    networkRequest,
+    networkRequestOptions,
+    mutableEncounteredRecords,
+  );
+  if (data.kind === 'MissingData') {
+    return {
+      kind: 'MissingData',
+      reason: 'Missing data for ' + field.alias + ' on root ' + root.__link,
+      nestedReason: data,
+      recordLink: data.recordLink,
+    };
+  } else {
+    const refetchQueryIndex = field.refetchQuery;
+    const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
+    if (refetchQuery == null) {
+      throw new Error(
+        'refetchQuery is null in RefetchField. This is indicative of a bug in Isograph.',
+      );
+    }
+    const refetchQueryArtifact = refetchQuery.artifact;
+    const allowedVariables = refetchQuery.allowedVariables;
+
+    // Second, we allow the user to call the resolver, which will ultimately
+    // use the resolver reader AST to get the resolver parameters.
+    return {
+      kind: 'Success',
+      data: (args: any) => [
+        // Stable id
+        root.__link + '__' + field.name,
+        // Fetcher
+        field.refetchReaderArtifact.resolver(
+          environment,
+          refetchQueryArtifact,
+          data.data,
+          filterVariables({ ...args, ...variables }, allowedVariables),
+          root,
+          // TODO these params should be removed
+          null,
+          [],
+        ),
+      ],
+    };
+  }
 }
