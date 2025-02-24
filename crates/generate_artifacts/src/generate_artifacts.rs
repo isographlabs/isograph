@@ -870,23 +870,13 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                         }
                         ValidatedIsographSelectionVariant::Updatable => {
                             *updatable_fields = true;
-
-                            query_type_declaration.push_str(&format!(
-                                "get {}(): {},\n",
+                            write_getter_and_setter(
+                                query_type_declaration,
+                                indentation_level,
                                 name_or_alias,
-                                print_javascript_type_declaration(&type_annotation),
-                            ));
-                            let setter_type_annotation = associated_data
-                                .type_name
-                                .clone()
-                                .map(&mut |_| "{ link: Link }");
-                            query_type_declaration
-                                .push_str(&"  ".repeat(indentation_level as usize).to_string());
-                            query_type_declaration.push_str(&format!(
-                                "set {}(value: {}),\n",
-                                name_or_alias,
-                                print_javascript_type_declaration(&setter_type_annotation),
-                            ));
+                                associated_data,
+                                &type_annotation,
+                            );
                         }
                         ValidatedIsographSelectionVariant::Regular => {
                             query_type_declaration.push_str(&format!(
@@ -900,6 +890,32 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
             };
         }
     }
+}
+
+fn write_getter_and_setter(
+    query_type_declaration: &mut String,
+    indentation_level: u8,
+    name_or_alias: common_lang_types::FieldNameOrAlias,
+    associated_data: &isograph_schema::ServerFieldTypeAssociatedData<
+        TypeAnnotation<isograph_lang_types::ServerObjectId>,
+    >,
+    type_annotation: &TypeAnnotation<ClientFieldUpdatableDataType>,
+) {
+    query_type_declaration.push_str(format!(
+        "get {}(): {},\n",
+        name_or_alias,
+        print_javascript_type_declaration(&type_annotation),
+    ));
+    let setter_type_annotation = associated_data
+        .type_name
+        .clone()
+        .map(&mut |_| "{ link: Link }");
+    query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
+    query_type_declaration.push_str(&format!(
+        "set {}(value: {}),\n",
+        name_or_alias,
+        print_javascript_type_declaration(&setter_type_annotation),
+    ));
 }
 
 fn get_loadable_field_type_from_arguments<TOutputFormat: OutputFormat>(
