@@ -317,7 +317,7 @@ fn object_satisfies_type<TOutputFormat: OutputFormat>(
         selection_supplied_argument_value.location,
     )?;
 
-    let missing_fields = get_missing_and_provided_fields(server_fields, object_literal, object)
+    let missing_fields = get_non_nullable_missing_and_provided_fields(server_fields, object_literal, object)
         .iter()
         .filter_map(|field| match field {
             ObjectLiteralFieldType::Provided(
@@ -357,7 +357,7 @@ enum ObjectLiteralFieldType {
     Missing(SelectableFieldName),
 }
 
-fn get_missing_and_provided_fields<TOutputFormat: OutputFormat>(
+fn get_non_nullable_missing_and_provided_fields<TOutputFormat: OutputFormat>(
     server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     object: &SchemaObject<TOutputFormat>,
