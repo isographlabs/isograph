@@ -866,7 +866,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
 
                     match linked_field.associated_data.selection_variant {
                         ValidatedIsographSelectionVariant::Loadable(_) => {
-                            panic!("@loadble server fields  are not supported yet")
+                            panic!("@loadable server fields are not supported")
                         }
                         ValidatedIsographSelectionVariant::Updatable => {
                             *updatable_fields = true;
