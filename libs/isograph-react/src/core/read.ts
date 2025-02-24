@@ -612,7 +612,6 @@ export function readResolverFieldData(
               environment,
               fragment,
               readerWithRefetchQueries.readerArtifact.fieldName,
-              networkRequestOptions,
             )
           : undefined,
       };
