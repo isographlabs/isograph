@@ -76,6 +76,8 @@ export type LogMessage =
   | {
       kind: 'DoneReading';
       response: ReadDataResult<any>;
+      fieldName: string;
+      root: Link;
     }
   | {
       kind: 'NonEntrypointReceived';

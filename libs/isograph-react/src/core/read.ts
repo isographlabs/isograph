@@ -80,6 +80,8 @@ export function readButDoNotEvaluate<
   logMessage(environment, {
     kind: 'DoneReading',
     response,
+    fieldName: readerWithRefetchQueries.readerArtifact.fieldName,
+    root: fragmentReference.root,
   });
 
   if (response.kind === 'MissingData') {
