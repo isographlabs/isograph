@@ -93,6 +93,21 @@ pub fn get_artifact_path_and_content<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
     config: &CompilerConfig,
 ) -> Vec<ArtifactPathAndContent> {
+    let mut artifact_path_and_content = get_artifact_path_and_content_impl(schema, config);
+    if let Some(header) = config.options.generated_file_header {
+        let header = header.lookup();
+        for artifact_path_and_content in artifact_path_and_content.iter_mut() {
+            artifact_path_and_content.file_content =
+                format!("// {header}\n{}", artifact_path_and_content.file_content);
+        }
+    }
+    artifact_path_and_content
+}
+
+fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
+    config: &CompilerConfig,
+) -> Vec<ArtifactPathAndContent> {
     let mut encountered_client_type_map = BTreeMap::new();
     let mut path_and_contents = vec![];
     let mut encountered_output_types = HashSet::<ClientFieldId>::new();
