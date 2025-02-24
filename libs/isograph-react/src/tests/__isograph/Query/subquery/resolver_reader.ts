@@ -10,6 +10,7 @@ const readerAst: ReaderAst<Query__subquery__param> = [
     alias: null,
     arguments: null,
     condition: null,
+    isUpdatable: false,
     selections: [
       {
         kind: "Linked",
@@ -22,6 +23,7 @@ const readerAst: ReaderAst<Query__subquery__param> = [
           ],
         ],
         condition: null,
+        isUpdatable: false,
         selections: [
           {
             kind: "Scalar",

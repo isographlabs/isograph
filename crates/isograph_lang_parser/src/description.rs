@@ -73,7 +73,7 @@ fn get_common_indent(source: &str) -> usize {
     let mut common_indent: Option<usize> = None;
     for line in lines {
         if let Some((first_index, _)) = line.match_indices(is_not_whitespace).next() {
-            if common_indent.map_or(true, |indent| first_index < indent) {
+            if common_indent.is_none_or(|indent| first_index < indent) {
                 common_indent = Some(first_index)
             }
         }
