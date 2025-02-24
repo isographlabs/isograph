@@ -53,8 +53,6 @@ impl Clone for Input {
 #[memo]
 fn assert_input_cloned(db: &Database, input_id: SourceId<Input>) {
     ASSERT_INPUT_COUNTER.fetch_add(1, Ordering::SeqCst);
-
-    let clone_count = INPUT_CLONE_COUNTER.load(Ordering::SeqCst);
     db.get(input_id);
-    assert_eq!(INPUT_CLONE_COUNTER.load(Ordering::SeqCst), clone_count);
+    assert_eq!(INPUT_CLONE_COUNTER.load(Ordering::SeqCst), 0);
 }

@@ -9,7 +9,7 @@ use crate::{
     source::{Source, SourceId, SourceNode},
 };
 use boxcar::Vec as BoxcarVec;
-use dashmap::DashMap;
+use dashmap::{DashMap, Entry};
 use lru::LruCache;
 
 use crate::derived_node::{DerivedNode, DerivedNodeId, DerivedNodeRevision};
@@ -77,10 +77,10 @@ impl Database {
     }
 
     pub fn get<T: 'static>(&self, id: SourceId<T>) -> &T {
-        let source_node = self
-            .storage
-            .get_source_node(id.key)
-            .expect("source node should exist. This is indicative of a bug in Pico.");
+        let source_node = self.storage.get_source_node(id.key).expect(
+            "source node not found. SourceId should not be used \
+            after the corresponding source node is removed.",
+        );
         self.register_dependency_in_parent_memoized_fn(
             NodeKind::Source(id.key),
             source_node.time_updated,
@@ -218,36 +218,39 @@ impl DatabaseStorage {
     /// the new source, increment the current epoch.
     pub fn set_source<T: Source + DynEq>(&mut self, source: T) -> SourceId<T> {
         let id = SourceId::new(&source);
-        if let Some(index) = self.source_node_key_to_index.get(&id.key) {
-            let source_node = self
-                .source_nodes
-                .get_mut(index.idx)
-                .expect(
-                    "indexes should always be valid. \
-                    This is indicative of a bug in Pico.",
-                )
-                .as_mut()
-                .expect(
-                    "indexes should always point to a non-empty source node. \
-                    This is indicative of a bug in Pico.",
-                );
-            if !source_node.value.dyn_eq(&source) {
-                // We cannot call self.increment_epoch() because that borrows
-                // the entire struct, but self.source_nodes is already borrowed
-                let next_epoch = self.current_epoch.increment();
-                *source_node = SourceNode {
-                    time_updated: next_epoch,
-                    value: Box::new(source),
-                };
-            } else {
-                source_node.time_updated = self.current_epoch;
+        match self.source_node_key_to_index.entry(id.key) {
+            Entry::Occupied(occupied_entry) => {
+                let source_node = self
+                    .source_nodes
+                    .get_mut(occupied_entry.get().idx)
+                    .expect(
+                        "indexes should always be valid. \
+                        This is indicative of a bug in Pico.",
+                    )
+                    .as_mut()
+                    .expect(
+                        "indexes should always point to a non-empty source node. \
+                        This is indicative of a bug in Pico.",
+                    );
+                if !source_node.value.dyn_eq(&source) {
+                    // We cannot call self.increment_epoch() because that borrows
+                    // the entire struct, but self.source_nodes is already borrowed
+                    let next_epoch = self.current_epoch.increment();
+                    *source_node = SourceNode {
+                        time_updated: next_epoch,
+                        value: Box::new(source),
+                    };
+                } else {
+                    source_node.time_updated = self.current_epoch;
+                }
             }
-        } else {
-            let index = self.insert_source_node(SourceNode {
-                time_updated: self.current_epoch,
-                value: Box::new(source),
-            });
-            self.source_node_key_to_index.insert(id.key, index);
+            Entry::Vacant(vacant_entry) => {
+                let index = self.insert_source_node(SourceNode {
+                    time_updated: self.current_epoch,
+                    value: Box::new(source),
+                });
+                vacant_entry.insert(index);
+            }
         }
         id
     }
