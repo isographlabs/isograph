@@ -4,8 +4,8 @@ use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
 use isograph_schema::{
-    ClientType, OutputFormat, RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment,
-    UserWrittenClientFieldInfo, UserWrittenComponentVariant, ValidatedClientField,
+    OutputFormat, RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment,
+    UserWrittenClientTypeInfo, UserWrittenComponentVariant, ValidatedClientField,
     ValidatedClientType, ValidatedSchema, ValidatedSchemaServerField,
 };
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
@@ -26,9 +26,9 @@ use crate::{
 
 pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
-    client_field: &ValidatedClientField<TOutputFormat>,
+    client_type: &ValidatedClientType<TOutputFormat>,
     config: &CompilerConfig,
-    info: UserWrittenClientFieldInfo,
+    info: UserWrittenClientTypeInfo,
     refetched_paths: &RefetchedPathsMap,
     file_extensions: GenerateFileExtensionsOption,
     has_updatable: bool,
@@ -37,14 +37,14 @@ pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
     let user_written_component_variant = info.user_written_component_variant;
     let parent_type = schema
         .server_field_data
-        .object(client_field.parent_object_id);
+        .object(client_type.parent_object_id());
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         schema,
-        client_field.selection_set_for_parent_query(),
+        client_type.selection_set_for_parent_query(),
         0,
         refetched_paths,
-        &ClientType::ClientField(client_field).initial_variable_context(),
+        &client_type.initial_variable_context(),
     );
 
     let function_import_statement =
@@ -53,13 +53,13 @@ pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
     let reader_import_statement =
         reader_imports_to_import_statement(&reader_imports, file_extensions);
 
-    let reader_param_type = format!("{}__{}__param", parent_type.name, client_field.name);
+    let reader_param_type = format!("{}__{}__param", parent_type.name, client_type.name());
 
     let reader_content = if let UserWrittenComponentVariant::Eager = user_written_component_variant
     {
-        let eager_reader_name = format!("{}.{}", parent_type.name, client_field.name);
+        let eager_reader_name = format!("{}.{}", parent_type.name, client_type.name());
         let reader_output_type =
-            format!("{}__{}__output_type", parent_type.name, client_field.name);
+            format!("{}__{}__output_type", parent_type.name, client_type.name());
         let param_type_file_name = *RESOLVER_PARAM_TYPE;
         let output_type_file_name = *RESOLVER_OUTPUT_TYPE;
         format!(
@@ -83,7 +83,7 @@ pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
             "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         )
     } else {
-        let component_name = format!("{}.{}", parent_type.name, client_field.name);
+        let component_name = format!("{}.{}", parent_type.name, client_type.name());
         let param_type_file_name = *RESOLVER_PARAM_TYPE;
         format!(
             "import type {{ComponentReaderArtifact, ExtractSecondParam, \
@@ -112,14 +112,14 @@ pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
         file_content: reader_content,
         type_and_field: Some(ObjectTypeAndFieldName {
             type_name: parent_type.name,
-            field_name: client_field.name,
+            field_name: client_type.name(),
         }),
     }];
 
-    if !client_field.variable_definitions.is_empty() {
+    if !client_type.variable_definitions().is_empty() {
         let reader_parameters_type =
-            format!("{}__{}__parameters", parent_type.name, client_field.name);
-        let parameters = client_field.variable_definitions.iter().map(|x| &x.item);
+            format!("{}__{}__parameters", parent_type.name, client_type.name());
+        let parameters = client_type.variable_definitions().iter().map(|x| &x.item);
         let parameters_types = generate_parameters(schema, parameters);
         let parameters_content =
             format!("export type {reader_parameters_type} = {parameters_types}\n");
@@ -128,7 +128,7 @@ pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
             file_content: parameters_content,
             type_and_field: Some(ObjectTypeAndFieldName {
                 type_name: parent_type.name,
-                field_name: client_field.name,
+                field_name: client_type.name(),
             }),
         });
     }
@@ -302,7 +302,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TOutputFormat: OutputFo
     schema: &ValidatedSchema<TOutputFormat>,
     client_field: &ValidatedClientField<TOutputFormat>,
     config: &CompilerConfig,
-    info: UserWrittenClientFieldInfo,
+    info: UserWrittenClientTypeInfo,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
     let parent_type = schema
@@ -345,7 +345,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TOutputFormat: OutputFo
 /// Example: import { PetUpdater as resolver } from '../../../PetUpdater';
 fn generate_function_import_statement(
     config: &CompilerConfig,
-    target_field_info: UserWrittenClientFieldInfo,
+    target_field_info: UserWrittenClientTypeInfo,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ClientFieldFunctionImportStatement {
     // artifact directory includes __isograph, so artifact_directory.join("Type/Field")
