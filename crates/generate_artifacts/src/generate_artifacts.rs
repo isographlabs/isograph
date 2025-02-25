@@ -17,7 +17,7 @@ use isograph_lang_types::{
 use isograph_schema::{
     get_provided_arguments, selection_map_wrapped, ClientFieldVariant, ClientType,
     FieldTraversalResult, FieldType, NameAndArguments, NormalizationKey, OutputFormat,
-    RequiresRefinement, Schema, SchemaObject, SchemaServerFieldVariant,
+    RequiresRefinement, Schema, SchemaObject, SchemaServerFieldVariant, UserWrittenClientTypeInfo,
     UserWrittenComponentVariant, ValidatedClientField, ValidatedIsographSelectionVariant,
     ValidatedScalarFieldAssociatedData, ValidatedSchema, ValidatedSchemaState, ValidatedSelection,
     ValidatedVariableDefinition,
@@ -157,8 +157,22 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
                 };
             }
 
-            FieldType::ClientField(ClientType::ClientPointer(_)) => {
-                todo!("generate client pointer reader artifacts is not implemented")
+            FieldType::ClientField(ClientType::ClientPointer(encountered_client_pointer_id)) => {
+                let encountered_client_pointer =
+                    schema.client_pointer(*encountered_client_pointer_id);
+                path_and_contents.extend(generate_eager_reader_artifacts(
+                    schema,
+                    &ClientType::ClientPointer(encountered_client_pointer),
+                    config,
+                    UserWrittenClientTypeInfo {
+                        const_export_name: encountered_client_pointer.info.const_export_name,
+                        file_path: encountered_client_pointer.info.file_path,
+                        user_written_component_variant: UserWrittenComponentVariant::Eager,
+                    },
+                    &traversal_state.refetch_paths,
+                    config.options.include_file_extensions_in_import_statements,
+                    traversal_state.has_updatable,
+                ));
             }
             FieldType::ClientField(ClientType::ClientField(encountered_client_field_id)) => {
                 let encountered_client_field = schema.client_field(*encountered_client_field_id);
@@ -168,7 +182,7 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
                     ClientFieldVariant::UserWritten(info) => {
                         path_and_contents.extend(generate_eager_reader_artifacts(
                             schema,
-                            encountered_client_field,
+                            &ClientType::ClientField(encountered_client_field),
                             config,
                             *info,
                             &traversal_state.refetch_paths,
