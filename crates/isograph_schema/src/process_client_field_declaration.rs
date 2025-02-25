@@ -272,6 +272,11 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             }?,
             to: to_object_id,
             output_format: std::marker::PhantomData,
+
+            info: UserWrittenClientPointerInfo {
+                const_export_name: client_pointer_declaration.item.const_export_name,
+                file_path: client_pointer_declaration.item.definition_path,
+            },
         }));
 
         let parent_object = self.server_field_data.object_mut(parent_object_id);
@@ -380,16 +385,22 @@ pub enum UserWrittenComponentVariant {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct UserWrittenClientFieldInfo {
+pub struct UserWrittenClientTypeInfo {
     // TODO use a shared struct
     pub const_export_name: ConstExportName,
     pub file_path: RelativePathToSourceFile,
     pub user_written_component_variant: UserWrittenComponentVariant,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct UserWrittenClientPointerInfo {
+    pub const_export_name: ConstExportName,
+    pub file_path: RelativePathToSourceFile,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ClientFieldVariant {
-    UserWritten(UserWrittenClientFieldInfo),
+    UserWritten(UserWrittenClientTypeInfo),
     ImperativelyLoadedField(ImperativelyLoadedFieldVariant),
     Link,
 }
@@ -401,14 +412,14 @@ lazy_static! {
 fn get_client_variant(client_field_declaration: &ClientFieldDeclaration) -> ClientFieldVariant {
     for directive in client_field_declaration.directives.iter() {
         if directive.item.name.item == *COMPONENT {
-            return ClientFieldVariant::UserWritten(UserWrittenClientFieldInfo {
+            return ClientFieldVariant::UserWritten(UserWrittenClientTypeInfo {
                 const_export_name: client_field_declaration.const_export_name,
                 file_path: client_field_declaration.definition_path,
                 user_written_component_variant: UserWrittenComponentVariant::Component,
             });
         }
     }
-    ClientFieldVariant::UserWritten(UserWrittenClientFieldInfo {
+    ClientFieldVariant::UserWritten(UserWrittenClientTypeInfo {
         const_export_name: client_field_declaration.const_export_name,
         file_path: client_field_declaration.definition_path,
         user_written_component_variant: UserWrittenComponentVariant::Eager,
