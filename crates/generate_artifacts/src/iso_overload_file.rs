@@ -195,7 +195,7 @@ export function iso(_isographLiteralText: string):
 export function iso(isographLiteralText: string):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
-  | IsographEntrypoint<any, any>
+  | IsographEntrypoint<any, any, any>
 {
   switch (isographLiteralText) {\n",
             );
