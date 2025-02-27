@@ -393,6 +393,7 @@ pub struct UserWrittenClientTypeInfo {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+// TODO refactor this https://github.com/isographlabs/isograph/pull/435#discussion_r1970489356
 pub struct UserWrittenClientPointerInfo {
     pub const_export_name: ConstExportName,
     pub file_path: RelativePathToSourceFile,
