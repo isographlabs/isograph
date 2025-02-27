@@ -24,7 +24,8 @@ use lazy_static::lazy_static;
 use crate::{
     refetch_strategy::RefetchStrategy, schema_validation_state::SchemaValidationState,
     ClientFieldVariant, NormalizationKey, OutputFormat, ServerFieldTypeAssociatedData,
-    ValidatedClientField, ValidatedClientPointer, ValidatedSchemaServerField,
+    UserWrittenClientPointerInfo, ValidatedClientField, ValidatedClientPointer,
+    ValidatedSchemaServerField,
 };
 
 lazy_static! {
@@ -751,6 +752,8 @@ pub struct ClientPointer<
     pub parent_object_id: ServerObjectId,
 
     pub output_format: PhantomData<TOutputFormat>,
+
+    pub info: UserWrittenClientPointerInfo,
 }
 
 #[derive(Debug)]
