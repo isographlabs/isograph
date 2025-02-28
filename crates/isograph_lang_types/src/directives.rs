@@ -17,11 +17,11 @@ pub struct IsographFieldDirective {
 pub fn from_isograph_field_directive<'a, T: Deserialize<'a>>(
     directive: &'a IsographFieldDirective,
 ) -> Result<T, DeserializationError> {
-    T::deserialize(GraphQLDirectiveDeserializer { directive })
+    T::deserialize(IsographFieldDirectiveDeserializer { directive })
 }
 
 #[derive(Debug)]
-struct GraphQLDirectiveDeserializer<'a> {
+struct IsographFieldDirectiveDeserializer<'a> {
     directive: &'a IsographFieldDirective,
 }
 
@@ -40,7 +40,7 @@ impl de::Error for DeserializationError {
     }
 }
 
-impl<'de> Deserializer<'de> for GraphQLDirectiveDeserializer<'de> {
+impl<'de> Deserializer<'de> for IsographFieldDirectiveDeserializer<'de> {
     type Error = DeserializationError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
