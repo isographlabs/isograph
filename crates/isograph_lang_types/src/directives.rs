@@ -14,13 +14,6 @@ pub struct IsographFieldDirective {
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
 }
 
-pub fn from_isograph_field_directive<'a, T: Deserialize<'a>>(
-    directive: &'a IsographFieldDirective,
-) -> Result<T, DeserializationError> {
-    T::deserialize(IsographFieldDirectiveDeserializer { directive })
-}
-
-#[allow(unused)]
 pub fn from_isograph_field_directives<'a, T: Deserialize<'a>>(
     directives: &'a [WithSpan<IsographFieldDirective>],
 ) -> Result<T, DeserializationError> {

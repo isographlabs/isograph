@@ -340,11 +340,8 @@ pub enum ProcessClientFieldDeclarationError {
         client_field_name: SelectableFieldName,
     },
 
-    #[error("Unable to serialize directive named \"@{directive_name}\". Message: {message}")]
-    UnableToDeserialize {
-        directive_name: IsographDirectiveName,
-        message: DeserializationError,
-    },
+    #[error("Error when deserializing directives. Message: {message}")]
+    UnableToDeserializeDirectives { message: DeserializationError },
 
     #[error("The directive \"@loadable\" and \"@updatable\" are mutually exclusive.")]
     LoadableAndUpdatableAreMutuallyExclusive,
