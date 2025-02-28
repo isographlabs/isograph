@@ -81,7 +81,7 @@ impl<'de> MapAccess<'de> for NameValuePairVecDeserializer<'de> {
         if let Some(name_value_pair) = self.arguments.get(self.field_idx) {
             return seed
                 .deserialize(NameDeserializer {
-                    name_value_pair: &name_value_pair.item,
+                    name: name_value_pair.item.name.item.lookup(),
                 })
                 .map(Some);
         }
@@ -105,22 +105,22 @@ impl<'de> MapAccess<'de> for NameValuePairVecDeserializer<'de> {
     }
 }
 
-struct NameDeserializer<'a> {
-    name_value_pair: &'a SelectionFieldArgument,
+struct NameDeserializer {
+    name: &'static str,
 }
 
 struct ValueDeserializer<'a> {
     name_value_pair: &'a SelectionFieldArgument,
 }
 
-impl<'de> Deserializer<'de> for NameDeserializer<'de> {
+impl<'de> Deserializer<'de> for NameDeserializer {
     type Error = DeserializationError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_borrowed_str(self.name_value_pair.name.item.lookup())
+        visitor.visit_borrowed_str(self.name)
     }
 
     serde::forward_to_deserialize_any! {
