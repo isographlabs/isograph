@@ -15,6 +15,7 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
       ],
     ],
     condition: null,
+    isUpdatable: false,
     selections: [
       {
         kind: "Linked",
@@ -22,6 +23,7 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
         alias: null,
         arguments: null,
         condition: null,
+        isUpdatable: false,
         selections: [
           {
             kind: "Linked",
@@ -29,6 +31,7 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
             alias: null,
             arguments: null,
             condition: null,
+            isUpdatable: false,
             selections: [
               {
                 kind: "Scalar",
@@ -57,6 +60,7 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
                 alias: null,
                 arguments: null,
                 condition: null,
+                isUpdatable: false,
                 selections: [
                   {
                     kind: "Scalar",

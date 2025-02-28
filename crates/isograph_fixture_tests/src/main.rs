@@ -1,9 +1,9 @@
-mod config;
+mod config_for_test;
 
 use std::{ffi::OsStr, fs, path::PathBuf};
 
 use clap::Parser;
-use config::isograph_config_for_tests;
+use config_for_test::isograph_config_for_tests;
 use intern::string_key::Lookup;
 use isograph_compiler::parse_iso_literals_in_file_content;
 use isograph_config::CompilerConfig;

@@ -113,12 +113,12 @@ export function makeNetworkRequest<
   const myNetworkRequestId = networkRequestId + '';
   networkRequestId++;
 
-  logMessage(environment, {
+  logMessage(environment, () => ({
     kind: 'MakeNetworkRequest',
     artifact,
     variables,
     networkRequestId: myNetworkRequestId,
-  });
+  }));
 
   let status: NetworkRequestStatus = {
     kind: 'UndisposedIncomplete',
@@ -132,11 +132,11 @@ export function makeNetworkRequest<
     loadNormalizationAst(artifact.networkRequestInfo.normalizationAst),
   ])
     .then(([networkResponse, normalizationAst]) => {
-      logMessage(environment, {
+      logMessage(environment, () => ({
         kind: 'ReceivedNetworkResponse',
         networkResponse,
         networkRequestId: myNetworkRequestId,
-      });
+      }));
 
       if (networkResponse.errors != null) {
         try {
@@ -190,11 +190,11 @@ export function makeNetworkRequest<
       }
     })
     .catch((e) => {
-      logMessage(environment, {
+      logMessage(environment, () => ({
         kind: 'ReceivedNetworkError',
         networkRequestId: myNetworkRequestId,
         error: e,
-      });
+      }));
       try {
         fetchOptions?.onError?.();
       } catch {}

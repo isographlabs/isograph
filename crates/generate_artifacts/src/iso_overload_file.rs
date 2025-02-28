@@ -5,7 +5,7 @@ use std::cmp::Ordering;
 use common_lang_types::{ArtifactPathAndContent, IsoLiteralText, SelectableFieldName};
 use isograph_schema::{
     ClientFieldVariant, ClientType, OutputFormat, UserWrittenComponentVariant,
-    ValidatedClientField, ValidatedSchema,
+    ValidatedClientField, ValidatedClientType, ValidatedSchema,
 };
 
 use crate::generate_artifacts::ISO_TS_FILE_NAME;
@@ -39,25 +39,30 @@ export function iso<T>(
     (import, s)
 }
 
-fn build_iso_overload_for_client_defined_field<TOutputFormat: OutputFormat>(
-    client_field_and_variant: (
-        &ValidatedClientField<TOutputFormat>,
+fn build_iso_overload_for_client_defined_type<TOutputFormat: OutputFormat>(
+    client_type_and_variant: (
+        ValidatedClientType<TOutputFormat>,
         UserWrittenComponentVariant,
     ),
     file_extensions: GenerateFileExtensionsOption,
 ) -> (String, String) {
-    let (client_field, variant) = client_field_and_variant;
+    let (client_type, variant) = client_type_and_variant;
     let mut s: String = "".to_string();
     let import = format!(
         "import {{ type {}__param }} from './{}/{}/param_type{}';\n",
-        client_field.type_and_field.underscore_separated(),
-        client_field.type_and_field.type_name,
-        client_field.type_and_field.field_name,
+        client_type.type_and_field().underscore_separated(),
+        client_type.type_and_field().type_name,
+        client_type.type_and_field().field_name,
         file_extensions.ts()
     );
     let formatted_field = format!(
-        "field {}.{}",
-        client_field.type_and_field.type_name, client_field.type_and_field.field_name
+        "{} {}.{}",
+        match client_type {
+            ClientType::ClientField(_) => "field",
+            ClientType::ClientPointer(_) => "pointer",
+        },
+        client_type.type_and_field().type_name,
+        client_type.type_and_field().field_name
     );
     if matches!(variant, UserWrittenComponentVariant::Component) {
         s.push_str(&format!(
@@ -66,7 +71,7 @@ export function iso<T>(
   param: T & MatchesWhitespaceAndString<'{}', T>
 ): IdentityWithParamComponent<{}__param>;\n",
             formatted_field,
-            client_field.type_and_field.underscore_separated(),
+            client_type.type_and_field().underscore_separated(),
         ));
     } else {
         s.push_str(&format!(
@@ -75,7 +80,7 @@ export function iso<T>(
   param: T & MatchesWhitespaceAndString<'{}', T>
 ): IdentityWithParam<{}__param>;\n",
             formatted_field,
-            client_field.type_and_field.underscore_separated(),
+            client_type.type_and_field().underscore_separated(),
         ));
     }
     (import, s)
@@ -138,12 +143,15 @@ type MatchesWhitespaceAndString<
 > = Whitespace<T> extends `${TString}${string}` ? T : never;\n",
     );
 
-    let client_defined_field_overloads = sorted_user_written_fields(schema)
-        .into_iter()
-        .map(|field| build_iso_overload_for_client_defined_field(field, file_extensions));
-    for (import, field_overload) in client_defined_field_overloads {
+    let client_defined_type_overloads =
+        sorted_user_written_types(schema)
+            .into_iter()
+            .map(|client_type| {
+                build_iso_overload_for_client_defined_type(client_type, file_extensions)
+            });
+    for (import, client_type_overload) in client_defined_type_overloads {
         imports.push_str(&import);
-        content.push_str(&field_overload);
+        content.push_str(&client_type_overload);
     }
 
     let entrypoint_overloads = sorted_entrypoints(schema)
@@ -187,7 +195,7 @@ export function iso(_isographLiteralText: string):
 export function iso(isographLiteralText: string):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
-  | IsographEntrypoint<any, any>
+  | IsographEntrypoint<any, any, any>
 {
   switch (isographLiteralText) {\n",
             );
@@ -210,29 +218,29 @@ export function iso(isographLiteralText: string):
     }
 }
 
-fn sorted_user_written_fields<TOutputFormat: OutputFormat>(
+fn sorted_user_written_types<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
 ) -> Vec<(
-    &ValidatedClientField<TOutputFormat>,
+    ValidatedClientType<TOutputFormat>,
     UserWrittenComponentVariant,
 )> {
-    let mut fields = user_written_fields(schema).collect::<Vec<_>>();
-    fields.sort_by(|client_field_1, client_field_2| {
-        match client_field_1
+    let mut client_types = user_written_fields(schema).collect::<Vec<_>>();
+    client_types.sort_by(|client_type_1, client_type_2| {
+        match client_type_1
             .0
-            .type_and_field
+            .type_and_field()
             .type_name
-            .cmp(&client_field_2.0.type_and_field.type_name)
+            .cmp(&client_type_2.0.type_and_field().type_name)
         {
             Ordering::Less => Ordering::Less,
             Ordering::Greater => Ordering::Greater,
             Ordering::Equal => sort_field_name(
-                client_field_1.0.type_and_field.field_name,
-                client_field_2.0.type_and_field.field_name,
+                client_type_1.0.type_and_field().field_name,
+                client_type_2.0.type_and_field().field_name,
             ),
         }
     });
-    fields
+    client_types
 }
 
 fn sorted_entrypoints<TOutputFormat: OutputFormat>(
@@ -289,20 +297,24 @@ fn user_written_fields<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
 ) -> impl Iterator<
     Item = (
-        &ValidatedClientField<TOutputFormat>,
+        ValidatedClientType<TOutputFormat>,
         UserWrittenComponentVariant,
     ),
 > + '_ {
     schema
         .client_types
         .iter()
-        .filter_map(|client_field| match client_field {
-            ClientType::ClientPointer(_) => None,
+        .filter_map(|client_type| match client_type {
+            ClientType::ClientPointer(client_pointer) => Some((
+                ClientType::ClientPointer(client_pointer),
+                UserWrittenComponentVariant::Eager,
+            )),
             ClientType::ClientField(client_field) => match client_field.variant {
                 ClientFieldVariant::Link => None,
-                ClientFieldVariant::UserWritten(info) => {
-                    Some((client_field, info.user_written_component_variant))
-                }
+                ClientFieldVariant::UserWritten(info) => Some((
+                    ClientType::ClientField(client_field),
+                    info.user_written_component_variant,
+                )),
                 ClientFieldVariant::ImperativelyLoadedField(_) => None,
             },
         })

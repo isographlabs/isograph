@@ -4,7 +4,7 @@ use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
 use isograph_schema::{
-    OutputFormat, RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment,
+    ClientType, OutputFormat, RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment,
     UserWrittenClientFieldInfo, UserWrittenComponentVariant, ValidatedClientField,
     ValidatedClientType, ValidatedSchema, ValidatedSchemaServerField,
 };
@@ -12,10 +12,10 @@ use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
 use crate::{
     generate_artifacts::{
-        generate_client_field_parameter_type, generate_output_type, generate_parameters,
-        ClientFieldFunctionImportStatement, RESOLVER_OUTPUT_TYPE, RESOLVER_OUTPUT_TYPE_FILE_NAME,
-        RESOLVER_PARAMETERS_TYPE_FILE_NAME, RESOLVER_PARAM_TYPE, RESOLVER_PARAM_TYPE_FILE_NAME,
-        RESOLVER_READER_FILE_NAME,
+        generate_client_field_parameter_type, generate_client_field_updatable_data_type,
+        generate_output_type, generate_parameters, ClientFieldFunctionImportStatement,
+        RESOLVER_OUTPUT_TYPE, RESOLVER_OUTPUT_TYPE_FILE_NAME, RESOLVER_PARAMETERS_TYPE_FILE_NAME,
+        RESOLVER_PARAM_TYPE, RESOLVER_PARAM_TYPE_FILE_NAME, RESOLVER_READER_FILE_NAME,
     },
     import_statements::{
         param_type_imports_to_import_param_statement, param_type_imports_to_import_statement,
@@ -44,7 +44,7 @@ pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
         client_field.selection_set_for_parent_query(),
         0,
         refetched_paths,
-        &client_field.initial_variable_context(),
+        &ClientType::ClientField(client_field).initial_variable_context(),
     );
 
     let function_import_statement =
@@ -208,7 +208,16 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
     let mut loadable_fields = BTreeSet::new();
     let mut link_fields = false;
     let mut updatable_fields = false;
-    let (client_field_parameter_type, updatable_data_type) = generate_client_field_parameter_type(
+    let client_field_parameter_type = generate_client_field_parameter_type(
+        schema,
+        client_field.selection_set_for_parent_query(),
+        parent_type,
+        &mut param_type_imports,
+        &mut loadable_fields,
+        1,
+        &mut link_fields,
+    );
+    let updatable_data_type = generate_client_field_updatable_data_type(
         schema,
         client_field.selection_set_for_parent_query(),
         parent_type,

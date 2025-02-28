@@ -49,10 +49,10 @@ export function check(
     newStoreRecord,
     root,
   );
-  logMessage(environment, {
+  logMessage(environment, () => ({
     kind: 'EnvironmentCheck',
     result: checkResult,
-  });
+  }));
   return checkResult;
 }
 

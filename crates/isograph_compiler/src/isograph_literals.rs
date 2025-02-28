@@ -253,7 +253,7 @@ pub fn process_iso_literal_extraction(
 pub(crate) static ISOGRAPH_FOLDER: &str = "__isograph";
 lazy_static! {
     static ref EXTRACT_ISO_LITERAL: Regex =
-        Regex::new(r"(export const ([^ ]+) =\s+)?iso(\()?`([^`]+)`(\))?(\()?").unwrap();
+        Regex::new(r"(// )?(export const ([^ ]+) =\s+)?iso(\()?`([^`]+)`(\))?(\()?").unwrap();
 }
 
 pub struct IsoLiteralExtraction<'a> {
@@ -272,14 +272,21 @@ pub struct IsoLiteralExtraction<'a> {
 pub fn extract_iso_literals_from_file_content(
     content: &str,
 ) -> impl Iterator<Item = IsoLiteralExtraction> + '_ {
-    EXTRACT_ISO_LITERAL.captures_iter(content).map(|captures| {
-        let iso_literal_match = captures.get(4).unwrap();
-        IsoLiteralExtraction {
-            const_export_name: captures.get(1).map(|_| captures.get(2).unwrap().as_str()),
-            iso_literal_text: iso_literal_match.as_str(),
-            iso_literal_start_index: iso_literal_match.start(),
-            has_associated_js_function: captures.get(6).is_some(),
-            iso_function_called_with_paren: captures.get(3).is_some(),
-        }
-    })
+    EXTRACT_ISO_LITERAL
+        .captures_iter(content)
+        .flat_map(|captures| {
+            let iso_literal_match = captures.get(5).unwrap();
+            if captures.get(1).is_some() {
+                // HACK
+                // this iso literal is commented out using //, so skip it.
+                return None;
+            }
+            Some(IsoLiteralExtraction {
+                const_export_name: captures.get(2).map(|_| captures.get(3).unwrap().as_str()),
+                iso_literal_text: iso_literal_match.as_str(),
+                iso_literal_start_index: iso_literal_match.start(),
+                has_associated_js_function: captures.get(7).is_some(),
+                iso_function_called_with_paren: captures.get(4).is_some(),
+            })
+        })
 }

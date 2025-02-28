@@ -13,6 +13,7 @@ const readerAst: ReaderAst<NewsfeedItem__NewsfeedAdOrBlog__param> = [
     alias: null,
     arguments: null,
     condition: AdItem__asAdItem__resolver_reader,
+    isUpdatable: false,
     selections: [
       {
         kind: "Resolver",
@@ -29,6 +30,7 @@ const readerAst: ReaderAst<NewsfeedItem__NewsfeedAdOrBlog__param> = [
     alias: null,
     arguments: null,
     condition: BlogItem__asBlogItem__resolver_reader,
+    isUpdatable: false,
     selections: [
       {
         kind: "Resolver",

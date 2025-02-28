@@ -10,6 +10,7 @@ const readerAst: ReaderAst<Query__Header__param> = [
     alias: null,
     arguments: null,
     condition: null,
+    isUpdatable: false,
     selections: [
       {
         kind: "Scalar",

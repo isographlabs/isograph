@@ -32,11 +32,11 @@ export function getOrCreateCachedComponent(
         readerWithRefetchQueries.readerArtifact.readerAst,
       );
 
-      logMessage(environment, {
+      logMessage(environment, () => ({
         kind: 'ComponentRerendered',
         componentName,
         rootLink: fragmentReference.root,
-      });
+      }));
 
       return readerWithRefetchQueries.readerArtifact.resolver(
         {

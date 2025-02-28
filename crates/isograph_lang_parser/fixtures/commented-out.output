@@ -1,0 +1,8 @@
+Ok(
+    (
+        RelativePathToSourceFile(
+            "crates/isograph_lang_parser/fixtures/commented-out.input.js",
+        ),
+        [],
+    ),
+)

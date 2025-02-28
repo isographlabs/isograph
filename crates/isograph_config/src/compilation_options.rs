@@ -1,11 +1,11 @@
-use std::path::PathBuf;
-
 use common_lang_types::{
     relative_path_from_absolute_and_working_directory, CurrentWorkingDirectory,
-    RelativePathToSourceFile,
+    GeneratedFileHeader, RelativePathToSourceFile,
 };
+use intern::string_key::Intern;
 use schemars::JsonSchema;
 use serde::Deserialize;
+use std::path::PathBuf;
 use tracing::warn;
 
 pub static ISOGRAPH_FOLDER: &str = "__isograph";
@@ -45,6 +45,7 @@ pub struct CompilerConfigOptions {
     pub no_babel_transform: bool,
     pub include_file_extensions_in_import_statements: GenerateFileExtensionsOption,
     pub module: JavascriptModule,
+    pub generated_file_header: Option<GeneratedFileHeader>,
 }
 
 #[derive(Default, Debug, Clone, Copy)]
@@ -236,6 +237,8 @@ pub struct ConfigFileOptions {
     /// into imports or requires of the generated entrypoint.ts file. Should
     /// it generate require calls or esmodule imports?
     module: ConfigFileJavascriptModule,
+    /// A string to generate, in a comment, at the top of every generated file.
+    generated_file_header: Option<String>,
 }
 
 #[derive(Deserialize, Debug, Clone, Copy, JsonSchema)]
@@ -264,6 +267,15 @@ pub enum ConfigFileJavascriptModule {
 }
 
 fn create_options(options: ConfigFileOptions) -> CompilerConfigOptions {
+    if let Some(header) = options.generated_file_header.as_ref() {
+        let line_count = header.lines().count();
+        if line_count > 1 {
+            panic!("config.options.generated_file_header should not be a multi-line string.")
+        }
+    }
+
+    let generated_file_header = options.generated_file_header.map(|x| x.intern().into());
+
     CompilerConfigOptions {
         on_invalid_id_type: create_optional_validation_level(options.on_invalid_id_type),
         no_babel_transform: options.no_babel_transform,
@@ -271,6 +283,7 @@ fn create_options(options: ConfigFileOptions) -> CompilerConfigOptions {
             options.include_file_extensions_in_import_statements,
         ),
         module: create_module(options.module),
+        generated_file_header,
     }
 }
 
