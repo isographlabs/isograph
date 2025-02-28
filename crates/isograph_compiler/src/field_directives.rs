@@ -1,12 +1,12 @@
 use common_lang_types::{IsographDirectiveName, Location, WithLocation, WithSpan};
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    from_isograph_field_directive, ClientFieldDeclaration,
+    from_isograph_field_directives, ClientFieldDeclaration,
     ClientFieldDeclarationWithUnvalidatedDirectives, ClientFieldDeclarationWithValidatedDirectives,
     ClientPointerDeclaration, ClientPointerDeclarationWithUnvalidatedDirectives,
     ClientPointerDeclarationWithValidatedDirectives, IsographFieldDirective,
-    IsographSelectionVariant, LinkedFieldSelection, ScalarFieldSelection, ServerFieldSelection,
-    UnvalidatedSelection,
+    IsographSelectionVariant, LinkedFieldSelection, ScalarFieldSelection,
+    ScalarFieldValidParsedDirectives, ServerFieldSelection, UnvalidatedSelection,
 };
 use isograph_schema::ProcessClientFieldDeclarationError;
 use lazy_static::lazy_static;
@@ -61,37 +61,32 @@ pub fn validate_isograph_selection_set_directives(
     and_then_selection_set_and_collect_errors(
         selection_set,
         &|scalar_field_selection| {
-            let updatable_directive = find_directive_named(
-                &scalar_field_selection.directives,
-                *UPDATABLE_DIRECTIVE_NAME,
-            );
-
-            if let Some(directive) =
-                find_directive_named(&scalar_field_selection.directives, *LOADABLE_DIRECTIVE_NAME)
-            {
-                if updatable_directive.is_some() {
-                    return Err(WithLocation::new(
-                        ProcessClientFieldDeclarationError::LoadableAndUpdatableAreMutuallyExclusive,
-                        Location::generated(),
-                    ));
-                }
-                let loadable_variant =
-                    from_isograph_field_directive(&directive.item).map_err(|message| {
+            let validly_parsed_directives: ScalarFieldValidParsedDirectives =
+                from_isograph_field_directives(&scalar_field_selection.directives).map_err(
+                    |message| {
                         WithLocation::new(
-                            ProcessClientFieldDeclarationError::UnableToDeserialize {
-                                directive_name: *LOADABLE_DIRECTIVE_NAME,
+                            ProcessClientFieldDeclarationError::UnableToDeserializeDirectives {
                                 message,
                             },
                             Location::generated(),
                         )
-                    })?;
-                // TODO validate that the field is actually loadable (i.e. implements Node or
-                // whatnot)
-                Ok(IsographSelectionVariant::Loadable(loadable_variant))
-            } else if updatable_directive.is_some() {
-                Ok(IsographSelectionVariant::Updatable)
-            } else {
-                Ok(IsographSelectionVariant::Regular)
+                    },
+                )?;
+
+            match validly_parsed_directives.loadable {
+                Some(loadable_variant) => match validly_parsed_directives.updatable {
+                    Some(_) => {
+                        Err(WithLocation::new(
+                            ProcessClientFieldDeclarationError::LoadableAndUpdatableAreMutuallyExclusive,
+                            Location::generated(),
+                        ))
+                    }
+                    None => Ok(IsographSelectionVariant::Loadable(loadable_variant)),
+                },
+                None => match validly_parsed_directives.updatable {
+                    Some(_) => Ok(IsographSelectionVariant::Updatable),
+                    None => Ok(IsographSelectionVariant::Regular),
+                },
             }
         },
         &|linked_field_selection| {
