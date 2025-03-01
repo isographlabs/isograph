@@ -5,9 +5,8 @@ use std::{
 };
 
 use common_lang_types::{
-    ClientPointerFieldName, DescriptionValue, GraphQLInterfaceTypeName, GraphQLScalarTypeName,
-    IsographObjectTypeName, JavascriptName, ObjectTypeAndFieldName, SelectableFieldName,
-    UnvalidatedTypeName, WithLocation, WithSpan,
+    DescriptionValue, GraphQLInterfaceTypeName, GraphQLScalarTypeName, IsographObjectTypeName,
+    JavascriptName, SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition,
@@ -15,14 +14,15 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, ClientPointerId, SelectableServerFieldId, SelectionType,
-    ServerFieldId, ServerFieldSelection, ServerObjectId, ServerScalarId, ServerStrongIdFieldId,
-    TypeAnnotation, VariableDefinition,
+    ArgumentKeyAndValue, ClientFieldId, ClientPointerId, DefinitionLocation,
+    SelectableServerFieldId, SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId,
+    ServerScalarId, ServerStrongIdFieldId, TypeAnnotation, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
 use crate::{
-    refetch_strategy::RefetchStrategy, schema_validation_state::SchemaValidationState,
+    field_and_pointer::{ClientField, ClientPointer},
+    schema_validation_state::SchemaValidationState,
     ClientFieldVariant, NormalizationKey, OutputFormat, ServerFieldTypeAssociatedData,
     ValidatedClientField, ValidatedClientPointer,
 };
@@ -55,9 +55,9 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState, TOutputFormat: 
             TOutputFormat,
         >,
     >,
-    pub client_types: ClientTypes<
-        TSchemaValidationState::ClientTypeSelectionScalarFieldAssociatedData,
-        TSchemaValidationState::ClientTypeSelectionLinkedFieldAssociatedData,
+    pub client_types: SelectionTypes<
+        TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
+        TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
         TSchemaValidationState::VariableDefinitionInnerType,
         TOutputFormat,
     >,
@@ -69,22 +69,22 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState, TOutputFormat: 
     pub fetchable_types: BTreeMap<ServerObjectId, RootOperationName>,
 }
 
-type ClientTypes<
-    TClientTypeSelectionScalarFieldAssociatedData,
-    TClientTypeSelectionLinkedFieldAssociatedData,
+type SelectionTypes<
+    TSelectionTypeSelectionScalarFieldAssociatedData,
+    TSelectionTypeSelectionLinkedFieldAssociatedData,
     TClientFieldVariableDefinitionAssociatedData,
     TOutputFormat,
 > = Vec<
-    ClientType<
+    SelectionType<
         ClientField<
-            TClientTypeSelectionScalarFieldAssociatedData,
-            TClientTypeSelectionLinkedFieldAssociatedData,
+            TSelectionTypeSelectionScalarFieldAssociatedData,
+            TSelectionTypeSelectionLinkedFieldAssociatedData,
             TClientFieldVariableDefinitionAssociatedData,
             TOutputFormat,
         >,
         ClientPointer<
-            TClientTypeSelectionScalarFieldAssociatedData,
-            TClientTypeSelectionLinkedFieldAssociatedData,
+            TSelectionTypeSelectionScalarFieldAssociatedData,
+            TSelectionTypeSelectionLinkedFieldAssociatedData,
             TClientFieldVariableDefinitionAssociatedData,
             TOutputFormat,
         >,
@@ -118,135 +118,33 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     }
 }
 
-/// Distinguishes between server-defined fields and locally-defined fields.
-/// TFieldAssociatedData can be a ScalarFieldName in an unvalidated schema, or a
-/// ScalarId, in a validated schema.
-///
-/// TLocalType can be an UnvalidatedTypeName in an unvalidated schema, or an
-/// DefinedTypeId in a validated schema.
-///
-/// Note that locally-defined fields do **not** only include fields defined in
-/// an iso field literal. Refetch fields and generated mutation fields are
-/// also local fields.
-#[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq)]
-pub enum FieldType<TServer, TClient> {
-    ServerField(TServer),
-    ClientField(TClient),
-}
+pub type LinkedType<
+    'a,
+    ServerFieldTypeAssociatedData,
+    SelectionTypeSelectionScalarFieldAssociatedData,
+    SelectionTypeSelectionLinkedFieldAssociatedData,
+    VariableDefinitionInnerType,
+    TOutputFormat,
+> = DefinitionLocation<
+    &'a SchemaServerField<
+        ServerFieldTypeAssociatedData,
+        VariableDefinitionInnerType,
+        TOutputFormat,
+    >,
+    &'a ClientPointer<
+        SelectionTypeSelectionScalarFieldAssociatedData,
+        SelectionTypeSelectionLinkedFieldAssociatedData,
+        VariableDefinitionInnerType,
+        TOutputFormat,
+    >,
+>;
 
-#[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq, Hash)]
-pub enum ClientType<TField, TPointer> {
-    ClientField(TField),
-    ClientPointer(TPointer),
-}
+pub type SelectionTypeId = SelectionType<ClientFieldId, ClientPointerId>;
 
-pub type ClientTypeId = ClientType<ClientFieldId, ClientPointerId>;
-
-pub type ValidatedClientType<'a, TOutputFormat> =
-    ClientType<&'a ValidatedClientField<TOutputFormat>, &'a ValidatedClientPointer<TOutputFormat>>;
-
-impl<
-        TClientTypeSelectionScalarFieldAssociatedData,
-        TClientTypeSelectionLinkedFieldAssociatedData,
-        TClientTypeVariableDefinitionAssociatedData: Ord + Debug,
-        TOutputFormat: OutputFormat,
-    >
-    ClientType<
-        &ClientField<
-            TClientTypeSelectionScalarFieldAssociatedData,
-            TClientTypeSelectionLinkedFieldAssociatedData,
-            TClientTypeVariableDefinitionAssociatedData,
-            TOutputFormat,
-        >,
-        &ClientPointer<
-            TClientTypeSelectionScalarFieldAssociatedData,
-            TClientTypeSelectionLinkedFieldAssociatedData,
-            TClientTypeVariableDefinitionAssociatedData,
-            TOutputFormat,
-        >,
-    >
-{
-    pub fn parent_object_id(&self) -> ServerObjectId {
-        match self {
-            ClientType::ClientField(client_field) => client_field.parent_object_id,
-            ClientType::ClientPointer(client_pointer) => client_pointer.parent_object_id,
-        }
-    }
-
-    pub fn selection_set_for_parent_query(
-        &self,
-    ) -> &Vec<
-        WithSpan<
-            ServerFieldSelection<
-                TClientTypeSelectionScalarFieldAssociatedData,
-                TClientTypeSelectionLinkedFieldAssociatedData,
-            >,
-        >,
-    > {
-        match self {
-            ClientType::ClientField(client_field) => client_field.selection_set_for_parent_query(),
-            ClientType::ClientPointer(client_pointer) => &client_pointer.reader_selection_set,
-        }
-    }
-
-    pub fn name(&self) -> SelectableFieldName {
-        match self {
-            ClientType::ClientField(client_field) => client_field.name,
-            ClientType::ClientPointer(client_pointer) => client_pointer.name.into(),
-        }
-    }
-
-    pub fn id(&self) -> ClientTypeId {
-        match self {
-            ClientType::ClientField(client_field) => ClientType::ClientField(client_field.id),
-            ClientType::ClientPointer(client_pointer) => {
-                ClientType::ClientPointer(client_pointer.id)
-            }
-        }
-    }
-
-    pub fn variable_definitions(
-        &self,
-    ) -> &Vec<WithSpan<VariableDefinition<TClientTypeVariableDefinitionAssociatedData>>> {
-        match self {
-            ClientType::ClientPointer(client_pointer) => &client_pointer.variable_definitions,
-            ClientType::ClientField(client_field) => &client_field.variable_definitions,
-        }
-    }
-    pub fn reader_selection_set(
-        &self,
-    ) -> Option<
-        &Vec<
-            WithSpan<
-                ServerFieldSelection<
-                    TClientTypeSelectionScalarFieldAssociatedData,
-                    TClientTypeSelectionLinkedFieldAssociatedData,
-                >,
-            >,
-        >,
-    > {
-        match self {
-            ClientType::ClientPointer(client_pointer) => Some(&client_pointer.reader_selection_set),
-            ClientType::ClientField(client_field) => client_field.reader_selection_set.as_ref(),
-        }
-    }
-}
-
-impl<TFieldAssociatedData, TClientFieldType> FieldType<TFieldAssociatedData, TClientFieldType> {
-    pub fn as_server_field(&self) -> Option<&TFieldAssociatedData> {
-        match self {
-            FieldType::ServerField(server_field) => Some(server_field),
-            FieldType::ClientField(_) => None,
-        }
-    }
-
-    pub fn as_client_type(&self) -> Option<&TClientFieldType> {
-        match self {
-            FieldType::ServerField(_) => None,
-            FieldType::ClientField(client_field) => Some(client_field),
-        }
-    }
-}
+pub type ValidatedSelectionType<'a, TOutputFormat> = SelectionType<
+    &'a ValidatedClientField<TOutputFormat>,
+    &'a ValidatedClientPointer<TOutputFormat>,
+>;
 
 #[derive(Debug)]
 pub struct ServerFieldData<TOutputFormat: OutputFormat> {
@@ -285,17 +183,37 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
         &self,
         client_field_id: ClientFieldId,
     ) -> &ClientField<
-        TSchemaValidationState::ClientTypeSelectionScalarFieldAssociatedData,
-        TSchemaValidationState::ClientTypeSelectionLinkedFieldAssociatedData,
+        TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
+        TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
         TSchemaValidationState::VariableDefinitionInnerType,
         TOutputFormat,
     > {
         match &self.client_types[client_field_id.as_usize()] {
-            ClientType::ClientField(client_field) => client_field,
-            ClientType::ClientPointer(_) => panic!(
+            SelectionType::Scalar(client_field) => client_field,
+            SelectionType::Object(_) => panic!(
                 "encountered ClientPointer under ClientFieldId. \
                 This is indicative of a bug in Isograph."
             ),
+        }
+    }
+
+    pub fn linked_type(
+        &self,
+        field_id: DefinitionLocation<ServerFieldId, ClientPointerId>,
+    ) -> LinkedType<
+        TSchemaValidationState::ServerFieldTypeAssociatedData,
+        TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
+        TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
+        TSchemaValidationState::VariableDefinitionInnerType,
+        TOutputFormat,
+    > {
+        match field_id {
+            DefinitionLocation::Server(server_field_id) => {
+                DefinitionLocation::Server(self.server_field(server_field_id))
+            }
+            DefinitionLocation::Client(client_pointer_id) => {
+                DefinitionLocation::Client(self.client_pointer(client_pointer_id))
+            }
         }
     }
 
@@ -304,14 +222,14 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
         &self,
         client_pointer_id: ClientPointerId,
     ) -> &ClientPointer<
-        TSchemaValidationState::ClientTypeSelectionScalarFieldAssociatedData,
-        TSchemaValidationState::ClientTypeSelectionLinkedFieldAssociatedData,
+        TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
+        TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
         TSchemaValidationState::VariableDefinitionInnerType,
         TOutputFormat,
     > {
         match &self.client_types[client_pointer_id.as_usize()] {
-            ClientType::ClientPointer(client_pointer) => client_pointer,
-            ClientType::ClientField(_) => panic!(
+            SelectionType::Object(client_pointer) => client_pointer,
+            SelectionType::Scalar(_) => panic!(
                 "encountered ClientField under ClientPointerId. \
                 This is indicative of a bug in Isograph."
             ),
@@ -321,27 +239,27 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     #[allow(clippy::type_complexity)]
     pub fn client_type(
         &self,
-        client_type_id: ClientTypeId,
-    ) -> ClientType<
+        client_type_id: SelectionTypeId,
+    ) -> SelectionType<
         &ClientField<
-            TSchemaValidationState::ClientTypeSelectionScalarFieldAssociatedData,
-            TSchemaValidationState::ClientTypeSelectionLinkedFieldAssociatedData,
+            TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
+            TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
             TSchemaValidationState::VariableDefinitionInnerType,
             TOutputFormat,
         >,
         &ClientPointer<
-            TSchemaValidationState::ClientTypeSelectionScalarFieldAssociatedData,
-            TSchemaValidationState::ClientTypeSelectionLinkedFieldAssociatedData,
+            TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
+            TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
             TSchemaValidationState::VariableDefinitionInnerType,
             TOutputFormat,
         >,
     > {
         match client_type_id {
-            ClientType::ClientField(client_field_id) => {
-                ClientType::ClientField(self.client_field(client_field_id))
+            SelectionType::Scalar(client_field_id) => {
+                SelectionType::Scalar(self.client_field(client_field_id))
             }
-            ClientType::ClientPointer(client_pointer_id) => {
-                ClientType::ClientPointer(self.client_pointer(client_pointer_id))
+            SelectionType::Object(client_pointer_id) => {
+                SelectionType::Object(self.client_pointer(client_pointer_id))
             }
         }
     }
@@ -352,8 +270,8 @@ impl<
         TScalarFieldAssociatedData: Clone + Ord + Copy + Debug,
         TSchemaValidationState: SchemaValidationState<
             ServerFieldTypeAssociatedData = SelectionType<
-                ServerFieldTypeAssociatedData<TypeAnnotation<TObjectFieldAssociatedData>>,
                 TypeAnnotation<TScalarFieldAssociatedData>,
+                ServerFieldTypeAssociatedData<TypeAnnotation<TObjectFieldAssociatedData>>,
             >,
         >,
         TOutputFormat: OutputFormat,
@@ -423,7 +341,7 @@ impl<TOutputFormat: OutputFormat> ServerFieldData<TOutputFormat> {
 }
 
 pub type SchemaType<'a, TOutputFormat> =
-    SelectionType<&'a SchemaObject<TOutputFormat>, &'a SchemaScalar<TOutputFormat>>;
+    SelectionType<&'a SchemaScalar<TOutputFormat>, &'a SchemaObject<TOutputFormat>>;
 
 pub fn get_name<TOutputFormat: OutputFormat>(
     schema_type: SchemaType<'_, TOutputFormat>,
@@ -501,7 +419,8 @@ pub struct SchemaObject<TOutputFormat: OutputFormat> {
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
     /// to something else.
     pub id_field: Option<ServerStrongIdFieldId>,
-    pub encountered_fields: BTreeMap<SelectableFieldName, FieldType<ServerFieldId, ClientTypeId>>,
+    pub encountered_fields:
+        BTreeMap<SelectableFieldName, DefinitionLocation<ServerFieldId, SelectionTypeId>>,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 
@@ -622,98 +541,15 @@ impl<
     }
 }
 
-#[derive(Debug)]
-pub struct ClientPointer<
-    TClientTypeSelectionScalarFieldAssociatedData,
-    TClientTypeSelectionLinkedFieldAssociatedData,
-    TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
-    TOutputFormat: OutputFormat,
-> {
-    pub description: Option<DescriptionValue>,
-    pub name: ClientPointerFieldName,
-    pub id: ClientPointerId,
-    pub to: TypeAnnotation<ServerObjectId>,
-
-    pub reader_selection_set: Vec<
-        WithSpan<
-            ServerFieldSelection<
-                TClientTypeSelectionScalarFieldAssociatedData,
-                TClientTypeSelectionLinkedFieldAssociatedData,
-            >,
-        >,
-    >,
-
-    pub refetch_strategy: RefetchStrategy<
-        TClientTypeSelectionScalarFieldAssociatedData,
-        TClientTypeSelectionLinkedFieldAssociatedData,
-    >,
-
-    pub variable_definitions:
-        Vec<WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
-
-    // Why is this not calculated when needed?
-    pub type_and_field: ObjectTypeAndFieldName,
-
-    pub parent_object_id: ServerObjectId,
-
-    pub output_format: PhantomData<TOutputFormat>,
-}
-
-#[derive(Debug)]
-pub struct ClientField<
-    TClientTypeSelectionScalarFieldAssociatedData,
-    TClientTypeSelectionLinkedFieldAssociatedData,
-    TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
-    TOutputFormat: OutputFormat,
-> {
-    pub description: Option<DescriptionValue>,
-    // TODO make this a ClientFieldName that can be converted into a SelectableFieldName
-    pub name: SelectableFieldName,
-    pub id: ClientFieldId,
-    // TODO model this so that reader_selection_sets are required for
-    // non-imperative client fields. (Are imperatively loaded fields
-    // true client fields? Probably not!)
-    pub reader_selection_set: Option<
-        Vec<
-            WithSpan<
-                ServerFieldSelection<
-                    TClientTypeSelectionScalarFieldAssociatedData,
-                    TClientTypeSelectionLinkedFieldAssociatedData,
-                >,
-            >,
-        >,
-    >,
-
-    // None -> not refetchable
-    pub refetch_strategy: Option<
-        RefetchStrategy<
-            TClientTypeSelectionScalarFieldAssociatedData,
-            TClientTypeSelectionLinkedFieldAssociatedData,
-        >,
-    >,
-
-    // TODO we should probably model this differently
-    pub variant: ClientFieldVariant,
-
-    pub variable_definitions:
-        Vec<WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
-
-    // Why is this not calculated when needed?
-    pub type_and_field: ObjectTypeAndFieldName,
-
-    pub parent_object_id: ServerObjectId,
-    pub output_format: PhantomData<TOutputFormat>,
-}
-
 impl<
-        TClientTypeSelectionScalarFieldAssociatedData,
-        TClientTypeSelectionLinkedFieldAssociatedData,
+        TSelectionTypeSelectionScalarFieldAssociatedData,
+        TSelectionTypeSelectionLinkedFieldAssociatedData,
         TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
         TOutputFormat: OutputFormat,
     >
     ClientField<
-        TClientTypeSelectionScalarFieldAssociatedData,
-        TClientTypeSelectionLinkedFieldAssociatedData,
+        TSelectionTypeSelectionScalarFieldAssociatedData,
+        TSelectionTypeSelectionLinkedFieldAssociatedData,
         TClientFieldVariableDefinitionAssociatedData,
         TOutputFormat,
     >
@@ -723,22 +559,21 @@ impl<
     ) -> &Vec<
         WithSpan<
             ServerFieldSelection<
-                TClientTypeSelectionScalarFieldAssociatedData,
-                TClientTypeSelectionLinkedFieldAssociatedData,
+                TSelectionTypeSelectionScalarFieldAssociatedData,
+                TSelectionTypeSelectionLinkedFieldAssociatedData,
             >,
         >,
     > {
-        if let Some(s) = self.reader_selection_set.as_ref() {
-            s
-        } else {
-            self.refetch_strategy
+        match self.variant {
+            ClientFieldVariant::ImperativelyLoadedField(_) => self
+                .refetch_strategy
                 .as_ref()
                 .map(|strategy| strategy.refetch_selection_set())
                 .expect(
-                    "Expected client field to have \
-                    either a reader_selection_set or a refetch_selection_set.\
+                    "Expected imperatively loaded field to have refetch selection set. \
                     This is indicative of a bug in Isograph.",
-                )
+                ),
+            _ => &self.reader_selection_set,
         }
     }
 }

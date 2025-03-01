@@ -18,12 +18,6 @@ import { Arguments } from './util';
 
 export type LogMessage =
   | {
-      kind: 'GettingSuspenseCacheItem';
-      index: string;
-      availableCacheItems: ReadonlyArray<string>;
-      found: boolean;
-    }
-  | {
       kind: 'AboutToNormalize';
       normalizationAst: NormalizationAstNodes;
       networkResponse: NetworkResponseObject;
@@ -76,6 +70,8 @@ export type LogMessage =
   | {
       kind: 'DoneReading';
       response: ReadDataResult<any>;
+      fieldName: string;
+      root: Link;
     }
   | {
       kind: 'NonEntrypointReceived';
@@ -98,12 +94,15 @@ export type WrappedLogFunction = {
 
 export function logMessage(
   environment: IsographEnvironment,
-  message: LogMessage,
+  getMessage: () => LogMessage,
 ) {
-  for (const logger of environment.loggers) {
-    try {
-      logger.log(message);
-    } catch {}
+  if (environment.loggers.size > 0) {
+    const message = getMessage();
+    for (const logger of environment.loggers) {
+      try {
+        logger.log(message);
+      } catch {}
+    }
   }
 }
 

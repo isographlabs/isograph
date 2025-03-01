@@ -2,9 +2,10 @@ use common_lang_types::SelectableFieldName;
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 
 use isograph_lang_types::{
-    SelectableServerFieldId, SelectionType, ServerFieldId, TypeAnnotation, UnionVariant,
+    DefinitionLocation, SelectableServerFieldId, SelectionType, ServerFieldId, TypeAnnotation,
+    UnionVariant,
 };
-use isograph_schema::{ClientTypeId, FieldType, OutputFormat, ValidatedSchema};
+use isograph_schema::{OutputFormat, SelectionTypeId, ValidatedSchema};
 
 pub(crate) fn format_parameter_type<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
@@ -53,7 +54,7 @@ fn format_server_field_type<TOutputFormat: OutputFormat>(
                 .iter()
                 .filter(|x| matches!(
                     x.1,
-                    FieldType::ServerField(server_field_id) if !schema.server_field(*server_field_id).is_discriminator),
+                    DefinitionLocation::Server(server_field_id) if !schema.server_field(*server_field_id).is_discriminator),
                 )
             {
                 let field_type =
@@ -74,11 +75,11 @@ fn format_server_field_type<TOutputFormat: OutputFormat>(
 fn format_field_definition<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
     name: &SelectableFieldName,
-    type_: &FieldType<ServerFieldId, ClientTypeId>,
+    type_: &DefinitionLocation<ServerFieldId, SelectionTypeId>,
     indentation_level: u8,
 ) -> String {
     match type_ {
-        FieldType::ServerField(server_field_id) => {
+        DefinitionLocation::Server(server_field_id) => {
             let type_annotation = match &schema.server_field(*server_field_id).associated_data {
                 SelectionType::Object(associated_data) => associated_data
                     .type_name
@@ -102,7 +103,7 @@ fn format_field_definition<TOutputFormat: OutputFormat>(
                 format_type_annotation(schema, &type_annotation, indentation_level + 1),
             )
         }
-        FieldType::ClientField(_) => {
+        DefinitionLocation::Client(_) => {
             panic!(
                 "Unexpected object. Client fields are not supported as parameters, yet. \
                 This is indicative of an unimplemented feature in Isograph."

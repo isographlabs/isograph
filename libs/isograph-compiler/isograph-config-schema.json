@@ -84,6 +84,14 @@
     "ConfigFileOptions": {
       "type": "object",
       "properties": {
+        "generated_file_header": {
+          "description": "A string to generate, in a comment, at the top of every generated file.",
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "include_file_extensions_in_import_statements": {
           "description": "Should the compiler include file extensions in import statements in generated files? e.g. should it import ./param_type or ./param_type.ts?",
           "default": false,

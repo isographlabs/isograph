@@ -1,0 +1,123 @@
+Err(
+    WithLocation {
+        location: Embedded(
+            EmbeddedLocation {
+                text_source: TextSource {
+                    current_working_directory: CurrentWorkingDirectory,
+                    relative_path_to_source_file: RelativePathToSourceFile(
+                        "crates/isograph_lang_parser/fixtures/field-directives-on-linked-invalid.input.js",
+                    ),
+                    span: Some(
+                        Span {
+                            start: 31,
+                            end: 89,
+                        },
+                    ),
+                },
+                span: Span {
+                    start: 32,
+                    end: 38,
+                },
+            },
+        ),
+        item: UnableToDeserializeDirectives {
+            message: Custom(
+                "data did not match any variant of untagged enum LinkedFieldSelectionDirectiveSet",
+            ),
+        },
+    },
+)
+
+Unable to process directives. Message: Error when deserializing.
+
+data did not match any variant of untagged enum LinkedFieldSelectionDirectiveSet
+crates/isograph_lang_parser/fixtures/field-directives-on-linked-invalid.input.js
+
+  field Type.Name {
+    linked @hello @there {
+           ^^^^^^         
+    }
+  }
+---
+Err(
+    WithLocation {
+        location: Embedded(
+            EmbeddedLocation {
+                text_source: TextSource {
+                    current_working_directory: CurrentWorkingDirectory,
+                    relative_path_to_source_file: RelativePathToSourceFile(
+                        "crates/isograph_lang_parser/fixtures/field-directives-on-linked-invalid.input.js",
+                    ),
+                    span: Some(
+                        Span {
+                            start: 128,
+                            end: 194,
+                        },
+                    ),
+                },
+                span: Span {
+                    start: 32,
+                    end: 41,
+                },
+            },
+        ),
+        item: UnableToDeserializeDirectives {
+            message: Custom(
+                "data did not match any variant of untagged enum LinkedFieldSelectionDirectiveSet",
+            ),
+        },
+    },
+)
+
+Unable to process directives. Message: Error when deserializing.
+
+data did not match any variant of untagged enum LinkedFieldSelectionDirectiveSet
+crates/isograph_lang_parser/fixtures/field-directives-on-linked-invalid.input.js
+
+  field Type.Name {
+    linked @loadable(asdf: true) {
+           ^^^^^^^^^              
+    }
+  }
+---
+Err(
+    WithLocation {
+        location: Embedded(
+            EmbeddedLocation {
+                text_source: TextSource {
+                    current_working_directory: CurrentWorkingDirectory,
+                    relative_path_to_source_file: RelativePathToSourceFile(
+                        "crates/isograph_lang_parser/fixtures/field-directives-on-linked-invalid.input.js",
+                    ),
+                    span: Some(
+                        Span {
+                            start: 233,
+                            end: 298,
+                        },
+                    ),
+                },
+                span: Span {
+                    start: 32,
+                    end: 41,
+                },
+            },
+        ),
+        item: UnableToDeserializeDirectives {
+            message: Custom(
+                "data did not match any variant of untagged enum LinkedFieldSelectionDirectiveSet",
+            ),
+        },
+    },
+)
+
+Unable to process directives. Message: Error when deserializing.
+
+data did not match any variant of untagged enum LinkedFieldSelectionDirectiveSet
+crates/isograph_lang_parser/fixtures/field-directives-on-linked-invalid.input.js
+
+  field Type.Name {
+    linked @loadable @updatable {
+           ^^^^^^^^^             
+    }
+  }
+---

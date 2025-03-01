@@ -1,4 +1,5 @@
 use common_lang_types::{FieldNameOrAlias, SelectableFieldName, WithLocation, WithSpan};
+use isograph_lang_types::DeserializationError;
 use thiserror::Error;
 
 use crate::IsographLangTokenKind;
@@ -78,6 +79,9 @@ pub enum IsographLiteralParseError {
         closing_token: IsographLangTokenKind,
         delimiter: IsographLangTokenKind,
     },
+
+    #[error("Unable to process directives. Message: {message}")]
+    UnableToDeserializeDirectives { message: DeserializationError },
 }
 
 impl From<LowLevelParseError> for IsographLiteralParseError {

@@ -60,7 +60,9 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            associated_data: (),
+                                            associated_data: None(
+                                                EmptyDirectiveSet,
+                                            ),
                                             arguments: [
                                                 WithLocation {
                                                     location: Embedded(
@@ -121,7 +123,6 @@ Ok(
                                                     },
                                                 },
                                             ],
-                                            directives: [],
                                         },
                                     ),
                                     span: Span {

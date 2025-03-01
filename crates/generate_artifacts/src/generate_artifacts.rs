@@ -1,6 +1,6 @@
 use common_lang_types::{
     derive_display, ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent, DescriptionValue,
-    Location, ObjectTypeAndFieldName, Span, WithLocation, WithSpan,
+    FieldNameOrAlias, Location, ObjectTypeAndFieldName, Span, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
@@ -10,17 +10,17 @@ use intern::{string_key::Intern, Lookup};
 use core::panic;
 use isograph_config::CompilerConfig;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, NonConstantValue, ScalarFieldSelection,
-    SelectableServerFieldId, SelectionType, ServerFieldSelection, TypeAnnotation, UnionVariant,
-    VariableDefinition,
+    ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, NonConstantValue, ScalarFieldSelection,
+    ScalarFieldSelectionDirectiveSet, SelectableServerFieldId, SelectionType, ServerFieldSelection,
+    ServerObjectId, TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
-    get_provided_arguments, selection_map_wrapped, ClientFieldVariant, ClientType,
-    FieldTraversalResult, FieldType, NameAndArguments, NormalizationKey, OutputFormat,
-    RequiresRefinement, Schema, SchemaObject, SchemaServerFieldVariant,
-    UserWrittenComponentVariant, ValidatedClientField, ValidatedIsographSelectionVariant,
-    ValidatedScalarFieldAssociatedData, ValidatedSchema, ValidatedSchemaState, ValidatedSelection,
-    ValidatedVariableDefinition,
+    accessible_client_fields, as_server_field, description, get_provided_arguments,
+    output_type_annotation, selection_map_wrapped, ClientFieldVariant, FieldOrPointer,
+    FieldTraversalResult, NameAndArguments, NormalizationKey, OutputFormat, RequiresRefinement,
+    Schema, SchemaObject, SchemaServerFieldVariant, UserWrittenComponentVariant,
+    ValidatedClientField, ValidatedScalarFieldAssociatedData, ValidatedSchema,
+    ValidatedSchemaState, ValidatedSelection, ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -93,6 +93,21 @@ pub fn get_artifact_path_and_content<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
     config: &CompilerConfig,
 ) -> Vec<ArtifactPathAndContent> {
+    let mut artifact_path_and_content = get_artifact_path_and_content_impl(schema, config);
+    if let Some(header) = config.options.generated_file_header {
+        let header = header.lookup();
+        for artifact_path_and_content in artifact_path_and_content.iter_mut() {
+            artifact_path_and_content.file_content =
+                format!("// {header}\n{}", artifact_path_and_content.file_content);
+        }
+    }
+    artifact_path_and_content
+}
+
+fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
+    schema: &ValidatedSchema<TOutputFormat>,
+    config: &CompilerConfig,
+) -> Vec<ArtifactPathAndContent> {
     let mut encountered_client_type_map = BTreeMap::new();
     let mut path_and_contents = vec![];
     let mut encountered_output_types = HashSet::<ClientFieldId>::new();
@@ -122,7 +137,7 @@ pub fn get_artifact_path_and_content<TOutputFormat: OutputFormat>(
     ) in &encountered_client_type_map
     {
         match encountered_field_id {
-            FieldType::ServerField(encountered_server_field_id) => {
+            DefinitionLocation::Server(encountered_server_field_id) => {
                 let encountered_server_field = schema.server_field(*encountered_server_field_id);
 
                 match &encountered_server_field.associated_data {
@@ -142,10 +157,10 @@ pub fn get_artifact_path_and_content<TOutputFormat: OutputFormat>(
                 };
             }
 
-            FieldType::ClientField(ClientType::ClientPointer(_)) => {
+            DefinitionLocation::Client(SelectionType::Object(_)) => {
                 todo!("generate client pointer reader artifacts is not implemented")
             }
-            FieldType::ClientField(ClientType::ClientField(encountered_client_field_id)) => {
+            DefinitionLocation::Client(SelectionType::Scalar(encountered_client_field_id)) => {
                 let encountered_client_field = schema.client_field(*encountered_client_field_id);
 
                 match &encountered_client_field.variant {
@@ -266,10 +281,10 @@ pub fn get_artifact_path_and_content<TOutputFormat: OutputFormat>(
     }
 
     for user_written_client_type in schema.client_types.iter().flat_map(|field| match field {
-        ClientType::ClientPointer(pointer) => Some(ClientType::ClientPointer(pointer)),
-        ClientType::ClientField(field) => match field.variant {
+        SelectionType::Object(pointer) => Some(SelectionType::Object(pointer)),
+        SelectionType::Scalar(field) => match field.variant {
             ClientFieldVariant::Link => None,
-            ClientFieldVariant::UserWritten(_) => Some(ClientType::ClientField(field)),
+            ClientFieldVariant::UserWritten(_) => Some(SelectionType::Scalar(field)),
             ClientFieldVariant::ImperativelyLoadedField(_) => None,
         },
     }) {
@@ -281,7 +296,7 @@ pub fn get_artifact_path_and_content<TOutputFormat: OutputFormat>(
         ));
 
         match encountered_client_type_map
-            .get(&FieldType::ClientField(user_written_client_type.id()))
+            .get(&DefinitionLocation::Client(user_written_client_type.id()))
         {
             Some(FieldTraversalResult {
                 traversal_state, ..
@@ -293,7 +308,8 @@ pub fn get_artifact_path_and_content<TOutputFormat: OutputFormat>(
             None => {
                 // If this field is not reachable from an entrypoint, we need to
                 // encounter all the client fields
-                for nested_client_field in user_written_client_type.accessible_client_fields(schema)
+                for nested_client_field in
+                    accessible_client_fields(&user_written_client_type, schema)
                 {
                     encountered_output_types.insert(nested_client_field.id);
                 }
@@ -562,13 +578,14 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
     match &selection.item {
         ServerFieldSelection::ScalarField(scalar_field_selection) => {
             match scalar_field_selection.associated_data.location {
-                FieldType::ServerField(_server_field) => {
-                    let parent_field = parent_type
-                        .encountered_fields
-                        .get(&scalar_field_selection.name.item.into())
-                        .expect("parent_field should exist 1")
-                        .as_server_field()
-                        .expect("parent_field should exist and be server field");
+                DefinitionLocation::Server(_server_field) => {
+                    let parent_field = as_server_field(
+                        parent_type
+                            .encountered_fields
+                            .get(&scalar_field_selection.name.item.into())
+                            .expect("parent_field should exist 1"),
+                    )
+                    .expect("parent_field should exist and be server field");
                     let field = schema.server_field(*parent_field);
 
                     write_optional_description(
@@ -599,7 +616,7 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
                         print_javascript_type_declaration(&output_type)
                     ));
                 }
-                FieldType::ClientField(client_field_id) => write_param_type_from_client_field(
+                DefinitionLocation::Client(client_field_id) => write_param_type_from_client_field(
                     schema,
                     query_type_declaration,
                     nested_client_field_imports,
@@ -612,15 +629,17 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
             }
         }
         ServerFieldSelection::LinkedField(linked_field) => {
-            let parent_field = parent_type
-                .encountered_fields
-                .get(&linked_field.name.item.into())
-                .expect("parent_field should exist 2")
-                .as_server_field()
-                .expect("Parent field should exist and be server field");
-            let field = schema.server_field(*parent_field);
+            let field = match linked_field.associated_data.field_id {
+                DefinitionLocation::Server(server_field_id) => {
+                    DefinitionLocation::Server(schema.server_field(server_field_id))
+                }
+                DefinitionLocation::Client(client_pointer_id) => {
+                    DefinitionLocation::Client(schema.client_pointer(client_pointer_id))
+                }
+            };
+
             write_optional_description(
-                field.description,
+                description(&field),
                 query_type_declaration,
                 indentation_level,
             );
@@ -628,28 +647,21 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
             let name_or_alias = linked_field.name_or_alias().item;
 
             let type_annotation =
-                match &field.associated_data {
-                    SelectionType::Scalar(_) => panic!(
-                        "output_type_id should be an object. \
-                        This is indicative of a bug in Isograph.",
-                    ),
-                    SelectionType::Object(associated_data) => associated_data
-                        .type_name
-                        .clone()
-                        .map(&mut |output_type_id| {
-                            let object_id = output_type_id;
-                            let object = schema.server_field_data.object(object_id);
-                            generate_client_field_parameter_type(
-                                schema,
-                                &linked_field.selection_set,
-                                object,
-                                nested_client_field_imports,
-                                loadable_fields,
-                                indentation_level,
-                                link_fields,
-                            )
-                        }),
-                };
+                output_type_annotation(&field)
+                    .clone()
+                    .map(&mut |output_type_id| {
+                        let object_id = output_type_id;
+                        let object = schema.server_field_data.object(object_id);
+                        generate_client_field_parameter_type(
+                            schema,
+                            &linked_field.selection_set,
+                            object,
+                            nested_client_field_imports,
+                            loadable_fields,
+                            indentation_level,
+                            link_fields,
+                        )
+                    });
 
             query_type_declaration.push_str(&format!(
                 "readonly {}: {},\n",
@@ -697,9 +709,9 @@ fn write_param_type_from_client_field<TOutputFormat: OutputFormat>(
                 client_field.type_and_field.underscore_separated()
             );
             let output_type = match scalar_field_selection.associated_data.selection_variant {
-                ValidatedIsographSelectionVariant::Updatable
-                | ValidatedIsographSelectionVariant::Regular => inner_output_type,
-                ValidatedIsographSelectionVariant::Loadable(_) => {
+                ScalarFieldSelectionDirectiveSet::Updatable(_)
+                | ScalarFieldSelectionDirectiveSet::None(_) => inner_output_type,
+                ScalarFieldSelectionDirectiveSet::Loadable(_) => {
                     loadable_fields.insert(client_field.type_and_field);
                     let provided_arguments = get_provided_arguments(
                         client_field.variable_definitions.iter().map(|x| &x.item),
@@ -754,13 +766,14 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
     match &selection.item {
         ServerFieldSelection::ScalarField(scalar_field_selection) => {
             match scalar_field_selection.associated_data.location {
-                FieldType::ServerField(_server_field) => {
-                    let parent_field = parent_type
-                        .encountered_fields
-                        .get(&scalar_field_selection.name.item.into())
-                        .expect("parent_field should exist 1")
-                        .as_server_field()
-                        .expect("parent_field should exist and be server field");
+                DefinitionLocation::Server(_server_field) => {
+                    let parent_field = as_server_field(
+                        parent_type
+                            .encountered_fields
+                            .get(&scalar_field_selection.name.item.into())
+                            .expect("parent_field should exist 1"),
+                    )
+                    .expect("parent_field should exist and be server field");
                     let field = schema.server_field(*parent_field);
 
                     write_optional_description(
@@ -785,7 +798,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                     };
 
                     match scalar_field_selection.associated_data.selection_variant {
-                        ValidatedIsographSelectionVariant::Updatable => {
+                        ScalarFieldSelectionDirectiveSet::Updatable(_) => {
                             *updatable_fields = true;
                             query_type_declaration
                                 .push_str(&"  ".repeat(indentation_level as usize).to_string());
@@ -795,10 +808,10 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                                 print_javascript_type_declaration(&output_type)
                             ));
                         }
-                        ValidatedIsographSelectionVariant::Loadable(_) => {
+                        ScalarFieldSelectionDirectiveSet::Loadable(_) => {
                             panic!("@loadable server fields are not supported")
                         }
-                        ValidatedIsographSelectionVariant::Regular => {
+                        ScalarFieldSelectionDirectiveSet::None(_) => {
                             query_type_declaration.push_str(&format!(
                                 "{}readonly {}: {},\n",
                                 "  ".repeat(indentation_level as usize),
@@ -808,7 +821,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                         }
                     }
                 }
-                FieldType::ClientField(client_field_id) => {
+                DefinitionLocation::Client(client_field_id) => {
                     write_param_type_from_client_field(
                         schema,
                         query_type_declaration,
@@ -823,71 +836,56 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
             }
         }
         ServerFieldSelection::LinkedField(linked_field) => {
-            let parent_field = parent_type
-                .encountered_fields
-                .get(&linked_field.name.item.into())
-                .expect("parent_field should exist 2")
-                .as_server_field()
-                .expect("Parent field should exist and be server field");
-            let field = schema.server_field(*parent_field);
+            let field = schema.linked_type(linked_field.associated_data.field_id);
 
             write_optional_description(
-                field.description,
+                description(&field),
                 query_type_declaration,
                 indentation_level,
             );
             query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
             let name_or_alias = linked_field.name_or_alias().item;
 
-            match &field.associated_data {
-                SelectionType::Scalar(_) => panic!(
-                    "output_type_id should be an object. \
-                        This is indicative of a bug in Isograph.",
-                ),
-                SelectionType::Object(associated_data) => {
-                    let type_annotation =
-                        associated_data
-                            .type_name
-                            .clone()
-                            .map(&mut |output_type_id| {
-                                let object_id = output_type_id;
-                                let object = schema.server_field_data.object(object_id);
-                                generate_client_field_updatable_data_type(
-                                    schema,
-                                    &linked_field.selection_set,
-                                    object,
-                                    nested_client_field_imports,
-                                    loadable_fields,
-                                    indentation_level,
-                                    link_fields,
-                                    updatable_fields,
-                                )
-                            });
+            let type_annotation =
+                output_type_annotation(&field)
+                    .clone()
+                    .map(&mut |output_type_id| {
+                        let object_id = output_type_id;
+                        let object = schema.server_field_data.object(object_id);
+                        generate_client_field_updatable_data_type(
+                            schema,
+                            &linked_field.selection_set,
+                            object,
+                            nested_client_field_imports,
+                            loadable_fields,
+                            indentation_level,
+                            link_fields,
+                            updatable_fields,
+                        )
+                    });
 
-                    match linked_field.associated_data.selection_variant {
-                        ValidatedIsographSelectionVariant::Loadable(_) => {
-                            panic!("@loadable server fields are not supported")
-                        }
-                        ValidatedIsographSelectionVariant::Updatable => {
-                            *updatable_fields = true;
-                            write_getter_and_setter(
-                                query_type_declaration,
-                                indentation_level,
-                                name_or_alias,
-                                associated_data,
-                                &type_annotation,
-                            );
-                        }
-                        ValidatedIsographSelectionVariant::Regular => {
-                            query_type_declaration.push_str(&format!(
-                                "readonly {}: {},\n",
-                                name_or_alias,
-                                print_javascript_type_declaration(&type_annotation),
-                            ));
-                        }
-                    }
+            match linked_field.associated_data.selection_variant {
+                ScalarFieldSelectionDirectiveSet::Loadable(_) => {
+                    panic!("@loadable server fields are not supported")
                 }
-            };
+                ScalarFieldSelectionDirectiveSet::Updatable(_) => {
+                    *updatable_fields = true;
+                    write_getter_and_setter(
+                        query_type_declaration,
+                        indentation_level,
+                        name_or_alias,
+                        output_type_annotation(&field),
+                        &type_annotation,
+                    );
+                }
+                ScalarFieldSelectionDirectiveSet::None(_) => {
+                    query_type_declaration.push_str(&format!(
+                        "readonly {}: {},\n",
+                        name_or_alias,
+                        print_javascript_type_declaration(&type_annotation),
+                    ));
+                }
+            }
         }
     }
 }
@@ -895,10 +893,8 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
 fn write_getter_and_setter(
     query_type_declaration: &mut String,
     indentation_level: u8,
-    name_or_alias: common_lang_types::FieldNameOrAlias,
-    associated_data: &isograph_schema::ServerFieldTypeAssociatedData<
-        TypeAnnotation<isograph_lang_types::ServerObjectId>,
-    >,
+    name_or_alias: FieldNameOrAlias,
+    output_type_annotation: TypeAnnotation<ServerObjectId>,
     type_annotation: &TypeAnnotation<ClientFieldUpdatableDataType>,
 ) {
     query_type_declaration.push_str(&format!(
@@ -906,10 +902,7 @@ fn write_getter_and_setter(
         name_or_alias,
         print_javascript_type_declaration(type_annotation),
     ));
-    let setter_type_annotation = associated_data
-        .type_name
-        .clone()
-        .map(&mut |_| "{ link: Link }");
+    let setter_type_annotation = output_type_annotation.map(&mut |_| "{ link: Link }");
     query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
     query_type_declaration.push_str(&format!(
         "set {}(value: {}),\n",

@@ -10,13 +10,13 @@ use intern::Lookup;
 use std::collections::BTreeMap;
 
 use isograph_lang_types::{
-    graphql_type_annotation_from_type_annotation, ClientFieldId, ClientPointerId, NonConstantValue,
-    SelectableServerFieldId, SelectionType, ServerFieldId, ServerObjectId, ServerScalarId,
-    VariableDefinition,
+    graphql_type_annotation_from_type_annotation, ClientFieldId, ClientPointerId,
+    DefinitionLocation, NonConstantValue, SelectableServerFieldId, SelectionType, ServerFieldId,
+    ServerObjectId, ServerScalarId, VariableDefinition,
 };
 
 use crate::{
-    ClientType, FieldType, OutputFormat, SchemaObject, ServerFieldData, ValidateSchemaError,
+    as_server_field, OutputFormat, SchemaObject, ServerFieldData, ValidateSchemaError,
     ValidateSchemaResult, ValidatedSchemaServerField, ValidatedVariableDefinition,
 };
 
@@ -302,7 +302,7 @@ pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
 fn object_satisfies_type<TOutputFormat: OutputFormat>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
     variable_definitions: &[WithSpan<
-        VariableDefinition<SelectionType<ServerObjectId, ServerScalarId>>,
+        VariableDefinition<SelectionType<ServerScalarId, ServerObjectId>>,
     >],
     schema_data: &ServerFieldData<TOutputFormat>,
     server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
@@ -366,7 +366,7 @@ fn get_non_nullable_missing_and_provided_fields<TOutputFormat: OutputFormat>(
         .encountered_fields
         .iter()
         .filter_map(|(field_name, field_type)| {
-            let field = &server_fields[field_type.as_server_field()?.as_usize()];
+            let field = &server_fields[as_server_field(field_type)?.as_usize()];
 
             let field_type_annotation = match &field.associated_data {
                 SelectionType::Object(associated_data) => associated_data
@@ -403,7 +403,7 @@ fn get_non_nullable_missing_and_provided_fields<TOutputFormat: OutputFormat>(
 fn validate_no_extraneous_fields(
     object_fields: &BTreeMap<
         SelectableFieldName,
-        FieldType<ServerFieldId, ClientType<ClientFieldId, ClientPointerId>>,
+        DefinitionLocation<ServerFieldId, SelectionType<ClientFieldId, ClientPointerId>>,
     >,
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     location: Location,

@@ -37,10 +37,10 @@ export function useLazyReference<
 
   if (entrypoint?.kind !== 'Entrypoint') {
     // TODO have a separate error logger
-    logMessage(environment, {
+    logMessage(environment, () => ({
       kind: 'NonEntrypointReceived',
       entrypoint,
-    });
+    }));
   }
 
   const cache = getOrCreateCacheForArtifact(

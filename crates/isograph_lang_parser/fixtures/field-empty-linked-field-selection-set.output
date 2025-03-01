@@ -60,10 +60,11 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            associated_data: (),
+                                            associated_data: None(
+                                                EmptyDirectiveSet,
+                                            ),
                                             selection_set: [],
                                             arguments: [],
-                                            directives: [],
                                         },
                                     ),
                                     span: Span {

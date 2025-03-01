@@ -6,8 +6,8 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, IsographSelectionVariant, ScalarFieldSelection, ServerFieldSelection,
-    ServerObjectId,
+    ArgumentKeyAndValue, EmptyDirectiveSet, LinkedFieldSelectionDirectiveSet, ScalarFieldSelection,
+    ScalarFieldSelectionDirectiveSet, ServerFieldSelection, ServerObjectId,
 };
 
 use crate::{
@@ -17,25 +17,25 @@ use crate::{
 
 #[derive(Debug)]
 pub enum RefetchStrategy<
-    TClientTypeSelectionScalarFieldAssociatedData,
-    TClientTypeSelectionLinkedFieldAssociatedData,
+    TSelectionTypeSelectionScalarFieldAssociatedData,
+    TSelectionTypeSelectionLinkedFieldAssociatedData,
 > {
     UseRefetchField(
         UseRefetchFieldRefetchStrategy<
-            TClientTypeSelectionScalarFieldAssociatedData,
-            TClientTypeSelectionLinkedFieldAssociatedData,
+            TSelectionTypeSelectionScalarFieldAssociatedData,
+            TSelectionTypeSelectionLinkedFieldAssociatedData,
         >,
     ),
     // RefetchFromRoot
 }
 
 impl<
-        TClientTypeSelectionScalarFieldAssociatedData,
-        TClientTypeSelectionLinkedFieldAssociatedData,
+        TSelectionTypeSelectionScalarFieldAssociatedData,
+        TSelectionTypeSelectionLinkedFieldAssociatedData,
     >
     RefetchStrategy<
-        TClientTypeSelectionScalarFieldAssociatedData,
-        TClientTypeSelectionLinkedFieldAssociatedData,
+        TSelectionTypeSelectionScalarFieldAssociatedData,
+        TSelectionTypeSelectionLinkedFieldAssociatedData,
     >
 {
     pub fn refetch_selection_set(
@@ -43,8 +43,8 @@ impl<
     ) -> &Vec<
         WithSpan<
             ServerFieldSelection<
-                TClientTypeSelectionScalarFieldAssociatedData,
-                TClientTypeSelectionLinkedFieldAssociatedData,
+                TSelectionTypeSelectionScalarFieldAssociatedData,
+                TSelectionTypeSelectionLinkedFieldAssociatedData,
             >,
         >,
     > {
@@ -57,14 +57,14 @@ impl<
 }
 #[allow(clippy::too_many_arguments)]
 pub fn generate_refetch_field_strategy<
-    TClientTypeSelectionScalarFieldAssociatedData,
-    TClientTypeSelectionLinkedFieldAssociatedData,
+    TSelectionTypeSelectionScalarFieldAssociatedData,
+    TSelectionTypeSelectionLinkedFieldAssociatedData,
 >(
     refetch_selection_set: Vec<
         WithSpan<
             ServerFieldSelection<
-                TClientTypeSelectionScalarFieldAssociatedData,
-                TClientTypeSelectionLinkedFieldAssociatedData,
+                TSelectionTypeSelectionScalarFieldAssociatedData,
+                TSelectionTypeSelectionLinkedFieldAssociatedData,
             >,
         >,
     >,
@@ -77,8 +77,8 @@ pub fn generate_refetch_field_strategy<
     subfield: Option<LinkedFieldName>,
     subfield_concrete_type: Option<IsographObjectTypeName>,
 ) -> UseRefetchFieldRefetchStrategy<
-    TClientTypeSelectionScalarFieldAssociatedData,
-    TClientTypeSelectionLinkedFieldAssociatedData,
+    TSelectionTypeSelectionScalarFieldAssociatedData,
+    TSelectionTypeSelectionLinkedFieldAssociatedData,
 > {
     UseRefetchFieldRefetchStrategy {
         refetch_selection_set,
@@ -97,16 +97,16 @@ pub fn generate_refetch_field_strategy<
 
 #[derive(Debug)]
 pub struct UseRefetchFieldRefetchStrategy<
-    TClientTypeSelectionScalarFieldAssociatedData,
-    TClientTypeSelectionLinkedFieldAssociatedData,
+    TSelectionTypeSelectionScalarFieldAssociatedData,
+    TSelectionTypeSelectionLinkedFieldAssociatedData,
 > {
     /// If this field is fetched imperatively, what fields do we need to
     /// select in the parent query?
     pub refetch_selection_set: Vec<
         WithSpan<
             ServerFieldSelection<
-                TClientTypeSelectionScalarFieldAssociatedData,
-                TClientTypeSelectionLinkedFieldAssociatedData,
+                TSelectionTypeSelectionScalarFieldAssociatedData,
+                TSelectionTypeSelectionLinkedFieldAssociatedData,
             >,
         >,
     >,
@@ -164,15 +164,15 @@ impl GenerateRefetchQueryFn for GenerateRefetchQueryImpl {
     }
 }
 
-pub fn id_selection(
-) -> WithSpan<ServerFieldSelection<IsographSelectionVariant, IsographSelectionVariant>> {
+pub fn id_selection() -> WithSpan<
+    ServerFieldSelection<ScalarFieldSelectionDirectiveSet, LinkedFieldSelectionDirectiveSet>,
+> {
     WithSpan::new(
         ServerFieldSelection::ScalarField(ScalarFieldSelection {
             name: WithLocation::new("id".intern().into(), Location::generated()),
             reader_alias: None,
-            associated_data: IsographSelectionVariant::Regular,
+            associated_data: ScalarFieldSelectionDirectiveSet::None(EmptyDirectiveSet {}),
             arguments: vec![],
-            directives: vec![],
         }),
         Span::todo_generated(),
     )

@@ -1,12 +1,8 @@
-use common_lang_types::{IsographDirectiveName, Location, WithLocation, WithSpan};
+use common_lang_types::{IsographDirectiveName, WithLocation, WithSpan};
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    from_isograph_field_directive, ClientFieldDeclaration,
-    ClientFieldDeclarationWithUnvalidatedDirectives, ClientFieldDeclarationWithValidatedDirectives,
-    ClientPointerDeclaration, ClientPointerDeclarationWithUnvalidatedDirectives,
-    ClientPointerDeclarationWithValidatedDirectives, IsographFieldDirective,
-    IsographSelectionVariant, LinkedFieldSelection, ScalarFieldSelection, ServerFieldSelection,
-    UnvalidatedSelection,
+    ClientFieldDeclaration, ClientPointerDeclaration, LinkedFieldSelection, ScalarFieldSelection,
+    ServerFieldSelection, UnvalidatedSelection, UnvalidatedSelectionWithUnvalidatedDirectives,
 };
 use isograph_schema::ProcessClientFieldDeclarationError;
 use lazy_static::lazy_static;
@@ -18,11 +14,9 @@ lazy_static! {
 
 #[allow(clippy::complexity)]
 pub fn validate_isograph_field_directives(
-    client_field: WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>,
-) -> Result<
-    WithSpan<ClientFieldDeclarationWithValidatedDirectives>,
-    Vec<WithLocation<ProcessClientFieldDeclarationError>>,
-> {
+    client_field: WithSpan<ClientFieldDeclaration>,
+) -> Result<WithSpan<ClientFieldDeclaration>, Vec<WithLocation<ProcessClientFieldDeclarationError>>>
+{
     client_field.and_then(|client_field| {
         let ClientFieldDeclaration {
             const_export_name,
@@ -37,7 +31,7 @@ pub fn validate_isograph_field_directives(
             field_keyword,
         } = client_field;
 
-        Ok(ClientFieldDeclarationWithValidatedDirectives {
+        Ok(ClientFieldDeclaration {
             const_export_name,
             parent_type,
             client_field_name,
@@ -53,69 +47,23 @@ pub fn validate_isograph_field_directives(
 }
 
 pub fn validate_isograph_selection_set_directives(
-    selection_set: Vec<WithSpan<ServerFieldSelection<(), ()>>>,
+    selection_set: Vec<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>>,
 ) -> Result<
     Vec<WithSpan<UnvalidatedSelection>>,
     Vec<WithLocation<ProcessClientFieldDeclarationError>>,
 > {
     and_then_selection_set_and_collect_errors(
         selection_set,
-        &|scalar_field_selection| {
-            let updatable_directive = find_directive_named(
-                &scalar_field_selection.directives,
-                *UPDATABLE_DIRECTIVE_NAME,
-            );
-
-            if let Some(directive) =
-                find_directive_named(&scalar_field_selection.directives, *LOADABLE_DIRECTIVE_NAME)
-            {
-                if updatable_directive.is_some() {
-                    return Err(WithLocation::new(
-                        ProcessClientFieldDeclarationError::LoadableAndUpdatableAreMutuallyExclusive,
-                        Location::generated(),
-                    ));
-                }
-                let loadable_variant =
-                    from_isograph_field_directive(&directive.item).map_err(|message| {
-                        WithLocation::new(
-                            ProcessClientFieldDeclarationError::UnableToDeserialize {
-                                directive_name: *LOADABLE_DIRECTIVE_NAME,
-                                message,
-                            },
-                            Location::generated(),
-                        )
-                    })?;
-                // TODO validate that the field is actually loadable (i.e. implements Node or
-                // whatnot)
-                Ok(IsographSelectionVariant::Loadable(loadable_variant))
-            } else if updatable_directive.is_some() {
-                Ok(IsographSelectionVariant::Updatable)
-            } else {
-                Ok(IsographSelectionVariant::Regular)
-            }
-        },
-        &|linked_field_selection| {
-            let updatable_directive = find_directive_named(
-                &linked_field_selection.directives,
-                *UPDATABLE_DIRECTIVE_NAME,
-            );
-
-            Ok(if updatable_directive.is_some() {
-                IsographSelectionVariant::Updatable
-            } else {
-                IsographSelectionVariant::Regular
-            })
-        },
+        &|scalar_field_selection| Ok(scalar_field_selection.associated_data),
+        &|linked_field_selection| Ok(linked_field_selection.associated_data),
     )
 }
 
 #[allow(clippy::complexity)]
 pub fn validate_isograph_pointer_directives(
-    client_pointer: WithSpan<ClientPointerDeclarationWithUnvalidatedDirectives>,
-) -> Result<
-    WithSpan<ClientPointerDeclarationWithValidatedDirectives>,
-    Vec<WithLocation<ProcessClientFieldDeclarationError>>,
-> {
+    client_pointer: WithSpan<ClientPointerDeclaration>,
+) -> Result<WithSpan<ClientPointerDeclaration>, Vec<WithLocation<ProcessClientFieldDeclarationError>>>
+{
     client_pointer.and_then(|client_pointer| {
         let ClientPointerDeclaration {
             const_export_name,
@@ -131,7 +79,7 @@ pub fn validate_isograph_pointer_directives(
             directives,
         } = client_pointer;
 
-        Ok(ClientPointerDeclarationWithValidatedDirectives {
+        Ok(ClientPointerDeclaration {
             const_export_name,
             parent_type,
             client_pointer_name,
@@ -182,7 +130,6 @@ fn and_then_selection_set_and_collect_errors<
                                     associated_data: new_linked_field,
                                     selection_set: new_selection_set,
                                     arguments: l.arguments,
-                                    directives: l.directives,
                                 }),
                                 with_span.span,
                             )),
@@ -200,7 +147,6 @@ fn and_then_selection_set_and_collect_errors<
                             reader_alias: s.reader_alias,
                             associated_data: new_scalar_field_data,
                             arguments: s.arguments,
-                            directives: s.directives,
                         }),
                         with_span.span,
                     )),
@@ -215,13 +161,4 @@ fn and_then_selection_set_and_collect_errors<
     } else {
         Err(errors)
     }
-}
-
-fn find_directive_named(
-    directives: &[WithSpan<IsographFieldDirective>],
-    name: IsographDirectiveName,
-) -> Option<&WithSpan<IsographFieldDirective>> {
-    directives
-        .iter()
-        .find(|directive| directive.item.name.item == name)
 }

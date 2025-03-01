@@ -7,13 +7,14 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    EntrypointDeclaration, IsographSelectionVariant, LinkedFieldSelection, SelectableServerFieldId,
+    DefinitionLocation, EntrypointDeclaration, LinkedFieldSelection,
+    LinkedFieldSelectionDirectiveSet, ScalarFieldSelectionDirectiveSet, SelectableServerFieldId,
     ServerFieldId, ServerScalarId, VariableDefinition,
 };
 
 use crate::{
-    schema_validation_state::SchemaValidationState, ClientField, ClientPointer, ClientTypeId,
-    FieldType, OutputFormat, Schema, SchemaScalar, SchemaServerField, ServerFieldData,
+    schema_validation_state::SchemaValidationState, ClientField, ClientPointer, OutputFormat,
+    Schema, SchemaScalar, SchemaServerField, SelectionTypeId, ServerFieldData,
     UseRefetchFieldRefetchStrategy, ValidatedSelection,
 };
 use lazy_static::lazy_static;
@@ -30,8 +31,8 @@ type UnvalidatedServerFieldTypeAssociatedData =
 
 impl SchemaValidationState for UnvalidatedSchemaState {
     type ServerFieldTypeAssociatedData = UnvalidatedServerFieldTypeAssociatedData;
-    type ClientTypeSelectionScalarFieldAssociatedData = IsographSelectionVariant;
-    type ClientTypeSelectionLinkedFieldAssociatedData = IsographSelectionVariant;
+    type SelectionTypeSelectionScalarFieldAssociatedData = ScalarFieldSelectionDirectiveSet;
+    type SelectionTypeSelectionLinkedFieldAssociatedData = LinkedFieldSelectionDirectiveSet;
     type VariableDefinitionInnerType = UnvalidatedTypeName;
     type Entrypoint = Vec<(TextSource, WithSpan<EntrypointDeclaration>)>;
 }
@@ -61,7 +62,7 @@ pub type UnvalidatedSchema<TOutputFormat> = Schema<UnvalidatedSchemaState, TOutp
 /// On unvalidated schema objects, the encountered types are either a type annotation
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the
 /// client field.)
-pub type UnvalidatedObjectFieldInfo = FieldType<ServerFieldId, ClientTypeId>;
+pub type UnvalidatedObjectFieldInfo = DefinitionLocation<ServerFieldId, SelectionTypeId>;
 
 pub type UnvalidatedSchemaSchemaField<TOutputFormat> = SchemaServerField<
     <UnvalidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,
@@ -74,27 +75,27 @@ pub type UnvalidatedVariableDefinition = VariableDefinition<
 >;
 
 pub type UnvalidatedClientField<TOutputFormat> = ClientField<
-    <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
-    <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
     TOutputFormat,
 >;
 
 pub type UnvalidatedClientPointer<TOutputFormat> = ClientPointer<
-    <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
-    <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
     TOutputFormat,
 >;
 
 pub type UnvalidatedLinkedFieldSelection = LinkedFieldSelection<
-    <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
-    <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
 >;
 
 pub type UnvalidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
-    <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
-    <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
 >;
 
 impl<TOutputFormat: OutputFormat> Default for UnvalidatedSchema<TOutputFormat> {

@@ -9,28 +9,40 @@ use intern::string_key::Lookup;
 use serde::Deserialize;
 use std::fmt::Debug;
 
-use crate::IsographFieldDirective;
+use crate::{
+    IsographFieldDirective, LinkedFieldSelectionDirectiveSet, ScalarFieldSelectionDirectiveSet,
+};
 
-pub type UnvalidatedSelectionWithUnvalidatedDirectives = ServerFieldSelection<(), ()>;
+// This name makes no sense anymore... directives are validated!
+pub type UnvalidatedSelectionWithUnvalidatedDirectives =
+    ServerFieldSelection<ScalarFieldSelectionDirectiveSet, LinkedFieldSelectionDirectiveSet>;
 
 pub type UnvalidatedSelection = ServerFieldSelection<
-    // <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
-    IsographSelectionVariant,
-    // <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
-    IsographSelectionVariant,
+    // <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
+    ScalarFieldSelectionDirectiveSet,
+    // <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
+    LinkedFieldSelectionDirectiveSet,
 >;
 pub type UnvalidatedScalarFieldSelection = ScalarFieldSelection<
-    // <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
-    IsographSelectionVariant,
+    // <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
+    ScalarFieldSelectionDirectiveSet,
 >;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub struct ClientFieldDeclaration<TScalarField, TLinkedField> {
+pub struct ClientFieldDeclaration {
     pub const_export_name: ConstExportName,
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub client_field_name: WithSpan<ScalarFieldName>,
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub selection_set: Vec<WithSpan<ServerFieldSelection<TScalarField, TLinkedField>>>,
+    pub selection_set: Vec<
+        WithSpan<
+            ServerFieldSelection<
+                ScalarFieldSelectionDirectiveSet,
+                LinkedFieldSelectionDirectiveSet,
+            >,
+        >,
+    >,
+    // TODO remove, or put on a generic
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: RelativePathToSourceFile,
@@ -42,14 +54,21 @@ pub struct ClientFieldDeclaration<TScalarField, TLinkedField> {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub struct ClientPointerDeclaration<TScalarField, TLinkedField> {
+pub struct ClientPointerDeclaration {
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub const_export_name: ConstExportName,
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub target_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     pub client_pointer_name: WithSpan<ClientPointerFieldName>,
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub selection_set: Vec<WithSpan<ServerFieldSelection<TScalarField, TLinkedField>>>,
+    pub selection_set: Vec<
+        WithSpan<
+            ServerFieldSelection<
+                ScalarFieldSelectionDirectiveSet,
+                LinkedFieldSelectionDirectiveSet,
+            >,
+        >,
+    >,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: RelativePathToSourceFile,
 
@@ -59,24 +78,7 @@ pub struct ClientPointerDeclaration<TScalarField, TLinkedField> {
     pub dot: WithSpan<()>,
 }
 
-pub type ClientFieldDeclarationWithUnvalidatedDirectives = ClientFieldDeclaration<(), ()>;
-pub type ClientPointerDeclarationWithUnvalidatedDirectives = ClientPointerDeclaration<(), ()>;
-pub type ClientFieldDeclarationWithValidatedDirectives =
-    ClientFieldDeclaration<IsographSelectionVariant, IsographSelectionVariant>;
-
-pub type ClientPointerDeclarationWithValidatedDirectives =
-    ClientPointerDeclaration<IsographSelectionVariant, IsographSelectionVariant>;
-
-// TODO we should not have an enum, but instead a struct with fields lazy_load_artifact_info
-// and loadable_info or something.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum IsographSelectionVariant {
-    Regular,
-    Loadable(LoadableDirectiveParameters),
-    Updatable,
-}
-
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Default, Hash)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LoadableDirectiveParameters {
     #[serde(default)]
@@ -164,7 +166,6 @@ pub struct ScalarFieldSelection<TScalarField> {
     pub reader_alias: Option<WithLocation<ScalarFieldAlias>>,
     pub associated_data: TScalarField,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
-    pub directives: Vec<WithSpan<IsographFieldDirective>>,
 }
 
 impl<TScalarField> ScalarFieldSelection<TScalarField> {
@@ -174,7 +175,6 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
             reader_alias: self.reader_alias,
             associated_data: map(self.associated_data),
             arguments: self.arguments,
-            directives: self.directives,
         }
     }
 
@@ -187,7 +187,6 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
             reader_alias: self.reader_alias,
             associated_data: map(self.associated_data)?,
             arguments: self.arguments,
-            directives: self.directives,
         })
     }
 
@@ -201,12 +200,10 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct LinkedFieldSelection<TScalarField, TLinkedField> {
     pub name: WithLocation<LinkedFieldName>,
-    // pub alias
     pub reader_alias: Option<WithLocation<LinkedFieldAlias>>,
     pub associated_data: TLinkedField,
     pub selection_set: Vec<WithSpan<ServerFieldSelection<TScalarField, TLinkedField>>>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
-    pub directives: Vec<WithSpan<IsographFieldDirective>>,
 }
 
 impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField> {
@@ -234,7 +231,6 @@ impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField
                 })
                 .collect(),
             arguments: self.arguments,
-            directives: self.directives,
         }
     }
 

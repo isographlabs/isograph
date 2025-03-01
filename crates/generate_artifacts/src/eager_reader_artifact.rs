@@ -3,11 +3,14 @@ use intern::Lookup;
 
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
+use isograph_lang_types::SelectionType;
 use isograph_schema::{
-    ClientType, OutputFormat, RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment,
-    UserWrittenClientFieldInfo, UserWrittenComponentVariant, ValidatedClientField,
-    ValidatedClientType, ValidatedSchema, ValidatedSchemaServerField,
+    initial_variable_context, selection_set_for_parent_query, variable_definitions, FieldOrPointer,
+    OutputFormat, RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment,
+    UserWrittenClientFieldInfo, UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema,
+    ValidatedSchemaServerField, ValidatedSelectionType,
 };
+
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
 use crate::{
@@ -44,7 +47,7 @@ pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
         client_field.selection_set_for_parent_query(),
         0,
         refetched_paths,
-        &ClientType::ClientField(client_field).initial_variable_context(),
+        &initial_variable_context(&SelectionType::Scalar(client_field)),
     );
 
     let function_import_statement =
@@ -196,7 +199,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TOutputFormat: OutputForm
 
 pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
-    client_field: &ValidatedClientType<TOutputFormat>,
+    client_field: &ValidatedSelectionType<TOutputFormat>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
     let ts_file_extension = file_extensions.ts();
@@ -210,7 +213,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
     let mut updatable_fields = false;
     let client_field_parameter_type = generate_client_field_parameter_type(
         schema,
-        client_field.selection_set_for_parent_query(),
+        selection_set_for_parent_query(client_field),
         parent_type,
         &mut param_type_imports,
         &mut loadable_fields,
@@ -219,7 +222,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
     );
     let updatable_data_type = generate_client_field_updatable_data_type(
         schema,
-        client_field.selection_set_for_parent_query(),
+        selection_set_for_parent_query(client_field),
         parent_type,
         &mut param_type_imports,
         &mut loadable_fields,
@@ -255,7 +258,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
         "".to_string()
     };
 
-    let (parameters_import, parameters_type) = if !client_field.variable_definitions().is_empty() {
+    let (parameters_import, parameters_type) = if !variable_definitions(client_field).is_empty() {
         let reader_parameters_type =
             format!("{}__{}__parameters", parent_type.name, client_field.name());
         (
@@ -293,7 +296,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
         file_content: param_type_content,
         type_and_field: Some(ObjectTypeAndFieldName {
             type_name: parent_type.name,
-            field_name: client_field.name(),
+            field_name: client_field.name().into(),
         }),
     }
 }
