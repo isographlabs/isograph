@@ -13,10 +13,10 @@ use isograph_lang_types::{
 use isograph_schema::{
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
-    get_reachable_variables, initial_variable_context, FieldToCompletedMergeTraversalStateMap,
-    FieldTraversalResult, MergedSelectionMap, OutputFormat, RootOperationName, RootRefetchedPath,
-    ScalarClientFieldTraversalState, SchemaObject, ValidatedClientField, ValidatedSchema,
-    ValidatedVariableDefinition,
+    get_reachable_variables, initial_variable_context, FieldOrPointer,
+    FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, MergedSelectionMap, OutputFormat,
+    RootOperationName, RootRefetchedPath, ScalarClientFieldTraversalState, SchemaObject,
+    ValidatedClientField, ValidatedSchema, ValidatedVariableDefinition,
 };
 
 use crate::{

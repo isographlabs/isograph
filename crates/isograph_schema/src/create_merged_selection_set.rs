@@ -18,7 +18,7 @@ use lazy_static::lazy_static;
 
 use crate::{
     categorize_field_loadability, create_transformed_name_and_arguments,
-    expose_field_directive::RequiresRefinement, initial_variable_context, reader_selection_set,
+    expose_field_directive::RequiresRefinement, initial_variable_context,
     transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context, variable_definitions,
     ClientFieldVariant, FieldOrPointer, ImperativelyLoadedFieldVariant, Loadability,
@@ -1031,7 +1031,7 @@ fn merge_non_loadable_client_type<TOutputFormat: OutputFormat>(
     } = create_merged_selection_map_for_field_and_insert_into_global_map(
         schema,
         parent_type,
-        reader_selection_set(&newly_encountered_client_type),
+        newly_encountered_client_type.reader_selection_set(),
         encountered_client_field_map,
         DefinitionLocation::Client(newly_encountered_client_type.id()),
         &initial_variable_context(&newly_encountered_client_type),

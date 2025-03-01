@@ -7,8 +7,8 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, ClientFieldVariant,
-    Loadability, NameAndArguments, NormalizationKey, OutputFormat, PathToRefetchField,
-    RefetchedPathsMap, SchemaServerFieldVariant, ValidatedClientField,
+    FieldOrPointer, Loadability, NameAndArguments, NormalizationKey, OutputFormat,
+    PathToRefetchField, RefetchedPathsMap, SchemaServerFieldVariant, ValidatedClientField,
     ValidatedLinkedFieldSelection, ValidatedScalarFieldSelection, ValidatedSchema,
     ValidatedSelection, VariableContext,
 };
@@ -483,7 +483,7 @@ fn server_defined_scalar_field_ast_node(
 
 fn generate_reader_ast_with_path<'schema, TOutputFormat: OutputFormat>(
     schema: &'schema ValidatedSchema<TOutputFormat>,
-    selection_set: &'schema Vec<WithSpan<ValidatedSelection>>,
+    selection_set: &'schema [WithSpan<ValidatedSelection>],
     indentation_level: u8,
     nested_client_field_imports: &mut ReaderImports,
     // N.B. this is not root_refetched_paths when we're generating a non-fetchable client field :(
@@ -562,7 +562,7 @@ fn find_imperatively_fetchable_query_index(
 
 pub(crate) fn generate_reader_ast<'schema, TOutputFormat: OutputFormat>(
     schema: &'schema ValidatedSchema<TOutputFormat>,
-    selection_set: &'schema Vec<WithSpan<ValidatedSelection>>,
+    selection_set: &'schema [WithSpan<ValidatedSelection>],
     indentation_level: u8,
     // N.B. this is not root_refetched_paths when we're generating an entrypoint :(
     // ????

@@ -94,15 +94,41 @@ pub struct ClientPointer<
 }
 
 #[impl_for_selection_type]
-pub trait FieldOrPointer {
+pub trait FieldOrPointer<
+    TSelectionTypeSelectionScalarFieldAssociatedData,
+    TSelectionTypeSelectionLinkedFieldAssociatedData,
+>
+{
     fn description(&self) -> Option<DescriptionValue>;
     fn name(&self) -> FieldOrPointerName;
     fn id(&self) -> SelectionTypeId;
     fn type_and_field(&self) -> ObjectTypeAndFieldName;
     fn parent_object_id(&self) -> ServerObjectId;
     // the following are unsupported, for now, because the return values include a generic
-    // fn reader_selection_set
-    // fn refetch_strategy
+    fn reader_selection_set(
+        &self,
+    ) -> &[WithSpan<
+        ServerFieldSelection<
+            TSelectionTypeSelectionScalarFieldAssociatedData,
+            TSelectionTypeSelectionLinkedFieldAssociatedData,
+        >,
+    >];
+    fn refetch_strategy(
+        &self,
+    ) -> Option<
+        &RefetchStrategy<
+            TSelectionTypeSelectionScalarFieldAssociatedData,
+            TSelectionTypeSelectionLinkedFieldAssociatedData,
+        >,
+    >;
+    fn selection_set_for_parent_query(
+        &self,
+    ) -> &[WithSpan<
+        ServerFieldSelection<
+            TSelectionTypeSelectionScalarFieldAssociatedData,
+            TSelectionTypeSelectionLinkedFieldAssociatedData,
+        >,
+    >];
     // fn variable_definitions
 }
 
@@ -111,7 +137,11 @@ impl<
         TSelectionTypeSelectionLinkedFieldAssociatedData,
         TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
         TOutputFormat: OutputFormat,
-    > FieldOrPointer
+    >
+    FieldOrPointer<
+        TSelectionTypeSelectionScalarFieldAssociatedData,
+        TSelectionTypeSelectionLinkedFieldAssociatedData,
+    >
     for &ClientField<
         TSelectionTypeSelectionScalarFieldAssociatedData,
         TSelectionTypeSelectionLinkedFieldAssociatedData,
@@ -138,6 +168,49 @@ impl<
     fn parent_object_id(&self) -> ServerObjectId {
         self.parent_object_id
     }
+
+    fn reader_selection_set(
+        &self,
+    ) -> &[WithSpan<
+        ServerFieldSelection<
+            TSelectionTypeSelectionScalarFieldAssociatedData,
+            TSelectionTypeSelectionLinkedFieldAssociatedData,
+        >,
+    >] {
+        &self.reader_selection_set
+    }
+
+    fn refetch_strategy(
+        &self,
+    ) -> Option<
+        &RefetchStrategy<
+            TSelectionTypeSelectionScalarFieldAssociatedData,
+            TSelectionTypeSelectionLinkedFieldAssociatedData,
+        >,
+    > {
+        self.refetch_strategy.as_ref()
+    }
+
+    fn selection_set_for_parent_query(
+        &self,
+    ) -> &[WithSpan<
+        ServerFieldSelection<
+            TSelectionTypeSelectionScalarFieldAssociatedData,
+            TSelectionTypeSelectionLinkedFieldAssociatedData,
+        >,
+    >] {
+        match self.variant {
+            ClientFieldVariant::ImperativelyLoadedField(_) => self
+                .refetch_strategy
+                .as_ref()
+                .map(|strategy| strategy.refetch_selection_set())
+                .expect(
+                    "Expected imperatively loaded field to have refetch selection set. \
+                    This is indicative of a bug in Isograph.",
+                ),
+            _ => &self.reader_selection_set,
+        }
+    }
 }
 
 impl<
@@ -145,7 +218,11 @@ impl<
         TSelectionTypeSelectionLinkedFieldAssociatedData,
         TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
         TOutputFormat: OutputFormat,
-    > FieldOrPointer
+    >
+    FieldOrPointer<
+        TSelectionTypeSelectionScalarFieldAssociatedData,
+        TSelectionTypeSelectionLinkedFieldAssociatedData,
+    >
     for &ClientPointer<
         TSelectionTypeSelectionScalarFieldAssociatedData,
         TSelectionTypeSelectionLinkedFieldAssociatedData,
@@ -171,5 +248,38 @@ impl<
 
     fn parent_object_id(&self) -> ServerObjectId {
         self.parent_object_id
+    }
+
+    fn reader_selection_set(
+        &self,
+    ) -> &[WithSpan<
+        ServerFieldSelection<
+            TSelectionTypeSelectionScalarFieldAssociatedData,
+            TSelectionTypeSelectionLinkedFieldAssociatedData,
+        >,
+    >] {
+        &self.reader_selection_set
+    }
+
+    fn refetch_strategy(
+        &self,
+    ) -> Option<
+        &RefetchStrategy<
+            TSelectionTypeSelectionScalarFieldAssociatedData,
+            TSelectionTypeSelectionLinkedFieldAssociatedData,
+        >,
+    > {
+        Some(&self.refetch_strategy)
+    }
+
+    fn selection_set_for_parent_query(
+        &self,
+    ) -> &[WithSpan<
+        ServerFieldSelection<
+            TSelectionTypeSelectionScalarFieldAssociatedData,
+            TSelectionTypeSelectionLinkedFieldAssociatedData,
+        >,
+    >] {
+        &self.reader_selection_set
     }
 }

@@ -78,18 +78,21 @@ pub(crate) fn impl_base_types(
                 .to_compile_error(),
         });
 
-        let generics = base_type
+        let struct_generics = base_type
             .variant_names
             .iter()
             .enumerate()
             .map(|(count, _)| Ident::new(&format!("T{count}"), Span::call_site()));
-        let generics_2 = generics.clone();
+        let struct_generics_2 = struct_generics.clone();
+        let trait_generics = &item_trait.generics;
+        let trait_generics_without_angle_brackets = &item_trait.generics.params;
 
         quote! {
             impl<
-              #(#generics: #trait_name,)*
-            > #trait_name for ::#crate_name::#base_type_name<
-              #(#generics_2,)*
+                #trait_generics_without_angle_brackets
+                #(#struct_generics: #trait_name #trait_generics,)*
+            > #trait_name #trait_generics for ::#crate_name::#base_type_name<
+                #(#struct_generics_2,)*
             > {
                 #(
                     #method_impls

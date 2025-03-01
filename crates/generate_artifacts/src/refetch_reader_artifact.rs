@@ -4,8 +4,8 @@ use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
-    initial_variable_context, FieldMapItem, OutputFormat, PrimaryFieldInfo, RefetchedPathsMap,
-    ValidatedClientField, ValidatedSchema,
+    initial_variable_context, FieldMapItem, FieldOrPointer, OutputFormat, PrimaryFieldInfo,
+    RefetchedPathsMap, ValidatedClientField, ValidatedSchema,
 };
 
 use crate::{

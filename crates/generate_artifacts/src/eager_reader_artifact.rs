@@ -5,10 +5,10 @@ use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
-    initial_variable_context, selection_set_for_parent_query, variable_definitions, FieldOrPointer,
-    OutputFormat, RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment,
-    UserWrittenClientFieldInfo, UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema,
-    ValidatedSchemaServerField, ValidatedSelectionType,
+    initial_variable_context, variable_definitions, FieldOrPointer, OutputFormat,
+    RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment, UserWrittenClientFieldInfo,
+    UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema, ValidatedSchemaServerField,
+    ValidatedSelectionType,
 };
 
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
@@ -213,7 +213,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
     let mut updatable_fields = false;
     let client_field_parameter_type = generate_client_field_parameter_type(
         schema,
-        selection_set_for_parent_query(client_field),
+        client_field.selection_set_for_parent_query(),
         parent_type,
         &mut param_type_imports,
         &mut loadable_fields,
@@ -222,7 +222,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
     );
     let updatable_data_type = generate_client_field_updatable_data_type(
         schema,
-        selection_set_for_parent_query(client_field),
+        client_field.selection_set_for_parent_query(),
         parent_type,
         &mut param_type_imports,
         &mut loadable_fields,

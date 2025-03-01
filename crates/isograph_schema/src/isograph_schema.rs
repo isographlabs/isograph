@@ -15,16 +15,16 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, ClientPointerId, DefinitionLocation,
-    SelectableServerFieldId, SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId,
-    ServerScalarId, ServerStrongIdFieldId, TypeAnnotation, VariableDefinition,
+    SelectableServerFieldId, SelectionType, ServerFieldId, ServerObjectId, ServerScalarId,
+    ServerStrongIdFieldId, TypeAnnotation, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
 use crate::{
     field_and_pointer::{ClientField, ClientPointer},
     schema_validation_state::SchemaValidationState,
-    ClientFieldVariant, NormalizationKey, OutputFormat, ServerFieldTypeAssociatedData,
-    ValidatedClientField, ValidatedClientPointer,
+    NormalizationKey, OutputFormat, ServerFieldTypeAssociatedData, ValidatedClientField,
+    ValidatedClientPointer,
 };
 
 lazy_static! {
@@ -538,43 +538,6 @@ impl<
             associated_data: value.associated_data,
             parent_type_id: value.parent_type_id,
         })
-    }
-}
-
-impl<
-        TSelectionTypeSelectionScalarFieldAssociatedData,
-        TSelectionTypeSelectionLinkedFieldAssociatedData,
-        TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
-        TOutputFormat: OutputFormat,
-    >
-    ClientField<
-        TSelectionTypeSelectionScalarFieldAssociatedData,
-        TSelectionTypeSelectionLinkedFieldAssociatedData,
-        TClientFieldVariableDefinitionAssociatedData,
-        TOutputFormat,
-    >
-{
-    pub fn selection_set_for_parent_query(
-        &self,
-    ) -> &Vec<
-        WithSpan<
-            ServerFieldSelection<
-                TSelectionTypeSelectionScalarFieldAssociatedData,
-                TSelectionTypeSelectionLinkedFieldAssociatedData,
-            >,
-        >,
-    > {
-        match self.variant {
-            ClientFieldVariant::ImperativelyLoadedField(_) => self
-                .refetch_strategy
-                .as_ref()
-                .map(|strategy| strategy.refetch_selection_set())
-                .expect(
-                    "Expected imperatively loaded field to have refetch selection set. \
-                    This is indicative of a bug in Isograph.",
-                ),
-            _ => &self.reader_selection_set,
-        }
     }
 }
 
