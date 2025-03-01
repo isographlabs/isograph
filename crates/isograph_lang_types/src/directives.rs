@@ -196,7 +196,7 @@ impl<'de> Deserializer<'de> for IsographFieldDirectivesDeserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_map(IsographFieldDirectiveVecDeserializer::new(&self.directives))
+        visitor.visit_map(IsographFieldDirectiveVecDeserializer::new(self.directives))
     }
 
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>

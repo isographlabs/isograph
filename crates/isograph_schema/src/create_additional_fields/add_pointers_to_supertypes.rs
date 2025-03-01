@@ -48,7 +48,9 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                                     .as_server_field()
                                     .expect("Expected __typename to be server field"),
                             ),
-                            selection_variant: ScalarFieldValidDirectiveSet::None(EmptyDirectiveSet {}),
+                            selection_variant: ScalarFieldValidDirectiveSet::None(
+                                EmptyDirectiveSet {},
+                            ),
                         },
                         directives: vec![],
                         name: WithLocation::new(
@@ -78,7 +80,9 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                                     }
                                 },
                             ),
-                            selection_variant: ScalarFieldValidDirectiveSet::None(EmptyDirectiveSet {}),
+                            selection_variant: ScalarFieldValidDirectiveSet::None(
+                                EmptyDirectiveSet {},
+                            ),
                         },
                         directives: vec![],
                         name: WithLocation::new(*LINK_FIELD_NAME, Location::generated()),
