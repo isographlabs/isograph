@@ -5,11 +5,10 @@ use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
-    initial_variable_context, selection_set_for_parent_query, selection_type_name,
-    variable_definitions, FieldOrPointer, OutputFormat, RefetchedPathsMap,
-    ServerFieldTypeAssociatedDataInlineFragment, UserWrittenClientFieldInfo,
-    UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema, ValidatedSchemaServerField,
-    ValidatedSelectionType,
+    initial_variable_context, selection_set_for_parent_query, variable_definitions, FieldOrPointer,
+    OutputFormat, RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment,
+    UserWrittenClientFieldInfo, UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema,
+    ValidatedSchemaServerField, ValidatedSelectionType,
 };
 
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
@@ -234,11 +233,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
 
     let param_type_import_statement =
         param_type_imports_to_import_statement(&param_type_imports, file_extensions);
-    let reader_param_type = format!(
-        "{}__{}__param",
-        parent_type.name,
-        selection_type_name(client_field)
-    );
+    let reader_param_type = format!("{}__{}__param", parent_type.name, client_field.name());
 
     let link_field_imports = if link_fields {
         "import type { Link } from '@isograph/react';\n".to_string()
@@ -264,11 +259,8 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
     };
 
     let (parameters_import, parameters_type) = if !variable_definitions(client_field).is_empty() {
-        let reader_parameters_type = format!(
-            "{}__{}__parameters",
-            parent_type.name,
-            selection_type_name(client_field)
-        );
+        let reader_parameters_type =
+            format!("{}__{}__parameters", parent_type.name, client_field.name());
         (
             format!("import type {{ {reader_parameters_type} }} from './parameters_type{ts_file_extension}';\n"),
             reader_parameters_type,
@@ -304,7 +296,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
         file_content: param_type_content,
         type_and_field: Some(ObjectTypeAndFieldName {
             type_name: parent_type.name,
-            field_name: selection_type_name(client_field),
+            field_name: client_field.name().into(),
         }),
     }
 }

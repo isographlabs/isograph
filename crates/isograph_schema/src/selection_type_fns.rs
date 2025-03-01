@@ -1,38 +1,9 @@
 use std::fmt::Debug;
 
-use common_lang_types::{ObjectTypeAndFieldName, SelectableFieldName, WithSpan};
+use common_lang_types::WithSpan;
 use isograph_lang_types::{SelectionType, ServerFieldSelection, VariableDefinition};
 
-use crate::{ClientField, ClientPointer, OutputFormat, SelectionTypeId};
-
-#[allow(clippy::type_complexity)]
-pub fn type_and_field<
-    'a,
-    TSelectionTypeSelectionScalarFieldAssociatedData,
-    TSelectionTypeSelectionLinkedFieldAssociatedData,
-    TSelectionTypeVariableDefinitionAssociatedData: Ord + Debug,
-    TOutputFormat: OutputFormat,
->(
-    selection_type: &SelectionType<
-        &'a ClientField<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-            TSelectionTypeVariableDefinitionAssociatedData,
-            TOutputFormat,
-        >,
-        &'a ClientPointer<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-            TSelectionTypeVariableDefinitionAssociatedData,
-            TOutputFormat,
-        >,
-    >,
-) -> &'a ObjectTypeAndFieldName {
-    match selection_type {
-        SelectionType::Scalar(client_field) => &client_field.type_and_field,
-        SelectionType::Object(client_pointer) => &client_pointer.type_and_field,
-    }
-}
+use crate::{ClientField, ClientPointer, OutputFormat};
 
 #[allow(clippy::type_complexity)]
 pub fn selection_set_for_parent_query<
@@ -65,62 +36,6 @@ pub fn selection_set_for_parent_query<
     match selection_type {
         SelectionType::Scalar(client_field) => client_field.selection_set_for_parent_query(),
         SelectionType::Object(client_pointer) => &client_pointer.reader_selection_set,
-    }
-}
-
-#[allow(clippy::type_complexity)]
-pub fn selection_type_name<
-    TSelectionTypeSelectionScalarFieldAssociatedData,
-    TSelectionTypeSelectionLinkedFieldAssociatedData,
-    TSelectionTypeVariableDefinitionAssociatedData: Ord + Debug,
-    TOutputFormat: OutputFormat,
->(
-    selection_type: &SelectionType<
-        &ClientField<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-            TSelectionTypeVariableDefinitionAssociatedData,
-            TOutputFormat,
-        >,
-        &ClientPointer<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-            TSelectionTypeVariableDefinitionAssociatedData,
-            TOutputFormat,
-        >,
-    >,
-) -> SelectableFieldName {
-    match selection_type {
-        SelectionType::Scalar(client_field) => client_field.name,
-        SelectionType::Object(client_pointer) => client_pointer.name.into(),
-    }
-}
-
-#[allow(clippy::type_complexity)]
-pub fn selection_type_id<
-    TSelectionTypeSelectionScalarFieldAssociatedData,
-    TSelectionTypeSelectionLinkedFieldAssociatedData,
-    TSelectionTypeVariableDefinitionAssociatedData: Ord + Debug,
-    TOutputFormat: OutputFormat,
->(
-    selection_type: &SelectionType<
-        &ClientField<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-            TSelectionTypeVariableDefinitionAssociatedData,
-            TOutputFormat,
-        >,
-        &ClientPointer<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-            TSelectionTypeVariableDefinitionAssociatedData,
-            TOutputFormat,
-        >,
-    >,
-) -> SelectionTypeId {
-    match selection_type {
-        SelectionType::Scalar(client_field) => SelectionType::Scalar(client_field.id),
-        SelectionType::Object(client_pointer) => SelectionType::Object(client_pointer.id),
     }
 }
 

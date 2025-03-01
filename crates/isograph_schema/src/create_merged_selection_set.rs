@@ -19,13 +19,13 @@ use lazy_static::lazy_static;
 use crate::{
     categorize_field_loadability, create_transformed_name_and_arguments,
     expose_field_directive::RequiresRefinement, initial_variable_context, reader_selection_set,
-    selection_type_id, transform_arguments_with_child_context,
+    transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context, variable_definitions,
-    ClientFieldVariant, ImperativelyLoadedFieldVariant, Loadability, NameAndArguments,
-    OutputFormat, PathToRefetchField, RootOperationName, SchemaObject, SchemaServerFieldVariant,
-    SelectionTypeId, UnvalidatedVariableDefinition, ValidatedClientField, ValidatedClientPointer,
-    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection,
-    VariableContext,
+    ClientFieldVariant, FieldOrPointer, ImperativelyLoadedFieldVariant, Loadability,
+    NameAndArguments, OutputFormat, PathToRefetchField, RootOperationName, SchemaObject,
+    SchemaServerFieldVariant, SelectionTypeId, UnvalidatedVariableDefinition, ValidatedClientField,
+    ValidatedClientPointer, ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSchemaIdField,
+    ValidatedSelection, VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -1038,7 +1038,7 @@ fn merge_non_loadable_client_type<TOutputFormat: OutputFormat>(
                 This is indicative of a bug in Isograph.",
             ),
         encountered_client_field_map,
-        DefinitionLocation::Client(selection_type_id(&newly_encountered_client_type)),
+        DefinitionLocation::Client(newly_encountered_client_type.id()),
         &initial_variable_context(&newly_encountered_client_type),
     );
 

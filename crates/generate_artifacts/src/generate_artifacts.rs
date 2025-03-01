@@ -16,7 +16,7 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     accessible_client_fields, as_server_field, description, get_provided_arguments,
-    output_type_annotation, selection_map_wrapped, selection_type_id, ClientFieldVariant,
+    output_type_annotation, selection_map_wrapped, ClientFieldVariant, FieldOrPointer,
     FieldTraversalResult, NameAndArguments, NormalizationKey, OutputFormat, RequiresRefinement,
     Schema, SchemaObject, SchemaServerFieldVariant, UserWrittenComponentVariant,
     ValidatedClientField, ValidatedScalarFieldAssociatedData, ValidatedSchema,
@@ -295,9 +295,9 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
             config.options.include_file_extensions_in_import_statements,
         ));
 
-        match encountered_client_type_map.get(&DefinitionLocation::Client(selection_type_id(
-            &user_written_client_type,
-        ))) {
+        match encountered_client_type_map
+            .get(&DefinitionLocation::Client(user_written_client_type.id()))
+        {
             Some(FieldTraversalResult {
                 traversal_state, ..
             }) => {
