@@ -25,6 +25,7 @@ notify-debouncer-full = "0.4.0"
 once_map = "0.4.20"
 pathdiff = "0.2.1"
 pretty-duration = "0.1.1"
+proc-macro2 = "1.0.92"
 regex = "1.6.0"
 schemars = { version = "0.8.11", features = ["indexmap1"] }
 serde = "1.0.197"
@@ -37,5 +38,4 @@ thiserror = "1.0.40"
 tokio = { version = "1.35.0", features = ["full"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-proc-macro2 = "1.0.92"
 quote = "1.0.38"
