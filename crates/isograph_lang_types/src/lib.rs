@@ -3,11 +3,11 @@ mod directives;
 mod entrypoint_declaration;
 mod id_types;
 mod isograph_type_annotation;
-mod scalar_field_valid_parsed_directives;
+mod scalar_field_valid_directive_set;
 
 pub use client_field_declaration::*;
 pub use directives::*;
 pub use entrypoint_declaration::*;
 pub use id_types::*;
 pub use isograph_type_annotation::*;
-pub use scalar_field_valid_parsed_directives::*;
+pub use scalar_field_valid_directive_set::*;

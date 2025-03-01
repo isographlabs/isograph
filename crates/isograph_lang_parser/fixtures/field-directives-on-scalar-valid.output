@@ -60,7 +60,14 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            associated_data: (),
+                                            associated_data: Loadable(
+                                                LoadableDirectiveSet {
+                                                    loadable: LoadableDirectiveParameters {
+                                                        complete_selection_set: false,
+                                                        lazy_load_artifact: false,
+                                                    },
+                                                },
+                                            ),
                                             arguments: [],
                                             directives: [
                                                 WithSpan {
@@ -185,7 +192,14 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            associated_data: (),
+                                            associated_data: Loadable(
+                                                LoadableDirectiveSet {
+                                                    loadable: LoadableDirectiveParameters {
+                                                        complete_selection_set: false,
+                                                        lazy_load_artifact: false,
+                                                    },
+                                                },
+                                            ),
                                             arguments: [],
                                             directives: [
                                                 WithSpan {
@@ -369,7 +383,14 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            associated_data: (),
+                                            associated_data: Loadable(
+                                                LoadableDirectiveSet {
+                                                    loadable: LoadableDirectiveParameters {
+                                                        complete_selection_set: false,
+                                                        lazy_load_artifact: true,
+                                                    },
+                                                },
+                                            ),
                                             arguments: [],
                                             directives: [
                                                 WithSpan {
@@ -553,7 +574,11 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            associated_data: (),
+                                            associated_data: Updatable(
+                                                UpdatableDirectiveSet {
+                                                    updatable: UpdatableDirectiveParameters,
+                                                },
+                                            ),
                                             arguments: [],
                                             directives: [
                                                 WithSpan {

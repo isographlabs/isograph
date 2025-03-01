@@ -1,140 +1,8 @@
-Ok(
-    (
-        RelativePathToSourceFile(
-            "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
-        ),
-        [
-            (
-                ClientFieldDeclaration(
-                    WithSpan {
-                        item: ClientFieldDeclaration {
-                            const_export_name: ConstExportName(
-                                "BasicField",
-                            ),
-                            parent_type: WithSpan {
-                                item: UnvalidatedTypeName(
-                                    "Type",
-                                ),
-                                span: Span {
-                                    start: 9,
-                                    end: 13,
-                                },
-                            },
-                            client_field_name: WithSpan {
-                                item: ScalarFieldName(
-                                    "Name",
-                                ),
-                                span: Span {
-                                    start: 14,
-                                    end: 18,
-                                },
-                            },
-                            description: None,
-                            selection_set: [
-                                WithSpan {
-                                    item: ScalarField(
-                                        ScalarFieldSelection {
-                                            name: WithLocation {
-                                                location: Embedded(
-                                                    EmbeddedLocation {
-                                                        text_source: TextSource {
-                                                            current_working_directory: CurrentWorkingDirectory,
-                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
-                                                            ),
-                                                            span: Some(
-                                                                Span {
-                                                                    start: 31,
-                                                                    end: 81,
-                                                                },
-                                                            ),
-                                                        },
-                                                        span: Span {
-                                                            start: 25,
-                                                            end: 31,
-                                                        },
-                                                    },
-                                                ),
-                                                item: ScalarFieldName(
-                                                    "scalar",
-                                                ),
-                                            },
-                                            reader_alias: None,
-                                            associated_data: (),
-                                            arguments: [],
-                                            directives: [
-                                                WithSpan {
-                                                    item: IsographFieldDirective {
-                                                        name: WithSpan {
-                                                            item: IsographDirectiveName(
-                                                                "hello",
-                                                            ),
-                                                            span: Span {
-                                                                start: 33,
-                                                                end: 38,
-                                                            },
-                                                        },
-                                                        arguments: [],
-                                                    },
-                                                    span: Span {
-                                                        start: 32,
-                                                        end: 38,
-                                                    },
-                                                },
-                                                WithSpan {
-                                                    item: IsographFieldDirective {
-                                                        name: WithSpan {
-                                                            item: IsographDirectiveName(
-                                                                "there",
-                                                            ),
-                                                            span: Span {
-                                                                start: 40,
-                                                                end: 45,
-                                                            },
-                                                        },
-                                                        arguments: [],
-                                                    },
-                                                    span: Span {
-                                                        start: 39,
-                                                        end: 45,
-                                                    },
-                                                },
-                                            ],
-                                        },
-                                    ),
-                                    span: Span {
-                                        start: 25,
-                                        end: 45,
-                                    },
-                                },
-                            ],
-                            directives: [],
-                            variable_definitions: [],
-                            definition_path: RelativePathToSourceFile(
-                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
-                            ),
-                            field_keyword: WithSpan {
-                                item: (),
-                                span: Span {
-                                    start: 3,
-                                    end: 8,
-                                },
-                            },
-                            dot: WithSpan {
-                                item: (),
-                                span: Span {
-                                    start: 13,
-                                    end: 14,
-                                },
-                            },
-                        },
-                        span: Span {
-                            start: 9,
-                            end: 49,
-                        },
-                    },
-                ),
-                TextSource {
+Err(
+    WithLocation {
+        location: Embedded(
+            EmbeddedLocation {
+                text_source: TextSource {
                     current_working_directory: CurrentWorkingDirectory,
                     relative_path_to_source_file: RelativePathToSourceFile(
                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
@@ -146,180 +14,36 @@ Ok(
                         },
                     ),
                 },
+                span: Span {
+                    start: 32,
+                    end: 38,
+                },
+            },
+        ),
+        item: UnableToDeserializeDirectives {
+            message: Custom(
+                "data did not match any variant of untagged enum ScalarFieldValidDirectiveSet",
             ),
-            (
-                ClientFieldDeclaration(
-                    WithSpan {
-                        item: ClientFieldDeclaration {
-                            const_export_name: ConstExportName(
-                                "BasicField2",
-                            ),
-                            parent_type: WithSpan {
-                                item: UnvalidatedTypeName(
-                                    "Type",
-                                ),
-                                span: Span {
-                                    start: 9,
-                                    end: 13,
-                                },
-                            },
-                            client_field_name: WithSpan {
-                                item: ScalarFieldName(
-                                    "Name",
-                                ),
-                                span: Span {
-                                    start: 14,
-                                    end: 18,
-                                },
-                            },
-                            description: None,
-                            selection_set: [
-                                WithSpan {
-                                    item: LinkedField(
-                                        LinkedFieldSelection {
-                                            name: WithLocation {
-                                                location: Embedded(
-                                                    EmbeddedLocation {
-                                                        text_source: TextSource {
-                                                            current_working_directory: CurrentWorkingDirectory,
-                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
-                                                            ),
-                                                            span: Some(
-                                                                Span {
-                                                                    start: 120,
-                                                                    end: 186,
-                                                                },
-                                                            ),
-                                                        },
-                                                        span: Span {
-                                                            start: 25,
-                                                            end: 31,
-                                                        },
-                                                    },
-                                                ),
-                                                item: LinkedFieldName(
-                                                    "linked",
-                                                ),
-                                            },
-                                            reader_alias: None,
-                                            associated_data: (),
-                                            selection_set: [],
-                                            arguments: [],
-                                            directives: [
-                                                WithSpan {
-                                                    item: IsographFieldDirective {
-                                                        name: WithSpan {
-                                                            item: IsographDirectiveName(
-                                                                "loadable",
-                                                            ),
-                                                            span: Span {
-                                                                start: 33,
-                                                                end: 41,
-                                                            },
-                                                        },
-                                                        arguments: [
-                                                            WithLocation {
-                                                                location: Embedded(
-                                                                    EmbeddedLocation {
-                                                                        text_source: TextSource {
-                                                                            current_working_directory: CurrentWorkingDirectory,
-                                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
-                                                                            ),
-                                                                            span: Some(
-                                                                                Span {
-                                                                                    start: 120,
-                                                                                    end: 186,
-                                                                                },
-                                                                            ),
-                                                                        },
-                                                                        span: Span {
-                                                                            start: 42,
-                                                                            end: 52,
-                                                                        },
-                                                                    },
-                                                                ),
-                                                                item: SelectionFieldArgument {
-                                                                    name: WithSpan {
-                                                                        item: FieldArgumentName(
-                                                                            "asdf",
-                                                                        ),
-                                                                        span: Span {
-                                                                            start: 42,
-                                                                            end: 46,
-                                                                        },
-                                                                    },
-                                                                    value: WithLocation {
-                                                                        location: Embedded(
-                                                                            EmbeddedLocation {
-                                                                                text_source: TextSource {
-                                                                                    current_working_directory: CurrentWorkingDirectory,
-                                                                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
-                                                                                    ),
-                                                                                    span: Some(
-                                                                                        Span {
-                                                                                            start: 120,
-                                                                                            end: 186,
-                                                                                        },
-                                                                                    ),
-                                                                                },
-                                                                                span: Span {
-                                                                                    start: 48,
-                                                                                    end: 52,
-                                                                                },
-                                                                            },
-                                                                        ),
-                                                                        item: Boolean(
-                                                                            true,
-                                                                        ),
-                                                                    },
-                                                                },
-                                                            },
-                                                        ],
-                                                    },
-                                                    span: Span {
-                                                        start: 32,
-                                                        end: 41,
-                                                    },
-                                                },
-                                            ],
-                                        },
-                                    ),
-                                    span: Span {
-                                        start: 25,
-                                        end: 61,
-                                    },
-                                },
-                            ],
-                            directives: [],
-                            variable_definitions: [],
-                            definition_path: RelativePathToSourceFile(
-                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
-                            ),
-                            field_keyword: WithSpan {
-                                item: (),
-                                span: Span {
-                                    start: 3,
-                                    end: 8,
-                                },
-                            },
-                            dot: WithSpan {
-                                item: (),
-                                span: Span {
-                                    start: 13,
-                                    end: 14,
-                                },
-                            },
-                        },
-                        span: Span {
-                            start: 9,
-                            end: 65,
-                        },
-                    },
-                ),
-                TextSource {
+        },
+    },
+)
+
+Unable to process directives. Message: Error when deserializing.
+
+data did not match any variant of untagged enum ScalarFieldValidDirectiveSet
+crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js
+
+  field Type.Name {
+    scalar @hello @there
+           ^^^^^^       
+  }
+
+---
+Err(
+    WithLocation {
+        location: Embedded(
+            EmbeddedLocation {
+                text_source: TextSource {
                     current_working_directory: CurrentWorkingDirectory,
                     relative_path_to_source_file: RelativePathToSourceFile(
                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
@@ -331,139 +55,36 @@ Ok(
                         },
                     ),
                 },
+                span: Span {
+                    start: 32,
+                    end: 41,
+                },
+            },
+        ),
+        item: UnableToDeserializeDirectives {
+            message: Custom(
+                "data did not match any variant of untagged enum ScalarFieldValidDirectiveSet",
             ),
-            (
-                ClientFieldDeclaration(
-                    WithSpan {
-                        item: ClientFieldDeclaration {
-                            const_export_name: ConstExportName(
-                                "BasicField3",
-                            ),
-                            parent_type: WithSpan {
-                                item: UnvalidatedTypeName(
-                                    "Type",
-                                ),
-                                span: Span {
-                                    start: 9,
-                                    end: 13,
-                                },
-                            },
-                            client_field_name: WithSpan {
-                                item: ScalarFieldName(
-                                    "Name",
-                                ),
-                                span: Span {
-                                    start: 14,
-                                    end: 18,
-                                },
-                            },
-                            description: None,
-                            selection_set: [
-                                WithSpan {
-                                    item: LinkedField(
-                                        LinkedFieldSelection {
-                                            name: WithLocation {
-                                                location: Embedded(
-                                                    EmbeddedLocation {
-                                                        text_source: TextSource {
-                                                            current_working_directory: CurrentWorkingDirectory,
-                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
-                                                            ),
-                                                            span: Some(
-                                                                Span {
-                                                                    start: 225,
-                                                                    end: 290,
-                                                                },
-                                                            ),
-                                                        },
-                                                        span: Span {
-                                                            start: 25,
-                                                            end: 31,
-                                                        },
-                                                    },
-                                                ),
-                                                item: LinkedFieldName(
-                                                    "linked",
-                                                ),
-                                            },
-                                            reader_alias: None,
-                                            associated_data: (),
-                                            selection_set: [],
-                                            arguments: [],
-                                            directives: [
-                                                WithSpan {
-                                                    item: IsographFieldDirective {
-                                                        name: WithSpan {
-                                                            item: IsographDirectiveName(
-                                                                "loadable",
-                                                            ),
-                                                            span: Span {
-                                                                start: 33,
-                                                                end: 41,
-                                                            },
-                                                        },
-                                                        arguments: [],
-                                                    },
-                                                    span: Span {
-                                                        start: 32,
-                                                        end: 41,
-                                                    },
-                                                },
-                                                WithSpan {
-                                                    item: IsographFieldDirective {
-                                                        name: WithSpan {
-                                                            item: IsographDirectiveName(
-                                                                "updatable",
-                                                            ),
-                                                            span: Span {
-                                                                start: 43,
-                                                                end: 52,
-                                                            },
-                                                        },
-                                                        arguments: [],
-                                                    },
-                                                    span: Span {
-                                                        start: 42,
-                                                        end: 52,
-                                                    },
-                                                },
-                                            ],
-                                        },
-                                    ),
-                                    span: Span {
-                                        start: 25,
-                                        end: 60,
-                                    },
-                                },
-                            ],
-                            directives: [],
-                            variable_definitions: [],
-                            definition_path: RelativePathToSourceFile(
-                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
-                            ),
-                            field_keyword: WithSpan {
-                                item: (),
-                                span: Span {
-                                    start: 3,
-                                    end: 8,
-                                },
-                            },
-                            dot: WithSpan {
-                                item: (),
-                                span: Span {
-                                    start: 13,
-                                    end: 14,
-                                },
-                            },
-                        },
-                        span: Span {
-                            start: 9,
-                            end: 64,
-                        },
-                    },
-                ),
-                TextSource {
+        },
+    },
+)
+
+Unable to process directives. Message: Error when deserializing.
+
+data did not match any variant of untagged enum ScalarFieldValidDirectiveSet
+crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js
+
+  field Type.Name {
+    linked @loadable(asdf: true) {
+           ^^^^^^^^^              
+    }
+  }
+---
+Err(
+    WithLocation {
+        location: Embedded(
+            EmbeddedLocation {
+                text_source: TextSource {
                     current_working_directory: CurrentWorkingDirectory,
                     relative_path_to_source_file: RelativePathToSourceFile(
                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
@@ -475,180 +96,36 @@ Ok(
                         },
                     ),
                 },
+                span: Span {
+                    start: 32,
+                    end: 41,
+                },
+            },
+        ),
+        item: UnableToDeserializeDirectives {
+            message: Custom(
+                "data did not match any variant of untagged enum ScalarFieldValidDirectiveSet",
             ),
-            (
-                ClientFieldDeclaration(
-                    WithSpan {
-                        item: ClientFieldDeclaration {
-                            const_export_name: ConstExportName(
-                                "BasicField4",
-                            ),
-                            parent_type: WithSpan {
-                                item: UnvalidatedTypeName(
-                                    "Type",
-                                ),
-                                span: Span {
-                                    start: 9,
-                                    end: 13,
-                                },
-                            },
-                            client_field_name: WithSpan {
-                                item: ScalarFieldName(
-                                    "Name",
-                                ),
-                                span: Span {
-                                    start: 14,
-                                    end: 18,
-                                },
-                            },
-                            description: None,
-                            selection_set: [
-                                WithSpan {
-                                    item: LinkedField(
-                                        LinkedFieldSelection {
-                                            name: WithLocation {
-                                                location: Embedded(
-                                                    EmbeddedLocation {
-                                                        text_source: TextSource {
-                                                            current_working_directory: CurrentWorkingDirectory,
-                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
-                                                            ),
-                                                            span: Some(
-                                                                Span {
-                                                                    start: 329,
-                                                                    end: 406,
-                                                                },
-                                                            ),
-                                                        },
-                                                        span: Span {
-                                                            start: 25,
-                                                            end: 31,
-                                                        },
-                                                    },
-                                                ),
-                                                item: LinkedFieldName(
-                                                    "linked",
-                                                ),
-                                            },
-                                            reader_alias: None,
-                                            associated_data: (),
-                                            selection_set: [],
-                                            arguments: [],
-                                            directives: [
-                                                WithSpan {
-                                                    item: IsographFieldDirective {
-                                                        name: WithSpan {
-                                                            item: IsographDirectiveName(
-                                                                "loadable",
-                                                            ),
-                                                            span: Span {
-                                                                start: 33,
-                                                                end: 41,
-                                                            },
-                                                        },
-                                                        arguments: [
-                                                            WithLocation {
-                                                                location: Embedded(
-                                                                    EmbeddedLocation {
-                                                                        text_source: TextSource {
-                                                                            current_working_directory: CurrentWorkingDirectory,
-                                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
-                                                                            ),
-                                                                            span: Some(
-                                                                                Span {
-                                                                                    start: 329,
-                                                                                    end: 406,
-                                                                                },
-                                                                            ),
-                                                                        },
-                                                                        span: Span {
-                                                                            start: 42,
-                                                                            end: 63,
-                                                                        },
-                                                                    },
-                                                                ),
-                                                                item: SelectionFieldArgument {
-                                                                    name: WithSpan {
-                                                                        item: FieldArgumentName(
-                                                                            "lazyLoadArtifact",
-                                                                        ),
-                                                                        span: Span {
-                                                                            start: 42,
-                                                                            end: 58,
-                                                                        },
-                                                                    },
-                                                                    value: WithLocation {
-                                                                        location: Embedded(
-                                                                            EmbeddedLocation {
-                                                                                text_source: TextSource {
-                                                                                    current_working_directory: CurrentWorkingDirectory,
-                                                                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
-                                                                                    ),
-                                                                                    span: Some(
-                                                                                        Span {
-                                                                                            start: 329,
-                                                                                            end: 406,
-                                                                                        },
-                                                                                    ),
-                                                                                },
-                                                                                span: Span {
-                                                                                    start: 60,
-                                                                                    end: 63,
-                                                                                },
-                                                                            },
-                                                                        ),
-                                                                        item: Integer(
-                                                                            123,
-                                                                        ),
-                                                                    },
-                                                                },
-                                                            },
-                                                        ],
-                                                    },
-                                                    span: Span {
-                                                        start: 32,
-                                                        end: 41,
-                                                    },
-                                                },
-                                            ],
-                                        },
-                                    ),
-                                    span: Span {
-                                        start: 25,
-                                        end: 72,
-                                    },
-                                },
-                            ],
-                            directives: [],
-                            variable_definitions: [],
-                            definition_path: RelativePathToSourceFile(
-                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
-                            ),
-                            field_keyword: WithSpan {
-                                item: (),
-                                span: Span {
-                                    start: 3,
-                                    end: 8,
-                                },
-                            },
-                            dot: WithSpan {
-                                item: (),
-                                span: Span {
-                                    start: 13,
-                                    end: 14,
-                                },
-                            },
-                        },
-                        span: Span {
-                            start: 9,
-                            end: 76,
-                        },
-                    },
-                ),
-                TextSource {
+        },
+    },
+)
+
+Unable to process directives. Message: Error when deserializing.
+
+data did not match any variant of untagged enum ScalarFieldValidDirectiveSet
+crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js
+
+  field Type.Name {
+    linked @loadable @updatable {
+           ^^^^^^^^^             
+    }
+  }
+---
+Err(
+    WithLocation {
+        location: Embedded(
+            EmbeddedLocation {
+                text_source: TextSource {
                     current_working_directory: CurrentWorkingDirectory,
                     relative_path_to_source_file: RelativePathToSourceFile(
                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
@@ -660,7 +137,28 @@ Ok(
                         },
                     ),
                 },
+                span: Span {
+                    start: 32,
+                    end: 41,
+                },
+            },
+        ),
+        item: UnableToDeserializeDirectives {
+            message: Custom(
+                "data did not match any variant of untagged enum ScalarFieldValidDirectiveSet",
             ),
-        ],
-    ),
+        },
+    },
 )
+
+Unable to process directives. Message: Error when deserializing.
+
+data did not match any variant of untagged enum ScalarFieldValidDirectiveSet
+crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js
+
+  field Type.Name {
+    linked @loadable(lazyLoadArtifact: 123) {
+           ^^^^^^^^^                         
+    }
+  }
+---

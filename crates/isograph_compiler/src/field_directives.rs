@@ -1,12 +1,10 @@
-use common_lang_types::{IsographDirectiveName, Location, WithLocation, WithSpan};
+use common_lang_types::{IsographDirectiveName, WithLocation, WithSpan};
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    from_isograph_field_directives, ClientFieldDeclaration,
-    ClientFieldDeclarationWithUnvalidatedDirectives, ClientFieldDeclarationWithValidatedDirectives,
-    ClientPointerDeclaration, ClientPointerDeclarationWithUnvalidatedDirectives,
-    ClientPointerDeclarationWithValidatedDirectives, EmptyDirectiveSet, IsographFieldDirective,
+    ClientFieldDeclaration, ClientPointerDeclaration, EmptyDirectiveSet, IsographFieldDirective,
     LinkedFieldSelection, ScalarFieldSelection, ScalarFieldValidDirectiveSet, ServerFieldSelection,
-    UnvalidatedSelection, UpdatableDirectiveParameters, UpdatableDirectiveSet,
+    UnvalidatedSelection, UnvalidatedSelectionWithUnvalidatedDirectives,
+    UpdatableDirectiveParameters, UpdatableDirectiveSet,
 };
 use isograph_schema::ProcessClientFieldDeclarationError;
 use lazy_static::lazy_static;
@@ -18,11 +16,9 @@ lazy_static! {
 
 #[allow(clippy::complexity)]
 pub fn validate_isograph_field_directives(
-    client_field: WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>,
-) -> Result<
-    WithSpan<ClientFieldDeclarationWithValidatedDirectives>,
-    Vec<WithLocation<ProcessClientFieldDeclarationError>>,
-> {
+    client_field: WithSpan<ClientFieldDeclaration>,
+) -> Result<WithSpan<ClientFieldDeclaration>, Vec<WithLocation<ProcessClientFieldDeclarationError>>>
+{
     client_field.and_then(|client_field| {
         let ClientFieldDeclaration {
             const_export_name,
@@ -37,7 +33,7 @@ pub fn validate_isograph_field_directives(
             field_keyword,
         } = client_field;
 
-        Ok(ClientFieldDeclarationWithValidatedDirectives {
+        Ok(ClientFieldDeclaration {
             const_export_name,
             parent_type,
             client_field_name,
@@ -53,28 +49,14 @@ pub fn validate_isograph_field_directives(
 }
 
 pub fn validate_isograph_selection_set_directives(
-    selection_set: Vec<WithSpan<ServerFieldSelection<(), ()>>>,
+    selection_set: Vec<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>>,
 ) -> Result<
     Vec<WithSpan<UnvalidatedSelection>>,
     Vec<WithLocation<ProcessClientFieldDeclarationError>>,
 > {
     and_then_selection_set_and_collect_errors(
         selection_set,
-        &|scalar_field_selection| {
-            let scalar_field_selection_variant: ScalarFieldValidDirectiveSet =
-                from_isograph_field_directives(&scalar_field_selection.directives).map_err(
-                    |message| {
-                        WithLocation::new(
-                            ProcessClientFieldDeclarationError::UnableToDeserializeDirectives {
-                                message,
-                            },
-                            Location::generated(),
-                        )
-                    },
-                )?;
-
-            Ok(scalar_field_selection_variant)
-        },
+        &|scalar_field_selection| Ok(scalar_field_selection.associated_data),
         &|linked_field_selection| {
             let updatable_directive = find_directive_named(
                 &linked_field_selection.directives,
@@ -94,11 +76,9 @@ pub fn validate_isograph_selection_set_directives(
 
 #[allow(clippy::complexity)]
 pub fn validate_isograph_pointer_directives(
-    client_pointer: WithSpan<ClientPointerDeclarationWithUnvalidatedDirectives>,
-) -> Result<
-    WithSpan<ClientPointerDeclarationWithValidatedDirectives>,
-    Vec<WithLocation<ProcessClientFieldDeclarationError>>,
-> {
+    client_pointer: WithSpan<ClientPointerDeclaration>,
+) -> Result<WithSpan<ClientPointerDeclaration>, Vec<WithLocation<ProcessClientFieldDeclarationError>>>
+{
     client_pointer.and_then(|client_pointer| {
         let ClientPointerDeclaration {
             const_export_name,
@@ -114,7 +94,7 @@ pub fn validate_isograph_pointer_directives(
             directives,
         } = client_pointer;
 
-        Ok(ClientPointerDeclarationWithValidatedDirectives {
+        Ok(ClientPointerDeclaration {
             const_export_name,
             parent_type,
             client_pointer_name,

@@ -11,7 +11,9 @@ use std::fmt::Debug;
 
 use crate::{IsographFieldDirective, ScalarFieldValidDirectiveSet};
 
-pub type UnvalidatedSelectionWithUnvalidatedDirectives = ServerFieldSelection<(), ()>;
+// This name makes no sense anymore... directives are validated!
+pub type UnvalidatedSelectionWithUnvalidatedDirectives =
+    ServerFieldSelection<ScalarFieldValidDirectiveSet, ScalarFieldValidDirectiveSet>;
 
 pub type UnvalidatedSelection = ServerFieldSelection<
     // <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
@@ -25,12 +27,15 @@ pub type UnvalidatedScalarFieldSelection = ScalarFieldSelection<
 >;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub struct ClientFieldDeclaration<TScalarField, TLinkedField> {
+pub struct ClientFieldDeclaration {
     pub const_export_name: ConstExportName,
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub client_field_name: WithSpan<ScalarFieldName>,
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub selection_set: Vec<WithSpan<ServerFieldSelection<TScalarField, TLinkedField>>>,
+    pub selection_set: Vec<
+        WithSpan<ServerFieldSelection<ScalarFieldValidDirectiveSet, ScalarFieldValidDirectiveSet>>,
+    >,
+    // TODO remove, or put on a generic
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: RelativePathToSourceFile,
@@ -42,14 +47,16 @@ pub struct ClientFieldDeclaration<TScalarField, TLinkedField> {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub struct ClientPointerDeclaration<TScalarField, TLinkedField> {
+pub struct ClientPointerDeclaration {
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub const_export_name: ConstExportName,
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub target_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     pub client_pointer_name: WithSpan<ClientPointerFieldName>,
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub selection_set: Vec<WithSpan<ServerFieldSelection<TScalarField, TLinkedField>>>,
+    pub selection_set: Vec<
+        WithSpan<ServerFieldSelection<ScalarFieldValidDirectiveSet, ScalarFieldValidDirectiveSet>>,
+    >,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: RelativePathToSourceFile,
 
@@ -59,15 +66,7 @@ pub struct ClientPointerDeclaration<TScalarField, TLinkedField> {
     pub dot: WithSpan<()>,
 }
 
-pub type ClientFieldDeclarationWithUnvalidatedDirectives = ClientFieldDeclaration<(), ()>;
-pub type ClientPointerDeclarationWithUnvalidatedDirectives = ClientPointerDeclaration<(), ()>;
-pub type ClientFieldDeclarationWithValidatedDirectives =
-    ClientFieldDeclaration<ScalarFieldValidDirectiveSet, ScalarFieldValidDirectiveSet>;
-
-pub type ClientPointerDeclarationWithValidatedDirectives =
-    ClientPointerDeclaration<ScalarFieldValidDirectiveSet, ScalarFieldValidDirectiveSet>;
-
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Default)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Default, Hash)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LoadableDirectiveParameters {
     #[serde(default)]
