@@ -4,9 +4,9 @@ use isograph_lang_types::{
     from_isograph_field_directives, ClientFieldDeclaration,
     ClientFieldDeclarationWithUnvalidatedDirectives, ClientFieldDeclarationWithValidatedDirectives,
     ClientPointerDeclaration, ClientPointerDeclarationWithUnvalidatedDirectives,
-    ClientPointerDeclarationWithValidatedDirectives, IsographFieldDirective,
-    IsographSelectionVariant, LinkedFieldSelection, ScalarFieldSelection,
-    ScalarFieldSelectionVariant, ServerFieldSelection, UnvalidatedSelection,
+    ClientPointerDeclarationWithValidatedDirectives, EmptyStruct, IsographFieldDirective,
+    LinkedFieldSelection, ScalarFieldSelection, ScalarFieldSelectionVariant, ServerFieldSelection,
+    UnvalidatedSelection, UpdatableDirectiveParameters, UpdatableScalarSelectionVariant,
 };
 use isograph_schema::ProcessClientFieldDeclarationError;
 use lazy_static::lazy_static;
@@ -73,13 +73,7 @@ pub fn validate_isograph_selection_set_directives(
                     },
                 )?;
 
-            Ok(match scalar_field_selection_variant {
-                ScalarFieldSelectionVariant::Loadable(loadable_wrapper) => {
-                    IsographSelectionVariant::Loadable(loadable_wrapper.loadable)
-                }
-                ScalarFieldSelectionVariant::Updatable(_) => IsographSelectionVariant::Updatable,
-                ScalarFieldSelectionVariant::None(_) => IsographSelectionVariant::Regular,
-            })
+            Ok(scalar_field_selection_variant)
         },
         &|linked_field_selection| {
             let updatable_directive = find_directive_named(
@@ -88,9 +82,11 @@ pub fn validate_isograph_selection_set_directives(
             );
 
             Ok(if updatable_directive.is_some() {
-                IsographSelectionVariant::Updatable
+                ScalarFieldSelectionVariant::Updatable(UpdatableScalarSelectionVariant {
+                    updatable: UpdatableDirectiveParameters {},
+                })
             } else {
-                IsographSelectionVariant::Regular
+                ScalarFieldSelectionVariant::None(EmptyStruct {})
             })
         },
     )

@@ -6,8 +6,8 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, IsographSelectionVariant, ScalarFieldSelection, ServerFieldSelection,
-    ServerObjectId,
+    ArgumentKeyAndValue, EmptyStruct, ScalarFieldSelection, ScalarFieldSelectionVariant,
+    ServerFieldSelection, ServerObjectId,
 };
 
 use crate::{
@@ -165,12 +165,12 @@ impl GenerateRefetchQueryFn for GenerateRefetchQueryImpl {
 }
 
 pub fn id_selection(
-) -> WithSpan<ServerFieldSelection<IsographSelectionVariant, IsographSelectionVariant>> {
+) -> WithSpan<ServerFieldSelection<ScalarFieldSelectionVariant, ScalarFieldSelectionVariant>> {
     WithSpan::new(
         ServerFieldSelection::ScalarField(ScalarFieldSelection {
             name: WithLocation::new("id".intern().into(), Location::generated()),
             reader_alias: None,
-            associated_data: IsographSelectionVariant::Regular,
+            associated_data: ScalarFieldSelectionVariant::None(EmptyStruct {}),
             arguments: vec![],
             directives: vec![],
         }),

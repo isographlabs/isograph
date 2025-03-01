@@ -10,8 +10,8 @@ use common_lang_types::{
 
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    reachable_variables, ClientFieldId, ClientPointerId, IsographSelectionVariant,
-    LinkedFieldSelection, ScalarFieldSelection, SelectionFieldArgument, SelectionType,
+    reachable_variables, ClientFieldId, ClientPointerId, LinkedFieldSelection,
+    ScalarFieldSelection, ScalarFieldSelectionVariant, SelectionFieldArgument, SelectionType,
     ServerObjectId, UnvalidatedScalarFieldSelection, UnvalidatedSelection, VariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -458,27 +458,27 @@ fn validate_field_type_exists_and_is_scalar<TOutputFormat: OutputFormat>(
                         associated_data: ValidatedScalarFieldAssociatedData {
                             location: FieldType::ServerField(*server_field_id),
                             selection_variant: match scalar_field_selection.associated_data {
-                                IsographSelectionVariant::Regular => {
+                                ScalarFieldSelectionVariant::None(_) => {
                                     assert_no_missing_arguments(
                                         missing_arguments,
                                         scalar_field_selection.name.location,
                                     )?;
                                     ValidatedIsographSelectionVariant::Regular
                                 }
-                                IsographSelectionVariant::Updatable => {
+                                ScalarFieldSelectionVariant::Updatable(_) => {
                                     assert_no_missing_arguments(
                                         missing_arguments,
                                         scalar_field_selection.name.location,
                                     )?;
                                     ValidatedIsographSelectionVariant::Updatable
                                 }
-                                IsographSelectionVariant::Loadable(l) => {
+                                ScalarFieldSelectionVariant::Loadable(l) => {
                                     server_field_cannot_be_selected_loadably(
                                         scalar_field_name,
                                         scalar_field_selection.name.location,
                                     )?;
                                     ValidatedIsographSelectionVariant::Loadable((
-                                        l,
+                                        l.loadable,
                                         missing_arguments,
                                     ))
                                 }
@@ -593,22 +593,22 @@ fn validate_client_field<TOutputFormat: OutputFormat>(
         associated_data: ValidatedScalarFieldAssociatedData {
             location: FieldType::ClientField(*client_field_id),
             selection_variant: match scalar_field_selection.associated_data {
-                IsographSelectionVariant::Regular => {
+                ScalarFieldSelectionVariant::None(_) => {
                     assert_no_missing_arguments(
                         missing_arguments,
                         scalar_field_selection.name.location,
                     )?;
                     ValidatedIsographSelectionVariant::Regular
                 }
-                IsographSelectionVariant::Updatable => {
+                ScalarFieldSelectionVariant::Updatable(_) => {
                     assert_no_missing_arguments(
                         missing_arguments,
                         scalar_field_selection.name.location,
                     )?;
                     ValidatedIsographSelectionVariant::Updatable
                 }
-                IsographSelectionVariant::Loadable(l) => {
-                    ValidatedIsographSelectionVariant::Loadable((l, missing_arguments))
+                ScalarFieldSelectionVariant::Loadable(l) => {
+                    ValidatedIsographSelectionVariant::Loadable((l.loadable, missing_arguments))
                 }
             },
         },
@@ -699,27 +699,27 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
                                 parent_object_id: object_id.type_name.inner_non_null(),
                                 field_id: FieldType::ServerField(server_field.id),
                                 selection_variant: match linked_field_selection.associated_data {
-                                    IsographSelectionVariant::Regular => {
+                                    ScalarFieldSelectionVariant::None(_)=> {
                                         assert_no_missing_arguments(
                                             missing_arguments,
                                             linked_field_selection.name.location,
                                         )?;
                                         ValidatedIsographSelectionVariant::Regular
                                     }
-                                    IsographSelectionVariant::Updatable => {
+                                    ScalarFieldSelectionVariant::Updatable(_) => {
                                         assert_no_missing_arguments(
                                             missing_arguments,
                                             linked_field_selection.name.location,
                                         )?;
                                         ValidatedIsographSelectionVariant::Updatable
                                     }
-                                    IsographSelectionVariant::Loadable(l) => {
+                                    ScalarFieldSelectionVariant::Loadable(l) => {
                                         server_field_cannot_be_selected_loadably(
                                             linked_field_name,
                                             linked_field_selection.name.location,
                                         )?;
                                         ValidatedIsographSelectionVariant::Loadable((
-                                            l,
+                                            l.loadable,
                                             missing_arguments,
                                         ))
                                     }
@@ -786,20 +786,20 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
                             parent_object_id: *object_id,
                             field_id: FieldType::ClientField(*client_pointer_id),
                             selection_variant: match linked_field_selection.associated_data {
-                                IsographSelectionVariant::Regular => {
+                                ScalarFieldSelectionVariant::None(_) => {
                                     assert_no_missing_arguments(
                                         missing_arguments,
                                         linked_field_selection.name.location,
                                     )?;
                                     ValidatedIsographSelectionVariant::Regular
                                 }
-                                IsographSelectionVariant::Loadable(l) => {
+                                ScalarFieldSelectionVariant::Loadable(l) => {
                                     ValidatedIsographSelectionVariant::Loadable((
-                                        l,
+                                        l.loadable,
                                         missing_arguments,
                                     ))
                                 }
-                                IsographSelectionVariant::Updatable => {
+                                ScalarFieldSelectionVariant::Updatable(_) => {
                                     assert_no_missing_arguments(
                                         missing_arguments,
                                         linked_field_selection.name.location,

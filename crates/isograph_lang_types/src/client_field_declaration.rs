@@ -9,19 +9,19 @@ use intern::string_key::Lookup;
 use serde::Deserialize;
 use std::fmt::Debug;
 
-use crate::IsographFieldDirective;
+use crate::{IsographFieldDirective, ScalarFieldSelectionVariant};
 
 pub type UnvalidatedSelectionWithUnvalidatedDirectives = ServerFieldSelection<(), ()>;
 
 pub type UnvalidatedSelection = ServerFieldSelection<
     // <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
-    IsographSelectionVariant,
+    ScalarFieldSelectionVariant,
     // <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
-    IsographSelectionVariant,
+    ScalarFieldSelectionVariant,
 >;
 pub type UnvalidatedScalarFieldSelection = ScalarFieldSelection<
     // <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
-    IsographSelectionVariant,
+    ScalarFieldSelectionVariant,
 >;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
@@ -62,19 +62,10 @@ pub struct ClientPointerDeclaration<TScalarField, TLinkedField> {
 pub type ClientFieldDeclarationWithUnvalidatedDirectives = ClientFieldDeclaration<(), ()>;
 pub type ClientPointerDeclarationWithUnvalidatedDirectives = ClientPointerDeclaration<(), ()>;
 pub type ClientFieldDeclarationWithValidatedDirectives =
-    ClientFieldDeclaration<IsographSelectionVariant, IsographSelectionVariant>;
+    ClientFieldDeclaration<ScalarFieldSelectionVariant, ScalarFieldSelectionVariant>;
 
 pub type ClientPointerDeclarationWithValidatedDirectives =
-    ClientPointerDeclaration<IsographSelectionVariant, IsographSelectionVariant>;
-
-// TODO we should not have an enum, but instead a struct with fields lazy_load_artifact_info
-// and loadable_info or something.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum IsographSelectionVariant {
-    Regular,
-    Loadable(LoadableDirectiveParameters),
-    Updatable,
-}
+    ClientPointerDeclaration<ScalarFieldSelectionVariant, ScalarFieldSelectionVariant>;
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Default)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

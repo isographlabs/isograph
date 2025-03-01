@@ -9,8 +9,8 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, IsographSelectionVariant, NonConstantValue,
-    RefetchQueryIndex, SelectableServerFieldId, SelectionFieldArgument, SelectionType,
+    ArgumentKeyAndValue, ClientFieldId, EmptyStruct, NonConstantValue, RefetchQueryIndex,
+    ScalarFieldSelectionVariant, SelectableServerFieldId, SelectionFieldArgument, SelectionType,
     ServerFieldId, ServerFieldSelection, ServerObjectId, VariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -192,7 +192,7 @@ pub struct PathToRefetchFieldInfo {
 }
 
 pub type RefetchedPathsMap =
-    BTreeMap<(PathToRefetchField, IsographSelectionVariant), RootRefetchedPath>;
+    BTreeMap<(PathToRefetchField, ScalarFieldSelectionVariant), RootRefetchedPath>;
 
 /// As we traverse, whenever we enter a new scalar client field (including at the
 /// root, with the entrypoint), we create a new one of these and pass it down.
@@ -958,7 +958,7 @@ fn insert_imperative_field_into_refetch_paths<TOutputFormat: OutputFormat>(
         client_field_id: newly_encountered_scalar_client_field.id,
     };
     merge_traversal_state.refetch_paths.insert(
-        (path, IsographSelectionVariant::Regular),
+        (path, ScalarFieldSelectionVariant::None(EmptyStruct {})),
         RootRefetchedPath {
             field_name: newly_encountered_scalar_client_field.name,
             path_to_refetch_field_info: info,
