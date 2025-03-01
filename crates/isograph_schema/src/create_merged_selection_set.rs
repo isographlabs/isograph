@@ -22,8 +22,8 @@ use crate::{
     ClientTypeId, FieldType, ImperativelyLoadedFieldVariant, Loadability, NameAndArguments,
     OutputFormat, PathToRefetchField, RootOperationName, SchemaObject, SchemaServerFieldVariant,
     UnvalidatedVariableDefinition, ValidatedClientField, ValidatedClientPointer,
-    ValidatedIsographSelectionVariant, ValidatedScalarFieldSelection, ValidatedSchema,
-    ValidatedSchemaIdField, ValidatedSelection, VariableContext,
+    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection,
+    VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -672,11 +672,11 @@ fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
                 match &scalar_field_selection.associated_data.location {
                     FieldType::ServerField(_) => {
                         match scalar_field_selection.associated_data.selection_variant {
-                            ValidatedIsographSelectionVariant::Updatable => {
+                            ScalarFieldSelectionVariant::Updatable(_) => {
                                 merge_traversal_state.has_updatable = true;
                             }
-                            ValidatedIsographSelectionVariant::Regular => (),
-                            ValidatedIsographSelectionVariant::Loadable(_) => (),
+                            ScalarFieldSelectionVariant::None(_) => (),
+                            ScalarFieldSelectionVariant::Loadable(_) => (),
                         };
 
                         merge_scalar_server_field(
@@ -1038,7 +1038,7 @@ fn merge_non_loadable_client_type<TOutputFormat: OutputFormat>(
     let transformed_child_variable_context = parent_variable_context.child_variable_context(
         selection_arguments,
         newly_encountered_client_type.variable_definitions(),
-        &ValidatedIsographSelectionVariant::Regular,
+        &ScalarFieldSelectionVariant::None(EmptyStruct {}),
     );
     transform_and_merge_child_selection_map_into_parent_map(
         parent_map,

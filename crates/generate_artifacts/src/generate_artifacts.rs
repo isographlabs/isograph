@@ -11,16 +11,15 @@ use core::panic;
 use isograph_config::CompilerConfig;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, NonConstantValue, ScalarFieldSelection,
-    SelectableServerFieldId, SelectionType, ServerFieldSelection, ServerObjectId, TypeAnnotation,
-    UnionVariant, VariableDefinition,
+    ScalarFieldSelectionVariant, SelectableServerFieldId, SelectionType, ServerFieldSelection,
+    ServerObjectId, TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
     get_provided_arguments, selection_map_wrapped, ClientFieldVariant, ClientType,
     FieldTraversalResult, FieldType, NameAndArguments, NormalizationKey, OutputFormat,
     RequiresRefinement, Schema, SchemaObject, SchemaServerFieldVariant,
-    UserWrittenComponentVariant, ValidatedClientField, ValidatedIsographSelectionVariant,
-    ValidatedScalarFieldAssociatedData, ValidatedSchema, ValidatedSchemaState, ValidatedSelection,
-    ValidatedVariableDefinition,
+    UserWrittenComponentVariant, ValidatedClientField, ValidatedScalarFieldAssociatedData,
+    ValidatedSchema, ValidatedSchemaState, ValidatedSelection, ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -708,9 +707,9 @@ fn write_param_type_from_client_field<TOutputFormat: OutputFormat>(
                 client_field.type_and_field.underscore_separated()
             );
             let output_type = match scalar_field_selection.associated_data.selection_variant {
-                ValidatedIsographSelectionVariant::Updatable
-                | ValidatedIsographSelectionVariant::Regular => inner_output_type,
-                ValidatedIsographSelectionVariant::Loadable(_) => {
+                ScalarFieldSelectionVariant::Updatable(_)
+                | ScalarFieldSelectionVariant::None(_) => inner_output_type,
+                ScalarFieldSelectionVariant::Loadable(_) => {
                     loadable_fields.insert(client_field.type_and_field);
                     let provided_arguments = get_provided_arguments(
                         client_field.variable_definitions.iter().map(|x| &x.item),
@@ -796,7 +795,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                     };
 
                     match scalar_field_selection.associated_data.selection_variant {
-                        ValidatedIsographSelectionVariant::Updatable => {
+                        ScalarFieldSelectionVariant::Updatable(_) => {
                             *updatable_fields = true;
                             query_type_declaration
                                 .push_str(&"  ".repeat(indentation_level as usize).to_string());
@@ -806,10 +805,10 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                                 print_javascript_type_declaration(&output_type)
                             ));
                         }
-                        ValidatedIsographSelectionVariant::Loadable(_) => {
+                        ScalarFieldSelectionVariant::Loadable(_) => {
                             panic!("@loadable server fields are not supported")
                         }
-                        ValidatedIsographSelectionVariant::Regular => {
+                        ScalarFieldSelectionVariant::None(_) => {
                             query_type_declaration.push_str(&format!(
                                 "{}readonly {}: {},\n",
                                 "  ".repeat(indentation_level as usize),
@@ -864,10 +863,10 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                     });
 
             match linked_field.associated_data.selection_variant {
-                ValidatedIsographSelectionVariant::Loadable(_) => {
+                ScalarFieldSelectionVariant::Loadable(_) => {
                     panic!("@loadable server fields are not supported")
                 }
-                ValidatedIsographSelectionVariant::Updatable => {
+                ScalarFieldSelectionVariant::Updatable(_) => {
                     *updatable_fields = true;
                     write_getter_and_setter(
                         query_type_declaration,
@@ -877,7 +876,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                         &type_annotation,
                     );
                 }
-                ValidatedIsographSelectionVariant::Regular => {
+                ScalarFieldSelectionVariant::None(_) => {
                     query_type_declaration.push_str(&format!(
                         "readonly {}: {},\n",
                         name_or_alias,

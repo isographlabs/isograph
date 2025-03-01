@@ -1,12 +1,14 @@
 use common_lang_types::{SelectableFieldName, Span, UnvalidatedTypeName, WithLocation, WithSpan};
 use graphql_lang_types::{GraphQLNamedTypeAnnotation, GraphQLTypeAnnotation};
 use intern::string_key::Intern;
-use isograph_lang_types::{ScalarFieldSelection, ServerFieldSelection};
+use isograph_lang_types::{
+    EmptyStruct, ScalarFieldSelection, ScalarFieldSelectionVariant, ServerFieldSelection,
+};
 
 use crate::{
     ClientType, FieldType, OutputFormat, SchemaServerField, SchemaServerFieldVariant,
     ServerFieldTypeAssociatedData, ServerFieldTypeAssociatedDataInlineFragment, UnvalidatedSchema,
-    ValidatedIsographSelectionVariant, ValidatedScalarFieldAssociatedData, LINK_FIELD_NAME,
+    ValidatedScalarFieldAssociatedData, LINK_FIELD_NAME,
 };
 use common_lang_types::Location;
 
@@ -46,7 +48,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                                     .as_server_field()
                                     .expect("Expected __typename to be server field"),
                             ),
-                            selection_variant: ValidatedIsographSelectionVariant::Regular,
+                            selection_variant: ScalarFieldSelectionVariant::None(EmptyStruct {}),
                         },
                         directives: vec![],
                         name: WithLocation::new(
@@ -76,7 +78,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                                     }
                                 },
                             ),
-                            selection_variant: ValidatedIsographSelectionVariant::Regular,
+                            selection_variant: ScalarFieldSelectionVariant::None(EmptyStruct {}),
                         },
                         directives: vec![],
                         name: WithLocation::new(*LINK_FIELD_NAME, Location::generated()),

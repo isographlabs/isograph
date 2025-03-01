@@ -2,14 +2,15 @@ use std::collections::{BTreeSet, HashSet};
 
 use common_lang_types::{ObjectTypeAndFieldName, SelectableFieldName, WithSpan};
 use isograph_lang_types::{
-    LoadableDirectiveParameters, RefetchQueryIndex, SelectionType, ServerFieldSelection,
+    EmptyStruct, LoadableDirectiveParameters, RefetchQueryIndex, ScalarFieldSelectionVariant,
+    SelectionType, ServerFieldSelection,
 };
 use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, ClientFieldVariant,
     FieldType, Loadability, NameAndArguments, NormalizationKey, OutputFormat, PathToRefetchField,
     RefetchedPathsMap, SchemaServerFieldVariant, ValidatedClientField,
-    ValidatedIsographSelectionVariant, ValidatedLinkedFieldSelection,
-    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSelection, VariableContext,
+    ValidatedLinkedFieldSelection, ValidatedScalarFieldSelection, ValidatedSchema,
+    ValidatedSelection, VariableContext,
 };
 
 use crate::{
@@ -160,7 +161,7 @@ fn linked_field_ast_node<TOutputFormat: OutputFormat>(
 
     let is_updatable = matches!(
         linked_field.associated_data.selection_variant,
-        ValidatedIsographSelectionVariant::Updatable
+        ScalarFieldSelectionVariant::Updatable(_)
     );
 
     format!(
@@ -464,7 +465,7 @@ fn server_defined_scalar_field_ast_node(
     );
     let is_updatable = matches!(
         scalar_field_selection.associated_data.selection_variant,
-        ValidatedIsographSelectionVariant::Updatable
+        ScalarFieldSelectionVariant::Updatable(_)
     );
     let indent_1 = "  ".repeat(indentation_level as usize);
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
@@ -643,7 +644,7 @@ fn refetched_paths_with_path<TOutputFormat: OutputFormat>(
                                     &initial_variable_context.child_variable_context(
                                         &scalar_field_selection.arguments,
                                         &client_field.variable_definitions,
-                                        &ValidatedIsographSelectionVariant::Regular,
+                                        &ScalarFieldSelectionVariant::None(EmptyStruct {}),
                                     ),
                                 );
 
