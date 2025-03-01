@@ -9,21 +9,23 @@ use intern::string_key::Lookup;
 use serde::Deserialize;
 use std::fmt::Debug;
 
-use crate::{IsographFieldDirective, LinkedFieldValidDirectiveSet, ScalarFieldValidDirectiveSet};
+use crate::{
+    IsographFieldDirective, LinkedFieldSelectionDirectiveSet, ScalarFieldSelectionDirectiveSet,
+};
 
 // This name makes no sense anymore... directives are validated!
 pub type UnvalidatedSelectionWithUnvalidatedDirectives =
-    ServerFieldSelection<ScalarFieldValidDirectiveSet, LinkedFieldValidDirectiveSet>;
+    ServerFieldSelection<ScalarFieldSelectionDirectiveSet, LinkedFieldSelectionDirectiveSet>;
 
 pub type UnvalidatedSelection = ServerFieldSelection<
     // <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
-    ScalarFieldValidDirectiveSet,
+    ScalarFieldSelectionDirectiveSet,
     // <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
-    LinkedFieldValidDirectiveSet,
+    LinkedFieldSelectionDirectiveSet,
 >;
 pub type UnvalidatedScalarFieldSelection = ScalarFieldSelection<
     // <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
-    ScalarFieldValidDirectiveSet,
+    ScalarFieldSelectionDirectiveSet,
 >;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
@@ -33,7 +35,12 @@ pub struct ClientFieldDeclaration {
     pub client_field_name: WithSpan<ScalarFieldName>,
     pub description: Option<WithSpan<DescriptionValue>>,
     pub selection_set: Vec<
-        WithSpan<ServerFieldSelection<ScalarFieldValidDirectiveSet, LinkedFieldValidDirectiveSet>>,
+        WithSpan<
+            ServerFieldSelection<
+                ScalarFieldSelectionDirectiveSet,
+                LinkedFieldSelectionDirectiveSet,
+            >,
+        >,
     >,
     // TODO remove, or put on a generic
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
@@ -55,7 +62,12 @@ pub struct ClientPointerDeclaration {
     pub client_pointer_name: WithSpan<ClientPointerFieldName>,
     pub description: Option<WithSpan<DescriptionValue>>,
     pub selection_set: Vec<
-        WithSpan<ServerFieldSelection<ScalarFieldValidDirectiveSet, LinkedFieldValidDirectiveSet>>,
+        WithSpan<
+            ServerFieldSelection<
+                ScalarFieldSelectionDirectiveSet,
+                LinkedFieldSelectionDirectiveSet,
+            >,
+        >,
     >,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: RelativePathToSourceFile,

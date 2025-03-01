@@ -3,7 +3,7 @@ use std::collections::{BTreeSet, HashSet};
 use common_lang_types::{ObjectTypeAndFieldName, SelectableFieldName, WithSpan};
 use isograph_lang_types::{
     EmptyDirectiveSet, LoadableDirectiveParameters, RefetchQueryIndex,
-    ScalarFieldValidDirectiveSet, SelectionType, ServerFieldSelection,
+    ScalarFieldSelectionDirectiveSet, SelectionType, ServerFieldSelection,
 };
 use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, ClientFieldVariant,
@@ -161,7 +161,7 @@ fn linked_field_ast_node<TOutputFormat: OutputFormat>(
 
     let is_updatable = matches!(
         linked_field.associated_data.selection_variant,
-        ScalarFieldValidDirectiveSet::Updatable(_)
+        ScalarFieldSelectionDirectiveSet::Updatable(_)
     );
 
     format!(
@@ -465,7 +465,7 @@ fn server_defined_scalar_field_ast_node(
     );
     let is_updatable = matches!(
         scalar_field_selection.associated_data.selection_variant,
-        ScalarFieldValidDirectiveSet::Updatable(_)
+        ScalarFieldSelectionDirectiveSet::Updatable(_)
     );
     let indent_1 = "  ".repeat(indentation_level as usize);
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
@@ -644,7 +644,9 @@ fn refetched_paths_with_path<TOutputFormat: OutputFormat>(
                                     &initial_variable_context.child_variable_context(
                                         &scalar_field_selection.arguments,
                                         &client_field.variable_definitions,
-                                        &ScalarFieldValidDirectiveSet::None(EmptyDirectiveSet {}),
+                                        &ScalarFieldSelectionDirectiveSet::None(
+                                            EmptyDirectiveSet {},
+                                        ),
                                     ),
                                 );
 

@@ -8,9 +8,9 @@ use graphql_lang_types::{GraphQLTypeAnnotation, NameValuePair};
 use intern::Lookup;
 use isograph_lang_types::{
     ClientFieldId, ClientPointerId, LinkedFieldSelection, LoadableDirectiveParameters,
-    NonConstantValue, ScalarFieldSelection, ScalarFieldValidDirectiveSet, SelectableServerFieldId,
-    SelectionFieldArgument, SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId,
-    ServerScalarId, TypeAnnotation, VariableDefinition,
+    NonConstantValue, ScalarFieldSelection, ScalarFieldSelectionDirectiveSet,
+    SelectableServerFieldId, SelectionFieldArgument, SelectionType, ServerFieldId,
+    ServerFieldSelection, ServerObjectId, ServerScalarId, TypeAnnotation, VariableDefinition,
 };
 
 use thiserror::Error;
@@ -73,7 +73,7 @@ pub struct ValidatedLinkedFieldAssociatedData {
     pub parent_object_id: ServerObjectId,
     pub field_id: FieldType<ServerFieldId, ClientPointerId>,
     // N.B. we don't actually support loadable linked fields
-    pub selection_variant: ScalarFieldValidDirectiveSet,
+    pub selection_variant: ScalarFieldSelectionDirectiveSet,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 }
@@ -81,7 +81,7 @@ pub struct ValidatedLinkedFieldAssociatedData {
 #[derive(Debug, Clone)]
 pub struct ValidatedScalarFieldAssociatedData {
     pub location: ValidatedFieldDefinitionLocation,
-    pub selection_variant: ScalarFieldValidDirectiveSet,
+    pub selection_variant: ScalarFieldSelectionDirectiveSet,
 }
 
 pub type MissingArguments = Vec<ValidatedVariableDefinition>;
@@ -338,14 +338,14 @@ pub enum Loadability<'a> {
 /// @loadable directive.
 pub fn categorize_field_loadability<'a, TOutputFormat: OutputFormat>(
     client_field: &'a ValidatedClientField<TOutputFormat>,
-    selection_variant: &'a ScalarFieldValidDirectiveSet,
+    selection_variant: &'a ScalarFieldSelectionDirectiveSet,
 ) -> Option<Loadability<'a>> {
     match &client_field.variant {
         ClientFieldVariant::Link => None,
         ClientFieldVariant::UserWritten(_) => match selection_variant {
-            ScalarFieldValidDirectiveSet::None(_) => None,
-            ScalarFieldValidDirectiveSet::Updatable(_) => None,
-            ScalarFieldValidDirectiveSet::Loadable(l) => {
+            ScalarFieldSelectionDirectiveSet::None(_) => None,
+            ScalarFieldSelectionDirectiveSet::Updatable(_) => None,
+            ScalarFieldSelectionDirectiveSet::Loadable(l) => {
                 Some(Loadability::LoadablySelectedField(&l.loadable))
             }
         },

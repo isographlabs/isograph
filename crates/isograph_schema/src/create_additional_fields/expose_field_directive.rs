@@ -9,7 +9,7 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, EmptyDirectiveSet, NonConstantValue, ScalarFieldSelection,
-    ScalarFieldValidDirectiveSet, SelectableServerFieldId, ServerFieldId, ServerFieldSelection,
+    ScalarFieldSelectionDirectiveSet, SelectableServerFieldId, ServerFieldId, ServerFieldSelection,
     ServerObjectId,
 };
 
@@ -207,7 +207,9 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                             Location::generated(),
                         ),
                         reader_alias: None,
-                        associated_data: ScalarFieldValidDirectiveSet::None(EmptyDirectiveSet {}),
+                        associated_data: ScalarFieldSelectionDirectiveSet::None(
+                            EmptyDirectiveSet {},
+                        ),
                         // TODO what about arguments? How would we handle them?
                         arguments: vec![],
                     };
