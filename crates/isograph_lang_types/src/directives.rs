@@ -199,9 +199,20 @@ impl<'de> Deserializer<'de> for IsographFieldDirectivesDeserializer<'de> {
         visitor.visit_map(IsographFieldDirectiveVecDeserializer::new(&self.directives))
     }
 
+    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        if self.directives.is_empty() {
+            visitor.visit_none()
+        } else {
+            visitor.visit_some(self)
+        }
+    }
+
     serde::forward_to_deserialize_any! {
         bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
-        bytes byte_buf option unit unit_struct newtype_struct seq tuple
+        bytes byte_buf unit unit_struct newtype_struct seq tuple
         tuple_struct map struct enum identifier ignored_any
     }
 }
@@ -228,7 +239,6 @@ impl<'de> MapAccess<'de> for IsographFieldDirectiveVecDeserializer<'de> {
         K: de::DeserializeSeed<'de>,
     {
         if let Some(directive) = self.directives.get(self.field_idx) {
-            // eprintln!("vec deserializer name {}", directive.item.name.item);
             return seed
                 .deserialize(NameDeserializer {
                     name: directive.item.name.item.lookup(),
@@ -244,7 +254,6 @@ impl<'de> MapAccess<'de> for IsographFieldDirectiveVecDeserializer<'de> {
     {
         match self.directives.get(self.field_idx) {
             Some(directive) => {
-                // eprintln!("vec deserializer value {:#?}", directive.item);
                 self.field_idx += 1;
                 seed.deserialize(IsographFieldDirectiveDeserializer {
                     directive: &directive.item,

@@ -6,7 +6,7 @@ use isograph_lang_types::{
     ClientPointerDeclaration, ClientPointerDeclarationWithUnvalidatedDirectives,
     ClientPointerDeclarationWithValidatedDirectives, IsographFieldDirective,
     IsographSelectionVariant, LinkedFieldSelection, ScalarFieldSelection,
-    ScalarFieldValidParsedDirectives, ServerFieldSelection, UnvalidatedSelection,
+    ScalarFieldSelectionVariant, ServerFieldSelection, UnvalidatedSelection,
 };
 use isograph_schema::ProcessClientFieldDeclarationError;
 use lazy_static::lazy_static;
@@ -61,7 +61,7 @@ pub fn validate_isograph_selection_set_directives(
     and_then_selection_set_and_collect_errors(
         selection_set,
         &|scalar_field_selection| {
-            let validly_parsed_directives: ScalarFieldValidParsedDirectives =
+            let scalar_field_selection_variant: ScalarFieldSelectionVariant =
                 from_isograph_field_directives(&scalar_field_selection.directives).map_err(
                     |message| {
                         WithLocation::new(
@@ -73,21 +73,13 @@ pub fn validate_isograph_selection_set_directives(
                     },
                 )?;
 
-            match validly_parsed_directives.loadable {
-                Some(loadable_variant) => match validly_parsed_directives.updatable {
-                    Some(_) => {
-                        Err(WithLocation::new(
-                            ProcessClientFieldDeclarationError::LoadableAndUpdatableAreMutuallyExclusive,
-                            Location::generated(),
-                        ))
-                    }
-                    None => Ok(IsographSelectionVariant::Loadable(loadable_variant)),
-                },
-                None => match validly_parsed_directives.updatable {
-                    Some(_) => Ok(IsographSelectionVariant::Updatable),
-                    None => Ok(IsographSelectionVariant::Regular),
-                },
-            }
+            Ok(match scalar_field_selection_variant {
+                ScalarFieldSelectionVariant::Loadable(loadable_wrapper) => {
+                    IsographSelectionVariant::Loadable(loadable_wrapper.loadable)
+                }
+                ScalarFieldSelectionVariant::Updatable(_) => IsographSelectionVariant::Updatable,
+                ScalarFieldSelectionVariant::None(_) => IsographSelectionVariant::Regular,
+            })
         },
         &|linked_field_selection| {
             let updatable_directive = find_directive_named(
