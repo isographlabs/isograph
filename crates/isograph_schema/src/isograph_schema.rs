@@ -23,8 +23,8 @@ use lazy_static::lazy_static;
 use crate::{
     field_and_pointer::{ClientField, ClientPointer},
     schema_validation_state::SchemaValidationState,
-    NormalizationKey, OutputFormat, ServerFieldTypeAssociatedData, ValidatedClientField,
-    ValidatedClientPointer,
+    ClientFieldVariant, NormalizationKey, OutputFormat, ServerFieldTypeAssociatedData,
+    ValidatedClientField, ValidatedClientPointer,
 };
 
 lazy_static! {
@@ -564,17 +564,16 @@ impl<
             >,
         >,
     > {
-        if let Some(s) = self.reader_selection_set.as_ref() {
-            s
-        } else {
-            self.refetch_strategy
+        match self.variant {
+            ClientFieldVariant::ImperativelyLoadedField(_) => self
+                .refetch_strategy
                 .as_ref()
                 .map(|strategy| strategy.refetch_selection_set())
                 .expect(
-                    "Expected client field to have \
-                    either a reader_selection_set or a refetch_selection_set.\
+                    "Expected imperatively loaded field to have refetch selection set. \
                     This is indicative of a bug in Isograph.",
-                )
+                ),
+            _ => &self.reader_selection_set,
         }
     }
 }

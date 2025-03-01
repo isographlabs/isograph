@@ -24,21 +24,18 @@ pub struct ClientField<
     // TODO make this a ClientFieldName that can be converted into a SelectableFieldName
     pub name: SelectableFieldName,
     pub id: ClientFieldId,
-    // TODO model this so that reader_selection_sets are required for
-    // non-imperative client fields. (Are imperatively loaded fields
-    // true client fields? Probably not!)
-    pub reader_selection_set: Option<
-        Vec<
-            WithSpan<
-                ServerFieldSelection<
-                    TSelectionTypeSelectionScalarFieldAssociatedData,
-                    TSelectionTypeSelectionLinkedFieldAssociatedData,
-                >,
+    pub reader_selection_set: Vec<
+        WithSpan<
+            ServerFieldSelection<
+                TSelectionTypeSelectionScalarFieldAssociatedData,
+                TSelectionTypeSelectionLinkedFieldAssociatedData,
             >,
         >,
     >,
 
     // None -> not refetchable
+    // TODO - this is only used if variant === imperatively loaded field
+    // consider moving it into that struct.
     pub refetch_strategy: Option<
         RefetchStrategy<
             TSelectionTypeSelectionScalarFieldAssociatedData,

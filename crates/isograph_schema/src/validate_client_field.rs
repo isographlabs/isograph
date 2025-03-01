@@ -195,16 +195,11 @@ fn validate_client_field_selection_set<TOutputFormat: OutputFormat>(
         )
         .clone();
 
-    let selection_set_result = top_level_client_field
-        .reader_selection_set
-        .map(|selection_set| {
-            validate_client_type_definition_selections_exist_and_types_match(
-                selection_set,
-                &variable_definitions,
-                &top_level_client_type_info,
-            )
-        })
-        .transpose();
+    let selection_set_result = validate_client_type_definition_selections_exist_and_types_match(
+        top_level_client_field.reader_selection_set,
+        &variable_definitions,
+        &top_level_client_type_info,
+    );
 
     let refetch_strategy_result = top_level_client_field
         .refetch_strategy

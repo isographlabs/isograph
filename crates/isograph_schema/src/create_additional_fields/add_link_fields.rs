@@ -22,7 +22,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                 name: field_name,
                 parent_object_id: object.id,
                 variable_definitions: vec![],
-                reader_selection_set: Some(vec![]),
+                reader_selection_set: vec![],
                 variant: ClientFieldVariant::Link,
                 type_and_field: ObjectTypeAndFieldName {
                     field_name,

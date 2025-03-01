@@ -175,7 +175,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             description: client_field_declaration.item.description.map(|x| x.item),
             name,
             id: next_client_field_id,
-            reader_selection_set: Some(client_field_declaration.item.selection_set),
+            reader_selection_set: client_field_declaration.item.selection_set,
             variant,
             variable_definitions: client_field_declaration.item.variable_definitions,
             type_and_field: ObjectTypeAndFieldName {

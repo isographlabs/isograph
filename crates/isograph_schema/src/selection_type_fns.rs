@@ -90,16 +90,14 @@ pub fn reader_selection_set<
             TOutputFormat,
         >,
     >,
-) -> Option<
-    &'a [WithSpan<
-        ServerFieldSelection<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-        >,
-    >],
-> {
+) -> &'a [WithSpan<
+    ServerFieldSelection<
+        TSelectionTypeSelectionScalarFieldAssociatedData,
+        TSelectionTypeSelectionLinkedFieldAssociatedData,
+    >,
+>] {
     match selection_type {
-        SelectionType::Object(client_pointer) => Some(&client_pointer.reader_selection_set),
-        SelectionType::Scalar(client_field) => client_field.reader_selection_set.as_deref(),
+        SelectionType::Object(client_pointer) => &client_pointer.reader_selection_set,
+        SelectionType::Scalar(client_field) => &client_field.reader_selection_set,
     }
 }

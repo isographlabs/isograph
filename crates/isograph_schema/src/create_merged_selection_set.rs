@@ -1031,12 +1031,7 @@ fn merge_non_loadable_client_type<TOutputFormat: OutputFormat>(
     } = create_merged_selection_map_for_field_and_insert_into_global_map(
         schema,
         parent_type,
-        reader_selection_set(&newly_encountered_client_type)
-            .as_ref()
-            .expect(
-                "Expected selection set to exist. \
-                This is indicative of a bug in Isograph.",
-            ),
+        reader_selection_set(&newly_encountered_client_type),
         encountered_client_field_map,
         DefinitionLocation::Client(newly_encountered_client_type.id()),
         &initial_variable_context(&newly_encountered_client_type),
