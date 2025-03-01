@@ -165,7 +165,9 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            associated_data: (),
+                                            associated_data: None(
+                                                EmptyDirectiveSet,
+                                            ),
                                             selection_set: [
                                                 WithSpan {
                                                     item: ScalarField(
@@ -196,7 +198,9 @@ Ok(
                                                                 ),
                                                             },
                                                             reader_alias: None,
-                                                            associated_data: (),
+                                                            associated_data: None(
+                                                                EmptyDirectiveSet,
+                                                            ),
                                                             arguments: [],
                                                             directives: [],
                                                         },
@@ -235,7 +239,9 @@ Ok(
                                                                 ),
                                                             },
                                                             reader_alias: None,
-                                                            associated_data: (),
+                                                            associated_data: None(
+                                                                EmptyDirectiveSet,
+                                                            ),
                                                             arguments: [],
                                                             directives: [],
                                                         },

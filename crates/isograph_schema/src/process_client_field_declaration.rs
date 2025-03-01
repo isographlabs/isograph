@@ -5,9 +5,9 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldDeclaration, ClientFieldDeclarationWithValidatedDirectives,
-    ClientPointerDeclarationWithValidatedDirectives, ClientPointerId, DeserializationError,
-    NonConstantValue, SelectableServerFieldId, ServerObjectId, TypeAnnotation,
+    ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration, ClientPointerId,
+    DeserializationError, NonConstantValue, SelectableServerFieldId, ServerObjectId,
+    TypeAnnotation,
 };
 use lazy_static::lazy_static;
 
@@ -23,7 +23,7 @@ use crate::{
 impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     pub fn process_client_field_declaration(
         &mut self,
-        client_field_declaration: WithSpan<ClientFieldDeclarationWithValidatedDirectives>,
+        client_field_declaration: WithSpan<ClientFieldDeclaration>,
         text_source: TextSource,
     ) -> Result<(), WithLocation<ProcessClientFieldDeclarationError>> {
         let parent_type_id = self
@@ -59,7 +59,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 
     pub fn process_client_pointer_declaration(
         &mut self,
-        client_pointer_declaration: WithSpan<ClientPointerDeclarationWithValidatedDirectives>,
+        client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
         text_source: TextSource,
     ) -> Result<(), WithLocation<ProcessClientFieldDeclarationError>> {
         let parent_type_id = self
@@ -140,7 +140,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     fn add_client_field_to_object(
         &mut self,
         parent_object_id: ServerObjectId,
-        client_field_declaration: WithSpan<ClientFieldDeclarationWithValidatedDirectives>,
+        client_field_declaration: WithSpan<ClientFieldDeclaration>,
     ) -> ProcessClientFieldDeclarationResult<()> {
         let query_id = self.query_id();
         let object = &mut self.server_field_data.server_objects[parent_object_id.as_usize()];
@@ -207,7 +207,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         &mut self,
         parent_object_id: ServerObjectId,
         to_object_id: TypeAnnotation<ServerObjectId>,
-        client_pointer_declaration: WithSpan<ClientPointerDeclarationWithValidatedDirectives>,
+        client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
     ) -> ProcessClientFieldDeclarationResult<()> {
         let query_id = self.query_id();
         let to_object = self.server_field_data.object(to_object_id.inner());
@@ -402,9 +402,7 @@ lazy_static! {
     static ref COMPONENT: IsographDirectiveName = "component".intern().into();
 }
 
-fn get_client_variant<TScalarField, TLinkedField>(
-    client_field_declaration: &ClientFieldDeclaration<TScalarField, TLinkedField>,
-) -> ClientFieldVariant {
+fn get_client_variant(client_field_declaration: &ClientFieldDeclaration) -> ClientFieldVariant {
     for directive in client_field_declaration.directives.iter() {
         if directive.item.name.item == *COMPONENT {
             return ClientFieldVariant::UserWritten(UserWrittenClientFieldInfo {
