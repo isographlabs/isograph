@@ -13,6 +13,7 @@ pub enum DefinitionLocation<TServer, TClient> {
 /// - client fields vs client pointers
 /// - scalar field selections (i.e. those without selection sets) vs
 ///   linked field selections.
+/// - schema scalars vs schema objects
 #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub enum SelectionType<TScalar, TObject> {
     Scalar(TScalar),
