@@ -6,11 +6,13 @@ use common_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_config::GenerateFileExtensionsOption;
-use isograph_lang_types::{ClientFieldId, ScalarFieldSelectionDirectiveSet, ServerObjectId};
+use isograph_lang_types::{
+    ClientFieldId, ScalarFieldSelectionDirectiveSet, SelectionType, ServerObjectId,
+};
 use isograph_schema::{
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
-    get_reachable_variables, ClientType, DefinitionLocation,
+    get_reachable_variables, initial_variable_context, DefinitionLocation,
     FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, MergedSelectionMap, OutputFormat,
     RootOperationName, RootRefetchedPath, ScalarClientFieldTraversalState, SchemaObject,
     ValidatedClientField, ValidatedSchema, ValidatedVariableDefinition,
@@ -52,8 +54,8 @@ pub(crate) fn generate_entrypoint_artifacts<TOutputFormat: OutputFormat>(
         schema.server_field_data.object(entrypoint.parent_object_id),
         entrypoint.selection_set_for_parent_query(),
         encountered_client_type_map,
-        DefinitionLocation::Client(ClientType::ClientField(entrypoint.id)),
-        &ClientType::ClientField(entrypoint).initial_variable_context(),
+        DefinitionLocation::Client(SelectionType::Scalar(entrypoint.id)),
+        &initial_variable_context(&SelectionType::Scalar(entrypoint)),
     );
 
     generate_entrypoint_artifacts_with_client_field_traversal_result(
@@ -127,7 +129,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
                     // Note: it would be cleaner to include a reference to the merged selection set here via
                     // the selection_variant variable, instead of by looking it up like this.
                     &encountered_client_type_map
-                        .get(&DefinitionLocation::Client(ClientType::ClientField(
+                        .get(&DefinitionLocation::Client(SelectionType::Scalar(
                             root_refetch_path.path_to_refetch_field_info.client_field_id,
                         )))
                         .expect(

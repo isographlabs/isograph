@@ -4,12 +4,12 @@ use std::{collections::HashMap, fmt::Debug};
 use common_lang_types::{SelectableFieldName, VariableName, WithLocation, WithSpan};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ConstantValue, NonConstantValue, ScalarFieldSelectionDirectiveSet,
-    SelectionFieldArgument,
+    SelectionFieldArgument, SelectionType,
 };
 
 use crate::{
-    ClientField, ClientPointer, ClientType, NameAndArguments, OutputFormat, SchemaServerField,
-    ValidatedVariableDefinition,
+    variable_definitions, ClientField, ClientPointer, NameAndArguments, OutputFormat,
+    SchemaServerField, ValidatedVariableDefinition,
 };
 
 #[derive(Debug)]
@@ -88,57 +88,54 @@ impl VariableContext {
     }
 }
 
-impl<
-        TClientTypeSelectionScalarFieldAssociatedData,
-        TClientTypeSelectionLinkedFieldAssociatedData,
-        TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
-        TOutputFormat: OutputFormat,
-    >
-    ClientType<
+pub fn initial_variable_context<
+    TSelectionTypeSelectionScalarFieldAssociatedData,
+    TSelectionTypeSelectionLinkedFieldAssociatedData,
+    TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
+    TOutputFormat: OutputFormat,
+>(
+    selection_type: &SelectionType<
         &ClientField<
-            TClientTypeSelectionScalarFieldAssociatedData,
-            TClientTypeSelectionLinkedFieldAssociatedData,
+            TSelectionTypeSelectionScalarFieldAssociatedData,
+            TSelectionTypeSelectionLinkedFieldAssociatedData,
             TClientFieldVariableDefinitionAssociatedData,
             TOutputFormat,
         >,
         &ClientPointer<
-            TClientTypeSelectionScalarFieldAssociatedData,
-            TClientTypeSelectionLinkedFieldAssociatedData,
+            TSelectionTypeSelectionScalarFieldAssociatedData,
+            TSelectionTypeSelectionLinkedFieldAssociatedData,
             TClientFieldVariableDefinitionAssociatedData,
             TOutputFormat,
         >,
-    >
-{
-    pub fn initial_variable_context(&self) -> VariableContext {
-        // This is used in two places: before we generate a merged selection set for an
-        // entrypoint and when generating reader ASTs.
-        //
-        // For entrypoints:
-        // This seems fishy. We should be taking note of the defualt values, somehow. However,
-        // the variables that are provided/missing are done so at runtime, so this is not
-        // really possible.
-        //
-        // The replacement of missing values with default values is done by the GraphQL server,
-        // so in practice this is probably fine.
-        //
-        // But it is odd that variables and default values behave differently for fields that
-        // act as entrypoints vs. fields that are used within the entrypoint.
-        //
-        // For reader ASTs:
-        // This makes sense, but seems somewhat superfluous. Perhaps we can refactor code such
-        // that we do not need to call this.
-        let variable_context = self
-            .variable_definitions()
-            .iter()
-            .map(|variable_definition| {
-                (
-                    variable_definition.item.name.item,
-                    NonConstantValue::Variable(variable_definition.item.name.item),
-                )
-            })
-            .collect();
-        VariableContext(variable_context)
-    }
+    >,
+) -> VariableContext {
+    // This is used in two places: before we generate a merged selection set for an
+    // entrypoint and when generating reader ASTs.
+    //
+    // For entrypoints:
+    // This seems fishy. We should be taking note of the defualt values, somehow. However,
+    // the variables that are provided/missing are done so at runtime, so this is not
+    // really possible.
+    //
+    // The replacement of missing values with default values is done by the GraphQL server,
+    // so in practice this is probably fine.
+    //
+    // But it is odd that variables and default values behave differently for fields that
+    // act as entrypoints vs. fields that are used within the entrypoint.
+    //
+    // For reader ASTs:
+    // This makes sense, but seems somewhat superfluous. Perhaps we can refactor code such
+    // that we do not need to call this.
+    let variable_context = variable_definitions(selection_type)
+        .iter()
+        .map(|variable_definition| {
+            (
+                variable_definition.item.name.item,
+                NonConstantValue::Variable(variable_definition.item.name.item),
+            )
+        })
+        .collect();
+    VariableContext(variable_context)
 }
 
 impl<

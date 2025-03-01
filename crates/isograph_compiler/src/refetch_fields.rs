@@ -2,13 +2,12 @@ use std::collections::btree_map::Entry;
 
 use common_lang_types::ObjectTypeAndFieldName;
 use intern::string_key::Intern;
-use isograph_lang_types::ServerObjectId;
+use isograph_lang_types::{SelectionType, ServerObjectId};
 use isograph_schema::{
     generate_refetch_field_strategy, id_arguments, id_selection, id_top_level_arguments,
-    ClientField, ClientFieldVariant, ClientType, DefinitionLocation,
-    ImperativelyLoadedFieldVariant, OutputFormat, RefetchStrategy, RequiresRefinement,
-    SchemaObject, UnvalidatedClientField, UnvalidatedClientPointer, UnvalidatedSchema,
-    NODE_FIELD_NAME, REFETCH_FIELD_NAME,
+    ClientField, ClientFieldVariant, DefinitionLocation, ImperativelyLoadedFieldVariant,
+    OutputFormat, RefetchStrategy, RequiresRefinement, SchemaObject, UnvalidatedClientField,
+    UnvalidatedClientPointer, UnvalidatedSchema, NODE_FIELD_NAME, REFETCH_FIELD_NAME,
 };
 
 use crate::batch_compile::BatchCompileError;
@@ -34,7 +33,10 @@ pub fn add_refetch_fields_to_objects<TOutputFormat: OutputFormat>(
 fn add_refetch_field_to_object<TOutputFormat: OutputFormat>(
     object: &mut SchemaObject<TOutputFormat>,
     client_fields: &mut Vec<
-        ClientType<UnvalidatedClientField<TOutputFormat>, UnvalidatedClientPointer<TOutputFormat>>,
+        SelectionType<
+            UnvalidatedClientField<TOutputFormat>,
+            UnvalidatedClientPointer<TOutputFormat>,
+        >,
     >,
     query_id: ServerObjectId,
 ) -> Option<Result<(), BatchCompileError>> {
@@ -46,11 +48,11 @@ fn add_refetch_field_to_object<TOutputFormat: OutputFormat>(
         Entry::Vacant(vacant_entry) => {
             let next_client_field_id = client_fields.len().into();
 
-            vacant_entry.insert(DefinitionLocation::Client(ClientType::ClientField(
+            vacant_entry.insert(DefinitionLocation::Client(SelectionType::Scalar(
                 next_client_field_id,
             )));
 
-            client_fields.push(ClientType::ClientField(ClientField {
+            client_fields.push(SelectionType::Scalar(ClientField {
                 description: Some(
                     format!("A refetch field for the {} type.", object.name)
                         .intern()

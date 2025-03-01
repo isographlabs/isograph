@@ -4,7 +4,7 @@ use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 use isograph_lang_types::{
     SelectableServerFieldId, SelectionType, ServerFieldId, TypeAnnotation, UnionVariant,
 };
-use isograph_schema::{ClientTypeId, DefinitionLocation, OutputFormat, ValidatedSchema};
+use isograph_schema::{SelectionTypeId, DefinitionLocation, OutputFormat, ValidatedSchema};
 
 pub(crate) fn format_parameter_type<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
@@ -74,7 +74,7 @@ fn format_server_field_type<TOutputFormat: OutputFormat>(
 fn format_field_definition<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
     name: &SelectableFieldName,
-    type_: &DefinitionLocation<ServerFieldId, ClientTypeId>,
+    type_: &DefinitionLocation<ServerFieldId, SelectionTypeId>,
     indentation_level: u8,
 ) -> String {
     match type_ {

@@ -6,7 +6,7 @@ use common_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration, ClientPointerId,
-    DeserializationError, NonConstantValue, SelectableServerFieldId, ServerObjectId,
+    DeserializationError, NonConstantValue, SelectableServerFieldId, SelectionType, ServerObjectId,
     TypeAnnotation,
 };
 use lazy_static::lazy_static;
@@ -16,8 +16,8 @@ use thiserror::Error;
 use crate::{
     expose_field_directive::RequiresRefinement,
     refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
-    ClientField, ClientPointer, ClientType, DefinitionLocation, FieldMapItem, OutputFormat,
-    UnvalidatedSchema, UnvalidatedVariableDefinition, NODE_FIELD_NAME,
+    ClientField, ClientPointer, DefinitionLocation, FieldMapItem, OutputFormat, UnvalidatedSchema,
+    UnvalidatedVariableDefinition, NODE_FIELD_NAME,
 };
 
 impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
@@ -154,7 +154,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             .encountered_fields
             .insert(
                 client_field_name.into(),
-                DefinitionLocation::Client(ClientType::ClientField(next_client_field_id)),
+                DefinitionLocation::Client(SelectionType::Scalar(next_client_field_id)),
             )
             .is_some()
         {
@@ -171,7 +171,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         let name = client_field_declaration.item.client_field_name.item.into();
         let variant = get_client_variant(&client_field_declaration.item);
 
-        self.client_types.push(ClientType::ClientField(ClientField {
+        self.client_types.push(SelectionType::Scalar(ClientField {
             description: client_field_declaration.item.description.map(|x| x.item),
             name,
             id: next_client_field_id,
@@ -233,54 +233,53 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             }));
         }
 
-        self.client_types
-            .push(ClientType::ClientPointer(ClientPointer {
-                description: client_pointer_declaration.item.description.map(|x| x.item),
-                name,
-                id: next_client_pointer_id,
-                reader_selection_set: client_pointer_declaration.item.selection_set,
+        self.client_types.push(SelectionType::Object(ClientPointer {
+            description: client_pointer_declaration.item.description.map(|x| x.item),
+            name,
+            id: next_client_pointer_id,
+            reader_selection_set: client_pointer_declaration.item.selection_set,
 
-                variable_definitions: client_pointer_declaration.item.variable_definitions,
-                type_and_field: ObjectTypeAndFieldName {
-                    type_name: parent_object.name,
-                    field_name: name.into(),
-                },
+            variable_definitions: client_pointer_declaration.item.variable_definitions,
+            type_and_field: ObjectTypeAndFieldName {
+                type_name: parent_object.name,
+                field_name: name.into(),
+            },
 
-                parent_object_id,
-                refetch_strategy: match to_object.id_field {
-                    None => Err(WithSpan::new(
-                        ProcessClientFieldDeclarationError::ClientPointerTargetTypeHasNoId {
-                            target_type_name: *client_pointer_declaration.item.target_type.inner(),
-                        },
-                        *client_pointer_declaration.item.target_type.span(),
-                    )),
-                    Some(_) => {
-                        // Assume that if we have an id field, this implements Node
-                        Ok(RefetchStrategy::UseRefetchField(
-                            generate_refetch_field_strategy(
-                                vec![id_selection()],
-                                query_id,
-                                format!("refetch__{}", to_object.name).intern().into(),
-                                *NODE_FIELD_NAME,
-                                id_top_level_arguments(),
-                                None,
-                                RequiresRefinement::Yes(to_object.name),
-                                None,
-                                None,
-                            ),
-                        ))
-                    }
-                }?,
-                to: to_object_id,
-                output_format: std::marker::PhantomData,
-            }));
+            parent_object_id,
+            refetch_strategy: match to_object.id_field {
+                None => Err(WithSpan::new(
+                    ProcessClientFieldDeclarationError::ClientPointerTargetTypeHasNoId {
+                        target_type_name: *client_pointer_declaration.item.target_type.inner(),
+                    },
+                    *client_pointer_declaration.item.target_type.span(),
+                )),
+                Some(_) => {
+                    // Assume that if we have an id field, this implements Node
+                    Ok(RefetchStrategy::UseRefetchField(
+                        generate_refetch_field_strategy(
+                            vec![id_selection()],
+                            query_id,
+                            format!("refetch__{}", to_object.name).intern().into(),
+                            *NODE_FIELD_NAME,
+                            id_top_level_arguments(),
+                            None,
+                            RequiresRefinement::Yes(to_object.name),
+                            None,
+                            None,
+                        ),
+                    ))
+                }
+            }?,
+            to: to_object_id,
+            output_format: std::marker::PhantomData,
+        }));
 
         let parent_object = self.server_field_data.object_mut(parent_object_id);
         if parent_object
             .encountered_fields
             .insert(
                 client_pointer_name.into(),
-                DefinitionLocation::Client(ClientType::ClientPointer(next_client_pointer_id)),
+                DefinitionLocation::Client(SelectionType::Object(next_client_pointer_id)),
             )
             .is_some()
         {

@@ -1,9 +1,10 @@
 use crate::{
-    ClientField, ClientFieldVariant, ClientType, DefinitionLocation, OutputFormat,
-    UnvalidatedSchema, LINK_FIELD_NAME,
+    ClientField, ClientFieldVariant, DefinitionLocation, OutputFormat, UnvalidatedSchema,
+    LINK_FIELD_NAME,
 };
 use common_lang_types::{Location, ObjectTypeAndFieldName, WithLocation};
 use intern::string_key::Intern;
+use isograph_lang_types::SelectionType;
 
 use super::create_additional_fields_error::{
     CreateAdditionalFieldsError, ProcessTypeDefinitionResult,
@@ -14,7 +15,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         for object in &mut self.server_field_data.server_objects {
             let field_name = (*LINK_FIELD_NAME).into();
             let next_client_field_id = self.client_types.len().into();
-            self.client_types.push(ClientType::ClientField(ClientField {
+            self.client_types.push(SelectionType::Scalar(ClientField {
                 description: Some(
                     format!("A store Link for the {} type.", object.name)
                         .intern()
@@ -38,7 +39,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                 .encountered_fields
                 .insert(
                     field_name,
-                    DefinitionLocation::Client(ClientType::ClientField(next_client_field_id)),
+                    DefinitionLocation::Client(SelectionType::Scalar(next_client_field_id)),
                 )
                 .is_some()
             {

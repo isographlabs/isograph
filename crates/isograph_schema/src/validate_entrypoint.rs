@@ -3,12 +3,12 @@ use common_lang_types::{
     WithLocation, WithSpan,
 };
 use isograph_lang_types::{
-    ClientFieldId, EntrypointDeclaration, SelectableServerFieldId, ServerObjectId,
+    ClientFieldId, EntrypointDeclaration, SelectableServerFieldId, SelectionType, ServerObjectId,
 };
 
 use thiserror::Error;
 
-use crate::{ClientType, DefinitionLocation, OutputFormat, UnvalidatedSchema};
+use crate::{DefinitionLocation, OutputFormat, UnvalidatedSchema};
 
 impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     pub fn validate_entrypoint_type_and_field(
@@ -90,7 +90,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             .get(&field_name.item.into())
         {
             Some(defined_field) => match defined_field {
-                DefinitionLocation::Client(ClientType::ClientPointer(_))
+                DefinitionLocation::Client(SelectionType::Object(_))
                 | DefinitionLocation::Server(_) => Err(WithLocation::new(
                     ValidateEntrypointDeclarationError::FieldMustBeClientField {
                         parent_type_name: parent_object.name,
@@ -98,7 +98,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     },
                     Location::new(text_source, field_name.span),
                 )),
-                DefinitionLocation::Client(ClientType::ClientField(client_field_id)) => {
+                DefinitionLocation::Client(SelectionType::Scalar(client_field_id)) => {
                     Ok(*client_field_id)
                 }
             },

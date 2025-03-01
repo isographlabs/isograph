@@ -17,7 +17,7 @@ u32_newtype!(ServerScalarId);
 
 pub type SelectableServerFieldId = SelectionType<ServerScalarId, ServerObjectId>;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub enum SelectionType<TScalar, TObject> {
     Scalar(TScalar),
     Object(TObject),

@@ -15,11 +15,12 @@ use isograph_lang_types::{
     ServerObjectId, TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
-    get_provided_arguments, selection_map_wrapped, ClientFieldVariant, ClientType,
-    DefinitionLocation, FieldTraversalResult, NameAndArguments, NormalizationKey, OutputFormat,
-    RequiresRefinement, Schema, SchemaObject, SchemaServerFieldVariant,
-    UserWrittenComponentVariant, ValidatedClientField, ValidatedScalarFieldAssociatedData,
-    ValidatedSchema, ValidatedSchemaState, ValidatedSelection, ValidatedVariableDefinition,
+    accessible_client_fields, get_provided_arguments, selection_map_wrapped, selection_type_id,
+    ClientFieldVariant, DefinitionLocation, FieldTraversalResult, NameAndArguments,
+    NormalizationKey, OutputFormat, RequiresRefinement, Schema, SchemaObject,
+    SchemaServerFieldVariant, UserWrittenComponentVariant, ValidatedClientField,
+    ValidatedScalarFieldAssociatedData, ValidatedSchema, ValidatedSchemaState, ValidatedSelection,
+    ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -156,10 +157,10 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
                 };
             }
 
-            DefinitionLocation::Client(ClientType::ClientPointer(_)) => {
+            DefinitionLocation::Client(SelectionType::Object(_)) => {
                 todo!("generate client pointer reader artifacts is not implemented")
             }
-            DefinitionLocation::Client(ClientType::ClientField(encountered_client_field_id)) => {
+            DefinitionLocation::Client(SelectionType::Scalar(encountered_client_field_id)) => {
                 let encountered_client_field = schema.client_field(*encountered_client_field_id);
 
                 match &encountered_client_field.variant {
@@ -280,10 +281,10 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
     }
 
     for user_written_client_type in schema.client_types.iter().flat_map(|field| match field {
-        ClientType::ClientPointer(pointer) => Some(ClientType::ClientPointer(pointer)),
-        ClientType::ClientField(field) => match field.variant {
+        SelectionType::Object(pointer) => Some(SelectionType::Object(pointer)),
+        SelectionType::Scalar(field) => match field.variant {
             ClientFieldVariant::Link => None,
-            ClientFieldVariant::UserWritten(_) => Some(ClientType::ClientField(field)),
+            ClientFieldVariant::UserWritten(_) => Some(SelectionType::Scalar(field)),
             ClientFieldVariant::ImperativelyLoadedField(_) => None,
         },
     }) {
@@ -294,9 +295,9 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
             config.options.include_file_extensions_in_import_statements,
         ));
 
-        match encountered_client_type_map
-            .get(&DefinitionLocation::Client(user_written_client_type.id()))
-        {
+        match encountered_client_type_map.get(&DefinitionLocation::Client(selection_type_id(
+            &user_written_client_type,
+        ))) {
             Some(FieldTraversalResult {
                 traversal_state, ..
             }) => {
@@ -307,7 +308,8 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
             None => {
                 // If this field is not reachable from an entrypoint, we need to
                 // encounter all the client fields
-                for nested_client_field in user_written_client_type.accessible_client_fields(schema)
+                for nested_client_field in
+                    accessible_client_fields(&user_written_client_type, schema)
                 {
                     encountered_output_types.insert(nested_client_field.id);
                 }

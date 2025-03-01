@@ -1,11 +1,12 @@
 use intern::Lookup;
 use isograph_config::GenerateFileExtensionsOption;
+use isograph_lang_types::SelectionType;
 use std::cmp::Ordering;
 
 use common_lang_types::{ArtifactPathAndContent, IsoLiteralText, SelectableFieldName};
 use isograph_schema::{
-    ClientFieldVariant, ClientType, OutputFormat, UserWrittenComponentVariant,
-    ValidatedClientField, ValidatedClientType, ValidatedSchema,
+    type_and_field, ClientFieldVariant, OutputFormat, UserWrittenComponentVariant,
+    ValidatedClientField, ValidatedSchema, ValidatedSelectionType,
 };
 
 use crate::generate_artifacts::ISO_TS_FILE_NAME;
@@ -41,7 +42,7 @@ export function iso<T>(
 
 fn build_iso_overload_for_client_defined_type<TOutputFormat: OutputFormat>(
     client_type_and_variant: (
-        ValidatedClientType<TOutputFormat>,
+        ValidatedSelectionType<TOutputFormat>,
         UserWrittenComponentVariant,
     ),
     file_extensions: GenerateFileExtensionsOption,
@@ -50,19 +51,19 @@ fn build_iso_overload_for_client_defined_type<TOutputFormat: OutputFormat>(
     let mut s: String = "".to_string();
     let import = format!(
         "import {{ type {}__param }} from './{}/{}/param_type{}';\n",
-        client_type.type_and_field().underscore_separated(),
-        client_type.type_and_field().type_name,
-        client_type.type_and_field().field_name,
+        type_and_field(&client_type).underscore_separated(),
+        type_and_field(&client_type).type_name,
+        type_and_field(&client_type).field_name,
         file_extensions.ts()
     );
     let formatted_field = format!(
         "{} {}.{}",
         match client_type {
-            ClientType::ClientField(_) => "field",
-            ClientType::ClientPointer(_) => "pointer",
+            SelectionType::Scalar(_) => "field",
+            SelectionType::Object(_) => "pointer",
         },
-        client_type.type_and_field().type_name,
-        client_type.type_and_field().field_name
+        type_and_field(&client_type).type_name,
+        type_and_field(&client_type).field_name
     );
     if matches!(variant, UserWrittenComponentVariant::Component) {
         s.push_str(&format!(
@@ -71,7 +72,7 @@ export function iso<T>(
   param: T & MatchesWhitespaceAndString<'{}', T>
 ): IdentityWithParamComponent<{}__param>;\n",
             formatted_field,
-            client_type.type_and_field().underscore_separated(),
+            type_and_field(&client_type).underscore_separated(),
         ));
     } else {
         s.push_str(&format!(
@@ -80,7 +81,7 @@ export function iso<T>(
   param: T & MatchesWhitespaceAndString<'{}', T>
 ): IdentityWithParam<{}__param>;\n",
             formatted_field,
-            client_type.type_and_field().underscore_separated(),
+            type_and_field(&client_type).underscore_separated(),
         ));
     }
     (import, s)
@@ -221,22 +222,20 @@ export function iso(isographLiteralText: string):
 fn sorted_user_written_types<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
 ) -> Vec<(
-    ValidatedClientType<TOutputFormat>,
+    ValidatedSelectionType<TOutputFormat>,
     UserWrittenComponentVariant,
 )> {
     let mut client_types = user_written_fields(schema).collect::<Vec<_>>();
     client_types.sort_by(|client_type_1, client_type_2| {
-        match client_type_1
-            .0
-            .type_and_field()
+        match type_and_field(&client_type_1.0)
             .type_name
-            .cmp(&client_type_2.0.type_and_field().type_name)
+            .cmp(&type_and_field(&client_type_2.0).type_name)
         {
             Ordering::Less => Ordering::Less,
             Ordering::Greater => Ordering::Greater,
             Ordering::Equal => sort_field_name(
-                client_type_1.0.type_and_field().field_name,
-                client_type_2.0.type_and_field().field_name,
+                type_and_field(&client_type_1.0).field_name,
+                type_and_field(&client_type_2.0).field_name,
             ),
         }
     });
@@ -297,7 +296,7 @@ fn user_written_fields<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
 ) -> impl Iterator<
     Item = (
-        ValidatedClientType<TOutputFormat>,
+        ValidatedSelectionType<TOutputFormat>,
         UserWrittenComponentVariant,
     ),
 > + '_ {
@@ -305,14 +304,14 @@ fn user_written_fields<TOutputFormat: OutputFormat>(
         .client_types
         .iter()
         .filter_map(|client_type| match client_type {
-            ClientType::ClientPointer(client_pointer) => Some((
-                ClientType::ClientPointer(client_pointer),
+            SelectionType::Object(client_pointer) => Some((
+                SelectionType::Object(client_pointer),
                 UserWrittenComponentVariant::Eager,
             )),
-            ClientType::ClientField(client_field) => match client_field.variant {
+            SelectionType::Scalar(client_field) => match client_field.variant {
                 ClientFieldVariant::Link => None,
                 ClientFieldVariant::UserWritten(info) => Some((
-                    ClientType::ClientField(client_field),
+                    SelectionType::Scalar(client_field),
                     info.user_written_component_variant,
                 )),
                 ClientFieldVariant::ImperativelyLoadedField(_) => None,

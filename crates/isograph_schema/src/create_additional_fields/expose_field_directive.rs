@@ -9,16 +9,16 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, EmptyDirectiveSet, NonConstantValue, ScalarFieldSelection,
-    ScalarFieldSelectionDirectiveSet, SelectableServerFieldId, ServerFieldId, ServerFieldSelection,
-    ServerObjectId,
+    ScalarFieldSelectionDirectiveSet, SelectableServerFieldId, SelectionType, ServerFieldId,
+    ServerFieldSelection, ServerObjectId,
 };
 
 use serde::Deserialize;
 
 use crate::{
-    generate_refetch_field_strategy, ClientField, ClientFieldVariant, ClientType,
-    DefinitionLocation, ImperativelyLoadedFieldVariant, OutputFormat, PrimaryFieldInfo,
-    UnvalidatedSchema, UnvalidatedVariableDefinition,
+    generate_refetch_field_strategy, ClientField, ClientFieldVariant, DefinitionLocation,
+    ImperativelyLoadedFieldVariant, OutputFormat, PrimaryFieldInfo, UnvalidatedSchema,
+    UnvalidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -297,7 +297,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                 output_format: std::marker::PhantomData,
             };
             self.client_types
-                .push(ClientType::ClientField(mutation_client_field));
+                .push(SelectionType::Scalar(mutation_client_field));
 
             self.insert_client_field_on_object(
                 client_field_scalar_selection_name,
@@ -324,7 +324,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             .encountered_fields
             .insert(
                 mutation_field_name,
-                DefinitionLocation::Client(ClientType::ClientField(client_field_id)),
+                DefinitionLocation::Client(SelectionType::Scalar(client_field_id)),
             )
             .is_some()
         {

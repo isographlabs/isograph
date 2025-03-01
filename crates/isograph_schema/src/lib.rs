@@ -15,6 +15,7 @@ mod validate_schema;
 mod validate_server_field;
 mod variable_context;
 
+pub use accessible_client_fields_iterator::*;
 pub use create_additional_fields::*;
 pub use create_merged_selection_set::*;
 pub use isograph_schema::*;

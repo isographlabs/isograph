@@ -2,11 +2,12 @@ use common_lang_types::{SelectableFieldName, Span, UnvalidatedTypeName, WithLoca
 use graphql_lang_types::{GraphQLNamedTypeAnnotation, GraphQLTypeAnnotation};
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    EmptyDirectiveSet, ScalarFieldSelection, ScalarFieldSelectionDirectiveSet, ServerFieldSelection,
+    EmptyDirectiveSet, ScalarFieldSelection, ScalarFieldSelectionDirectiveSet, SelectionType,
+    ServerFieldSelection,
 };
 
 use crate::{
-    ClientType, DefinitionLocation, OutputFormat, SchemaServerField, SchemaServerFieldVariant,
+    DefinitionLocation, OutputFormat, SchemaServerField, SchemaServerFieldVariant,
     ServerFieldTypeAssociatedData, ServerFieldTypeAssociatedDataInlineFragment, UnvalidatedSchema,
     ValidatedScalarFieldAssociatedData, LINK_FIELD_NAME,
 };
@@ -73,8 +74,8 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                                     .as_client_type()
                                     .expect("Expected link to be client field")
                                 {
-                                    ClientType::ClientField(client_field_id) => client_field_id,
-                                    ClientType::ClientPointer(_) => {
+                                    SelectionType::Scalar(client_field_id) => client_field_id,
+                                    SelectionType::Object(_) => {
                                         panic!("Expected link to be client field")
                                     }
                                 },
