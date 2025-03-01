@@ -1,3 +1,5 @@
+// These must be kept in-sync with `impl_base_types` or things will not compile!
+
 /// Distinguishes between server-defined items and locally-defined items.
 ///
 /// Examples include:

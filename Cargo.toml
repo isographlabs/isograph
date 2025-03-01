@@ -21,12 +21,15 @@ notify = "7.0.0"
 notify-debouncer-full = "0.4.0"
 pathdiff = "0.2.1"
 pretty-duration = "0.1.1"
+proc-macro2 = "1.0.92"
 regex = "1.6.0"
-schemars = { version="0.8.11", features=["indexmap1"] }
+schemars = { version = "0.8.11", features = ["indexmap1"] }
 serde = "1.0.197"
 serde_json = "1.0.108"
 strum = { version = "0.25.0", features = ["derive"] }
+syn = "2.0.96"
 thiserror = "1.0.40"
 tokio = { version = "1.35.0", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
+quote = "1.0.38"
