@@ -1,10 +1,8 @@
 use common_lang_types::{IsographDirectiveName, WithLocation, WithSpan};
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ClientFieldDeclaration, ClientPointerDeclaration, EmptyDirectiveSet, IsographFieldDirective,
-    LinkedFieldSelection, ScalarFieldSelection, ScalarFieldValidDirectiveSet, ServerFieldSelection,
-    UnvalidatedSelection, UnvalidatedSelectionWithUnvalidatedDirectives,
-    UpdatableDirectiveParameters, UpdatableDirectiveSet,
+    ClientFieldDeclaration, ClientPointerDeclaration, LinkedFieldSelection, ScalarFieldSelection,
+    ServerFieldSelection, UnvalidatedSelection, UnvalidatedSelectionWithUnvalidatedDirectives,
 };
 use isograph_schema::ProcessClientFieldDeclarationError;
 use lazy_static::lazy_static;
@@ -57,20 +55,7 @@ pub fn validate_isograph_selection_set_directives(
     and_then_selection_set_and_collect_errors(
         selection_set,
         &|scalar_field_selection| Ok(scalar_field_selection.associated_data),
-        &|linked_field_selection| {
-            let updatable_directive = find_directive_named(
-                &linked_field_selection.directives,
-                *UPDATABLE_DIRECTIVE_NAME,
-            );
-
-            Ok(if updatable_directive.is_some() {
-                ScalarFieldValidDirectiveSet::Updatable(UpdatableDirectiveSet {
-                    updatable: UpdatableDirectiveParameters {},
-                })
-            } else {
-                ScalarFieldValidDirectiveSet::None(EmptyDirectiveSet {})
-            })
-        },
+        &|linked_field_selection| Ok(linked_field_selection.associated_data),
     )
 }
 
@@ -178,13 +163,4 @@ fn and_then_selection_set_and_collect_errors<
     } else {
         Err(errors)
     }
-}
-
-fn find_directive_named(
-    directives: &[WithSpan<IsographFieldDirective>],
-    name: IsographDirectiveName,
-) -> Option<&WithSpan<IsographFieldDirective>> {
-    directives
-        .iter()
-        .find(|directive| directive.item.name.item == name)
 }
