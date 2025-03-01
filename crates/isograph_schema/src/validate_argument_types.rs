@@ -10,14 +10,15 @@ use intern::Lookup;
 use std::collections::BTreeMap;
 
 use isograph_lang_types::{
-    graphql_type_annotation_from_type_annotation, ClientFieldId, ClientPointerId,
-    DefinitionLocation, NonConstantValue, SelectableServerFieldId, SelectionType, ServerFieldId,
-    ServerObjectId, ServerScalarId, VariableDefinition,
+    graphql_type_annotation_from_type_annotation, DefinitionLocation, NonConstantValue,
+    SelectableServerFieldId, SelectionType, ServerFieldId, ServerObjectId, ServerScalarId,
+    VariableDefinition,
 };
 
 use crate::{
-    as_server_field, OutputFormat, SchemaObject, ServerFieldData, ValidateSchemaError,
-    ValidateSchemaResult, ValidatedSchemaServerField, ValidatedVariableDefinition,
+    as_server_field, OutputFormat, SchemaObject, SelectionTypeId, ServerFieldData,
+    ValidateSchemaError, ValidateSchemaResult, ValidatedSchemaServerField,
+    ValidatedVariableDefinition,
 };
 
 fn graphql_type_to_non_null_type<TValue>(
@@ -301,9 +302,7 @@ pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
 
 fn object_satisfies_type<TOutputFormat: OutputFormat>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
-    variable_definitions: &[WithSpan<
-        VariableDefinition<SelectionType<ServerScalarId, ServerObjectId>>,
-    >],
+    variable_definitions: &[WithSpan<VariableDefinition<SelectableServerFieldId>>],
     schema_data: &ServerFieldData<TOutputFormat>,
     server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
@@ -403,7 +402,7 @@ fn get_non_nullable_missing_and_provided_fields<TOutputFormat: OutputFormat>(
 fn validate_no_extraneous_fields(
     object_fields: &BTreeMap<
         SelectableFieldName,
-        DefinitionLocation<ServerFieldId, SelectionType<ClientFieldId, ClientPointerId>>,
+        DefinitionLocation<ServerFieldId, SelectionTypeId>,
     >,
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     location: Location,

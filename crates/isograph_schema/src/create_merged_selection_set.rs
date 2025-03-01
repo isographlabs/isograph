@@ -23,8 +23,8 @@ use crate::{
     transform_name_and_arguments_with_child_variable_context, ClientFieldVariant, FieldOrPointer,
     ImperativelyLoadedFieldVariant, Loadability, NameAndArguments, OutputFormat,
     PathToRefetchField, RootOperationName, SchemaObject, SchemaServerFieldVariant, SelectionTypeId,
-    UnvalidatedVariableDefinition, ValidatedClientField, ValidatedClientPointer,
-    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection,
+    UnvalidatedVariableDefinition, ValidatedClientField, ValidatedScalarFieldSelection,
+    ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection, ValidatedSelectionType,
     VariableContext,
 };
 
@@ -1014,10 +1014,7 @@ fn merge_non_loadable_client_type<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
     parent_map: &mut MergedSelectionMap,
     parent_merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    newly_encountered_client_type: SelectionType<
-        &ValidatedClientField<TOutputFormat>,
-        &ValidatedClientPointer<TOutputFormat>,
-    >,
+    newly_encountered_client_type: ValidatedSelectionType<TOutputFormat>,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     parent_variable_context: &VariableContext,
     selection_arguments: &[WithLocation<SelectionFieldArgument>],

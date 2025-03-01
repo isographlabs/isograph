@@ -9,9 +9,10 @@ use isograph_lang_types::{
     TypeAnnotation, VariableDefinition,
 };
 
-use crate::{ClientFieldVariant, OutputFormat, RefetchStrategy, SelectionTypeId};
+use crate::{ClientFieldVariant, OutputFormat, RefetchStrategy};
 
 pub type FieldOrPointerName = SelectionType<SelectableFieldName, ClientPointerFieldName>;
+pub type SelectionTypeId = SelectionType<ClientFieldId, ClientPointerId>;
 
 #[derive(Debug)]
 pub struct ClientField<
