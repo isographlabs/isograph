@@ -1,3 +1,4 @@
+mod base_types;
 mod client_field_declaration;
 mod entrypoint_declaration;
 mod id_types;
@@ -5,6 +6,7 @@ mod isograph_directives;
 mod isograph_type_annotation;
 mod selection_directive_set;
 
+pub use base_types::*;
 pub use client_field_declaration::*;
 pub use entrypoint_declaration::*;
 pub use id_types::*;
