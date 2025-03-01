@@ -14,6 +14,13 @@ pub enum ScalarFieldValidDirectiveSet {
     None(EmptyDirectiveSet),
 }
 
+#[derive(Deserialize, Debug, Clone, PartialEq, PartialOrd, Ord, Eq, Copy, Hash)]
+#[serde(rename_all = "camelCase", untagged)]
+pub enum LinkedFieldValidDirectiveSet {
+    Updatable(UpdatableDirectiveSet),
+    None(EmptyDirectiveSet),
+}
+
 #[derive(Deserialize, Debug, Default, Clone, PartialEq, PartialOrd, Ord, Eq, Copy, Hash)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct UpdatableDirectiveSet {

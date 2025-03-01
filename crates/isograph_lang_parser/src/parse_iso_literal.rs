@@ -415,15 +415,6 @@ fn parse_selection(
         let arguments = parse_optional_arguments(tokens, text_source)?;
 
         let directives = parse_directives(tokens, text_source)?;
-        let associated_data = from_isograph_field_directives(&directives).map_err(|message| {
-            WithSpan::new(
-                IsographLiteralParseError::UnableToDeserializeDirectives { message },
-                directives
-                    .first()
-                    .map(|x| x.span)
-                    .unwrap_or_else(|| Span::todo_generated()),
-            )
-        })?;
 
         // If we encounter a selection set, we are parsing a linked field. Otherwise, a scalar field.
         let selection_set = parse_optional_selection_set(tokens, text_source)?;
@@ -431,19 +422,45 @@ fn parse_selection(
         parse_comma_line_break_or_curly(tokens)?;
 
         let selection = match selection_set {
-            Some(selection_set) => ServerFieldSelection::LinkedField(LinkedFieldSelection {
-                name: field_name.map(|string_key| string_key.into()),
-                reader_alias: alias.map(|with_span| with_span.map(|string_key| string_key.into())),
-                associated_data,
-                selection_set,
-                arguments,
-            }),
-            None => ServerFieldSelection::ScalarField(ScalarFieldSelection {
-                name: field_name.map(|string_key| string_key.into()),
-                reader_alias: alias.map(|with_span| with_span.map(|string_key| string_key.into())),
-                associated_data,
-                arguments,
-            }),
+            Some(selection_set) => {
+                let associated_data =
+                    from_isograph_field_directives(&directives).map_err(|message| {
+                        WithSpan::new(
+                            IsographLiteralParseError::UnableToDeserializeDirectives { message },
+                            directives
+                                .first()
+                                .map(|x| x.span)
+                                .unwrap_or_else(|| Span::todo_generated()),
+                        )
+                    })?;
+                ServerFieldSelection::LinkedField(LinkedFieldSelection {
+                    name: field_name.map(|string_key| string_key.into()),
+                    reader_alias: alias
+                        .map(|with_span| with_span.map(|string_key| string_key.into())),
+                    associated_data,
+                    selection_set,
+                    arguments,
+                })
+            }
+            None => {
+                let associated_data =
+                    from_isograph_field_directives(&directives).map_err(|message| {
+                        WithSpan::new(
+                            IsographLiteralParseError::UnableToDeserializeDirectives { message },
+                            directives
+                                .first()
+                                .map(|x| x.span)
+                                .unwrap_or_else(|| Span::todo_generated()),
+                        )
+                    })?;
+                ServerFieldSelection::ScalarField(ScalarFieldSelection {
+                    name: field_name.map(|string_key| string_key.into()),
+                    reader_alias: alias
+                        .map(|with_span| with_span.map(|string_key| string_key.into())),
+                    associated_data,
+                    arguments,
+                })
+            }
         };
         Ok(selection)
     })

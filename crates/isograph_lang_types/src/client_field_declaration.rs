@@ -9,17 +9,17 @@ use intern::string_key::Lookup;
 use serde::Deserialize;
 use std::fmt::Debug;
 
-use crate::{IsographFieldDirective, ScalarFieldValidDirectiveSet};
+use crate::{IsographFieldDirective, LinkedFieldValidDirectiveSet, ScalarFieldValidDirectiveSet};
 
 // This name makes no sense anymore... directives are validated!
 pub type UnvalidatedSelectionWithUnvalidatedDirectives =
-    ServerFieldSelection<ScalarFieldValidDirectiveSet, ScalarFieldValidDirectiveSet>;
+    ServerFieldSelection<ScalarFieldValidDirectiveSet, LinkedFieldValidDirectiveSet>;
 
 pub type UnvalidatedSelection = ServerFieldSelection<
     // <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
     ScalarFieldValidDirectiveSet,
     // <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
-    ScalarFieldValidDirectiveSet,
+    LinkedFieldValidDirectiveSet,
 >;
 pub type UnvalidatedScalarFieldSelection = ScalarFieldSelection<
     // <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
@@ -33,7 +33,7 @@ pub struct ClientFieldDeclaration {
     pub client_field_name: WithSpan<ScalarFieldName>,
     pub description: Option<WithSpan<DescriptionValue>>,
     pub selection_set: Vec<
-        WithSpan<ServerFieldSelection<ScalarFieldValidDirectiveSet, ScalarFieldValidDirectiveSet>>,
+        WithSpan<ServerFieldSelection<ScalarFieldValidDirectiveSet, LinkedFieldValidDirectiveSet>>,
     >,
     // TODO remove, or put on a generic
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
@@ -55,7 +55,7 @@ pub struct ClientPointerDeclaration {
     pub client_pointer_name: WithSpan<ClientPointerFieldName>,
     pub description: Option<WithSpan<DescriptionValue>>,
     pub selection_set: Vec<
-        WithSpan<ServerFieldSelection<ScalarFieldValidDirectiveSet, ScalarFieldValidDirectiveSet>>,
+        WithSpan<ServerFieldSelection<ScalarFieldValidDirectiveSet, LinkedFieldValidDirectiveSet>>,
     >,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: RelativePathToSourceFile,

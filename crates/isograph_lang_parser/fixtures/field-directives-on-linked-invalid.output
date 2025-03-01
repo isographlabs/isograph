@@ -22,7 +22,7 @@ Err(
         ),
         item: UnableToDeserializeDirectives {
             message: Custom(
-                "data did not match any variant of untagged enum ScalarFieldValidDirectiveSet",
+                "data did not match any variant of untagged enum LinkedFieldValidDirectiveSet",
             ),
         },
     },
@@ -30,7 +30,7 @@ Err(
 
 Unable to process directives. Message: Error when deserializing.
 
-data did not match any variant of untagged enum ScalarFieldValidDirectiveSet
+data did not match any variant of untagged enum LinkedFieldValidDirectiveSet
 crates/isograph_lang_parser/fixtures/field-directives-on-linked-invalid.input.js
 
   field Type.Name {
@@ -63,7 +63,7 @@ Err(
         ),
         item: UnableToDeserializeDirectives {
             message: Custom(
-                "data did not match any variant of untagged enum ScalarFieldValidDirectiveSet",
+                "data did not match any variant of untagged enum LinkedFieldValidDirectiveSet",
             ),
         },
     },
@@ -71,7 +71,7 @@ Err(
 
 Unable to process directives. Message: Error when deserializing.
 
-data did not match any variant of untagged enum ScalarFieldValidDirectiveSet
+data did not match any variant of untagged enum LinkedFieldValidDirectiveSet
 crates/isograph_lang_parser/fixtures/field-directives-on-linked-invalid.input.js
 
   field Type.Name {
@@ -104,7 +104,7 @@ Err(
         ),
         item: UnableToDeserializeDirectives {
             message: Custom(
-                "data did not match any variant of untagged enum ScalarFieldValidDirectiveSet",
+                "data did not match any variant of untagged enum LinkedFieldValidDirectiveSet",
             ),
         },
     },
@@ -112,7 +112,7 @@ Err(
 
 Unable to process directives. Message: Error when deserializing.
 
-data did not match any variant of untagged enum ScalarFieldValidDirectiveSet
+data did not match any variant of untagged enum LinkedFieldValidDirectiveSet
 crates/isograph_lang_parser/fixtures/field-directives-on-linked-invalid.input.js
 
   field Type.Name {
