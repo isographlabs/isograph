@@ -178,7 +178,6 @@ Ok(
                                                     },
                                                 },
                                             ],
-                                            directives: [],
                                         },
                                     ),
                                     span: Span {

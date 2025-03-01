@@ -125,7 +125,6 @@ Ok(
                                                     },
                                                 },
                                             ],
-                                            directives: [],
                                         },
                                     ),
                                     span: Span {

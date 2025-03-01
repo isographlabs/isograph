@@ -70,26 +70,6 @@ Ok(
                                             ),
                                             selection_set: [],
                                             arguments: [],
-                                            directives: [
-                                                WithSpan {
-                                                    item: IsographFieldDirective {
-                                                        name: WithSpan {
-                                                            item: IsographDirectiveName(
-                                                                "loadable",
-                                                            ),
-                                                            span: Span {
-                                                                start: 33,
-                                                                end: 41,
-                                                            },
-                                                        },
-                                                        arguments: [],
-                                                    },
-                                                    span: Span {
-                                                        start: 32,
-                                                        end: 41,
-                                                    },
-                                                },
-                                            ],
                                         },
                                     ),
                                     span: Span {
@@ -203,85 +183,6 @@ Ok(
                                             ),
                                             selection_set: [],
                                             arguments: [],
-                                            directives: [
-                                                WithSpan {
-                                                    item: IsographFieldDirective {
-                                                        name: WithSpan {
-                                                            item: IsographDirectiveName(
-                                                                "loadable",
-                                                            ),
-                                                            span: Span {
-                                                                start: 33,
-                                                                end: 41,
-                                                            },
-                                                        },
-                                                        arguments: [
-                                                            WithLocation {
-                                                                location: Embedded(
-                                                                    EmbeddedLocation {
-                                                                        text_source: TextSource {
-                                                                            current_working_directory: CurrentWorkingDirectory,
-                                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-linked-valid.input.js",
-                                                                            ),
-                                                                            span: Some(
-                                                                                Span {
-                                                                                    start: 124,
-                                                                                    end: 202,
-                                                                                },
-                                                                            ),
-                                                                        },
-                                                                        span: Span {
-                                                                            start: 42,
-                                                                            end: 64,
-                                                                        },
-                                                                    },
-                                                                ),
-                                                                item: SelectionFieldArgument {
-                                                                    name: WithSpan {
-                                                                        item: FieldArgumentName(
-                                                                            "lazyLoadArtifact",
-                                                                        ),
-                                                                        span: Span {
-                                                                            start: 42,
-                                                                            end: 58,
-                                                                        },
-                                                                    },
-                                                                    value: WithLocation {
-                                                                        location: Embedded(
-                                                                            EmbeddedLocation {
-                                                                                text_source: TextSource {
-                                                                                    current_working_directory: CurrentWorkingDirectory,
-                                                                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                        "crates/isograph_lang_parser/fixtures/field-directives-on-linked-valid.input.js",
-                                                                                    ),
-                                                                                    span: Some(
-                                                                                        Span {
-                                                                                            start: 124,
-                                                                                            end: 202,
-                                                                                        },
-                                                                                    ),
-                                                                                },
-                                                                                span: Span {
-                                                                                    start: 60,
-                                                                                    end: 64,
-                                                                                },
-                                                                            },
-                                                                        ),
-                                                                        item: Boolean(
-                                                                            true,
-                                                                        ),
-                                                                    },
-                                                                },
-                                                            },
-                                                        ],
-                                                    },
-                                                    span: Span {
-                                                        start: 32,
-                                                        end: 41,
-                                                    },
-                                                },
-                                            ],
                                         },
                                     ),
                                     span: Span {
@@ -395,85 +296,6 @@ Ok(
                                             ),
                                             selection_set: [],
                                             arguments: [],
-                                            directives: [
-                                                WithSpan {
-                                                    item: IsographFieldDirective {
-                                                        name: WithSpan {
-                                                            item: IsographDirectiveName(
-                                                                "loadable",
-                                                            ),
-                                                            span: Span {
-                                                                start: 33,
-                                                                end: 41,
-                                                            },
-                                                        },
-                                                        arguments: [
-                                                            WithLocation {
-                                                                location: Embedded(
-                                                                    EmbeddedLocation {
-                                                                        text_source: TextSource {
-                                                                            current_working_directory: CurrentWorkingDirectory,
-                                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-linked-valid.input.js",
-                                                                            ),
-                                                                            span: Some(
-                                                                                Span {
-                                                                                    start: 241,
-                                                                                    end: 320,
-                                                                                },
-                                                                            ),
-                                                                        },
-                                                                        span: Span {
-                                                                            start: 42,
-                                                                            end: 65,
-                                                                        },
-                                                                    },
-                                                                ),
-                                                                item: SelectionFieldArgument {
-                                                                    name: WithSpan {
-                                                                        item: FieldArgumentName(
-                                                                            "lazyLoadArtifact",
-                                                                        ),
-                                                                        span: Span {
-                                                                            start: 42,
-                                                                            end: 58,
-                                                                        },
-                                                                    },
-                                                                    value: WithLocation {
-                                                                        location: Embedded(
-                                                                            EmbeddedLocation {
-                                                                                text_source: TextSource {
-                                                                                    current_working_directory: CurrentWorkingDirectory,
-                                                                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                        "crates/isograph_lang_parser/fixtures/field-directives-on-linked-valid.input.js",
-                                                                                    ),
-                                                                                    span: Some(
-                                                                                        Span {
-                                                                                            start: 241,
-                                                                                            end: 320,
-                                                                                        },
-                                                                                    ),
-                                                                                },
-                                                                                span: Span {
-                                                                                    start: 60,
-                                                                                    end: 65,
-                                                                                },
-                                                                            },
-                                                                        ),
-                                                                        item: Boolean(
-                                                                            false,
-                                                                        ),
-                                                                    },
-                                                                },
-                                                            },
-                                                        ],
-                                                    },
-                                                    span: Span {
-                                                        start: 32,
-                                                        end: 41,
-                                                    },
-                                                },
-                                            ],
                                         },
                                     ),
                                     span: Span {
@@ -584,26 +406,6 @@ Ok(
                                             ),
                                             selection_set: [],
                                             arguments: [],
-                                            directives: [
-                                                WithSpan {
-                                                    item: IsographFieldDirective {
-                                                        name: WithSpan {
-                                                            item: IsographDirectiveName(
-                                                                "updatable",
-                                                            ),
-                                                            span: Span {
-                                                                start: 33,
-                                                                end: 42,
-                                                            },
-                                                        },
-                                                        arguments: [],
-                                                    },
-                                                    span: Span {
-                                                        start: 32,
-                                                        end: 42,
-                                                    },
-                                                },
-                                            ],
                                         },
                                     ),
                                     span: Span {

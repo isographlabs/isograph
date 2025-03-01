@@ -202,7 +202,6 @@ Ok(
                                                                 EmptyDirectiveSet,
                                                             ),
                                                             arguments: [],
-                                                            directives: [],
                                                         },
                                                     ),
                                                     span: Span {
@@ -243,7 +242,6 @@ Ok(
                                                                 EmptyDirectiveSet,
                                                             ),
                                                             arguments: [],
-                                                            directives: [],
                                                         },
                                                     ),
                                                     span: Span {
@@ -253,7 +251,6 @@ Ok(
                                                 },
                                             ],
                                             arguments: [],
-                                            directives: [],
                                         },
                                     ),
                                     span: Span {

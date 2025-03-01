@@ -65,7 +65,6 @@ Ok(
                                             ),
                                             selection_set: [],
                                             arguments: [],
-                                            directives: [],
                                         },
                                     ),
                                     span: Span {
