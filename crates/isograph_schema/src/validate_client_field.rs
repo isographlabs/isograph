@@ -12,7 +12,7 @@ use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     reachable_variables, ClientFieldId, ClientPointerId, LinkedFieldSelection,
     ScalarFieldSelection, ScalarFieldValidDirectiveSet, SelectionFieldArgument, SelectionType,
-    ServerObjectId, UnvalidatedScalarFieldSelection, UnvalidatedSelection, VariableDefinition,
+    ServerObjectId, UnvalidatedSelection, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -424,7 +424,7 @@ fn validate_client_field_definition_selection_exists_and_type_matches<
 /// and type should be a client field (which is a scalar) or a server scalar type.
 fn validate_field_type_exists_and_is_scalar<TOutputFormat: OutputFormat>(
     scalar_field_selection_parent_object: &SchemaObject<TOutputFormat>,
-    scalar_field_selection: UnvalidatedScalarFieldSelection,
+    scalar_field_selection: ScalarFieldSelection,
     used_variables: &mut UsedVariables,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     top_level_client_type_info: &ValidateSchemaSharedInfo<'_, TOutputFormat>,

@@ -958,7 +958,10 @@ fn insert_imperative_field_into_refetch_paths<TOutputFormat: OutputFormat>(
         client_field_id: newly_encountered_scalar_client_field.id,
     };
     merge_traversal_state.refetch_paths.insert(
-        (path, ScalarFieldValidDirectiveSet::None(EmptyDirectiveSet {})),
+        (
+            path,
+            ScalarFieldValidDirectiveSet::None(EmptyDirectiveSet {}),
+        ),
         RootRefetchedPath {
             field_name: newly_encountered_scalar_client_field.name,
             path_to_refetch_field_info: info,

@@ -11,26 +11,17 @@ use std::fmt::Debug;
 
 use crate::{IsographFieldDirective, ScalarFieldValidDirectiveSet};
 
-pub type UnvalidatedSelectionWithUnvalidatedDirectives = ServerFieldSelection<(), ()>;
+pub type UnvalidatedSelectionWithUnvalidatedDirectives = ServerFieldSelection;
 
-pub type UnvalidatedSelection = ServerFieldSelection<
-    // <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
-    ScalarFieldValidDirectiveSet,
-    // <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
-    ScalarFieldValidDirectiveSet,
->;
-pub type UnvalidatedScalarFieldSelection = ScalarFieldSelection<
-    // <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
-    ScalarFieldValidDirectiveSet,
->;
+pub type UnvalidatedSelection = ServerFieldSelection;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub struct ClientFieldDeclaration<TScalarField, TLinkedField> {
+pub struct ClientFieldDeclaration {
     pub const_export_name: ConstExportName,
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub client_field_name: WithSpan<ScalarFieldName>,
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub selection_set: Vec<WithSpan<ServerFieldSelection<TScalarField, TLinkedField>>>,
+    pub selection_set: Vec<WithSpan<ServerFieldSelection>>,
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: RelativePathToSourceFile,
@@ -42,14 +33,14 @@ pub struct ClientFieldDeclaration<TScalarField, TLinkedField> {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub struct ClientPointerDeclaration<TScalarField, TLinkedField> {
+pub struct ClientPointerDeclaration {
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub const_export_name: ConstExportName,
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub target_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     pub client_pointer_name: WithSpan<ClientPointerFieldName>,
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub selection_set: Vec<WithSpan<ServerFieldSelection<TScalarField, TLinkedField>>>,
+    pub selection_set: Vec<WithSpan<ServerFieldSelection>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: RelativePathToSourceFile,
 
@@ -59,15 +50,13 @@ pub struct ClientPointerDeclaration<TScalarField, TLinkedField> {
     pub dot: WithSpan<()>,
 }
 
-pub type ClientFieldDeclarationWithUnvalidatedDirectives = ClientFieldDeclaration<(), ()>;
-pub type ClientPointerDeclarationWithUnvalidatedDirectives = ClientPointerDeclaration<(), ()>;
-pub type ClientFieldDeclarationWithValidatedDirectives =
-    ClientFieldDeclaration<ScalarFieldValidDirectiveSet, ScalarFieldValidDirectiveSet>;
+pub type ClientFieldDeclarationWithUnvalidatedDirectives = ClientFieldDeclaration;
+pub type ClientPointerDeclarationWithUnvalidatedDirectives = ClientPointerDeclaration;
+pub type ClientFieldDeclarationWithValidatedDirectives = ClientFieldDeclaration;
 
-pub type ClientPointerDeclarationWithValidatedDirectives =
-    ClientPointerDeclaration<ScalarFieldValidDirectiveSet, ScalarFieldValidDirectiveSet>;
+pub type ClientPointerDeclarationWithValidatedDirectives = ClientPointerDeclaration;
 
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Default)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Default, Hash)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LoadableDirectiveParameters {
     #[serde(default)]
@@ -77,22 +66,17 @@ pub struct LoadableDirectiveParameters {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub enum ServerFieldSelection<TScalarField, TLinkedField> {
-    ScalarField(ScalarFieldSelection<TScalarField>),
-    LinkedField(LinkedFieldSelection<TScalarField, TLinkedField>),
+pub enum ServerFieldSelection {
+    ScalarField(ScalarFieldSelection),
+    LinkedField(LinkedFieldSelection),
 }
 
-impl<TScalarField, TLinkedField> ServerFieldSelection<TScalarField, TLinkedField> {
-    pub fn map<TNewScalarField, TNewLinkedField>(
+impl ServerFieldSelection {
+    pub fn map(
         self,
-        map_scalar_field: &mut impl FnMut(
-            ScalarFieldSelection<TScalarField>,
-        ) -> ScalarFieldSelection<TNewScalarField>,
-        map_linked_field: &mut impl FnMut(
-            LinkedFieldSelection<TScalarField, TLinkedField>,
-        )
-            -> LinkedFieldSelection<TNewScalarField, TNewLinkedField>,
-    ) -> ServerFieldSelection<TNewScalarField, TNewLinkedField> {
+        map_scalar_field: &mut impl FnMut(ScalarFieldSelection) -> ScalarFieldSelection,
+        map_linked_field: &mut impl FnMut(LinkedFieldSelection) -> LinkedFieldSelection,
+    ) -> ServerFieldSelection {
         match self {
             ServerFieldSelection::ScalarField(s) => {
                 ServerFieldSelection::ScalarField(map_scalar_field(s))
@@ -105,17 +89,9 @@ impl<TScalarField, TLinkedField> ServerFieldSelection<TScalarField, TLinkedField
 
     pub fn and_then<TNewScalarField, TNewLinkedField, E>(
         self,
-        and_then_scalar_field: &mut impl FnMut(
-            ScalarFieldSelection<TScalarField>,
-        )
-            -> Result<ScalarFieldSelection<TNewScalarField>, E>,
-        and_then_linked_field: &mut impl FnMut(
-            LinkedFieldSelection<TScalarField, TLinkedField>,
-        ) -> Result<
-            LinkedFieldSelection<TNewScalarField, TNewLinkedField>,
-            E,
-        >,
-    ) -> Result<ServerFieldSelection<TNewScalarField, TNewLinkedField>, E> {
+        and_then_scalar_field: &mut impl FnMut(ScalarFieldSelection) -> Result<ScalarFieldSelection, E>,
+        and_then_linked_field: &mut impl FnMut(LinkedFieldSelection) -> Result<LinkedFieldSelection, E>,
+    ) -> Result<ServerFieldSelection, E> {
         match self {
             ServerFieldSelection::ScalarField(s) => {
                 Ok(ServerFieldSelection::ScalarField(and_then_scalar_field(s)?))
@@ -150,33 +126,32 @@ impl<TScalarField, TLinkedField> ServerFieldSelection<TScalarField, TLinkedField
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub struct ScalarFieldSelection<TScalarField> {
+pub struct ScalarFieldSelection {
     pub name: WithLocation<ScalarFieldName>,
     pub reader_alias: Option<WithLocation<ScalarFieldAlias>>,
-    pub associated_data: TScalarField,
+    pub associated_data: ScalarFieldValidDirectiveSet,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
 }
 
-impl<TScalarField> ScalarFieldSelection<TScalarField> {
-    pub fn map<U>(self, map: &impl Fn(TScalarField) -> U) -> ScalarFieldSelection<U> {
+impl ScalarFieldSelection {
+    pub fn map(self, map: &impl Fn()) -> ScalarFieldSelection {
+        map();
         ScalarFieldSelection {
             name: self.name,
             reader_alias: self.reader_alias,
-            associated_data: map(self.associated_data),
+            associated_data: self.associated_data,
             arguments: self.arguments,
             directives: self.directives,
         }
     }
 
-    pub fn and_then<U, E>(
-        self,
-        map: &impl Fn(TScalarField) -> Result<U, E>,
-    ) -> Result<ScalarFieldSelection<U>, E> {
+    pub fn and_then<E>(self, map: &impl Fn() -> Result<(), E>) -> Result<ScalarFieldSelection, E> {
+        map()?;
         Ok(ScalarFieldSelection {
             name: self.name,
             reader_alias: self.reader_alias,
-            associated_data: map(self.associated_data)?,
+            associated_data: self.associated_data,
             arguments: self.arguments,
             directives: self.directives,
         })
@@ -190,26 +165,23 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub struct LinkedFieldSelection<TScalarField, TLinkedField> {
+pub struct LinkedFieldSelection {
     pub name: WithLocation<LinkedFieldName>,
     // pub alias
     pub reader_alias: Option<WithLocation<LinkedFieldAlias>>,
-    pub associated_data: TLinkedField,
-    pub selection_set: Vec<WithSpan<ServerFieldSelection<TScalarField, TLinkedField>>>,
+    pub associated_data: ScalarFieldValidDirectiveSet,
+    pub selection_set: Vec<WithSpan<ServerFieldSelection>>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
 }
 
-impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField> {
-    pub fn map<U, V>(
-        self,
-        map_scalar: &impl Fn(TScalarField) -> U,
-        map_linked: &impl Fn(TLinkedField) -> V,
-    ) -> LinkedFieldSelection<U, V> {
+impl LinkedFieldSelection {
+    pub fn map(self, map_scalar: &impl Fn(), map_linked: &impl Fn()) -> LinkedFieldSelection {
+        map_linked();
         LinkedFieldSelection {
             name: self.name,
             reader_alias: self.reader_alias,
-            associated_data: map_linked(self.associated_data),
+            associated_data: self.associated_data,
             selection_set: self
                 .selection_set
                 .into_iter()
