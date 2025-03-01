@@ -342,9 +342,6 @@ pub enum ProcessClientFieldDeclarationError {
 
     #[error("Error when deserializing directives. Message: {message}")]
     UnableToDeserializeDirectives { message: DeserializationError },
-
-    #[error("The directive \"@loadable\" and \"@updatable\" are mutually exclusive.")]
-    LoadableAndUpdatableAreMutuallyExclusive,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
