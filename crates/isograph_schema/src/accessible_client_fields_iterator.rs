@@ -1,9 +1,9 @@
 use common_lang_types::WithSpan;
-use isograph_lang_types::{SelectionType, ServerFieldSelection};
+use isograph_lang_types::{DefinitionLocation, SelectionType, ServerFieldSelection};
 
 use crate::{
-    selection_set_for_parent_query, DefinitionLocation, OutputFormat, ValidatedClientField,
-    ValidatedClientPointer, ValidatedSchema, ValidatedSelection,
+    selection_set_for_parent_query, OutputFormat, ValidatedClientField, ValidatedClientPointer,
+    ValidatedSchema, ValidatedSelection,
 };
 
 // This should really be replaced with a proper visitor, or something

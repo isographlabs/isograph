@@ -46,3 +46,19 @@ impl TryFrom<SelectableServerFieldId> for ServerObjectId {
 }
 
 u32_newtype!(RefetchQueryIndex);
+
+/// Distinguishes between server-defined fields and locally-defined fields.
+/// TFieldAssociatedData can be a ScalarFieldName in an unvalidated schema, or a
+/// ScalarId, in a validated schema.
+///
+/// TLocalType can be an UnvalidatedTypeName in an unvalidated schema, or an
+/// DefinedTypeId in a validated schema.
+///
+/// Note that locally-defined fields do **not** only include fields defined in
+/// an iso field literal. Refetch fields and generated mutation fields are
+/// also local fields.
+#[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq)]
+pub enum DefinitionLocation<TServer, TClient> {
+    Server(TServer),
+    Client(TClient),
+}

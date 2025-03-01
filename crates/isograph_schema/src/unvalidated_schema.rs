@@ -7,14 +7,14 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    EntrypointDeclaration, LinkedFieldSelection, LinkedFieldSelectionDirectiveSet,
-    ScalarFieldSelectionDirectiveSet, SelectableServerFieldId, ServerFieldId, ServerScalarId,
-    VariableDefinition,
+    DefinitionLocation, EntrypointDeclaration, LinkedFieldSelection,
+    LinkedFieldSelectionDirectiveSet, ScalarFieldSelectionDirectiveSet, SelectableServerFieldId,
+    ServerFieldId, ServerScalarId, VariableDefinition,
 };
 
 use crate::{
-    schema_validation_state::SchemaValidationState, ClientField, ClientPointer, SelectionTypeId,
-    DefinitionLocation, OutputFormat, Schema, SchemaScalar, SchemaServerField, ServerFieldData,
+    schema_validation_state::SchemaValidationState, ClientField, ClientPointer, OutputFormat,
+    Schema, SchemaScalar, SchemaServerField, SelectionTypeId, ServerFieldData,
     UseRefetchFieldRefetchStrategy, ValidatedSelection,
 };
 use lazy_static::lazy_static;

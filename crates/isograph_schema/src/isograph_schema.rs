@@ -15,9 +15,9 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, ClientPointerId, SelectableServerFieldId, SelectionType,
-    ServerFieldId, ServerFieldSelection, ServerObjectId, ServerScalarId, ServerStrongIdFieldId,
-    TypeAnnotation, VariableDefinition,
+    ArgumentKeyAndValue, ClientFieldId, ClientPointerId, DefinitionLocation,
+    SelectableServerFieldId, SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId,
+    ServerScalarId, ServerStrongIdFieldId, TypeAnnotation, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -118,22 +118,6 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     }
 }
 
-/// Distinguishes between server-defined fields and locally-defined fields.
-/// TFieldAssociatedData can be a ScalarFieldName in an unvalidated schema, or a
-/// ScalarId, in a validated schema.
-///
-/// TLocalType can be an UnvalidatedTypeName in an unvalidated schema, or an
-/// DefinedTypeId in a validated schema.
-///
-/// Note that locally-defined fields do **not** only include fields defined in
-/// an iso field literal. Refetch fields and generated mutation fields are
-/// also local fields.
-#[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq)]
-pub enum DefinitionLocation<TServer, TClient> {
-    Server(TServer),
-    Client(TClient),
-}
-
 pub type LinkedType<
     'a,
     ServerFieldTypeAssociatedData,
@@ -155,14 +139,14 @@ pub type LinkedType<
     >,
 >;
 
-impl<
-        ServerFieldTypeAssociatedData,
-        TSelectionTypeSelectionScalarFieldAssociatedData,
-        TSelectionTypeSelectionLinkedFieldAssociatedData,
-        TSelectionTypeVariableDefinitionAssociatedData: Ord + Debug,
-        TOutputFormat: OutputFormat,
-    >
-    DefinitionLocation<
+pub fn description<
+    ServerFieldTypeAssociatedData,
+    TSelectionTypeSelectionScalarFieldAssociatedData,
+    TSelectionTypeSelectionLinkedFieldAssociatedData,
+    TSelectionTypeVariableDefinitionAssociatedData: Ord + Debug,
+    TOutputFormat: OutputFormat,
+>(
+    definition_location: &DefinitionLocation<
         &SchemaServerField<
             ServerFieldTypeAssociatedData,
             TSelectionTypeVariableDefinitionAssociatedData,
@@ -174,33 +158,29 @@ impl<
             TSelectionTypeVariableDefinitionAssociatedData,
             TOutputFormat,
         >,
-    >
-{
-    pub fn description(&self) -> Option<DescriptionValue> {
-        match self {
-            DefinitionLocation::Server(server_field) => server_field.description,
-            DefinitionLocation::Client(client_field) => client_field.description,
-        }
+    >,
+) -> Option<DescriptionValue> {
+    match definition_location {
+        DefinitionLocation::Server(server_field) => server_field.description,
+        DefinitionLocation::Client(client_field) => client_field.description,
     }
 }
 
-impl<TOutputFormat: OutputFormat>
-    DefinitionLocation<
+pub fn output_type_annotation<TOutputFormat: OutputFormat>(
+    definition_location: &DefinitionLocation<
         &ValidatedSchemaServerField<TOutputFormat>,
         &ValidatedClientPointer<TOutputFormat>,
-    >
-{
-    pub fn output_type_annotation(&self) -> TypeAnnotation<ServerObjectId> {
-        match self {
-            DefinitionLocation::Client(client_pointer) => client_pointer.to.clone(),
-            DefinitionLocation::Server(server_field) => match &server_field.associated_data {
-                SelectionType::Scalar(_) => panic!(
-                    "output_type_id should be an object. \
+    >,
+) -> TypeAnnotation<ServerObjectId> {
+    match definition_location {
+        DefinitionLocation::Client(client_pointer) => client_pointer.to.clone(),
+        DefinitionLocation::Server(server_field) => match &server_field.associated_data {
+            SelectionType::Scalar(_) => panic!(
+                "output_type_id should be an object. \
                     This is indicative of a bug in Isograph.",
-                ),
-                SelectionType::Object(associated_data) => associated_data.type_name.clone(),
-            },
-        }
+            ),
+            SelectionType::Object(associated_data) => associated_data.type_name.clone(),
+        },
     }
 }
 
@@ -418,21 +398,21 @@ pub fn reader_selection_set<
     }
 }
 
-impl<TFieldAssociatedData, TClientFieldType>
-    DefinitionLocation<TFieldAssociatedData, TClientFieldType>
-{
-    pub fn as_server_field(&self) -> Option<&TFieldAssociatedData> {
-        match self {
-            DefinitionLocation::Server(server_field) => Some(server_field),
-            DefinitionLocation::Client(_) => None,
-        }
+pub fn as_server_field<TFieldAssociatedData, TClientFieldType>(
+    definition_location: &DefinitionLocation<TFieldAssociatedData, TClientFieldType>,
+) -> Option<&TFieldAssociatedData> {
+    match definition_location {
+        DefinitionLocation::Server(server_field) => Some(server_field),
+        DefinitionLocation::Client(_) => None,
     }
+}
 
-    pub fn as_client_type(&self) -> Option<&TClientFieldType> {
-        match self {
-            DefinitionLocation::Server(_) => None,
-            DefinitionLocation::Client(client_field) => Some(client_field),
-        }
+pub fn as_client_type<TFieldAssociatedData, TClientFieldType>(
+    definition_location: &DefinitionLocation<TFieldAssociatedData, TClientFieldType>,
+) -> Option<&TClientFieldType> {
+    match definition_location {
+        DefinitionLocation::Server(_) => None,
+        DefinitionLocation::Client(client_field) => Some(client_field),
     }
 }
 

@@ -10,7 +10,7 @@ use common_lang_types::{
 
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    reachable_variables, ClientFieldId, ClientPointerId, LinkedFieldSelection,
+    reachable_variables, ClientFieldId, ClientPointerId, DefinitionLocation, LinkedFieldSelection,
     LinkedFieldSelectionDirectiveSet, ScalarFieldSelection, ScalarFieldSelectionDirectiveSet,
     SelectionFieldArgument, SelectionType, ServerObjectId, UnvalidatedScalarFieldSelection,
     UnvalidatedSelection, VariableDefinition,
@@ -20,11 +20,11 @@ use lazy_static::lazy_static;
 use crate::{
     get_all_errors_or_all_ok, get_all_errors_or_all_ok_as_hashmap, get_all_errors_or_all_ok_iter,
     get_all_errors_or_tuple_ok, validate_argument_types::value_satisfies_type, ClientField,
-    ClientPointer, SelectionTypeId, DefinitionLocation, OutputFormat, RefetchStrategy, SchemaObject,
-    ServerFieldData, UnvalidatedClientField, UnvalidatedClientPointer,
-    UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy,
-    UnvalidatedVariableDefinition, ValidateSchemaError, ValidateSchemaResult, ValidatedClientField,
-    ValidatedClientPointer, ValidatedLinkedFieldAssociatedData, ValidatedLinkedFieldSelection,
+    ClientPointer, OutputFormat, RefetchStrategy, SchemaObject, SelectionTypeId, ServerFieldData,
+    UnvalidatedClientField, UnvalidatedClientPointer, UnvalidatedLinkedFieldSelection,
+    UnvalidatedRefetchFieldStrategy, UnvalidatedVariableDefinition, ValidateSchemaError,
+    ValidateSchemaResult, ValidatedClientField, ValidatedClientPointer,
+    ValidatedLinkedFieldAssociatedData, ValidatedLinkedFieldSelection,
     ValidatedRefetchFieldStrategy, ValidatedScalarFieldAssociatedData,
     ValidatedScalarFieldSelection, ValidatedSchemaServerField, ValidatedSelection,
     ValidatedVariableDefinition,
@@ -42,7 +42,10 @@ lazy_static! {
 #[allow(clippy::type_complexity)]
 pub(crate) fn validate_and_transform_client_types<TOutputFormat: OutputFormat>(
     client_types: Vec<
-        SelectionType<UnvalidatedClientField<TOutputFormat>, UnvalidatedClientPointer<TOutputFormat>>,
+        SelectionType<
+            UnvalidatedClientField<TOutputFormat>,
+            UnvalidatedClientPointer<TOutputFormat>,
+        >,
     >,
     schema_data: &ServerFieldData<TOutputFormat>,
     server_fields: &[ValidatedSchemaServerField<TOutputFormat>],

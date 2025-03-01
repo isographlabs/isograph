@@ -10,17 +10,17 @@ use intern::{string_key::Intern, Lookup};
 use core::panic;
 use isograph_config::CompilerConfig;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, NonConstantValue, ScalarFieldSelection,
+    ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, NonConstantValue, ScalarFieldSelection,
     ScalarFieldSelectionDirectiveSet, SelectableServerFieldId, SelectionType, ServerFieldSelection,
     ServerObjectId, TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
-    accessible_client_fields, get_provided_arguments, selection_map_wrapped, selection_type_id,
-    ClientFieldVariant, DefinitionLocation, FieldTraversalResult, NameAndArguments,
-    NormalizationKey, OutputFormat, RequiresRefinement, Schema, SchemaObject,
-    SchemaServerFieldVariant, UserWrittenComponentVariant, ValidatedClientField,
-    ValidatedScalarFieldAssociatedData, ValidatedSchema, ValidatedSchemaState, ValidatedSelection,
-    ValidatedVariableDefinition,
+    accessible_client_fields, as_server_field, description, get_provided_arguments,
+    output_type_annotation, selection_map_wrapped, selection_type_id, ClientFieldVariant,
+    FieldTraversalResult, NameAndArguments, NormalizationKey, OutputFormat, RequiresRefinement,
+    Schema, SchemaObject, SchemaServerFieldVariant, UserWrittenComponentVariant,
+    ValidatedClientField, ValidatedScalarFieldAssociatedData, ValidatedSchema,
+    ValidatedSchemaState, ValidatedSelection, ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -579,12 +579,13 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
         ServerFieldSelection::ScalarField(scalar_field_selection) => {
             match scalar_field_selection.associated_data.location {
                 DefinitionLocation::Server(_server_field) => {
-                    let parent_field = parent_type
-                        .encountered_fields
-                        .get(&scalar_field_selection.name.item.into())
-                        .expect("parent_field should exist 1")
-                        .as_server_field()
-                        .expect("parent_field should exist and be server field");
+                    let parent_field = as_server_field(
+                        parent_type
+                            .encountered_fields
+                            .get(&scalar_field_selection.name.item.into())
+                            .expect("parent_field should exist 1"),
+                    )
+                    .expect("parent_field should exist and be server field");
                     let field = schema.server_field(*parent_field);
 
                     write_optional_description(
@@ -638,7 +639,7 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
             };
 
             write_optional_description(
-                field.description(),
+                description(&field),
                 query_type_declaration,
                 indentation_level,
             );
@@ -646,8 +647,7 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
             let name_or_alias = linked_field.name_or_alias().item;
 
             let type_annotation =
-                field
-                    .output_type_annotation()
+                output_type_annotation(&field)
                     .clone()
                     .map(&mut |output_type_id| {
                         let object_id = output_type_id;
@@ -767,12 +767,13 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
         ServerFieldSelection::ScalarField(scalar_field_selection) => {
             match scalar_field_selection.associated_data.location {
                 DefinitionLocation::Server(_server_field) => {
-                    let parent_field = parent_type
-                        .encountered_fields
-                        .get(&scalar_field_selection.name.item.into())
-                        .expect("parent_field should exist 1")
-                        .as_server_field()
-                        .expect("parent_field should exist and be server field");
+                    let parent_field = as_server_field(
+                        parent_type
+                            .encountered_fields
+                            .get(&scalar_field_selection.name.item.into())
+                            .expect("parent_field should exist 1"),
+                    )
+                    .expect("parent_field should exist and be server field");
                     let field = schema.server_field(*parent_field);
 
                     write_optional_description(
@@ -838,7 +839,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
             let field = schema.linked_type(linked_field.associated_data.field_id);
 
             write_optional_description(
-                field.description(),
+                description(&field),
                 query_type_declaration,
                 indentation_level,
             );
@@ -846,8 +847,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
             let name_or_alias = linked_field.name_or_alias().item;
 
             let type_annotation =
-                field
-                    .output_type_annotation()
+                output_type_annotation(&field)
                     .clone()
                     .map(&mut |output_type_id| {
                         let object_id = output_type_id;
@@ -874,7 +874,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                         query_type_declaration,
                         indentation_level,
                         name_or_alias,
-                        field.output_type_annotation(),
+                        output_type_annotation(&field),
                         &type_annotation,
                     );
                 }

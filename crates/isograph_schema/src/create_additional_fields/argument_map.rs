@@ -6,9 +6,9 @@ use common_lang_types::{
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::{string_key::Intern, Lookup};
-use isograph_lang_types::{SelectableServerFieldId, ServerFieldId};
+use isograph_lang_types::{DefinitionLocation, SelectableServerFieldId, ServerFieldId};
 
-use crate::{DefinitionLocation, OutputFormat, UnvalidatedSchema, UnvalidatedVariableDefinition};
+use crate::{OutputFormat, UnvalidatedSchema, UnvalidatedVariableDefinition};
 
 use super::create_additional_fields_error::{
     CreateAdditionalFieldsError, FieldMapItem, ProcessTypeDefinitionResult, ProcessedFieldMapItem,

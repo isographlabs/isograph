@@ -10,13 +10,13 @@ use intern::Lookup;
 use std::collections::BTreeMap;
 
 use isograph_lang_types::{
-    graphql_type_annotation_from_type_annotation, ClientFieldId, ClientPointerId, NonConstantValue,
-    SelectableServerFieldId, SelectionType, ServerFieldId, ServerObjectId, ServerScalarId,
-    VariableDefinition,
+    graphql_type_annotation_from_type_annotation, ClientFieldId, ClientPointerId,
+    DefinitionLocation, NonConstantValue, SelectableServerFieldId, SelectionType, ServerFieldId,
+    ServerObjectId, ServerScalarId, VariableDefinition,
 };
 
 use crate::{
-    DefinitionLocation, OutputFormat, SchemaObject, ServerFieldData, ValidateSchemaError,
+    as_server_field, OutputFormat, SchemaObject, ServerFieldData, ValidateSchemaError,
     ValidateSchemaResult, ValidatedSchemaServerField, ValidatedVariableDefinition,
 };
 
@@ -366,7 +366,7 @@ fn get_non_nullable_missing_and_provided_fields<TOutputFormat: OutputFormat>(
         .encountered_fields
         .iter()
         .filter_map(|(field_name, field_type)| {
-            let field = &server_fields[field_type.as_server_field()?.as_usize()];
+            let field = &server_fields[as_server_field(field_type)?.as_usize()];
 
             let field_type_annotation = match &field.associated_data {
                 SelectionType::Object(associated_data) => associated_data

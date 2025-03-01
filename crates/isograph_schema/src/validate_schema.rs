@@ -7,10 +7,11 @@ use common_lang_types::{
 use graphql_lang_types::{GraphQLTypeAnnotation, NameValuePair};
 use intern::Lookup;
 use isograph_lang_types::{
-    ClientFieldId, ClientPointerId, LinkedFieldSelection, LoadableDirectiveParameters,
-    NonConstantValue, ScalarFieldSelection, ScalarFieldSelectionDirectiveSet,
-    SelectableServerFieldId, SelectionFieldArgument, SelectionType, ServerFieldId,
-    ServerFieldSelection, ServerObjectId, ServerScalarId, TypeAnnotation, VariableDefinition,
+    ClientFieldId, ClientPointerId, DefinitionLocation, LinkedFieldSelection,
+    LoadableDirectiveParameters, NonConstantValue, ScalarFieldSelection,
+    ScalarFieldSelectionDirectiveSet, SelectableServerFieldId, SelectionFieldArgument,
+    SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId, ServerScalarId,
+    TypeAnnotation, VariableDefinition,
 };
 
 use thiserror::Error;
@@ -19,8 +20,8 @@ use crate::{
     schema_validation_state::SchemaValidationState,
     validate_client_field::validate_and_transform_client_types,
     validate_server_field::validate_and_transform_server_fields, ClientField, ClientFieldVariant,
-    ClientPointer, DefinitionLocation, ImperativelyLoadedFieldVariant, OutputFormat, Schema,
-    SchemaIdField, SchemaObject, SchemaServerField, ServerFieldData, ServerFieldTypeAssociatedData,
+    ClientPointer, ImperativelyLoadedFieldVariant, OutputFormat, Schema, SchemaIdField,
+    SchemaObject, SchemaServerField, ServerFieldData, ServerFieldTypeAssociatedData,
     UnvalidatedSchema, UseRefetchFieldRefetchStrategy, ValidateEntrypointDeclarationError,
 };
 

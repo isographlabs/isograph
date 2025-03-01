@@ -8,15 +8,15 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, EmptyDirectiveSet, NonConstantValue, ScalarFieldSelection,
-    ScalarFieldSelectionDirectiveSet, SelectableServerFieldId, SelectionType, ServerFieldId,
-    ServerFieldSelection, ServerObjectId,
+    ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
+    ScalarFieldSelection, ScalarFieldSelectionDirectiveSet, SelectableServerFieldId, SelectionType,
+    ServerFieldId, ServerFieldSelection, ServerObjectId,
 };
 
 use serde::Deserialize;
 
 use crate::{
-    generate_refetch_field_strategy, ClientField, ClientFieldVariant, DefinitionLocation,
+    generate_refetch_field_strategy, ClientField, ClientFieldVariant,
     ImperativelyLoadedFieldVariant, OutputFormat, PrimaryFieldInfo, UnvalidatedSchema,
     UnvalidatedVariableDefinition,
 };

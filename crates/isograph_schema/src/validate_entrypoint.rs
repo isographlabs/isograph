@@ -3,12 +3,13 @@ use common_lang_types::{
     WithLocation, WithSpan,
 };
 use isograph_lang_types::{
-    ClientFieldId, EntrypointDeclaration, SelectableServerFieldId, SelectionType, ServerObjectId,
+    ClientFieldId, DefinitionLocation, EntrypointDeclaration, SelectableServerFieldId,
+    SelectionType, ServerObjectId,
 };
 
 use thiserror::Error;
 
-use crate::{DefinitionLocation, OutputFormat, UnvalidatedSchema};
+use crate::{OutputFormat, UnvalidatedSchema};
 
 impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     pub fn validate_entrypoint_type_and_field(

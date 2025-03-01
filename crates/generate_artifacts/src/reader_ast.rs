@@ -2,13 +2,13 @@ use std::collections::{BTreeSet, HashSet};
 
 use common_lang_types::{ObjectTypeAndFieldName, SelectableFieldName, WithSpan};
 use isograph_lang_types::{
-    EmptyDirectiveSet, LoadableDirectiveParameters, RefetchQueryIndex,
+    DefinitionLocation, EmptyDirectiveSet, LoadableDirectiveParameters, RefetchQueryIndex,
     ScalarFieldSelectionDirectiveSet, SelectionType, ServerFieldSelection,
 };
 use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, ClientFieldVariant,
-    DefinitionLocation, Loadability, NameAndArguments, NormalizationKey, OutputFormat,
-    PathToRefetchField, RefetchedPathsMap, SchemaServerFieldVariant, ValidatedClientField,
+    Loadability, NameAndArguments, NormalizationKey, OutputFormat, PathToRefetchField,
+    RefetchedPathsMap, SchemaServerFieldVariant, ValidatedClientField,
     ValidatedLinkedFieldSelection, ValidatedScalarFieldSelection, ValidatedSchema,
     ValidatedSelection, VariableContext,
 };

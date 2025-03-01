@@ -6,8 +6,8 @@ use common_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration, ClientPointerId,
-    DeserializationError, NonConstantValue, SelectableServerFieldId, SelectionType, ServerObjectId,
-    TypeAnnotation,
+    DefinitionLocation, DeserializationError, NonConstantValue, SelectableServerFieldId,
+    SelectionType, ServerObjectId, TypeAnnotation,
 };
 use lazy_static::lazy_static;
 
@@ -16,7 +16,7 @@ use thiserror::Error;
 use crate::{
     expose_field_directive::RequiresRefinement,
     refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
-    ClientField, ClientPointer, DefinitionLocation, FieldMapItem, OutputFormat, UnvalidatedSchema,
+    ClientField, ClientPointer, FieldMapItem, OutputFormat, UnvalidatedSchema,
     UnvalidatedVariableDefinition, NODE_FIELD_NAME,
 };
 

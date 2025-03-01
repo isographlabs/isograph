@@ -1,10 +1,7 @@
-use crate::{
-    ClientField, ClientFieldVariant, DefinitionLocation, OutputFormat, UnvalidatedSchema,
-    LINK_FIELD_NAME,
-};
+use crate::{ClientField, ClientFieldVariant, OutputFormat, UnvalidatedSchema, LINK_FIELD_NAME};
 use common_lang_types::{Location, ObjectTypeAndFieldName, WithLocation};
 use intern::string_key::Intern;
-use isograph_lang_types::SelectionType;
+use isograph_lang_types::{DefinitionLocation, SelectionType};
 
 use super::create_additional_fields_error::{
     CreateAdditionalFieldsError, ProcessTypeDefinitionResult,

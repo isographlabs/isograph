@@ -2,12 +2,12 @@ use common_lang_types::{SelectableFieldName, Span, UnvalidatedTypeName, WithLoca
 use graphql_lang_types::{GraphQLNamedTypeAnnotation, GraphQLTypeAnnotation};
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    EmptyDirectiveSet, ScalarFieldSelection, ScalarFieldSelectionDirectiveSet, SelectionType,
-    ServerFieldSelection,
+    DefinitionLocation, EmptyDirectiveSet, ScalarFieldSelection, ScalarFieldSelectionDirectiveSet,
+    SelectionType, ServerFieldSelection,
 };
 
 use crate::{
-    DefinitionLocation, OutputFormat, SchemaServerField, SchemaServerFieldVariant,
+    as_client_type, as_server_field, OutputFormat, SchemaServerField, SchemaServerFieldVariant,
     ServerFieldTypeAssociatedData, ServerFieldTypeAssociatedDataInlineFragment, UnvalidatedSchema,
     ValidatedScalarFieldAssociatedData, LINK_FIELD_NAME,
 };
@@ -42,12 +42,13 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                         arguments: vec![],
                         associated_data: ValidatedScalarFieldAssociatedData {
                             location: DefinitionLocation::Server(
-                                *subtype
-                                    .encountered_fields
-                                    .get(&"__typename".intern().into())
-                                    .expect("Expected __typename to exist")
-                                    .as_server_field()
-                                    .expect("Expected __typename to be server field"),
+                                *as_server_field(
+                                    subtype
+                                        .encountered_fields
+                                        .get(&"__typename".intern().into())
+                                        .expect("Expected __typename to exist"),
+                                )
+                                .expect("Expected __typename to be server field"),
                             ),
                             selection_variant: ScalarFieldSelectionDirectiveSet::None(
                                 EmptyDirectiveSet {},
@@ -67,12 +68,13 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                         arguments: vec![],
                         associated_data: ValidatedScalarFieldAssociatedData {
                             location: DefinitionLocation::Client(
-                                match *subtype
-                                    .encountered_fields
-                                    .get(&(*LINK_FIELD_NAME).into())
-                                    .expect("Expected link to exist")
-                                    .as_client_type()
-                                    .expect("Expected link to be client field")
+                                match *as_client_type(
+                                    subtype
+                                        .encountered_fields
+                                        .get(&(*LINK_FIELD_NAME).into())
+                                        .expect("Expected link to exist"),
+                                )
+                                .expect("Expected link to be client field")
                                 {
                                     SelectionType::Scalar(client_field_id) => client_field_id,
                                     SelectionType::Object(_) => {

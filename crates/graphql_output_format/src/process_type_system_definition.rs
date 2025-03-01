@@ -14,10 +14,11 @@ use graphql_lang_types::{
 use intern::string_key::{Intern, Lookup};
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
-    SelectableServerFieldId, ServerObjectId, ServerStrongIdFieldId, VariableDefinition,
+    DefinitionLocation, SelectableServerFieldId, ServerObjectId, ServerStrongIdFieldId,
+    VariableDefinition,
 };
 use isograph_schema::{
-    DefinitionLocation, EncounteredRootTypes, IsographObjectTypeDefinition, OutputFormat,
+    EncounteredRootTypes, IsographObjectTypeDefinition, OutputFormat,
     ProcessTypeSystemDocumentOutcome, ProcessedRootTypes, RootOperationName, RootTypes, Schema,
     SchemaObject, SchemaScalar, SchemaServerField, SchemaServerFieldVariant,
     ServerFieldTypeAssociatedData, TypeRefinementMaps, UnvalidatedObjectFieldInfo,
