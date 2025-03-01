@@ -451,8 +451,8 @@ impl<
         TScalarFieldAssociatedData: Clone + Ord + Copy + Debug,
         TSchemaValidationState: SchemaValidationState<
             ServerFieldTypeAssociatedData = SelectionType<
-                ServerFieldTypeAssociatedData<TypeAnnotation<TObjectFieldAssociatedData>>,
                 TypeAnnotation<TScalarFieldAssociatedData>,
+                ServerFieldTypeAssociatedData<TypeAnnotation<TObjectFieldAssociatedData>>,
             >,
         >,
         TOutputFormat: OutputFormat,
@@ -522,7 +522,7 @@ impl<TOutputFormat: OutputFormat> ServerFieldData<TOutputFormat> {
 }
 
 pub type SchemaType<'a, TOutputFormat> =
-    SelectionType<&'a SchemaObject<TOutputFormat>, &'a SchemaScalar<TOutputFormat>>;
+    SelectionType<&'a SchemaScalar<TOutputFormat>, &'a SchemaObject<TOutputFormat>>;
 
 pub fn get_name<TOutputFormat: OutputFormat>(
     schema_type: SchemaType<'_, TOutputFormat>,

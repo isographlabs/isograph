@@ -87,8 +87,8 @@ pub struct ValidatedScalarFieldAssociatedData {
 pub type MissingArguments = Vec<ValidatedVariableDefinition>;
 
 pub type ValidatedServerFieldTypeAssociatedData = SelectionType<
-    ServerFieldTypeAssociatedData<TypeAnnotation<ServerObjectId>>,
     TypeAnnotation<ServerScalarId>,
+    ServerFieldTypeAssociatedData<TypeAnnotation<ServerObjectId>>,
 >;
 
 #[derive(Debug)]

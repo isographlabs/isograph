@@ -303,7 +303,7 @@ pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
 fn object_satisfies_type<TOutputFormat: OutputFormat>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
     variable_definitions: &[WithSpan<
-        VariableDefinition<SelectionType<ServerObjectId, ServerScalarId>>,
+        VariableDefinition<SelectionType<ServerScalarId, ServerObjectId>>,
     >],
     schema_data: &ServerFieldData<TOutputFormat>,
     server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
