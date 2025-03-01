@@ -199,7 +199,7 @@ impl<TOutputFormat: OutputFormat>
             FieldType::ServerField(server_field) => match &server_field.associated_data {
                 SelectionType::Scalar(_) => panic!(
                     "output_type_id should be an object. \
-                                       This is indicative of a bug in Isograph.",
+                    This is indicative of a bug in Isograph.",
                 ),
                 SelectionType::Object(associated_data) => associated_data.type_name.clone(),
             },
