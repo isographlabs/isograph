@@ -9,13 +9,13 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     DefinitionLocation, EntrypointDeclaration, LinkedFieldSelection,
     LinkedFieldSelectionDirectiveSet, ScalarFieldSelectionDirectiveSet, SelectableServerFieldId,
-    ServerFieldId, ServerScalarId, VariableDefinition,
+    ServerObjectFieldId, ServerScalarId, VariableDefinition,
 };
 
 use crate::{
     schema_validation_state::SchemaValidationState, ClientField, ClientPointer, OutputFormat,
-    Schema, SchemaScalar, SchemaServerField, SelectionTypeId, ServerFieldData,
-    UseRefetchFieldRefetchStrategy, ValidatedSelection,
+    Schema, SchemaScalar, SelectionTypeId, ServerFieldData, ServerFieldType, ServerObjectField,
+    ServerScalarField, UseRefetchFieldRefetchStrategy, ValidatedSelection,
 };
 use lazy_static::lazy_static;
 
@@ -52,7 +52,7 @@ pub enum SchemaServerFieldVariant {
 
 #[derive(Debug, Clone)]
 pub struct ServerFieldTypeAssociatedDataInlineFragment {
-    pub server_field_id: ServerFieldId,
+    pub server_field_id: ServerObjectFieldId,
     pub concrete_type: IsographObjectTypeName,
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 }
@@ -62,9 +62,21 @@ pub type UnvalidatedSchema<TOutputFormat> = Schema<UnvalidatedSchemaState, TOutp
 /// On unvalidated schema objects, the encountered types are either a type annotation
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the
 /// client field.)
-pub type UnvalidatedObjectFieldInfo = DefinitionLocation<ServerFieldId, SelectionTypeId>;
+pub type UnvalidatedObjectFieldInfo = DefinitionLocation<ServerObjectFieldId, SelectionTypeId>;
 
-pub type UnvalidatedSchemaSchemaField<TOutputFormat> = SchemaServerField<
+pub type UnvalidatedSchemaSchemaField<TOutputFormat> = ServerFieldType<
+    <UnvalidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+    TOutputFormat,
+>;
+
+pub type UnvalidatedServerObjectField<TOutputFormat> = ServerObjectField<
+    <UnvalidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,
+    <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+    TOutputFormat,
+>;
+
+pub type UnvalidatedServerScalarField<TOutputFormat> = ServerScalarField<
     <UnvalidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
     TOutputFormat,

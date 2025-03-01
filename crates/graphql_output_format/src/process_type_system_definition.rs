@@ -20,8 +20,8 @@ use isograph_lang_types::{
 use isograph_schema::{
     EncounteredRootTypes, IsographObjectTypeDefinition, OutputFormat,
     ProcessTypeSystemDocumentOutcome, ProcessedRootTypes, RootOperationName, RootTypes, Schema,
-    SchemaObject, SchemaScalar, SchemaServerField, SchemaServerFieldVariant,
-    ServerFieldTypeAssociatedData, TypeRefinementMaps, UnvalidatedObjectFieldInfo,
+    SchemaObject, SchemaScalar, SchemaServerFieldVariant, ServerFieldTypeAssociatedData,
+    ServerObjectField, TypeRefinementMaps, UnvalidatedObjectFieldInfo,
     UnvalidatedSchemaSchemaField, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE,
 };
 use lazy_static::lazy_static;
@@ -608,7 +608,7 @@ fn get_field_objects_ids_and_names<TOutputFormat: OutputFormat>(
                     )?;
                 }
 
-                unvalidated_fields.push(SchemaServerField {
+                unvalidated_fields.push(ServerObjectField {
                     description: field.item.description.map(|d| d.item),
                     name: field.item.name,
                     id: next_server_field_id,
@@ -649,7 +649,7 @@ fn get_field_objects_ids_and_names<TOutputFormat: OutputFormat>(
     let typename_field_id = (next_field_id + server_field_ids.len()).into();
     let typename_name = WithLocation::new("__typename".intern().into(), Location::generated());
     server_field_ids.push(typename_field_id);
-    unvalidated_fields.push(SchemaServerField {
+    unvalidated_fields.push(ServerObjectField {
         description: None,
         name: typename_name,
         id: typename_field_id,

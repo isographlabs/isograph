@@ -16,8 +16,9 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, ClientPointerId, DefinitionLocation,
-    SelectableServerFieldId, SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId,
-    ServerScalarId, ServerStrongIdFieldId, TypeAnnotation, VariableDefinition,
+    SelectableServerFieldId, SelectionType, ServerFieldSelection, ServerObjectFieldId,
+    ServerObjectId, ServerScalarFieldId, ServerScalarId, ServerStrongIdFieldId, TypeAnnotation,
+    VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -48,14 +49,12 @@ pub struct RootOperationName(pub String);
 /// the schema does not support removing items.
 #[derive(Debug)]
 pub struct Schema<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat> {
-    pub server_fields: Vec<
-        SchemaServerField<
-            TSchemaValidationState::ServerFieldTypeAssociatedData,
-            TSchemaValidationState::VariableDefinitionInnerType,
-            TOutputFormat,
-        >,
+    pub server_fields: ServerTypes<
+        TSchemaValidationState::ServerFieldTypeAssociatedData,
+        TSchemaValidationState::VariableDefinitionInnerType,
+        TOutputFormat,
     >,
-    pub client_types: SelectionTypes<
+    pub client_types: ClientTypes<
         TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
         TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
         TSchemaValidationState::VariableDefinitionInnerType,
@@ -69,7 +68,20 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState, TOutputFormat: 
     pub fetchable_types: BTreeMap<ServerObjectId, RootOperationName>,
 }
 
-type SelectionTypes<
+pub type ServerFieldType<
+    TServerFieldTypeAssociatedData,
+    TVariableDefinitionInnerType,
+    TOutputFormat,
+> = SelectionType<
+    ServerScalarField<TServerFieldTypeAssociatedData, TVariableDefinitionInnerType, TOutputFormat>,
+    ServerObjectField<TServerFieldTypeAssociatedData, TVariableDefinitionInnerType, TOutputFormat>,
+>;
+
+type ServerTypes<TServerFieldTypeAssociatedData, TVariableDefinitionInnerType, TOutputFormat> = Vec<
+    ServerFieldType<TServerFieldTypeAssociatedData, TVariableDefinitionInnerType, TOutputFormat>,
+>;
+
+type ClientTypes<
     TSelectionTypeSelectionScalarFieldAssociatedData,
     TSelectionTypeSelectionLinkedFieldAssociatedData,
     TClientFieldVariableDefinitionAssociatedData,
@@ -126,7 +138,7 @@ pub type LinkedType<
     VariableDefinitionInnerType,
     TOutputFormat,
 > = DefinitionLocation<
-    &'a SchemaServerField<
+    &'a ServerObjectField<
         ServerFieldTypeAssociatedData,
         VariableDefinitionInnerType,
         TOutputFormat,
@@ -166,19 +178,39 @@ pub struct ServerFieldData<TOutputFormat: OutputFormat> {
 impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     Schema<TSchemaValidationState, TOutputFormat>
 {
-    /// Get a reference to a given server field by its id.
-    pub fn server_field(
+    pub fn server_scalar_field(
         &self,
-        server_field_id: ServerFieldId,
-    ) -> &SchemaServerField<
+        server_field_id: ServerScalarFieldId,
+    ) -> &ServerScalarField<
         TSchemaValidationState::ServerFieldTypeAssociatedData,
         TSchemaValidationState::VariableDefinitionInnerType,
         TOutputFormat,
     > {
-        &self.server_fields[server_field_id.as_usize()]
+        match &self.server_fields[server_field_id.as_usize()] {
+            SelectionType::Scalar(scalar) => scalar,
+            SelectionType::Object(_) => panic!(
+                "Encountered a ServerObjectField uder a ServerScalarFieldId. \
+                This is indicative of a bug in Isograph."
+            ),
+        }
+    }
+    pub fn server_object_field(
+        &self,
+        server_field_id: ServerObjectFieldId,
+    ) -> &ServerObjectField<
+        TSchemaValidationState::ServerFieldTypeAssociatedData,
+        TSchemaValidationState::VariableDefinitionInnerType,
+        TOutputFormat,
+    > {
+        match &self.server_fields[server_field_id.as_usize()] {
+            SelectionType::Scalar(_) => panic!(
+                "Encountered a ServerScalarField under a ServerObjectFieldId. \
+                This is indicative of a bug in Isograph."
+            ),
+            SelectionType::Object(object) => object,
+        }
     }
 
-    /// Get a reference to a given client field by its id.
     pub fn client_field(
         &self,
         client_field_id: ClientFieldId,
@@ -191,7 +223,7 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
         match &self.client_types[client_field_id.as_usize()] {
             SelectionType::Scalar(client_field) => client_field,
             SelectionType::Object(_) => panic!(
-                "encountered ClientPointer under ClientFieldId. \
+                "encountered ClientPointer under a ClientFieldId. \
                 This is indicative of a bug in Isograph."
             ),
         }
@@ -199,7 +231,7 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
 
     pub fn linked_type(
         &self,
-        field_id: DefinitionLocation<ServerFieldId, ClientPointerId>,
+        field_id: DefinitionLocation<ServerObjectFieldId, ClientPointerId>,
     ) -> LinkedType<
         TSchemaValidationState::ServerFieldTypeAssociatedData,
         TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
@@ -209,7 +241,7 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     > {
         match field_id {
             DefinitionLocation::Server(server_field_id) => {
-                DefinitionLocation::Server(self.server_field(server_field_id))
+                DefinitionLocation::Server(self.server_object_field(server_field_id))
             }
             DefinitionLocation::Client(client_pointer_id) => {
                 DefinitionLocation::Client(self.client_pointer(client_pointer_id))
@@ -230,7 +262,7 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
         match &self.client_types[client_pointer_id.as_usize()] {
             SelectionType::Object(client_pointer) => client_pointer,
             SelectionType::Scalar(_) => panic!(
-                "encountered ClientField under ClientPointerId. \
+                "encountered ClientField under a ClientPointerId. \
                 This is indicative of a bug in Isograph."
             ),
         }
@@ -289,7 +321,7 @@ impl<
         let field_id = id_field_id.into();
 
         let field = self
-            .server_field(field_id)
+            .server_scalar_field(field_id)
             .and_then(|e| match e {
                 SelectionType::Object(_) => panic!(
                     "We had an id field, it should be scalar. This indicates a bug in Isograph.",
@@ -420,7 +452,7 @@ pub struct SchemaObject<TOutputFormat: OutputFormat> {
     /// to something else.
     pub id_field: Option<ServerStrongIdFieldId>,
     pub encountered_fields:
-        BTreeMap<SelectableFieldName, DefinitionLocation<ServerFieldId, SelectionTypeId>>,
+        BTreeMap<SelectableFieldName, DefinitionLocation<ServerObjectFieldId, SelectionTypeId>>,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 
@@ -428,7 +460,7 @@ pub struct SchemaObject<TOutputFormat: OutputFormat> {
 }
 
 #[derive(Debug, Clone)]
-pub struct SchemaServerField<
+pub struct ServerObjectField<
     TData,
     TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
     TOutputFormat: OutputFormat,
@@ -437,7 +469,7 @@ pub struct SchemaServerField<
     /// The name of the server field and the location where it was defined
     /// (an iso literal or Location::Generated).
     pub name: WithLocation<SelectableFieldName>,
-    pub id: ServerFieldId,
+    pub id: ServerObjectFieldId,
     pub associated_data: TData,
     pub parent_type_id: ServerObjectId,
     // pub directives: Vec<Directive<ConstantValue>>,
@@ -452,16 +484,16 @@ impl<
         TData,
         TClientFieldVariableDefinitionAssociatedData: Clone + Ord + Debug,
         TOutputFormat: OutputFormat,
-    > SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>
+    > ServerObjectField<TData, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>
 {
     pub fn and_then<TData2, E>(
         &self,
         convert: impl FnOnce(&TData) -> Result<TData2, E>,
     ) -> Result<
-        SchemaServerField<TData2, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>,
+        ServerObjectField<TData2, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>,
         E,
     > {
-        Ok(SchemaServerField {
+        Ok(ServerObjectField {
             description: self.description,
             name: self.name,
             id: self.id,
@@ -476,9 +508,73 @@ impl<
     pub fn map<TData2, E>(
         &self,
         convert: impl FnOnce(&TData) -> TData2,
-    ) -> SchemaServerField<TData2, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>
+    ) -> ServerObjectField<TData2, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>
     {
-        SchemaServerField {
+        ServerObjectField {
+            description: self.description,
+            name: self.name,
+            id: self.id,
+            associated_data: convert(&self.associated_data),
+            parent_type_id: self.parent_type_id,
+            arguments: self.arguments.clone(),
+            is_discriminator: self.is_discriminator,
+            phantom_data: PhantomData,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ServerScalarField<
+    TData,
+    TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
+    TOutputFormat: OutputFormat,
+> {
+    pub description: Option<DescriptionValue>,
+    /// The name of the server field and the location where it was defined
+    /// (an iso literal or Location::Generated).
+    pub name: WithLocation<SelectableFieldName>,
+    pub id: ServerObjectFieldId,
+    pub associated_data: TData,
+    pub parent_type_id: ServerObjectId,
+    // pub directives: Vec<Directive<ConstantValue>>,
+    pub arguments:
+        Vec<WithLocation<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
+    // TODO remove this. This is indicative of poor modeling.
+    pub is_discriminator: bool,
+    pub phantom_data: PhantomData<TOutputFormat>,
+}
+
+impl<
+        TData,
+        TClientFieldVariableDefinitionAssociatedData: Clone + Ord + Debug,
+        TOutputFormat: OutputFormat,
+    > ServerScalarField<TData, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>
+{
+    pub fn and_then<TData2, E>(
+        &self,
+        convert: impl FnOnce(&TData) -> Result<TData2, E>,
+    ) -> Result<
+        ServerScalarField<TData2, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>,
+        E,
+    > {
+        Ok(ServerScalarField {
+            description: self.description,
+            name: self.name,
+            id: self.id,
+            associated_data: convert(&self.associated_data)?,
+            parent_type_id: self.parent_type_id,
+            arguments: self.arguments.clone(),
+            is_discriminator: self.is_discriminator,
+            phantom_data: PhantomData,
+        })
+    }
+
+    pub fn map<TData2, E>(
+        &self,
+        convert: impl FnOnce(&TData) -> TData2,
+    ) -> ServerScalarField<TData2, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>
+    {
+        ServerScalarField {
             description: self.description,
             name: self.name,
             id: self.id,
@@ -507,13 +603,13 @@ impl<
         TData: Copy,
         TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
         TOutputFormat: OutputFormat,
-    > TryFrom<SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>>
+    > TryFrom<ServerScalarField<TData, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>>
     for SchemaIdField<TData>
 {
     type Error = ();
 
     fn try_from(
-        value: SchemaServerField<
+        value: ServerScalarField<
             TData,
             TClientFieldVariableDefinitionAssociatedData,
             TOutputFormat,
@@ -685,13 +781,13 @@ impl NameAndArguments {
 }
 
 impl<T, VariableDefinitionInnerType: Ord + Debug, TOutputFormat: OutputFormat>
-    SchemaServerField<T, VariableDefinitionInnerType, TOutputFormat>
+    ServerObjectField<T, VariableDefinitionInnerType, TOutputFormat>
 {
     // TODO probably unnecessary, and can be replaced with .map and .transpose
     pub fn split(
         self,
     ) -> (
-        SchemaServerField<(), VariableDefinitionInnerType, TOutputFormat>,
+        ServerObjectField<(), VariableDefinitionInnerType, TOutputFormat>,
         T,
     ) {
         let Self {
@@ -705,7 +801,7 @@ impl<T, VariableDefinitionInnerType: Ord + Debug, TOutputFormat: OutputFormat>
             phantom_data,
         } = self;
         (
-            SchemaServerField {
+            ServerObjectField {
                 description,
                 name,
                 id,

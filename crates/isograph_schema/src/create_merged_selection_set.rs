@@ -11,8 +11,8 @@ use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
     RefetchQueryIndex, ScalarFieldSelectionDirectiveSet, SelectableServerFieldId,
-    SelectionFieldArgument, SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId,
-    VariableDefinition,
+    SelectionFieldArgument, SelectionType, ServerFieldSelection, ServerObjectFieldId,
+    ServerObjectId, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -32,7 +32,7 @@ pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
 
 // Maybe this should be FNVHashMap? We don't really need stable iteration order
 pub type FieldToCompletedMergeTraversalStateMap =
-    BTreeMap<DefinitionLocation<ServerFieldId, SelectionTypeId>, FieldTraversalResult>;
+    BTreeMap<DefinitionLocation<ServerObjectFieldId, SelectionTypeId>, FieldTraversalResult>;
 
 #[derive(Clone, Debug)]
 pub struct FieldTraversalResult {
@@ -407,7 +407,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     parent_type: &SchemaObject<TOutputFormat>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
-    root_field_id: DefinitionLocation<ServerFieldId, SelectionTypeId>,
+    root_field_id: DefinitionLocation<ServerObjectFieldId, SelectionTypeId>,
     variable_context: &VariableContext,
     // TODO return Cow?
 ) -> FieldTraversalResult {
@@ -779,7 +779,7 @@ fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
                         )
                     }
                     DefinitionLocation::Server(server_field_id) => {
-                        let server_field = schema.server_field(server_field_id);
+                        let server_field = schema.server_object_field(server_field_id);
 
                         match &server_field.associated_data {
                             SelectionType::Scalar(_) => {}
@@ -842,7 +842,7 @@ fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
                                                     variable_context,
                                                 );
 
-                                                let server_field = schema.server_field(
+                                                let server_field = schema.server_object_field(
                                                     inline_fragment_variant.server_field_id,
                                                 );
 

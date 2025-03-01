@@ -2,8 +2,8 @@ use common_lang_types::SelectableFieldName;
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 
 use isograph_lang_types::{
-    DefinitionLocation, SelectableServerFieldId, SelectionType, ServerFieldId, TypeAnnotation,
-    UnionVariant,
+    DefinitionLocation, SelectableServerFieldId, SelectionType, ServerObjectFieldId,
+    TypeAnnotation, UnionVariant,
 };
 use isograph_schema::{OutputFormat, SelectionTypeId, ValidatedSchema};
 
@@ -54,7 +54,7 @@ fn format_server_field_type<TOutputFormat: OutputFormat>(
                 .iter()
                 .filter(|x| matches!(
                     x.1,
-                    DefinitionLocation::Server(server_field_id) if !schema.server_field(*server_field_id).is_discriminator),
+                    DefinitionLocation::Server(server_field_id) if !schema.server_object_field(*server_field_id).is_discriminator),
                 )
             {
                 let field_type =
@@ -75,20 +75,21 @@ fn format_server_field_type<TOutputFormat: OutputFormat>(
 fn format_field_definition<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
     name: &SelectableFieldName,
-    type_: &DefinitionLocation<ServerFieldId, SelectionTypeId>,
+    type_: &DefinitionLocation<ServerObjectFieldId, SelectionTypeId>,
     indentation_level: u8,
 ) -> String {
     match type_ {
         DefinitionLocation::Server(server_field_id) => {
-            let type_annotation = match &schema.server_field(*server_field_id).associated_data {
-                SelectionType::Object(associated_data) => associated_data
-                    .type_name
-                    .clone()
-                    .map(&mut SelectionType::Object),
-                SelectionType::Scalar(type_name) => {
-                    type_name.clone().map(&mut SelectionType::Scalar)
-                }
-            };
+            let type_annotation =
+                match &schema.server_object_field(*server_field_id).associated_data {
+                    SelectionType::Object(associated_data) => associated_data
+                        .type_name
+                        .clone()
+                        .map(&mut SelectionType::Object),
+                    SelectionType::Scalar(type_name) => {
+                        type_name.clone().map(&mut SelectionType::Scalar)
+                    }
+                };
             let is_optional = match &type_annotation {
                 TypeAnnotation::Union(union) => union.nullable,
                 TypeAnnotation::Plural(_) => false,

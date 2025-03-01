@@ -6,7 +6,7 @@ use common_lang_types::{
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::{string_key::Intern, Lookup};
-use isograph_lang_types::{DefinitionLocation, SelectableServerFieldId, ServerFieldId};
+use isograph_lang_types::{DefinitionLocation, SelectableServerFieldId, ServerObjectFieldId};
 
 use crate::{OutputFormat, UnvalidatedSchema, UnvalidatedVariableDefinition};
 
@@ -155,7 +155,7 @@ pub(crate) struct ModifiedObject {
 
 #[derive(Debug)]
 pub(crate) enum PotentiallyModifiedField {
-    Unmodified(ServerFieldId),
+    Unmodified(ServerObjectFieldId),
     // This is exercised in the case of 3+ segments, e.g. input.foo.id.
     // For now, we support only up to two segments.
     #[allow(dead_code)]
@@ -276,7 +276,7 @@ impl ModifiedArgument {
 
                         match field {
                             PotentiallyModifiedField::Unmodified(field_id) => {
-                                let field_object = schema.server_field(*field_id);
+                                let field_object = schema.server_object_field(*field_id);
                                 let field_object_type =
                                     field_object.associated_data.type_name.inner();
 

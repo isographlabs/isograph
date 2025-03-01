@@ -138,7 +138,8 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
     {
         match encountered_field_id {
             DefinitionLocation::Server(encountered_server_field_id) => {
-                let encountered_server_field = schema.server_field(*encountered_server_field_id);
+                let encountered_server_field =
+                    schema.server_object_field(*encountered_server_field_id);
 
                 match &encountered_server_field.associated_data {
                     SelectionType::Scalar(_) => {}
@@ -586,7 +587,7 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
                             .expect("parent_field should exist 1"),
                     )
                     .expect("parent_field should exist and be server field");
-                    let field = schema.server_field(*parent_field);
+                    let field = schema.server_object_field(*parent_field);
 
                     write_optional_description(
                         field.description,
@@ -631,7 +632,7 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
         ServerFieldSelection::LinkedField(linked_field) => {
             let field = match linked_field.associated_data.field_id {
                 DefinitionLocation::Server(server_field_id) => {
-                    DefinitionLocation::Server(schema.server_field(server_field_id))
+                    DefinitionLocation::Server(schema.server_object_field(server_field_id))
                 }
                 DefinitionLocation::Client(client_pointer_id) => {
                     DefinitionLocation::Client(schema.client_pointer(client_pointer_id))
@@ -774,7 +775,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                             .expect("parent_field should exist 1"),
                     )
                     .expect("parent_field should exist and be server field");
-                    let field = schema.server_field(*parent_field);
+                    let field = schema.server_object_field(*parent_field);
 
                     write_optional_description(
                         field.description,

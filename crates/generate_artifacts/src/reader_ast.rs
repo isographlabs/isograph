@@ -131,12 +131,12 @@ fn linked_field_ast_node<TOutputFormat: OutputFormat>(
             )
         }
         DefinitionLocation::Server(server_field_id) => {
-            match &schema.server_field(server_field_id).associated_data {
+            match &schema.server_object_field(server_field_id).associated_data {
                 SelectionType::Scalar(_) => panic!("Expected object"),
                 SelectionType::Object(associated_data) => match &associated_data.variant {
                     SchemaServerFieldVariant::InlineFragment(inline_fragment) => {
                         let parent_object_id = schema
-                            .server_field(inline_fragment.server_field_id)
+                            .server_object_field(inline_fragment.server_field_id)
                             .parent_type_id;
                         let object = schema.server_field_data.object(parent_object_id);
 

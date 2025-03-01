@@ -10,7 +10,7 @@ use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
     ScalarFieldSelection, ScalarFieldSelectionDirectiveSet, SelectableServerFieldId, SelectionType,
-    ServerFieldId, ServerFieldSelection, ServerObjectId,
+    ServerFieldSelection, ServerObjectFieldId, ServerObjectId,
 };
 
 use serde::Deserialize;
@@ -129,7 +129,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         let mutation_subfield_id = self.parse_mutation_subfield_id(*field, parent_object_id)?;
 
         // TODO do not use mutation naming here
-        let mutation_field = self.server_field(mutation_subfield_id);
+        let mutation_field = self.server_object_field(mutation_subfield_id);
         let mutation_field_payload_type_name = *mutation_field.associated_data.type_name.inner();
         let client_field_scalar_selection_name = expose_as.unwrap_or(mutation_field.name.item);
         // TODO what is going on here. Should mutation_field have a checked way of converting to LinkedField?
@@ -169,7 +169,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             let (maybe_abstract_parent_object_id, maybe_abstract_parent_type_name) =
                 match primary_field {
                     Some(DefinitionLocation::Server(server_field_id)) => {
-                        let server_field = self.server_field(*server_field_id);
+                        let server_field = self.server_object_field(*server_field_id);
 
                         // This is the parent type name (Pet)
                         let inner = server_field.associated_data.type_name.inner();
@@ -365,7 +365,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         &self,
         field_arg: StringLiteralValue,
         mutation_object_id: ServerObjectId,
-    ) -> ProcessTypeDefinitionResult<ServerFieldId> {
+    ) -> ProcessTypeDefinitionResult<ServerObjectFieldId> {
         let mutation = self.server_field_data.object(mutation_object_id);
 
         // TODO make this a no-op

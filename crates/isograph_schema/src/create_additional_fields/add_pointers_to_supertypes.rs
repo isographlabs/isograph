@@ -7,9 +7,9 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    as_client_type, as_server_field, OutputFormat, SchemaServerField, SchemaServerFieldVariant,
-    ServerFieldTypeAssociatedData, ServerFieldTypeAssociatedDataInlineFragment, UnvalidatedSchema,
-    ValidatedScalarFieldAssociatedData, LINK_FIELD_NAME,
+    as_client_type, as_server_field, OutputFormat, SchemaServerFieldVariant,
+    ServerFieldTypeAssociatedData, ServerFieldTypeAssociatedDataInlineFragment, ServerObjectField,
+    UnvalidatedSchema, ValidatedScalarFieldAssociatedData, LINK_FIELD_NAME,
 };
 use common_lang_types::Location;
 
@@ -94,7 +94,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 
                 let reader_selection_set = vec![typename_selection, link_selection];
 
-                let server_field = SchemaServerField {
+                let server_field = ServerObjectField {
                     description: Some(
                         format!("A client pointer for the {} type.", subtype.name)
                             .intern()
@@ -118,7 +118,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     phantom_data: std::marker::PhantomData,
                 };
 
-                self.server_fields.push(server_field);
+                self.server_fields.push(SelectionType::Object(server_field));
 
                 for supertype_id in supertype_ids {
                     let supertype = self.server_field_data.object_mut(*supertype_id);

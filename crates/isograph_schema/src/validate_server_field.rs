@@ -6,11 +6,12 @@ use isograph_lang_types::{
 
 use crate::{
     get_all_errors_or_all_ok, get_all_errors_or_all_ok_iter,
-    schema_validation_state::SchemaValidationState, OutputFormat, SchemaServerField,
-    SchemaServerFieldVariant, ServerFieldData, ServerFieldTypeAssociatedData,
-    ServerFieldTypeAssociatedDataInlineFragment, UnvalidatedSchemaSchemaField,
-    UnvalidatedSchemaState, UnvalidatedVariableDefinition, ValidateSchemaError,
-    ValidateSchemaResult, ValidatedSchemaServerField, ValidatedVariableDefinition,
+    schema_validation_state::SchemaValidationState, OutputFormat, SchemaServerFieldVariant,
+    ServerFieldData, ServerFieldTypeAssociatedData, ServerFieldTypeAssociatedDataInlineFragment,
+    ServerObjectField, UnvalidatedSchemaSchemaField, UnvalidatedSchemaState,
+    UnvalidatedServerObjectField, UnvalidatedVariableDefinition, ValidateSchemaError,
+    ValidateSchemaResult, ValidatedSchemaServerField, ValidatedServerObjectField,
+    ValidatedVariableDefinition,
 };
 
 pub(crate) fn validate_and_transform_server_fields<TOutputFormat: OutputFormat>(
@@ -30,6 +31,22 @@ fn validate_and_transform_server_field<TOutputFormat: OutputFormat>(
     schema_data: &ServerFieldData<TOutputFormat>,
 ) -> Result<
     ValidatedSchemaServerField<TOutputFormat>,
+    impl Iterator<Item = WithLocation<ValidateSchemaError>>,
+> {
+    match field {
+        SelectionType::Scalar(_) => todo!("validate and transform scalar"),
+        SelectionType::Object(object) => {
+            validate_and_transform_server_object_field(object, schema_data)
+                .map(SelectionType::Object)
+        }
+    }
+}
+
+fn validate_and_transform_server_object_field<TOutputFormat: OutputFormat>(
+    field: UnvalidatedServerObjectField<TOutputFormat>,
+    schema_data: &ServerFieldData<TOutputFormat>,
+) -> Result<
+    ValidatedServerObjectField<TOutputFormat>,
     impl Iterator<Item = WithLocation<ValidateSchemaError>>,
 > {
     // TODO rewrite as field.map(...).transpose()
@@ -81,7 +98,7 @@ fn validate_and_transform_server_field<TOutputFormat: OutputFormat>(
         };
 
         if let Some(valid_arguments) = valid_arguments {
-            return Ok(SchemaServerField {
+            return Ok(ServerObjectField {
                 description: empty_field.description,
                 name: empty_field.name,
                 id: empty_field.id,
@@ -108,7 +125,7 @@ fn validate_and_transform_server_field<TOutputFormat: OutputFormat>(
 fn validate_server_field_type_exists<TOutputFormat: OutputFormat>(
     schema_data: &ServerFieldData<TOutputFormat>,
     server_field_type: &GraphQLTypeAnnotation<UnvalidatedTypeName>,
-    field: &SchemaServerField<
+    field: &ServerObjectField<
         (),
         <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
         TOutputFormat,

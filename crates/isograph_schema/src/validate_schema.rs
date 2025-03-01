@@ -10,7 +10,7 @@ use isograph_lang_types::{
     ClientFieldId, ClientPointerId, DefinitionLocation, LinkedFieldSelection,
     LoadableDirectiveParameters, NonConstantValue, ScalarFieldSelection,
     ScalarFieldSelectionDirectiveSet, SelectableServerFieldId, SelectionFieldArgument,
-    SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId, ServerScalarId,
+    SelectionType, ServerFieldSelection, ServerObjectFieldId, ServerObjectId, ServerScalarId,
     TypeAnnotation, VariableDefinition,
 };
 
@@ -21,11 +21,24 @@ use crate::{
     validate_client_field::validate_and_transform_client_types,
     validate_server_field::validate_and_transform_server_fields, ClientField, ClientFieldVariant,
     ClientPointer, ImperativelyLoadedFieldVariant, OutputFormat, Schema, SchemaIdField,
-    SchemaObject, SchemaServerField, ServerFieldData, ServerFieldTypeAssociatedData,
-    UnvalidatedSchema, UseRefetchFieldRefetchStrategy, ValidateEntrypointDeclarationError,
+    SchemaObject, ServerFieldData, ServerFieldType, ServerFieldTypeAssociatedData,
+    ServerObjectField, ServerScalarField, UnvalidatedSchema, UseRefetchFieldRefetchStrategy,
+    ValidateEntrypointDeclarationError,
 };
 
-pub type ValidatedSchemaServerField<TOutputFormat> = SchemaServerField<
+pub type ValidatedSchemaServerField<TOutputFormat> = ServerFieldType<
+    <ValidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+    TOutputFormat,
+>;
+
+pub type ValidatedServerObjectField<TOutputFormat> = ServerObjectField<
+    <ValidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,
+    <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
+    TOutputFormat,
+>;
+
+pub type ValidatedServerScalarField<TOutputFormat> = ServerScalarField<
     <ValidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
     TOutputFormat,
@@ -65,14 +78,14 @@ pub type ValidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
 >;
 
 /// The validated defined field that shows up in the TScalarField generic.
-pub type ValidatedFieldDefinitionLocation = DefinitionLocation<ServerFieldId, ClientFieldId>;
+pub type ValidatedFieldDefinitionLocation = DefinitionLocation<ServerObjectFieldId, ClientFieldId>;
 
 pub type ValidatedSchemaIdField = SchemaIdField<ServerScalarId>;
 
 #[derive(Debug, Clone)]
 pub struct ValidatedLinkedFieldAssociatedData {
     pub parent_object_id: ServerObjectId,
-    pub field_id: DefinitionLocation<ServerFieldId, ClientPointerId>,
+    pub field_id: DefinitionLocation<ServerObjectFieldId, ClientPointerId>,
     // N.B. we don't actually support loadable linked fields
     pub selection_variant: ScalarFieldSelectionDirectiveSet,
     /// Some if the object is concrete; None otherwise.

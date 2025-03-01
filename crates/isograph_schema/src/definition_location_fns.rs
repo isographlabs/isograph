@@ -2,8 +2,8 @@ use common_lang_types::DescriptionValue;
 use isograph_lang_types::{DefinitionLocation, SelectionType, ServerObjectId, TypeAnnotation};
 
 use crate::{
-    ClientPointer, OutputFormat, SchemaServerField, ValidatedClientPointer,
-    ValidatedSchemaServerField,
+    ClientPointer, OutputFormat, ServerObjectField, ValidatedClientPointer,
+    ValidatedSchemaServerField, ValidatedServerObjectField,
 };
 
 #[allow(clippy::type_complexity)]
@@ -15,7 +15,7 @@ pub fn description<
     TOutputFormat: OutputFormat,
 >(
     definition_location: &DefinitionLocation<
-        &SchemaServerField<
+        &ServerObjectField<
             ServerFieldTypeAssociatedData,
             TSelectionTypeVariableDefinitionAssociatedData,
             TOutputFormat,
@@ -36,7 +36,7 @@ pub fn description<
 
 pub fn output_type_annotation<TOutputFormat: OutputFormat>(
     definition_location: &DefinitionLocation<
-        &ValidatedSchemaServerField<TOutputFormat>,
+        &ValidatedServerObjectField<TOutputFormat>,
         &ValidatedClientPointer<TOutputFormat>,
     >,
 ) -> TypeAnnotation<ServerObjectId> {
