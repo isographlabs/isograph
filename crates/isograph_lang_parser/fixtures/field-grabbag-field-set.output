@@ -60,9 +60,10 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            associated_data: (),
+                                            associated_data: None(
+                                                EmptyDirectiveSet,
+                                            ),
                                             arguments: [],
-                                            directives: [],
                                         },
                                     ),
                                     span: Span {
@@ -99,7 +100,9 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            associated_data: (),
+                                            associated_data: None(
+                                                EmptyDirectiveSet,
+                                            ),
                                             selection_set: [
                                                 WithSpan {
                                                     item: ScalarField(
@@ -130,9 +133,10 @@ Ok(
                                                                 ),
                                                             },
                                                             reader_alias: None,
-                                                            associated_data: (),
+                                                            associated_data: None(
+                                                                EmptyDirectiveSet,
+                                                            ),
                                                             arguments: [],
-                                                            directives: [],
                                                         },
                                                     ),
                                                     span: Span {
@@ -142,7 +146,6 @@ Ok(
                                                 },
                                             ],
                                             arguments: [],
-                                            directives: [],
                                         },
                                     ),
                                     span: Span {
@@ -179,7 +182,9 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            associated_data: (),
+                                            associated_data: None(
+                                                EmptyDirectiveSet,
+                                            ),
                                             selection_set: [
                                                 WithSpan {
                                                     item: ScalarField(
@@ -210,9 +215,10 @@ Ok(
                                                                 ),
                                                             },
                                                             reader_alias: None,
-                                                            associated_data: (),
+                                                            associated_data: None(
+                                                                EmptyDirectiveSet,
+                                                            ),
                                                             arguments: [],
-                                                            directives: [],
                                                         },
                                                     ),
                                                     span: Span {
@@ -222,7 +228,6 @@ Ok(
                                                 },
                                             ],
                                             arguments: [],
-                                            directives: [],
                                         },
                                     ),
                                     span: Span {
@@ -259,9 +264,10 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            associated_data: (),
+                                            associated_data: None(
+                                                EmptyDirectiveSet,
+                                            ),
                                             arguments: [],
-                                            directives: [],
                                         },
                                     ),
                                     span: Span {
@@ -298,9 +304,10 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            associated_data: (),
+                                            associated_data: None(
+                                                EmptyDirectiveSet,
+                                            ),
                                             arguments: [],
-                                            directives: [],
                                         },
                                     ),
                                     span: Span {
@@ -337,9 +344,10 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            associated_data: (),
+                                            associated_data: None(
+                                                EmptyDirectiveSet,
+                                            ),
                                             arguments: [],
-                                            directives: [],
                                         },
                                     ),
                                     span: Span {
@@ -376,9 +384,10 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            associated_data: (),
+                                            associated_data: None(
+                                                EmptyDirectiveSet,
+                                            ),
                                             arguments: [],
-                                            directives: [],
                                         },
                                     ),
                                     span: Span {
@@ -415,9 +424,10 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            associated_data: (),
+                                            associated_data: None(
+                                                EmptyDirectiveSet,
+                                            ),
                                             arguments: [],
-                                            directives: [],
                                         },
                                     ),
                                     span: Span {
@@ -454,9 +464,10 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            associated_data: (),
+                                            associated_data: None(
+                                                EmptyDirectiveSet,
+                                            ),
                                             arguments: [],
-                                            directives: [],
                                         },
                                     ),
                                     span: Span {
@@ -493,7 +504,9 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            associated_data: (),
+                                            associated_data: None(
+                                                EmptyDirectiveSet,
+                                            ),
                                             selection_set: [
                                                 WithSpan {
                                                     item: ScalarField(
@@ -524,9 +537,10 @@ Ok(
                                                                 ),
                                                             },
                                                             reader_alias: None,
-                                                            associated_data: (),
+                                                            associated_data: None(
+                                                                EmptyDirectiveSet,
+                                                            ),
                                                             arguments: [],
-                                                            directives: [],
                                                         },
                                                     ),
                                                     span: Span {
@@ -536,7 +550,6 @@ Ok(
                                                 },
                                             ],
                                             arguments: [],
-                                            directives: [],
                                         },
                                     ),
                                     span: Span {

@@ -3,12 +3,13 @@ use std::{collections::HashMap, fmt::Debug};
 
 use common_lang_types::{SelectableFieldName, VariableName, WithLocation, WithSpan};
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ConstantValue, NonConstantValue, SelectionFieldArgument,
+    ArgumentKeyAndValue, ConstantValue, NonConstantValue, ScalarFieldSelectionDirectiveSet,
+    SelectionFieldArgument, SelectionType,
 };
 
 use crate::{
-    ClientField, ClientPointer, ClientType, NameAndArguments, OutputFormat, SchemaServerField,
-    ValidatedIsographSelectionVariant, ValidatedVariableDefinition,
+    variable_definitions, ClientField, ClientPointer, NameAndArguments, OutputFormat,
+    SchemaServerField, ValidatedVariableDefinition,
 };
 
 #[derive(Debug)]
@@ -19,7 +20,7 @@ impl VariableContext {
         &self,
         selection_arguments: &[WithLocation<SelectionFieldArgument>],
         child_variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-        selection_variant: &ValidatedIsographSelectionVariant,
+        selection_variant: &ScalarFieldSelectionDirectiveSet,
     ) -> Self {
         // We need to take a parent context ({$id: NonConstantValue1 }), the argument parameters ({blah: $id}),
         // and the child variable definitions ({ $blah: Option<NonConstantValue2> }) and create a new child
@@ -45,7 +46,7 @@ impl VariableContext {
                     None => {
                         if matches!(
                             selection_variant,
-                            ValidatedIsographSelectionVariant::Loadable(_)
+                            ScalarFieldSelectionDirectiveSet::Loadable(_)
                         ) {
                             // If this field was selected loadably, missing arguments are allowed.
                             // These missing arguments become variables that are provided at
@@ -87,57 +88,55 @@ impl VariableContext {
     }
 }
 
-impl<
-        TClientTypeSelectionScalarFieldAssociatedData,
-        TClientTypeSelectionLinkedFieldAssociatedData,
-        TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
-        TOutputFormat: OutputFormat,
-    >
-    ClientType<
+#[allow(clippy::type_complexity)]
+pub fn initial_variable_context<
+    TSelectionTypeSelectionScalarFieldAssociatedData,
+    TSelectionTypeSelectionLinkedFieldAssociatedData,
+    TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
+    TOutputFormat: OutputFormat,
+>(
+    selection_type: &SelectionType<
         &ClientField<
-            TClientTypeSelectionScalarFieldAssociatedData,
-            TClientTypeSelectionLinkedFieldAssociatedData,
+            TSelectionTypeSelectionScalarFieldAssociatedData,
+            TSelectionTypeSelectionLinkedFieldAssociatedData,
             TClientFieldVariableDefinitionAssociatedData,
             TOutputFormat,
         >,
         &ClientPointer<
-            TClientTypeSelectionScalarFieldAssociatedData,
-            TClientTypeSelectionLinkedFieldAssociatedData,
+            TSelectionTypeSelectionScalarFieldAssociatedData,
+            TSelectionTypeSelectionLinkedFieldAssociatedData,
             TClientFieldVariableDefinitionAssociatedData,
             TOutputFormat,
         >,
-    >
-{
-    pub fn initial_variable_context(&self) -> VariableContext {
-        // This is used in two places: before we generate a merged selection set for an
-        // entrypoint and when generating reader ASTs.
-        //
-        // For entrypoints:
-        // This seems fishy. We should be taking note of the defualt values, somehow. However,
-        // the variables that are provided/missing are done so at runtime, so this is not
-        // really possible.
-        //
-        // The replacement of missing values with default values is done by the GraphQL server,
-        // so in practice this is probably fine.
-        //
-        // But it is odd that variables and default values behave differently for fields that
-        // act as entrypoints vs. fields that are used within the entrypoint.
-        //
-        // For reader ASTs:
-        // This makes sense, but seems somewhat superfluous. Perhaps we can refactor code such
-        // that we do not need to call this.
-        let variable_context = self
-            .variable_definitions()
-            .iter()
-            .map(|variable_definition| {
-                (
-                    variable_definition.item.name.item,
-                    NonConstantValue::Variable(variable_definition.item.name.item),
-                )
-            })
-            .collect();
-        VariableContext(variable_context)
-    }
+    >,
+) -> VariableContext {
+    // This is used in two places: before we generate a merged selection set for an
+    // entrypoint and when generating reader ASTs.
+    //
+    // For entrypoints:
+    // This seems fishy. We should be taking note of the defualt values, somehow. However,
+    // the variables that are provided/missing are done so at runtime, so this is not
+    // really possible.
+    //
+    // The replacement of missing values with default values is done by the GraphQL server,
+    // so in practice this is probably fine.
+    //
+    // But it is odd that variables and default values behave differently for fields that
+    // act as entrypoints vs. fields that are used within the entrypoint.
+    //
+    // For reader ASTs:
+    // This makes sense, but seems somewhat superfluous. Perhaps we can refactor code such
+    // that we do not need to call this.
+    let variable_context = variable_definitions(selection_type)
+        .iter()
+        .map(|variable_definition| {
+            (
+                variable_definition.item.name.item,
+                NonConstantValue::Variable(variable_definition.item.name.item),
+            )
+        })
+        .collect();
+    VariableContext(variable_context)
 }
 
 impl<

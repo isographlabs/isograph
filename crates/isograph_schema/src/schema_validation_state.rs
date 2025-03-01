@@ -14,12 +14,12 @@ pub trait SchemaValidationState: Debug {
     /// - Unvalidated: ()
     /// - Validated: ValidatedFieldDefinitionLocation
     ///   i.e. DefinedField<ServerFieldId, ClientFieldId>
-    type ClientTypeSelectionScalarFieldAssociatedData: Debug;
+    type SelectionTypeSelectionScalarFieldAssociatedData: Debug;
 
     /// The associated data type of linked fields in client fields' selection sets and unwraps
     /// - Unvalidated: ()
     /// - Validated: ObjectId
-    type ClientTypeSelectionLinkedFieldAssociatedData: Debug;
+    type SelectionTypeSelectionLinkedFieldAssociatedData: Debug;
 
     /// The associated data type of client fields' variable definitions
     /// - Unvalidated: UnvalidatedTypeName

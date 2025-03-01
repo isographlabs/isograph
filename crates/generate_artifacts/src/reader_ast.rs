@@ -2,14 +2,15 @@ use std::collections::{BTreeSet, HashSet};
 
 use common_lang_types::{ObjectTypeAndFieldName, SelectableFieldName, WithSpan};
 use isograph_lang_types::{
-    LoadableDirectiveParameters, RefetchQueryIndex, SelectionType, ServerFieldSelection,
+    DefinitionLocation, EmptyDirectiveSet, LoadableDirectiveParameters, RefetchQueryIndex,
+    ScalarFieldSelectionDirectiveSet, SelectionType, ServerFieldSelection,
 };
 use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, ClientFieldVariant,
-    FieldType, Loadability, NameAndArguments, NormalizationKey, OutputFormat, PathToRefetchField,
+    Loadability, NameAndArguments, NormalizationKey, OutputFormat, PathToRefetchField,
     RefetchedPathsMap, SchemaServerFieldVariant, ValidatedClientField,
-    ValidatedIsographSelectionVariant, ValidatedLinkedFieldSelection,
-    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSelection, VariableContext,
+    ValidatedLinkedFieldSelection, ValidatedScalarFieldSelection, ValidatedSchema,
+    ValidatedSelection, VariableContext,
 };
 
 use crate::{
@@ -31,12 +32,12 @@ fn generate_reader_ast_node<TOutputFormat: OutputFormat>(
     match &selection.item {
         ServerFieldSelection::ScalarField(scalar_field_selection) => {
             match scalar_field_selection.associated_data.location {
-                FieldType::ServerField(_) => server_defined_scalar_field_ast_node(
+                DefinitionLocation::Server(_) => server_defined_scalar_field_ast_node(
                     scalar_field_selection,
                     indentation_level,
                     initial_variable_context,
                 ),
-                FieldType::ClientField(client_field_id) => {
+                DefinitionLocation::Client(client_field_id) => {
                     let client_field = schema.client_field(client_field_id);
                     scalar_client_defined_field_ast_node(
                         scalar_field_selection,
@@ -122,14 +123,14 @@ fn linked_field_ast_node<TOutputFormat: OutputFormat>(
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
 
     let condition = match linked_field.associated_data.field_id {
-        FieldType::ClientField(client_pointer_id) => {
+        DefinitionLocation::Client(client_pointer_id) => {
             let client_pointer = schema.client_pointer(client_pointer_id);
             format!(
                 "{}__resolver_reader",
                 client_pointer.type_and_field.underscore_separated()
             )
         }
-        FieldType::ServerField(server_field_id) => {
+        DefinitionLocation::Server(server_field_id) => {
             match &schema.server_field(server_field_id).associated_data {
                 SelectionType::Scalar(_) => panic!("Expected object"),
                 SelectionType::Object(associated_data) => match &associated_data.variant {
@@ -160,7 +161,7 @@ fn linked_field_ast_node<TOutputFormat: OutputFormat>(
 
     let is_updatable = matches!(
         linked_field.associated_data.selection_variant,
-        ValidatedIsographSelectionVariant::Updatable
+        ScalarFieldSelectionDirectiveSet::Updatable(_)
     );
 
     format!(
@@ -464,7 +465,7 @@ fn server_defined_scalar_field_ast_node(
     );
     let is_updatable = matches!(
         scalar_field_selection.associated_data.selection_variant,
-        ValidatedIsographSelectionVariant::Updatable
+        ScalarFieldSelectionDirectiveSet::Updatable(_)
     );
     let indent_1 = "  ".repeat(indentation_level as usize);
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
@@ -617,10 +618,10 @@ fn refetched_paths_with_path<TOutputFormat: OutputFormat>(
         match &selection.item {
             ServerFieldSelection::ScalarField(scalar_field_selection) => {
                 match scalar_field_selection.associated_data.location {
-                    FieldType::ServerField(_) => {
+                    DefinitionLocation::Server(_) => {
                         // Do nothing, we encountered a server field
                     }
-                    FieldType::ClientField(client_field_id) => {
+                    DefinitionLocation::Client(client_field_id) => {
                         let client_field = schema.client_field(client_field_id);
                         match categorize_field_loadability(
                             client_field,
@@ -643,7 +644,9 @@ fn refetched_paths_with_path<TOutputFormat: OutputFormat>(
                                     &initial_variable_context.child_variable_context(
                                         &scalar_field_selection.arguments,
                                         &client_field.variable_definitions,
-                                        &ValidatedIsographSelectionVariant::Regular,
+                                        &ScalarFieldSelectionDirectiveSet::None(
+                                            EmptyDirectiveSet {},
+                                        ),
                                     ),
                                 );
 

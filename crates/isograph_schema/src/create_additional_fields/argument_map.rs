@@ -6,9 +6,9 @@ use common_lang_types::{
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::{string_key::Intern, Lookup};
-use isograph_lang_types::{SelectableServerFieldId, ServerFieldId};
+use isograph_lang_types::{DefinitionLocation, SelectableServerFieldId, ServerFieldId};
 
-use crate::{FieldType, OutputFormat, UnvalidatedSchema, UnvalidatedVariableDefinition};
+use crate::{OutputFormat, UnvalidatedSchema, UnvalidatedVariableDefinition};
 
 use super::create_additional_fields_error::{
     CreateAdditionalFieldsError, FieldMapItem, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
@@ -218,10 +218,10 @@ impl ModifiedArgument {
                             .encountered_fields
                             .iter()
                             .flat_map(|(name, field_id)| match field_id {
-                                FieldType::ServerField(s) => {
+                                DefinitionLocation::Server(s) => {
                                     Some((*name, PotentiallyModifiedField::Unmodified(*s)))
                                 }
-                                FieldType::ClientField(_) => None,
+                                DefinitionLocation::Client(_) => None,
                             })
                             .collect(),
                     }

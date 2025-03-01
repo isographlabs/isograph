@@ -5,9 +5,9 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldDeclaration, ClientFieldDeclarationWithValidatedDirectives,
-    ClientPointerDeclarationWithValidatedDirectives, ClientPointerId, DeserializationError,
-    NonConstantValue, SelectableServerFieldId, ServerObjectId, TypeAnnotation,
+    ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration, ClientPointerId,
+    DefinitionLocation, DeserializationError, NonConstantValue, SelectableServerFieldId,
+    SelectionType, ServerObjectId, TypeAnnotation,
 };
 use lazy_static::lazy_static;
 
@@ -16,14 +16,14 @@ use thiserror::Error;
 use crate::{
     expose_field_directive::RequiresRefinement,
     refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
-    ClientField, ClientPointer, ClientType, FieldMapItem, FieldType, OutputFormat,
-    UnvalidatedSchema, UnvalidatedVariableDefinition, NODE_FIELD_NAME,
+    ClientField, ClientPointer, FieldMapItem, OutputFormat, UnvalidatedSchema,
+    UnvalidatedVariableDefinition, NODE_FIELD_NAME,
 };
 
 impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     pub fn process_client_field_declaration(
         &mut self,
-        client_field_declaration: WithSpan<ClientFieldDeclarationWithValidatedDirectives>,
+        client_field_declaration: WithSpan<ClientFieldDeclaration>,
         text_source: TextSource,
     ) -> Result<(), WithLocation<ProcessClientFieldDeclarationError>> {
         let parent_type_id = self
@@ -59,7 +59,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 
     pub fn process_client_pointer_declaration(
         &mut self,
-        client_pointer_declaration: WithSpan<ClientPointerDeclarationWithValidatedDirectives>,
+        client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
         text_source: TextSource,
     ) -> Result<(), WithLocation<ProcessClientFieldDeclarationError>> {
         let parent_type_id = self
@@ -140,7 +140,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     fn add_client_field_to_object(
         &mut self,
         parent_object_id: ServerObjectId,
-        client_field_declaration: WithSpan<ClientFieldDeclarationWithValidatedDirectives>,
+        client_field_declaration: WithSpan<ClientFieldDeclaration>,
     ) -> ProcessClientFieldDeclarationResult<()> {
         let query_id = self.query_id();
         let object = &mut self.server_field_data.server_objects[parent_object_id.as_usize()];
@@ -154,7 +154,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             .encountered_fields
             .insert(
                 client_field_name.into(),
-                FieldType::ClientField(ClientType::ClientField(next_client_field_id)),
+                DefinitionLocation::Client(SelectionType::Scalar(next_client_field_id)),
             )
             .is_some()
         {
@@ -171,7 +171,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         let name = client_field_declaration.item.client_field_name.item.into();
         let variant = get_client_variant(&client_field_declaration.item);
 
-        self.client_types.push(ClientType::ClientField(ClientField {
+        self.client_types.push(SelectionType::Scalar(ClientField {
             description: client_field_declaration.item.description.map(|x| x.item),
             name,
             id: next_client_field_id,
@@ -207,7 +207,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         &mut self,
         parent_object_id: ServerObjectId,
         to_object_id: TypeAnnotation<ServerObjectId>,
-        client_pointer_declaration: WithSpan<ClientPointerDeclarationWithValidatedDirectives>,
+        client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
     ) -> ProcessClientFieldDeclarationResult<()> {
         let query_id = self.query_id();
         let to_object = self.server_field_data.object(to_object_id.inner());
@@ -233,54 +233,53 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             }));
         }
 
-        self.client_types
-            .push(ClientType::ClientPointer(ClientPointer {
-                description: client_pointer_declaration.item.description.map(|x| x.item),
-                name,
-                id: next_client_pointer_id,
-                reader_selection_set: client_pointer_declaration.item.selection_set,
+        self.client_types.push(SelectionType::Object(ClientPointer {
+            description: client_pointer_declaration.item.description.map(|x| x.item),
+            name,
+            id: next_client_pointer_id,
+            reader_selection_set: client_pointer_declaration.item.selection_set,
 
-                variable_definitions: client_pointer_declaration.item.variable_definitions,
-                type_and_field: ObjectTypeAndFieldName {
-                    type_name: parent_object.name,
-                    field_name: name.into(),
-                },
+            variable_definitions: client_pointer_declaration.item.variable_definitions,
+            type_and_field: ObjectTypeAndFieldName {
+                type_name: parent_object.name,
+                field_name: name.into(),
+            },
 
-                parent_object_id,
-                refetch_strategy: match to_object.id_field {
-                    None => Err(WithSpan::new(
-                        ProcessClientFieldDeclarationError::ClientPointerTargetTypeHasNoId {
-                            target_type_name: *client_pointer_declaration.item.target_type.inner(),
-                        },
-                        *client_pointer_declaration.item.target_type.span(),
-                    )),
-                    Some(_) => {
-                        // Assume that if we have an id field, this implements Node
-                        Ok(RefetchStrategy::UseRefetchField(
-                            generate_refetch_field_strategy(
-                                vec![id_selection()],
-                                query_id,
-                                format!("refetch__{}", to_object.name).intern().into(),
-                                *NODE_FIELD_NAME,
-                                id_top_level_arguments(),
-                                None,
-                                RequiresRefinement::Yes(to_object.name),
-                                None,
-                                None,
-                            ),
-                        ))
-                    }
-                }?,
-                to: to_object_id,
-                output_format: std::marker::PhantomData,
-            }));
+            parent_object_id,
+            refetch_strategy: match to_object.id_field {
+                None => Err(WithSpan::new(
+                    ProcessClientFieldDeclarationError::ClientPointerTargetTypeHasNoId {
+                        target_type_name: *client_pointer_declaration.item.target_type.inner(),
+                    },
+                    *client_pointer_declaration.item.target_type.span(),
+                )),
+                Some(_) => {
+                    // Assume that if we have an id field, this implements Node
+                    Ok(RefetchStrategy::UseRefetchField(
+                        generate_refetch_field_strategy(
+                            vec![id_selection()],
+                            query_id,
+                            format!("refetch__{}", to_object.name).intern().into(),
+                            *NODE_FIELD_NAME,
+                            id_top_level_arguments(),
+                            None,
+                            RequiresRefinement::Yes(to_object.name),
+                            None,
+                            None,
+                        ),
+                    ))
+                }
+            }?,
+            to: to_object_id,
+            output_format: std::marker::PhantomData,
+        }));
 
         let parent_object = self.server_field_data.object_mut(parent_object_id);
         if parent_object
             .encountered_fields
             .insert(
                 client_pointer_name.into(),
-                FieldType::ClientField(ClientType::ClientPointer(next_client_pointer_id)),
+                DefinitionLocation::Client(SelectionType::Object(next_client_pointer_id)),
             )
             .is_some()
         {
@@ -340,14 +339,8 @@ pub enum ProcessClientFieldDeclarationError {
         client_field_name: SelectableFieldName,
     },
 
-    #[error("Unable to serialize directive named \"@{directive_name}\". Message: {message}")]
-    UnableToDeserialize {
-        directive_name: IsographDirectiveName,
-        message: DeserializationError,
-    },
-
-    #[error("The directive \"@loadable\" and \"@updatable\" are mutually exclusive.")]
-    LoadableAndUpdatableAreMutuallyExclusive,
+    #[error("Error when deserializing directives. Message: {message}")]
+    UnableToDeserializeDirectives { message: DeserializationError },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -405,9 +398,7 @@ lazy_static! {
     static ref COMPONENT: IsographDirectiveName = "component".intern().into();
 }
 
-fn get_client_variant<TScalarField, TLinkedField>(
-    client_field_declaration: &ClientFieldDeclaration<TScalarField, TLinkedField>,
-) -> ClientFieldVariant {
+fn get_client_variant(client_field_declaration: &ClientFieldDeclaration) -> ClientFieldVariant {
     for directive in client_field_declaration.directives.iter() {
         if directive.item.name.item == *COMPONENT {
             return ClientFieldVariant::UserWritten(UserWrittenClientFieldInfo {

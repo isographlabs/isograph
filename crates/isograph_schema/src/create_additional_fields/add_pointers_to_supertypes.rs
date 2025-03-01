@@ -1,12 +1,15 @@
 use common_lang_types::{SelectableFieldName, Span, UnvalidatedTypeName, WithLocation, WithSpan};
 use graphql_lang_types::{GraphQLNamedTypeAnnotation, GraphQLTypeAnnotation};
 use intern::string_key::Intern;
-use isograph_lang_types::{ScalarFieldSelection, ServerFieldSelection};
+use isograph_lang_types::{
+    DefinitionLocation, EmptyDirectiveSet, ScalarFieldSelection, ScalarFieldSelectionDirectiveSet,
+    SelectionType, ServerFieldSelection,
+};
 
 use crate::{
-    ClientType, FieldType, OutputFormat, SchemaServerField, SchemaServerFieldVariant,
+    as_client_type, as_server_field, OutputFormat, SchemaServerField, SchemaServerFieldVariant,
     ServerFieldTypeAssociatedData, ServerFieldTypeAssociatedDataInlineFragment, UnvalidatedSchema,
-    ValidatedIsographSelectionVariant, ValidatedScalarFieldAssociatedData, LINK_FIELD_NAME,
+    ValidatedScalarFieldAssociatedData, LINK_FIELD_NAME,
 };
 use common_lang_types::Location;
 
@@ -38,17 +41,19 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     ServerFieldSelection::ScalarField(ScalarFieldSelection {
                         arguments: vec![],
                         associated_data: ValidatedScalarFieldAssociatedData {
-                            location: FieldType::ServerField(
-                                *subtype
-                                    .encountered_fields
-                                    .get(&"__typename".intern().into())
-                                    .expect("Expected __typename to exist")
-                                    .as_server_field()
-                                    .expect("Expected __typename to be server field"),
+                            location: DefinitionLocation::Server(
+                                *as_server_field(
+                                    subtype
+                                        .encountered_fields
+                                        .get(&"__typename".intern().into())
+                                        .expect("Expected __typename to exist"),
+                                )
+                                .expect("Expected __typename to be server field"),
                             ),
-                            selection_variant: ValidatedIsographSelectionVariant::Regular,
+                            selection_variant: ScalarFieldSelectionDirectiveSet::None(
+                                EmptyDirectiveSet {},
+                            ),
                         },
-                        directives: vec![],
                         name: WithLocation::new(
                             "__typename".intern().into(),
                             Location::generated(),
@@ -62,23 +67,25 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     ServerFieldSelection::ScalarField(ScalarFieldSelection {
                         arguments: vec![],
                         associated_data: ValidatedScalarFieldAssociatedData {
-                            location: FieldType::ClientField(
-                                match *subtype
-                                    .encountered_fields
-                                    .get(&(*LINK_FIELD_NAME).into())
-                                    .expect("Expected link to exist")
-                                    .as_client_type()
-                                    .expect("Expected link to be client field")
+                            location: DefinitionLocation::Client(
+                                match *as_client_type(
+                                    subtype
+                                        .encountered_fields
+                                        .get(&(*LINK_FIELD_NAME).into())
+                                        .expect("Expected link to exist"),
+                                )
+                                .expect("Expected link to be client field")
                                 {
-                                    ClientType::ClientField(client_field_id) => client_field_id,
-                                    ClientType::ClientPointer(_) => {
+                                    SelectionType::Scalar(client_field_id) => client_field_id,
+                                    SelectionType::Object(_) => {
                                         panic!("Expected link to be client field")
                                     }
                                 },
                             ),
-                            selection_variant: ValidatedIsographSelectionVariant::Regular,
+                            selection_variant: ScalarFieldSelectionDirectiveSet::None(
+                                EmptyDirectiveSet {},
+                            ),
                         },
-                        directives: vec![],
                         name: WithLocation::new(*LINK_FIELD_NAME, Location::generated()),
                         reader_alias: None,
                     }),
@@ -118,7 +125,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 
                     if supertype
                         .encountered_fields
-                        .insert(field_name, FieldType::ServerField(next_server_field_id))
+                        .insert(field_name, DefinitionLocation::Server(next_server_field_id))
                         .is_some()
                     {
                         return Err(WithLocation::new(

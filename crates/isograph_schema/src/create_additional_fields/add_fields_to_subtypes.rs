@@ -1,4 +1,5 @@
 use common_lang_types::{Location, WithLocation};
+use isograph_lang_types::DefinitionLocation;
 
 use crate::{OutputFormat, UnvalidatedSchema};
 
@@ -30,11 +31,11 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             for subtype_id in subtype_ids {
                 for (supertype_field_name, defined_field) in &supertype_encountered_fields {
                     match defined_field {
-                        crate::FieldType::ServerField(_) => {
+                        DefinitionLocation::Server(_) => {
                             // Should we transfer server fields??? That makes no sense for
                             // GraphQL, but ... does it make sense otherwise? Who knows.
                         }
-                        crate::FieldType::ClientField(_) => {
+                        DefinitionLocation::Client(_) => {
                             let subtype = self.server_field_data.object_mut(*subtype_id);
 
                             if subtype

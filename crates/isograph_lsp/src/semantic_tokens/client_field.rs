@@ -1,5 +1,7 @@
 use common_lang_types::{Span, WithSpan};
-use isograph_lang_types::{ClientFieldDeclarationWithUnvalidatedDirectives, ServerFieldSelection};
+use isograph_lang_types::{
+    ClientFieldDeclaration, ServerFieldSelection, UnvalidatedSelectionWithUnvalidatedDirectives,
+};
 use lsp_types::SemanticToken;
 
 use crate::row_col_offset::RowColDiff;
@@ -13,7 +15,7 @@ use super::{
 };
 
 pub(crate) fn client_field_declaration_to_tokens(
-    client_field_declaration: WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>,
+    client_field_declaration: WithSpan<ClientFieldDeclaration>,
     iso_literal_text: &str,
     initial_diff: RowColDiff,
 ) -> (Vec<SemanticToken>, RowColDiff) {
@@ -78,7 +80,7 @@ pub(crate) fn client_field_declaration_to_tokens(
 
 fn selection_set_to_tokens(
     semantic_token_generator: &mut SemanticTokenGenerator<'_>,
-    selection_set: Vec<WithSpan<ServerFieldSelection<(), ()>>>,
+    selection_set: Vec<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>>,
 ) {
     for selection in selection_set {
         selection_to_tokens(semantic_token_generator, selection)
@@ -87,7 +89,7 @@ fn selection_set_to_tokens(
 
 fn selection_to_tokens(
     semantic_token_generator: &mut SemanticTokenGenerator<'_>,
-    selection: WithSpan<ServerFieldSelection<(), ()>>,
+    selection: WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>,
 ) {
     match selection.item {
         ServerFieldSelection::ScalarField(scalar_field_selection) => {
@@ -108,10 +110,7 @@ fn selection_to_tokens(
             semantic_token_generator
                 .generate_semantic_token(name_span, semantic_token_type_variable());
 
-            for directive in scalar_field_selection.directives {
-                semantic_token_generator
-                    .generate_semantic_token(directive.span, semantic_token_type_decorator());
-            }
+            todo!("This doesn't work because we don't store directives at the moment. Rethink it!")
         }
         ServerFieldSelection::LinkedField(linked_field_selection) => {
             let name_span = linked_field_selection
@@ -130,14 +129,12 @@ fn selection_to_tokens(
             }
 
             // TODO this is awkward
-            let mut last_span_so_far = name_span;
+            let last_span_so_far = name_span;
             semantic_token_generator
                 .generate_semantic_token(name_span, semantic_token_type_variable());
 
-            for directive in linked_field_selection.directives {
-                last_span_so_far = directive.span;
-                semantic_token_generator
-                    .generate_semantic_token(directive.span, semantic_token_type_decorator());
+            if true {
+                todo!("This doesn't work because we don't store directives at the moment. Rethink it!");
             }
 
             let first_selection_set_span = linked_field_selection

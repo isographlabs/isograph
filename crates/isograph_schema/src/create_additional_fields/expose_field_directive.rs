@@ -8,15 +8,15 @@ use graphql_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, IsographSelectionVariant, NonConstantValue,
-    ScalarFieldSelection, SelectableServerFieldId, ServerFieldId, ServerFieldSelection,
-    ServerObjectId,
+    ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
+    ScalarFieldSelection, ScalarFieldSelectionDirectiveSet, SelectableServerFieldId, SelectionType,
+    ServerFieldId, ServerFieldSelection, ServerObjectId,
 };
 
 use serde::Deserialize;
 
 use crate::{
-    generate_refetch_field_strategy, ClientField, ClientFieldVariant, ClientType, FieldType,
+    generate_refetch_field_strategy, ClientField, ClientFieldVariant,
     ImperativelyLoadedFieldVariant, OutputFormat, PrimaryFieldInfo, UnvalidatedSchema,
     UnvalidatedVariableDefinition,
 };
@@ -168,7 +168,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 
             let (maybe_abstract_parent_object_id, maybe_abstract_parent_type_name) =
                 match primary_field {
-                    Some(FieldType::ServerField(server_field_id)) => {
+                    Some(DefinitionLocation::Server(server_field_id)) => {
                         let server_field = self.server_field(*server_field_id);
 
                         // This is the parent type name (Pet)
@@ -207,10 +207,11 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                             Location::generated(),
                         ),
                         reader_alias: None,
-                        associated_data: IsographSelectionVariant::Regular,
+                        associated_data: ScalarFieldSelectionDirectiveSet::None(
+                            EmptyDirectiveSet {},
+                        ),
                         // TODO what about arguments? How would we handle them?
                         arguments: vec![],
-                        directives: vec![],
                     };
 
                     WithSpan::new(
@@ -296,7 +297,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                 output_format: std::marker::PhantomData,
             };
             self.client_types
-                .push(ClientType::ClientField(mutation_client_field));
+                .push(SelectionType::Scalar(mutation_client_field));
 
             self.insert_client_field_on_object(
                 client_field_scalar_selection_name,
@@ -323,7 +324,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             .encountered_fields
             .insert(
                 mutation_field_name,
-                FieldType::ClientField(ClientType::ClientField(client_field_id)),
+                DefinitionLocation::Client(SelectionType::Scalar(client_field_id)),
             )
             .is_some()
         {
@@ -374,7 +375,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             .encountered_fields
             .iter()
             .find_map(|(name, field_id)| {
-                if let FieldType::ServerField(server_field_id) = field_id {
+                if let DefinitionLocation::Server(server_field_id) = field_id {
                     if *name == field_arg {
                         return Some(server_field_id);
                     }

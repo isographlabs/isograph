@@ -114,7 +114,7 @@ fn validate_server_field_type_exists<TOutputFormat: OutputFormat>(
         TOutputFormat,
     >,
 ) -> ValidateSchemaResult<
-    SelectionType<TypeAnnotation<ServerObjectId>, TypeAnnotation<ServerScalarId>>,
+    SelectionType<TypeAnnotation<ServerScalarId>, TypeAnnotation<ServerObjectId>>,
 > {
     // look up the item in defined_types. If it's not there, error.
     match schema_data.defined_types.get(server_field_type.inner()) {

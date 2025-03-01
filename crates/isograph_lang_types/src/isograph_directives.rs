@@ -14,14 +14,14 @@ pub struct IsographFieldDirective {
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
 }
 
-pub fn from_isograph_field_directive<'a, T: Deserialize<'a>>(
-    directive: &'a IsographFieldDirective,
+pub fn from_isograph_field_directives<'a, T: Deserialize<'a>>(
+    directives: &'a [WithSpan<IsographFieldDirective>],
 ) -> Result<T, DeserializationError> {
-    T::deserialize(GraphQLDirectiveDeserializer { directive })
+    T::deserialize(IsographFieldDirectivesDeserializer { directives })
 }
 
 #[derive(Debug)]
-struct GraphQLDirectiveDeserializer<'a> {
+struct IsographFieldDirectiveDeserializer<'a> {
     directive: &'a IsographFieldDirective,
 }
 
@@ -40,7 +40,7 @@ impl de::Error for DeserializationError {
     }
 }
 
-impl<'de> Deserializer<'de> for GraphQLDirectiveDeserializer<'de> {
+impl<'de> Deserializer<'de> for IsographFieldDirectiveDeserializer<'de> {
     type Error = DeserializationError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -52,8 +52,15 @@ impl<'de> Deserializer<'de> for GraphQLDirectiveDeserializer<'de> {
 
     serde::forward_to_deserialize_any! {
         bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
-        bytes byte_buf option unit unit_struct newtype_struct seq tuple
+        bytes byte_buf unit unit_struct newtype_struct seq tuple
         tuple_struct map struct enum identifier ignored_any
+    }
+
+    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        visitor.visit_some(self)
     }
 }
 
@@ -81,7 +88,7 @@ impl<'de> MapAccess<'de> for NameValuePairVecDeserializer<'de> {
         if let Some(name_value_pair) = self.arguments.get(self.field_idx) {
             return seed
                 .deserialize(NameDeserializer {
-                    name_value_pair: &name_value_pair.item,
+                    name: name_value_pair.item.name.item.lookup(),
                 })
                 .map(Some);
         }
@@ -95,32 +102,31 @@ impl<'de> MapAccess<'de> for NameValuePairVecDeserializer<'de> {
         match self.arguments.get(self.field_idx) {
             Some(name_value_pair) => {
                 self.field_idx += 1;
-                seed.deserialize(ValueDeserializer { name_value_pair : &name_value_pair.item})
+                seed.deserialize(NonConstantValueDeserializer {
+                    value: &name_value_pair.item.value.item,
+                })
             }
             _ => Err(DeserializationError::Custom(format!(
-                "Called deserialization of field value for a field with idx {} that doesn't exist. This is indicative of a bug in Isograph.",
+                "Called deserialization of field value for a field with idx {} \
+                that doesn't exist. This is indicative of a bug in Isograph.",
                 self.field_idx
             ))),
         }
     }
 }
 
-struct NameDeserializer<'a> {
-    name_value_pair: &'a SelectionFieldArgument,
+struct NameDeserializer {
+    name: &'static str,
 }
 
-struct ValueDeserializer<'a> {
-    name_value_pair: &'a SelectionFieldArgument,
-}
-
-impl<'de> Deserializer<'de> for NameDeserializer<'de> {
+impl<'de> Deserializer<'de> for NameDeserializer {
     type Error = DeserializationError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_borrowed_str(self.name_value_pair.name.item.lookup())
+        visitor.visit_borrowed_str(self.name)
     }
 
     serde::forward_to_deserialize_any! {
@@ -178,32 +184,86 @@ impl<'de> Deserializer<'de> for NonConstantValueDeserializer<'de> {
     }
 }
 
-impl<'de> Deserializer<'de> for ValueDeserializer<'de> {
+#[derive(Debug)]
+struct IsographFieldDirectivesDeserializer<'a> {
+    directives: &'a [WithSpan<IsographFieldDirective>],
+}
+
+impl<'de> Deserializer<'de> for IsographFieldDirectivesDeserializer<'de> {
     type Error = DeserializationError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        let deserializer = NonConstantValueDeserializer {
-            value: &self.name_value_pair.value.item,
-        };
-        deserializer.deserialize_any(visitor)
+        visitor.visit_map(IsographFieldDirectiveVecDeserializer::new(self.directives))
     }
 
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        let deserializer = NonConstantValueDeserializer {
-            value: &self.name_value_pair.value.item,
-        };
-        deserializer.deserialize_option(visitor)
+        if self.directives.is_empty() {
+            visitor.visit_none()
+        } else {
+            visitor.visit_some(self)
+        }
     }
 
     serde::forward_to_deserialize_any! {
         bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
         bytes byte_buf unit unit_struct newtype_struct seq tuple
-        tuple_struct map struct enum ignored_any identifier
+        tuple_struct map struct enum identifier ignored_any
+    }
+}
+
+struct IsographFieldDirectiveVecDeserializer<'a> {
+    directives: &'a [WithSpan<IsographFieldDirective>],
+    field_idx: usize,
+}
+
+impl<'a> IsographFieldDirectiveVecDeserializer<'a> {
+    pub fn new(directives: &'a [WithSpan<IsographFieldDirective>]) -> Self {
+        Self {
+            field_idx: 0,
+            directives,
+        }
+    }
+}
+
+impl<'de> MapAccess<'de> for IsographFieldDirectiveVecDeserializer<'de> {
+    type Error = DeserializationError;
+
+    fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
+    where
+        K: de::DeserializeSeed<'de>,
+    {
+        if let Some(directive) = self.directives.get(self.field_idx) {
+            return seed
+                .deserialize(NameDeserializer {
+                    name: directive.item.name.item.lookup(),
+                })
+                .map(Some);
+        }
+        Ok(None)
+    }
+
+    fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::DeserializeSeed<'de>,
+    {
+        match self.directives.get(self.field_idx) {
+            Some(directive) => {
+                self.field_idx += 1;
+                seed.deserialize(IsographFieldDirectiveDeserializer {
+                    directive: &directive.item,
+                })
+            }
+            _ => Err(DeserializationError::Custom(format!(
+                "Called deserialization of field value for a field with idx {} \
+                that doesn't exist. This is indicative of a bug in Isograph.",
+                self.field_idx
+            ))),
+        }
     }
 }

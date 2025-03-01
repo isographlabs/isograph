@@ -1,29 +1,29 @@
 use common_lang_types::WithSpan;
-use isograph_lang_types::ServerFieldSelection;
+use isograph_lang_types::{DefinitionLocation, SelectionType, ServerFieldSelection};
 
 use crate::{
-    ClientType, FieldType, OutputFormat, ValidatedClientField, ValidatedClientPointer,
+    selection_set_for_parent_query, OutputFormat, ValidatedClientField, ValidatedClientPointer,
     ValidatedSchema, ValidatedSelection,
 };
 
-impl<TOutputFormat: OutputFormat>
-    ClientType<&ValidatedClientField<TOutputFormat>, &ValidatedClientPointer<TOutputFormat>>
-{
-    // This should really be replaced with a proper visitor, or something
-    pub fn accessible_client_fields<'a>(
-        &'a self,
-        schema: &'a ValidatedSchema<TOutputFormat>,
-    ) -> impl Iterator<Item = &'a ValidatedClientField<TOutputFormat>> + 'a {
-        AccessibleClientFieldIterator {
-            selection_set: self.selection_set_for_parent_query(),
-            index: 0,
-            schema,
-            sub_iterator: None,
-        }
+// This should really be replaced with a proper visitor, or something
+pub fn accessible_client_fields<'a, TOutputFormat: OutputFormat>(
+    selection_type: &'a SelectionType<
+        &'a ValidatedClientField<TOutputFormat>,
+        &'a ValidatedClientPointer<TOutputFormat>,
+    >,
+    schema: &'a ValidatedSchema<TOutputFormat>,
+) -> impl Iterator<Item = &'a ValidatedClientField<TOutputFormat>> + 'a {
+    AccessibleClientFieldIterator {
+        selection_set: selection_set_for_parent_query(selection_type),
+        index: 0,
+        schema,
+        sub_iterator: None,
     }
 }
+
 struct AccessibleClientFieldIterator<'a, TOutputFormat: OutputFormat> {
-    selection_set: &'a Vec<WithSpan<ValidatedSelection>>,
+    selection_set: &'a [WithSpan<ValidatedSelection>],
     schema: &'a ValidatedSchema<TOutputFormat>,
     index: usize,
     sub_iterator: Option<Box<AccessibleClientFieldIterator<'a, TOutputFormat>>>,
@@ -51,11 +51,11 @@ impl<'a, TOutputFormat: OutputFormat> Iterator
                 match &selection.item {
                     ServerFieldSelection::ScalarField(scalar) => {
                         match scalar.associated_data.location {
-                            FieldType::ServerField(_) => {
+                            DefinitionLocation::Server(_) => {
                                 self.index += 1;
                                 continue 'main_loop;
                             }
-                            FieldType::ClientField(client_field_id) => {
+                            DefinitionLocation::Client(client_field_id) => {
                                 let nested_client_field = self.schema.client_field(client_field_id);
                                 self.index += 1;
                                 return Some(nested_client_field);

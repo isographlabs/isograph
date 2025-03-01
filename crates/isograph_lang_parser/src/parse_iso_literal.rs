@@ -8,10 +8,9 @@ use graphql_lang_types::{
 };
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
-    ClientFieldDeclaration, ClientFieldDeclarationWithUnvalidatedDirectives,
-    ClientPointerDeclaration, ClientPointerDeclarationWithUnvalidatedDirectives, ConstantValue,
-    EntrypointDeclaration, IsographFieldDirective, LinkedFieldSelection, NonConstantValue,
-    ScalarFieldSelection, SelectionFieldArgument, ServerFieldSelection,
+    from_isograph_field_directives, ClientFieldDeclaration, ClientPointerDeclaration,
+    ConstantValue, EntrypointDeclaration, IsographFieldDirective, LinkedFieldSelection,
+    NonConstantValue, ScalarFieldSelection, SelectionFieldArgument, ServerFieldSelection,
     UnvalidatedSelectionWithUnvalidatedDirectives, VariableDefinition,
 };
 use std::{collections::HashSet, ops::ControlFlow};
@@ -23,8 +22,8 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IsoLiteralExtractionResult {
-    ClientPointerDeclaration(WithSpan<ClientPointerDeclarationWithUnvalidatedDirectives>),
-    ClientFieldDeclaration(WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>),
+    ClientPointerDeclaration(WithSpan<ClientPointerDeclaration>),
+    ClientFieldDeclaration(WithSpan<ClientFieldDeclaration>),
     EntrypointDeclaration(WithSpan<EntrypointDeclaration>),
 }
 
@@ -117,7 +116,7 @@ fn parse_iso_client_field_declaration(
     const_export_name: Option<&str>,
     text_source: TextSource,
     field_keyword_span: Span,
-) -> ParseResultWithLocation<WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>> {
+) -> ParseResultWithLocation<WithSpan<ClientFieldDeclaration>> {
     let client_field_declaration = parse_client_field_declaration_inner(
         tokens,
         definition_file_path,
@@ -143,7 +142,7 @@ fn parse_client_field_declaration_inner(
     const_export_name: Option<&str>,
     text_source: TextSource,
     field_keyword_span: Span,
-) -> ParseResultWithSpan<WithSpan<ClientFieldDeclarationWithUnvalidatedDirectives>> {
+) -> ParseResultWithSpan<WithSpan<ClientFieldDeclaration>> {
     tokens.with_span(|tokens| {
         let parent_type = tokens
             .parse_string_key_type(IsographLangTokenKind::Identifier)
@@ -202,7 +201,7 @@ fn parse_iso_client_pointer_declaration(
     const_export_name: Option<&str>,
     text_source: TextSource,
     field_keyword_span: Span,
-) -> ParseResultWithLocation<WithSpan<ClientPointerDeclarationWithUnvalidatedDirectives>> {
+) -> ParseResultWithLocation<WithSpan<ClientPointerDeclaration>> {
     let client_pointer_declaration = parse_client_pointer_declaration_inner(
         tokens,
         definition_file_path,
@@ -245,7 +244,7 @@ fn parse_client_pointer_declaration_inner(
     const_export_name: Option<&str>,
     text_source: TextSource,
     pointer_keyword_span: Span,
-) -> ParseResultWithSpan<WithSpan<ClientPointerDeclarationWithUnvalidatedDirectives>> {
+) -> ParseResultWithSpan<WithSpan<ClientPointerDeclaration>> {
     tokens.with_span(|tokens| {
         let parent_type = tokens
             .parse_string_key_type(IsographLangTokenKind::Identifier)
@@ -413,7 +412,6 @@ fn parse_selection(
         let field_name = field_name.to_with_location(text_source);
         let alias = alias.map(|alias| alias.to_with_location(text_source));
 
-        // TODO distinguish field groups
         let arguments = parse_optional_arguments(tokens, text_source)?;
 
         let directives = parse_directives(tokens, text_source)?;
@@ -424,21 +422,45 @@ fn parse_selection(
         parse_comma_line_break_or_curly(tokens)?;
 
         let selection = match selection_set {
-            Some(selection_set) => ServerFieldSelection::LinkedField(LinkedFieldSelection {
-                name: field_name.map(|string_key| string_key.into()),
-                reader_alias: alias.map(|with_span| with_span.map(|string_key| string_key.into())),
-                associated_data: (),
-                selection_set,
-                arguments,
-                directives,
-            }),
-            None => ServerFieldSelection::ScalarField(ScalarFieldSelection {
-                name: field_name.map(|string_key| string_key.into()),
-                reader_alias: alias.map(|with_span| with_span.map(|string_key| string_key.into())),
-                associated_data: (),
-                arguments,
-                directives,
-            }),
+            Some(selection_set) => {
+                let associated_data =
+                    from_isograph_field_directives(&directives).map_err(|message| {
+                        WithSpan::new(
+                            IsographLiteralParseError::UnableToDeserializeDirectives { message },
+                            directives
+                                .first()
+                                .map(|x| x.span)
+                                .unwrap_or_else(Span::todo_generated),
+                        )
+                    })?;
+                ServerFieldSelection::LinkedField(LinkedFieldSelection {
+                    name: field_name.map(|string_key| string_key.into()),
+                    reader_alias: alias
+                        .map(|with_span| with_span.map(|string_key| string_key.into())),
+                    associated_data,
+                    selection_set,
+                    arguments,
+                })
+            }
+            None => {
+                let associated_data =
+                    from_isograph_field_directives(&directives).map_err(|message| {
+                        WithSpan::new(
+                            IsographLiteralParseError::UnableToDeserializeDirectives { message },
+                            directives
+                                .first()
+                                .map(|x| x.span)
+                                .unwrap_or_else(Span::todo_generated),
+                        )
+                    })?;
+                ServerFieldSelection::ScalarField(ScalarFieldSelection {
+                    name: field_name.map(|string_key| string_key.into()),
+                    reader_alias: alias
+                        .map(|with_span| with_span.map(|string_key| string_key.into())),
+                    associated_data,
+                    arguments,
+                })
+            }
         };
         Ok(selection)
     })

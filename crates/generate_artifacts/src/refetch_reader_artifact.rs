@@ -2,8 +2,9 @@ use common_lang_types::{ArtifactPathAndContent, ObjectTypeAndFieldName};
 use intern::string_key::Intern;
 
 use isograph_config::GenerateFileExtensionsOption;
+use isograph_lang_types::SelectionType;
 use isograph_schema::{
-    ClientType, FieldMapItem, OutputFormat, PrimaryFieldInfo, RefetchedPathsMap,
+    initial_variable_context, FieldMapItem, OutputFormat, PrimaryFieldInfo, RefetchedPathsMap,
     ValidatedClientField, ValidatedSchema,
 };
 
@@ -51,7 +52,7 @@ pub(crate) fn generate_refetch_reader_artifact<TOutputFormat: OutputFormat>(
         },
         0,
         refetched_paths,
-        &ClientType::ClientField(client_field).initial_variable_context(),
+        &initial_variable_context(&SelectionType::Scalar(client_field)),
     );
 
     let reader_import_statement =
