@@ -115,7 +115,7 @@ impl<
         TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
         TOutputFormat: OutputFormat,
     > FieldOrPointer
-    for ClientField<
+    for &ClientField<
         TSelectionTypeSelectionScalarFieldAssociatedData,
         TSelectionTypeSelectionLinkedFieldAssociatedData,
         TClientFieldVariableDefinitionAssociatedData,
@@ -149,7 +149,7 @@ impl<
         TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
         TOutputFormat: OutputFormat,
     > FieldOrPointer
-    for ClientPointer<
+    for &ClientPointer<
         TSelectionTypeSelectionScalarFieldAssociatedData,
         TSelectionTypeSelectionLinkedFieldAssociatedData,
         TClientFieldVariableDefinitionAssociatedData,

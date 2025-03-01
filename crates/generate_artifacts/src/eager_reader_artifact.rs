@@ -5,12 +5,13 @@ use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
-    initial_variable_context, parent_object_id, selection_set_for_parent_query,
-    selection_type_name, variable_definitions, OutputFormat, RefetchedPathsMap,
+    initial_variable_context, selection_set_for_parent_query, selection_type_name,
+    variable_definitions, FieldOrPointer, OutputFormat, RefetchedPathsMap,
     ServerFieldTypeAssociatedDataInlineFragment, UserWrittenClientFieldInfo,
     UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema, ValidatedSchemaServerField,
     ValidatedSelectionType,
 };
+
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
 use crate::{
@@ -205,7 +206,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
     let ts_file_extension = file_extensions.ts();
     let parent_type = schema
         .server_field_data
-        .object(parent_object_id(client_field));
+        .object(client_field.parent_object_id());
 
     let mut param_type_imports = BTreeSet::new();
     let mut loadable_fields = BTreeSet::new();
