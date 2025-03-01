@@ -88,6 +88,7 @@ impl VariableContext {
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn initial_variable_context<
     TSelectionTypeSelectionScalarFieldAssociatedData,
     TSelectionTypeSelectionLinkedFieldAssociatedData,

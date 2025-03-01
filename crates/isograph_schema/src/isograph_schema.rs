@@ -139,6 +139,7 @@ pub type LinkedType<
     >,
 >;
 
+#[allow(clippy::type_complexity)]
 pub fn description<
     ServerFieldTypeAssociatedData,
     TSelectionTypeSelectionScalarFieldAssociatedData,
@@ -191,6 +192,7 @@ pub type ValidatedSelectionType<'a, TOutputFormat> = SelectionType<
     &'a ValidatedClientPointer<TOutputFormat>,
 >;
 
+#[allow(clippy::type_complexity)]
 pub fn parent_object_id<
     TSelectionTypeSelectionScalarFieldAssociatedData,
     TSelectionTypeSelectionLinkedFieldAssociatedData,
@@ -218,6 +220,7 @@ pub fn parent_object_id<
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn type_and_field<
     'a,
     TSelectionTypeSelectionScalarFieldAssociatedData,
@@ -246,6 +249,7 @@ pub fn type_and_field<
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn selection_set_for_parent_query<
     'a,
     TSelectionTypeSelectionScalarFieldAssociatedData,
@@ -279,6 +283,7 @@ pub fn selection_set_for_parent_query<
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn selection_type_name<
     TSelectionTypeSelectionScalarFieldAssociatedData,
     TSelectionTypeSelectionLinkedFieldAssociatedData,
@@ -306,6 +311,7 @@ pub fn selection_type_name<
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn selection_type_id<
     TSelectionTypeSelectionScalarFieldAssociatedData,
     TSelectionTypeSelectionLinkedFieldAssociatedData,
@@ -333,6 +339,7 @@ pub fn selection_type_id<
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub fn variable_definitions<
     'a,
     TSelectionTypeSelectionScalarFieldAssociatedData,
@@ -360,6 +367,8 @@ pub fn variable_definitions<
         SelectionType::Scalar(client_field) => &client_field.variable_definitions,
     }
 }
+
+#[allow(clippy::type_complexity)]
 pub fn reader_selection_set<
     'a,
     TSelectionTypeSelectionScalarFieldAssociatedData,
@@ -391,10 +400,7 @@ pub fn reader_selection_set<
 > {
     match selection_type {
         SelectionType::Object(client_pointer) => Some(&client_pointer.reader_selection_set),
-        SelectionType::Scalar(client_field) => client_field
-            .reader_selection_set
-            .as_ref()
-            .map(|x| x.as_slice()),
+        SelectionType::Scalar(client_field) => client_field.reader_selection_set.as_deref(),
     }
 }
 

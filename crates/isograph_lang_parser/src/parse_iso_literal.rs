@@ -430,7 +430,7 @@ fn parse_selection(
                             directives
                                 .first()
                                 .map(|x| x.span)
-                                .unwrap_or_else(|| Span::todo_generated()),
+                                .unwrap_or_else(Span::todo_generated),
                         )
                     })?;
                 ServerFieldSelection::LinkedField(LinkedFieldSelection {
@@ -450,7 +450,7 @@ fn parse_selection(
                             directives
                                 .first()
                                 .map(|x| x.span)
-                                .unwrap_or_else(|| Span::todo_generated()),
+                                .unwrap_or_else(Span::todo_generated),
                         )
                     })?;
                 ServerFieldSelection::ScalarField(ScalarFieldSelection {
