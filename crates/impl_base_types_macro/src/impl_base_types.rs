@@ -1,7 +1,9 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
-use syn::{parse_macro_input, Error, Ident, ItemTrait, TraitItem};
+use syn::{
+    parse_macro_input, punctuated::Punctuated, Error, GenericParam, Ident, ItemTrait, TraitItem,
+};
 
 #[derive(Clone, Copy)]
 pub(crate) struct BaseType {
@@ -84,8 +86,13 @@ pub(crate) fn impl_base_types(
             .enumerate()
             .map(|(count, _)| Ident::new(&format!("T{count}"), Span::call_site()));
         let struct_generics_2 = struct_generics.clone();
-        let trait_generics = &item_trait.generics;
         let trait_generics_without_angle_brackets = &item_trait.generics.params;
+        let mut trait_generics = item_trait.generics.clone();
+        for mut param in trait_generics.params.iter_mut() {
+            if let GenericParam::Type(t) = &mut param {
+                t.bounds = Punctuated::new();
+            }
+        }
 
         quote! {
             impl<
