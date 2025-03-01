@@ -52,7 +52,6 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                                 EmptyDirectiveSet {},
                             ),
                         },
-                        directives: vec![],
                         name: WithLocation::new(
                             "__typename".intern().into(),
                             Location::generated(),
@@ -84,7 +83,6 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                                 EmptyDirectiveSet {},
                             ),
                         },
-                        directives: vec![],
                         name: WithLocation::new(*LINK_FIELD_NAME, Location::generated()),
                         reader_alias: None,
                     }),

@@ -172,7 +172,6 @@ pub fn id_selection(
             reader_alias: None,
             associated_data: ScalarFieldValidDirectiveSet::None(EmptyDirectiveSet {}),
             arguments: vec![],
-            directives: vec![],
         }),
         Span::todo_generated(),
     )

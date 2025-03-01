@@ -154,7 +154,6 @@ pub struct ScalarFieldSelection<TScalarField> {
     pub reader_alias: Option<WithLocation<ScalarFieldAlias>>,
     pub associated_data: TScalarField,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
-    pub directives: Vec<WithSpan<IsographFieldDirective>>,
 }
 
 impl<TScalarField> ScalarFieldSelection<TScalarField> {
@@ -164,7 +163,6 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
             reader_alias: self.reader_alias,
             associated_data: map(self.associated_data),
             arguments: self.arguments,
-            directives: self.directives,
         }
     }
 
@@ -177,7 +175,6 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
             reader_alias: self.reader_alias,
             associated_data: map(self.associated_data)?,
             arguments: self.arguments,
-            directives: self.directives,
         })
     }
 
@@ -191,12 +188,10 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct LinkedFieldSelection<TScalarField, TLinkedField> {
     pub name: WithLocation<LinkedFieldName>,
-    // pub alias
     pub reader_alias: Option<WithLocation<LinkedFieldAlias>>,
     pub associated_data: TLinkedField,
     pub selection_set: Vec<WithSpan<ServerFieldSelection<TScalarField, TLinkedField>>>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
-    pub directives: Vec<WithSpan<IsographFieldDirective>>,
 }
 
 impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField> {
@@ -224,7 +219,6 @@ impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField
                 })
                 .collect(),
             arguments: self.arguments,
-            directives: self.directives,
         }
     }
 

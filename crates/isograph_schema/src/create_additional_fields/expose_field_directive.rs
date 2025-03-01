@@ -210,7 +210,6 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                         associated_data: ScalarFieldValidDirectiveSet::None(EmptyDirectiveSet {}),
                         // TODO what about arguments? How would we handle them?
                         arguments: vec![],
-                        directives: vec![],
                     };
 
                     WithSpan::new(

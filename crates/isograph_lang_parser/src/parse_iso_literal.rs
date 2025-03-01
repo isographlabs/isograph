@@ -437,14 +437,12 @@ fn parse_selection(
                 associated_data,
                 selection_set,
                 arguments,
-                directives,
             }),
             None => ServerFieldSelection::ScalarField(ScalarFieldSelection {
                 name: field_name.map(|string_key| string_key.into()),
                 reader_alias: alias.map(|with_span| with_span.map(|string_key| string_key.into())),
                 associated_data,
                 arguments,
-                directives,
             }),
         };
         Ok(selection)

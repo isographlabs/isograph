@@ -483,7 +483,6 @@ fn validate_field_type_exists_and_is_scalar<TOutputFormat: OutputFormat>(
                         },
                         reader_alias: scalar_field_selection.reader_alias,
                         arguments: scalar_field_selection.arguments,
-                        directives: scalar_field_selection.directives,
                     }),
                     SelectionType::Object(object_id) => Err(WithLocation::new(
                         ValidateSchemaError::ClientTypeSelectionFieldIsNotScalar {
@@ -610,7 +609,6 @@ fn validate_client_field<TOutputFormat: OutputFormat>(
             },
         },
         arguments: scalar_field_selection.arguments,
-        directives: scalar_field_selection.directives,
     })
 }
 
@@ -720,7 +718,6 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
                                 },
                             },
                             arguments: linked_field_selection.arguments,
-                            directives: linked_field_selection.directives,
                         })
                     }
                 }
@@ -800,7 +797,6 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
                             },
                         },
                         arguments: linked_field_selection.arguments,
-                        directives: linked_field_selection.directives,
                     })
                 }
                 ClientType::ClientField(_) => Err(WithLocation::new(
