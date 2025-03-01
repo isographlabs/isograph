@@ -477,10 +477,7 @@ fn validate_field_type_exists_and_is_scalar<TOutputFormat: OutputFormat>(
                                         scalar_field_name,
                                         scalar_field_selection.name.location,
                                     )?;
-                                    ValidatedIsographSelectionVariant::Loadable((
-                                        l.loadable,
-                                        missing_arguments,
-                                    ))
+                                    ValidatedIsographSelectionVariant::Loadable((l.loadable,))
                                 }
                             },
                         },
@@ -608,7 +605,7 @@ fn validate_client_field<TOutputFormat: OutputFormat>(
                     ValidatedIsographSelectionVariant::Updatable
                 }
                 ScalarFieldSelectionVariant::Loadable(l) => {
-                    ValidatedIsographSelectionVariant::Loadable((l.loadable, missing_arguments))
+                    ValidatedIsographSelectionVariant::Loadable((l.loadable,))
                 }
             },
         },
@@ -720,7 +717,6 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
                                         )?;
                                         ValidatedIsographSelectionVariant::Loadable((
                                             l.loadable,
-                                            missing_arguments,
                                         ))
                                     }
                                 },
@@ -794,10 +790,7 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
                                     ValidatedIsographSelectionVariant::Regular
                                 }
                                 ScalarFieldSelectionVariant::Loadable(l) => {
-                                    ValidatedIsographSelectionVariant::Loadable((
-                                        l.loadable,
-                                        missing_arguments,
-                                    ))
+                                    ValidatedIsographSelectionVariant::Loadable((l.loadable,))
                                 }
                                 ScalarFieldSelectionVariant::Updatable(_) => {
                                     assert_no_missing_arguments(

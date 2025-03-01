@@ -87,13 +87,7 @@ pub struct ValidatedScalarFieldAssociatedData {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ValidatedIsographSelectionVariant {
     Regular,
-    Loadable(
-        (
-            LoadableDirectiveParameters,
-            // TODO this is unused
-            MissingArguments,
-        ),
-    ),
+    Loadable((LoadableDirectiveParameters,)),
     Updatable,
 }
 
@@ -358,7 +352,7 @@ pub fn categorize_field_loadability<'a, TOutputFormat: OutputFormat>(
         ClientFieldVariant::UserWritten(_) => match selection_variant {
             ValidatedIsographSelectionVariant::Regular => None,
             ValidatedIsographSelectionVariant::Updatable => None,
-            ValidatedIsographSelectionVariant::Loadable((l, _)) => {
+            ValidatedIsographSelectionVariant::Loadable((l,)) => {
                 Some(Loadability::LoadablySelectedField(l))
             }
         },
