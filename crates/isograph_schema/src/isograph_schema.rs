@@ -24,7 +24,6 @@ use crate::{
     field_and_pointer::{ClientField, ClientPointer},
     schema_validation_state::SchemaValidationState,
     NormalizationKey, OutputFormat, SelectionTypeId, ServerFieldTypeAssociatedData,
-    ValidatedClientField, ValidatedClientPointer,
 };
 
 lazy_static! {
@@ -137,11 +136,6 @@ pub type LinkedType<
         VariableDefinitionInnerType,
         TOutputFormat,
     >,
->;
-
-pub type ValidatedSelectionType<'a, TOutputFormat> = SelectionType<
-    &'a ValidatedClientField<TOutputFormat>,
-    &'a ValidatedClientPointer<TOutputFormat>,
 >;
 
 #[derive(Debug)]

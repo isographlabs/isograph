@@ -92,6 +92,11 @@ pub type ValidatedServerFieldTypeAssociatedData = SelectionType<
     ServerFieldTypeAssociatedData<TypeAnnotation<ServerObjectId>>,
 >;
 
+pub type ValidatedSelectionType<'a, TOutputFormat> = SelectionType<
+    &'a ValidatedClientField<TOutputFormat>,
+    &'a ValidatedClientPointer<TOutputFormat>,
+>;
+
 #[derive(Debug)]
 pub struct ValidatedSchemaState {}
 impl SchemaValidationState for ValidatedSchemaState {
