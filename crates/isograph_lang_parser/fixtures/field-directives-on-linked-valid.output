@@ -1,0 +1,631 @@
+Ok(
+    (
+        RelativePathToSourceFile(
+            "crates/isograph_lang_parser/fixtures/field-directives-on-linked-valid.input.js",
+        ),
+        [
+            (
+                ClientFieldDeclaration(
+                    WithSpan {
+                        item: ClientFieldDeclaration {
+                            const_export_name: ConstExportName(
+                                "BasicField",
+                            ),
+                            parent_type: WithSpan {
+                                item: UnvalidatedTypeName(
+                                    "Type",
+                                ),
+                                span: Span {
+                                    start: 9,
+                                    end: 13,
+                                },
+                            },
+                            client_field_name: WithSpan {
+                                item: ScalarFieldName(
+                                    "Name",
+                                ),
+                                span: Span {
+                                    start: 14,
+                                    end: 18,
+                                },
+                            },
+                            description: None,
+                            selection_set: [
+                                WithSpan {
+                                    item: LinkedField(
+                                        LinkedFieldSelection {
+                                            name: WithLocation {
+                                                location: Embedded(
+                                                    EmbeddedLocation {
+                                                        text_source: TextSource {
+                                                            current_working_directory: CurrentWorkingDirectory,
+                                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-linked-valid.input.js",
+                                                            ),
+                                                            span: Some(
+                                                                Span {
+                                                                    start: 31,
+                                                                    end: 85,
+                                                                },
+                                                            ),
+                                                        },
+                                                        span: Span {
+                                                            start: 25,
+                                                            end: 31,
+                                                        },
+                                                    },
+                                                ),
+                                                item: LinkedFieldName(
+                                                    "linked",
+                                                ),
+                                            },
+                                            reader_alias: None,
+                                            associated_data: (),
+                                            selection_set: [],
+                                            arguments: [],
+                                            directives: [
+                                                WithSpan {
+                                                    item: IsographFieldDirective {
+                                                        name: WithSpan {
+                                                            item: IsographDirectiveName(
+                                                                "loadable",
+                                                            ),
+                                                            span: Span {
+                                                                start: 33,
+                                                                end: 41,
+                                                            },
+                                                        },
+                                                        arguments: [],
+                                                    },
+                                                    span: Span {
+                                                        start: 32,
+                                                        end: 41,
+                                                    },
+                                                },
+                                            ],
+                                        },
+                                    ),
+                                    span: Span {
+                                        start: 25,
+                                        end: 49,
+                                    },
+                                },
+                            ],
+                            directives: [],
+                            variable_definitions: [],
+                            definition_path: RelativePathToSourceFile(
+                                "crates/isograph_lang_parser/fixtures/field-directives-on-linked-valid.input.js",
+                            ),
+                            field_keyword: WithSpan {
+                                item: (),
+                                span: Span {
+                                    start: 3,
+                                    end: 8,
+                                },
+                            },
+                            dot: WithSpan {
+                                item: (),
+                                span: Span {
+                                    start: 13,
+                                    end: 14,
+                                },
+                            },
+                        },
+                        span: Span {
+                            start: 9,
+                            end: 53,
+                        },
+                    },
+                ),
+                TextSource {
+                    current_working_directory: CurrentWorkingDirectory,
+                    relative_path_to_source_file: RelativePathToSourceFile(
+                        "crates/isograph_lang_parser/fixtures/field-directives-on-linked-valid.input.js",
+                    ),
+                    span: Some(
+                        Span {
+                            start: 31,
+                            end: 85,
+                        },
+                    ),
+                },
+            ),
+            (
+                ClientFieldDeclaration(
+                    WithSpan {
+                        item: ClientFieldDeclaration {
+                            const_export_name: ConstExportName(
+                                "BasicField2",
+                            ),
+                            parent_type: WithSpan {
+                                item: UnvalidatedTypeName(
+                                    "Type",
+                                ),
+                                span: Span {
+                                    start: 9,
+                                    end: 13,
+                                },
+                            },
+                            client_field_name: WithSpan {
+                                item: ScalarFieldName(
+                                    "Name",
+                                ),
+                                span: Span {
+                                    start: 14,
+                                    end: 18,
+                                },
+                            },
+                            description: None,
+                            selection_set: [
+                                WithSpan {
+                                    item: LinkedField(
+                                        LinkedFieldSelection {
+                                            name: WithLocation {
+                                                location: Embedded(
+                                                    EmbeddedLocation {
+                                                        text_source: TextSource {
+                                                            current_working_directory: CurrentWorkingDirectory,
+                                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-linked-valid.input.js",
+                                                            ),
+                                                            span: Some(
+                                                                Span {
+                                                                    start: 124,
+                                                                    end: 202,
+                                                                },
+                                                            ),
+                                                        },
+                                                        span: Span {
+                                                            start: 25,
+                                                            end: 31,
+                                                        },
+                                                    },
+                                                ),
+                                                item: LinkedFieldName(
+                                                    "linked",
+                                                ),
+                                            },
+                                            reader_alias: None,
+                                            associated_data: (),
+                                            selection_set: [],
+                                            arguments: [],
+                                            directives: [
+                                                WithSpan {
+                                                    item: IsographFieldDirective {
+                                                        name: WithSpan {
+                                                            item: IsographDirectiveName(
+                                                                "loadable",
+                                                            ),
+                                                            span: Span {
+                                                                start: 33,
+                                                                end: 41,
+                                                            },
+                                                        },
+                                                        arguments: [
+                                                            WithLocation {
+                                                                location: Embedded(
+                                                                    EmbeddedLocation {
+                                                                        text_source: TextSource {
+                                                                            current_working_directory: CurrentWorkingDirectory,
+                                                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-linked-valid.input.js",
+                                                                            ),
+                                                                            span: Some(
+                                                                                Span {
+                                                                                    start: 124,
+                                                                                    end: 202,
+                                                                                },
+                                                                            ),
+                                                                        },
+                                                                        span: Span {
+                                                                            start: 42,
+                                                                            end: 64,
+                                                                        },
+                                                                    },
+                                                                ),
+                                                                item: SelectionFieldArgument {
+                                                                    name: WithSpan {
+                                                                        item: FieldArgumentName(
+                                                                            "lazyLoadArtifact",
+                                                                        ),
+                                                                        span: Span {
+                                                                            start: 42,
+                                                                            end: 58,
+                                                                        },
+                                                                    },
+                                                                    value: WithLocation {
+                                                                        location: Embedded(
+                                                                            EmbeddedLocation {
+                                                                                text_source: TextSource {
+                                                                                    current_working_directory: CurrentWorkingDirectory,
+                                                                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                                                                        "crates/isograph_lang_parser/fixtures/field-directives-on-linked-valid.input.js",
+                                                                                    ),
+                                                                                    span: Some(
+                                                                                        Span {
+                                                                                            start: 124,
+                                                                                            end: 202,
+                                                                                        },
+                                                                                    ),
+                                                                                },
+                                                                                span: Span {
+                                                                                    start: 60,
+                                                                                    end: 64,
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                        item: Boolean(
+                                                                            true,
+                                                                        ),
+                                                                    },
+                                                                },
+                                                            },
+                                                        ],
+                                                    },
+                                                    span: Span {
+                                                        start: 32,
+                                                        end: 41,
+                                                    },
+                                                },
+                                            ],
+                                        },
+                                    ),
+                                    span: Span {
+                                        start: 25,
+                                        end: 73,
+                                    },
+                                },
+                            ],
+                            directives: [],
+                            variable_definitions: [],
+                            definition_path: RelativePathToSourceFile(
+                                "crates/isograph_lang_parser/fixtures/field-directives-on-linked-valid.input.js",
+                            ),
+                            field_keyword: WithSpan {
+                                item: (),
+                                span: Span {
+                                    start: 3,
+                                    end: 8,
+                                },
+                            },
+                            dot: WithSpan {
+                                item: (),
+                                span: Span {
+                                    start: 13,
+                                    end: 14,
+                                },
+                            },
+                        },
+                        span: Span {
+                            start: 9,
+                            end: 77,
+                        },
+                    },
+                ),
+                TextSource {
+                    current_working_directory: CurrentWorkingDirectory,
+                    relative_path_to_source_file: RelativePathToSourceFile(
+                        "crates/isograph_lang_parser/fixtures/field-directives-on-linked-valid.input.js",
+                    ),
+                    span: Some(
+                        Span {
+                            start: 124,
+                            end: 202,
+                        },
+                    ),
+                },
+            ),
+            (
+                ClientFieldDeclaration(
+                    WithSpan {
+                        item: ClientFieldDeclaration {
+                            const_export_name: ConstExportName(
+                                "BasicField3",
+                            ),
+                            parent_type: WithSpan {
+                                item: UnvalidatedTypeName(
+                                    "Type",
+                                ),
+                                span: Span {
+                                    start: 9,
+                                    end: 13,
+                                },
+                            },
+                            client_field_name: WithSpan {
+                                item: ScalarFieldName(
+                                    "Name",
+                                ),
+                                span: Span {
+                                    start: 14,
+                                    end: 18,
+                                },
+                            },
+                            description: None,
+                            selection_set: [
+                                WithSpan {
+                                    item: LinkedField(
+                                        LinkedFieldSelection {
+                                            name: WithLocation {
+                                                location: Embedded(
+                                                    EmbeddedLocation {
+                                                        text_source: TextSource {
+                                                            current_working_directory: CurrentWorkingDirectory,
+                                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-linked-valid.input.js",
+                                                            ),
+                                                            span: Some(
+                                                                Span {
+                                                                    start: 241,
+                                                                    end: 320,
+                                                                },
+                                                            ),
+                                                        },
+                                                        span: Span {
+                                                            start: 25,
+                                                            end: 31,
+                                                        },
+                                                    },
+                                                ),
+                                                item: LinkedFieldName(
+                                                    "linked",
+                                                ),
+                                            },
+                                            reader_alias: None,
+                                            associated_data: (),
+                                            selection_set: [],
+                                            arguments: [],
+                                            directives: [
+                                                WithSpan {
+                                                    item: IsographFieldDirective {
+                                                        name: WithSpan {
+                                                            item: IsographDirectiveName(
+                                                                "loadable",
+                                                            ),
+                                                            span: Span {
+                                                                start: 33,
+                                                                end: 41,
+                                                            },
+                                                        },
+                                                        arguments: [
+                                                            WithLocation {
+                                                                location: Embedded(
+                                                                    EmbeddedLocation {
+                                                                        text_source: TextSource {
+                                                                            current_working_directory: CurrentWorkingDirectory,
+                                                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-linked-valid.input.js",
+                                                                            ),
+                                                                            span: Some(
+                                                                                Span {
+                                                                                    start: 241,
+                                                                                    end: 320,
+                                                                                },
+                                                                            ),
+                                                                        },
+                                                                        span: Span {
+                                                                            start: 42,
+                                                                            end: 65,
+                                                                        },
+                                                                    },
+                                                                ),
+                                                                item: SelectionFieldArgument {
+                                                                    name: WithSpan {
+                                                                        item: FieldArgumentName(
+                                                                            "lazyLoadArtifact",
+                                                                        ),
+                                                                        span: Span {
+                                                                            start: 42,
+                                                                            end: 58,
+                                                                        },
+                                                                    },
+                                                                    value: WithLocation {
+                                                                        location: Embedded(
+                                                                            EmbeddedLocation {
+                                                                                text_source: TextSource {
+                                                                                    current_working_directory: CurrentWorkingDirectory,
+                                                                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                                                                        "crates/isograph_lang_parser/fixtures/field-directives-on-linked-valid.input.js",
+                                                                                    ),
+                                                                                    span: Some(
+                                                                                        Span {
+                                                                                            start: 241,
+                                                                                            end: 320,
+                                                                                        },
+                                                                                    ),
+                                                                                },
+                                                                                span: Span {
+                                                                                    start: 60,
+                                                                                    end: 65,
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                        item: Boolean(
+                                                                            false,
+                                                                        ),
+                                                                    },
+                                                                },
+                                                            },
+                                                        ],
+                                                    },
+                                                    span: Span {
+                                                        start: 32,
+                                                        end: 41,
+                                                    },
+                                                },
+                                            ],
+                                        },
+                                    ),
+                                    span: Span {
+                                        start: 25,
+                                        end: 74,
+                                    },
+                                },
+                            ],
+                            directives: [],
+                            variable_definitions: [],
+                            definition_path: RelativePathToSourceFile(
+                                "crates/isograph_lang_parser/fixtures/field-directives-on-linked-valid.input.js",
+                            ),
+                            field_keyword: WithSpan {
+                                item: (),
+                                span: Span {
+                                    start: 3,
+                                    end: 8,
+                                },
+                            },
+                            dot: WithSpan {
+                                item: (),
+                                span: Span {
+                                    start: 13,
+                                    end: 14,
+                                },
+                            },
+                        },
+                        span: Span {
+                            start: 9,
+                            end: 78,
+                        },
+                    },
+                ),
+                TextSource {
+                    current_working_directory: CurrentWorkingDirectory,
+                    relative_path_to_source_file: RelativePathToSourceFile(
+                        "crates/isograph_lang_parser/fixtures/field-directives-on-linked-valid.input.js",
+                    ),
+                    span: Some(
+                        Span {
+                            start: 241,
+                            end: 320,
+                        },
+                    ),
+                },
+            ),
+            (
+                ClientFieldDeclaration(
+                    WithSpan {
+                        item: ClientFieldDeclaration {
+                            const_export_name: ConstExportName(
+                                "updatable",
+                            ),
+                            parent_type: WithSpan {
+                                item: UnvalidatedTypeName(
+                                    "Type",
+                                ),
+                                span: Span {
+                                    start: 9,
+                                    end: 13,
+                                },
+                            },
+                            client_field_name: WithSpan {
+                                item: ScalarFieldName(
+                                    "Name",
+                                ),
+                                span: Span {
+                                    start: 14,
+                                    end: 18,
+                                },
+                            },
+                            description: None,
+                            selection_set: [
+                                WithSpan {
+                                    item: LinkedField(
+                                        LinkedFieldSelection {
+                                            name: WithLocation {
+                                                location: Embedded(
+                                                    EmbeddedLocation {
+                                                        text_source: TextSource {
+                                                            current_working_directory: CurrentWorkingDirectory,
+                                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-linked-valid.input.js",
+                                                            ),
+                                                            span: Some(
+                                                                Span {
+                                                                    start: 357,
+                                                                    end: 412,
+                                                                },
+                                                            ),
+                                                        },
+                                                        span: Span {
+                                                            start: 25,
+                                                            end: 31,
+                                                        },
+                                                    },
+                                                ),
+                                                item: LinkedFieldName(
+                                                    "linked",
+                                                ),
+                                            },
+                                            reader_alias: None,
+                                            associated_data: (),
+                                            selection_set: [],
+                                            arguments: [],
+                                            directives: [
+                                                WithSpan {
+                                                    item: IsographFieldDirective {
+                                                        name: WithSpan {
+                                                            item: IsographDirectiveName(
+                                                                "updatable",
+                                                            ),
+                                                            span: Span {
+                                                                start: 33,
+                                                                end: 42,
+                                                            },
+                                                        },
+                                                        arguments: [],
+                                                    },
+                                                    span: Span {
+                                                        start: 32,
+                                                        end: 42,
+                                                    },
+                                                },
+                                            ],
+                                        },
+                                    ),
+                                    span: Span {
+                                        start: 25,
+                                        end: 50,
+                                    },
+                                },
+                            ],
+                            directives: [],
+                            variable_definitions: [],
+                            definition_path: RelativePathToSourceFile(
+                                "crates/isograph_lang_parser/fixtures/field-directives-on-linked-valid.input.js",
+                            ),
+                            field_keyword: WithSpan {
+                                item: (),
+                                span: Span {
+                                    start: 3,
+                                    end: 8,
+                                },
+                            },
+                            dot: WithSpan {
+                                item: (),
+                                span: Span {
+                                    start: 13,
+                                    end: 14,
+                                },
+                            },
+                        },
+                        span: Span {
+                            start: 9,
+                            end: 54,
+                        },
+                    },
+                ),
+                TextSource {
+                    current_working_directory: CurrentWorkingDirectory,
+                    relative_path_to_source_file: RelativePathToSourceFile(
+                        "crates/isograph_lang_parser/fixtures/field-directives-on-linked-valid.input.js",
+                    ),
+                    span: Some(
+                        Span {
+                            start: 357,
+                            end: 412,
+                        },
+                    ),
+                },
+            ),
+        ],
+    ),
+)
