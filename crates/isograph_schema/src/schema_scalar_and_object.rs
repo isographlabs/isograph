@@ -2,9 +2,10 @@ use std::{collections::BTreeMap, marker::PhantomData};
 
 use common_lang_types::{
     DescriptionValue, GraphQLScalarTypeName, IsographObjectTypeName, JavascriptName,
-    SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
+    SelectableFieldName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective};
+use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
     DefinitionLocation, SelectionType, ServerFieldId, ServerObjectId, ServerScalarId,
     ServerStrongIdFieldId,
@@ -44,11 +45,19 @@ pub struct SchemaObject<TOutputFormat: OutputFormat> {
 pub type SchemaType<'a, TOutputFormat> =
     SelectionType<&'a SchemaScalar<TOutputFormat>, &'a SchemaObject<TOutputFormat>>;
 
-pub fn get_name<TOutputFormat: OutputFormat>(
-    schema_type: SchemaType<'_, TOutputFormat>,
-) -> UnvalidatedTypeName {
-    match schema_type {
-        SelectionType::Object(object) => object.name.into(),
-        SelectionType::Scalar(scalar) => scalar.name.item.into(),
+#[impl_for_selection_type]
+pub trait SchemaScalarOrObject {
+    fn name(&self) -> SelectionType<GraphQLScalarTypeName, IsographObjectTypeName>;
+}
+
+impl<TOutputFormat: OutputFormat> SchemaScalarOrObject for &SchemaScalar<TOutputFormat> {
+    fn name(&self) -> SelectionType<GraphQLScalarTypeName, IsographObjectTypeName> {
+        SelectionType::Scalar(self.name.item)
+    }
+}
+
+impl<TOutputFormat: OutputFormat> SchemaScalarOrObject for &SchemaObject<TOutputFormat> {
+    fn name(&self) -> SelectionType<GraphQLScalarTypeName, IsographObjectTypeName> {
+        SelectionType::Object(self.name)
     }
 }
