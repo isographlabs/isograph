@@ -20,12 +20,12 @@ use crate::{
     categorize_field_loadability, create_transformed_name_and_arguments,
     expose_field_directive::RequiresRefinement, initial_variable_context,
     transform_arguments_with_child_context,
-    transform_name_and_arguments_with_child_variable_context, variable_definitions,
-    ClientFieldVariant, FieldOrPointer, ImperativelyLoadedFieldVariant, Loadability,
-    NameAndArguments, OutputFormat, PathToRefetchField, RootOperationName, SchemaObject,
-    SchemaServerFieldVariant, SelectionTypeId, UnvalidatedVariableDefinition, ValidatedClientField,
-    ValidatedClientPointer, ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSchemaIdField,
-    ValidatedSelection, VariableContext,
+    transform_name_and_arguments_with_child_variable_context, ClientFieldVariant, FieldOrPointer,
+    ImperativelyLoadedFieldVariant, Loadability, NameAndArguments, OutputFormat,
+    PathToRefetchField, RootOperationName, SchemaObject, SchemaServerFieldVariant, SelectionTypeId,
+    UnvalidatedVariableDefinition, ValidatedClientField, ValidatedClientPointer,
+    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection,
+    VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -1039,7 +1039,7 @@ fn merge_non_loadable_client_type<TOutputFormat: OutputFormat>(
 
     let transformed_child_variable_context = parent_variable_context.child_variable_context(
         selection_arguments,
-        variable_definitions(&newly_encountered_client_type),
+        newly_encountered_client_type.variable_definitions(),
         &ScalarFieldSelectionDirectiveSet::None(EmptyDirectiveSet {}),
     );
     transform_and_merge_child_selection_map_into_parent_map(

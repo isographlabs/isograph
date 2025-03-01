@@ -97,6 +97,7 @@ pub struct ClientPointer<
 pub trait FieldOrPointer<
     TSelectionTypeSelectionScalarFieldAssociatedData,
     TSelectionTypeSelectionLinkedFieldAssociatedData,
+    TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
 >
 {
     fn description(&self) -> Option<DescriptionValue>;
@@ -129,7 +130,10 @@ pub trait FieldOrPointer<
             TSelectionTypeSelectionLinkedFieldAssociatedData,
         >,
     >];
-    // fn variable_definitions
+
+    fn variable_definitions(
+        &self,
+    ) -> &[WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>];
 }
 
 impl<
@@ -141,6 +145,7 @@ impl<
     FieldOrPointer<
         TSelectionTypeSelectionScalarFieldAssociatedData,
         TSelectionTypeSelectionLinkedFieldAssociatedData,
+        TClientFieldVariableDefinitionAssociatedData,
     >
     for &ClientField<
         TSelectionTypeSelectionScalarFieldAssociatedData,
@@ -211,6 +216,12 @@ impl<
             _ => &self.reader_selection_set,
         }
     }
+
+    fn variable_definitions(
+        &self,
+    ) -> &[WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>] {
+        &self.variable_definitions
+    }
 }
 
 impl<
@@ -222,6 +233,7 @@ impl<
     FieldOrPointer<
         TSelectionTypeSelectionScalarFieldAssociatedData,
         TSelectionTypeSelectionLinkedFieldAssociatedData,
+        TClientFieldVariableDefinitionAssociatedData,
     >
     for &ClientPointer<
         TSelectionTypeSelectionScalarFieldAssociatedData,
@@ -281,5 +293,11 @@ impl<
         >,
     >] {
         &self.reader_selection_set
+    }
+
+    fn variable_definitions(
+        &self,
+    ) -> &[WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>] {
+        &self.variable_definitions
     }
 }

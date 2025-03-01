@@ -5,8 +5,8 @@ use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
-    initial_variable_context, variable_definitions, FieldOrPointer, OutputFormat,
-    RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment, UserWrittenClientFieldInfo,
+    initial_variable_context, FieldOrPointer, OutputFormat, RefetchedPathsMap,
+    ServerFieldTypeAssociatedDataInlineFragment, UserWrittenClientFieldInfo,
     UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema, ValidatedSchemaServerField,
     ValidatedSelectionType,
 };
@@ -258,7 +258,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
         "".to_string()
     };
 
-    let (parameters_import, parameters_type) = if !variable_definitions(client_field).is_empty() {
+    let (parameters_import, parameters_type) = if !client_field.variable_definitions().is_empty() {
         let reader_parameters_type =
             format!("{}__{}__parameters", parent_type.name, client_field.name());
         (

@@ -8,8 +8,8 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    variable_definitions, ClientField, ClientPointer, NameAndArguments, OutputFormat,
-    SchemaServerField, ValidatedVariableDefinition,
+    ClientField, ClientPointer, FieldOrPointer, NameAndArguments, OutputFormat, SchemaServerField,
+    ValidatedVariableDefinition,
 };
 
 #[derive(Debug)]
@@ -127,7 +127,8 @@ pub fn initial_variable_context<
     // For reader ASTs:
     // This makes sense, but seems somewhat superfluous. Perhaps we can refactor code such
     // that we do not need to call this.
-    let variable_context = variable_definitions(selection_type)
+    let variable_context = selection_type
+        .variable_definitions()
         .iter()
         .map(|variable_definition| {
             (
