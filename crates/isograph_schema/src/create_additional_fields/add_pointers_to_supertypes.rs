@@ -6,7 +6,7 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ClientType, FieldType, OutputFormat, SchemaServerField, SchemaServerFieldVariant,
+    ClientType, DefinitionLocation, OutputFormat, SchemaServerField, SchemaServerFieldVariant,
     ServerFieldTypeAssociatedData, ServerFieldTypeAssociatedDataInlineFragment, UnvalidatedSchema,
     ValidatedScalarFieldAssociatedData, LINK_FIELD_NAME,
 };
@@ -40,7 +40,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     ServerFieldSelection::ScalarField(ScalarFieldSelection {
                         arguments: vec![],
                         associated_data: ValidatedScalarFieldAssociatedData {
-                            location: FieldType::ServerField(
+                            location: DefinitionLocation::Server(
                                 *subtype
                                     .encountered_fields
                                     .get(&"__typename".intern().into())
@@ -65,7 +65,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     ServerFieldSelection::ScalarField(ScalarFieldSelection {
                         arguments: vec![],
                         associated_data: ValidatedScalarFieldAssociatedData {
-                            location: FieldType::ClientField(
+                            location: DefinitionLocation::Client(
                                 match *subtype
                                     .encountered_fields
                                     .get(&(*LINK_FIELD_NAME).into())
@@ -122,7 +122,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 
                     if supertype
                         .encountered_fields
-                        .insert(field_name, FieldType::ServerField(next_server_field_id))
+                        .insert(field_name, DefinitionLocation::Server(next_server_field_id))
                         .is_some()
                     {
                         return Err(WithLocation::new(

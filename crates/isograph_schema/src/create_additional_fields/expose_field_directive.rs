@@ -16,9 +16,9 @@ use isograph_lang_types::{
 use serde::Deserialize;
 
 use crate::{
-    generate_refetch_field_strategy, ClientField, ClientFieldVariant, ClientType, FieldType,
-    ImperativelyLoadedFieldVariant, OutputFormat, PrimaryFieldInfo, UnvalidatedSchema,
-    UnvalidatedVariableDefinition,
+    generate_refetch_field_strategy, ClientField, ClientFieldVariant, ClientType,
+    DefinitionLocation, ImperativelyLoadedFieldVariant, OutputFormat, PrimaryFieldInfo,
+    UnvalidatedSchema, UnvalidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -168,7 +168,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 
             let (maybe_abstract_parent_object_id, maybe_abstract_parent_type_name) =
                 match primary_field {
-                    Some(FieldType::ServerField(server_field_id)) => {
+                    Some(DefinitionLocation::Server(server_field_id)) => {
                         let server_field = self.server_field(*server_field_id);
 
                         // This is the parent type name (Pet)
@@ -324,7 +324,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             .encountered_fields
             .insert(
                 mutation_field_name,
-                FieldType::ClientField(ClientType::ClientField(client_field_id)),
+                DefinitionLocation::Client(ClientType::ClientField(client_field_id)),
             )
             .is_some()
         {
@@ -375,7 +375,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             .encountered_fields
             .iter()
             .find_map(|(name, field_id)| {
-                if let FieldType::ServerField(server_field_id) = field_id {
+                if let DefinitionLocation::Server(server_field_id) = field_id {
                     if *name == field_arg {
                         return Some(server_field_id);
                     }

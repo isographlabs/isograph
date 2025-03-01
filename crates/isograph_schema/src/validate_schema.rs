@@ -19,8 +19,8 @@ use crate::{
     schema_validation_state::SchemaValidationState,
     validate_client_field::validate_and_transform_client_types,
     validate_server_field::validate_and_transform_server_fields, ClientField, ClientFieldVariant,
-    ClientPointer, FieldType, ImperativelyLoadedFieldVariant, OutputFormat, Schema, SchemaIdField,
-    SchemaObject, SchemaServerField, ServerFieldData, ServerFieldTypeAssociatedData,
+    ClientPointer, DefinitionLocation, ImperativelyLoadedFieldVariant, OutputFormat, Schema,
+    SchemaIdField, SchemaObject, SchemaServerField, ServerFieldData, ServerFieldTypeAssociatedData,
     UnvalidatedSchema, UseRefetchFieldRefetchStrategy, ValidateEntrypointDeclarationError,
 };
 
@@ -64,14 +64,14 @@ pub type ValidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
 >;
 
 /// The validated defined field that shows up in the TScalarField generic.
-pub type ValidatedFieldDefinitionLocation = FieldType<ServerFieldId, ClientFieldId>;
+pub type ValidatedFieldDefinitionLocation = DefinitionLocation<ServerFieldId, ClientFieldId>;
 
 pub type ValidatedSchemaIdField = SchemaIdField<ServerScalarId>;
 
 #[derive(Debug, Clone)]
 pub struct ValidatedLinkedFieldAssociatedData {
     pub parent_object_id: ServerObjectId,
-    pub field_id: FieldType<ServerFieldId, ClientPointerId>,
+    pub field_id: DefinitionLocation<ServerFieldId, ClientPointerId>,
     // N.B. we don't actually support loadable linked fields
     pub selection_variant: ScalarFieldSelectionDirectiveSet,
     /// Some if the object is concrete; None otherwise.
@@ -225,12 +225,12 @@ fn transform_object_field_ids<TOutputFormat: OutputFormat>(
     let validated_encountered_fields = unvalidated_encountered_fields
         .into_iter()
         .map(|(encountered_field_name, value)| match value {
-            FieldType::ServerField(server_field_id) => (encountered_field_name, {
-                FieldType::ServerField(server_field_id)
+            DefinitionLocation::Server(server_field_id) => (encountered_field_name, {
+                DefinitionLocation::Server(server_field_id)
             }),
-            FieldType::ClientField(client_field_id) => (
+            DefinitionLocation::Client(client_field_id) => (
                 encountered_field_name,
-                FieldType::ClientField(client_field_id),
+                DefinitionLocation::Client(client_field_id),
             ),
         })
         .collect();

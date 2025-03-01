@@ -1,6 +1,6 @@
 use crate::{
-    ClientField, ClientFieldVariant, ClientType, FieldType, OutputFormat, UnvalidatedSchema,
-    LINK_FIELD_NAME,
+    ClientField, ClientFieldVariant, ClientType, DefinitionLocation, OutputFormat,
+    UnvalidatedSchema, LINK_FIELD_NAME,
 };
 use common_lang_types::{Location, ObjectTypeAndFieldName, WithLocation};
 use intern::string_key::Intern;
@@ -38,7 +38,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                 .encountered_fields
                 .insert(
                     field_name,
-                    FieldType::ClientField(ClientType::ClientField(next_client_field_id)),
+                    DefinitionLocation::Client(ClientType::ClientField(next_client_field_id)),
                 )
                 .is_some()
             {

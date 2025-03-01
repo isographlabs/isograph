@@ -16,7 +16,7 @@ use thiserror::Error;
 use crate::{
     expose_field_directive::RequiresRefinement,
     refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
-    ClientField, ClientPointer, ClientType, FieldMapItem, FieldType, OutputFormat,
+    ClientField, ClientPointer, ClientType, DefinitionLocation, FieldMapItem, OutputFormat,
     UnvalidatedSchema, UnvalidatedVariableDefinition, NODE_FIELD_NAME,
 };
 
@@ -154,7 +154,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             .encountered_fields
             .insert(
                 client_field_name.into(),
-                FieldType::ClientField(ClientType::ClientField(next_client_field_id)),
+                DefinitionLocation::Client(ClientType::ClientField(next_client_field_id)),
             )
             .is_some()
         {
@@ -280,7 +280,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             .encountered_fields
             .insert(
                 client_pointer_name.into(),
-                FieldType::ClientField(ClientType::ClientPointer(next_client_pointer_id)),
+                DefinitionLocation::Client(ClientType::ClientPointer(next_client_pointer_id)),
             )
             .is_some()
         {

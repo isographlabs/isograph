@@ -2,7 +2,7 @@ use common_lang_types::WithSpan;
 use isograph_lang_types::ServerFieldSelection;
 
 use crate::{
-    ClientType, FieldType, OutputFormat, ValidatedClientField, ValidatedClientPointer,
+    ClientType, DefinitionLocation, OutputFormat, ValidatedClientField, ValidatedClientPointer,
     ValidatedSchema, ValidatedSelection,
 };
 
@@ -51,11 +51,11 @@ impl<'a, TOutputFormat: OutputFormat> Iterator
                 match &selection.item {
                     ServerFieldSelection::ScalarField(scalar) => {
                         match scalar.associated_data.location {
-                            FieldType::ServerField(_) => {
+                            DefinitionLocation::Server(_) => {
                                 self.index += 1;
                                 continue 'main_loop;
                             }
-                            FieldType::ClientField(client_field_id) => {
+                            DefinitionLocation::Client(client_field_id) => {
                                 let nested_client_field = self.schema.client_field(client_field_id);
                                 self.index += 1;
                                 return Some(nested_client_field);

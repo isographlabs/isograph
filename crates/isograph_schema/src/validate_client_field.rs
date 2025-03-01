@@ -20,7 +20,7 @@ use lazy_static::lazy_static;
 use crate::{
     get_all_errors_or_all_ok, get_all_errors_or_all_ok_as_hashmap, get_all_errors_or_all_ok_iter,
     get_all_errors_or_tuple_ok, validate_argument_types::value_satisfies_type, ClientField,
-    ClientPointer, ClientType, ClientTypeId, FieldType, OutputFormat, RefetchStrategy,
+    ClientPointer, ClientType, ClientTypeId, DefinitionLocation, OutputFormat, RefetchStrategy,
     SchemaObject, ServerFieldData, UnvalidatedClientField, UnvalidatedClientPointer,
     UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy,
     UnvalidatedVariableDefinition, ValidateSchemaError, ValidateSchemaResult, ValidatedClientField,
@@ -436,7 +436,7 @@ fn validate_field_type_exists_and_is_scalar<TOutputFormat: OutputFormat>(
         .get(&scalar_field_name)
     {
         Some(defined_field_type) => match defined_field_type {
-            FieldType::ServerField(server_field_id) => {
+            DefinitionLocation::Server(server_field_id) => {
                 let server_field =
                     &top_level_client_type_info.server_fields[server_field_id.as_usize()];
                 let missing_arguments = get_missing_arguments_and_validate_argument_types(
@@ -457,7 +457,7 @@ fn validate_field_type_exists_and_is_scalar<TOutputFormat: OutputFormat>(
                     SelectionType::Scalar(_) => Ok(ScalarFieldSelection {
                         name: scalar_field_selection.name,
                         associated_data: ValidatedScalarFieldAssociatedData {
-                            location: FieldType::ServerField(*server_field_id),
+                            location: DefinitionLocation::Server(*server_field_id),
                             selection_variant: match scalar_field_selection.associated_data {
                                 ScalarFieldSelectionDirectiveSet::None(empty_struct) => {
                                     assert_no_missing_arguments(
@@ -510,7 +510,7 @@ fn validate_field_type_exists_and_is_scalar<TOutputFormat: OutputFormat>(
                     )),
                 }
             }
-            FieldType::ClientField(ClientType::ClientPointer(_)) => Err(WithLocation::new(
+            DefinitionLocation::Client(ClientType::ClientPointer(_)) => Err(WithLocation::new(
                 ValidateSchemaError::ClientTypeSelectionClientPointerSelectedAsScalar {
                     client_field_parent_type_name: top_level_client_type_info
                         .client_type_object_type_and_field_name
@@ -527,7 +527,7 @@ fn validate_field_type_exists_and_is_scalar<TOutputFormat: OutputFormat>(
                 },
                 scalar_field_selection.name.location,
             )),
-            FieldType::ClientField(ClientType::ClientField(client_field_id)) => {
+            DefinitionLocation::Client(ClientType::ClientField(client_field_id)) => {
                 validate_client_field(
                     client_field_id,
                     scalar_field_selection,
@@ -588,7 +588,7 @@ fn validate_client_field<TOutputFormat: OutputFormat>(
         name: scalar_field_selection.name,
         reader_alias: scalar_field_selection.reader_alias,
         associated_data: ValidatedScalarFieldAssociatedData {
-            location: FieldType::ClientField(*client_field_id),
+            location: DefinitionLocation::Client(*client_field_id),
             selection_variant: match scalar_field_selection.associated_data {
                 ScalarFieldSelectionDirectiveSet::None(empty_struct) => {
                     assert_no_missing_arguments(
@@ -625,7 +625,7 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
     let linked_field_name = linked_field_selection.name.item.into();
     match (field_parent_object.encountered_fields).get(&linked_field_name) {
         Some(defined_field_type) => match defined_field_type {
-            FieldType::ServerField(server_field_id) => {
+            DefinitionLocation::Server(server_field_id) => {
                 let server_field =
                     &top_level_client_type_info.server_fields[server_field_id.as_usize()];
                 match &server_field.associated_data {
@@ -693,7 +693,7 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
                             associated_data: ValidatedLinkedFieldAssociatedData {
                                 concrete_type: linked_field_target_object.concrete_type,
                                 parent_object_id: object_id.type_name.inner_non_null(),
-                                field_id: FieldType::ServerField(server_field.id),
+                                field_id: DefinitionLocation::Server(server_field.id),
                                 selection_variant: match linked_field_selection.associated_data {
                                     LinkedFieldSelectionDirectiveSet::None(empty_struct)=> {
                                         assert_no_missing_arguments(
@@ -716,7 +716,7 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
                     }
                 }
             }
-            FieldType::ClientField(client_type) => match client_type {
+            DefinitionLocation::Client(client_type) => match client_type {
                 ClientType::ClientPointer(client_pointer_id) => {
                     let object_id = top_level_client_type_info
                         .client_pointer_target_type_map
@@ -769,7 +769,7 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
                         associated_data: ValidatedLinkedFieldAssociatedData {
                             concrete_type: linked_field_target_object.concrete_type,
                             parent_object_id: *object_id,
-                            field_id: FieldType::ClientField(*client_pointer_id),
+                            field_id: DefinitionLocation::Client(*client_pointer_id),
                             selection_variant: match linked_field_selection.associated_data {
                                 LinkedFieldSelectionDirectiveSet::None(empty_struct) => {
                                     assert_no_missing_arguments(

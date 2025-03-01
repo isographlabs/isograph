@@ -10,10 +10,10 @@ use isograph_lang_types::{ClientFieldId, ScalarFieldSelectionDirectiveSet, Serve
 use isograph_schema::{
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
-    get_reachable_variables, ClientType, FieldToCompletedMergeTraversalStateMap,
-    FieldTraversalResult, FieldType, MergedSelectionMap, OutputFormat, RootOperationName,
-    RootRefetchedPath, ScalarClientFieldTraversalState, SchemaObject, ValidatedClientField,
-    ValidatedSchema, ValidatedVariableDefinition,
+    get_reachable_variables, ClientType, DefinitionLocation,
+    FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, MergedSelectionMap, OutputFormat,
+    RootOperationName, RootRefetchedPath, ScalarClientFieldTraversalState, SchemaObject,
+    ValidatedClientField, ValidatedSchema, ValidatedVariableDefinition,
 };
 
 use crate::{
@@ -52,7 +52,7 @@ pub(crate) fn generate_entrypoint_artifacts<TOutputFormat: OutputFormat>(
         schema.server_field_data.object(entrypoint.parent_object_id),
         entrypoint.selection_set_for_parent_query(),
         encountered_client_type_map,
-        FieldType::ClientField(ClientType::ClientField(entrypoint.id)),
+        DefinitionLocation::Client(ClientType::ClientField(entrypoint.id)),
         &ClientType::ClientField(entrypoint).initial_variable_context(),
     );
 
@@ -127,7 +127,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
                     // Note: it would be cleaner to include a reference to the merged selection set here via
                     // the selection_variant variable, instead of by looking it up like this.
                     &encountered_client_type_map
-                        .get(&FieldType::ClientField(ClientType::ClientField(
+                        .get(&DefinitionLocation::Client(ClientType::ClientField(
                             root_refetch_path.path_to_refetch_field_info.client_field_id,
                         )))
                         .expect(

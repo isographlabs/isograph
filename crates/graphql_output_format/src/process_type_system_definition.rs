@@ -17,7 +17,7 @@ use isograph_lang_types::{
     SelectableServerFieldId, ServerObjectId, ServerStrongIdFieldId, VariableDefinition,
 };
 use isograph_schema::{
-    EncounteredRootTypes, FieldType, IsographObjectTypeDefinition, OutputFormat,
+    DefinitionLocation, EncounteredRootTypes, IsographObjectTypeDefinition, OutputFormat,
     ProcessTypeSystemDocumentOutcome, ProcessedRootTypes, RootOperationName, RootTypes, Schema,
     SchemaObject, SchemaScalar, SchemaServerField, SchemaServerFieldVariant,
     ServerFieldTypeAssociatedData, TypeRefinementMaps, UnvalidatedObjectFieldInfo,
@@ -593,7 +593,7 @@ fn get_field_objects_ids_and_names<TOutputFormat: OutputFormat>(
 
         match encountered_fields.insert(
             field.item.name.item,
-            FieldType::ServerField(next_server_field_id),
+            DefinitionLocation::Server(next_server_field_id),
         ) {
             None => {
                 // TODO check for @strong directive instead!
@@ -665,7 +665,7 @@ fn get_field_objects_ids_and_names<TOutputFormat: OutputFormat>(
     if encountered_fields
         .insert(
             typename_name.item,
-            FieldType::ServerField(typename_field_id),
+            DefinitionLocation::Server(typename_field_id),
         )
         .is_some()
     {

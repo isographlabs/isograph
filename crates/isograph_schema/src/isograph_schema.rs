@@ -129,9 +129,9 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
 /// an iso field literal. Refetch fields and generated mutation fields are
 /// also local fields.
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq)]
-pub enum FieldType<TServer, TClient> {
-    ServerField(TServer),
-    ClientField(TClient),
+pub enum DefinitionLocation<TServer, TClient> {
+    Server(TServer),
+    Client(TClient),
 }
 
 pub type LinkedType<
@@ -141,7 +141,7 @@ pub type LinkedType<
     ClientTypeSelectionLinkedFieldAssociatedData,
     VariableDefinitionInnerType,
     TOutputFormat,
-> = FieldType<
+> = DefinitionLocation<
     &'a SchemaServerField<
         ServerFieldTypeAssociatedData,
         VariableDefinitionInnerType,
@@ -168,7 +168,7 @@ impl<
         TClientTypeVariableDefinitionAssociatedData: Ord + Debug,
         TOutputFormat: OutputFormat,
     >
-    FieldType<
+    DefinitionLocation<
         &SchemaServerField<
             ServerFieldTypeAssociatedData,
             TClientTypeVariableDefinitionAssociatedData,
@@ -184,19 +184,22 @@ impl<
 {
     pub fn description(&self) -> Option<DescriptionValue> {
         match self {
-            FieldType::ServerField(server_field) => server_field.description,
-            FieldType::ClientField(client_field) => client_field.description,
+            DefinitionLocation::Server(server_field) => server_field.description,
+            DefinitionLocation::Client(client_field) => client_field.description,
         }
     }
 }
 
 impl<TOutputFormat: OutputFormat>
-    FieldType<&ValidatedSchemaServerField<TOutputFormat>, &ValidatedClientPointer<TOutputFormat>>
+    DefinitionLocation<
+        &ValidatedSchemaServerField<TOutputFormat>,
+        &ValidatedClientPointer<TOutputFormat>,
+    >
 {
     pub fn output_type_annotation(&self) -> TypeAnnotation<ServerObjectId> {
         match self {
-            FieldType::ClientField(client_pointer) => client_pointer.to.clone(),
-            FieldType::ServerField(server_field) => match &server_field.associated_data {
+            DefinitionLocation::Client(client_pointer) => client_pointer.to.clone(),
+            DefinitionLocation::Server(server_field) => match &server_field.associated_data {
                 SelectionType::Scalar(_) => panic!(
                     "output_type_id should be an object. \
                     This is indicative of a bug in Isograph.",
@@ -306,18 +309,20 @@ impl<
     }
 }
 
-impl<TFieldAssociatedData, TClientFieldType> FieldType<TFieldAssociatedData, TClientFieldType> {
+impl<TFieldAssociatedData, TClientFieldType>
+    DefinitionLocation<TFieldAssociatedData, TClientFieldType>
+{
     pub fn as_server_field(&self) -> Option<&TFieldAssociatedData> {
         match self {
-            FieldType::ServerField(server_field) => Some(server_field),
-            FieldType::ClientField(_) => None,
+            DefinitionLocation::Server(server_field) => Some(server_field),
+            DefinitionLocation::Client(_) => None,
         }
     }
 
     pub fn as_client_type(&self) -> Option<&TClientFieldType> {
         match self {
-            FieldType::ServerField(_) => None,
-            FieldType::ClientField(client_field) => Some(client_field),
+            DefinitionLocation::Server(_) => None,
+            DefinitionLocation::Client(client_field) => Some(client_field),
         }
     }
 }
@@ -375,7 +380,7 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
 
     pub fn linked_type(
         &self,
-        field_id: FieldType<ServerFieldId, ClientPointerId>,
+        field_id: DefinitionLocation<ServerFieldId, ClientPointerId>,
     ) -> LinkedType<
         TSchemaValidationState::ServerFieldTypeAssociatedData,
         TSchemaValidationState::ClientTypeSelectionScalarFieldAssociatedData,
@@ -384,11 +389,11 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
         TOutputFormat,
     > {
         match field_id {
-            FieldType::ServerField(server_field_id) => {
-                FieldType::ServerField(self.server_field(server_field_id))
+            DefinitionLocation::Server(server_field_id) => {
+                DefinitionLocation::Server(self.server_field(server_field_id))
             }
-            FieldType::ClientField(client_pointer_id) => {
-                FieldType::ClientField(self.client_pointer(client_pointer_id))
+            DefinitionLocation::Client(client_pointer_id) => {
+                DefinitionLocation::Client(self.client_pointer(client_pointer_id))
             }
         }
     }
@@ -595,7 +600,8 @@ pub struct SchemaObject<TOutputFormat: OutputFormat> {
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
     /// to something else.
     pub id_field: Option<ServerStrongIdFieldId>,
-    pub encountered_fields: BTreeMap<SelectableFieldName, FieldType<ServerFieldId, ClientTypeId>>,
+    pub encountered_fields:
+        BTreeMap<SelectableFieldName, DefinitionLocation<ServerFieldId, ClientTypeId>>,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 

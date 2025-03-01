@@ -16,8 +16,9 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ClientType, FieldType, OutputFormat, SchemaObject, ServerFieldData, ValidateSchemaError,
-    ValidateSchemaResult, ValidatedSchemaServerField, ValidatedVariableDefinition,
+    ClientType, DefinitionLocation, OutputFormat, SchemaObject, ServerFieldData,
+    ValidateSchemaError, ValidateSchemaResult, ValidatedSchemaServerField,
+    ValidatedVariableDefinition,
 };
 
 fn graphql_type_to_non_null_type<TValue>(
@@ -403,7 +404,7 @@ fn get_non_nullable_missing_and_provided_fields<TOutputFormat: OutputFormat>(
 fn validate_no_extraneous_fields(
     object_fields: &BTreeMap<
         SelectableFieldName,
-        FieldType<ServerFieldId, ClientType<ClientFieldId, ClientPointerId>>,
+        DefinitionLocation<ServerFieldId, ClientType<ClientFieldId, ClientPointerId>>,
     >,
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     location: Location,

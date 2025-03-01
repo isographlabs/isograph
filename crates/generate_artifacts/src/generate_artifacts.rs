@@ -16,7 +16,7 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     get_provided_arguments, selection_map_wrapped, ClientFieldVariant, ClientType,
-    FieldTraversalResult, FieldType, NameAndArguments, NormalizationKey, OutputFormat,
+    DefinitionLocation, FieldTraversalResult, NameAndArguments, NormalizationKey, OutputFormat,
     RequiresRefinement, Schema, SchemaObject, SchemaServerFieldVariant,
     UserWrittenComponentVariant, ValidatedClientField, ValidatedScalarFieldAssociatedData,
     ValidatedSchema, ValidatedSchemaState, ValidatedSelection, ValidatedVariableDefinition,
@@ -136,7 +136,7 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
     ) in &encountered_client_type_map
     {
         match encountered_field_id {
-            FieldType::ServerField(encountered_server_field_id) => {
+            DefinitionLocation::Server(encountered_server_field_id) => {
                 let encountered_server_field = schema.server_field(*encountered_server_field_id);
 
                 match &encountered_server_field.associated_data {
@@ -156,10 +156,10 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
                 };
             }
 
-            FieldType::ClientField(ClientType::ClientPointer(_)) => {
+            DefinitionLocation::Client(ClientType::ClientPointer(_)) => {
                 todo!("generate client pointer reader artifacts is not implemented")
             }
-            FieldType::ClientField(ClientType::ClientField(encountered_client_field_id)) => {
+            DefinitionLocation::Client(ClientType::ClientField(encountered_client_field_id)) => {
                 let encountered_client_field = schema.client_field(*encountered_client_field_id);
 
                 match &encountered_client_field.variant {
@@ -295,7 +295,7 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
         ));
 
         match encountered_client_type_map
-            .get(&FieldType::ClientField(user_written_client_type.id()))
+            .get(&DefinitionLocation::Client(user_written_client_type.id()))
         {
             Some(FieldTraversalResult {
                 traversal_state, ..
@@ -576,7 +576,7 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
     match &selection.item {
         ServerFieldSelection::ScalarField(scalar_field_selection) => {
             match scalar_field_selection.associated_data.location {
-                FieldType::ServerField(_server_field) => {
+                DefinitionLocation::Server(_server_field) => {
                     let parent_field = parent_type
                         .encountered_fields
                         .get(&scalar_field_selection.name.item.into())
@@ -613,7 +613,7 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
                         print_javascript_type_declaration(&output_type)
                     ));
                 }
-                FieldType::ClientField(client_field_id) => write_param_type_from_client_field(
+                DefinitionLocation::Client(client_field_id) => write_param_type_from_client_field(
                     schema,
                     query_type_declaration,
                     nested_client_field_imports,
@@ -627,11 +627,11 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
         }
         ServerFieldSelection::LinkedField(linked_field) => {
             let field = match linked_field.associated_data.field_id {
-                FieldType::ServerField(server_field_id) => {
-                    FieldType::ServerField(schema.server_field(server_field_id))
+                DefinitionLocation::Server(server_field_id) => {
+                    DefinitionLocation::Server(schema.server_field(server_field_id))
                 }
-                FieldType::ClientField(client_pointer_id) => {
-                    FieldType::ClientField(schema.client_pointer(client_pointer_id))
+                DefinitionLocation::Client(client_pointer_id) => {
+                    DefinitionLocation::Client(schema.client_pointer(client_pointer_id))
                 }
             };
 
@@ -764,7 +764,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
     match &selection.item {
         ServerFieldSelection::ScalarField(scalar_field_selection) => {
             match scalar_field_selection.associated_data.location {
-                FieldType::ServerField(_server_field) => {
+                DefinitionLocation::Server(_server_field) => {
                     let parent_field = parent_type
                         .encountered_fields
                         .get(&scalar_field_selection.name.item.into())
@@ -818,7 +818,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                         }
                     }
                 }
-                FieldType::ClientField(client_field_id) => {
+                DefinitionLocation::Client(client_field_id) => {
                     write_param_type_from_client_field(
                         schema,
                         query_type_declaration,
