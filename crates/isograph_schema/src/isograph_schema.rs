@@ -6,7 +6,7 @@ use std::{
 
 use common_lang_types::{
     DescriptionValue, GraphQLInterfaceTypeName, GraphQLScalarTypeName, IsographObjectTypeName,
-    JavascriptName, SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
+    SelectableFieldName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition,
@@ -22,6 +22,7 @@ use lazy_static::lazy_static;
 
 use crate::{
     field_and_pointer::{ClientField, ClientPointer},
+    schema_scalar_and_object::{SchemaObject, SchemaScalar, SchemaType},
     schema_validation_state::SchemaValidationState,
     NormalizationKey, OutputFormat, SelectionTypeId, ServerFieldTypeAssociatedData,
 };
@@ -332,18 +333,6 @@ impl<TOutputFormat: OutputFormat> ServerFieldData<TOutputFormat> {
     }
 }
 
-pub type SchemaType<'a, TOutputFormat> =
-    SelectionType<&'a SchemaScalar<TOutputFormat>, &'a SchemaObject<TOutputFormat>>;
-
-pub fn get_name<TOutputFormat: OutputFormat>(
-    schema_type: SchemaType<'_, TOutputFormat>,
-) -> UnvalidatedTypeName {
-    match schema_type {
-        SelectionType::Object(object) => object.name.into(),
-        SelectionType::Scalar(scalar) => scalar.name.item.into(),
-    }
-}
-
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct IsographObjectTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
@@ -398,25 +387,6 @@ impl From<GraphQLInputObjectTypeDefinition> for IsographObjectTypeDefinition {
                 .collect(),
         }
     }
-}
-
-/// An object type in the schema.
-#[derive(Debug)]
-pub struct SchemaObject<TOutputFormat: OutputFormat> {
-    pub description: Option<DescriptionValue>,
-    pub name: IsographObjectTypeName,
-    pub id: ServerObjectId,
-    // We probably don't want this
-    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
-    /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
-    /// to something else.
-    pub id_field: Option<ServerStrongIdFieldId>,
-    pub encountered_fields:
-        BTreeMap<SelectableFieldName, DefinitionLocation<ServerFieldId, SelectionTypeId>>,
-    /// Some if the object is concrete; None otherwise.
-    pub concrete_type: Option<IsographObjectTypeName>,
-
-    pub output_associated_data: TOutputFormat::SchemaObjectAssociatedData,
 }
 
 #[derive(Debug, Clone)]
@@ -589,14 +559,4 @@ impl<T, VariableDefinitionInnerType: Ord + Debug, TOutputFormat: OutputFormat>
             associated_data,
         )
     }
-}
-
-/// A scalar type in the schema.
-#[derive(Debug)]
-pub struct SchemaScalar<TOutputFormat: OutputFormat> {
-    pub description: Option<WithSpan<DescriptionValue>>,
-    pub name: WithLocation<GraphQLScalarTypeName>,
-    pub id: ServerScalarId,
-    pub javascript_name: JavascriptName,
-    pub output_format: PhantomData<TOutputFormat>,
 }
