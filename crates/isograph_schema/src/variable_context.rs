@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Debug};
 
 use common_lang_types::{SelectableFieldName, VariableName, WithLocation, WithSpan};
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ConstantValue, NonConstantValue, ScalarFieldSelectionVariant,
+    ArgumentKeyAndValue, ConstantValue, NonConstantValue, ScalarFieldValidDirectiveSet,
     SelectionFieldArgument,
 };
 
@@ -20,7 +20,7 @@ impl VariableContext {
         &self,
         selection_arguments: &[WithLocation<SelectionFieldArgument>],
         child_variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-        selection_variant: &ScalarFieldSelectionVariant,
+        selection_variant: &ScalarFieldValidDirectiveSet,
     ) -> Self {
         // We need to take a parent context ({$id: NonConstantValue1 }), the argument parameters ({blah: $id}),
         // and the child variable definitions ({ $blah: Option<NonConstantValue2> }) and create a new child
@@ -44,7 +44,7 @@ impl VariableContext {
                 }) {
                     Some(arg) => arg,
                     None => {
-                        if matches!(selection_variant, ScalarFieldSelectionVariant::Loadable(_)) {
+                        if matches!(selection_variant, ScalarFieldValidDirectiveSet::Loadable(_)) {
                             // If this field was selected loadably, missing arguments are allowed.
                             // These missing arguments become variables that are provided at
                             // runtime. If they are missing at runtime, they will fall back to

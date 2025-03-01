@@ -2,7 +2,7 @@ use common_lang_types::{SelectableFieldName, Span, UnvalidatedTypeName, WithLoca
 use graphql_lang_types::{GraphQLNamedTypeAnnotation, GraphQLTypeAnnotation};
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    EmptyStruct, ScalarFieldSelection, ScalarFieldSelectionVariant, ServerFieldSelection,
+    EmptyDirectiveSet, ScalarFieldSelection, ScalarFieldValidDirectiveSet, ServerFieldSelection,
 };
 
 use crate::{
@@ -48,7 +48,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                                     .as_server_field()
                                     .expect("Expected __typename to be server field"),
                             ),
-                            selection_variant: ScalarFieldSelectionVariant::None(EmptyStruct {}),
+                            selection_variant: ScalarFieldValidDirectiveSet::None(EmptyDirectiveSet {}),
                         },
                         directives: vec![],
                         name: WithLocation::new(
@@ -78,7 +78,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                                     }
                                 },
                             ),
-                            selection_variant: ScalarFieldSelectionVariant::None(EmptyStruct {}),
+                            selection_variant: ScalarFieldValidDirectiveSet::None(EmptyDirectiveSet {}),
                         },
                         directives: vec![],
                         name: WithLocation::new(*LINK_FIELD_NAME, Location::generated()),

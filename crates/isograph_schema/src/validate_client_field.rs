@@ -11,7 +11,7 @@ use common_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     reachable_variables, ClientFieldId, ClientPointerId, LinkedFieldSelection,
-    ScalarFieldSelection, ScalarFieldSelectionVariant, SelectionFieldArgument, SelectionType,
+    ScalarFieldSelection, ScalarFieldValidDirectiveSet, SelectionFieldArgument, SelectionType,
     ServerObjectId, UnvalidatedScalarFieldSelection, UnvalidatedSelection, VariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -458,26 +458,26 @@ fn validate_field_type_exists_and_is_scalar<TOutputFormat: OutputFormat>(
                         associated_data: ValidatedScalarFieldAssociatedData {
                             location: FieldType::ServerField(*server_field_id),
                             selection_variant: match scalar_field_selection.associated_data {
-                                ScalarFieldSelectionVariant::None(empty_struct) => {
+                                ScalarFieldValidDirectiveSet::None(empty_struct) => {
                                     assert_no_missing_arguments(
                                         missing_arguments,
                                         scalar_field_selection.name.location,
                                     )?;
-                                    ScalarFieldSelectionVariant::None(empty_struct)
+                                    ScalarFieldValidDirectiveSet::None(empty_struct)
                                 }
-                                ScalarFieldSelectionVariant::Updatable(u) => {
+                                ScalarFieldValidDirectiveSet::Updatable(u) => {
                                     assert_no_missing_arguments(
                                         missing_arguments,
                                         scalar_field_selection.name.location,
                                     )?;
-                                    ScalarFieldSelectionVariant::Updatable(u)
+                                    ScalarFieldValidDirectiveSet::Updatable(u)
                                 }
-                                ScalarFieldSelectionVariant::Loadable(l) => {
+                                ScalarFieldValidDirectiveSet::Loadable(l) => {
                                     server_field_cannot_be_selected_loadably(
                                         scalar_field_name,
                                         scalar_field_selection.name.location,
                                     )?;
-                                    ScalarFieldSelectionVariant::Loadable(l)
+                                    ScalarFieldValidDirectiveSet::Loadable(l)
                                 }
                             },
                         },
@@ -590,22 +590,22 @@ fn validate_client_field<TOutputFormat: OutputFormat>(
         associated_data: ValidatedScalarFieldAssociatedData {
             location: FieldType::ClientField(*client_field_id),
             selection_variant: match scalar_field_selection.associated_data {
-                ScalarFieldSelectionVariant::None(empty_struct) => {
+                ScalarFieldValidDirectiveSet::None(empty_struct) => {
                     assert_no_missing_arguments(
                         missing_arguments,
                         scalar_field_selection.name.location,
                     )?;
-                    ScalarFieldSelectionVariant::None(empty_struct)
+                    ScalarFieldValidDirectiveSet::None(empty_struct)
                 }
-                ScalarFieldSelectionVariant::Updatable(u) => {
+                ScalarFieldValidDirectiveSet::Updatable(u) => {
                     assert_no_missing_arguments(
                         missing_arguments,
                         scalar_field_selection.name.location,
                     )?;
-                    ScalarFieldSelectionVariant::Updatable(u)
+                    ScalarFieldValidDirectiveSet::Updatable(u)
                 }
-                ScalarFieldSelectionVariant::Loadable(l) => {
-                    ScalarFieldSelectionVariant::Loadable(l)
+                ScalarFieldValidDirectiveSet::Loadable(l) => {
+                    ScalarFieldValidDirectiveSet::Loadable(l)
                 }
             },
         },
@@ -696,26 +696,26 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
                                 parent_object_id: object_id.type_name.inner_non_null(),
                                 field_id: FieldType::ServerField(server_field.id),
                                 selection_variant: match linked_field_selection.associated_data {
-                                    ScalarFieldSelectionVariant::None(empty_struct)=> {
+                                    ScalarFieldValidDirectiveSet::None(empty_struct)=> {
                                         assert_no_missing_arguments(
                                             missing_arguments,
                                             linked_field_selection.name.location,
                                         )?;
-                                        ScalarFieldSelectionVariant::None(empty_struct)
+                                        ScalarFieldValidDirectiveSet::None(empty_struct)
                                     }
-                                    ScalarFieldSelectionVariant::Updatable(u) => {
+                                    ScalarFieldValidDirectiveSet::Updatable(u) => {
                                         assert_no_missing_arguments(
                                             missing_arguments,
                                             linked_field_selection.name.location,
                                         )?;
-                                        ScalarFieldSelectionVariant::Updatable(u)
+                                        ScalarFieldValidDirectiveSet::Updatable(u)
                                     }
-                                    ScalarFieldSelectionVariant::Loadable(l) => {
+                                    ScalarFieldValidDirectiveSet::Loadable(l) => {
                                         server_field_cannot_be_selected_loadably(
                                             linked_field_name,
                                             linked_field_selection.name.location,
                                         )?;
-                                        ScalarFieldSelectionVariant::Loadable(l)
+                                        ScalarFieldValidDirectiveSet::Loadable(l)
                                     }
                                 },
                             },
@@ -780,22 +780,22 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
                             parent_object_id: *object_id,
                             field_id: FieldType::ClientField(*client_pointer_id),
                             selection_variant: match linked_field_selection.associated_data {
-                                ScalarFieldSelectionVariant::None(empty_struct) => {
+                                ScalarFieldValidDirectiveSet::None(empty_struct) => {
                                     assert_no_missing_arguments(
                                         missing_arguments,
                                         linked_field_selection.name.location,
                                     )?;
-                                    ScalarFieldSelectionVariant::None(empty_struct)
+                                    ScalarFieldValidDirectiveSet::None(empty_struct)
                                 }
-                                ScalarFieldSelectionVariant::Updatable(u) => {
+                                ScalarFieldValidDirectiveSet::Updatable(u) => {
                                     assert_no_missing_arguments(
                                         missing_arguments,
                                         linked_field_selection.name.location,
                                     )?;
-                                    ScalarFieldSelectionVariant::Updatable(u)
+                                    ScalarFieldValidDirectiveSet::Updatable(u)
                                 }
-                                ScalarFieldSelectionVariant::Loadable(l) => {
-                                    ScalarFieldSelectionVariant::Loadable(l)
+                                ScalarFieldValidDirectiveSet::Loadable(l) => {
+                                    ScalarFieldValidDirectiveSet::Loadable(l)
                                 }
                             },
                         },

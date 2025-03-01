@@ -4,9 +4,9 @@ use isograph_lang_types::{
     from_isograph_field_directives, ClientFieldDeclaration,
     ClientFieldDeclarationWithUnvalidatedDirectives, ClientFieldDeclarationWithValidatedDirectives,
     ClientPointerDeclaration, ClientPointerDeclarationWithUnvalidatedDirectives,
-    ClientPointerDeclarationWithValidatedDirectives, EmptyStruct, IsographFieldDirective,
-    LinkedFieldSelection, ScalarFieldSelection, ScalarFieldSelectionVariant, ServerFieldSelection,
-    UnvalidatedSelection, UpdatableDirectiveParameters, UpdatableScalarSelectionVariant,
+    ClientPointerDeclarationWithValidatedDirectives, EmptyDirectiveSet, IsographFieldDirective,
+    LinkedFieldSelection, ScalarFieldSelection, ScalarFieldValidDirectiveSet, ServerFieldSelection,
+    UnvalidatedSelection, UpdatableDirectiveParameters, UpdatableDirectiveSet,
 };
 use isograph_schema::ProcessClientFieldDeclarationError;
 use lazy_static::lazy_static;
@@ -61,7 +61,7 @@ pub fn validate_isograph_selection_set_directives(
     and_then_selection_set_and_collect_errors(
         selection_set,
         &|scalar_field_selection| {
-            let scalar_field_selection_variant: ScalarFieldSelectionVariant =
+            let scalar_field_selection_variant: ScalarFieldValidDirectiveSet =
                 from_isograph_field_directives(&scalar_field_selection.directives).map_err(
                     |message| {
                         WithLocation::new(
@@ -82,11 +82,11 @@ pub fn validate_isograph_selection_set_directives(
             );
 
             Ok(if updatable_directive.is_some() {
-                ScalarFieldSelectionVariant::Updatable(UpdatableScalarSelectionVariant {
+                ScalarFieldValidDirectiveSet::Updatable(UpdatableDirectiveSet {
                     updatable: UpdatableDirectiveParameters {},
                 })
             } else {
-                ScalarFieldSelectionVariant::None(EmptyStruct {})
+                ScalarFieldValidDirectiveSet::None(EmptyDirectiveSet {})
             })
         },
     )

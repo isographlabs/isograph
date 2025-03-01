@@ -9,19 +9,19 @@ use intern::string_key::Lookup;
 use serde::Deserialize;
 use std::fmt::Debug;
 
-use crate::{IsographFieldDirective, ScalarFieldSelectionVariant};
+use crate::{IsographFieldDirective, ScalarFieldValidDirectiveSet};
 
 pub type UnvalidatedSelectionWithUnvalidatedDirectives = ServerFieldSelection<(), ()>;
 
 pub type UnvalidatedSelection = ServerFieldSelection<
     // <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
-    ScalarFieldSelectionVariant,
+    ScalarFieldValidDirectiveSet,
     // <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionLinkedFieldAssociatedData,
-    ScalarFieldSelectionVariant,
+    ScalarFieldValidDirectiveSet,
 >;
 pub type UnvalidatedScalarFieldSelection = ScalarFieldSelection<
     // <UnvalidatedSchemaState as SchemaValidationState>::ClientTypeSelectionScalarFieldAssociatedData,
-    ScalarFieldSelectionVariant,
+    ScalarFieldValidDirectiveSet,
 >;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
@@ -62,10 +62,10 @@ pub struct ClientPointerDeclaration<TScalarField, TLinkedField> {
 pub type ClientFieldDeclarationWithUnvalidatedDirectives = ClientFieldDeclaration<(), ()>;
 pub type ClientPointerDeclarationWithUnvalidatedDirectives = ClientPointerDeclaration<(), ()>;
 pub type ClientFieldDeclarationWithValidatedDirectives =
-    ClientFieldDeclaration<ScalarFieldSelectionVariant, ScalarFieldSelectionVariant>;
+    ClientFieldDeclaration<ScalarFieldValidDirectiveSet, ScalarFieldValidDirectiveSet>;
 
 pub type ClientPointerDeclarationWithValidatedDirectives =
-    ClientPointerDeclaration<ScalarFieldSelectionVariant, ScalarFieldSelectionVariant>;
+    ClientPointerDeclaration<ScalarFieldValidDirectiveSet, ScalarFieldValidDirectiveSet>;
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Default)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
