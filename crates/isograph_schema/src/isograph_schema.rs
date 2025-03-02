@@ -16,11 +16,9 @@ use isograph_lang_types::{
 use lazy_static::lazy_static;
 
 use crate::{
-    field_and_pointer::{ClientField, ClientPointer},
-    schema_validation_state::SchemaValidationState,
-    server_scalar_and_object::{SchemaObject, SchemaScalar, SchemaType},
-    ClientFieldOrPointerId, NormalizationKey, OutputFormat, SchemaServerField,
-    ServerFieldTypeAssociatedData,
+    schema_validation_state::SchemaValidationState, ClientField, ClientFieldOrPointerId,
+    ClientPointer, NormalizationKey, OutputFormat, SchemaObject, SchemaScalar, SchemaServerField,
+    SchemaType, ServerFieldTypeAssociatedData,
 };
 
 lazy_static! {

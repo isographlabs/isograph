@@ -10,7 +10,7 @@ use isograph_lang_types::{
     TypeAnnotation, VariableDefinition,
 };
 
-use crate::{ClientFieldVariant, OutputFormat, RefetchStrategy};
+use crate::{ClientFieldVariant, OutputFormat, RefetchStrategy, UserWrittenClientPointerInfo};
 
 pub type ClientFieldOrPointerId = SelectionType<ClientFieldId, ClientPointerId>;
 
@@ -91,6 +91,7 @@ pub struct ClientPointer<
     pub parent_object_id: ServerObjectId,
 
     pub output_format: PhantomData<TOutputFormat>,
+    pub info: UserWrittenClientPointerInfo,
 }
 
 #[impl_for_selection_type]

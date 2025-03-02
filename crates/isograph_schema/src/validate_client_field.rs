@@ -279,6 +279,7 @@ fn validate_client_pointer_selection_set<TOutputFormat: OutputFormat>(
         get_all_errors_or_tuple_ok(selection_set_result, refetch_strategy_result)?;
 
     Ok(ClientPointer {
+        info: top_level_client_pointer.info,
         to: top_level_client_pointer.to,
         description: top_level_client_pointer.description,
         name: top_level_client_pointer.name,
