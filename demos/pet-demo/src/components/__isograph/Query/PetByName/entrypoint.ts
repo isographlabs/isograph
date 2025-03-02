@@ -2,14 +2,8 @@ import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArti
 import {Query__PetByName__param} from './param_type';
 import {Query__PetByName__output_type} from './output_type';
 import readerResolver from './resolver_reader';
+import queryText from './query_text';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
-
-const queryText = 'query PetByName ($name: String!) {\
-  petByName____name___v_name: petByName(name: $name) {\
-    id,\
-    name,\
-  },\
-}';
 
 const normalizationAst: NormalizationAst = {
   kind: "NormalizationAst",

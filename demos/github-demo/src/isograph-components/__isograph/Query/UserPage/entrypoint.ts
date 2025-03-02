@@ -2,46 +2,8 @@ import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArti
 import {Query__UserPage__param} from './param_type';
 import {Query__UserPage__output_type} from './output_type';
 import readerResolver from './resolver_reader';
+import queryText from './query_text';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
-
-const queryText = 'query UserPage ($userLogin: String!) {\
-  user____login___v_userLogin: user(login: $userLogin) {\
-    id,\
-    name,\
-    repositories____first___l_10____after___l_null: repositories(first: 10, after: null) {\
-      edges {\
-        node {\
-          id,\
-          description,\
-          forkCount,\
-          name,\
-          nameWithOwner,\
-          owner {\
-            __typename,\
-            id,\
-            login,\
-          },\
-          pullRequests {\
-            totalCount,\
-          },\
-          stargazerCount,\
-          watchers {\
-            totalCount,\
-          },\
-        },\
-      },\
-      pageInfo {\
-        endCursor,\
-        hasNextPage,\
-      },\
-    },\
-  },\
-  viewer {\
-    id,\
-    avatarUrl,\
-    name,\
-  },\
-}';
 
 const normalizationAst: NormalizationAst = {
   kind: "NormalizationAst",
