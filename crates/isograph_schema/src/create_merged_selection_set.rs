@@ -20,19 +20,19 @@ use crate::{
     categorize_field_loadability, create_transformed_name_and_arguments,
     expose_field_directive::RequiresRefinement, initial_variable_context,
     transform_arguments_with_child_context,
-    transform_name_and_arguments_with_child_variable_context, ClientFieldVariant, FieldOrPointer,
-    ImperativelyLoadedFieldVariant, Loadability, NameAndArguments, OutputFormat,
-    PathToRefetchField, RootOperationName, SchemaObject, SchemaServerFieldVariant, SelectionTypeId,
-    UnvalidatedVariableDefinition, ValidatedClientField, ValidatedScalarFieldSelection,
-    ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection, ValidatedSelectionType,
-    VariableContext,
+    transform_name_and_arguments_with_child_variable_context, ClientFieldOrPointer,
+    ClientFieldOrPointerId, ClientFieldVariant, ImperativelyLoadedFieldVariant, Loadability,
+    NameAndArguments, OutputFormat, PathToRefetchField, RootOperationName, SchemaObject,
+    SchemaServerFieldVariant, UnvalidatedVariableDefinition, ValidatedClientField,
+    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection,
+    ValidatedSelectionType, VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
 
 // Maybe this should be FNVHashMap? We don't really need stable iteration order
 pub type FieldToCompletedMergeTraversalStateMap =
-    BTreeMap<DefinitionLocation<ServerFieldId, SelectionTypeId>, FieldTraversalResult>;
+    BTreeMap<DefinitionLocation<ServerFieldId, ClientFieldOrPointerId>, FieldTraversalResult>;
 
 #[derive(Clone, Debug)]
 pub struct FieldTraversalResult {
@@ -407,7 +407,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     parent_type: &SchemaObject<TOutputFormat>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
-    root_field_id: DefinitionLocation<ServerFieldId, SelectionTypeId>,
+    root_field_id: DefinitionLocation<ServerFieldId, ClientFieldOrPointerId>,
     variable_context: &VariableContext,
     // TODO return Cow?
 ) -> FieldTraversalResult {

@@ -16,7 +16,7 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     accessible_client_fields, as_server_field, description, get_provided_arguments,
-    output_type_annotation, selection_map_wrapped, ClientFieldVariant, FieldOrPointer,
+    output_type_annotation, selection_map_wrapped, ClientFieldOrPointer, ClientFieldVariant,
     FieldTraversalResult, NameAndArguments, NormalizationKey, OutputFormat, RequiresRefinement,
     Schema, SchemaObject, SchemaServerFieldVariant, UserWrittenComponentVariant,
     ValidatedClientField, ValidatedScalarFieldAssociatedData, ValidatedSchema,

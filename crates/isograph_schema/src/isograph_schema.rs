@@ -19,7 +19,7 @@ use crate::{
     field_and_pointer::{ClientField, ClientPointer},
     schema_scalar_and_object::{SchemaObject, SchemaScalar, SchemaType},
     schema_validation_state::SchemaValidationState,
-    NormalizationKey, OutputFormat, SelectionTypeId, ServerFieldTypeAssociatedData,
+    ClientFieldOrPointerId, NormalizationKey, OutputFormat, ServerFieldTypeAssociatedData,
 };
 
 lazy_static! {
@@ -227,7 +227,7 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     #[allow(clippy::type_complexity)]
     pub fn client_type(
         &self,
-        client_type_id: SelectionTypeId,
+        client_type_id: ClientFieldOrPointerId,
     ) -> SelectionType<
         &ClientField<
             TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,

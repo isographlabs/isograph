@@ -11,8 +11,8 @@ use isograph_lang_types::{
 
 use crate::{ClientFieldVariant, OutputFormat, RefetchStrategy};
 
-pub type FieldOrPointerName = SelectionType<SelectableFieldName, ClientPointerFieldName>;
-pub type SelectionTypeId = SelectionType<ClientFieldId, ClientPointerId>;
+pub type ClientFieldOrPointerName = SelectionType<SelectableFieldName, ClientPointerFieldName>;
+pub type ClientFieldOrPointerId = SelectionType<ClientFieldId, ClientPointerId>;
 
 #[derive(Debug)]
 pub struct ClientField<
@@ -95,15 +95,15 @@ pub struct ClientPointer<
 }
 
 #[impl_for_selection_type]
-pub trait FieldOrPointer<
+pub trait ClientFieldOrPointer<
     TSelectionTypeSelectionScalarFieldAssociatedData,
     TSelectionTypeSelectionLinkedFieldAssociatedData,
     TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
 >
 {
     fn description(&self) -> Option<DescriptionValue>;
-    fn name(&self) -> FieldOrPointerName;
-    fn id(&self) -> SelectionTypeId;
+    fn name(&self) -> ClientFieldOrPointerName;
+    fn id(&self) -> ClientFieldOrPointerId;
     fn type_and_field(&self) -> ObjectTypeAndFieldName;
     fn parent_object_id(&self) -> ServerObjectId;
     // the following are unsupported, for now, because the return values include a generic
@@ -143,7 +143,7 @@ impl<
         TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
         TOutputFormat: OutputFormat,
     >
-    FieldOrPointer<
+    ClientFieldOrPointer<
         TSelectionTypeSelectionScalarFieldAssociatedData,
         TSelectionTypeSelectionLinkedFieldAssociatedData,
         TClientFieldVariableDefinitionAssociatedData,
@@ -159,11 +159,11 @@ impl<
         self.description
     }
 
-    fn name(&self) -> FieldOrPointerName {
+    fn name(&self) -> ClientFieldOrPointerName {
         SelectionType::Scalar(self.name)
     }
 
-    fn id(&self) -> SelectionTypeId {
+    fn id(&self) -> ClientFieldOrPointerId {
         SelectionType::Scalar(self.id)
     }
 
@@ -231,7 +231,7 @@ impl<
         TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
         TOutputFormat: OutputFormat,
     >
-    FieldOrPointer<
+    ClientFieldOrPointer<
         TSelectionTypeSelectionScalarFieldAssociatedData,
         TSelectionTypeSelectionLinkedFieldAssociatedData,
         TClientFieldVariableDefinitionAssociatedData,
@@ -247,11 +247,11 @@ impl<
         self.description
     }
 
-    fn name(&self) -> FieldOrPointerName {
+    fn name(&self) -> ClientFieldOrPointerName {
         SelectionType::Object(self.name)
     }
 
-    fn id(&self) -> SelectionTypeId {
+    fn id(&self) -> ClientFieldOrPointerId {
         SelectionType::Object(self.id)
     }
 

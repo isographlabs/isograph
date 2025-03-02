@@ -11,7 +11,7 @@ use isograph_lang_types::{
     ServerStrongIdFieldId,
 };
 
-use crate::{OutputFormat, SelectionTypeId};
+use crate::{ClientFieldOrPointerId, OutputFormat};
 
 /// A scalar type in the schema.
 #[derive(Debug)]
@@ -35,7 +35,7 @@ pub struct SchemaObject<TOutputFormat: OutputFormat> {
     /// to something else.
     pub id_field: Option<ServerStrongIdFieldId>,
     pub encountered_fields:
-        BTreeMap<SelectableFieldName, DefinitionLocation<ServerFieldId, SelectionTypeId>>,
+        BTreeMap<SelectableFieldName, DefinitionLocation<ServerFieldId, ClientFieldOrPointerId>>,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 

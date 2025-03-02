@@ -2,7 +2,7 @@ use common_lang_types::WithSpan;
 use isograph_lang_types::{DefinitionLocation, ServerFieldSelection};
 
 use crate::{
-    FieldOrPointer, OutputFormat, ValidatedClientField, ValidatedSchema, ValidatedSelection,
+    ClientFieldOrPointer, OutputFormat, ValidatedClientField, ValidatedSchema, ValidatedSelection,
     ValidatedSelectionType,
 };
 

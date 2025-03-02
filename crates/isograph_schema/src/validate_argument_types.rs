@@ -16,7 +16,7 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    as_server_field, OutputFormat, SchemaObject, SelectionTypeId, ServerFieldData,
+    as_server_field, ClientFieldOrPointerId, OutputFormat, SchemaObject, ServerFieldData,
     ValidateSchemaError, ValidateSchemaResult, ValidatedSchemaServerField,
     ValidatedVariableDefinition,
 };
@@ -402,7 +402,7 @@ fn get_non_nullable_missing_and_provided_fields<TOutputFormat: OutputFormat>(
 fn validate_no_extraneous_fields(
     object_fields: &BTreeMap<
         SelectableFieldName,
-        DefinitionLocation<ServerFieldId, SelectionTypeId>,
+        DefinitionLocation<ServerFieldId, ClientFieldOrPointerId>,
     >,
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     location: Location,

@@ -20,18 +20,19 @@ use lazy_static::lazy_static;
 use crate::{
     get_all_errors_or_all_ok, get_all_errors_or_all_ok_as_hashmap, get_all_errors_or_all_ok_iter,
     get_all_errors_or_tuple_ok, validate_argument_types::value_satisfies_type, ClientField,
-    ClientPointer, OutputFormat, RefetchStrategy, SchemaObject, SelectionTypeId, ServerFieldData,
-    UnvalidatedClientField, UnvalidatedClientPointer, UnvalidatedLinkedFieldSelection,
-    UnvalidatedRefetchFieldStrategy, UnvalidatedVariableDefinition, ValidateSchemaError,
-    ValidateSchemaResult, ValidatedClientField, ValidatedClientPointer,
-    ValidatedLinkedFieldAssociatedData, ValidatedLinkedFieldSelection,
+    ClientFieldOrPointerId, ClientPointer, OutputFormat, RefetchStrategy, SchemaObject,
+    ServerFieldData, UnvalidatedClientField, UnvalidatedClientPointer,
+    UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy,
+    UnvalidatedVariableDefinition, ValidateSchemaError, ValidateSchemaResult, ValidatedClientField,
+    ValidatedClientPointer, ValidatedLinkedFieldAssociatedData, ValidatedLinkedFieldSelection,
     ValidatedRefetchFieldStrategy, ValidatedScalarFieldAssociatedData,
     ValidatedScalarFieldSelection, ValidatedSchemaServerField, ValidatedSelection,
     ValidatedVariableDefinition,
 };
 
 type UsedVariables = BTreeSet<VariableName>;
-type SelectionTypeArgsMap = HashMap<SelectionTypeId, Vec<WithSpan<ValidatedVariableDefinition>>>;
+type SelectionTypeArgsMap =
+    HashMap<ClientFieldOrPointerId, Vec<WithSpan<ValidatedVariableDefinition>>>;
 
 type ClientPointerTargetTypeMap = HashMap<ClientPointerId, ServerObjectId>;
 

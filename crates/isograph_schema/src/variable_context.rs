@@ -8,8 +8,8 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ClientField, ClientPointer, FieldOrPointer, NameAndArguments, OutputFormat, SchemaServerField,
-    ValidatedVariableDefinition,
+    ClientField, ClientFieldOrPointer, ClientPointer, NameAndArguments, OutputFormat,
+    SchemaServerField, ValidatedVariableDefinition,
 };
 
 #[derive(Debug)]

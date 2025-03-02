@@ -5,7 +5,7 @@ use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
-    initial_variable_context, FieldOrPointer, OutputFormat, RefetchedPathsMap,
+    initial_variable_context, ClientFieldOrPointer, OutputFormat, RefetchedPathsMap,
     ServerFieldTypeAssociatedDataInlineFragment, UserWrittenClientFieldInfo,
     UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema, ValidatedSchemaServerField,
     ValidatedSelectionType,

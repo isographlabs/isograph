@@ -5,7 +5,7 @@ use std::cmp::Ordering;
 
 use common_lang_types::{ArtifactPathAndContent, IsoLiteralText, SelectableFieldName};
 use isograph_schema::{
-    ClientFieldVariant, FieldOrPointer, OutputFormat, UserWrittenComponentVariant,
+    ClientFieldOrPointer, ClientFieldVariant, OutputFormat, UserWrittenComponentVariant,
     ValidatedClientField, ValidatedSchema, ValidatedSelectionType,
 };
 

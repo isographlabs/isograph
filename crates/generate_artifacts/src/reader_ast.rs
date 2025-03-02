@@ -6,8 +6,8 @@ use isograph_lang_types::{
     ScalarFieldSelectionDirectiveSet, SelectionType, ServerFieldSelection,
 };
 use isograph_schema::{
-    categorize_field_loadability, transform_arguments_with_child_context, ClientFieldVariant,
-    FieldOrPointer, Loadability, NameAndArguments, NormalizationKey, OutputFormat,
+    categorize_field_loadability, transform_arguments_with_child_context, ClientFieldOrPointer,
+    ClientFieldVariant, Loadability, NameAndArguments, NormalizationKey, OutputFormat,
     PathToRefetchField, RefetchedPathsMap, SchemaServerFieldVariant, ValidatedClientField,
     ValidatedLinkedFieldSelection, ValidatedScalarFieldSelection, ValidatedSchema,
     ValidatedSelection, VariableContext,
