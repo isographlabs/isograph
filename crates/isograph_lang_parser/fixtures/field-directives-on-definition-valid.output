@@ -16,8 +16,8 @@ Ok(
                                     "Type",
                                 ),
                                 span: Span {
-                                    start: 9,
-                                    end: 13,
+                                    start: 10,
+                                    end: 14,
                                 },
                             },
                             client_field_name: WithSpan {
@@ -25,8 +25,8 @@ Ok(
                                     "Name",
                                 ),
                                 span: Span {
-                                    start: 14,
-                                    end: 18,
+                                    start: 15,
+                                    end: 19,
                                 },
                             },
                             description: None,
@@ -39,15 +39,15 @@ Ok(
                                                 "component",
                                             ),
                                             span: Span {
-                                                start: 20,
-                                                end: 29,
+                                                start: 21,
+                                                end: 30,
                                             },
                                         },
                                         arguments: [],
                                     },
                                     span: Span {
-                                        start: 19,
-                                        end: 29,
+                                        start: 20,
+                                        end: 30,
                                     },
                                 },
                             ],
@@ -58,21 +58,21 @@ Ok(
                             field_keyword: WithSpan {
                                 item: (),
                                 span: Span {
-                                    start: 3,
-                                    end: 8,
+                                    start: 4,
+                                    end: 9,
                                 },
                             },
                             dot: WithSpan {
                                 item: (),
                                 span: Span {
-                                    start: 13,
-                                    end: 14,
+                                    start: 14,
+                                    end: 15,
                                 },
                             },
                         },
                         span: Span {
-                            start: 9,
-                            end: 35,
+                            start: 10,
+                            end: 37,
                         },
                     },
                 ),
@@ -84,7 +84,7 @@ Ok(
                     span: Some(
                         Span {
                             start: 31,
-                            end: 67,
+                            end: 70,
                         },
                     ),
                 },
