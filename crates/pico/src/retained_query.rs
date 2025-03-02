@@ -2,7 +2,7 @@ use dashmap::Entry;
 
 use crate::{Database, DerivedNodeId, MemoRef};
 
-/// Calling [`db.retain(&memoized_result)`][Database::retain] returns a
+/// Calling [`db.retain(memoized_result)`][Database::retain] returns a
 /// [`RetainedQuery`] object. **This object acts as a temporary guard**
 /// — as long as it exists, the memoized function and its dependencies
 /// will not be garbage collected.
@@ -43,7 +43,7 @@ impl std::ops::Drop for RetainedQuery {
 }
 
 impl Database {
-    pub fn retain<'db, T>(&'db self, memo_ref: &MemoRef<'db, T>) -> RetainedQuery {
+    pub fn retain<T>(&self, memo_ref: MemoRef<T>) -> RetainedQuery {
         debug_assert!(std::ptr::eq(self, memo_ref.db));
         match self.retained_calls.entry(memo_ref.derived_node_id) {
             Entry::Occupied(mut occupied_entry) => {

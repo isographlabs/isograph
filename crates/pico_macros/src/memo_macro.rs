@@ -2,10 +2,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{
-    parse_macro_input, parse_quote, Error, FnArg, GenericParam, ItemFn, Lifetime, PatType,
-    ReturnType, Signature,
-};
+use syn::{parse_macro_input, parse_quote, Error, FnArg, ItemFn, PatType, ReturnType, Signature};
 
 pub(crate) fn memo(_args: TokenStream, item: TokenStream) -> TokenStream {
     let ItemFn {
@@ -66,13 +63,9 @@ pub(crate) fn memo(_args: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     let mut new_sig = sig.clone();
-    let lifetime = get_or_create_fn_lifetime(&mut new_sig);
-    if let Err(e) = check_db_lifetime(&mut new_sig.inputs[0], lifetime.clone()) {
-        return e.to_compile_error().into();
-    }
     new_sig.output = ReturnType::Type(
         parse_quote!(->),
-        Box::new(parse_quote!(::pico::MemoRef<#lifetime, #return_type>)),
+        Box::new(parse_quote!(::pico::MemoRef<#return_type>)),
     );
 
     let extract_parameters = args
@@ -186,38 +179,4 @@ fn type_is(ty: &syn::Type, target: &'static str) -> bool {
         }
     }
     false
-}
-
-fn get_or_create_fn_lifetime(sig: &mut Signature) -> Lifetime {
-    sig.generics
-        .params
-        .iter()
-        .find_map(|param| match param {
-            GenericParam::Lifetime(lt) => Some(lt.lifetime.clone()),
-            _ => None,
-        })
-        .unwrap_or_else(|| {
-            sig.generics.params.push(parse_quote!('db));
-            parse_quote!('db)
-        })
-}
-
-fn check_db_lifetime(arg: &mut FnArg, lifetime: Lifetime) -> Result<(), syn::Error> {
-    if let FnArg::Typed(PatType { ty, .. }) = arg {
-        if let syn::Type::Reference(ref mut reference) = **ty {
-            if let Some(db_lifetime) = &reference.lifetime {
-                if db_lifetime != &lifetime {
-                    return Err(Error::new_spanned(
-                        ty,
-                        format!("Expected lifetime {lifetime}"),
-                    ));
-                }
-            } else {
-                reference.lifetime = Some(lifetime);
-            }
-        } else {
-            return Err(Error::new_spanned(ty, "Expected a reference"));
-        }
-    }
-    Ok(())
 }

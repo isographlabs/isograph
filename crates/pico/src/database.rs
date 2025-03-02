@@ -1,4 +1,4 @@
-use std::{any::Any, num::NonZeroUsize};
+use std::{any::Any, hash::Hash, num::NonZeroUsize};
 
 use crate::{
     dependency::{Dependency, DependencyStack, NodeKind},
@@ -6,7 +6,9 @@ use crate::{
     epoch::Epoch,
     index::Index,
     intern::{Key, ParamId},
+    macro_fns::{get_param, init_param_vec, intern_borrowed_param, intern_owned_param},
     source::{Source, SourceId, SourceNode},
+    InnerFn, MemoRef,
 };
 use boxcar::Vec as BoxcarVec;
 use dashmap::{DashMap, Entry};
@@ -131,6 +133,16 @@ impl Database {
             self.dependency_stack.is_empty(),
             "Cannot modify database while a memoized function is being invoked."
         );
+    }
+
+    pub fn intern<T: Clone + Hash + DynEq + 'static>(&self, value: T) -> MemoRef<T> {
+        let param_id = intern_owned_param(self, value);
+        intern_from_param(self, param_id)
+    }
+
+    pub fn intern_ref<T: Clone + Hash + DynEq + 'static>(&self, value: &T) -> MemoRef<T> {
+        let param_id = intern_borrowed_param(self, value);
+        intern_from_param(self, param_id)
     }
 }
 
@@ -273,4 +285,20 @@ impl Default for Database {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn intern_from_param<T: Clone + DynEq>(db: &Database, param_id: ParamId) -> MemoRef<T> {
+    let mut param_ids = init_param_vec();
+    param_ids.push(param_id);
+    let derived_node_id = DerivedNodeId::new(param_id.inner().into(), param_ids);
+    db.execute_memoized_function(
+        derived_node_id,
+        InnerFn::new(|db, derived_node_id| {
+            let param = get_param(db, derived_node_id.params[0])?
+                .downcast_ref::<T>()
+                .expect("Unexpected param type. This is indicative of a bug in Pico.");
+            Some(Box::new(param.clone()))
+        }),
+    );
+    MemoRef::new(db, derived_node_id)
 }
