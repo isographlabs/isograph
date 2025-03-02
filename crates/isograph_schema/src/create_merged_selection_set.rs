@@ -847,13 +847,13 @@ fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
                                                 );
 
                                                 create_merged_selection_map_for_field_and_insert_into_global_map(
-                                            schema,
-                                            parent_type,
-                                            &linked_field_selection.selection_set,
-                                            encountered_client_field_map,
-                                            DefinitionLocation::Server(inline_fragment_variant.server_field_id),
-                                            &server_field.initial_variable_context()
-                                        );
+                                                    schema,
+                                                    parent_type,
+                                                    &linked_field_selection.selection_set,
+                                                    encountered_client_field_map,
+                                                    DefinitionLocation::Server(inline_fragment_variant.server_field_id),
+                                                    &server_field.initial_variable_context()
+                                                );
                                             }
                                         }
                                     }
