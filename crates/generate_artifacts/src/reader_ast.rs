@@ -1,14 +1,15 @@
 use std::collections::{BTreeSet, HashSet};
 
-use common_lang_types::{ObjectTypeAndFieldName, SelectableFieldName, WithSpan};
+use common_lang_types::{ClientScalarSelectableName, ObjectTypeAndFieldName, WithSpan};
 use isograph_lang_types::{
-    DefinitionLocation, EmptyDirectiveSet, LoadableDirectiveParameters, RefetchQueryIndex,
-    ScalarFieldSelectionDirectiveSet, SelectionType, ServerFieldSelection,
+    DefinitionLocation, EmptyDirectiveSet, LoadableDirectiveParameters,
+    ObjectSelectionDirectiveSet, RefetchQueryIndex, ScalarSelectionDirectiveSet, SelectionType,
+    ServerFieldSelection,
 };
 use isograph_schema::{
-    categorize_field_loadability, transform_arguments_with_child_context, ClientFieldVariant,
-    Loadability, NameAndArguments, NormalizationKey, OutputFormat, PathToRefetchField,
-    RefetchedPathsMap, SchemaServerFieldVariant, ValidatedClientField,
+    categorize_field_loadability, transform_arguments_with_child_context, ClientFieldOrPointer,
+    ClientFieldVariant, Loadability, NameAndArguments, NormalizationKey, OutputFormat,
+    PathToRefetchField, RefetchedPathsMap, SchemaServerFieldVariant, ValidatedClientField,
     ValidatedLinkedFieldSelection, ValidatedScalarFieldSelection, ValidatedSchema,
     ValidatedSelection, VariableContext,
 };
@@ -161,7 +162,7 @@ fn linked_field_ast_node<TOutputFormat: OutputFormat>(
 
     let is_updatable = matches!(
         linked_field.associated_data.selection_variant,
-        ScalarFieldSelectionDirectiveSet::Updatable(_)
+        ObjectSelectionDirectiveSet::Updatable(_)
     );
 
     format!(
@@ -345,7 +346,7 @@ fn imperatively_loaded_variant_ast_node<TOutputFormat: OutputFormat>(
     let refetch_query_index = find_imperatively_fetchable_query_index(
         root_refetched_paths,
         path,
-        scalar_field_selection.name.item.into(),
+        scalar_field_selection.name.item.unchecked_conversion(),
     )
     .0;
 
@@ -465,7 +466,7 @@ fn server_defined_scalar_field_ast_node(
     );
     let is_updatable = matches!(
         scalar_field_selection.associated_data.selection_variant,
-        ScalarFieldSelectionDirectiveSet::Updatable(_)
+        ScalarSelectionDirectiveSet::Updatable(_)
     );
     let indent_1 = "  ".repeat(indentation_level as usize);
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
@@ -483,7 +484,7 @@ fn server_defined_scalar_field_ast_node(
 
 fn generate_reader_ast_with_path<'schema, TOutputFormat: OutputFormat>(
     schema: &'schema ValidatedSchema<TOutputFormat>,
-    selection_set: &'schema Vec<WithSpan<ValidatedSelection>>,
+    selection_set: &'schema [WithSpan<ValidatedSelection>],
     indentation_level: u8,
     nested_client_field_imports: &mut ReaderImports,
     // N.B. this is not root_refetched_paths when we're generating a non-fetchable client field :(
@@ -543,7 +544,7 @@ fn get_nested_refetch_query_text(
 fn find_imperatively_fetchable_query_index(
     paths: &RefetchedPathsMap,
     outer_path: &[NormalizationKey],
-    imperatively_fetchable_field_name: SelectableFieldName,
+    imperatively_fetchable_field_name: ClientScalarSelectableName,
 ) -> RefetchQueryIndex {
     paths
         .iter()
@@ -562,7 +563,7 @@ fn find_imperatively_fetchable_query_index(
 
 pub(crate) fn generate_reader_ast<'schema, TOutputFormat: OutputFormat>(
     schema: &'schema ValidatedSchema<TOutputFormat>,
-    selection_set: &'schema Vec<WithSpan<ValidatedSelection>>,
+    selection_set: &'schema [WithSpan<ValidatedSelection>],
     indentation_level: u8,
     // N.B. this is not root_refetched_paths when we're generating an entrypoint :(
     // ????
@@ -644,9 +645,7 @@ fn refetched_paths_with_path<TOutputFormat: OutputFormat>(
                                     &initial_variable_context.child_variable_context(
                                         &scalar_field_selection.arguments,
                                         &client_field.variable_definitions,
-                                        &ScalarFieldSelectionDirectiveSet::None(
-                                            EmptyDirectiveSet {},
-                                        ),
+                                        &ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
                                     ),
                                 );
 

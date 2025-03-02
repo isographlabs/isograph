@@ -22,7 +22,7 @@ Err(
         ),
         item: UnableToDeserializeDirectives {
             message: Custom(
-                "data did not match any variant of untagged enum ScalarFieldSelectionDirectiveSet",
+                "data did not match any variant of untagged enum ScalarSelectionDirectiveSet",
             ),
         },
     },
@@ -30,7 +30,7 @@ Err(
 
 Unable to process directives. Message: Error when deserializing.
 
-data did not match any variant of untagged enum ScalarFieldSelectionDirectiveSet
+data did not match any variant of untagged enum ScalarSelectionDirectiveSet
 crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js
 
   field Type.Name {
@@ -63,7 +63,7 @@ Err(
         ),
         item: UnableToDeserializeDirectives {
             message: Custom(
-                "data did not match any variant of untagged enum LinkedFieldSelectionDirectiveSet",
+                "data did not match any variant of untagged enum ObjectSelectionDirectiveSet",
             ),
         },
     },
@@ -71,7 +71,7 @@ Err(
 
 Unable to process directives. Message: Error when deserializing.
 
-data did not match any variant of untagged enum LinkedFieldSelectionDirectiveSet
+data did not match any variant of untagged enum ObjectSelectionDirectiveSet
 crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js
 
   field Type.Name {
@@ -104,7 +104,7 @@ Err(
         ),
         item: UnableToDeserializeDirectives {
             message: Custom(
-                "data did not match any variant of untagged enum LinkedFieldSelectionDirectiveSet",
+                "data did not match any variant of untagged enum ObjectSelectionDirectiveSet",
             ),
         },
     },
@@ -112,7 +112,7 @@ Err(
 
 Unable to process directives. Message: Error when deserializing.
 
-data did not match any variant of untagged enum LinkedFieldSelectionDirectiveSet
+data did not match any variant of untagged enum ObjectSelectionDirectiveSet
 crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js
 
   field Type.Name {
@@ -145,7 +145,7 @@ Err(
         ),
         item: UnableToDeserializeDirectives {
             message: Custom(
-                "data did not match any variant of untagged enum LinkedFieldSelectionDirectiveSet",
+                "data did not match any variant of untagged enum ObjectSelectionDirectiveSet",
             ),
         },
     },
@@ -153,7 +153,7 @@ Err(
 
 Unable to process directives. Message: Error when deserializing.
 
-data did not match any variant of untagged enum LinkedFieldSelectionDirectiveSet
+data did not match any variant of untagged enum ObjectSelectionDirectiveSet
 crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js
 
   field Type.Name {

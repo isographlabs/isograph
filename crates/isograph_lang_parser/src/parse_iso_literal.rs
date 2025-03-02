@@ -1,6 +1,7 @@
 use common_lang_types::{
-    ClientPointerFieldName, IsoLiteralText, Location, RelativePathToSourceFile, ScalarFieldName,
-    Span, TextSource, UnvalidatedTypeName, ValueKeyName, WithLocation, WithSpan,
+    ClientObjectSelectableName, ClientScalarSelectableName, IsoLiteralText, Location,
+    RelativePathToSourceFile, Span, TextSource, UnvalidatedTypeName, ValueKeyName, WithLocation,
+    WithSpan,
 };
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
@@ -152,7 +153,7 @@ fn parse_client_field_declaration_inner(
             .parse_token_of_kind(IsographLangTokenKind::Period)
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
-        let client_field_name: WithSpan<ScalarFieldName> = tokens
+        let client_field_name: WithSpan<ClientScalarSelectableName> = tokens
             .parse_string_key_type(IsographLangTokenKind::Identifier)
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
@@ -254,7 +255,7 @@ fn parse_client_pointer_declaration_inner(
             .parse_token_of_kind(IsographLangTokenKind::Period)
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
-        let client_pointer_name: WithSpan<ClientPointerFieldName> = tokens
+        let client_pointer_name: WithSpan<ClientObjectSelectableName> = tokens
             .parse_string_key_type(IsographLangTokenKind::Identifier)
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
@@ -334,7 +335,7 @@ fn parse_optional_selection_set(
         if !encountered_names_or_aliases.insert(selection_name_or_alias) {
             // We have already encountered this name or alias, so we emit
             // an error.
-            // TODO should SelectionSet be a HashMap<FieldNameOrAlias, ...> instead of
+            // TODO should SelectionSet be a HashMap<SelectableNameOrAlias, ...> instead of
             // a Vec??
             // TODO find a way to include the location of the previous field with matching
             // name or alias

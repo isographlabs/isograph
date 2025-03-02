@@ -1,21 +1,18 @@
 use common_lang_types::WithSpan;
-use isograph_lang_types::{DefinitionLocation, SelectionType, ServerFieldSelection};
+use isograph_lang_types::{DefinitionLocation, ServerFieldSelection};
 
 use crate::{
-    selection_set_for_parent_query, OutputFormat, ValidatedClientField, ValidatedClientPointer,
-    ValidatedSchema, ValidatedSelection,
+    ClientFieldOrPointer, OutputFormat, ValidatedClientField, ValidatedSchema, ValidatedSelection,
+    ValidatedSelectionType,
 };
 
 // This should really be replaced with a proper visitor, or something
 pub fn accessible_client_fields<'a, TOutputFormat: OutputFormat>(
-    selection_type: &'a SelectionType<
-        &'a ValidatedClientField<TOutputFormat>,
-        &'a ValidatedClientPointer<TOutputFormat>,
-    >,
+    selection_type: &'a ValidatedSelectionType<'a, TOutputFormat>,
     schema: &'a ValidatedSchema<TOutputFormat>,
 ) -> impl Iterator<Item = &'a ValidatedClientField<TOutputFormat>> + 'a {
     AccessibleClientFieldIterator {
-        selection_set: selection_set_for_parent_query(selection_type),
+        selection_set: selection_type.selection_set_for_parent_query(),
         index: 0,
         schema,
         sub_iterator: None,

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    IsographObjectTypeName, Location, SelectableFieldName, StringLiteralValue, VariableName,
+    IsographObjectTypeName, Location, SelectableName, StringLiteralValue, VariableName,
     WithLocation,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
@@ -33,7 +33,7 @@ impl ArgumentMap {
         field_map_item: FieldMapItem,
         primary_type_name: IsographObjectTypeName,
         mutation_object_name: IsographObjectTypeName,
-        mutation_field_name: SelectableFieldName,
+        mutation_field_name: SelectableName,
         schema: &mut UnvalidatedSchema<TOutputFormat>,
     ) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem> {
         let split_to_arg = field_map_item.split_to_arg();
@@ -150,7 +150,7 @@ enum PotentiallyModifiedArgument {
 /// only deleted.
 #[derive(Debug)]
 pub(crate) struct ModifiedObject {
-    field_map: HashMap<SelectableFieldName, PotentiallyModifiedField>,
+    field_map: HashMap<SelectableName, PotentiallyModifiedField>,
 }
 
 #[derive(Debug)]

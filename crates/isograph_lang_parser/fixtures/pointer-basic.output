@@ -35,7 +35,7 @@ Ok(
                                 ),
                             ),
                             client_pointer_name: WithSpan {
-                                item: ClientPointerFieldName(
+                                item: ClientObjectSelectableName(
                                     "bestFriend",
                                 ),
                                 span: Span {
@@ -69,7 +69,7 @@ Ok(
                                                         },
                                                     },
                                                 ),
-                                                item: LinkedFieldName(
+                                                item: ServerObjectSelectableName(
                                                     "friends",
                                                 ),
                                             },
@@ -102,7 +102,7 @@ Ok(
                                                                         },
                                                                     },
                                                                 ),
-                                                                item: ScalarFieldName(
+                                                                item: ScalarSelectableName(
                                                                     "id",
                                                                 ),
                                                             },
@@ -142,7 +142,7 @@ Ok(
                                                                         },
                                                                     },
                                                                 ),
-                                                                item: ScalarFieldName(
+                                                                item: ScalarSelectableName(
                                                                     "closeness",
                                                                 ),
                                                             },

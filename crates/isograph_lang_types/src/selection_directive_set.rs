@@ -8,7 +8,7 @@ pub struct UpdatableDirectiveParameters {}
 
 #[derive(Deserialize, Debug, Clone, PartialEq, PartialOrd, Ord, Eq, Copy, Hash)]
 #[serde(rename_all = "camelCase", untagged)]
-pub enum ScalarFieldSelectionDirectiveSet {
+pub enum ScalarSelectionDirectiveSet {
     Loadable(LoadableDirectiveSet),
     Updatable(UpdatableDirectiveSet),
     None(EmptyDirectiveSet),
@@ -16,7 +16,7 @@ pub enum ScalarFieldSelectionDirectiveSet {
 
 #[derive(Deserialize, Debug, Clone, PartialEq, PartialOrd, Ord, Eq, Copy, Hash)]
 #[serde(rename_all = "camelCase", untagged)]
-pub enum LinkedFieldSelectionDirectiveSet {
+pub enum ObjectSelectionDirectiveSet {
     Updatable(UpdatableDirectiveSet),
     None(EmptyDirectiveSet),
 }

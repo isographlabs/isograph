@@ -1,6 +1,6 @@
 use common_lang_types::{
-    DirectiveArgumentName, DirectiveName, IsographObjectTypeName, LinkedFieldName, Location,
-    ObjectTypeAndFieldName, SelectableFieldName, Span, StringLiteralValue, ValueKeyName,
+    DirectiveArgumentName, DirectiveName, IsographObjectTypeName, Location, ObjectTypeAndFieldName,
+    SelectableName, ServerObjectSelectableName, Span, StringLiteralValue, ValueKeyName,
     WithLocation, WithSpan,
 };
 use graphql_lang_types::{
@@ -9,7 +9,7 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
-    ScalarFieldSelection, ScalarFieldSelectionDirectiveSet, SelectableServerFieldId, SelectionType,
+    ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectableServerFieldId, SelectionType,
     ServerFieldId, ServerFieldSelection, ServerObjectId,
 };
 
@@ -43,7 +43,7 @@ lazy_static! {
 pub struct ExposeFieldDirective {
     #[serde(default)]
     #[serde(rename = "as")]
-    expose_as: Option<SelectableFieldName>,
+    expose_as: Option<SelectableName>,
     path: StringLiteralValue,
     #[serde(default)]
     field_map: Vec<FieldMapItem>,
@@ -52,7 +52,7 @@ pub struct ExposeFieldDirective {
 
 impl ExposeFieldDirective {
     pub fn new(
-        expose_as: Option<SelectableFieldName>,
+        expose_as: Option<SelectableName>,
         path: StringLiteralValue,
         field_map: Vec<FieldMapItem>,
         field: StringLiteralValue,
@@ -131,7 +131,8 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         // TODO do not use mutation naming here
         let mutation_field = self.server_field(mutation_subfield_id);
         let mutation_field_payload_type_name = *mutation_field.associated_data.type_name.inner();
-        let client_field_scalar_selection_name = expose_as.unwrap_or(mutation_field.name.item);
+        let client_field_scalar_selection_name =
+            expose_as.unwrap_or(mutation_field.name.item.into());
         // TODO what is going on here. Should mutation_field have a checked way of converting to LinkedField?
         let top_level_schema_field_name = mutation_field.name.item.lookup().intern().into();
         let mutation_field_arguments = mutation_field.arguments.clone();
@@ -160,7 +161,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 
             // TODO make this zero cost
             // TODO split path on .
-            let primary_field_name: LinkedFieldName = path.lookup().intern().into();
+            let primary_field_name: ServerObjectSelectableName = path.lookup().intern().into();
 
             let primary_field = payload_object
                 .encountered_fields
@@ -207,9 +208,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                             Location::generated(),
                         ),
                         reader_alias: None,
-                        associated_data: ScalarFieldSelectionDirectiveSet::None(
-                            EmptyDirectiveSet {},
-                        ),
+                        associated_data: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
                         // TODO what about arguments? How would we handle them?
                         arguments: vec![],
                     };
@@ -241,10 +240,9 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 
             let mutation_client_field = ClientField {
                 description,
-                // set_pet_best_friend
-                name: client_field_scalar_selection_name,
+                name: client_field_scalar_selection_name.unchecked_conversion(),
                 id: mutation_field_client_field_id,
-                reader_selection_set: None,
+                reader_selection_set: vec![],
 
                 variant: ClientFieldVariant::ImperativelyLoadedField(
                     ImperativelyLoadedFieldVariant {
@@ -312,7 +310,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     // TODO this should be defined elsewhere, probably
     pub fn insert_client_field_on_object(
         &mut self,
-        mutation_field_name: SelectableFieldName,
+        mutation_field_name: SelectableName,
         client_field_parent_object_id: ServerObjectId,
         client_field_id: ClientFieldId,
         payload_object_name: IsographObjectTypeName,
@@ -400,7 +398,7 @@ fn skip_arguments_contained_in_field_map<TOutputFormat: OutputFormat>(
     arguments: Vec<WithLocation<UnvalidatedVariableDefinition>>,
     primary_type_name: IsographObjectTypeName,
     mutation_object_name: IsographObjectTypeName,
-    mutation_field_name: SelectableFieldName,
+    mutation_field_name: SelectableName,
     field_map_items: Vec<FieldMapItem>,
 ) -> ProcessTypeDefinitionResult<Vec<ProcessedFieldMapItem>> {
     let mut processed_field_map_items = Vec::with_capacity(field_map_items.len());

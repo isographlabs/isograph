@@ -21,7 +21,7 @@ Ok(
                                 },
                             },
                             client_field_name: WithSpan {
-                                item: ScalarFieldName(
+                                item: ClientScalarSelectableName(
                                     "Name",
                                 ),
                                 span: Span {

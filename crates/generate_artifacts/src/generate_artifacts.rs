@@ -1,6 +1,6 @@
 use common_lang_types::{
     derive_display, ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent, DescriptionValue,
-    FieldNameOrAlias, Location, ObjectTypeAndFieldName, Span, WithLocation, WithSpan,
+    Location, ObjectTypeAndFieldName, SelectableNameOrAlias, Span, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
@@ -10,16 +10,17 @@ use intern::{string_key::Intern, Lookup};
 use core::panic;
 use isograph_config::CompilerConfig;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, NonConstantValue, ScalarFieldSelection,
-    ScalarFieldSelectionDirectiveSet, SelectableServerFieldId, SelectionType, ServerFieldSelection,
-    ServerObjectId, TypeAnnotation, UnionVariant, VariableDefinition,
+    ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, NonConstantValue,
+    ObjectSelectionDirectiveSet, ScalarFieldSelection, ScalarSelectionDirectiveSet,
+    SelectableServerFieldId, SelectionType, ServerFieldSelection, ServerObjectId, TypeAnnotation,
+    UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
     accessible_client_fields, as_server_field, description, get_provided_arguments,
-    output_type_annotation, selection_map_wrapped, selection_type_id, ClientFieldVariant,
+    output_type_annotation, selection_map_wrapped, ClientFieldOrPointer, ClientFieldVariant,
     FieldTraversalResult, NameAndArguments, NormalizationKey, OutputFormat, RequiresRefinement,
     Schema, SchemaObject, SchemaServerFieldVariant, UserWrittenComponentVariant,
-    ValidatedClientField, ValidatedScalarFieldAssociatedData, ValidatedSchema,
+    ValidatedClientField, ValidatedScalarSelectionAssociatedData, ValidatedSchema,
     ValidatedSchemaState, ValidatedSelection, ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -295,9 +296,9 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
             config.options.include_file_extensions_in_import_statements,
         ));
 
-        match encountered_client_type_map.get(&DefinitionLocation::Client(selection_type_id(
-            &user_written_client_type,
-        ))) {
+        match encountered_client_type_map
+            .get(&DefinitionLocation::Client(user_written_client_type.id()))
+        {
             Some(FieldTraversalResult {
                 traversal_state, ..
             }) => {
@@ -680,7 +681,7 @@ fn write_param_type_from_client_field<TOutputFormat: OutputFormat>(
     loadable_fields: &mut BTreeSet<ObjectTypeAndFieldName>,
     indentation_level: u8,
     link_fields: &mut bool,
-    scalar_field_selection: &ScalarFieldSelection<ValidatedScalarFieldAssociatedData>,
+    scalar_field_selection: &ScalarFieldSelection<ValidatedScalarSelectionAssociatedData>,
     client_field_id: ClientFieldId,
 ) {
     let client_field = schema.client_field(client_field_id);
@@ -709,9 +710,9 @@ fn write_param_type_from_client_field<TOutputFormat: OutputFormat>(
                 client_field.type_and_field.underscore_separated()
             );
             let output_type = match scalar_field_selection.associated_data.selection_variant {
-                ScalarFieldSelectionDirectiveSet::Updatable(_)
-                | ScalarFieldSelectionDirectiveSet::None(_) => inner_output_type,
-                ScalarFieldSelectionDirectiveSet::Loadable(_) => {
+                ScalarSelectionDirectiveSet::Updatable(_)
+                | ScalarSelectionDirectiveSet::None(_) => inner_output_type,
+                ScalarSelectionDirectiveSet::Loadable(_) => {
                     loadable_fields.insert(client_field.type_and_field);
                     let provided_arguments = get_provided_arguments(
                         client_field.variable_definitions.iter().map(|x| &x.item),
@@ -798,7 +799,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                     };
 
                     match scalar_field_selection.associated_data.selection_variant {
-                        ScalarFieldSelectionDirectiveSet::Updatable(_) => {
+                        ScalarSelectionDirectiveSet::Updatable(_) => {
                             *updatable_fields = true;
                             query_type_declaration
                                 .push_str(&"  ".repeat(indentation_level as usize).to_string());
@@ -808,10 +809,10 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                                 print_javascript_type_declaration(&output_type)
                             ));
                         }
-                        ScalarFieldSelectionDirectiveSet::Loadable(_) => {
+                        ScalarSelectionDirectiveSet::Loadable(_) => {
                             panic!("@loadable server fields are not supported")
                         }
-                        ScalarFieldSelectionDirectiveSet::None(_) => {
+                        ScalarSelectionDirectiveSet::None(_) => {
                             query_type_declaration.push_str(&format!(
                                 "{}readonly {}: {},\n",
                                 "  ".repeat(indentation_level as usize),
@@ -865,10 +866,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                     });
 
             match linked_field.associated_data.selection_variant {
-                ScalarFieldSelectionDirectiveSet::Loadable(_) => {
-                    panic!("@loadable server fields are not supported")
-                }
-                ScalarFieldSelectionDirectiveSet::Updatable(_) => {
+                ObjectSelectionDirectiveSet::Updatable(_) => {
                     *updatable_fields = true;
                     write_getter_and_setter(
                         query_type_declaration,
@@ -878,7 +876,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                         &type_annotation,
                     );
                 }
-                ScalarFieldSelectionDirectiveSet::None(_) => {
+                ObjectSelectionDirectiveSet::None(_) => {
                     query_type_declaration.push_str(&format!(
                         "readonly {}: {},\n",
                         name_or_alias,
@@ -893,7 +891,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
 fn write_getter_and_setter(
     query_type_declaration: &mut String,
     indentation_level: u8,
-    name_or_alias: FieldNameOrAlias,
+    name_or_alias: SelectableNameOrAlias,
     output_type_annotation: TypeAnnotation<ServerObjectId>,
     type_annotation: &TypeAnnotation<ClientFieldUpdatableDataType>,
 ) {

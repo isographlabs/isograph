@@ -22,7 +22,7 @@ Err(
         ),
         item: UnableToDeserializeDirectives {
             message: Custom(
-                "data did not match any variant of untagged enum LinkedFieldSelectionDirectiveSet",
+                "data did not match any variant of untagged enum ObjectSelectionDirectiveSet",
             ),
         },
     },
@@ -30,7 +30,7 @@ Err(
 
 Unable to process directives. Message: Error when deserializing.
 
-data did not match any variant of untagged enum LinkedFieldSelectionDirectiveSet
+data did not match any variant of untagged enum ObjectSelectionDirectiveSet
 crates/isograph_lang_parser/fixtures/field-directives-on-linked-valid.input.js
 
   field Type.Name {

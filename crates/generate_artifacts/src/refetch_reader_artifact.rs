@@ -4,8 +4,8 @@ use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
-    initial_variable_context, FieldMapItem, OutputFormat, PrimaryFieldInfo, RefetchedPathsMap,
-    ValidatedClientField, ValidatedSchema,
+    initial_variable_context, ClientFieldOrPointer, FieldMapItem, OutputFormat, PrimaryFieldInfo,
+    RefetchedPathsMap, ValidatedClientField, ValidatedSchema,
 };
 
 use crate::{
@@ -78,7 +78,7 @@ pub(crate) fn generate_refetch_reader_artifact<TOutputFormat: OutputFormat>(
         file_content: reader_content,
         type_and_field: Some(ObjectTypeAndFieldName {
             type_name: parent_type.name,
-            field_name: client_field.name,
+            field_name: client_field.name.into(),
         }),
     }
 }
@@ -111,7 +111,7 @@ pub(crate) fn generate_refetch_output_type_artifact<TOutputFormat: OutputFormat>
         file_content: output_type_text,
         type_and_field: Some(ObjectTypeAndFieldName {
             type_name: parent_type.name,
-            field_name: client_field.name,
+            field_name: client_field.name.into(),
         }),
     }
 }

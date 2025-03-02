@@ -3,9 +3,9 @@ use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::SelectionType;
 use std::cmp::Ordering;
 
-use common_lang_types::{ArtifactPathAndContent, IsoLiteralText, SelectableFieldName};
+use common_lang_types::{ArtifactPathAndContent, IsoLiteralText, SelectableName};
 use isograph_schema::{
-    type_and_field, ClientFieldVariant, OutputFormat, UserWrittenComponentVariant,
+    ClientFieldOrPointer, ClientFieldVariant, OutputFormat, UserWrittenComponentVariant,
     ValidatedClientField, ValidatedSchema, ValidatedSelectionType,
 };
 
@@ -51,9 +51,9 @@ fn build_iso_overload_for_client_defined_type<TOutputFormat: OutputFormat>(
     let mut s: String = "".to_string();
     let import = format!(
         "import {{ type {}__param }} from './{}/{}/param_type{}';\n",
-        type_and_field(&client_type).underscore_separated(),
-        type_and_field(&client_type).type_name,
-        type_and_field(&client_type).field_name,
+        client_type.type_and_field().underscore_separated(),
+        client_type.type_and_field().type_name,
+        client_type.type_and_field().field_name,
         file_extensions.ts()
     );
     let formatted_field = format!(
@@ -62,8 +62,8 @@ fn build_iso_overload_for_client_defined_type<TOutputFormat: OutputFormat>(
             SelectionType::Scalar(_) => "field",
             SelectionType::Object(_) => "pointer",
         },
-        type_and_field(&client_type).type_name,
-        type_and_field(&client_type).field_name
+        client_type.type_and_field().type_name,
+        client_type.type_and_field().field_name
     );
     if matches!(variant, UserWrittenComponentVariant::Component) {
         s.push_str(&format!(
@@ -72,7 +72,7 @@ export function iso<T>(
   param: T & MatchesWhitespaceAndString<'{}', T>
 ): IdentityWithParamComponent<{}__param>;\n",
             formatted_field,
-            type_and_field(&client_type).underscore_separated(),
+            client_type.type_and_field().underscore_separated(),
         ));
     } else {
         s.push_str(&format!(
@@ -81,7 +81,7 @@ export function iso<T>(
   param: T & MatchesWhitespaceAndString<'{}', T>
 ): IdentityWithParam<{}__param>;\n",
             formatted_field,
-            type_and_field(&client_type).underscore_separated(),
+            client_type.type_and_field().underscore_separated(),
         ));
     }
     (import, s)
@@ -227,15 +227,17 @@ fn sorted_user_written_types<TOutputFormat: OutputFormat>(
 )> {
     let mut client_types = user_written_fields(schema).collect::<Vec<_>>();
     client_types.sort_by(|client_type_1, client_type_2| {
-        match type_and_field(&client_type_1.0)
+        match client_type_1
+            .0
+            .type_and_field()
             .type_name
-            .cmp(&type_and_field(&client_type_2.0).type_name)
+            .cmp(&client_type_2.0.type_and_field().type_name)
         {
             Ordering::Less => Ordering::Less,
             Ordering::Greater => Ordering::Greater,
             Ordering::Equal => sort_field_name(
-                type_and_field(&client_type_1.0).field_name,
-                type_and_field(&client_type_2.0).field_name,
+                client_type_1.0.type_and_field().field_name,
+                client_type_2.0.type_and_field().field_name,
             ),
         }
     });
@@ -269,7 +271,7 @@ fn sorted_entrypoints<TOutputFormat: OutputFormat>(
     entrypoints
 }
 
-fn sort_field_name(field_1: SelectableFieldName, field_2: SelectableFieldName) -> Ordering {
+fn sort_field_name(field_1: SelectableName, field_2: SelectableName) -> Ordering {
     // We cannot alphabetically sort by field_name. This is because
     // if Query.Foo comes before Query.FooBar in the generated iso.ts,
     // then the iso literal containing field Query.FooBar will be

@@ -1,14 +1,14 @@
 use intern::Lookup;
 use std::{collections::HashMap, fmt::Debug};
 
-use common_lang_types::{SelectableFieldName, VariableName, WithLocation, WithSpan};
+use common_lang_types::{SelectableName, VariableName, WithLocation, WithSpan};
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ConstantValue, NonConstantValue, ScalarFieldSelectionDirectiveSet,
+    ArgumentKeyAndValue, ConstantValue, NonConstantValue, ScalarSelectionDirectiveSet,
     SelectionFieldArgument, SelectionType,
 };
 
 use crate::{
-    variable_definitions, ClientField, ClientPointer, NameAndArguments, OutputFormat,
+    ClientField, ClientFieldOrPointer, ClientPointer, NameAndArguments, OutputFormat,
     SchemaServerField, ValidatedVariableDefinition,
 };
 
@@ -20,7 +20,7 @@ impl VariableContext {
         &self,
         selection_arguments: &[WithLocation<SelectionFieldArgument>],
         child_variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-        selection_variant: &ScalarFieldSelectionDirectiveSet,
+        selection_variant: &ScalarSelectionDirectiveSet,
     ) -> Self {
         // We need to take a parent context ({$id: NonConstantValue1 }), the argument parameters ({blah: $id}),
         // and the child variable definitions ({ $blah: Option<NonConstantValue2> }) and create a new child
@@ -44,10 +44,7 @@ impl VariableContext {
                 }) {
                     Some(arg) => arg,
                     None => {
-                        if matches!(
-                            selection_variant,
-                            ScalarFieldSelectionDirectiveSet::Loadable(_)
-                        ) {
+                        if matches!(selection_variant, ScalarSelectionDirectiveSet::Loadable(_)) {
                             // If this field was selected loadably, missing arguments are allowed.
                             // These missing arguments become variables that are provided at
                             // runtime. If they are missing at runtime, they will fall back to
@@ -127,7 +124,8 @@ pub fn initial_variable_context<
     // For reader ASTs:
     // This makes sense, but seems somewhat superfluous. Perhaps we can refactor code such
     // that we do not need to call this.
-    let variable_context = variable_definitions(selection_type)
+    let variable_context = selection_type
+        .variable_definitions()
         .iter()
         .map(|variable_definition| {
             (
@@ -218,7 +216,7 @@ pub fn transform_name_and_arguments_with_child_variable_context(
 }
 
 pub fn create_transformed_name_and_arguments(
-    name: SelectableFieldName,
+    name: SelectableName,
     arguments: &[WithLocation<SelectionFieldArgument>],
     variable_context: &VariableContext,
 ) -> NameAndArguments {

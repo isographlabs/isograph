@@ -4,14 +4,14 @@ use std::{
 };
 
 use common_lang_types::{
-    FieldArgumentName, Location, ObjectTypeAndFieldName, SelectableFieldName, VariableName,
+    FieldArgumentName, Location, ObjectTypeAndFieldName, SelectableName, VariableName,
     WithLocation, WithSpan,
 };
 
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     reachable_variables, ClientFieldId, ClientPointerId, DefinitionLocation, LinkedFieldSelection,
-    LinkedFieldSelectionDirectiveSet, ScalarFieldSelection, ScalarFieldSelectionDirectiveSet,
+    ObjectSelectionDirectiveSet, ScalarFieldSelection, ScalarSelectionDirectiveSet,
     SelectionFieldArgument, SelectionType, ServerObjectId, UnvalidatedScalarFieldSelection,
     UnvalidatedSelection, VariableDefinition,
 };
@@ -20,18 +20,19 @@ use lazy_static::lazy_static;
 use crate::{
     get_all_errors_or_all_ok, get_all_errors_or_all_ok_as_hashmap, get_all_errors_or_all_ok_iter,
     get_all_errors_or_tuple_ok, validate_argument_types::value_satisfies_type, ClientField,
-    ClientPointer, OutputFormat, RefetchStrategy, SchemaObject, SelectionTypeId, ServerFieldData,
-    UnvalidatedClientField, UnvalidatedClientPointer, UnvalidatedLinkedFieldSelection,
-    UnvalidatedRefetchFieldStrategy, UnvalidatedVariableDefinition, ValidateSchemaError,
-    ValidateSchemaResult, ValidatedClientField, ValidatedClientPointer,
-    ValidatedLinkedFieldAssociatedData, ValidatedLinkedFieldSelection,
-    ValidatedRefetchFieldStrategy, ValidatedScalarFieldAssociatedData,
-    ValidatedScalarFieldSelection, ValidatedSchemaServerField, ValidatedSelection,
+    ClientFieldOrPointerId, ClientPointer, OutputFormat, RefetchStrategy, SchemaObject,
+    ServerFieldData, UnvalidatedClientField, UnvalidatedClientPointer,
+    UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy,
+    UnvalidatedVariableDefinition, ValidateSchemaError, ValidateSchemaResult, ValidatedClientField,
+    ValidatedClientPointer, ValidatedLinkedFieldAssociatedData, ValidatedLinkedFieldSelection,
+    ValidatedRefetchFieldStrategy, ValidatedScalarFieldSelection,
+    ValidatedScalarSelectionAssociatedData, ValidatedSchemaServerField, ValidatedSelection,
     ValidatedVariableDefinition,
 };
 
 type UsedVariables = BTreeSet<VariableName>;
-type SelectionTypeArgsMap = HashMap<SelectionTypeId, Vec<WithSpan<ValidatedVariableDefinition>>>;
+type SelectionTypeArgsMap =
+    HashMap<ClientFieldOrPointerId, Vec<WithSpan<ValidatedVariableDefinition>>>;
 
 type ClientPointerTargetTypeMap = HashMap<ClientPointerId, ServerObjectId>;
 
@@ -195,16 +196,11 @@ fn validate_client_field_selection_set<TOutputFormat: OutputFormat>(
         )
         .clone();
 
-    let selection_set_result = top_level_client_field
-        .reader_selection_set
-        .map(|selection_set| {
-            validate_client_type_definition_selections_exist_and_types_match(
-                selection_set,
-                &variable_definitions,
-                &top_level_client_type_info,
-            )
-        })
-        .transpose();
+    let selection_set_result = validate_client_type_definition_selections_exist_and_types_match(
+        top_level_client_field.reader_selection_set,
+        &variable_definitions,
+        &top_level_client_type_info,
+    );
 
     let refetch_strategy_result = top_level_client_field
         .refetch_strategy
@@ -457,29 +453,29 @@ fn validate_field_type_exists_and_is_scalar<TOutputFormat: OutputFormat>(
                 match &server_field.associated_data {
                     SelectionType::Scalar(_) => Ok(ScalarFieldSelection {
                         name: scalar_field_selection.name,
-                        associated_data: ValidatedScalarFieldAssociatedData {
+                        associated_data: ValidatedScalarSelectionAssociatedData {
                             location: DefinitionLocation::Server(*server_field_id),
                             selection_variant: match scalar_field_selection.associated_data {
-                                ScalarFieldSelectionDirectiveSet::None(empty_struct) => {
+                                ScalarSelectionDirectiveSet::None(empty_struct) => {
                                     assert_no_missing_arguments(
                                         missing_arguments,
                                         scalar_field_selection.name.location,
                                     )?;
-                                    ScalarFieldSelectionDirectiveSet::None(empty_struct)
+                                    ScalarSelectionDirectiveSet::None(empty_struct)
                                 }
-                                ScalarFieldSelectionDirectiveSet::Updatable(u) => {
+                                ScalarSelectionDirectiveSet::Updatable(u) => {
                                     assert_no_missing_arguments(
                                         missing_arguments,
                                         scalar_field_selection.name.location,
                                     )?;
-                                    ScalarFieldSelectionDirectiveSet::Updatable(u)
+                                    ScalarSelectionDirectiveSet::Updatable(u)
                                 }
-                                ScalarFieldSelectionDirectiveSet::Loadable(l) => {
+                                ScalarSelectionDirectiveSet::Loadable(l) => {
                                     server_field_cannot_be_selected_loadably(
                                         scalar_field_name,
                                         scalar_field_selection.name.location,
                                     )?;
-                                    ScalarFieldSelectionDirectiveSet::Loadable(l)
+                                    ScalarSelectionDirectiveSet::Loadable(l)
                                 }
                             },
                         },
@@ -588,25 +584,25 @@ fn validate_client_field<TOutputFormat: OutputFormat>(
     Ok(ScalarFieldSelection {
         name: scalar_field_selection.name,
         reader_alias: scalar_field_selection.reader_alias,
-        associated_data: ValidatedScalarFieldAssociatedData {
+        associated_data: ValidatedScalarSelectionAssociatedData {
             location: DefinitionLocation::Client(*client_field_id),
             selection_variant: match scalar_field_selection.associated_data {
-                ScalarFieldSelectionDirectiveSet::None(empty_struct) => {
+                ScalarSelectionDirectiveSet::None(empty_struct) => {
                     assert_no_missing_arguments(
                         missing_arguments,
                         scalar_field_selection.name.location,
                     )?;
-                    ScalarFieldSelectionDirectiveSet::None(empty_struct)
+                    ScalarSelectionDirectiveSet::None(empty_struct)
                 }
-                ScalarFieldSelectionDirectiveSet::Updatable(u) => {
+                ScalarSelectionDirectiveSet::Updatable(u) => {
                     assert_no_missing_arguments(
                         missing_arguments,
                         scalar_field_selection.name.location,
                     )?;
-                    ScalarFieldSelectionDirectiveSet::Updatable(u)
+                    ScalarSelectionDirectiveSet::Updatable(u)
                 }
-                ScalarFieldSelectionDirectiveSet::Loadable(l) => {
-                    ScalarFieldSelectionDirectiveSet::Loadable(l)
+                ScalarSelectionDirectiveSet::Loadable(l) => {
+                    ScalarSelectionDirectiveSet::Loadable(l)
                 }
             },
         },
@@ -696,19 +692,19 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
                                 parent_object_id: object_id.type_name.inner_non_null(),
                                 field_id: DefinitionLocation::Server(server_field.id),
                                 selection_variant: match linked_field_selection.associated_data {
-                                    LinkedFieldSelectionDirectiveSet::None(empty_struct)=> {
+                                    ObjectSelectionDirectiveSet::None(empty_struct)=> {
                                         assert_no_missing_arguments(
                                             missing_arguments,
                                             linked_field_selection.name.location,
                                         )?;
-                                        ScalarFieldSelectionDirectiveSet::None(empty_struct)
+                                        ObjectSelectionDirectiveSet::None(empty_struct)
                                     }
-                                    LinkedFieldSelectionDirectiveSet::Updatable(u) => {
+                                    ObjectSelectionDirectiveSet::Updatable(u) => {
                                         assert_no_missing_arguments(
                                             missing_arguments,
                                             linked_field_selection.name.location,
                                         )?;
-                                        ScalarFieldSelectionDirectiveSet::Updatable(u)
+                                        ObjectSelectionDirectiveSet::Updatable(u)
                                     }
                                 },
                             },
@@ -772,19 +768,19 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
                             parent_object_id: *object_id,
                             field_id: DefinitionLocation::Client(*client_pointer_id),
                             selection_variant: match linked_field_selection.associated_data {
-                                LinkedFieldSelectionDirectiveSet::None(empty_struct) => {
+                                ObjectSelectionDirectiveSet::None(empty_struct) => {
                                     assert_no_missing_arguments(
                                         missing_arguments,
                                         linked_field_selection.name.location,
                                     )?;
-                                    ScalarFieldSelectionDirectiveSet::None(empty_struct)
+                                    ObjectSelectionDirectiveSet::None(empty_struct)
                                 }
-                                LinkedFieldSelectionDirectiveSet::Updatable(u) => {
+                                ObjectSelectionDirectiveSet::Updatable(u) => {
                                     assert_no_missing_arguments(
                                         missing_arguments,
                                         linked_field_selection.name.location,
                                     )?;
-                                    ScalarFieldSelectionDirectiveSet::Updatable(u)
+                                    ObjectSelectionDirectiveSet::Updatable(u)
                                 }
                             },
                         },
@@ -831,7 +827,7 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
 }
 
 fn server_field_cannot_be_selected_loadably(
-    server_field_name: SelectableFieldName,
+    server_field_name: SelectableName,
     location: Location,
 ) -> ValidateSchemaResult<()> {
     Err(WithLocation::new(

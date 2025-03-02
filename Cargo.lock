@@ -1086,6 +1086,7 @@ dependencies = [
  "colorize",
  "common_lang_types",
  "graphql_lang_types",
+ "impl_base_types_macro",
  "intern",
  "isograph_config",
  "isograph_lang_types",

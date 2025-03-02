@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{OutputFormat, UnvalidatedSchema};
-use common_lang_types::{
-    IsographObjectTypeName, SelectableFieldName, StringLiteralValue, WithLocation,
-};
+use common_lang_types::{IsographObjectTypeName, SelectableName, StringLiteralValue, WithLocation};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::ServerObjectId;
 
@@ -57,7 +55,7 @@ pub enum CreateAdditionalFieldsError {
     \"{field_name}\" on type \"{parent_type}\", but a field with that name already exists."
     )]
     FieldExistsOnType {
-        field_name: SelectableFieldName,
+        field_name: SelectableName,
         parent_type: IsographObjectTypeName,
     },
 
@@ -75,7 +73,7 @@ pub enum CreateAdditionalFieldsError {
     PrimaryDirectiveArgumentDoesNotExistOnField {
         primary_type_name: IsographObjectTypeName,
         mutation_object_name: IsographObjectTypeName,
-        mutation_field_name: SelectableFieldName,
+        mutation_field_name: SelectableName,
         field_name: String,
     },
 

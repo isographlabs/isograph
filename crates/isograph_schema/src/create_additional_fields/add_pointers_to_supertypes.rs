@@ -1,15 +1,15 @@
-use common_lang_types::{SelectableFieldName, Span, UnvalidatedTypeName, WithLocation, WithSpan};
+use common_lang_types::{ServerSelectableName, Span, UnvalidatedTypeName, WithLocation, WithSpan};
 use graphql_lang_types::{GraphQLNamedTypeAnnotation, GraphQLTypeAnnotation};
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    DefinitionLocation, EmptyDirectiveSet, ScalarFieldSelection, ScalarFieldSelectionDirectiveSet,
+    DefinitionLocation, EmptyDirectiveSet, ScalarFieldSelection, ScalarSelectionDirectiveSet,
     SelectionType, ServerFieldSelection,
 };
 
 use crate::{
     as_client_type, as_server_field, OutputFormat, SchemaServerField, SchemaServerFieldVariant,
     ServerFieldTypeAssociatedData, ServerFieldTypeAssociatedDataInlineFragment, UnvalidatedSchema,
-    ValidatedScalarFieldAssociatedData, LINK_FIELD_NAME,
+    ValidatedScalarSelectionAssociatedData, LINK_FIELD_NAME,
 };
 use common_lang_types::Location;
 
@@ -27,7 +27,8 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             let subtype = self.server_field_data.object(*subtype_id);
 
             if let Some(concrete_type) = subtype.concrete_type {
-                let field_name: SelectableFieldName = format!("as{}", subtype.name).intern().into();
+                let field_name: ServerSelectableName =
+                    format!("as{}", subtype.name).intern().into();
 
                 let next_server_field_id = self.server_fields.len().into();
 
@@ -40,7 +41,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                 let typename_selection = WithSpan::new(
                     ServerFieldSelection::ScalarField(ScalarFieldSelection {
                         arguments: vec![],
-                        associated_data: ValidatedScalarFieldAssociatedData {
+                        associated_data: ValidatedScalarSelectionAssociatedData {
                             location: DefinitionLocation::Server(
                                 *as_server_field(
                                     subtype
@@ -50,7 +51,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                                 )
                                 .expect("Expected __typename to be server field"),
                             ),
-                            selection_variant: ScalarFieldSelectionDirectiveSet::None(
+                            selection_variant: ScalarSelectionDirectiveSet::None(
                                 EmptyDirectiveSet {},
                             ),
                         },
@@ -66,7 +67,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                 let link_selection = WithSpan::new(
                     ServerFieldSelection::ScalarField(ScalarFieldSelection {
                         arguments: vec![],
-                        associated_data: ValidatedScalarFieldAssociatedData {
+                        associated_data: ValidatedScalarSelectionAssociatedData {
                             location: DefinitionLocation::Client(
                                 match *as_client_type(
                                     subtype
@@ -82,11 +83,11 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                                     }
                                 },
                             ),
-                            selection_variant: ScalarFieldSelectionDirectiveSet::None(
+                            selection_variant: ScalarSelectionDirectiveSet::None(
                                 EmptyDirectiveSet {},
                             ),
                         },
-                        name: WithLocation::new(*LINK_FIELD_NAME, Location::generated()),
+                        name: WithLocation::new((*LINK_FIELD_NAME).into(), Location::generated()),
                         reader_alias: None,
                     }),
                     Span::todo_generated(),
@@ -94,6 +95,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 
                 let reader_selection_set = vec![typename_selection, link_selection];
 
+                // TODO ... is this a server field?!
                 let server_field = SchemaServerField {
                     description: Some(
                         format!("A client pointer for the {} type.", subtype.name)
@@ -125,12 +127,15 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 
                     if supertype
                         .encountered_fields
-                        .insert(field_name, DefinitionLocation::Server(next_server_field_id))
+                        .insert(
+                            field_name.into(),
+                            DefinitionLocation::Server(next_server_field_id),
+                        )
                         .is_some()
                     {
                         return Err(WithLocation::new(
                             CreateAdditionalFieldsError::FieldExistsOnType {
-                                field_name,
+                                field_name: field_name.into(),
                                 parent_type: supertype.name,
                             },
                             Location::generated(),

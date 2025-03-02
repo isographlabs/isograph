@@ -1,8 +1,9 @@
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, HashSet};
 
 use common_lang_types::{
-    IsographObjectTypeName, LinkedFieldName, Location, QueryOperationName, ScalarFieldName,
-    SelectableFieldName, Span, VariableName, WithLocation, WithSpan,
+    ClientScalarSelectableName, IsographObjectTypeName, Location, QueryOperationName,
+    ScalarSelectableName, SelectableName, ServerObjectSelectableName, ServerScalarSelectableName,
+    Span, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
@@ -10,7 +11,7 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
-    RefetchQueryIndex, ScalarFieldSelectionDirectiveSet, SelectableServerFieldId,
+    RefetchQueryIndex, ScalarSelectionDirectiveSet, SelectableServerFieldId,
     SelectionFieldArgument, SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId,
     VariableDefinition,
 };
@@ -18,21 +19,21 @@ use lazy_static::lazy_static;
 
 use crate::{
     categorize_field_loadability, create_transformed_name_and_arguments,
-    expose_field_directive::RequiresRefinement, initial_variable_context, reader_selection_set,
-    selection_type_id, transform_arguments_with_child_context,
-    transform_name_and_arguments_with_child_variable_context, variable_definitions,
-    ClientFieldVariant, ImperativelyLoadedFieldVariant, Loadability, NameAndArguments,
-    OutputFormat, PathToRefetchField, RootOperationName, SchemaObject, SchemaServerFieldVariant,
-    SelectionTypeId, UnvalidatedVariableDefinition, ValidatedClientField, ValidatedClientPointer,
+    expose_field_directive::RequiresRefinement, initial_variable_context,
+    transform_arguments_with_child_context,
+    transform_name_and_arguments_with_child_variable_context, ClientFieldOrPointer,
+    ClientFieldOrPointerId, ClientFieldVariant, ImperativelyLoadedFieldVariant, Loadability,
+    NameAndArguments, OutputFormat, PathToRefetchField, RootOperationName, SchemaObject,
+    SchemaServerFieldVariant, UnvalidatedVariableDefinition, ValidatedClientField,
     ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection,
-    VariableContext,
+    ValidatedSelectionType, VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
 
 // Maybe this should be FNVHashMap? We don't really need stable iteration order
 pub type FieldToCompletedMergeTraversalStateMap =
-    BTreeMap<DefinitionLocation<ServerFieldId, SelectionTypeId>, FieldTraversalResult>;
+    BTreeMap<DefinitionLocation<ServerFieldId, ClientFieldOrPointerId>, FieldTraversalResult>;
 
 #[derive(Clone, Debug)]
 pub struct FieldTraversalResult {
@@ -44,15 +45,15 @@ pub struct FieldTraversalResult {
 }
 
 lazy_static! {
-    pub static ref REFETCH_FIELD_NAME: ScalarFieldName = "__refetch".intern().into();
-    pub static ref NODE_FIELD_NAME: LinkedFieldName = "node".intern().into();
-    pub static ref TYPENAME_FIELD_NAME: ScalarFieldName = "__typename".intern().into();
-    pub static ref LINK_FIELD_NAME: ScalarFieldName = "link".intern().into();
+    pub static ref REFETCH_FIELD_NAME: ClientScalarSelectableName = "__refetch".intern().into();
+    pub static ref NODE_FIELD_NAME: ServerObjectSelectableName = "node".intern().into();
+    pub static ref TYPENAME_FIELD_NAME: ServerScalarSelectableName = "__typename".intern().into();
+    pub static ref LINK_FIELD_NAME: ClientScalarSelectableName = "link".intern().into();
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RootRefetchedPath {
-    pub field_name: SelectableFieldName,
+    pub field_name: ClientScalarSelectableName,
     pub path_to_refetch_field_info: PathToRefetchFieldInfo,
 }
 
@@ -91,8 +92,7 @@ fn get_variables(arguments: &[ArgumentKeyAndValue]) -> impl Iterator<Item = Vari
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct MergedScalarFieldSelection {
-    // TODO no location
-    pub name: ScalarFieldName,
+    pub name: ScalarSelectableName,
     pub arguments: Vec<ArgumentKeyAndValue>,
 }
 
@@ -113,7 +113,7 @@ impl MergedScalarFieldSelection {
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct MergedLinkedFieldSelection {
     // TODO no location
-    pub name: LinkedFieldName,
+    pub name: ServerObjectSelectableName,
     pub selection_map: MergedSelectionMap,
     pub arguments: Vec<ArgumentKeyAndValue>,
     /// Some if the object is concrete; None otherwise.
@@ -177,7 +177,7 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
     /// among other things.
     pub variable_definitions: Vec<WithSpan<VariableDefinition<SelectableServerFieldId>>>,
     pub root_parent_object: IsographObjectTypeName,
-    pub root_fetchable_field: SelectableFieldName,
+    pub root_fetchable_field: ClientScalarSelectableName,
     pub refetch_query_index: RefetchQueryIndex,
 
     pub root_operation_name: RootOperationName,
@@ -194,7 +194,7 @@ pub struct PathToRefetchFieldInfo {
 }
 
 pub type RefetchedPathsMap =
-    BTreeMap<(PathToRefetchField, ScalarFieldSelectionDirectiveSet), RootRefetchedPath>;
+    BTreeMap<(PathToRefetchField, ScalarSelectionDirectiveSet), RootRefetchedPath>;
 
 /// As we traverse, whenever we enter a new scalar client field (including at the
 /// root, with the entrypoint), we create a new one of these and pass it down.
@@ -407,7 +407,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     parent_type: &SchemaObject<TOutputFormat>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
-    root_field_id: DefinitionLocation<ServerFieldId, SelectionTypeId>,
+    root_field_id: DefinitionLocation<ServerFieldId, ClientFieldOrPointerId>,
     variable_context: &VariableContext,
     // TODO return Cow?
 ) -> FieldTraversalResult {
@@ -674,11 +674,11 @@ fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
                 match &scalar_field_selection.associated_data.location {
                     DefinitionLocation::Server(_) => {
                         match scalar_field_selection.associated_data.selection_variant {
-                            ScalarFieldSelectionDirectiveSet::Updatable(_) => {
+                            ScalarSelectionDirectiveSet::Updatable(_) => {
                                 merge_traversal_state.has_updatable = true;
                             }
-                            ScalarFieldSelectionDirectiveSet::None(_) => (),
-                            ScalarFieldSelectionDirectiveSet::Loadable(_) => (),
+                            ScalarSelectionDirectiveSet::None(_) => (),
+                            ScalarSelectionDirectiveSet::Loadable(_) => (),
                         };
 
                         merge_scalar_server_field(
@@ -847,13 +847,13 @@ fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
                                                 );
 
                                                 create_merged_selection_map_for_field_and_insert_into_global_map(
-                                            schema,
-                                            parent_type,
-                                            &linked_field_selection.selection_set,
-                                            encountered_client_field_map,
-                                            DefinitionLocation::Server(inline_fragment_variant.server_field_id),
-                                            &server_field.initial_variable_context()
-                                        );
+                                                    schema,
+                                                    parent_type,
+                                                    &linked_field_selection.selection_set,
+                                                    encountered_client_field_map,
+                                                    DefinitionLocation::Server(inline_fragment_variant.server_field_id),
+                                                    &server_field.initial_variable_context()
+                                                );
                                             }
                                         }
                                     }
@@ -963,7 +963,7 @@ fn insert_imperative_field_into_refetch_paths<TOutputFormat: OutputFormat>(
     merge_traversal_state.refetch_paths.insert(
         (
             path,
-            ScalarFieldSelectionDirectiveSet::None(EmptyDirectiveSet {}),
+            ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
         ),
         RootRefetchedPath {
             field_name: newly_encountered_scalar_client_field.name,
@@ -1014,10 +1014,7 @@ fn merge_non_loadable_client_type<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
     parent_map: &mut MergedSelectionMap,
     parent_merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    newly_encountered_client_type: SelectionType<
-        &ValidatedClientField<TOutputFormat>,
-        &ValidatedClientPointer<TOutputFormat>,
-    >,
+    newly_encountered_client_type: ValidatedSelectionType<TOutputFormat>,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     parent_variable_context: &VariableContext,
     selection_arguments: &[WithLocation<SelectionFieldArgument>],
@@ -1031,21 +1028,16 @@ fn merge_non_loadable_client_type<TOutputFormat: OutputFormat>(
     } = create_merged_selection_map_for_field_and_insert_into_global_map(
         schema,
         parent_type,
-        reader_selection_set(&newly_encountered_client_type)
-            .as_ref()
-            .expect(
-                "Expected selection set to exist. \
-                This is indicative of a bug in Isograph.",
-            ),
+        newly_encountered_client_type.reader_selection_set(),
         encountered_client_field_map,
-        DefinitionLocation::Client(selection_type_id(&newly_encountered_client_type)),
+        DefinitionLocation::Client(newly_encountered_client_type.id()),
         &initial_variable_context(&newly_encountered_client_type),
     );
 
     let transformed_child_variable_context = parent_variable_context.child_variable_context(
         selection_arguments,
-        variable_definitions(&newly_encountered_client_type),
-        &ScalarFieldSelectionDirectiveSet::None(EmptyDirectiveSet {}),
+        newly_encountered_client_type.variable_definitions(),
+        &ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
     );
     transform_and_merge_child_selection_map_into_parent_map(
         parent_map,
@@ -1145,11 +1137,11 @@ fn select_typename_and_id_fields_in_merged_selection<TOutputFormat: OutputFormat
 
 pub fn selection_map_wrapped(
     mut inner_selection_map: MergedSelectionMap,
-    top_level_field: LinkedFieldName,
+    top_level_field: ServerObjectSelectableName,
     top_level_field_arguments: Vec<ArgumentKeyAndValue>,
     top_level_field_concrete_type: Option<IsographObjectTypeName>,
     // TODO support arguments and vectors of subfields
-    subfield: Option<LinkedFieldName>,
+    subfield: Option<ServerObjectSelectableName>,
     subfield_concrete_type: Option<IsographObjectTypeName>,
     type_to_refine_to: RequiresRefinement,
 ) -> MergedSelectionMap {
@@ -1216,14 +1208,14 @@ fn maybe_add_typename_selection(selections: &mut MergedSelectionMap) {
     selections.insert(
         NormalizationKey::Discriminator,
         MergedServerSelection::ScalarField(MergedScalarFieldSelection {
-            name: *TYPENAME_FIELD_NAME,
+            name: (*TYPENAME_FIELD_NAME).into(),
             arguments: vec![],
         }),
     );
 }
 
 fn get_aliased_mutation_field_name(
-    name: SelectableFieldName,
+    name: SelectableName,
     parameters: &[ArgumentKeyAndValue],
 ) -> String {
     let mut s = name.to_string();

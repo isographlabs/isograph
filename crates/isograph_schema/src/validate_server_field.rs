@@ -1,4 +1,4 @@
-use common_lang_types::{SelectableFieldName, UnvalidatedTypeName, WithLocation};
+use common_lang_types::{SelectableName, UnvalidatedTypeName, WithLocation};
 use graphql_lang_types::GraphQLTypeAnnotation;
 use isograph_lang_types::{
     SelectionType, ServerObjectId, ServerScalarId, TypeAnnotation, VariableDefinition,
@@ -53,7 +53,7 @@ fn validate_and_transform_server_field<TOutputFormat: OutputFormat>(
                 argument,
                 schema_data,
                 empty_field.parent_type_id,
-                empty_field.name,
+                empty_field.name.map(Into::into),
             )
         })) {
             Ok(arguments) => Some(arguments),
@@ -134,7 +134,7 @@ fn validate_server_field_type_exists<TOutputFormat: OutputFormat>(
         None => Err(WithLocation::new(
             ValidateSchemaError::FieldTypenameDoesNotExist {
                 parent_type_name: schema_data.object(field.parent_type_id).name,
-                field_name: field.name.item,
+                field_name: field.name.item.into(),
                 field_type: *server_field_type.inner(),
             },
             field.name.location,
@@ -146,7 +146,7 @@ fn validate_server_field_argument<TOutputFormat: OutputFormat>(
     argument: WithLocation<UnvalidatedVariableDefinition>,
     schema_data: &ServerFieldData<TOutputFormat>,
     parent_type_id: ServerObjectId,
-    name: WithLocation<SelectableFieldName>,
+    name: WithLocation<SelectableName>,
 ) -> ValidateSchemaResult<WithLocation<ValidatedVariableDefinition>> {
     // Isograph doesn't care about the default value, and that remains
     // unvalidated.

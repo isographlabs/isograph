@@ -2,16 +2,16 @@ use std::collections::HashMap;
 
 use common_lang_types::{
     EnumLiteralValue, GraphQLScalarTypeName, IsoLiteralText, IsographObjectTypeName,
-    SelectableFieldName, UnvalidatedTypeName, ValueKeyName, VariableName, WithLocation, WithSpan,
+    SelectableName, UnvalidatedTypeName, ValueKeyName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLTypeAnnotation, NameValuePair};
 use intern::Lookup;
 use isograph_lang_types::{
     ClientFieldId, ClientPointerId, DefinitionLocation, LinkedFieldSelection,
-    LoadableDirectiveParameters, NonConstantValue, ScalarFieldSelection,
-    ScalarFieldSelectionDirectiveSet, SelectableServerFieldId, SelectionFieldArgument,
-    SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId, ServerScalarId,
-    TypeAnnotation, VariableDefinition,
+    LoadableDirectiveParameters, NonConstantValue, ObjectSelectionDirectiveSet,
+    ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectableServerFieldId,
+    SelectionFieldArgument, SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId,
+    ServerScalarId, TypeAnnotation, VariableDefinition,
 };
 
 use thiserror::Error;
@@ -74,15 +74,17 @@ pub struct ValidatedLinkedFieldAssociatedData {
     pub parent_object_id: ServerObjectId,
     pub field_id: DefinitionLocation<ServerFieldId, ClientPointerId>,
     // N.B. we don't actually support loadable linked fields
-    pub selection_variant: ScalarFieldSelectionDirectiveSet,
-    /// Some if the object is concrete; None otherwise.
+    pub selection_variant: ObjectSelectionDirectiveSet,
+    /// Some if the (destination?) object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 }
 
+// TODO this should encode whether the scalar selection points to a
+// client field or to a server scalar
 #[derive(Debug, Clone)]
-pub struct ValidatedScalarFieldAssociatedData {
+pub struct ValidatedScalarSelectionAssociatedData {
     pub location: ValidatedFieldDefinitionLocation,
-    pub selection_variant: ScalarFieldSelectionDirectiveSet,
+    pub selection_variant: ScalarSelectionDirectiveSet,
 }
 
 pub type MissingArguments = Vec<ValidatedVariableDefinition>;
@@ -92,11 +94,16 @@ pub type ValidatedServerFieldTypeAssociatedData = SelectionType<
     ServerFieldTypeAssociatedData<TypeAnnotation<ServerObjectId>>,
 >;
 
+pub type ValidatedSelectionType<'a, TOutputFormat> = SelectionType<
+    &'a ValidatedClientField<TOutputFormat>,
+    &'a ValidatedClientPointer<TOutputFormat>,
+>;
+
 #[derive(Debug)]
 pub struct ValidatedSchemaState {}
 impl SchemaValidationState for ValidatedSchemaState {
     type ServerFieldTypeAssociatedData = ValidatedServerFieldTypeAssociatedData;
-    type SelectionTypeSelectionScalarFieldAssociatedData = ValidatedScalarFieldAssociatedData;
+    type SelectionTypeSelectionScalarFieldAssociatedData = ValidatedScalarSelectionAssociatedData;
     type SelectionTypeSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
     type VariableDefinitionInnerType = SelectableServerFieldId;
     type Entrypoint = HashMap<ClientFieldId, IsoLiteralText>;
@@ -339,14 +346,14 @@ pub enum Loadability<'a> {
 /// @loadable directive.
 pub fn categorize_field_loadability<'a, TOutputFormat: OutputFormat>(
     client_field: &'a ValidatedClientField<TOutputFormat>,
-    selection_variant: &'a ScalarFieldSelectionDirectiveSet,
+    selection_variant: &'a ScalarSelectionDirectiveSet,
 ) -> Option<Loadability<'a>> {
     match &client_field.variant {
         ClientFieldVariant::Link => None,
         ClientFieldVariant::UserWritten(_) => match selection_variant {
-            ScalarFieldSelectionDirectiveSet::None(_) => None,
-            ScalarFieldSelectionDirectiveSet::Updatable(_) => None,
-            ScalarFieldSelectionDirectiveSet::Loadable(l) => {
+            ScalarSelectionDirectiveSet::None(_) => None,
+            ScalarSelectionDirectiveSet::Updatable(_) => None,
+            ScalarSelectionDirectiveSet::Loadable(l) => {
                 Some(Loadability::LoadablySelectedField(&l.loadable))
             }
         },
@@ -384,7 +391,7 @@ pub enum ValidateSchemaError {
     )]
     FieldTypenameDoesNotExist {
         parent_type_name: IsographObjectTypeName,
-        field_name: SelectableFieldName,
+        field_name: SelectableName,
         field_type: UnvalidatedTypeName,
     },
 
@@ -394,7 +401,7 @@ pub enum ValidateSchemaError {
     FieldArgumentTypeDoesNotExist {
         argument_name: VariableName,
         parent_type_name: IsographObjectTypeName,
-        field_name: SelectableFieldName,
+        field_name: SelectableName,
         argument_type: UnvalidatedTypeName,
     },
 
@@ -439,9 +446,9 @@ pub enum ValidateSchemaError {
     )]
     SelectionTypeSelectionFieldDoesNotExist {
         client_field_parent_type_name: IsographObjectTypeName,
-        client_field_name: SelectableFieldName,
+        client_field_name: SelectableName,
         field_parent_type_name: IsographObjectTypeName,
-        field_name: SelectableFieldName,
+        field_name: SelectableName,
         client_type: String,
     },
 
@@ -452,9 +459,9 @@ pub enum ValidateSchemaError {
     )]
     SelectionTypeSelectionFieldIsNotScalar {
         client_field_parent_type_name: IsographObjectTypeName,
-        client_field_name: SelectableFieldName,
+        client_field_name: SelectableName,
         field_parent_type_name: IsographObjectTypeName,
-        field_name: SelectableFieldName,
+        field_name: SelectableName,
         field_type: &'static str,
         target_type_name: UnvalidatedTypeName,
         client_type: String,
@@ -467,9 +474,9 @@ pub enum ValidateSchemaError {
     )]
     SelectionTypeSelectionFieldIsScalar {
         client_field_parent_type_name: IsographObjectTypeName,
-        client_field_name: SelectableFieldName,
+        client_field_name: SelectableName,
         field_parent_type_name: IsographObjectTypeName,
-        field_name: SelectableFieldName,
+        field_name: SelectableName,
         field_type: &'static str,
         target_type_name: UnvalidatedTypeName,
         client_type: String,
@@ -482,9 +489,9 @@ pub enum ValidateSchemaError {
     )]
     SelectionTypeSelectionClientFieldSelectedAsLinked {
         client_field_parent_type_name: IsographObjectTypeName,
-        client_field_name: SelectableFieldName,
+        client_field_name: SelectableName,
         field_parent_type_name: IsographObjectTypeName,
-        field_name: SelectableFieldName,
+        field_name: SelectableName,
         client_type: String,
     },
 
@@ -495,16 +502,14 @@ pub enum ValidateSchemaError {
     )]
     SelectionTypeSelectionClientPointerSelectedAsScalar {
         client_field_parent_type_name: IsographObjectTypeName,
-        client_field_name: SelectableFieldName,
+        client_field_name: SelectableName,
         field_parent_type_name: IsographObjectTypeName,
-        field_name: SelectableFieldName,
+        field_name: SelectableName,
         client_type: String,
     },
 
     #[error("`{server_field_name}` is a server field, and cannot be selected with `@loadable`")]
-    ServerFieldCannotBeSelectedLoadably {
-        server_field_name: SelectableFieldName,
-    },
+    ServerFieldCannotBeSelectedLoadably { server_field_name: SelectableName },
 
     #[error(
         "This field has missing arguments: {0}",
@@ -517,7 +522,7 @@ pub enum ValidateSchemaError {
         missing_fields_names.iter().map(|field_name| format!("${}", field_name)).collect::<Vec<_>>().join(", ")
     )]
     MissingFields {
-        missing_fields_names: Vec<SelectableFieldName>,
+        missing_fields_names: Vec<SelectableName>,
     },
 
     #[error(
@@ -558,7 +563,7 @@ pub enum ValidateSchemaError {
     UnusedVariables {
         unused_variables: Vec<WithSpan<ValidatedVariableDefinition>>,
         type_name: IsographObjectTypeName,
-        field_name: SelectableFieldName,
+        field_name: SelectableName,
     },
 
     #[error("This variable is not defined: ${undefined_variable}")]

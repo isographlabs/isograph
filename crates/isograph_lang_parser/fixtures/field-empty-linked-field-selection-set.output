@@ -21,7 +21,7 @@ Ok(
                                 },
                             },
                             client_field_name: WithSpan {
-                                item: ScalarFieldName(
+                                item: ClientScalarSelectableName(
                                     "Name",
                                 ),
                                 span: Span {
@@ -55,7 +55,7 @@ Ok(
                                                         },
                                                     },
                                                 ),
-                                                item: LinkedFieldName(
+                                                item: ServerObjectSelectableName(
                                                     "linked",
                                                 ),
                                             },

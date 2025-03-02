@@ -1,30 +1,26 @@
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Debug,
-    marker::PhantomData,
 };
 
 use common_lang_types::{
-    ClientPointerFieldName, DescriptionValue, GraphQLInterfaceTypeName, GraphQLScalarTypeName,
-    IsographObjectTypeName, JavascriptName, ObjectTypeAndFieldName, SelectableFieldName,
-    UnvalidatedTypeName, WithLocation, WithSpan,
-};
-use graphql_lang_types::{
-    GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition,
-    GraphQLInputObjectTypeDefinition, GraphQLInterfaceTypeDefinition, GraphQLObjectTypeDefinition,
+    ClientScalarSelectableName, DescriptionValue, GraphQLScalarTypeName, SelectableName,
+    ServerScalarSelectableName, UnvalidatedTypeName, WithLocation,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, ClientPointerId, DefinitionLocation,
-    SelectableServerFieldId, SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId,
-    ServerScalarId, ServerStrongIdFieldId, TypeAnnotation, VariableDefinition,
+    SelectableServerFieldId, SelectionType, ServerFieldId, ServerObjectId, ServerScalarId,
+    ServerStrongIdFieldId, TypeAnnotation,
 };
 use lazy_static::lazy_static;
 
 use crate::{
-    refetch_strategy::RefetchStrategy, schema_validation_state::SchemaValidationState,
-    ClientFieldVariant, NormalizationKey, OutputFormat, ServerFieldTypeAssociatedData,
-    ValidatedClientField, ValidatedClientPointer,
+    field_and_pointer::{ClientField, ClientPointer},
+    schema_validation_state::SchemaValidationState,
+    server_scalar_and_object::{SchemaObject, SchemaScalar, SchemaType},
+    ClientFieldOrPointerId, NormalizationKey, OutputFormat, SchemaServerField,
+    ServerFieldTypeAssociatedData,
 };
 
 lazy_static! {
@@ -139,13 +135,6 @@ pub type LinkedType<
     >,
 >;
 
-pub type SelectionTypeId = SelectionType<ClientFieldId, ClientPointerId>;
-
-pub type ValidatedSelectionType<'a, TOutputFormat> = SelectionType<
-    &'a ValidatedClientField<TOutputFormat>,
-    &'a ValidatedClientPointer<TOutputFormat>,
->;
-
 #[derive(Debug)]
 pub struct ServerFieldData<TOutputFormat: OutputFormat> {
     pub server_objects: Vec<SchemaObject<TOutputFormat>>,
@@ -239,7 +228,7 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     #[allow(clippy::type_complexity)]
     pub fn client_type(
         &self,
-        client_type_id: SelectionTypeId,
+        client_type_id: ClientFieldOrPointerId,
     ) -> SelectionType<
         &ClientField<
             TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
@@ -340,163 +329,12 @@ impl<TOutputFormat: OutputFormat> ServerFieldData<TOutputFormat> {
     }
 }
 
-pub type SchemaType<'a, TOutputFormat> =
-    SelectionType<&'a SchemaScalar<TOutputFormat>, &'a SchemaObject<TOutputFormat>>;
-
-pub fn get_name<TOutputFormat: OutputFormat>(
-    schema_type: SchemaType<'_, TOutputFormat>,
-) -> UnvalidatedTypeName {
-    match schema_type {
-        SelectionType::Object(object) => object.name.into(),
-        SelectionType::Scalar(scalar) => scalar.name.item.into(),
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub struct IsographObjectTypeDefinition {
-    pub description: Option<WithSpan<DescriptionValue>>,
-    pub name: WithLocation<IsographObjectTypeName>,
-    // maybe this should be Vec<WithSpan<IsographObjectTypeName>>>
-    pub interfaces: Vec<WithLocation<GraphQLInterfaceTypeName>>,
-    /// Directives that we don't know about. Maybe this should be validated to be
-    /// empty, or not exist.
-    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
-    // TODO the spans of these fields are wrong
-    // TODO use a shared field type
-    pub fields: Vec<WithLocation<GraphQLFieldDefinition>>,
-}
-
-impl From<GraphQLObjectTypeDefinition> for IsographObjectTypeDefinition {
-    fn from(object_type_definition: GraphQLObjectTypeDefinition) -> Self {
-        IsographObjectTypeDefinition {
-            description: object_type_definition.description,
-            name: object_type_definition.name.map(|x| x.into()),
-            interfaces: object_type_definition.interfaces,
-            directives: object_type_definition.directives,
-            fields: object_type_definition.fields,
-        }
-    }
-}
-
-impl From<GraphQLInterfaceTypeDefinition> for IsographObjectTypeDefinition {
-    fn from(value: GraphQLInterfaceTypeDefinition) -> Self {
-        Self {
-            description: value.description,
-            name: value.name.map(|x| x.into()),
-            interfaces: value.interfaces,
-            directives: value.directives,
-            fields: value.fields,
-        }
-    }
-}
-
-// TODO this is bad. We should instead convert both GraphQL types to a common
-// Isograph type
-impl From<GraphQLInputObjectTypeDefinition> for IsographObjectTypeDefinition {
-    fn from(value: GraphQLInputObjectTypeDefinition) -> Self {
-        Self {
-            description: value.description,
-            name: value.name.map(|x| x.into()),
-            interfaces: vec![],
-            directives: value.directives,
-            fields: value
-                .fields
-                .into_iter()
-                .map(|with_location| with_location.map(From::from))
-                .collect(),
-        }
-    }
-}
-
-/// An object type in the schema.
-#[derive(Debug)]
-pub struct SchemaObject<TOutputFormat: OutputFormat> {
-    pub description: Option<DescriptionValue>,
-    pub name: IsographObjectTypeName,
-    pub id: ServerObjectId,
-    // We probably don't want this
-    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
-    /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
-    /// to something else.
-    pub id_field: Option<ServerStrongIdFieldId>,
-    pub encountered_fields:
-        BTreeMap<SelectableFieldName, DefinitionLocation<ServerFieldId, SelectionTypeId>>,
-    /// Some if the object is concrete; None otherwise.
-    pub concrete_type: Option<IsographObjectTypeName>,
-
-    pub output_associated_data: TOutputFormat::SchemaObjectAssociatedData,
-}
-
-#[derive(Debug, Clone)]
-pub struct SchemaServerField<
-    TData,
-    TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
-    TOutputFormat: OutputFormat,
-> {
-    pub description: Option<DescriptionValue>,
-    /// The name of the server field and the location where it was defined
-    /// (an iso literal or Location::Generated).
-    pub name: WithLocation<SelectableFieldName>,
-    pub id: ServerFieldId,
-    pub associated_data: TData,
-    pub parent_type_id: ServerObjectId,
-    // pub directives: Vec<Directive<ConstantValue>>,
-    pub arguments:
-        Vec<WithLocation<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
-    // TODO remove this. This is indicative of poor modeling.
-    pub is_discriminator: bool,
-    pub phantom_data: PhantomData<TOutputFormat>,
-}
-
-impl<
-        TData,
-        TClientFieldVariableDefinitionAssociatedData: Clone + Ord + Debug,
-        TOutputFormat: OutputFormat,
-    > SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>
-{
-    pub fn and_then<TData2, E>(
-        &self,
-        convert: impl FnOnce(&TData) -> Result<TData2, E>,
-    ) -> Result<
-        SchemaServerField<TData2, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>,
-        E,
-    > {
-        Ok(SchemaServerField {
-            description: self.description,
-            name: self.name,
-            id: self.id,
-            associated_data: convert(&self.associated_data)?,
-            parent_type_id: self.parent_type_id,
-            arguments: self.arguments.clone(),
-            is_discriminator: self.is_discriminator,
-            phantom_data: PhantomData,
-        })
-    }
-
-    pub fn map<TData2, E>(
-        &self,
-        convert: impl FnOnce(&TData) -> TData2,
-    ) -> SchemaServerField<TData2, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>
-    {
-        SchemaServerField {
-            description: self.description,
-            name: self.name,
-            id: self.id,
-            associated_data: convert(&self.associated_data),
-            parent_type_id: self.parent_type_id,
-            arguments: self.arguments.clone(),
-            is_discriminator: self.is_discriminator,
-            phantom_data: PhantomData,
-        }
-    }
-}
-
 // TODO make SchemaServerField generic over TData, TId and TArguments, instead of just TData.
 // Then, SchemaIdField can be the same struct.
 #[derive(Debug, Clone, Copy)]
 pub struct SchemaIdField<TData> {
     pub description: Option<DescriptionValue>,
-    pub name: WithLocation<SelectableFieldName>,
+    pub name: WithLocation<ServerScalarSelectableName>,
     pub id: ServerStrongIdFieldId,
     pub associated_data: TData,
     pub parent_type_id: ServerObjectId,
@@ -533,7 +371,7 @@ impl<
         // enforce that we didn't just call .inner()
         Ok(SchemaIdField {
             description: value.description,
-            name: value.name,
+            name: value.name.map(|x| x.unchecked_conversion()),
             id: value.id.0.into(),
             associated_data: value.associated_data,
             parent_type_id: value.parent_type_id,
@@ -541,136 +379,15 @@ impl<
     }
 }
 
-#[derive(Debug)]
-pub struct ClientPointer<
-    TSelectionTypeSelectionScalarFieldAssociatedData,
-    TSelectionTypeSelectionLinkedFieldAssociatedData,
-    TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
-    TOutputFormat: OutputFormat,
-> {
-    pub description: Option<DescriptionValue>,
-    pub name: ClientPointerFieldName,
-    pub id: ClientPointerId,
-    pub to: TypeAnnotation<ServerObjectId>,
-
-    pub reader_selection_set: Vec<
-        WithSpan<
-            ServerFieldSelection<
-                TSelectionTypeSelectionScalarFieldAssociatedData,
-                TSelectionTypeSelectionLinkedFieldAssociatedData,
-            >,
-        >,
-    >,
-
-    pub refetch_strategy: RefetchStrategy<
-        TSelectionTypeSelectionScalarFieldAssociatedData,
-        TSelectionTypeSelectionLinkedFieldAssociatedData,
-    >,
-
-    pub variable_definitions:
-        Vec<WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
-
-    // Why is this not calculated when needed?
-    pub type_and_field: ObjectTypeAndFieldName,
-
-    pub parent_object_id: ServerObjectId,
-
-    pub output_format: PhantomData<TOutputFormat>,
-}
-
-#[derive(Debug)]
-pub struct ClientField<
-    TSelectionTypeSelectionScalarFieldAssociatedData,
-    TSelectionTypeSelectionLinkedFieldAssociatedData,
-    TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
-    TOutputFormat: OutputFormat,
-> {
-    pub description: Option<DescriptionValue>,
-    // TODO make this a ClientFieldName that can be converted into a SelectableFieldName
-    pub name: SelectableFieldName,
-    pub id: ClientFieldId,
-    // TODO model this so that reader_selection_sets are required for
-    // non-imperative client fields. (Are imperatively loaded fields
-    // true client fields? Probably not!)
-    pub reader_selection_set: Option<
-        Vec<
-            WithSpan<
-                ServerFieldSelection<
-                    TSelectionTypeSelectionScalarFieldAssociatedData,
-                    TSelectionTypeSelectionLinkedFieldAssociatedData,
-                >,
-            >,
-        >,
-    >,
-
-    // None -> not refetchable
-    pub refetch_strategy: Option<
-        RefetchStrategy<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-        >,
-    >,
-
-    // TODO we should probably model this differently
-    pub variant: ClientFieldVariant,
-
-    pub variable_definitions:
-        Vec<WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
-
-    // Why is this not calculated when needed?
-    pub type_and_field: ObjectTypeAndFieldName,
-
-    pub parent_object_id: ServerObjectId,
-    pub output_format: PhantomData<TOutputFormat>,
-}
-
-impl<
-        TSelectionTypeSelectionScalarFieldAssociatedData,
-        TSelectionTypeSelectionLinkedFieldAssociatedData,
-        TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
-        TOutputFormat: OutputFormat,
-    >
-    ClientField<
-        TSelectionTypeSelectionScalarFieldAssociatedData,
-        TSelectionTypeSelectionLinkedFieldAssociatedData,
-        TClientFieldVariableDefinitionAssociatedData,
-        TOutputFormat,
-    >
-{
-    pub fn selection_set_for_parent_query(
-        &self,
-    ) -> &Vec<
-        WithSpan<
-            ServerFieldSelection<
-                TSelectionTypeSelectionScalarFieldAssociatedData,
-                TSelectionTypeSelectionLinkedFieldAssociatedData,
-            >,
-        >,
-    > {
-        if let Some(s) = self.reader_selection_set.as_ref() {
-            s
-        } else {
-            self.refetch_strategy
-                .as_ref()
-                .map(|strategy| strategy.refetch_selection_set())
-                .expect(
-                    "Expected client field to have \
-                    either a reader_selection_set or a refetch_selection_set.\
-                    This is indicative of a bug in Isograph.",
-                )
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PathToRefetchField {
     pub linked_fields: Vec<NormalizationKey>,
-    pub field_name: SelectableFieldName,
+    pub field_name: ClientScalarSelectableName,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct NameAndArguments {
-    pub name: SelectableFieldName,
+    pub name: SelectableName,
     pub arguments: Vec<ArgumentKeyAndValue>,
 }
 
@@ -718,14 +435,4 @@ impl<T, VariableDefinitionInnerType: Ord + Debug, TOutputFormat: OutputFormat>
             associated_data,
         )
     }
-}
-
-/// A scalar type in the schema.
-#[derive(Debug)]
-pub struct SchemaScalar<TOutputFormat: OutputFormat> {
-    pub description: Option<WithSpan<DescriptionValue>>,
-    pub name: WithLocation<GraphQLScalarTypeName>,
-    pub id: ServerScalarId,
-    pub javascript_name: JavascriptName,
-    pub output_format: PhantomData<TOutputFormat>,
 }

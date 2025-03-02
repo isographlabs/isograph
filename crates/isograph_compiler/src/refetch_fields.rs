@@ -58,9 +58,9 @@ fn add_refetch_field_to_object<TOutputFormat: OutputFormat>(
                         .intern()
                         .into(),
                 ),
-                name: (*REFETCH_FIELD_NAME).into(),
+                name: *REFETCH_FIELD_NAME,
                 id: next_client_field_id,
-                reader_selection_set: None,
+                reader_selection_set: vec![],
                 variant: ClientFieldVariant::ImperativelyLoadedField(
                     ImperativelyLoadedFieldVariant {
                         client_field_scalar_selection_name: *REFETCH_FIELD_NAME,

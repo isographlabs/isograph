@@ -5,12 +5,12 @@ use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
-    initial_variable_context, parent_object_id, selection_set_for_parent_query,
-    selection_type_name, variable_definitions, OutputFormat, RefetchedPathsMap,
+    initial_variable_context, ClientFieldOrPointer, OutputFormat, RefetchedPathsMap,
     ServerFieldTypeAssociatedDataInlineFragment, UserWrittenClientFieldInfo,
     UserWrittenComponentVariant, ValidatedClientField, ValidatedSchema, ValidatedSchemaServerField,
     ValidatedSelectionType,
 };
+
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
 use crate::{
@@ -115,7 +115,7 @@ pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
         file_content: reader_content,
         type_and_field: Some(ObjectTypeAndFieldName {
             type_name: parent_type.name,
-            field_name: client_field.name,
+            field_name: client_field.name.into(),
         }),
     }];
 
@@ -131,7 +131,7 @@ pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
             file_content: parameters_content,
             type_and_field: Some(ObjectTypeAndFieldName {
                 type_name: parent_type.name,
-                field_name: client_field.name,
+                field_name: client_field.name.into(),
             }),
         });
     }
@@ -192,7 +192,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TOutputFormat: OutputForm
         file_content: reader_content,
         type_and_field: Some(ObjectTypeAndFieldName {
             type_name: parent_type.name,
-            field_name,
+            field_name: field_name.into(),
         }),
     }
 }
@@ -205,7 +205,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
     let ts_file_extension = file_extensions.ts();
     let parent_type = schema
         .server_field_data
-        .object(parent_object_id(client_field));
+        .object(client_field.parent_object_id());
 
     let mut param_type_imports = BTreeSet::new();
     let mut loadable_fields = BTreeSet::new();
@@ -213,7 +213,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
     let mut updatable_fields = false;
     let client_field_parameter_type = generate_client_field_parameter_type(
         schema,
-        selection_set_for_parent_query(client_field),
+        client_field.selection_set_for_parent_query(),
         parent_type,
         &mut param_type_imports,
         &mut loadable_fields,
@@ -222,7 +222,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
     );
     let updatable_data_type = generate_client_field_updatable_data_type(
         schema,
-        selection_set_for_parent_query(client_field),
+        client_field.selection_set_for_parent_query(),
         parent_type,
         &mut param_type_imports,
         &mut loadable_fields,
@@ -233,11 +233,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
 
     let param_type_import_statement =
         param_type_imports_to_import_statement(&param_type_imports, file_extensions);
-    let reader_param_type = format!(
-        "{}__{}__param",
-        parent_type.name,
-        selection_type_name(client_field)
-    );
+    let reader_param_type = format!("{}__{}__param", parent_type.name, client_field.name());
 
     let link_field_imports = if link_fields {
         "import type { Link } from '@isograph/react';\n".to_string()
@@ -262,12 +258,9 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
         "".to_string()
     };
 
-    let (parameters_import, parameters_type) = if !variable_definitions(client_field).is_empty() {
-        let reader_parameters_type = format!(
-            "{}__{}__parameters",
-            parent_type.name,
-            selection_type_name(client_field)
-        );
+    let (parameters_import, parameters_type) = if !client_field.variable_definitions().is_empty() {
+        let reader_parameters_type =
+            format!("{}__{}__parameters", parent_type.name, client_field.name());
         (
             format!("import type {{ {reader_parameters_type} }} from './parameters_type{ts_file_extension}';\n"),
             reader_parameters_type,
@@ -303,7 +296,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
         file_content: param_type_content,
         type_and_field: Some(ObjectTypeAndFieldName {
             type_name: parent_type.name,
-            field_name: selection_type_name(client_field),
+            field_name: client_field.name().into(),
         }),
     }
 }
@@ -347,7 +340,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TOutputFormat: OutputFo
         file_content: final_output_type_text,
         type_and_field: Some(ObjectTypeAndFieldName {
             type_name: parent_type.name,
-            field_name: client_field.name,
+            field_name: client_field.name.into(),
         }),
     }
 }
