@@ -2,6 +2,7 @@ import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArti
 import {Query__PetDetailRoute__param} from './param_type';
 import {Query__PetDetailRoute__output_type} from './output_type';
 import readerResolver from './resolver_reader';
+import queryText from './query_text';
 import refetchQuery0 from './__refetch__0';
 import refetchQuery1 from './__refetch__1';
 import refetchQuery2 from './__refetch__2';
@@ -14,42 +15,6 @@ const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [
   { artifact: refetchQuery3, allowedVariables: ["checkin_id", ] },
   { artifact: refetchQuery4, allowedVariables: ["id", ] },
 ];
-
-const queryText = 'query PetDetailRoute ($id: ID!) {\
-  pet____id___v_id: pet(id: $id) {\
-    id,\
-    age,\
-    best_friend_relationship {\
-      best_friend {\
-        id,\
-        name,\
-        picture,\
-      },\
-      picture_together,\
-    },\
-    checkins____skip___l_null____limit___l_null: checkins(skip: null, limit: null) {\
-      id,\
-      location,\
-      time,\
-    },\
-    favorite_phrase,\
-    name,\
-    nickname,\
-    potential_new_best_friends {\
-      id,\
-      name,\
-    },\
-    stats {\
-      cuteness,\
-      energy,\
-      hunger,\
-      intelligence,\
-      sociability,\
-      weight,\
-    },\
-    tagline,\
-  },\
-}';
 
 const normalizationAst: NormalizationAst = {
   kind: "NormalizationAst",

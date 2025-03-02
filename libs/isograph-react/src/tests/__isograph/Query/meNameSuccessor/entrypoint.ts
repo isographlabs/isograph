@@ -2,21 +2,8 @@ import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArti
 import {Query__meNameSuccessor__param} from './param_type';
 import {Query__meNameSuccessor__output_type} from './output_type';
 import readerResolver from './resolver_reader';
+import queryText from './query_text';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
-
-const queryText = 'query meNameSuccessor  {\
-  me {\
-    id,\
-    name,\
-    successor {\
-      id,\
-      successor {\
-        id,\
-        name,\
-      },\
-    },\
-  },\
-}';
 
 const normalizationAst: NormalizationAst = {
   kind: "NormalizationAst",
