@@ -10,16 +10,17 @@ use intern::{string_key::Intern, Lookup};
 use core::panic;
 use isograph_config::CompilerConfig;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, NonConstantValue, ScalarFieldSelection,
-    ScalarFieldSelectionDirectiveSet, SelectableServerFieldId, SelectionType, ServerFieldSelection,
-    ServerObjectId, TypeAnnotation, UnionVariant, VariableDefinition,
+    ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, LinkedFieldSelectionDirectiveSet,
+    NonConstantValue, ScalarFieldSelection, ScalarFieldSelectionDirectiveSet,
+    SelectableServerFieldId, SelectionType, ServerFieldSelection, ServerObjectId, TypeAnnotation,
+    UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
     accessible_client_fields, as_server_field, description, get_provided_arguments,
     output_type_annotation, selection_map_wrapped, ClientFieldOrPointer, ClientFieldVariant,
     FieldTraversalResult, NameAndArguments, NormalizationKey, OutputFormat, RequiresRefinement,
     Schema, SchemaObject, SchemaServerFieldVariant, UserWrittenComponentVariant,
-    ValidatedClientField, ValidatedScalarFieldAssociatedData, ValidatedSchema,
+    ValidatedClientField, ValidatedScalarSelectionAssociatedData, ValidatedSchema,
     ValidatedSchemaState, ValidatedSelection, ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -680,7 +681,7 @@ fn write_param_type_from_client_field<TOutputFormat: OutputFormat>(
     loadable_fields: &mut BTreeSet<ObjectTypeAndFieldName>,
     indentation_level: u8,
     link_fields: &mut bool,
-    scalar_field_selection: &ScalarFieldSelection<ValidatedScalarFieldAssociatedData>,
+    scalar_field_selection: &ScalarFieldSelection<ValidatedScalarSelectionAssociatedData>,
     client_field_id: ClientFieldId,
 ) {
     let client_field = schema.client_field(client_field_id);
@@ -865,10 +866,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                     });
 
             match linked_field.associated_data.selection_variant {
-                ScalarFieldSelectionDirectiveSet::Loadable(_) => {
-                    panic!("@loadable server fields are not supported")
-                }
-                ScalarFieldSelectionDirectiveSet::Updatable(_) => {
+                LinkedFieldSelectionDirectiveSet::Updatable(_) => {
                     *updatable_fields = true;
                     write_getter_and_setter(
                         query_type_declaration,
@@ -878,7 +876,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                         &type_annotation,
                     );
                 }
-                ScalarFieldSelectionDirectiveSet::None(_) => {
+                LinkedFieldSelectionDirectiveSet::None(_) => {
                     query_type_declaration.push_str(&format!(
                         "readonly {}: {},\n",
                         name_or_alias,

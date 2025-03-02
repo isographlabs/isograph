@@ -8,10 +8,10 @@ use graphql_lang_types::{GraphQLTypeAnnotation, NameValuePair};
 use intern::Lookup;
 use isograph_lang_types::{
     ClientFieldId, ClientPointerId, DefinitionLocation, LinkedFieldSelection,
-    LoadableDirectiveParameters, NonConstantValue, ScalarFieldSelection,
-    ScalarFieldSelectionDirectiveSet, SelectableServerFieldId, SelectionFieldArgument,
-    SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId, ServerScalarId,
-    TypeAnnotation, VariableDefinition,
+    LinkedFieldSelectionDirectiveSet, LoadableDirectiveParameters, NonConstantValue,
+    ScalarFieldSelection, ScalarFieldSelectionDirectiveSet, SelectableServerFieldId,
+    SelectionFieldArgument, SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId,
+    ServerScalarId, TypeAnnotation, VariableDefinition,
 };
 
 use thiserror::Error;
@@ -74,13 +74,15 @@ pub struct ValidatedLinkedFieldAssociatedData {
     pub parent_object_id: ServerObjectId,
     pub field_id: DefinitionLocation<ServerFieldId, ClientPointerId>,
     // N.B. we don't actually support loadable linked fields
-    pub selection_variant: ScalarFieldSelectionDirectiveSet,
-    /// Some if the object is concrete; None otherwise.
+    pub selection_variant: LinkedFieldSelectionDirectiveSet,
+    /// Some if the (destination?) object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 }
 
+// TODO this should encode whether the scalar selection points to a
+// client field or to a server scalar
 #[derive(Debug, Clone)]
-pub struct ValidatedScalarFieldAssociatedData {
+pub struct ValidatedScalarSelectionAssociatedData {
     pub location: ValidatedFieldDefinitionLocation,
     pub selection_variant: ScalarFieldSelectionDirectiveSet,
 }
@@ -101,7 +103,7 @@ pub type ValidatedSelectionType<'a, TOutputFormat> = SelectionType<
 pub struct ValidatedSchemaState {}
 impl SchemaValidationState for ValidatedSchemaState {
     type ServerFieldTypeAssociatedData = ValidatedServerFieldTypeAssociatedData;
-    type SelectionTypeSelectionScalarFieldAssociatedData = ValidatedScalarFieldAssociatedData;
+    type SelectionTypeSelectionScalarFieldAssociatedData = ValidatedScalarSelectionAssociatedData;
     type SelectionTypeSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
     type VariableDefinitionInnerType = SelectableServerFieldId;
     type Entrypoint = HashMap<ClientFieldId, IsoLiteralText>;

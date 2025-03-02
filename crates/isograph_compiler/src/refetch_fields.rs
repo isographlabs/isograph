@@ -58,7 +58,7 @@ fn add_refetch_field_to_object<TOutputFormat: OutputFormat>(
                         .intern()
                         .into(),
                 ),
-                name: (*REFETCH_FIELD_NAME).into(),
+                name: *REFETCH_FIELD_NAME,
                 id: next_client_field_id,
                 reader_selection_set: vec![],
                 // reader_selection_set: vec![WithSpan::new(

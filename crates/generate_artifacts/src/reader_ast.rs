@@ -2,8 +2,9 @@ use std::collections::{BTreeSet, HashSet};
 
 use common_lang_types::{ClientScalarSelectableName, ObjectTypeAndFieldName, WithSpan};
 use isograph_lang_types::{
-    DefinitionLocation, EmptyDirectiveSet, LoadableDirectiveParameters, RefetchQueryIndex,
-    ScalarFieldSelectionDirectiveSet, SelectionType, ServerFieldSelection,
+    DefinitionLocation, EmptyDirectiveSet, LinkedFieldSelectionDirectiveSet,
+    LoadableDirectiveParameters, RefetchQueryIndex, ScalarFieldSelectionDirectiveSet,
+    SelectionType, ServerFieldSelection,
 };
 use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, ClientFieldOrPointer,
@@ -161,7 +162,7 @@ fn linked_field_ast_node<TOutputFormat: OutputFormat>(
 
     let is_updatable = matches!(
         linked_field.associated_data.selection_variant,
-        ScalarFieldSelectionDirectiveSet::Updatable(_)
+        LinkedFieldSelectionDirectiveSet::Updatable(_)
     );
 
     format!(

@@ -9,7 +9,7 @@ use isograph_lang_types::{
 use crate::{
     as_client_type, as_server_field, OutputFormat, SchemaServerField, SchemaServerFieldVariant,
     ServerFieldTypeAssociatedData, ServerFieldTypeAssociatedDataInlineFragment, UnvalidatedSchema,
-    ValidatedScalarFieldAssociatedData, LINK_FIELD_NAME,
+    ValidatedScalarSelectionAssociatedData, LINK_FIELD_NAME,
 };
 use common_lang_types::Location;
 
@@ -41,7 +41,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                 let typename_selection = WithSpan::new(
                     ServerFieldSelection::ScalarField(ScalarFieldSelection {
                         arguments: vec![],
-                        associated_data: ValidatedScalarFieldAssociatedData {
+                        associated_data: ValidatedScalarSelectionAssociatedData {
                             location: DefinitionLocation::Server(
                                 *as_server_field(
                                     subtype
@@ -67,7 +67,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                 let link_selection = WithSpan::new(
                     ServerFieldSelection::ScalarField(ScalarFieldSelection {
                         arguments: vec![],
-                        associated_data: ValidatedScalarFieldAssociatedData {
+                        associated_data: ValidatedScalarSelectionAssociatedData {
                             location: DefinitionLocation::Client(
                                 match *as_client_type(
                                     subtype

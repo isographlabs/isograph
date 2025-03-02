@@ -10,7 +10,7 @@ use super::create_additional_fields_error::{
 impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     pub fn add_link_fields(&mut self) -> ProcessTypeDefinitionResult<()> {
         for object in &mut self.server_field_data.server_objects {
-            let field_name = (*LINK_FIELD_NAME).into();
+            let field_name = *LINK_FIELD_NAME;
             let next_client_field_id = self.client_types.len().into();
             self.client_types.push(SelectionType::Scalar(ClientField {
                 description: Some(

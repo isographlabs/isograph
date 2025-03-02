@@ -25,8 +25,8 @@ use crate::{
     UnvalidatedLinkedFieldSelection, UnvalidatedRefetchFieldStrategy,
     UnvalidatedVariableDefinition, ValidateSchemaError, ValidateSchemaResult, ValidatedClientField,
     ValidatedClientPointer, ValidatedLinkedFieldAssociatedData, ValidatedLinkedFieldSelection,
-    ValidatedRefetchFieldStrategy, ValidatedScalarFieldAssociatedData,
-    ValidatedScalarFieldSelection, ValidatedSchemaServerField, ValidatedSelection,
+    ValidatedRefetchFieldStrategy, ValidatedScalarFieldSelection,
+    ValidatedScalarSelectionAssociatedData, ValidatedSchemaServerField, ValidatedSelection,
     ValidatedVariableDefinition,
 };
 
@@ -453,7 +453,7 @@ fn validate_field_type_exists_and_is_scalar<TOutputFormat: OutputFormat>(
                 match &server_field.associated_data {
                     SelectionType::Scalar(_) => Ok(ScalarFieldSelection {
                         name: scalar_field_selection.name,
-                        associated_data: ValidatedScalarFieldAssociatedData {
+                        associated_data: ValidatedScalarSelectionAssociatedData {
                             location: DefinitionLocation::Server(*server_field_id),
                             selection_variant: match scalar_field_selection.associated_data {
                                 ScalarFieldSelectionDirectiveSet::None(empty_struct) => {
@@ -584,7 +584,7 @@ fn validate_client_field<TOutputFormat: OutputFormat>(
     Ok(ScalarFieldSelection {
         name: scalar_field_selection.name,
         reader_alias: scalar_field_selection.reader_alias,
-        associated_data: ValidatedScalarFieldAssociatedData {
+        associated_data: ValidatedScalarSelectionAssociatedData {
             location: DefinitionLocation::Client(*client_field_id),
             selection_variant: match scalar_field_selection.associated_data {
                 ScalarFieldSelectionDirectiveSet::None(empty_struct) => {
@@ -697,14 +697,14 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
                                             missing_arguments,
                                             linked_field_selection.name.location,
                                         )?;
-                                        ScalarFieldSelectionDirectiveSet::None(empty_struct)
+                                        LinkedFieldSelectionDirectiveSet::None(empty_struct)
                                     }
                                     LinkedFieldSelectionDirectiveSet::Updatable(u) => {
                                         assert_no_missing_arguments(
                                             missing_arguments,
                                             linked_field_selection.name.location,
                                         )?;
-                                        ScalarFieldSelectionDirectiveSet::Updatable(u)
+                                        LinkedFieldSelectionDirectiveSet::Updatable(u)
                                     }
                                 },
                             },
@@ -773,14 +773,14 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
                                         missing_arguments,
                                         linked_field_selection.name.location,
                                     )?;
-                                    ScalarFieldSelectionDirectiveSet::None(empty_struct)
+                                    LinkedFieldSelectionDirectiveSet::None(empty_struct)
                                 }
                                 LinkedFieldSelectionDirectiveSet::Updatable(u) => {
                                     assert_no_missing_arguments(
                                         missing_arguments,
                                         linked_field_selection.name.location,
                                     )?;
-                                    ScalarFieldSelectionDirectiveSet::Updatable(u)
+                                    LinkedFieldSelectionDirectiveSet::Updatable(u)
                                 }
                             },
                         },
