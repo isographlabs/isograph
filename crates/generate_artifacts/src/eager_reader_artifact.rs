@@ -30,7 +30,7 @@ use crate::{
 
 pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
-    client_type: &ValidatedSelectionType<TOutputFormat>,
+    selection_type: &ValidatedSelectionType<TOutputFormat>,
     config: &CompilerConfig,
     info: UserWrittenClientTypeInfo,
     refetched_paths: &RefetchedPathsMap,
@@ -41,14 +41,14 @@ pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
     let user_written_component_variant = info.user_written_component_variant;
     let parent_type = schema
         .server_field_data
-        .object(client_type.parent_object_id());
+        .object(selection_type.parent_object_id());
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         schema,
-        client_type.selection_set_for_parent_query(),
+        selection_type.selection_set_for_parent_query(),
         0,
         refetched_paths,
-        &initial_variable_context(client_type),
+        &initial_variable_context(selection_type),
     );
 
     let function_import_statement =
@@ -57,13 +57,16 @@ pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
     let reader_import_statement =
         reader_imports_to_import_statement(&reader_imports, file_extensions);
 
-    let reader_param_type = format!("{}__{}__param", parent_type.name, client_type.name());
+    let reader_param_type = format!("{}__{}__param", parent_type.name, selection_type.name());
 
     let reader_content = if let UserWrittenComponentVariant::Eager = user_written_component_variant
     {
-        let eager_reader_name = format!("{}.{}", parent_type.name, client_type.name());
-        let reader_output_type =
-            format!("{}__{}__output_type", parent_type.name, client_type.name());
+        let eager_reader_name = format!("{}.{}", parent_type.name, selection_type.name());
+        let reader_output_type = format!(
+            "{}__{}__output_type",
+            parent_type.name,
+            selection_type.name()
+        );
         let param_type_file_name = *RESOLVER_PARAM_TYPE;
         let output_type_file_name = *RESOLVER_OUTPUT_TYPE;
         format!(
@@ -87,7 +90,7 @@ pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
             "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         )
     } else {
-        let component_name = format!("{}.{}", parent_type.name, client_type.name());
+        let component_name = format!("{}.{}", parent_type.name, selection_type.name());
         let param_type_file_name = *RESOLVER_PARAM_TYPE;
         format!(
             "import type {{ComponentReaderArtifact, ExtractSecondParam, \
@@ -116,14 +119,20 @@ pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
         file_content: reader_content,
         type_and_field: Some(ObjectTypeAndFieldName {
             type_name: parent_type.name,
-            field_name: client_type.name().into(),
+            field_name: selection_type.name().into(),
         }),
     }];
 
-    if !client_type.variable_definitions().is_empty() {
-        let reader_parameters_type =
-            format!("{}__{}__parameters", parent_type.name, client_type.name());
-        let parameters = client_type.variable_definitions().iter().map(|x| &x.item);
+    if !selection_type.variable_definitions().is_empty() {
+        let reader_parameters_type = format!(
+            "{}__{}__parameters",
+            parent_type.name,
+            selection_type.name()
+        );
+        let parameters = selection_type
+            .variable_definitions()
+            .iter()
+            .map(|x| &x.item);
         let parameters_types = generate_parameters(schema, parameters);
         let parameters_content =
             format!("export type {reader_parameters_type} = {parameters_types}\n");
@@ -132,7 +141,7 @@ pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
             file_content: parameters_content,
             type_and_field: Some(ObjectTypeAndFieldName {
                 type_name: parent_type.name,
-                field_name: client_type.name().into(),
+                field_name: selection_type.name().into(),
             }),
         });
     }
