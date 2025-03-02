@@ -20,8 +20,9 @@ use isograph_schema::{
 
 use crate::{
     generate_artifacts::{
-        NormalizationAstText, RefetchQueryArtifactImport, ENTRYPOINT_FILE_NAME, QUERY_TEXT,
-        QUERY_TEXT_FILE_NAME, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
+        NormalizationAstText, RefetchQueryArtifactImport, ENTRYPOINT_FILE_NAME, NORMALIZATION_AST,
+        NORMALIZATION_AST_FILE_NAME, QUERY_TEXT, QUERY_TEXT_FILE_NAME, RESOLVER_OUTPUT_TYPE,
+        RESOLVER_PARAM_TYPE, RESOLVER_READER,
     },
     imperatively_loaded_fields::get_artifact_for_imperatively_loaded_field,
     normalization_ast_text::generate_normalization_ast_text,
@@ -264,6 +265,7 @@ impl<TOutputFormat: OutputFormat> EntrypointArtifactInfo<'_, TOutputFormat> {
             query_name,
             parent_type,
             query_text,
+            normalization_ast_text,
             ..
         } = &self;
         let field_name = (*query_name).into();
@@ -273,6 +275,22 @@ impl<TOutputFormat: OutputFormat> EntrypointArtifactInfo<'_, TOutputFormat> {
             ArtifactPathAndContent {
                 file_content: format!("export default '{}';", query_text),
                 file_name: *QUERY_TEXT_FILE_NAME,
+                type_and_field: Some(ObjectTypeAndFieldName {
+                    type_name,
+                    field_name,
+                }),
+            },
+            ArtifactPathAndContent {
+                file_content: format!(
+                    "import type {{NormalizationAst}} from '@isograph/react';\n\
+                    const normalizationAst: NormalizationAst = {{\n\
+                    {}kind: \"NormalizationAst\",\n\
+                    {}selections: {normalization_ast_text},\n\
+                    }};\n\
+                    export default normalizationAst;\n",
+                    "  ", "  "
+                ),
+                file_name: *NORMALIZATION_AST_FILE_NAME,
                 type_and_field: Some(ObjectTypeAndFieldName {
                     type_name,
                     field_name,
@@ -291,7 +309,6 @@ impl<TOutputFormat: OutputFormat> EntrypointArtifactInfo<'_, TOutputFormat> {
 
     fn file_contents(self, file_extensions: GenerateFileExtensionsOption) -> String {
         let EntrypointArtifactInfo {
-            normalization_ast_text,
             refetch_query_artifact_import,
             query_name,
             parent_type,
@@ -307,6 +324,7 @@ impl<TOutputFormat: OutputFormat> EntrypointArtifactInfo<'_, TOutputFormat> {
         let param_type_file_name = *RESOLVER_PARAM_TYPE;
         let output_type_file_name = *RESOLVER_OUTPUT_TYPE;
         let query_text_file_name = *QUERY_TEXT;
+        let normalization_text_file_name = *NORMALIZATION_AST;
         format!(
             "import type {{IsographEntrypoint, \
             NormalizationAst, RefetchQueryNormalizationArtifactWrapper}} from '@isograph/react';\n\
@@ -314,11 +332,8 @@ impl<TOutputFormat: OutputFormat> EntrypointArtifactInfo<'_, TOutputFormat> {
             import {{{entrypoint_output_type_name}}} from './{output_type_file_name}{ts_file_extension}';\n\
             import readerResolver from './{resolver_reader_file_name}{ts_file_extension}';\n\
             import queryText from './{query_text_file_name}{ts_file_extension}';\n\
+            import normalizationAst from './{normalization_text_file_name}{ts_file_extension}';\n\
             {refetch_query_artifact_import}\n\n\
-            const normalizationAst: NormalizationAst = {{\n\
-            {}kind: \"NormalizationAst\",\n\
-            {}selections: {normalization_ast_text},\n\
-            }};\n\
             const artifact: IsographEntrypoint<\n\
             {}{entrypoint_params_typename},\n\
             {}{entrypoint_output_type_name},\n\
@@ -338,7 +353,7 @@ impl<TOutputFormat: OutputFormat> EntrypointArtifactInfo<'_, TOutputFormat> {
             {}}},\n\
             }};\n\n\
             export default artifact;\n",
-            "  ", "  ", "  ","  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ",
+            "  ", "  ", "  ","  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         )
     }
 }
