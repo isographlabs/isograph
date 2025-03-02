@@ -1,4 +1,4 @@
-use std::{fmt, hash::Hash, marker::PhantomData, ops::Deref};
+use std::{fmt, hash::Hash};
 
 use intern::{intern_struct, InternId};
 use serde::{Deserialize, Serialize};
@@ -63,47 +63,4 @@ pub struct DerivedNodeRevision {
     pub time_updated: Epoch,
     pub time_verified: Epoch,
     pub index: Index<DerivedNodeId>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct MemoRef<'db, T> {
-    pub(crate) db: &'db Database,
-    pub(crate) derived_node_id: DerivedNodeId,
-    phantom: PhantomData<T>,
-}
-
-impl<'db, T: 'static + Clone> MemoRef<'db, T> {
-    pub fn new(db: &'db Database, derived_node_id: DerivedNodeId) -> Self {
-        Self {
-            db,
-            derived_node_id,
-            phantom: PhantomData,
-        }
-    }
-
-    pub fn to_owned(&self) -> T {
-        self.deref().clone()
-    }
-}
-
-impl<T> From<MemoRef<'_, T>> for ParamId {
-    fn from(val: MemoRef<'_, T>) -> Self {
-        let idx: u64 = val.derived_node_id.index().into();
-        ParamId::from(idx)
-    }
-}
-
-impl<T: 'static> Deref for MemoRef<'_, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        self.db
-            .storage
-            .get_derived_node(self.derived_node_id)
-            .unwrap()
-            .value
-            .as_any()
-            .downcast_ref::<T>()
-            .unwrap()
-    }
 }
