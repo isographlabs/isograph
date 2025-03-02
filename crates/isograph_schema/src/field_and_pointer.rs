@@ -1,7 +1,8 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use common_lang_types::{
-    ClientPointerFieldName, DescriptionValue, ObjectTypeAndFieldName, SelectableFieldName, WithSpan,
+    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, DescriptionValue,
+    ObjectTypeAndFieldName, WithSpan,
 };
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
@@ -11,7 +12,6 @@ use isograph_lang_types::{
 
 use crate::{ClientFieldVariant, OutputFormat, RefetchStrategy};
 
-pub type ClientFieldOrPointerName = SelectionType<SelectableFieldName, ClientPointerFieldName>;
 pub type ClientFieldOrPointerId = SelectionType<ClientFieldId, ClientPointerId>;
 
 #[derive(Debug)]
@@ -22,8 +22,7 @@ pub struct ClientField<
     TOutputFormat: OutputFormat,
 > {
     pub description: Option<DescriptionValue>,
-    // TODO make this a ClientFieldName that can be converted into a SelectableFieldName
-    pub name: SelectableFieldName,
+    pub name: ClientScalarSelectableName,
     pub id: ClientFieldId,
     pub reader_selection_set: Vec<
         WithSpan<
@@ -65,7 +64,7 @@ pub struct ClientPointer<
     TOutputFormat: OutputFormat,
 > {
     pub description: Option<DescriptionValue>,
-    pub name: ClientPointerFieldName,
+    pub name: ClientObjectSelectableName,
     pub id: ClientPointerId,
     pub to: TypeAnnotation<ServerObjectId>,
 
@@ -102,7 +101,7 @@ pub trait ClientFieldOrPointer<
 >
 {
     fn description(&self) -> Option<DescriptionValue>;
-    fn name(&self) -> ClientFieldOrPointerName;
+    fn name(&self) -> ClientSelectableName;
     fn id(&self) -> ClientFieldOrPointerId;
     fn type_and_field(&self) -> ObjectTypeAndFieldName;
     fn parent_object_id(&self) -> ServerObjectId;
@@ -159,8 +158,8 @@ impl<
         self.description
     }
 
-    fn name(&self) -> ClientFieldOrPointerName {
-        SelectionType::Scalar(self.name)
+    fn name(&self) -> ClientSelectableName {
+        self.name.into()
     }
 
     fn id(&self) -> ClientFieldOrPointerId {
@@ -247,8 +246,8 @@ impl<
         self.description
     }
 
-    fn name(&self) -> ClientFieldOrPointerName {
-        SelectionType::Object(self.name)
+    fn name(&self) -> ClientSelectableName {
+        self.name.into()
     }
 
     fn id(&self) -> ClientFieldOrPointerId {

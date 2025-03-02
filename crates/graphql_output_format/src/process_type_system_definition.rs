@@ -1,8 +1,8 @@
 use std::collections::{hash_map::Entry, BTreeMap, HashMap};
 
 use common_lang_types::{
-    GraphQLObjectTypeName, GraphQLScalarTypeName, IsographObjectTypeName, Location,
-    SelectableFieldName, Span, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
+    GraphQLObjectTypeName, GraphQLScalarTypeName, IsographObjectTypeName, Location, SelectableName,
+    Span, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLFieldDefinition, GraphQLInputValueDefinition, GraphQLNamedTypeAnnotation,
@@ -279,7 +279,7 @@ pub(crate) enum ProcessGraphqlTypeSystemDefinitionError {
     // TODO include info about where the field was previously defined
     #[error("Duplicate field named \"{field_name}\" on type \"{parent_type}\"")]
     DuplicateField {
-        field_name: SelectableFieldName,
+        field_name: SelectableName,
         parent_type: IsographObjectTypeName,
     },
 
@@ -565,7 +565,7 @@ fn process_graphql_type_system_extension(
 struct FieldObjectIdsEtc<TOutputFormat: OutputFormat> {
     unvalidated_schema_fields: Vec<UnvalidatedSchemaSchemaField<TOutputFormat>>,
     // TODO this should be BTreeMap<_, WithLocation<_>> or something
-    encountered_fields: BTreeMap<SelectableFieldName, UnvalidatedObjectFieldInfo>,
+    encountered_fields: BTreeMap<SelectableName, UnvalidatedObjectFieldInfo>,
     // TODO this should not be a ServerFieldId, but a special type
     id_field: Option<ServerStrongIdFieldId>,
 }
@@ -593,7 +593,7 @@ fn get_field_objects_ids_and_names<TOutputFormat: OutputFormat>(
         let next_server_field_id = next_server_field_id_usize.into();
 
         match encountered_fields.insert(
-            field.item.name.item,
+            field.item.name.item.into(),
             DefinitionLocation::Server(next_server_field_id),
         ) {
             None => {
@@ -631,7 +631,7 @@ fn get_field_objects_ids_and_names<TOutputFormat: OutputFormat>(
             Some(_) => {
                 return Err(WithLocation::new(
                     ProcessGraphqlTypeSystemDefinitionError::DuplicateField {
-                        field_name: field.item.name.item,
+                        field_name: field.item.name.item.into(),
                         parent_type: parent_type_name,
                     },
                     field.item.name.location,
@@ -665,7 +665,7 @@ fn get_field_objects_ids_and_names<TOutputFormat: OutputFormat>(
 
     if encountered_fields
         .insert(
-            typename_name.item,
+            typename_name.item.into(),
             DefinitionLocation::Server(typename_field_id),
         )
         .is_some()

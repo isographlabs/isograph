@@ -1,17 +1,10 @@
-pub trait StringKeyNewtype:
-    From<intern::string_key::StringKey> + std::fmt::Display + Clone
-{
-}
-
 #[macro_export]
 macro_rules! string_key_newtype {
     ($named:ident) => {
         // TODO serialize, deserialize
 
         #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-        pub struct $named(intern::string_key::StringKey);
-
-        impl string_key_newtype::StringKeyNewtype for $named {}
+        pub struct $named(pub(crate) intern::string_key::StringKey);
 
         impl intern::Lookup for $named {
             fn lookup(self) -> &'static str {
@@ -42,6 +35,12 @@ macro_rules! string_key_newtype {
                 Ok($named::from(interned))
             }
         }
+
+        impl $named {
+            pub fn unchecked_conversion<T: From<intern::string_key::StringKey>>(self) -> T {
+                self.0.into()
+            }
+        }
     };
 }
 
@@ -50,8 +49,6 @@ macro_rules! string_key_newtype_no_display {
     ($named:ident) => {
         #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
         pub struct $named(intern::string_key::StringKey);
-
-        impl string_key_newtype::StringKeyNewtype for $named {}
 
         impl intern::Lookup for $named {
             fn lookup(self) -> &'static str {
@@ -75,11 +72,17 @@ macro_rules! string_key_newtype_no_display {
                 Ok($named::from(interned))
             }
         }
+
+        impl $named {
+            pub fn unchecked_conversion<T: From<intern::string_key::StringKey>>(self) -> T {
+                self.0.into()
+            }
+        }
     };
 }
 
 #[macro_export]
-macro_rules! string_key_conversion {
+macro_rules! string_key_one_way_conversion {
     (from: $from:ident, to: $to:ident) => {
         impl From<$from> for $to {
             fn from(other: $from) -> Self {

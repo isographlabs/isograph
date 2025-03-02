@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, marker::PhantomData};
 
 use common_lang_types::{
     DescriptionValue, GraphQLScalarTypeName, IsographObjectTypeName, JavascriptName,
-    SelectableFieldName, WithLocation, WithSpan,
+    SelectableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective};
 use impl_base_types_macro::impl_for_selection_type;
@@ -35,7 +35,7 @@ pub struct SchemaObject<TOutputFormat: OutputFormat> {
     /// to something else.
     pub id_field: Option<ServerStrongIdFieldId>,
     pub encountered_fields:
-        BTreeMap<SelectableFieldName, DefinitionLocation<ServerFieldId, ClientFieldOrPointerId>>,
+        BTreeMap<SelectableName, DefinitionLocation<ServerFieldId, ClientFieldOrPointerId>>,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 

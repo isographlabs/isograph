@@ -1,4 +1,4 @@
-use common_lang_types::SelectableFieldName;
+use common_lang_types::SelectableName;
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 
 use isograph_lang_types::{
@@ -74,7 +74,7 @@ fn format_server_field_type<TOutputFormat: OutputFormat>(
 
 fn format_field_definition<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
-    name: &SelectableFieldName,
+    name: &SelectableName,
     type_: &DefinitionLocation<ServerFieldId, ClientFieldOrPointerId>,
     indentation_level: u8,
 ) -> String {

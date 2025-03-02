@@ -1,6 +1,6 @@
 use common_lang_types::{
-    EnumLiteralValue, Location, SelectableFieldName, UnvalidatedTypeName, ValueKeyName,
-    VariableName, WithLocation, WithSpan,
+    EnumLiteralValue, Location, SelectableName, UnvalidatedTypeName, ValueKeyName, VariableName,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
@@ -353,7 +353,7 @@ enum ObjectLiteralFieldType {
         GraphQLTypeAnnotation<SelectableServerFieldId>,
         NameValuePair<ValueKeyName, NonConstantValue>,
     ),
-    Missing(SelectableFieldName),
+    Missing(SelectableName),
 }
 
 fn get_non_nullable_missing_and_provided_fields<TOutputFormat: OutputFormat>(
@@ -401,7 +401,7 @@ fn get_non_nullable_missing_and_provided_fields<TOutputFormat: OutputFormat>(
 
 fn validate_no_extraneous_fields(
     object_fields: &BTreeMap<
-        SelectableFieldName,
+        SelectableName,
         DefinitionLocation<ServerFieldId, ClientFieldOrPointerId>,
     >,
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],

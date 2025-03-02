@@ -1,6 +1,6 @@
 use common_lang_types::{
-    ArtifactPathAndContent, IsographObjectTypeName, ObjectTypeAndFieldName, QueryText,
-    SelectableFieldName,
+    ArtifactPathAndContent, ClientScalarSelectableName, IsographObjectTypeName,
+    ObjectTypeAndFieldName, QueryText,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::RefetchQueryIndex;
@@ -17,7 +17,7 @@ use crate::{
 pub(crate) struct ImperativelyLoadedEntrypointArtifactInfo {
     pub normalization_ast_text: NormalizationAstText,
     pub query_text: QueryText,
-    pub root_fetchable_field: SelectableFieldName,
+    pub root_fetchable_field: ClientScalarSelectableName,
     pub root_fetchable_field_parent_object: IsographObjectTypeName,
     pub refetch_query_index: RefetchQueryIndex,
     pub concrete_type: IsographObjectTypeName,
@@ -44,7 +44,7 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
             file_name: file_name_prefix,
             type_and_field: Some(ObjectTypeAndFieldName {
                 type_name,
-                field_name,
+                field_name: field_name.into(),
             }),
         }
     }

@@ -1,8 +1,8 @@
 use std::{collections::BTreeSet, fmt::Debug};
 
 use common_lang_types::{
-    IsographObjectTypeName, LinkedFieldName, Location, QueryOperationName, Span, VariableName,
-    WithLocation, WithSpan,
+    IsographObjectTypeName, Location, QueryOperationName, ServerObjectSelectableName, Span,
+    VariableName, WithLocation, WithSpan,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -70,11 +70,11 @@ pub fn generate_refetch_field_strategy<
     >,
     root_fetchable_type: ServerObjectId,
     refetch_query_name: QueryOperationName,
-    top_level_field_name: LinkedFieldName,
+    top_level_field_name: ServerObjectSelectableName,
     top_level_arguments: Vec<ArgumentKeyAndValue>,
     top_level_field_concrete_type: Option<IsographObjectTypeName>,
     refine_to_type: RequiresRefinement,
-    subfield: Option<LinkedFieldName>,
+    subfield: Option<ServerObjectSelectableName>,
     subfield_concrete_type: Option<IsographObjectTypeName>,
 ) -> UseRefetchFieldRefetchStrategy<
     TSelectionTypeSelectionScalarFieldAssociatedData,
@@ -131,12 +131,12 @@ pub trait GenerateRefetchQueryFn: Debug {
 
 #[derive(Debug)]
 struct GenerateRefetchQueryImpl {
-    top_level_field_name: LinkedFieldName,
+    top_level_field_name: ServerObjectSelectableName,
     top_level_arguments: Vec<ArgumentKeyAndValue>,
     /// Some if the object is concrete; None otherwise.
     top_level_field_concrete_type: Option<IsographObjectTypeName>,
     refine_to_type: RequiresRefinement,
-    subfield: Option<LinkedFieldName>,
+    subfield: Option<ServerObjectSelectableName>,
     /// Some if the object is concrete; None otherwise.
     subfield_concrete_type: Option<IsographObjectTypeName>,
 }

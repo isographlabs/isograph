@@ -1,4 +1,4 @@
-use common_lang_types::{FieldNameOrAlias, SelectableFieldName, WithLocation, WithSpan};
+use common_lang_types::{SelectableName, SelectableNameOrAlias, WithLocation, WithSpan};
 use isograph_lang_types::DeserializationError;
 use thiserror::Error;
 
@@ -38,7 +38,7 @@ pub enum IsographLiteralParseError {
     )]
     ExpectedLiteralToBeExported {
         literal_type: String,
-        suggested_const_export_name: SelectableFieldName,
+        suggested_const_export_name: SelectableName,
     },
 
     #[error("Expected a valid value, like $foo, 42, \"bar\", true or false")]
@@ -69,7 +69,9 @@ pub enum IsographLiteralParseError {
         "A field with name or alias `{name_or_alias}` has already been defined in \
         this client field declaration"
     )]
-    DuplicateNameOrAlias { name_or_alias: FieldNameOrAlias },
+    DuplicateNameOrAlias {
+        name_or_alias: SelectableNameOrAlias,
+    },
 
     #[error("Expected a boolean value (true or false).")]
     ExpectedBoolean,

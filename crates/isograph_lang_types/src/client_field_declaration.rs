@@ -1,8 +1,8 @@
 use common_lang_types::{
-    ClientPointerFieldName, ConstExportName, DescriptionValue, EnumLiteralValue, FieldArgumentName,
-    FieldNameOrAlias, LinkedFieldAlias, LinkedFieldName, RelativePathToSourceFile,
-    ScalarFieldAlias, ScalarFieldName, StringLiteralValue, UnvalidatedTypeName, ValueKeyName,
-    VariableName, WithLocation, WithSpan,
+    ClientObjectSelectableName, ClientScalarSelectableName, ConstExportName, DescriptionValue,
+    EnumLiteralValue, FieldArgumentName, RelativePathToSourceFile, ScalarSelectableName,
+    SelectableAlias, SelectableNameOrAlias, ServerObjectSelectableName, StringLiteralValue,
+    UnvalidatedTypeName, ValueKeyName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{FloatValue, GraphQLTypeAnnotation, NameValuePair};
 use intern::string_key::Lookup;
@@ -32,7 +32,7 @@ pub type UnvalidatedScalarFieldSelection = ScalarFieldSelection<
 pub struct ClientFieldDeclaration {
     pub const_export_name: ConstExportName,
     pub parent_type: WithSpan<UnvalidatedTypeName>,
-    pub client_field_name: WithSpan<ScalarFieldName>,
+    pub client_field_name: WithSpan<ClientScalarSelectableName>,
     pub description: Option<WithSpan<DescriptionValue>>,
     pub selection_set: Vec<
         WithSpan<
@@ -59,7 +59,7 @@ pub struct ClientPointerDeclaration {
     pub const_export_name: ConstExportName,
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub target_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
-    pub client_pointer_name: WithSpan<ClientPointerFieldName>,
+    pub client_pointer_name: WithSpan<ClientObjectSelectableName>,
     pub description: Option<WithSpan<DescriptionValue>>,
     pub selection_set: Vec<
         WithSpan<
@@ -137,7 +137,7 @@ impl<TScalarField, TLinkedField> ServerFieldSelection<TScalarField, TLinkedField
         }
     }
 
-    pub fn name_or_alias(&self) -> WithLocation<FieldNameOrAlias> {
+    pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
         match self {
             ServerFieldSelection::ScalarField(scalar_field) => scalar_field.name_or_alias(),
             ServerFieldSelection::LinkedField(linked_field) => linked_field.name_or_alias(),
@@ -162,8 +162,8 @@ impl<TScalarField, TLinkedField> ServerFieldSelection<TScalarField, TLinkedField
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct ScalarFieldSelection<TScalarField> {
-    pub name: WithLocation<ScalarFieldName>,
-    pub reader_alias: Option<WithLocation<ScalarFieldAlias>>,
+    pub name: WithLocation<ScalarSelectableName>,
+    pub reader_alias: Option<WithLocation<SelectableAlias>>,
     pub associated_data: TScalarField,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
 }
@@ -190,17 +190,17 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
         })
     }
 
-    pub fn name_or_alias(&self) -> WithLocation<FieldNameOrAlias> {
+    pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
         self.reader_alias
-            .map(|item| item.map(FieldNameOrAlias::from))
-            .unwrap_or_else(|| self.name.map(FieldNameOrAlias::from))
+            .map(|item| item.map(SelectableNameOrAlias::from))
+            .unwrap_or_else(|| self.name.map(SelectableNameOrAlias::from))
     }
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct LinkedFieldSelection<TScalarField, TLinkedField> {
-    pub name: WithLocation<LinkedFieldName>,
-    pub reader_alias: Option<WithLocation<LinkedFieldAlias>>,
+    pub name: WithLocation<ServerObjectSelectableName>,
+    pub reader_alias: Option<WithLocation<SelectableAlias>>,
     pub associated_data: TLinkedField,
     pub selection_set: Vec<WithSpan<ServerFieldSelection<TScalarField, TLinkedField>>>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
@@ -234,10 +234,10 @@ impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField
         }
     }
 
-    pub fn name_or_alias(&self) -> WithLocation<FieldNameOrAlias> {
+    pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
         self.reader_alias
-            .map(|item| item.map(FieldNameOrAlias::from))
-            .unwrap_or_else(|| self.name.map(FieldNameOrAlias::from))
+            .map(|item| item.map(SelectableNameOrAlias::from))
+            .unwrap_or_else(|| self.name.map(SelectableNameOrAlias::from))
     }
 }
 

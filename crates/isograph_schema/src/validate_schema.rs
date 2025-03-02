@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use common_lang_types::{
     EnumLiteralValue, GraphQLScalarTypeName, IsoLiteralText, IsographObjectTypeName,
-    SelectableFieldName, UnvalidatedTypeName, ValueKeyName, VariableName, WithLocation, WithSpan,
+    SelectableName, UnvalidatedTypeName, ValueKeyName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLTypeAnnotation, NameValuePair};
 use intern::Lookup;
@@ -389,7 +389,7 @@ pub enum ValidateSchemaError {
     )]
     FieldTypenameDoesNotExist {
         parent_type_name: IsographObjectTypeName,
-        field_name: SelectableFieldName,
+        field_name: SelectableName,
         field_type: UnvalidatedTypeName,
     },
 
@@ -399,7 +399,7 @@ pub enum ValidateSchemaError {
     FieldArgumentTypeDoesNotExist {
         argument_name: VariableName,
         parent_type_name: IsographObjectTypeName,
-        field_name: SelectableFieldName,
+        field_name: SelectableName,
         argument_type: UnvalidatedTypeName,
     },
 
@@ -444,9 +444,9 @@ pub enum ValidateSchemaError {
     )]
     SelectionTypeSelectionFieldDoesNotExist {
         client_field_parent_type_name: IsographObjectTypeName,
-        client_field_name: SelectableFieldName,
+        client_field_name: SelectableName,
         field_parent_type_name: IsographObjectTypeName,
-        field_name: SelectableFieldName,
+        field_name: SelectableName,
         client_type: String,
     },
 
@@ -457,9 +457,9 @@ pub enum ValidateSchemaError {
     )]
     SelectionTypeSelectionFieldIsNotScalar {
         client_field_parent_type_name: IsographObjectTypeName,
-        client_field_name: SelectableFieldName,
+        client_field_name: SelectableName,
         field_parent_type_name: IsographObjectTypeName,
-        field_name: SelectableFieldName,
+        field_name: SelectableName,
         field_type: &'static str,
         target_type_name: UnvalidatedTypeName,
         client_type: String,
@@ -472,9 +472,9 @@ pub enum ValidateSchemaError {
     )]
     SelectionTypeSelectionFieldIsScalar {
         client_field_parent_type_name: IsographObjectTypeName,
-        client_field_name: SelectableFieldName,
+        client_field_name: SelectableName,
         field_parent_type_name: IsographObjectTypeName,
-        field_name: SelectableFieldName,
+        field_name: SelectableName,
         field_type: &'static str,
         target_type_name: UnvalidatedTypeName,
         client_type: String,
@@ -487,9 +487,9 @@ pub enum ValidateSchemaError {
     )]
     SelectionTypeSelectionClientFieldSelectedAsLinked {
         client_field_parent_type_name: IsographObjectTypeName,
-        client_field_name: SelectableFieldName,
+        client_field_name: SelectableName,
         field_parent_type_name: IsographObjectTypeName,
-        field_name: SelectableFieldName,
+        field_name: SelectableName,
         client_type: String,
     },
 
@@ -500,16 +500,14 @@ pub enum ValidateSchemaError {
     )]
     SelectionTypeSelectionClientPointerSelectedAsScalar {
         client_field_parent_type_name: IsographObjectTypeName,
-        client_field_name: SelectableFieldName,
+        client_field_name: SelectableName,
         field_parent_type_name: IsographObjectTypeName,
-        field_name: SelectableFieldName,
+        field_name: SelectableName,
         client_type: String,
     },
 
     #[error("`{server_field_name}` is a server field, and cannot be selected with `@loadable`")]
-    ServerFieldCannotBeSelectedLoadably {
-        server_field_name: SelectableFieldName,
-    },
+    ServerFieldCannotBeSelectedLoadably { server_field_name: SelectableName },
 
     #[error(
         "This field has missing arguments: {0}",
@@ -522,7 +520,7 @@ pub enum ValidateSchemaError {
         missing_fields_names.iter().map(|field_name| format!("${}", field_name)).collect::<Vec<_>>().join(", ")
     )]
     MissingFields {
-        missing_fields_names: Vec<SelectableFieldName>,
+        missing_fields_names: Vec<SelectableName>,
     },
 
     #[error(
@@ -563,7 +561,7 @@ pub enum ValidateSchemaError {
     UnusedVariables {
         unused_variables: Vec<WithSpan<ValidatedVariableDefinition>>,
         type_name: IsographObjectTypeName,
-        field_name: SelectableFieldName,
+        field_name: SelectableName,
     },
 
     #[error("This variable is not defined: ${undefined_variable}")]

@@ -1,7 +1,7 @@
 use common_lang_types::{
-    ConstExportName, IsographDirectiveName, IsographObjectTypeName, LinkedFieldName, Location,
-    ObjectTypeAndFieldName, RelativePathToSourceFile, ScalarFieldName, SelectableFieldName,
-    TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
+    ClientScalarSelectableName, ConstExportName, IsographDirectiveName, IsographObjectTypeName,
+    Location, ObjectTypeAndFieldName, RelativePathToSourceFile, SelectableName,
+    ServerObjectSelectableName, TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -168,7 +168,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             ));
         }
 
-        let name = client_field_declaration.item.client_field_name.item.into();
+        let name = client_field_declaration.item.client_field_name.item;
         let variant = get_client_variant(&client_field_declaration.item);
 
         self.client_types.push(SelectionType::Scalar(ClientField {
@@ -180,7 +180,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             variable_definitions: client_field_declaration.item.variable_definitions,
             type_and_field: ObjectTypeAndFieldName {
                 type_name: object.name,
-                field_name: name,
+                field_name: name.into(),
             },
 
             parent_object_id,
@@ -336,7 +336,7 @@ pub enum ProcessClientFieldDeclarationError {
     )]
     ParentAlreadyHasField {
         parent_type_name: IsographObjectTypeName,
-        client_field_name: SelectableFieldName,
+        client_field_name: SelectableName,
     },
 
     #[error("Error when deserializing directives. Message: {message}")]
@@ -345,7 +345,7 @@ pub enum ProcessClientFieldDeclarationError {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PrimaryFieldInfo {
-    pub primary_field_name: LinkedFieldName,
+    pub primary_field_name: ServerObjectSelectableName,
     /// Some if the object is concrete; None otherwise.
     pub primary_field_concrete_type: Option<IsographObjectTypeName>,
     /// If this is abstract, we add a fragment spread
@@ -355,9 +355,9 @@ pub struct PrimaryFieldInfo {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ImperativelyLoadedFieldVariant {
-    pub client_field_scalar_selection_name: ScalarFieldName,
+    pub client_field_scalar_selection_name: ClientScalarSelectableName,
     /// What field should we select when generating the refetch query?
-    pub top_level_schema_field_name: LinkedFieldName,
+    pub top_level_schema_field_name: ServerObjectSelectableName,
     /// The arguments we must pass to the top level schema field, e.g. id: ID!
     /// for node(id: $id)
     pub top_level_schema_field_arguments: Vec<UnvalidatedVariableDefinition>,

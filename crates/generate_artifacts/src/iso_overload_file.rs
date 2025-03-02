@@ -3,7 +3,7 @@ use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::SelectionType;
 use std::cmp::Ordering;
 
-use common_lang_types::{ArtifactPathAndContent, IsoLiteralText, SelectableFieldName};
+use common_lang_types::{ArtifactPathAndContent, IsoLiteralText, SelectableName};
 use isograph_schema::{
     ClientFieldOrPointer, ClientFieldVariant, OutputFormat, UserWrittenComponentVariant,
     ValidatedClientField, ValidatedSchema, ValidatedSelectionType,
@@ -271,7 +271,7 @@ fn sorted_entrypoints<TOutputFormat: OutputFormat>(
     entrypoints
 }
 
-fn sort_field_name(field_1: SelectableFieldName, field_2: SelectableFieldName) -> Ordering {
+fn sort_field_name(field_1: SelectableName, field_2: SelectableName) -> Ordering {
     // We cannot alphabetically sort by field_name. This is because
     // if Query.Foo comes before Query.FooBar in the generated iso.ts,
     // then the iso literal containing field Query.FooBar will be

@@ -5,7 +5,8 @@ use std::{
 };
 
 use common_lang_types::{
-    DescriptionValue, GraphQLScalarTypeName, SelectableFieldName, UnvalidatedTypeName, WithLocation,
+    ClientScalarSelectableName, DescriptionValue, GraphQLScalarTypeName, SelectableName,
+    ServerScalarSelectableName, ServerSelectableName, UnvalidatedTypeName, WithLocation,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -328,6 +329,7 @@ impl<TOutputFormat: OutputFormat> ServerFieldData<TOutputFormat> {
     }
 }
 
+// TODO convert this to two structs
 #[derive(Debug, Clone)]
 pub struct SchemaServerField<
     TData,
@@ -337,7 +339,7 @@ pub struct SchemaServerField<
     pub description: Option<DescriptionValue>,
     /// The name of the server field and the location where it was defined
     /// (an iso literal or Location::Generated).
-    pub name: WithLocation<SelectableFieldName>,
+    pub name: WithLocation<ServerSelectableName>,
     pub id: ServerFieldId,
     pub associated_data: TData,
     pub parent_type_id: ServerObjectId,
@@ -397,7 +399,7 @@ impl<
 #[derive(Debug, Clone, Copy)]
 pub struct SchemaIdField<TData> {
     pub description: Option<DescriptionValue>,
-    pub name: WithLocation<SelectableFieldName>,
+    pub name: WithLocation<ServerScalarSelectableName>,
     pub id: ServerStrongIdFieldId,
     pub associated_data: TData,
     pub parent_type_id: ServerObjectId,
@@ -434,7 +436,7 @@ impl<
         // enforce that we didn't just call .inner()
         Ok(SchemaIdField {
             description: value.description,
-            name: value.name,
+            name: value.name.map(|x| x.unchecked_conversion()),
             id: value.id.0.into(),
             associated_data: value.associated_data,
             parent_type_id: value.parent_type_id,
@@ -445,12 +447,12 @@ impl<
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PathToRefetchField {
     pub linked_fields: Vec<NormalizationKey>,
-    pub field_name: SelectableFieldName,
+    pub field_name: ClientScalarSelectableName,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct NameAndArguments {
-    pub name: SelectableFieldName,
+    pub name: SelectableName,
     pub arguments: Vec<ArgumentKeyAndValue>,
 }
 

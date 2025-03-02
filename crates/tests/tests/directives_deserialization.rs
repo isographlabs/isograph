@@ -1,4 +1,4 @@
-use common_lang_types::{SelectableFieldName, StringLiteralValue, TextSource};
+use common_lang_types::{SelectableName, StringLiteralValue, TextSource};
 use graphql_lang_types::{
     from_graph_ql_directive, DeserializationError, GraphQLConstantValue, GraphQLDirective,
 };
@@ -46,7 +46,7 @@ fn test_test_mutation_extension_expose_as() -> Result<(), Box<dyn Error>> {
         "fixtures/directives/mutation_extension_valid_as.graphql"
     ))?;
     let set_tagline_mutation = ExposeFieldDirective::new(
-        Some(SelectableFieldName::from("set_puppy_tagline".intern())),
+        Some(SelectableName::from("set_puppy_tagline".intern())),
         StringLiteralValue::from("pet".intern()),
         vec![FieldMapItem {
             from: StringLiteralValue::from("id".intern()),

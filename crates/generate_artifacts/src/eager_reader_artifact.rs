@@ -115,7 +115,7 @@ pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
         file_content: reader_content,
         type_and_field: Some(ObjectTypeAndFieldName {
             type_name: parent_type.name,
-            field_name: client_field.name,
+            field_name: client_field.name.into(),
         }),
     }];
 
@@ -131,7 +131,7 @@ pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
             file_content: parameters_content,
             type_and_field: Some(ObjectTypeAndFieldName {
                 type_name: parent_type.name,
-                field_name: client_field.name,
+                field_name: client_field.name.into(),
             }),
         });
     }
@@ -192,7 +192,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TOutputFormat: OutputForm
         file_content: reader_content,
         type_and_field: Some(ObjectTypeAndFieldName {
             type_name: parent_type.name,
-            field_name,
+            field_name: field_name.into(),
         }),
     }
 }
@@ -340,7 +340,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TOutputFormat: OutputFo
         file_content: final_output_type_text,
         type_and_field: Some(ObjectTypeAndFieldName {
             type_name: parent_type.name,
-            field_name: client_field.name,
+            field_name: client_field.name.into(),
         }),
     }
 }

@@ -1,8 +1,9 @@
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, HashSet};
 
 use common_lang_types::{
-    IsographObjectTypeName, LinkedFieldName, Location, QueryOperationName, ScalarFieldName,
-    SelectableFieldName, Span, VariableName, WithLocation, WithSpan,
+    ClientScalarSelectableName, IsographObjectTypeName, Location, QueryOperationName,
+    ScalarSelectableName, SelectableName, ServerObjectSelectableName, ServerScalarSelectableName,
+    Span, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
@@ -44,15 +45,15 @@ pub struct FieldTraversalResult {
 }
 
 lazy_static! {
-    pub static ref REFETCH_FIELD_NAME: ScalarFieldName = "__refetch".intern().into();
-    pub static ref NODE_FIELD_NAME: LinkedFieldName = "node".intern().into();
-    pub static ref TYPENAME_FIELD_NAME: ScalarFieldName = "__typename".intern().into();
-    pub static ref LINK_FIELD_NAME: ScalarFieldName = "link".intern().into();
+    pub static ref REFETCH_FIELD_NAME: ClientScalarSelectableName = "__refetch".intern().into();
+    pub static ref NODE_FIELD_NAME: ServerObjectSelectableName = "node".intern().into();
+    pub static ref TYPENAME_FIELD_NAME: ServerScalarSelectableName = "__typename".intern().into();
+    pub static ref LINK_FIELD_NAME: ClientScalarSelectableName = "link".intern().into();
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RootRefetchedPath {
-    pub field_name: SelectableFieldName,
+    pub field_name: ClientScalarSelectableName,
     pub path_to_refetch_field_info: PathToRefetchFieldInfo,
 }
 
@@ -91,8 +92,7 @@ fn get_variables(arguments: &[ArgumentKeyAndValue]) -> impl Iterator<Item = Vari
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct MergedScalarFieldSelection {
-    // TODO no location
-    pub name: ScalarFieldName,
+    pub name: ScalarSelectableName,
     pub arguments: Vec<ArgumentKeyAndValue>,
 }
 
@@ -113,7 +113,7 @@ impl MergedScalarFieldSelection {
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct MergedLinkedFieldSelection {
     // TODO no location
-    pub name: LinkedFieldName,
+    pub name: ServerObjectSelectableName,
     pub selection_map: MergedSelectionMap,
     pub arguments: Vec<ArgumentKeyAndValue>,
     /// Some if the object is concrete; None otherwise.
@@ -177,7 +177,7 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
     /// among other things.
     pub variable_definitions: Vec<WithSpan<VariableDefinition<SelectableServerFieldId>>>,
     pub root_parent_object: IsographObjectTypeName,
-    pub root_fetchable_field: SelectableFieldName,
+    pub root_fetchable_field: ClientScalarSelectableName,
     pub refetch_query_index: RefetchQueryIndex,
 
     pub root_operation_name: RootOperationName,
@@ -1137,11 +1137,11 @@ fn select_typename_and_id_fields_in_merged_selection<TOutputFormat: OutputFormat
 
 pub fn selection_map_wrapped(
     mut inner_selection_map: MergedSelectionMap,
-    top_level_field: LinkedFieldName,
+    top_level_field: ServerObjectSelectableName,
     top_level_field_arguments: Vec<ArgumentKeyAndValue>,
     top_level_field_concrete_type: Option<IsographObjectTypeName>,
     // TODO support arguments and vectors of subfields
-    subfield: Option<LinkedFieldName>,
+    subfield: Option<ServerObjectSelectableName>,
     subfield_concrete_type: Option<IsographObjectTypeName>,
     type_to_refine_to: RequiresRefinement,
 ) -> MergedSelectionMap {
@@ -1208,14 +1208,14 @@ fn maybe_add_typename_selection(selections: &mut MergedSelectionMap) {
     selections.insert(
         NormalizationKey::Discriminator,
         MergedServerSelection::ScalarField(MergedScalarFieldSelection {
-            name: *TYPENAME_FIELD_NAME,
+            name: (*TYPENAME_FIELD_NAME).into(),
             arguments: vec![],
         }),
     );
 }
 
 fn get_aliased_mutation_field_name(
-    name: SelectableFieldName,
+    name: SelectableName,
     parameters: &[ArgumentKeyAndValue],
 ) -> String {
     let mut s = name.to_string();

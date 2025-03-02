@@ -4,7 +4,7 @@ use std::{
 };
 
 use common_lang_types::{
-    FieldArgumentName, Location, ObjectTypeAndFieldName, SelectableFieldName, VariableName,
+    FieldArgumentName, Location, ObjectTypeAndFieldName, SelectableName, VariableName,
     WithLocation, WithSpan,
 };
 
@@ -827,7 +827,7 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
 }
 
 fn server_field_cannot_be_selected_loadably(
-    server_field_name: SelectableFieldName,
+    server_field_name: SelectableName,
     location: Location,
 ) -> ValidateSchemaResult<()> {
     Err(WithLocation::new(

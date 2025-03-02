@@ -25,7 +25,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                 reader_selection_set: vec![],
                 variant: ClientFieldVariant::Link,
                 type_and_field: ObjectTypeAndFieldName {
-                    field_name,
+                    field_name: field_name.into(),
                     type_name: object.name,
                 },
                 refetch_strategy: None,
@@ -35,14 +35,14 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             if object
                 .encountered_fields
                 .insert(
-                    field_name,
+                    field_name.into(),
                     DefinitionLocation::Client(SelectionType::Scalar(next_client_field_id)),
                 )
                 .is_some()
             {
                 return Err(WithLocation::new(
                     CreateAdditionalFieldsError::FieldExistsOnType {
-                        field_name,
+                        field_name: field_name.into(),
                         parent_type: object.name,
                     },
                     Location::generated(),

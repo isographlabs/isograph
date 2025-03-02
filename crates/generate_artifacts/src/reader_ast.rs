@@ -1,6 +1,6 @@
 use std::collections::{BTreeSet, HashSet};
 
-use common_lang_types::{ObjectTypeAndFieldName, SelectableFieldName, WithSpan};
+use common_lang_types::{ClientScalarSelectableName, ObjectTypeAndFieldName, WithSpan};
 use isograph_lang_types::{
     DefinitionLocation, EmptyDirectiveSet, LoadableDirectiveParameters, RefetchQueryIndex,
     ScalarFieldSelectionDirectiveSet, SelectionType, ServerFieldSelection,
@@ -345,7 +345,7 @@ fn imperatively_loaded_variant_ast_node<TOutputFormat: OutputFormat>(
     let refetch_query_index = find_imperatively_fetchable_query_index(
         root_refetched_paths,
         path,
-        scalar_field_selection.name.item.into(),
+        scalar_field_selection.name.item.unchecked_conversion(),
     )
     .0;
 
@@ -543,7 +543,7 @@ fn get_nested_refetch_query_text(
 fn find_imperatively_fetchable_query_index(
     paths: &RefetchedPathsMap,
     outer_path: &[NormalizationKey],
-    imperatively_fetchable_field_name: SelectableFieldName,
+    imperatively_fetchable_field_name: ClientScalarSelectableName,
 ) -> RefetchQueryIndex {
     paths
         .iter()

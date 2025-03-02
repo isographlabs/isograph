@@ -1,5 +1,5 @@
 use common_lang_types::{
-    IsographObjectTypeName, Location, ScalarFieldName, TextSource, UnvalidatedTypeName,
+    IsographObjectTypeName, Location, ServerScalarSelectableName, TextSource, UnvalidatedTypeName,
     WithLocation, WithSpan,
 };
 use isograph_lang_types::{
@@ -80,7 +80,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 
     fn validate_client_field(
         &self,
-        field_name: WithSpan<ScalarFieldName>,
+        field_name: WithSpan<ServerScalarSelectableName>,
         text_source: TextSource,
         parent_object_id: ServerObjectId,
     ) -> Result<ClientFieldId, WithLocation<ValidateEntrypointDeclarationError>> {
@@ -138,13 +138,13 @@ pub enum ValidateEntrypointDeclarationError {
     #[error("The client field `{parent_type_name}.{client_field_name}` is not defined.")]
     ClientFieldMustExist {
         parent_type_name: IsographObjectTypeName,
-        client_field_name: ScalarFieldName,
+        client_field_name: ServerScalarSelectableName,
     },
 
     // N.B. We could conceivably support fetching server fields, though!
     #[error("The field `{parent_type_name}.{client_field_name}` is a server field. It must be a client defined field.")]
     FieldMustBeClientField {
         parent_type_name: IsographObjectTypeName,
-        client_field_name: ScalarFieldName,
+        client_field_name: ServerScalarSelectableName,
     },
 }

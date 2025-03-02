@@ -1,7 +1,7 @@
 use intern::Lookup;
 use std::{collections::HashMap, fmt::Debug};
 
-use common_lang_types::{SelectableFieldName, VariableName, WithLocation, WithSpan};
+use common_lang_types::{SelectableName, VariableName, WithLocation, WithSpan};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ConstantValue, NonConstantValue, ScalarFieldSelectionDirectiveSet,
     SelectionFieldArgument, SelectionType,
@@ -219,7 +219,7 @@ pub fn transform_name_and_arguments_with_child_variable_context(
 }
 
 pub fn create_transformed_name_and_arguments(
-    name: SelectableFieldName,
+    name: SelectableName,
     arguments: &[WithLocation<SelectionFieldArgument>],
     variable_context: &VariableContext,
 ) -> NameAndArguments {

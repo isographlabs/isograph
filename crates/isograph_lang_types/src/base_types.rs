@@ -2,7 +2,7 @@
 
 use std::fmt::Display;
 
-use common_lang_types::{SelectableFieldName, UnvalidatedTypeName};
+use common_lang_types::{SelectableName, UnvalidatedTypeName};
 use intern::Lookup;
 
 /// Distinguishes between server-defined items and locally-defined items.
@@ -50,8 +50,8 @@ impl<T0: Display, T1: Display> Display for SelectionType<T0, T1> {
     }
 }
 
-impl<T0: Into<SelectableFieldName>, T1: Into<SelectableFieldName>> From<SelectionType<T0, T1>>
-    for SelectableFieldName
+impl<T0: Into<SelectableName>, T1: Into<SelectableName>> From<SelectionType<T0, T1>>
+    for SelectableName
 {
     fn from(value: SelectionType<T0, T1>) -> Self {
         match value {
