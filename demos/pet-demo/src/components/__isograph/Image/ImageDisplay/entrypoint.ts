@@ -2,17 +2,8 @@ import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArti
 import {Image__ImageDisplay__param} from './param_type';
 import {Image__ImageDisplay__output_type} from './output_type';
 import readerResolver from './resolver_reader';
+import queryText from './query_text';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
-
-const queryText = 'query ImageDisplay ($id: ID!) {\
-  node____id___v_id: node(id: $id) {\
-    ... on Image {\
-      __typename,\
-      id,\
-      url,\
-    },\
-  },\
-}';
 
 const normalizationAst: NormalizationAst = {
   kind: "NormalizationAst",

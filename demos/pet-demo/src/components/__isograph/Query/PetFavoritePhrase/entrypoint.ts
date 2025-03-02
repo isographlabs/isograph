@@ -2,15 +2,8 @@ import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArti
 import {Query__PetFavoritePhrase__param} from './param_type';
 import {Query__PetFavoritePhrase__output_type} from './output_type';
 import readerResolver from './resolver_reader';
+import queryText from './query_text';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
-
-const queryText = 'query PetFavoritePhrase ($id: ID!) {\
-  pet____id___v_id: pet(id: $id) {\
-    id,\
-    favorite_phrase,\
-    name,\
-  },\
-}';
 
 const normalizationAst: NormalizationAst = {
   kind: "NormalizationAst",

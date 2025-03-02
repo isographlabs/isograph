@@ -2,33 +2,8 @@ import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArti
 import {Viewer__NewsfeedPaginationComponent__param} from './param_type';
 import {Viewer__NewsfeedPaginationComponent__output_type} from './output_type';
 import readerResolver from './resolver_reader';
+import queryText from './query_text';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
-
-const queryText = 'query NewsfeedPaginationComponent ($skip: Int!, $limit: Int!, $id: ID!) {\
-  node____id___v_id: node(id: $id) {\
-    ... on Viewer {\
-      __typename,\
-      id,\
-      newsfeed____skip___v_skip____limit___v_limit: newsfeed(skip: $skip, limit: $limit) {\
-        __typename,\
-        ... on AdItem {\
-          id,\
-          __typename,\
-        },\
-        ... on BlogItem {\
-          id,\
-          __typename,\
-          author,\
-          content,\
-          image {\
-            id,\
-          },\
-          title,\
-        },\
-      },\
-    },\
-  },\
-}';
 
 const normalizationAst: NormalizationAst = {
   kind: "NormalizationAst",

@@ -2,21 +2,11 @@ import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArti
 import {Query__PetCheckinListRoute__param} from './param_type';
 import {Query__PetCheckinListRoute__output_type} from './output_type';
 import readerResolver from './resolver_reader';
+import queryText from './query_text';
 import refetchQuery0 from './__refetch__0';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [
   { artifact: refetchQuery0, allowedVariables: ["checkin_id", ] },
 ];
-
-const queryText = 'query PetCheckinListRoute ($id: ID!) {\
-  pet____id___v_id: pet(id: $id) {\
-    id,\
-    checkins____skip___l_0____limit___l_1: checkins(skip: 0, limit: 1) {\
-      id,\
-      location,\
-    },\
-    name,\
-  },\
-}';
 
 const normalizationAst: NormalizationAst = {
   kind: "NormalizationAst",
