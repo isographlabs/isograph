@@ -21,7 +21,7 @@ Ok(
                                 },
                             },
                             client_field_name: WithSpan {
-                                item: ScalarFieldName(
+                                item: ClientScalarSelectableName(
                                     "Name",
                                 ),
                                 span: Span {
@@ -55,7 +55,7 @@ Ok(
                                                         },
                                                     },
                                                 ),
-                                                item: ScalarFieldName(
+                                                item: ScalarSelectableName(
                                                     "scalar",
                                                 ),
                                             },
@@ -95,7 +95,7 @@ Ok(
                                                         },
                                                     },
                                                 ),
-                                                item: LinkedFieldName(
+                                                item: ServerObjectSelectableName(
                                                     "linked",
                                                 ),
                                             },
@@ -128,7 +128,7 @@ Ok(
                                                                         },
                                                                     },
                                                                 ),
-                                                                item: ScalarFieldName(
+                                                                item: ScalarSelectableName(
                                                                     "scalarWithComma",
                                                                 ),
                                                             },
@@ -177,7 +177,7 @@ Ok(
                                                         },
                                                     },
                                                 ),
-                                                item: LinkedFieldName(
+                                                item: ServerObjectSelectableName(
                                                     "linkedWithComma",
                                                 ),
                                             },
@@ -210,7 +210,7 @@ Ok(
                                                                         },
                                                                     },
                                                                 ),
-                                                                item: ScalarFieldName(
+                                                                item: ScalarSelectableName(
                                                                     "blah",
                                                                 ),
                                                             },
@@ -259,7 +259,7 @@ Ok(
                                                         },
                                                     },
                                                 ),
-                                                item: ScalarFieldName(
+                                                item: ScalarSelectableName(
                                                     "multiple",
                                                 ),
                                             },
@@ -299,7 +299,7 @@ Ok(
                                                         },
                                                     },
                                                 ),
-                                                item: ScalarFieldName(
+                                                item: ScalarSelectableName(
                                                     "on",
                                                 ),
                                             },
@@ -339,7 +339,7 @@ Ok(
                                                         },
                                                     },
                                                 ),
-                                                item: ScalarFieldName(
+                                                item: ScalarSelectableName(
                                                     "the",
                                                 ),
                                             },
@@ -379,7 +379,7 @@ Ok(
                                                         },
                                                     },
                                                 ),
-                                                item: ScalarFieldName(
+                                                item: ScalarSelectableName(
                                                     "same",
                                                 ),
                                             },
@@ -419,7 +419,7 @@ Ok(
                                                         },
                                                     },
                                                 ),
-                                                item: ScalarFieldName(
+                                                item: ScalarSelectableName(
                                                     "line",
                                                 ),
                                             },
@@ -459,7 +459,7 @@ Ok(
                                                         },
                                                     },
                                                 ),
-                                                item: ScalarFieldName(
+                                                item: ScalarSelectableName(
                                                     "including",
                                                 ),
                                             },
@@ -499,7 +499,7 @@ Ok(
                                                         },
                                                     },
                                                 ),
-                                                item: LinkedFieldName(
+                                                item: ServerObjectSelectableName(
                                                     "youCanEndWithALinkedField",
                                                 ),
                                             },
@@ -532,7 +532,7 @@ Ok(
                                                                         },
                                                                     },
                                                                 ),
-                                                                item: ScalarFieldName(
+                                                                item: ScalarSelectableName(
                                                                     "butWhyWouldYouDoThat",
                                                                 ),
                                                             },
