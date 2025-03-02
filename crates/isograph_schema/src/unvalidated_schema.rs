@@ -7,9 +7,9 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    DefinitionLocation, EntrypointDeclaration, LinkedFieldSelection,
-    LinkedFieldSelectionDirectiveSet, ScalarFieldSelectionDirectiveSet, SelectableServerFieldId,
-    ServerFieldId, ServerScalarId, VariableDefinition,
+    DefinitionLocation, EntrypointDeclaration, LinkedFieldSelection, ObjectSelectionDirectiveSet,
+    ScalarSelectionDirectiveSet, SelectableServerFieldId, ServerFieldId, ServerScalarId,
+    VariableDefinition,
 };
 
 use crate::{
@@ -31,8 +31,8 @@ type UnvalidatedServerFieldTypeAssociatedData =
 
 impl SchemaValidationState for UnvalidatedSchemaState {
     type ServerFieldTypeAssociatedData = UnvalidatedServerFieldTypeAssociatedData;
-    type SelectionTypeSelectionScalarFieldAssociatedData = ScalarFieldSelectionDirectiveSet;
-    type SelectionTypeSelectionLinkedFieldAssociatedData = LinkedFieldSelectionDirectiveSet;
+    type SelectionTypeSelectionScalarFieldAssociatedData = ScalarSelectionDirectiveSet;
+    type SelectionTypeSelectionLinkedFieldAssociatedData = ObjectSelectionDirectiveSet;
     type VariableDefinitionInnerType = UnvalidatedTypeName;
     type Entrypoint = Vec<(TextSource, WithSpan<EntrypointDeclaration>)>;
 }

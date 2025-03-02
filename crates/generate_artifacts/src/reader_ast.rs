@@ -2,9 +2,9 @@ use std::collections::{BTreeSet, HashSet};
 
 use common_lang_types::{ClientScalarSelectableName, ObjectTypeAndFieldName, WithSpan};
 use isograph_lang_types::{
-    DefinitionLocation, EmptyDirectiveSet, LinkedFieldSelectionDirectiveSet,
-    LoadableDirectiveParameters, RefetchQueryIndex, ScalarFieldSelectionDirectiveSet,
-    SelectionType, ServerFieldSelection,
+    DefinitionLocation, EmptyDirectiveSet, LoadableDirectiveParameters,
+    ObjectSelectionDirectiveSet, RefetchQueryIndex, ScalarSelectionDirectiveSet, SelectionType,
+    ServerFieldSelection,
 };
 use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, ClientFieldOrPointer,
@@ -162,7 +162,7 @@ fn linked_field_ast_node<TOutputFormat: OutputFormat>(
 
     let is_updatable = matches!(
         linked_field.associated_data.selection_variant,
-        LinkedFieldSelectionDirectiveSet::Updatable(_)
+        ObjectSelectionDirectiveSet::Updatable(_)
     );
 
     format!(
@@ -466,7 +466,7 @@ fn server_defined_scalar_field_ast_node(
     );
     let is_updatable = matches!(
         scalar_field_selection.associated_data.selection_variant,
-        ScalarFieldSelectionDirectiveSet::Updatable(_)
+        ScalarSelectionDirectiveSet::Updatable(_)
     );
     let indent_1 = "  ".repeat(indentation_level as usize);
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
@@ -645,9 +645,7 @@ fn refetched_paths_with_path<TOutputFormat: OutputFormat>(
                                     &initial_variable_context.child_variable_context(
                                         &scalar_field_selection.arguments,
                                         &client_field.variable_definitions,
-                                        &ScalarFieldSelectionDirectiveSet::None(
-                                            EmptyDirectiveSet {},
-                                        ),
+                                        &ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
                                     ),
                                 );
 

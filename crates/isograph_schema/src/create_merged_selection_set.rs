@@ -11,7 +11,7 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
-    RefetchQueryIndex, ScalarFieldSelectionDirectiveSet, SelectableServerFieldId,
+    RefetchQueryIndex, ScalarSelectionDirectiveSet, SelectableServerFieldId,
     SelectionFieldArgument, SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId,
     VariableDefinition,
 };
@@ -194,7 +194,7 @@ pub struct PathToRefetchFieldInfo {
 }
 
 pub type RefetchedPathsMap =
-    BTreeMap<(PathToRefetchField, ScalarFieldSelectionDirectiveSet), RootRefetchedPath>;
+    BTreeMap<(PathToRefetchField, ScalarSelectionDirectiveSet), RootRefetchedPath>;
 
 /// As we traverse, whenever we enter a new scalar client field (including at the
 /// root, with the entrypoint), we create a new one of these and pass it down.
@@ -674,11 +674,11 @@ fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
                 match &scalar_field_selection.associated_data.location {
                     DefinitionLocation::Server(_) => {
                         match scalar_field_selection.associated_data.selection_variant {
-                            ScalarFieldSelectionDirectiveSet::Updatable(_) => {
+                            ScalarSelectionDirectiveSet::Updatable(_) => {
                                 merge_traversal_state.has_updatable = true;
                             }
-                            ScalarFieldSelectionDirectiveSet::None(_) => (),
-                            ScalarFieldSelectionDirectiveSet::Loadable(_) => (),
+                            ScalarSelectionDirectiveSet::None(_) => (),
+                            ScalarSelectionDirectiveSet::Loadable(_) => (),
                         };
 
                         merge_scalar_server_field(
@@ -963,7 +963,7 @@ fn insert_imperative_field_into_refetch_paths<TOutputFormat: OutputFormat>(
     merge_traversal_state.refetch_paths.insert(
         (
             path,
-            ScalarFieldSelectionDirectiveSet::None(EmptyDirectiveSet {}),
+            ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
         ),
         RootRefetchedPath {
             field_name: newly_encountered_scalar_client_field.name,
@@ -1037,7 +1037,7 @@ fn merge_non_loadable_client_type<TOutputFormat: OutputFormat>(
     let transformed_child_variable_context = parent_variable_context.child_variable_context(
         selection_arguments,
         newly_encountered_client_type.variable_definitions(),
-        &ScalarFieldSelectionDirectiveSet::None(EmptyDirectiveSet {}),
+        &ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
     );
     transform_and_merge_child_selection_map_into_parent_map(
         parent_map,

@@ -10,8 +10,8 @@ use intern::{string_key::Intern, Lookup};
 use core::panic;
 use isograph_config::CompilerConfig;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, LinkedFieldSelectionDirectiveSet,
-    NonConstantValue, ScalarFieldSelection, ScalarFieldSelectionDirectiveSet,
+    ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, NonConstantValue,
+    ObjectSelectionDirectiveSet, ScalarFieldSelection, ScalarSelectionDirectiveSet,
     SelectableServerFieldId, SelectionType, ServerFieldSelection, ServerObjectId, TypeAnnotation,
     UnionVariant, VariableDefinition,
 };
@@ -710,9 +710,9 @@ fn write_param_type_from_client_field<TOutputFormat: OutputFormat>(
                 client_field.type_and_field.underscore_separated()
             );
             let output_type = match scalar_field_selection.associated_data.selection_variant {
-                ScalarFieldSelectionDirectiveSet::Updatable(_)
-                | ScalarFieldSelectionDirectiveSet::None(_) => inner_output_type,
-                ScalarFieldSelectionDirectiveSet::Loadable(_) => {
+                ScalarSelectionDirectiveSet::Updatable(_)
+                | ScalarSelectionDirectiveSet::None(_) => inner_output_type,
+                ScalarSelectionDirectiveSet::Loadable(_) => {
                     loadable_fields.insert(client_field.type_and_field);
                     let provided_arguments = get_provided_arguments(
                         client_field.variable_definitions.iter().map(|x| &x.item),
@@ -799,7 +799,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                     };
 
                     match scalar_field_selection.associated_data.selection_variant {
-                        ScalarFieldSelectionDirectiveSet::Updatable(_) => {
+                        ScalarSelectionDirectiveSet::Updatable(_) => {
                             *updatable_fields = true;
                             query_type_declaration
                                 .push_str(&"  ".repeat(indentation_level as usize).to_string());
@@ -809,10 +809,10 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                                 print_javascript_type_declaration(&output_type)
                             ));
                         }
-                        ScalarFieldSelectionDirectiveSet::Loadable(_) => {
+                        ScalarSelectionDirectiveSet::Loadable(_) => {
                             panic!("@loadable server fields are not supported")
                         }
-                        ScalarFieldSelectionDirectiveSet::None(_) => {
+                        ScalarSelectionDirectiveSet::None(_) => {
                             query_type_declaration.push_str(&format!(
                                 "{}readonly {}: {},\n",
                                 "  ".repeat(indentation_level as usize),
@@ -866,7 +866,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                     });
 
             match linked_field.associated_data.selection_variant {
-                LinkedFieldSelectionDirectiveSet::Updatable(_) => {
+                ObjectSelectionDirectiveSet::Updatable(_) => {
                     *updatable_fields = true;
                     write_getter_and_setter(
                         query_type_declaration,
@@ -876,7 +876,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                         &type_annotation,
                     );
                 }
-                LinkedFieldSelectionDirectiveSet::None(_) => {
+                ObjectSelectionDirectiveSet::None(_) => {
                     query_type_declaration.push_str(&format!(
                         "readonly {}: {},\n",
                         name_or_alias,
