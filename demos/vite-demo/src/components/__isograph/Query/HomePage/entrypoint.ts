@@ -2,18 +2,8 @@ import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArti
 import {Query__HomePage__param} from './param_type';
 import {Query__HomePage__output_type} from './output_type';
 import readerResolver from './resolver_reader';
+import queryText from './query_text';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
-
-const queryText = 'query HomePage  {\
-  getAllPokemon____take___l_232____offset___l_93: getAllPokemon(take: 232, offset: 93) {\
-    bulbapediaPage,\
-    forme,\
-    key,\
-    num,\
-    species,\
-    sprite,\
-  },\
-}';
 
 const normalizationAst: NormalizationAst = {
   kind: "NormalizationAst",

@@ -2,36 +2,8 @@ import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArti
 import {Query__PullRequest__param} from './param_type';
 import {Query__PullRequest__output_type} from './output_type';
 import readerResolver from './resolver_reader';
+import queryText from './query_text';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
-
-const queryText = 'query PullRequest ($repositoryOwner: String!, $repositoryName: String!, $pullRequestNumber: Int!) {\
-  repository____owner___v_repositoryOwner____name___v_repositoryName: repository(owner: $repositoryOwner, name: $repositoryName) {\
-    id,\
-    pullRequest____number___v_pullRequestNumber: pullRequest(number: $pullRequestNumber) {\
-      id,\
-      bodyHTML,\
-      comments____last___l_10: comments(last: 10) {\
-        edges {\
-          node {\
-            id,\
-            author {\
-              __typename,\
-              login,\
-            },\
-            bodyText,\
-            createdAt,\
-          },\
-        },\
-      },\
-      title,\
-    },\
-  },\
-  viewer {\
-    id,\
-    avatarUrl,\
-    name,\
-  },\
-}';
 
 const normalizationAst: NormalizationAst = {
   kind: "NormalizationAst",

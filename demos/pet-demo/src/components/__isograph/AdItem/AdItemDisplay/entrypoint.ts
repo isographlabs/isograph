@@ -2,18 +2,8 @@ import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArti
 import {AdItem__AdItemDisplay__param} from './param_type';
 import {AdItem__AdItemDisplay__output_type} from './output_type';
 import readerResolver from './resolver_reader';
+import queryText from './query_text';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
-
-const queryText = 'query AdItemDisplay ($id: ID!) {\
-  node____id___v_id: node(id: $id) {\
-    ... on AdItem {\
-      __typename,\
-      id,\
-      advertiser,\
-      message,\
-    },\
-  },\
-}';
 
 const normalizationAst: NormalizationAst = {
   kind: "NormalizationAst",

@@ -2,17 +2,8 @@ import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArti
 import {BlogItem__BlogItemMoreDetail__param} from './param_type';
 import {BlogItem__BlogItemMoreDetail__output_type} from './output_type';
 import readerResolver from './resolver_reader';
+import queryText from './query_text';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
-
-const queryText = 'query BlogItemMoreDetail ($id: ID!) {\
-  node____id___v_id: node(id: $id) {\
-    ... on BlogItem {\
-      __typename,\
-      id,\
-      moreContent,\
-    },\
-  },\
-}';
 
 const normalizationAst: NormalizationAst = {
   kind: "NormalizationAst",
