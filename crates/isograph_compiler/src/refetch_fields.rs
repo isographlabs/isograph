@@ -61,18 +61,6 @@ fn add_refetch_field_to_object<TOutputFormat: OutputFormat>(
                 name: *REFETCH_FIELD_NAME,
                 id: next_client_field_id,
                 reader_selection_set: vec![],
-                // reader_selection_set: vec![WithSpan::new(
-                //     isograph_lang_types::ServerFieldSelection::ScalarField(ScalarFieldSelection {
-                //         name: WithLocation::new("id".intern().into(), Location::generated()),
-                //         reader_alias: None,
-                //         associated_data:
-                //             isograph_lang_types::ScalarFieldSelectionDirectiveSet::None(
-                //                 EmptyDirectiveSet {},
-                //             ),
-                //         arguments: vec![],
-                //     }),
-                //     Span::todo_generated(),
-                // )],
                 variant: ClientFieldVariant::ImperativelyLoadedField(
                     ImperativelyLoadedFieldVariant {
                         client_field_scalar_selection_name: *REFETCH_FIELD_NAME,
