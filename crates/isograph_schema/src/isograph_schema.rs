@@ -18,8 +18,8 @@ use lazy_static::lazy_static;
 
 use crate::{
     field_and_pointer::{ClientField, ClientPointer},
-    schema_scalar_and_object::{SchemaObject, SchemaScalar, SchemaType},
     schema_validation_state::SchemaValidationState,
+    server_scalar_and_object::{SchemaObject, SchemaScalar, SchemaType},
     ClientFieldOrPointerId, NormalizationKey, OutputFormat, ServerFieldTypeAssociatedData,
 };
 
