@@ -17,7 +17,7 @@ fn basic_retained() {
     memoized_b(&db);
     assert_eq!(B_COUNTER.load(Ordering::SeqCst), 1);
 
-    let retain = db.retain(&memo_ref_a);
+    let retain = db.retain(memo_ref_a);
     retain.never_garbage_collect();
 
     // Run GC. both are retained — b, because of the LRU cache, and a, because of
