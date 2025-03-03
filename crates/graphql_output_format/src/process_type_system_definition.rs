@@ -343,15 +343,17 @@ pub(crate) fn process_object_type_definition(
     type_definition_type: &'static str,
 ) -> ProcessTypeDefinitionResult<ProcessObjectTypeDefinitionOutcome> {
     let &mut Schema {
-        server_fields: ref mut schema_fields,
-        server_field_data: ref mut schema_data,
+        ref mut server_fields,
+        ref mut server_field_data,
         ..
     } = schema;
-    let next_object_id = schema_data.server_objects.len().into();
-    let string_type_for_typename = schema_data.scalar(schema_data.string_type_id).name;
-    let type_names = &mut schema_data.defined_types;
-    let objects = &mut schema_data.server_objects;
-    let encountered_root_kind = match type_names.entry(object_type_definition.name.item.into()) {
+    let next_object_id = server_field_data.server_objects.len().into();
+    let string_type_for_typename = server_field_data
+        .scalar(server_field_data.string_type_id)
+        .name;
+    let defined_types = &mut server_field_data.defined_types;
+    let server_objects = &mut server_field_data.server_objects;
+    let encountered_root_kind = match defined_types.entry(object_type_definition.name.item.into()) {
         Entry::Occupied(_) => {
             return Err(WithLocation::new(
                 ProcessGraphqlTypeSystemDefinitionError::DuplicateTypeDefinition {
@@ -371,7 +373,7 @@ pub(crate) fn process_object_type_definition(
                 id_field,
             } = get_field_objects_ids_and_names(
                 type_def_2.fields,
-                schema_fields.len(),
+                server_fields.len(),
                 next_object_id,
                 type_def_2.name.item,
                 get_typename_type(string_type_for_typename.item),
@@ -379,7 +381,7 @@ pub(crate) fn process_object_type_definition(
                 options,
             )?;
 
-            objects.push(SchemaObject {
+            server_objects.push(SchemaObject {
                 description: object_type_definition.description.map(|d| d.item),
                 name: object_type_definition.name.item,
                 id: next_object_id,
@@ -390,7 +392,7 @@ pub(crate) fn process_object_type_definition(
                 output_associated_data: associated_data,
             });
 
-            schema_fields.extend(unvalidated_schema_fields);
+            server_fields.extend(unvalidated_schema_fields);
             vacant.insert(SelectableServerFieldId::Object(next_object_id));
 
             // TODO default types are a GraphQL-land concept, but this is Isograph-land
@@ -436,12 +438,12 @@ fn process_scalar_definition(
     scalar_type_definition: GraphQLScalarTypeDefinition,
 ) -> ProcessTypeDefinitionResult<()> {
     let &mut Schema {
-        server_field_data: ref mut schema_data,
+        ref mut server_field_data,
         ..
     } = schema;
-    let next_scalar_id = schema_data.server_scalars.len().into();
-    let type_names = &mut schema_data.defined_types;
-    let scalars = &mut schema_data.server_scalars;
+    let next_scalar_id = server_field_data.server_scalars.len().into();
+    let type_names = &mut server_field_data.defined_types;
+    let scalars = &mut server_field_data.server_scalars;
     match type_names.entry(scalar_type_definition.name.item.into()) {
         Entry::Occupied(_) => {
             return Err(WithLocation::new(
