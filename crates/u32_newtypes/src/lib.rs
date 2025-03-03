@@ -36,6 +36,10 @@ macro_rules! u32_newtype {
             pub fn as_usize(&self) -> usize {
                 self.0 as usize
             }
+
+            pub fn unchecked_conversion<T: From<u32>>(self) -> T {
+                self.0.into()
+            }
         }
     };
 }
