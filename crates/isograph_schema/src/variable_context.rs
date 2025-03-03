@@ -137,11 +137,8 @@ pub fn initial_variable_context<
     VariableContext(variable_context)
 }
 
-impl<
-        TData,
-        TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
-        TOutputFormat: OutputFormat,
-    > SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>
+impl<TClientFieldVariableDefinitionAssociatedData: Ord + Debug, TOutputFormat: OutputFormat>
+    SchemaServerField<TClientFieldVariableDefinitionAssociatedData, TOutputFormat>
 {
     pub fn initial_variable_context(&self) -> VariableContext {
         let variable_context = self

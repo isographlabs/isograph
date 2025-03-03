@@ -9,9 +9,9 @@ use isograph_lang_types::{
 use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, ClientFieldOrPointer,
     ClientFieldVariant, Loadability, NameAndArguments, NormalizationKey, OutputFormat,
-    PathToRefetchField, RefetchedPathsMap, SchemaServerFieldVariant, ValidatedClientField,
-    ValidatedLinkedFieldSelection, ValidatedScalarFieldSelection, ValidatedSchema,
-    ValidatedSelection, VariableContext,
+    PathToRefetchField, RefetchedPathsMap, SchemaServerLinkedFieldFieldVariant,
+    ValidatedClientField, ValidatedLinkedFieldSelection, ValidatedScalarFieldSelection,
+    ValidatedSchema, ValidatedSelection, VariableContext,
 };
 
 use crate::{
@@ -132,10 +132,11 @@ fn linked_field_ast_node<TOutputFormat: OutputFormat>(
             )
         }
         DefinitionLocation::Server(server_field_id) => {
-            match &schema.server_field(server_field_id).associated_data {
+            let server_field = schema.server_field(server_field_id);
+            match &server_field.associated_data.type_name.inner() {
                 SelectionType::Scalar(_) => panic!("Expected object"),
-                SelectionType::Object(associated_data) => match &associated_data.variant {
-                    SchemaServerFieldVariant::InlineFragment(inline_fragment) => {
+                SelectionType::Object(_) => match &server_field.associated_data.variant {
+                    SchemaServerLinkedFieldFieldVariant::InlineFragment(inline_fragment) => {
                         let parent_object_id = schema
                             .server_field(inline_fragment.server_field_id)
                             .parent_type_id;
@@ -154,7 +155,7 @@ fn linked_field_ast_node<TOutputFormat: OutputFormat>(
 
                         reader_artifact_import_name
                     }
-                    SchemaServerFieldVariant::LinkedField => "null".to_string(),
+                    SchemaServerLinkedFieldFieldVariant::LinkedField => "null".to_string(),
                 },
             }
         }

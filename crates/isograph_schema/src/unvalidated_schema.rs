@@ -4,12 +4,11 @@ use common_lang_types::{
     IsographObjectTypeName, JavascriptName, Location, TextSource, UnvalidatedTypeName,
     WithLocation, WithSpan,
 };
-use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
     DefinitionLocation, EntrypointDeclaration, LinkedFieldSelection, ObjectSelectionDirectiveSet,
-    ScalarSelectionDirectiveSet, SelectableServerFieldId, ServerFieldId, ServerScalarId,
-    VariableDefinition,
+    ScalarSelectionDirectiveSet, SelectableServerFieldId, SelectionType, ServerFieldId,
+    ServerObjectId, ServerScalarId, TypeAnnotation, VariableDefinition,
 };
 
 use crate::{
@@ -26,11 +25,7 @@ lazy_static! {
 #[derive(Debug)]
 pub struct UnvalidatedSchemaState {}
 
-type UnvalidatedServerFieldTypeAssociatedData =
-    ServerFieldTypeAssociatedData<GraphQLTypeAnnotation<UnvalidatedTypeName>>;
-
 impl SchemaValidationState for UnvalidatedSchemaState {
-    type ServerFieldTypeAssociatedData = UnvalidatedServerFieldTypeAssociatedData;
     type SelectionTypeSelectionScalarFieldAssociatedData = ScalarSelectionDirectiveSet;
     type SelectionTypeSelectionLinkedFieldAssociatedData = ObjectSelectionDirectiveSet;
     type VariableDefinitionInnerType = UnvalidatedTypeName;
@@ -39,13 +34,14 @@ impl SchemaValidationState for UnvalidatedSchemaState {
 
 #[derive(Debug, Clone)]
 
-pub struct ServerFieldTypeAssociatedData<TTypename> {
-    pub type_name: TTypename,
-    pub variant: SchemaServerFieldVariant,
+pub struct ServerFieldTypeAssociatedData {
+    // TODO linked_field_variant belongs on the SelectionType::Object variant of selection_type
+    pub variant: SchemaServerLinkedFieldFieldVariant,
+    pub type_name: TypeAnnotation<SelectionType<ServerScalarId, ServerObjectId>>,
 }
 
 #[derive(Debug, Clone)]
-pub enum SchemaServerFieldVariant {
+pub enum SchemaServerLinkedFieldFieldVariant {
     LinkedField,
     InlineFragment(ServerFieldTypeAssociatedDataInlineFragment),
 }
@@ -65,7 +61,6 @@ pub type UnvalidatedSchema<TOutputFormat> = Schema<UnvalidatedSchemaState, TOutp
 pub type UnvalidatedObjectFieldInfo = DefinitionLocation<ServerFieldId, ClientFieldOrPointerId>;
 
 pub type UnvalidatedSchemaSchemaField<TOutputFormat> = SchemaServerField<
-    <UnvalidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
     TOutputFormat,
 >;

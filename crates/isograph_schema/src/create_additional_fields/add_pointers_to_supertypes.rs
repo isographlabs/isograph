@@ -3,12 +3,13 @@ use graphql_lang_types::{GraphQLNamedTypeAnnotation, GraphQLTypeAnnotation};
 use intern::string_key::Intern;
 use isograph_lang_types::{
     DefinitionLocation, EmptyDirectiveSet, ScalarFieldSelection, ScalarSelectionDirectiveSet,
-    SelectionType, ServerFieldSelection,
+    SelectionType, ServerFieldSelection, TypeAnnotation,
 };
 
 use crate::{
-    as_client_type, as_server_field, OutputFormat, SchemaServerField, SchemaServerFieldVariant,
-    ServerFieldTypeAssociatedData, ServerFieldTypeAssociatedDataInlineFragment, UnvalidatedSchema,
+    as_client_type, as_server_field, OutputFormat, SchemaServerField,
+    SchemaServerLinkedFieldFieldVariant, ServerFieldTypeAssociatedData,
+    ServerFieldTypeAssociatedDataInlineFragment, UnvalidatedSchema,
     ValidatedScalarSelectionAssociatedData, LINK_FIELD_NAME,
 };
 use common_lang_types::Location;
@@ -32,7 +33,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 
                 let next_server_field_id = self.server_fields.len().into();
 
-                let associated_data: GraphQLTypeAnnotation<UnvalidatedTypeName> =
+                let graphql_type_annotation: GraphQLTypeAnnotation<UnvalidatedTypeName> =
                     GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(WithSpan {
                         item: subtype.name.into(),
                         span: Span::todo_generated(),
@@ -95,7 +96,11 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 
                 let reader_selection_set = vec![typename_selection, link_selection];
 
-                // TODO ... is this a server field?!
+                let target_object = TypeAnnotation::from_graphql_type_annotation(
+                    graphql_type_annotation.map(|_| SelectionType::Object(*subtype_id)),
+                );
+
+                // TODO ... is this a server field? Yes, because it's an inline fragment?
                 let server_field = SchemaServerField {
                     description: Some(
                         format!("A client pointer for the {} type.", subtype.name)
@@ -107,14 +112,14 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     parent_type_id: subtype.id,
                     arguments: vec![],
                     associated_data: ServerFieldTypeAssociatedData {
-                        type_name: associated_data,
-                        variant: SchemaServerFieldVariant::InlineFragment(
+                        variant: SchemaServerLinkedFieldFieldVariant::InlineFragment(
                             ServerFieldTypeAssociatedDataInlineFragment {
                                 server_field_id: next_server_field_id,
                                 concrete_type,
                                 reader_selection_set,
                             },
                         ),
+                        type_name: target_object,
                     },
                     phantom_data: std::marker::PhantomData,
                 };

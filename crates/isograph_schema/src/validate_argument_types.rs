@@ -367,15 +367,7 @@ fn get_non_nullable_missing_and_provided_fields<TOutputFormat: OutputFormat>(
         .filter_map(|(field_name, field_type)| {
             let field = &server_fields[as_server_field(field_type)?.as_usize()];
 
-            let field_type_annotation = match &field.associated_data {
-                SelectionType::Object(associated_data) => associated_data
-                    .type_name
-                    .clone()
-                    .map(&mut |object_id| SelectionType::Object(object_id)),
-                SelectionType::Scalar(type_name) => type_name
-                    .clone()
-                    .map(&mut |scalar_id| SelectionType::Scalar(scalar_id)),
-            };
+            let field_type_annotation = &field.associated_data.type_name;
             let field_type_annotation =
                 graphql_type_annotation_from_type_annotation(field_type_annotation);
 
