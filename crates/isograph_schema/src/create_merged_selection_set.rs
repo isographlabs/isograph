@@ -25,8 +25,8 @@ use crate::{
     ClientFieldOrPointerId, ClientFieldVariant, ImperativelyLoadedFieldVariant, Loadability,
     NameAndArguments, OutputFormat, PathToRefetchField, RootOperationName, SchemaObject,
     SchemaServerFieldVariant, UnvalidatedVariableDefinition, ValidatedClientField,
-    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection,
-    ValidatedSelectionType, VariableContext,
+    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSelection, ValidatedSelectionType,
+    VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -781,10 +781,10 @@ fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
                     DefinitionLocation::Server(server_field_id) => {
                         let server_field = schema.server_field(server_field_id);
 
-                        match &server_field.associated_data {
+                        match &server_field.associated_data.selection_type.inner() {
                             SelectionType::Scalar(_) => {}
-                            SelectionType::Object(object) => {
-                                match &object.variant {
+                            SelectionType::Object(_) => {
+                                match &server_field.associated_data.variant {
                                     SchemaServerFieldVariant::InlineFragment(
                                         inline_fragment_variant,
                                     ) => {
@@ -1101,12 +1101,8 @@ fn select_typename_and_id_fields_in_merged_selection<TOutputFormat: OutputFormat
         maybe_add_typename_selection(merged_selection_map)
     };
 
-    let id_field: Option<ValidatedSchemaIdField> = parent_type
-        .id_field
-        .map(|id_field_id| schema.id_field(id_field_id));
-
     // If the type has an id field, we must select it.
-    if let Some(id_field) = id_field {
+    if let Some(id_field) = parent_type.id_field {
         match merged_selection_map.entry(NormalizationKey::Id) {
             Entry::Occupied(occupied) => {
                 match occupied.get() {
@@ -1123,10 +1119,15 @@ fn select_typename_and_id_fields_in_merged_selection<TOutputFormat: OutputFormat
                 };
             }
             Entry::Vacant(vacant_entry) => {
+                // TODO why is this difficult. Can this be fixed with better modeling?
+                let name = schema
+                    .server_field(id_field.into())
+                    .name
+                    .item
+                    .unchecked_conversion();
                 vacant_entry.insert(MergedServerSelection::ScalarField(
                     MergedScalarFieldSelection {
-                        // major HACK alert
-                        name: id_field.name.item.lookup().intern().into(),
+                        name,
                         arguments: vec![],
                     },
                 ));

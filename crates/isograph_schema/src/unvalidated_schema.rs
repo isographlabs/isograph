@@ -8,8 +8,8 @@ use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
     DefinitionLocation, EntrypointDeclaration, LinkedFieldSelection, ObjectSelectionDirectiveSet,
-    ScalarSelectionDirectiveSet, SelectableServerFieldId, ServerFieldId, ServerScalarId,
-    VariableDefinition,
+    ScalarSelectionDirectiveSet, SelectableServerFieldId, SelectionType, ServerFieldId,
+    ServerObjectId, ServerScalarId, TypeAnnotation, VariableDefinition,
 };
 
 use crate::{
@@ -26,11 +26,7 @@ lazy_static! {
 #[derive(Debug)]
 pub struct UnvalidatedSchemaState {}
 
-type UnvalidatedServerFieldTypeAssociatedData =
-    ServerFieldTypeAssociatedData<GraphQLTypeAnnotation<UnvalidatedTypeName>>;
-
 impl SchemaValidationState for UnvalidatedSchemaState {
-    type ServerFieldTypeAssociatedData = UnvalidatedServerFieldTypeAssociatedData;
     type SelectionTypeSelectionScalarFieldAssociatedData = ScalarSelectionDirectiveSet;
     type SelectionTypeSelectionLinkedFieldAssociatedData = ObjectSelectionDirectiveSet;
     type VariableDefinitionInnerType = UnvalidatedTypeName;
@@ -39,9 +35,11 @@ impl SchemaValidationState for UnvalidatedSchemaState {
 
 #[derive(Debug, Clone)]
 
-pub struct ServerFieldTypeAssociatedData<TTypename> {
-    pub type_name: TTypename,
+pub struct ServerFieldTypeAssociatedData {
+    // TODO this is unneeded and should be removed
+    pub type_name: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     pub variant: SchemaServerFieldVariant,
+    pub selection_type: TypeAnnotation<SelectionType<ServerScalarId, ServerObjectId>>,
 }
 
 #[derive(Debug, Clone)]
@@ -65,7 +63,6 @@ pub type UnvalidatedSchema<TOutputFormat> = Schema<UnvalidatedSchemaState, TOutp
 pub type UnvalidatedObjectFieldInfo = DefinitionLocation<ServerFieldId, ClientFieldOrPointerId>;
 
 pub type UnvalidatedSchemaSchemaField<TOutputFormat> = SchemaServerField<
-    <UnvalidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
     TOutputFormat,
 >;

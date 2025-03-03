@@ -15,7 +15,7 @@ use intern::string_key::{Intern, Lookup};
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
     DefinitionLocation, SelectableServerFieldId, ServerFieldId, ServerObjectId,
-    ServerStrongIdFieldId, VariableDefinition,
+    ServerStrongIdFieldId, TypeAnnotation, VariableDefinition,
 };
 use isograph_schema::{
     EncounteredRootTypes, IsographObjectTypeDefinition, ProcessTypeSystemDocumentOutcome,
@@ -324,6 +324,11 @@ pub(crate) enum ProcessGraphqlTypeSystemDefinitionError {
 
     #[error("Root types must be objects. This type is a scalar.")]
     RootTypeMustBeObject,
+
+    #[error("This field has type {unvalidated_type_name}, which does not exist")]
+    FieldTypenameDoesNotExist {
+        unvalidated_type_name: UnvalidatedTypeName,
+    },
 }
 
 type UnvalidatedTypeRefinementMap = HashMap<UnvalidatedTypeName, Vec<UnvalidatedTypeName>>;
@@ -582,7 +587,10 @@ fn process_fields(
 ) -> ProcessTypeDefinitionResult<()> {
     // TODO
     for (object_id, fields) in field_queue {
-        let parent_object = schema.server_field_data.object_mut(object_id);
+        let server_field_data = &mut schema.server_field_data;
+        // Calling .objects takes a reference to all of server_field_data, but we need
+        // to also access .defined_types
+        let parent_object = &mut server_field_data.server_objects[object_id.as_usize()];
 
         for field in fields.into_iter() {
             let next_server_field_id = schema.server_fields.len().into();
@@ -608,8 +616,22 @@ fn process_fields(
                         name: field.item.name,
                         id: next_server_field_id,
                         associated_data: ServerFieldTypeAssociatedData {
-                            type_name: field.item.type_,
                             variant: SchemaServerFieldVariant::LinkedField,
+                            selection_type: TypeAnnotation::from_graphql_type_annotation(
+                                field.item.type_.clone().and_then(|unvalidated_type_name| {
+                                    server_field_data.defined_types.get(&unvalidated_type_name)
+                                        .copied()
+                                        .ok_or_else(|| {
+                                            WithLocation::new(
+                                                ProcessGraphqlTypeSystemDefinitionError::FieldTypenameDoesNotExist {
+                                                    unvalidated_type_name
+                                                },
+                                                field.item.name.location
+                                            )
+                                        })
+                                })?,
+                            ),
+                            type_name: field.item.type_,
                         },
                         parent_type_id: parent_object.id,
                         arguments: field

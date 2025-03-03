@@ -3,12 +3,11 @@ use std::{fmt::Debug, marker::PhantomData};
 use common_lang_types::{DescriptionValue, ServerSelectableName, WithLocation};
 use isograph_lang_types::{ServerFieldId, ServerObjectId, VariableDefinition};
 
-use crate::OutputFormat;
+use crate::{OutputFormat, ServerFieldTypeAssociatedData};
 
 // TODO convert this to two structs
 #[derive(Debug, Clone)]
 pub struct SchemaServerField<
-    TData,
     TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
     TOutputFormat: OutputFormat,
 > {
@@ -17,51 +16,10 @@ pub struct SchemaServerField<
     /// (an iso literal or Location::Generated).
     pub name: WithLocation<ServerSelectableName>,
     pub id: ServerFieldId,
-    pub associated_data: TData,
+    pub associated_data: ServerFieldTypeAssociatedData,
     pub parent_type_id: ServerObjectId,
     // pub directives: Vec<Directive<ConstantValue>>,
     pub arguments:
         Vec<WithLocation<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
     pub phantom_data: PhantomData<TOutputFormat>,
-}
-
-impl<
-        TData,
-        TClientFieldVariableDefinitionAssociatedData: Clone + Ord + Debug,
-        TOutputFormat: OutputFormat,
-    > SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>
-{
-    pub fn and_then<TData2, E>(
-        &self,
-        convert: impl FnOnce(&TData) -> Result<TData2, E>,
-    ) -> Result<
-        SchemaServerField<TData2, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>,
-        E,
-    > {
-        Ok(SchemaServerField {
-            description: self.description,
-            name: self.name,
-            id: self.id,
-            associated_data: convert(&self.associated_data)?,
-            parent_type_id: self.parent_type_id,
-            arguments: self.arguments.clone(),
-            phantom_data: PhantomData,
-        })
-    }
-
-    pub fn map<TData2, E>(
-        &self,
-        convert: impl FnOnce(&TData) -> TData2,
-    ) -> SchemaServerField<TData2, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>
-    {
-        SchemaServerField {
-            description: self.description,
-            name: self.name,
-            id: self.id,
-            associated_data: convert(&self.associated_data),
-            parent_type_id: self.parent_type_id,
-            arguments: self.arguments.clone(),
-            phantom_data: PhantomData,
-        }
-    }
 }

@@ -146,20 +146,26 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
             DefinitionLocation::Server(encountered_server_field_id) => {
                 let encountered_server_field = schema.server_field(*encountered_server_field_id);
 
-                match &encountered_server_field.associated_data {
+                match &encountered_server_field
+                    .associated_data
+                    .selection_type
+                    .inner()
+                {
                     SelectionType::Scalar(_) => {}
-                    SelectionType::Object(associated_data) => match &associated_data.variant {
-                        SchemaServerFieldVariant::LinkedField => {}
-                        SchemaServerFieldVariant::InlineFragment(inline_fragment) => {
-                            path_and_contents.push(generate_eager_reader_condition_artifact(
-                                schema,
-                                encountered_server_field,
-                                inline_fragment,
-                                &traversal_state.refetch_paths,
-                                config.options.include_file_extensions_in_import_statements,
-                            ));
+                    SelectionType::Object(_) => {
+                        match &encountered_server_field.associated_data.variant {
+                            SchemaServerFieldVariant::LinkedField => {}
+                            SchemaServerFieldVariant::InlineFragment(inline_fragment) => {
+                                path_and_contents.push(generate_eager_reader_condition_artifact(
+                                    schema,
+                                    encountered_server_field,
+                                    inline_fragment,
+                                    &traversal_state.refetch_paths,
+                                    config.options.include_file_extensions_in_import_statements,
+                                ));
+                            }
                         }
-                    },
+                    }
                 };
             }
 
@@ -616,18 +622,18 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
 
                     let name_or_alias = scalar_field_selection.name_or_alias().item;
 
-                    let output_type = match &field.associated_data {
-                        // TODO there should be a clever way to print without cloning
-                        SelectionType::Scalar(type_name) => {
-                            type_name.clone().map(&mut |scalar_id| {
+                    let output_type = field.associated_data.selection_type.clone().map(&mut |x| {
+                        match x {
+                            // TODO there should be a clever way to print without cloning
+                            SelectionType::Scalar(scalar_id) => {
                                 schema.server_field_data.scalar(scalar_id).javascript_name
-                            })
+                            }
+                            // TODO not just scalars, enums as well. Both should have a javascript name
+                            SelectionType::Object(_) => {
+                                panic!("output_type_id should be a scalar")
+                            }
                         }
-                        // TODO not just scalars, enums as well. Both should have a javascript name
-                        SelectionType::Object(_) => {
-                            panic!("output_type_id should be a scalar")
-                        }
-                    };
+                    });
 
                     query_type_declaration.push_str(&format!(
                         "{}readonly {}: {},\n",
@@ -804,18 +810,18 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
 
                     let name_or_alias = scalar_field_selection.name_or_alias().item;
 
-                    let output_type = match &field.associated_data {
-                        // TODO there should be a clever way to print without cloning
-                        SelectionType::Scalar(type_name) => {
-                            type_name.clone().map(&mut |scalar_id| {
+                    let output_type = field.associated_data.selection_type.clone().map(&mut |x| {
+                        match x {
+                            // TODO there should be a clever way to print without cloning
+                            SelectionType::Scalar(scalar_id) => {
                                 schema.server_field_data.scalar(scalar_id).javascript_name
-                            })
+                            }
+                            // TODO not just scalars, enums as well. Both should have a javascript name
+                            SelectionType::Object(_) => {
+                                panic!("output_type_id should be a scalar")
+                            }
                         }
-                        // TODO not just scalars, enums as well. Both should have a javascript name
-                        SelectionType::Object(_) => {
-                            panic!("output_type_id should be a scalar")
-                        }
-                    };
+                    });
 
                     match scalar_field_selection.associated_data.selection_variant {
                         ScalarSelectionDirectiveSet::Updatable(_) => {

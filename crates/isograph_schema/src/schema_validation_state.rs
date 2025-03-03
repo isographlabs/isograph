@@ -5,11 +5,6 @@ use std::fmt::Debug;
 /// validated, we will get objects that are generic over a different type
 /// that implements SchemaValidationState.
 pub trait SchemaValidationState: Debug {
-    /// A SchemaServerField contains a associated_data: TypeAnnotation<ServerFieldTypeAssociatedData>
-    /// - Unvalidated: UnvalidatedTypeName
-    /// - Validated: DefinedTypeId
-    type ServerFieldTypeAssociatedData: Debug;
-
     /// The associated data type of scalars in client fields' selection sets and unwraps
     /// - Unvalidated: ()
     /// - Validated: ValidatedFieldDefinitionLocation
