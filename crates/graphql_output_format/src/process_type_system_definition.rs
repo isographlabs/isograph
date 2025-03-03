@@ -89,6 +89,7 @@ pub fn process_graphql_type_system_document(
                     GraphQLSchemaObjectAssociatedData {
                         original_definition_type: GraphQLSchemaOriginalDefinitionType::Object,
                     },
+                    "object",
                 )?;
                 if let Some(encountered_root_kind) = outcome.encountered_root_kind {
                     encountered_root_types.set_root_type(encountered_root_kind, outcome.object_id);
@@ -108,6 +109,7 @@ pub fn process_graphql_type_system_document(
                     GraphQLSchemaObjectAssociatedData {
                         original_definition_type: GraphQLSchemaOriginalDefinitionType::Interface,
                     },
+                    "interface",
                 )?;
                 // N.B. we assume that Mutation will be an object, not an interface
             }
@@ -125,6 +127,7 @@ pub fn process_graphql_type_system_document(
                     GraphQLSchemaObjectAssociatedData {
                         original_definition_type: GraphQLSchemaOriginalDefinitionType::InputObject,
                     },
+                    "input object",
                 )?;
             }
             GraphQLTypeSystemDefinition::DirectiveDefinition(_) => {
@@ -159,6 +162,7 @@ pub fn process_graphql_type_system_document(
                     GraphQLSchemaObjectAssociatedData {
                         original_definition_type: GraphQLSchemaOriginalDefinitionType::Union,
                     },
+                    "union",
                 )?;
 
                 for union_member_type in union_definition.union_member_types {
@@ -336,6 +340,7 @@ pub(crate) fn process_object_type_definition(
     options: &CompilerConfigOptions,
     concrete_type: Option<IsographObjectTypeName>,
     associated_data: GraphQLSchemaObjectAssociatedData,
+    type_definition_type: &'static str,
 ) -> ProcessTypeDefinitionResult<ProcessObjectTypeDefinitionOutcome> {
     let &mut Schema {
         server_fields: ref mut schema_fields,
@@ -351,7 +356,7 @@ pub(crate) fn process_object_type_definition(
             return Err(WithLocation::new(
                 ProcessGraphqlTypeSystemDefinitionError::DuplicateTypeDefinition {
                     // BUG: this could be an interface, actually
-                    type_definition_type: "object",
+                    type_definition_type,
                     type_name: object_type_definition.name.item.into(),
                 },
                 object_type_definition.name.location,
