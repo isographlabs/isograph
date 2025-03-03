@@ -618,7 +618,6 @@ fn process_fields(
                             .into_iter()
                             .map(graphql_input_value_definition_to_variable_definition)
                             .collect::<Result<Vec<_>, _>>()?,
-                        is_discriminator: false,
                         phantom_data: std::marker::PhantomData,
                     });
                 }

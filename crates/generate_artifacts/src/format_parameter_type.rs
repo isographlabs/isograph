@@ -52,10 +52,6 @@ fn format_server_field_type<TOutputFormat: OutputFormat>(
                 .object(object_id)
                 .encountered_fields
                 .iter()
-                .filter(|x| matches!(
-                    x.1,
-                    DefinitionLocation::Server(server_field_id) if !schema.server_field(*server_field_id).is_discriminator),
-                )
             {
                 let field_type =
                     format_field_definition(schema, name, field_definition, indentation_level + 1);

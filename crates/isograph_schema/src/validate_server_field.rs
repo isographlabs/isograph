@@ -96,7 +96,6 @@ fn validate_and_transform_server_field<TOutputFormat: OutputFormat>(
                 },
                 parent_type_id: empty_field.parent_type_id,
                 arguments: valid_arguments,
-                is_discriminator: empty_field.is_discriminator,
                 phantom_data: std::marker::PhantomData,
             });
         }
