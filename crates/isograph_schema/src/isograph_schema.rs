@@ -416,7 +416,6 @@ impl<T, VariableDefinitionInnerType: Ord + Debug, TOutputFormat: OutputFormat>
             associated_data,
             parent_type_id,
             arguments,
-            is_discriminator,
             phantom_data,
         } = self;
         (
@@ -427,7 +426,6 @@ impl<T, VariableDefinitionInnerType: Ord + Debug, TOutputFormat: OutputFormat>
                 associated_data: (),
                 parent_type_id,
                 arguments,
-                is_discriminator,
                 phantom_data,
             },
             associated_data,

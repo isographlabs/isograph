@@ -22,8 +22,6 @@ pub struct SchemaServerField<
     // pub directives: Vec<Directive<ConstantValue>>,
     pub arguments:
         Vec<WithLocation<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
-    // TODO remove this. This is indicative of poor modeling.
-    pub is_discriminator: bool,
     pub phantom_data: PhantomData<TOutputFormat>,
 }
 
@@ -47,7 +45,6 @@ impl<
             associated_data: convert(&self.associated_data)?,
             parent_type_id: self.parent_type_id,
             arguments: self.arguments.clone(),
-            is_discriminator: self.is_discriminator,
             phantom_data: PhantomData,
         })
     }
@@ -64,7 +61,6 @@ impl<
             associated_data: convert(&self.associated_data),
             parent_type_id: self.parent_type_id,
             arguments: self.arguments.clone(),
-            is_discriminator: self.is_discriminator,
             phantom_data: PhantomData,
         }
     }
