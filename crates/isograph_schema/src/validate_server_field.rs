@@ -52,10 +52,11 @@ fn validate_and_transform_server_field<TOutputFormat: OutputFormat>(
             description: field.description,
             name: field.name,
             id: field.id,
-            associated_data: field.associated_data,
             parent_type_id: field.parent_type_id,
             arguments: valid_arguments,
             phantom_data: std::marker::PhantomData,
+            linked_field_variant: field.linked_field_variant,
+            target_server_entity: field.target_server_entity,
         });
     }
 

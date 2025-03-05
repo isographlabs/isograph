@@ -20,8 +20,8 @@ use isograph_lang_types::{
 use isograph_schema::{
     EncounteredRootTypes, IsographObjectTypeDefinition, ProcessTypeSystemDocumentOutcome,
     ProcessedRootTypes, RootOperationName, RootTypes, Schema, SchemaObject, SchemaScalar,
-    SchemaServerField, SchemaServerLinkedFieldFieldVariant, ServerFieldTypeAssociatedData,
-    TypeRefinementMaps, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE, TYPENAME_FIELD_NAME,
+    SchemaServerField, SchemaServerLinkedFieldFieldVariant, TypeRefinementMaps, ID_GRAPHQL_TYPE,
+    STRING_JAVASCRIPT_TYPE, TYPENAME_FIELD_NAME,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
@@ -615,7 +615,6 @@ fn process_fields(
                         description: field.item.description.map(|d| d.item),
                         name: field.item.name,
                         id: next_server_field_id,
-                        associated_data: ServerFieldTypeAssociatedData {
                             linked_field_variant: SchemaServerLinkedFieldFieldVariant::LinkedField,
                             target_server_entity: TypeAnnotation::from_graphql_type_annotation(
                                 field.item.type_.and_then(|unvalidated_type_name| {
@@ -631,7 +630,6 @@ fn process_fields(
                                         })
                                 })?,
                             ),
-                        },
                         parent_type_id: parent_object.id,
                         arguments: field
                             .item

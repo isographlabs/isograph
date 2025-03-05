@@ -7,8 +7,8 @@ use common_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     DefinitionLocation, EntrypointDeclaration, LinkedFieldSelection, ObjectSelectionDirectiveSet,
-    ScalarSelectionDirectiveSet, SelectableServerFieldId, SelectionType, ServerFieldId,
-    ServerObjectId, ServerScalarId, TypeAnnotation, VariableDefinition,
+    ScalarSelectionDirectiveSet, SelectableServerFieldId, ServerFieldId, ServerScalarId,
+    VariableDefinition,
 };
 
 use crate::{
@@ -30,14 +30,6 @@ impl SchemaValidationState for UnvalidatedSchemaState {
     type SelectionTypeSelectionLinkedFieldAssociatedData = ObjectSelectionDirectiveSet;
     type VariableDefinitionInnerType = UnvalidatedTypeName;
     type Entrypoint = Vec<(TextSource, WithSpan<EntrypointDeclaration>)>;
-}
-
-#[derive(Debug, Clone)]
-
-pub struct ServerFieldTypeAssociatedData {
-    // TODO linked_field_variant belongs on the SelectionType::Object variant of selection_type
-    pub linked_field_variant: SchemaServerLinkedFieldFieldVariant,
-    pub target_server_entity: TypeAnnotation<SelectionType<ServerScalarId, ServerObjectId>>,
 }
 
 #[derive(Debug, Clone)]

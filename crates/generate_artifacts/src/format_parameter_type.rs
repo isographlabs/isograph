@@ -79,10 +79,7 @@ fn format_field_definition<TOutputFormat: OutputFormat>(
     server_field_id: ServerFieldId,
     indentation_level: u8,
 ) -> String {
-    let type_annotation = &schema
-        .server_field(server_field_id)
-        .associated_data
-        .target_server_entity;
+    let type_annotation = &schema.server_field(server_field_id).target_server_entity;
     let is_optional = match type_annotation {
         TypeAnnotation::Union(union) => union.nullable,
         TypeAnnotation::Plural(_) => false,

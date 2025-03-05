@@ -451,7 +451,7 @@ fn validate_field_type_exists_and_is_scalar<TOutputFormat: OutputFormat>(
                     top_level_client_type_info,
                 )?;
 
-                match &server_field.associated_data.target_server_entity.inner() {
+                match &server_field.target_server_entity.inner() {
                     SelectionType::Scalar(_) => Ok(ScalarFieldSelection {
                         name: scalar_field_selection.name,
                         associated_data: ValidatedScalarSelectionAssociatedData {
@@ -626,7 +626,7 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
             DefinitionLocation::Server(server_field_id) => {
                 let server_field =
                     &top_level_client_type_info.server_fields[server_field_id.as_usize()];
-                match &server_field.associated_data.target_server_entity.inner() {
+                match &server_field.target_server_entity.inner() {
                     SelectionType::Scalar(scalar_id) => Err(WithLocation::new(
                         ValidateSchemaError::SelectionTypeSelectionFieldIsScalar {
                             field_parent_type_name: field_parent_object.name,

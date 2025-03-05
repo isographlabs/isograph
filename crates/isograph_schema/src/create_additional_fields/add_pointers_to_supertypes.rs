@@ -8,9 +8,8 @@ use isograph_lang_types::{
 
 use crate::{
     as_client_type, as_server_field, OutputFormat, SchemaServerField,
-    SchemaServerLinkedFieldFieldVariant, ServerFieldTypeAssociatedData,
-    ServerFieldTypeAssociatedDataInlineFragment, UnvalidatedSchema,
-    ValidatedScalarSelectionAssociatedData, LINK_FIELD_NAME,
+    SchemaServerLinkedFieldFieldVariant, ServerFieldTypeAssociatedDataInlineFragment,
+    UnvalidatedSchema, ValidatedScalarSelectionAssociatedData, LINK_FIELD_NAME,
 };
 use common_lang_types::Location;
 
@@ -111,16 +110,14 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     name: WithLocation::new(field_name, Location::generated()),
                     parent_type_id: subtype.id,
                     arguments: vec![],
-                    associated_data: ServerFieldTypeAssociatedData {
-                        linked_field_variant: SchemaServerLinkedFieldFieldVariant::InlineFragment(
-                            ServerFieldTypeAssociatedDataInlineFragment {
-                                server_field_id: next_server_field_id,
-                                concrete_type,
-                                reader_selection_set,
-                            },
-                        ),
-                        target_server_entity: target_object,
-                    },
+                    linked_field_variant: SchemaServerLinkedFieldFieldVariant::InlineFragment(
+                        ServerFieldTypeAssociatedDataInlineFragment {
+                            server_field_id: next_server_field_id,
+                            concrete_type,
+                            reader_selection_set,
+                        },
+                    ),
+                    target_server_entity: target_object,
                     phantom_data: std::marker::PhantomData,
                 };
 

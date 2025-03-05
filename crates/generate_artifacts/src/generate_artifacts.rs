@@ -146,10 +146,10 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
             DefinitionLocation::Server(encountered_server_field_id) => {
                 let encountered_server_field = schema.server_field(*encountered_server_field_id);
 
-                match &encountered_server_field.associated_data.target_server_entity.inner() {
+                match &encountered_server_field.target_server_entity.inner() {
                     SelectionType::Scalar(_) => {}
                     SelectionType::Object(_) => {
-                        match &encountered_server_field.associated_data.linked_field_variant {
+                        match &encountered_server_field.linked_field_variant {
                             SchemaServerLinkedFieldFieldVariant::LinkedField => {}
                             SchemaServerLinkedFieldFieldVariant::InlineFragment(
                                 inline_fragment,
@@ -620,7 +620,7 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
 
                     let name_or_alias = scalar_field_selection.name_or_alias().item;
 
-                    let output_type = field.associated_data.target_server_entity.clone().map(&mut |x| {
+                    let output_type = field.target_server_entity.clone().map(&mut |x| {
                         match x {
                             // TODO there should be a clever way to print without cloning
                             SelectionType::Scalar(scalar_id) => {
@@ -808,7 +808,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
 
                     let name_or_alias = scalar_field_selection.name_or_alias().item;
 
-                    let output_type = field.associated_data.target_server_entity.clone().map(&mut |x| {
+                    let output_type = field.target_server_entity.clone().map(&mut |x| {
                         match x {
                             // TODO there should be a clever way to print without cloning
                             SelectionType::Scalar(scalar_id) => {
