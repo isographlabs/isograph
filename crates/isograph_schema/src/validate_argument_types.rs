@@ -368,8 +368,18 @@ fn get_non_nullable_missing_and_provided_fields<TOutputFormat: OutputFormat>(
             let field = &server_fields[as_server_field(field_type)?.as_usize()];
 
             let field_type_annotation = &field.target_server_entity;
+
+            let iso_type_annotation = match field_type_annotation {
+                SelectionType::Scalar(type_annotation) => {
+                    type_annotation.clone().map(&mut SelectionType::Scalar)
+                }
+                SelectionType::Object((_variant, type_annotation)) => {
+                    type_annotation.clone().map(&mut SelectionType::Object)
+                }
+            };
+
             let field_type_annotation =
-                graphql_type_annotation_from_type_annotation(field_type_annotation);
+                graphql_type_annotation_from_type_annotation(&iso_type_annotation);
 
             let object_literal_supplied_field = object_literal
                 .iter()

@@ -130,8 +130,8 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 
         // TODO do not use mutation naming here
         let mutation_field = self.server_field(mutation_subfield_id);
-        let inner = mutation_field.target_server_entity.inner();
-        let payload_object_id = match inner {
+        let selection_type = &mutation_field.target_server_entity;
+        let (_variant, payload_object_type_annotation) = match selection_type {
             SelectionType::Scalar(_) => {
                 panic!(
                     "Expected selection type to be an object. \
@@ -140,6 +140,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             }
             SelectionType::Object(object) => object,
         };
+        let payload_object_id = payload_object_type_annotation.inner();
 
         // TODO it's a bit annoying that we call .object twice!
         let mutation_field_payload_type_name =
@@ -176,23 +177,24 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             Some(DefinitionLocation::Server(server_field_id)) => {
                 let server_field = self.server_field(*server_field_id);
 
-                // This is the parent type name (Pet)
-                let inner = self
-                    .server_field_data
-                    .lookup_unvalidated_type(server_field.target_server_entity.inner());
-
                 // TODO validate that the payload object has no plural fields in between
 
-                if let SelectionType::Object(client_field_parent_object_id) = inner {
-                    Ok((
-                        client_field_parent_object_id.id,
-                        client_field_parent_object_id.name,
-                    ))
-                } else {
-                    Err(WithLocation::new(
+                match &server_field.target_server_entity {
+                    SelectionType::Object((_variant, type_annotation)) => {
+                        let client_field_parent_object_id = type_annotation.inner();
+                        let client_field_parent_object =
+                            self.server_field_data.object(client_field_parent_object_id);
+
+                        Ok((
+                            client_field_parent_object_id,
+                            // This is the parent type name (Pet)
+                            client_field_parent_object.name,
+                        ))
+                    }
+                    SelectionType::Scalar(_) => Err(WithLocation::new(
                         CreateAdditionalFieldsError::InvalidMutationField,
                         Location::generated(),
-                    ))
+                    )),
                 }
             }
             _ => Err(WithLocation::new(

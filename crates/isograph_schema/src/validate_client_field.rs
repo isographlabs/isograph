@@ -451,7 +451,7 @@ fn validate_field_type_exists_and_is_scalar<TOutputFormat: OutputFormat>(
                     top_level_client_type_info,
                 )?;
 
-                match &server_field.target_server_entity.inner() {
+                match &server_field.target_server_entity {
                     SelectionType::Scalar(_) => Ok(ScalarFieldSelection {
                         name: scalar_field_selection.name,
                         associated_data: ValidatedScalarSelectionAssociatedData {
@@ -483,14 +483,14 @@ fn validate_field_type_exists_and_is_scalar<TOutputFormat: OutputFormat>(
                         reader_alias: scalar_field_selection.reader_alias,
                         arguments: scalar_field_selection.arguments,
                     }),
-                    SelectionType::Object(object_id) => Err(WithLocation::new(
+                    SelectionType::Object((_variant, type_annotation)) => Err(WithLocation::new(
                         ValidateSchemaError::SelectionTypeSelectionFieldIsNotScalar {
                             field_parent_type_name: scalar_field_selection_parent_object.name,
                             field_name: scalar_field_name,
                             field_type: "an object",
                             target_type_name: top_level_client_type_info
                                 .schema_data
-                                .object(*object_id)
+                                .object(type_annotation.inner())
                                 .name
                                 .into(),
                             client_field_parent_type_name: top_level_client_type_info
@@ -626,15 +626,15 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
             DefinitionLocation::Server(server_field_id) => {
                 let server_field =
                     &top_level_client_type_info.server_fields[server_field_id.as_usize()];
-                match &server_field.target_server_entity.inner() {
-                    SelectionType::Scalar(scalar_id) => Err(WithLocation::new(
+                match &server_field.target_server_entity {
+                    SelectionType::Scalar(type_annotation) => Err(WithLocation::new(
                         ValidateSchemaError::SelectionTypeSelectionFieldIsScalar {
                             field_parent_type_name: field_parent_object.name,
                             field_name: linked_field_name,
                             field_type: "a scalar",
                             target_type_name: top_level_client_type_info
                                 .schema_data
-                                .scalar(*scalar_id)
+                                .scalar(type_annotation.inner())
                                 .name
                                 .item
                                 .into(),
@@ -651,9 +651,10 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
                         },
                         linked_field_selection.name.location,
                     )),
-                    SelectionType::Object(object_id) => {
+                    SelectionType::Object((_variant, type_annotation)) => {
+                        let object_id = type_annotation.inner();
                         let linked_field_target_object =
-                            top_level_client_type_info.schema_data.object(*object_id);
+                            top_level_client_type_info.schema_data.object(object_id);
 
                         let missing_arguments = get_missing_arguments_and_validate_argument_types(
                             top_level_client_type_info.schema_data,
@@ -687,7 +688,7 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
                                 .collect::<Result<Vec<_>, _>>()?,
                             associated_data: ValidatedLinkedFieldAssociatedData {
                                 concrete_type: linked_field_target_object.concrete_type,
-                                parent_object_id: *object_id,
+                                parent_object_id: object_id,
                                 field_id: DefinitionLocation::Server(server_field.id),
                                 selection_variant: match linked_field_selection.associated_data {
                                     ObjectSelectionDirectiveSet::None(empty_struct)=> {

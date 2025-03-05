@@ -20,12 +20,15 @@ pub struct SchemaServerField<
     pub name: WithLocation<ServerSelectableName>,
     pub id: ServerFieldId,
 
-    // TODO linked_field_variant belongs on the SelectionType::Object variant of selection_type
-    pub linked_field_variant: SchemaServerLinkedFieldFieldVariant,
-    pub target_server_entity: TypeAnnotation<SelectionType<ServerScalarId, ServerObjectId>>,
+    pub target_server_entity: SelectionType<
+        TypeAnnotation<ServerScalarId>,
+        (
+            SchemaServerLinkedFieldFieldVariant,
+            TypeAnnotation<ServerObjectId>,
+        ),
+    >,
 
     pub parent_type_id: ServerObjectId,
-    // pub directives: Vec<Directive<ConstantValue>>,
     pub arguments:
         Vec<WithLocation<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
     pub phantom_data: PhantomData<TOutputFormat>,

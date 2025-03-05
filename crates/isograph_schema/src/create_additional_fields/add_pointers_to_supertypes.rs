@@ -95,9 +95,18 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 
                 let reader_selection_set = vec![typename_selection, link_selection];
 
-                let target_object = TypeAnnotation::from_graphql_type_annotation(
-                    graphql_type_annotation.map(|_| SelectionType::Object(*subtype_id)),
-                );
+                let target_server_entity = SelectionType::Object((
+                    SchemaServerLinkedFieldFieldVariant::InlineFragment(
+                        ServerFieldTypeAssociatedDataInlineFragment {
+                            server_field_id: next_server_field_id,
+                            concrete_type,
+                            reader_selection_set,
+                        },
+                    ),
+                    TypeAnnotation::from_graphql_type_annotation(
+                        graphql_type_annotation.map(|_| *subtype_id),
+                    ),
+                ));
 
                 // TODO ... is this a server field? Yes, because it's an inline fragment?
                 let server_field = SchemaServerField {
@@ -110,14 +119,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     name: WithLocation::new(field_name, Location::generated()),
                     parent_type_id: subtype.id,
                     arguments: vec![],
-                    linked_field_variant: SchemaServerLinkedFieldFieldVariant::InlineFragment(
-                        ServerFieldTypeAssociatedDataInlineFragment {
-                            server_field_id: next_server_field_id,
-                            concrete_type,
-                            reader_selection_set,
-                        },
-                    ),
-                    target_server_entity: target_object,
+                    target_server_entity,
                     phantom_data: std::marker::PhantomData,
                 };
 

@@ -29,23 +29,23 @@ pub fn description<
     }
 }
 
-pub fn output_type_annotation<TOutputFormat: OutputFormat>(
-    definition_location: &DefinitionLocation<
+pub fn output_type_annotation<'a, TOutputFormat: OutputFormat>(
+    definition_location: &'a DefinitionLocation<
         &ValidatedSchemaServerField<TOutputFormat>,
         &ValidatedClientPointer<TOutputFormat>,
     >,
-) -> TypeAnnotation<ServerObjectId> {
+) -> &'a TypeAnnotation<ServerObjectId> {
     match definition_location {
-        DefinitionLocation::Client(client_pointer) => client_pointer.to.clone(),
-        DefinitionLocation::Server(server_field) => server_field.target_server_entity.clone().map(
-            &mut |selection_type| match selection_type {
-                SelectionType::Scalar(_) => panic!(
+        DefinitionLocation::Client(client_pointer) => &client_pointer.to,
+        DefinitionLocation::Server(server_field) => match &server_field.target_server_entity {
+            SelectionType::Scalar(_) => {
+                panic!(
                     "output_type_id should be an object. \
                     This is indicative of a bug in Isograph.",
-                ),
-                SelectionType::Object(object) => object,
-            },
-        ),
+                )
+            }
+            SelectionType::Object((_, type_annotation)) => type_annotation,
+        },
     }
 }
 

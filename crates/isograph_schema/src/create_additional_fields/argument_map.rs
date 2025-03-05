@@ -279,8 +279,7 @@ impl ModifiedArgument {
                         match field {
                             PotentiallyModifiedField::Unmodified(field_id) => {
                                 let field_object = schema.server_field(*field_id);
-                                if let SelectionType::Object(_) =
-                                    field_object.target_server_entity.inner()
+                                if let SelectionType::Object(_) = field_object.target_server_entity
                                 {
                                     return Err(WithLocation::new(
                                         CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {

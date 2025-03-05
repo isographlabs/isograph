@@ -51,6 +51,7 @@ impl<TInner: Ord + Copy + Debug> TypeAnnotation<TInner> {
 }
 
 impl<TInner: Ord + Copy + Debug> TypeAnnotation<TInner> {
+    // TODO don't require copy, just return a reference and deref
     pub fn inner(&self) -> TInner {
         match self {
             TypeAnnotation::Scalar(s) => *s,

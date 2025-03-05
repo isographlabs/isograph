@@ -1,8 +1,11 @@
+use std::fmt::Debug;
+
 use common_lang_types::SelectableName;
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 
 use isograph_lang_types::{
-    DefinitionLocation, SelectableServerFieldId, ServerFieldId, TypeAnnotation, UnionVariant,
+    DefinitionLocation, SelectableServerFieldId, SelectionType, ServerFieldId, TypeAnnotation,
+    UnionVariant,
 };
 use isograph_schema::{OutputFormat, ValidatedSchema};
 
@@ -79,11 +82,16 @@ fn format_field_definition<TOutputFormat: OutputFormat>(
     server_field_id: ServerFieldId,
     indentation_level: u8,
 ) -> String {
-    let type_annotation = &schema.server_field(server_field_id).target_server_entity;
-    let is_optional = match type_annotation {
-        TypeAnnotation::Union(union) => union.nullable,
-        TypeAnnotation::Plural(_) => false,
-        TypeAnnotation::Scalar(_) => false,
+    let selection_type = &schema.server_field(server_field_id).target_server_entity;
+    let (is_optional, selection_type) = match selection_type {
+        SelectionType::Scalar(type_annotation) => (
+            is_nullable(type_annotation),
+            type_annotation.clone().map(&mut SelectionType::Scalar),
+        ),
+        SelectionType::Object((_, type_annotation)) => (
+            is_nullable(type_annotation),
+            type_annotation.clone().map(&mut SelectionType::Object),
+        ),
     };
 
     format!(
@@ -91,8 +99,16 @@ fn format_field_definition<TOutputFormat: OutputFormat>(
         "  ".repeat(indentation_level as usize),
         name,
         if is_optional { "?" } else { "" },
-        format_type_annotation(schema, &type_annotation, indentation_level + 1),
+        format_type_annotation(schema, &selection_type, indentation_level + 1),
     )
+}
+
+fn is_nullable<T: Ord + Debug>(type_annotation: &TypeAnnotation<T>) -> bool {
+    match type_annotation {
+        TypeAnnotation::Union(union) => union.nullable,
+        TypeAnnotation::Plural(_) => false,
+        TypeAnnotation::Scalar(_) => false,
+    }
 }
 
 fn format_type_annotation<TOutputFormat: OutputFormat>(

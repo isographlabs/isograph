@@ -781,10 +781,10 @@ fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
                     DefinitionLocation::Server(server_field_id) => {
                         let server_field = schema.server_field(server_field_id);
 
-                        match &server_field.target_server_entity.inner() {
+                        match &server_field.target_server_entity {
                             SelectionType::Scalar(_) => {}
-                            SelectionType::Object(_) => {
-                                match &server_field.linked_field_variant {
+                            SelectionType::Object((linked_field_variant, _)) => {
+                                match &linked_field_variant {
                                     SchemaServerLinkedFieldFieldVariant::InlineFragment(
                                         inline_fragment_variant,
                                     ) => {

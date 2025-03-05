@@ -14,7 +14,7 @@ use graphql_lang_types::{
 use intern::string_key::{Intern, Lookup};
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
-    DefinitionLocation, SelectableServerFieldId, ServerFieldId, ServerObjectId,
+    DefinitionLocation, SelectableServerFieldId, SelectionType, ServerFieldId, ServerObjectId,
     ServerStrongIdFieldId, TypeAnnotation, VariableDefinition,
 };
 use isograph_schema::{
@@ -611,25 +611,35 @@ fn process_fields(
                         )?;
                     }
 
+                    let inner_type = field.item.type_.inner();
+                    let target_server_entity = match server_field_data
+                        .defined_types
+                        .entry(*inner_type)
+                    {
+                        HashMapEntry::Occupied(occupied_entry) => match occupied_entry.get() {
+                            SelectionType::Scalar(scalar_id) => SelectionType::Scalar(
+                                TypeAnnotation::from_graphql_type_annotation(field.item.type_)
+                                    .map(&mut |_| *scalar_id),
+                            ),
+                            SelectionType::Object(object_id) => SelectionType::Object((
+                                SchemaServerLinkedFieldFieldVariant::LinkedField,
+                                TypeAnnotation::from_graphql_type_annotation(field.item.type_)
+                                    .map(&mut |_| *object_id),
+                            )),
+                        },
+                        HashMapEntry::Vacant(_) => return Err(WithLocation::new(
+                            ProcessGraphqlTypeSystemDefinitionError::FieldTypenameDoesNotExist {
+                                unvalidated_type_name: *inner_type,
+                            },
+                            field.item.name.location,
+                        )),
+                    };
+
                     schema.server_fields.push(SchemaServerField {
                         description: field.item.description.map(|d| d.item),
                         name: field.item.name,
                         id: next_server_field_id,
-                            linked_field_variant: SchemaServerLinkedFieldFieldVariant::LinkedField,
-                            target_server_entity: TypeAnnotation::from_graphql_type_annotation(
-                                field.item.type_.and_then(|unvalidated_type_name| {
-                                    server_field_data.defined_types.get(&unvalidated_type_name)
-                                        .copied()
-                                        .ok_or_else(|| {
-                                            WithLocation::new(
-                                                ProcessGraphqlTypeSystemDefinitionError::FieldTypenameDoesNotExist {
-                                                    unvalidated_type_name
-                                                },
-                                                field.item.name.location
-                                            )
-                                        })
-                                })?,
-                            ),
+                        target_server_entity,
                         parent_type_id: parent_object.id,
                         arguments: field
                             .item

@@ -146,24 +146,21 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
             DefinitionLocation::Server(encountered_server_field_id) => {
                 let encountered_server_field = schema.server_field(*encountered_server_field_id);
 
-                match &encountered_server_field.target_server_entity.inner() {
+                match &encountered_server_field.target_server_entity {
                     SelectionType::Scalar(_) => {}
-                    SelectionType::Object(_) => {
-                        match &encountered_server_field.linked_field_variant {
-                            SchemaServerLinkedFieldFieldVariant::LinkedField => {}
-                            SchemaServerLinkedFieldFieldVariant::InlineFragment(
+                    SelectionType::Object((linked_field_variant, _)) => match &linked_field_variant
+                    {
+                        SchemaServerLinkedFieldFieldVariant::LinkedField => {}
+                        SchemaServerLinkedFieldFieldVariant::InlineFragment(inline_fragment) => {
+                            path_and_contents.push(generate_eager_reader_condition_artifact(
+                                schema,
+                                encountered_server_field,
                                 inline_fragment,
-                            ) => {
-                                path_and_contents.push(generate_eager_reader_condition_artifact(
-                                    schema,
-                                    encountered_server_field,
-                                    inline_fragment,
-                                    &traversal_state.refetch_paths,
-                                    config.options.include_file_extensions_in_import_statements,
-                                ));
-                            }
+                                &traversal_state.refetch_paths,
+                                config.options.include_file_extensions_in_import_statements,
+                            ));
                         }
-                    }
+                    },
                 };
             }
 
@@ -620,18 +617,14 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
 
                     let name_or_alias = scalar_field_selection.name_or_alias().item;
 
-                    let output_type = field.target_server_entity.clone().map(&mut |x| {
-                        match x {
-                            // TODO there should be a clever way to print without cloning
-                            SelectionType::Scalar(scalar_id) => {
-                                schema.server_field_data.scalar(scalar_id).javascript_name
-                            }
-                            // TODO not just scalars, enums as well. Both should have a javascript name
-                            SelectionType::Object(_) => {
-                                panic!("output_type_id should be a scalar")
-                            }
+                    let output_type = match &field.target_server_entity {
+                        SelectionType::Scalar(type_annotation) => {
+                            type_annotation.clone().map(&mut SelectionType::Scalar)
                         }
-                    });
+                        SelectionType::Object((_, type_annotation)) => {
+                            type_annotation.clone().map(&mut SelectionType::Object)
+                        }
+                    };
 
                     query_type_declaration.push_str(&format!(
                         "{}readonly {}: {},\n",
@@ -808,18 +801,12 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
 
                     let name_or_alias = scalar_field_selection.name_or_alias().item;
 
-                    let output_type = field.target_server_entity.clone().map(&mut |x| {
-                        match x {
-                            // TODO there should be a clever way to print without cloning
-                            SelectionType::Scalar(scalar_id) => {
-                                schema.server_field_data.scalar(scalar_id).javascript_name
-                            }
-                            // TODO not just scalars, enums as well. Both should have a javascript name
-                            SelectionType::Object(_) => {
-                                panic!("output_type_id should be a scalar")
-                            }
+                    let output_type = match &field.target_server_entity {
+                        SelectionType::Scalar(type_annotation) => type_annotation,
+                        SelectionType::Object(_) => {
+                            panic!("Output type must be a scalar");
                         }
-                    });
+                    };
 
                     match scalar_field_selection.associated_data.selection_variant {
                         ScalarSelectionDirectiveSet::Updatable(_) => {
@@ -915,7 +902,7 @@ fn write_getter_and_setter(
     query_type_declaration: &mut String,
     indentation_level: u8,
     name_or_alias: SelectableNameOrAlias,
-    output_type_annotation: TypeAnnotation<ServerObjectId>,
+    output_type_annotation: &TypeAnnotation<ServerObjectId>,
     type_annotation: &TypeAnnotation<ClientFieldUpdatableDataType>,
 ) {
     query_type_declaration.push_str(&format!(
@@ -923,7 +910,9 @@ fn write_getter_and_setter(
         name_or_alias,
         print_javascript_type_declaration(type_annotation),
     ));
-    let setter_type_annotation = output_type_annotation.map(&mut |_| "{ link: Link }");
+    let setter_type_annotation = output_type_annotation
+        .clone()
+        .map(&mut |_| "{ link: Link }");
     query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
     query_type_declaration.push_str(&format!(
         "set {}(value: {}),\n",
