@@ -133,30 +133,34 @@ fn linked_field_ast_node<TOutputFormat: OutputFormat>(
         }
         DefinitionLocation::Server(server_field_id) => {
             let server_field = schema.server_field(server_field_id);
-            match &server_field.associated_data.type_name.inner() {
+            match &server_field.associated_data.target_server_entity.inner() {
                 SelectionType::Scalar(_) => panic!("Expected object"),
-                SelectionType::Object(_) => match &server_field.associated_data.variant {
-                    SchemaServerLinkedFieldFieldVariant::InlineFragment(inline_fragment) => {
-                        let parent_object_id = schema
-                            .server_field(inline_fragment.server_field_id)
-                            .parent_type_id;
-                        let object = schema.server_field_data.object(parent_object_id);
+                SelectionType::Object(_) => {
+                    match &server_field.associated_data.linked_field_variant {
+                        SchemaServerLinkedFieldFieldVariant::InlineFragment(inline_fragment) => {
+                            let parent_object_id = schema
+                                .server_field(inline_fragment.server_field_id)
+                                .parent_type_id;
+                            let object = schema.server_field_data.object(parent_object_id);
 
-                        let type_and_field = ObjectTypeAndFieldName {
-                            field_name: linked_field.name.item.into(),
-                            type_name: object.name,
-                        };
+                            let type_and_field = ObjectTypeAndFieldName {
+                                field_name: linked_field.name.item.into(),
+                                type_name: object.name,
+                            };
 
-                        let reader_artifact_import_name =
-                            format!("{}__resolver_reader", type_and_field.underscore_separated());
+                            let reader_artifact_import_name = format!(
+                                "{}__resolver_reader",
+                                type_and_field.underscore_separated()
+                            );
 
-                        reader_imports
-                            .insert((type_and_field, ImportedFileCategory::ResolverReader));
+                            reader_imports
+                                .insert((type_and_field, ImportedFileCategory::ResolverReader));
 
-                        reader_artifact_import_name
+                            reader_artifact_import_name
+                        }
+                        SchemaServerLinkedFieldFieldVariant::LinkedField => "null".to_string(),
                     }
-                    SchemaServerLinkedFieldFieldVariant::LinkedField => "null".to_string(),
-                },
+                }
             }
         }
     };

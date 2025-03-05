@@ -616,8 +616,8 @@ fn process_fields(
                         name: field.item.name,
                         id: next_server_field_id,
                         associated_data: ServerFieldTypeAssociatedData {
-                            variant: SchemaServerLinkedFieldFieldVariant::LinkedField,
-                            type_name: TypeAnnotation::from_graphql_type_annotation(
+                            linked_field_variant: SchemaServerLinkedFieldFieldVariant::LinkedField,
+                            target_server_entity: TypeAnnotation::from_graphql_type_annotation(
                                 field.item.type_.and_then(|unvalidated_type_name| {
                                     server_field_data.defined_types.get(&unvalidated_type_name)
                                         .copied()

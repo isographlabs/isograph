@@ -130,7 +130,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 
         // TODO do not use mutation naming here
         let mutation_field = self.server_field(mutation_subfield_id);
-        let inner = mutation_field.associated_data.type_name.inner();
+        let inner = mutation_field.associated_data.target_server_entity.inner();
         let payload_object_id = match inner {
             SelectionType::Scalar(_) => {
                 panic!(
@@ -177,9 +177,9 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                 let server_field = self.server_field(*server_field_id);
 
                 // This is the parent type name (Pet)
-                let inner = self
-                    .server_field_data
-                    .lookup_unvalidated_type(server_field.associated_data.type_name.inner());
+                let inner = self.server_field_data.lookup_unvalidated_type(
+                    server_field.associated_data.target_server_entity.inner(),
+                );
 
                 // TODO validate that the payload object has no plural fields in between
 

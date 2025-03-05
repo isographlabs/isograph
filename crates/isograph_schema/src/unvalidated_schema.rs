@@ -36,8 +36,8 @@ impl SchemaValidationState for UnvalidatedSchemaState {
 
 pub struct ServerFieldTypeAssociatedData {
     // TODO linked_field_variant belongs on the SelectionType::Object variant of selection_type
-    pub variant: SchemaServerLinkedFieldFieldVariant,
-    pub type_name: TypeAnnotation<SelectionType<ServerScalarId, ServerObjectId>>,
+    pub linked_field_variant: SchemaServerLinkedFieldFieldVariant,
+    pub target_server_entity: TypeAnnotation<SelectionType<ServerScalarId, ServerObjectId>>,
 }
 
 #[derive(Debug, Clone)]

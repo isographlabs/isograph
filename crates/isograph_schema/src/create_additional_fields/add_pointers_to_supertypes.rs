@@ -112,14 +112,14 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     parent_type_id: subtype.id,
                     arguments: vec![],
                     associated_data: ServerFieldTypeAssociatedData {
-                        variant: SchemaServerLinkedFieldFieldVariant::InlineFragment(
+                        linked_field_variant: SchemaServerLinkedFieldFieldVariant::InlineFragment(
                             ServerFieldTypeAssociatedDataInlineFragment {
                                 server_field_id: next_server_field_id,
                                 concrete_type,
                                 reader_selection_set,
                             },
                         ),
-                        type_name: target_object,
+                        target_server_entity: target_object,
                     },
                     phantom_data: std::marker::PhantomData,
                 };

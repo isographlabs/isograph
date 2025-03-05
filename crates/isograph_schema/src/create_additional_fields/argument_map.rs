@@ -280,7 +280,7 @@ impl ModifiedArgument {
                             PotentiallyModifiedField::Unmodified(field_id) => {
                                 let field_object = schema.server_field(*field_id);
                                 if let SelectionType::Object(_) =
-                                    field_object.associated_data.type_name.inner()
+                                    field_object.associated_data.target_server_entity.inner()
                                 {
                                     return Err(WithLocation::new(
                                         CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
