@@ -619,10 +619,12 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
 
                     let output_type = match &field.target_server_entity {
                         SelectionType::Scalar(type_annotation) => {
-                            type_annotation.clone().map(&mut SelectionType::Scalar)
+                            type_annotation.clone().map(&mut |scalar_id| {
+                                schema.server_field_data.scalar(scalar_id).javascript_name
+                            })
                         }
-                        SelectionType::Object((_, type_annotation)) => {
-                            type_annotation.clone().map(&mut SelectionType::Object)
+                        SelectionType::Object(_) => {
+                            panic!("Output type should be a scalar");
                         }
                     };
 
@@ -802,9 +804,13 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                     let name_or_alias = scalar_field_selection.name_or_alias().item;
 
                     let output_type = match &field.target_server_entity {
-                        SelectionType::Scalar(type_annotation) => type_annotation,
+                        SelectionType::Scalar(type_annotation) => {
+                            type_annotation.clone().map(&mut |scalar_id| {
+                                schema.server_field_data.scalar(scalar_id).javascript_name
+                            })
+                        }
                         SelectionType::Object(_) => {
-                            panic!("Output type must be a scalar");
+                            panic!("Output type should be a scalar");
                         }
                     };
 
@@ -816,7 +822,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                             query_type_declaration.push_str(&format!(
                                 "{}: {},\n",
                                 name_or_alias,
-                                print_javascript_type_declaration(output_type)
+                                print_javascript_type_declaration(&output_type)
                             ));
                         }
                         ScalarSelectionDirectiveSet::Loadable(_) => {
@@ -827,7 +833,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                                 "{}readonly {}: {},\n",
                                 "  ".repeat(indentation_level as usize),
                                 name_or_alias,
-                                print_javascript_type_declaration(output_type)
+                                print_javascript_type_declaration(&output_type)
                             ));
                         }
                     }
