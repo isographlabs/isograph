@@ -593,7 +593,7 @@ fn process_fields(
         let parent_object = &mut server_field_data.server_objects[object_id.as_usize()];
 
         for field in fields.into_iter() {
-            let next_server_field_id = schema.server_fields.len().into();
+            let next_server_field_id = schema.server_scalar_selectables.len().into();
             match parent_object
                 .encountered_fields
                 .entry(field.item.name.item.into())
@@ -635,20 +635,22 @@ fn process_fields(
                         )),
                     };
 
-                    schema.server_fields.push(ServerScalarSelectable {
-                        description: field.item.description.map(|d| d.item),
-                        name: field.item.name,
-                        id: next_server_field_id,
-                        target_server_entity,
-                        parent_type_id: parent_object.id,
-                        arguments: field
-                            .item
-                            .arguments
-                            .into_iter()
-                            .map(graphql_input_value_definition_to_variable_definition)
-                            .collect::<Result<Vec<_>, _>>()?,
-                        phantom_data: std::marker::PhantomData,
-                    });
+                    schema
+                        .server_scalar_selectables
+                        .push(ServerScalarSelectable {
+                            description: field.item.description.map(|d| d.item),
+                            name: field.item.name,
+                            id: next_server_field_id,
+                            target_server_entity,
+                            parent_type_id: parent_object.id,
+                            arguments: field
+                                .item
+                                .arguments
+                                .into_iter()
+                                .map(graphql_input_value_definition_to_variable_definition)
+                                .collect::<Result<Vec<_>, _>>()?,
+                            phantom_data: std::marker::PhantomData,
+                        });
                 }
                 Entry::Occupied(_) => {
                     return Err(WithLocation::new(

@@ -40,7 +40,7 @@ pub struct RootOperationName(pub String);
 /// the schema does not support removing items.
 #[derive(Debug)]
 pub struct Schema<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat> {
-    pub server_fields: Vec<
+    pub server_scalar_selectables: Vec<
         ServerScalarSelectable<TSchemaValidationState::VariableDefinitionInnerType, TOutputFormat>,
     >,
     pub client_types: SelectionTypes<
@@ -148,7 +148,7 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
         server_field_id: ServerScalarSelectableId,
     ) -> &ServerScalarSelectable<TSchemaValidationState::VariableDefinitionInnerType, TOutputFormat>
     {
-        &self.server_fields[server_field_id.as_usize()]
+        &self.server_scalar_selectables[server_field_id.as_usize()]
     }
 
     /// Get a reference to a given client field by its id.

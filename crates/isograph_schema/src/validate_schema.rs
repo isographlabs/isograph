@@ -132,7 +132,7 @@ impl<TOutputFormat: OutputFormat> ValidatedSchema<TOutputFormat> {
         }
 
         let Schema {
-            server_fields: fields,
+            server_scalar_selectables: fields,
             client_types,
             entrypoints: _,
             server_field_data: schema_data,
@@ -185,7 +185,7 @@ impl<TOutputFormat: OutputFormat> ValidatedSchema<TOutputFormat> {
                 .collect();
 
             Ok(Self {
-                server_fields: updated_server_fields,
+                server_scalar_selectables: updated_server_fields,
                 client_types: updated_client_types,
                 entrypoints: updated_entrypoints,
                 server_field_data: ServerFieldData {

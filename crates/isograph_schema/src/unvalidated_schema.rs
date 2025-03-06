@@ -142,7 +142,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         );
 
         Self {
-            server_fields: fields,
+            server_scalar_selectables: fields,
             client_types: client_fields,
             entrypoints: Default::default(),
             server_field_data: ServerFieldData {

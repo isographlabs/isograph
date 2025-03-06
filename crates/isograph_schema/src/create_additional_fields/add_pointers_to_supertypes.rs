@@ -30,7 +30,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                 let field_name: ServerSelectableName =
                     format!("as{}", subtype.name).intern().into();
 
-                let next_server_field_id = self.server_fields.len().into();
+                let next_server_field_id = self.server_scalar_selectables.len().into();
 
                 let graphql_type_annotation: GraphQLTypeAnnotation<UnvalidatedTypeName> =
                     GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(WithSpan {
@@ -123,7 +123,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     phantom_data: std::marker::PhantomData,
                 };
 
-                self.server_fields.push(server_field);
+                self.server_scalar_selectables.push(server_field);
 
                 for supertype_id in supertype_ids {
                     let supertype = self.server_field_data.object_mut(*supertype_id);
