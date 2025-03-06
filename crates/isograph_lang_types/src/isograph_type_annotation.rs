@@ -51,6 +51,18 @@ impl<TInner: Ord> TypeAnnotation<TInner> {
             }
         }
     }
+
+    pub fn as_ref(&self) -> TypeAnnotation<&TInner> {
+        match self {
+            TypeAnnotation::Scalar(s) => TypeAnnotation::Scalar(s),
+            TypeAnnotation::Union(union_type_annotation) => {
+                TypeAnnotation::Union(union_type_annotation.as_ref())
+            }
+            TypeAnnotation::Plural(type_annotation) => {
+                TypeAnnotation::Plural(Box::new(TypeAnnotation::as_ref(type_annotation)))
+            }
+        }
+    }
 }
 
 impl<TInner: Ord> TypeAnnotation<TInner> {
@@ -147,6 +159,22 @@ impl<TInner: Ord> UnionTypeAnnotation<TInner> {
             }
         } else {
             panic!("Expected self.variants to not be empty");
+        }
+    }
+
+    pub fn as_ref(&self) -> UnionTypeAnnotation<&TInner> {
+        UnionTypeAnnotation {
+            variants: self
+                .variants
+                .iter()
+                .map(|union_variant| match union_variant {
+                    UnionVariant::Scalar(scalar) => UnionVariant::Scalar(scalar),
+                    UnionVariant::Plural(type_annotation) => {
+                        UnionVariant::Plural(type_annotation.as_ref())
+                    }
+                })
+                .collect(),
+            nullable: self.nullable,
         }
     }
 }
