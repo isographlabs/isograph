@@ -1,5 +1,5 @@
 use common_lang_types::WithSpan;
-use isograph_lang_types::{DefinitionLocation, ServerFieldSelection};
+use isograph_lang_types::{DefinitionLocation, SelectionTypeContainingSelections};
 
 use crate::{
     ClientFieldOrPointer, OutputFormat, ValidatedClientField, ValidatedSchema, ValidatedSelection,
@@ -46,7 +46,7 @@ impl<'a, TOutputFormat: OutputFormat> Iterator
 
             if let Some(selection) = item {
                 match &selection.item {
-                    ServerFieldSelection::ScalarField(scalar) => {
+                    SelectionTypeContainingSelections::Scalar(scalar) => {
                         match scalar.associated_data.location {
                             DefinitionLocation::Server(_) => {
                                 self.index += 1;
@@ -59,7 +59,7 @@ impl<'a, TOutputFormat: OutputFormat> Iterator
                             }
                         }
                     }
-                    ServerFieldSelection::LinkedField(linked_field) => {
+                    SelectionTypeContainingSelections::Object(linked_field) => {
                         let mut iterator = AccessibleClientFieldIterator {
                             selection_set: &linked_field.selection_set,
                             schema: self.schema,

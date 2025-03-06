@@ -3,7 +3,7 @@ use graphql_lang_types::{GraphQLNamedTypeAnnotation, GraphQLTypeAnnotation};
 use intern::string_key::Intern;
 use isograph_lang_types::{
     DefinitionLocation, EmptyDirectiveSet, ScalarFieldSelection, ScalarSelectionDirectiveSet,
-    SelectionType, ServerFieldSelection, TypeAnnotation,
+    SelectionType, SelectionTypeContainingSelections, TypeAnnotation,
 };
 
 use crate::{
@@ -39,7 +39,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     }));
 
                 let typename_selection = WithSpan::new(
-                    ServerFieldSelection::ScalarField(ScalarFieldSelection {
+                    SelectionTypeContainingSelections::Scalar(ScalarFieldSelection {
                         arguments: vec![],
                         associated_data: ValidatedScalarSelectionAssociatedData {
                             location: DefinitionLocation::Server(
@@ -65,7 +65,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                 );
 
                 let link_selection = WithSpan::new(
-                    ServerFieldSelection::ScalarField(ScalarFieldSelection {
+                    SelectionTypeContainingSelections::Scalar(ScalarFieldSelection {
                         arguments: vec![],
                         associated_data: ValidatedScalarSelectionAssociatedData {
                             location: DefinitionLocation::Client(

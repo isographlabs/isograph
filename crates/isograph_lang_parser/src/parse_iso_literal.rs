@@ -11,8 +11,9 @@ use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
     from_isograph_field_directives, ClientFieldDeclaration, ClientPointerDeclaration,
     ConstantValue, EntrypointDeclaration, IsographFieldDirective, LinkedFieldSelection,
-    NonConstantValue, ScalarFieldSelection, SelectionFieldArgument, ServerFieldSelection,
-    UnvalidatedSelectionWithUnvalidatedDirectives, VariableDefinition,
+    NonConstantValue, ScalarFieldSelection, SelectionFieldArgument,
+    SelectionTypeContainingSelections, UnvalidatedSelectionWithUnvalidatedDirectives,
+    VariableDefinition,
 };
 use std::{collections::HashSet, ops::ControlFlow};
 
@@ -434,7 +435,7 @@ fn parse_selection(
                                 .unwrap_or_else(Span::todo_generated),
                         )
                     })?;
-                ServerFieldSelection::LinkedField(LinkedFieldSelection {
+                SelectionTypeContainingSelections::Object(LinkedFieldSelection {
                     name: field_name.map(|string_key| string_key.into()),
                     reader_alias: alias
                         .map(|with_span| with_span.map(|string_key| string_key.into())),
@@ -454,7 +455,7 @@ fn parse_selection(
                                 .unwrap_or_else(Span::todo_generated),
                         )
                     })?;
-                ServerFieldSelection::ScalarField(ScalarFieldSelection {
+                SelectionTypeContainingSelections::Scalar(ScalarFieldSelection {
                     name: field_name.map(|string_key| string_key.into()),
                     reader_alias: alias
                         .map(|with_span| with_span.map(|string_key| string_key.into())),

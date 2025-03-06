@@ -12,7 +12,7 @@ use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
     RefetchQueryIndex, ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionType,
-    ServerEntityId, ServerFieldSelection, ServerObjectId, ServerScalarSelectableId,
+    SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, ServerScalarSelectableId,
     VariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -672,7 +672,7 @@ fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
 ) {
     for validated_selection in validated_selections.iter().filter(filter_id_fields) {
         match &validated_selection.item {
-            ServerFieldSelection::ScalarField(scalar_field_selection) => {
+            SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
                 match &scalar_field_selection.associated_data.location {
                     DefinitionLocation::Server(_) => {
                         match scalar_field_selection.associated_data.selection_variant {
@@ -760,7 +760,7 @@ fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
                     }
                 };
             }
-            ServerFieldSelection::LinkedField(linked_field_selection) => {
+            SelectionTypeContainingSelections::Object(linked_field_selection) => {
                 let type_id = linked_field_selection.associated_data.parent_object_id;
                 let linked_field_parent_type = schema.server_field_data.object(type_id);
 
@@ -998,7 +998,7 @@ fn insert_imperative_field_into_refetch_paths<TOutputFormat: OutputFormat>(
 fn filter_id_fields(field: &&WithSpan<ValidatedSelection>) -> bool {
     // filter out id fields, and eventually other always-selected fields like __typename
     match &field.item {
-        ServerFieldSelection::ScalarField(scalar_field) => {
+        SelectionTypeContainingSelections::Scalar(scalar_field) => {
             // -------- HACK --------
             // Here, we check whether the field is named "id", but we should really
             // know whether it is an id field in some other way. There can be non-id fields
@@ -1006,7 +1006,7 @@ fn filter_id_fields(field: &&WithSpan<ValidatedSelection>) -> bool {
             scalar_field.name.item != "id".intern().into()
             // ------ END HACK ------
         }
-        ServerFieldSelection::LinkedField(_) => true,
+        SelectionTypeContainingSelections::Object(_) => true,
     }
 }
 

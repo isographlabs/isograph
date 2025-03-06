@@ -12,8 +12,8 @@ use isograph_config::CompilerConfig;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, NonConstantValue,
     ObjectSelectionDirectiveSet, ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectionType,
-    ServerEntityId, ServerFieldSelection, ServerObjectId, TypeAnnotation, UnionVariant,
-    VariableDefinition,
+    SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, TypeAnnotation,
+    UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
     accessible_client_fields, as_server_field, description, get_provided_arguments,
@@ -597,7 +597,7 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
     link_fields: &mut LinkImports,
 ) {
     match &selection.item {
-        ServerFieldSelection::ScalarField(scalar_field_selection) => {
+        SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
             match scalar_field_selection.associated_data.location {
                 DefinitionLocation::Server(_server_field) => {
                     let parent_field = as_server_field(
@@ -647,7 +647,7 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
                 ),
             }
         }
-        ServerFieldSelection::LinkedField(linked_field) => {
+        SelectionTypeContainingSelections::Object(linked_field) => {
             let field = match linked_field.associated_data.field_id {
                 DefinitionLocation::Server(server_field_id) => {
                     DefinitionLocation::Server(schema.server_field(server_field_id))
@@ -783,7 +783,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
     updatable_fields: &mut UpdatableImports,
 ) {
     match &selection.item {
-        ServerFieldSelection::ScalarField(scalar_field_selection) => {
+        SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
             match scalar_field_selection.associated_data.location {
                 DefinitionLocation::Server(_server_field) => {
                     let parent_field = as_server_field(
@@ -852,7 +852,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                 }
             }
         }
-        ServerFieldSelection::LinkedField(linked_field) => {
+        SelectionTypeContainingSelections::Object(linked_field) => {
             let field = schema.linked_type(linked_field.associated_data.field_id);
 
             write_optional_description(

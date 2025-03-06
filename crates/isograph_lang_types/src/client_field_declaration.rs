@@ -9,13 +9,15 @@ use intern::string_key::Lookup;
 use serde::Deserialize;
 use std::fmt::Debug;
 
-use crate::{IsographFieldDirective, ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet};
+use crate::{
+    IsographFieldDirective, ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionType,
+};
 
 // This name makes no sense anymore... directives are validated!
 pub type UnvalidatedSelectionWithUnvalidatedDirectives =
-    ServerFieldSelection<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>;
+    SelectionTypeContainingSelections<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>;
 
-pub type UnvalidatedSelection = ServerFieldSelection<
+pub type UnvalidatedSelection = SelectionTypeContainingSelections<
     // <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
     ScalarSelectionDirectiveSet,
     // <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
@@ -33,7 +35,12 @@ pub struct ClientFieldDeclaration {
     pub client_field_name: WithSpan<ClientScalarSelectableName>,
     pub description: Option<WithSpan<DescriptionValue>>,
     pub selection_set: Vec<
-        WithSpan<ServerFieldSelection<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>>,
+        WithSpan<
+            SelectionTypeContainingSelections<
+                ScalarSelectionDirectiveSet,
+                ObjectSelectionDirectiveSet,
+            >,
+        >,
     >,
     // TODO remove, or put on a generic
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
@@ -55,7 +62,12 @@ pub struct ClientPointerDeclaration {
     pub client_pointer_name: WithSpan<ClientObjectSelectableName>,
     pub description: Option<WithSpan<DescriptionValue>>,
     pub selection_set: Vec<
-        WithSpan<ServerFieldSelection<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>>,
+        WithSpan<
+            SelectionTypeContainingSelections<
+                ScalarSelectionDirectiveSet,
+                ObjectSelectionDirectiveSet,
+            >,
+        >,
     >,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: RelativePathToSourceFile,
@@ -75,13 +87,12 @@ pub struct LoadableDirectiveParameters {
     pub lazy_load_artifact: bool,
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub enum ServerFieldSelection<TScalarField, TLinkedField> {
-    ScalarField(ScalarFieldSelection<TScalarField>),
-    LinkedField(LinkedFieldSelection<TScalarField, TLinkedField>),
-}
+pub type SelectionTypeContainingSelections<TScalarField, TLinkedField> = SelectionType<
+    ScalarFieldSelection<TScalarField>,
+    LinkedFieldSelection<TScalarField, TLinkedField>,
+>;
 
-impl<TScalarField, TLinkedField> ServerFieldSelection<TScalarField, TLinkedField> {
+impl<TScalarField, TLinkedField> SelectionTypeContainingSelections<TScalarField, TLinkedField> {
     pub fn map<TNewScalarField, TNewLinkedField>(
         self,
         map_scalar_field: &mut impl FnMut(
@@ -91,13 +102,13 @@ impl<TScalarField, TLinkedField> ServerFieldSelection<TScalarField, TLinkedField
             LinkedFieldSelection<TScalarField, TLinkedField>,
         )
             -> LinkedFieldSelection<TNewScalarField, TNewLinkedField>,
-    ) -> ServerFieldSelection<TNewScalarField, TNewLinkedField> {
+    ) -> SelectionTypeContainingSelections<TNewScalarField, TNewLinkedField> {
         match self {
-            ServerFieldSelection::ScalarField(s) => {
-                ServerFieldSelection::ScalarField(map_scalar_field(s))
+            SelectionTypeContainingSelections::Scalar(s) => {
+                SelectionTypeContainingSelections::Scalar(map_scalar_field(s))
             }
-            ServerFieldSelection::LinkedField(l) => {
-                ServerFieldSelection::LinkedField(map_linked_field(l))
+            SelectionTypeContainingSelections::Object(l) => {
+                SelectionTypeContainingSelections::Object(map_linked_field(l))
             }
         }
     }
@@ -114,21 +125,21 @@ impl<TScalarField, TLinkedField> ServerFieldSelection<TScalarField, TLinkedField
             LinkedFieldSelection<TNewScalarField, TNewLinkedField>,
             E,
         >,
-    ) -> Result<ServerFieldSelection<TNewScalarField, TNewLinkedField>, E> {
+    ) -> Result<SelectionTypeContainingSelections<TNewScalarField, TNewLinkedField>, E> {
         match self {
-            ServerFieldSelection::ScalarField(s) => {
-                Ok(ServerFieldSelection::ScalarField(and_then_scalar_field(s)?))
-            }
-            ServerFieldSelection::LinkedField(l) => {
-                Ok(ServerFieldSelection::LinkedField(and_then_linked_field(l)?))
-            }
+            SelectionTypeContainingSelections::Scalar(s) => Ok(
+                SelectionTypeContainingSelections::Scalar(and_then_scalar_field(s)?),
+            ),
+            SelectionTypeContainingSelections::Object(l) => Ok(
+                SelectionTypeContainingSelections::Object(and_then_linked_field(l)?),
+            ),
         }
     }
 
     pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
         match self {
-            ServerFieldSelection::ScalarField(scalar_field) => scalar_field.name_or_alias(),
-            ServerFieldSelection::LinkedField(linked_field) => linked_field.name_or_alias(),
+            SelectionTypeContainingSelections::Scalar(scalar_field) => scalar_field.name_or_alias(),
+            SelectionTypeContainingSelections::Object(linked_field) => linked_field.name_or_alias(),
         }
     }
 
@@ -138,10 +149,10 @@ impl<TScalarField, TLinkedField> ServerFieldSelection<TScalarField, TLinkedField
             _ => None,
         };
         match self {
-            ServerFieldSelection::ScalarField(scalar_field) => {
+            SelectionTypeContainingSelections::Scalar(scalar_field) => {
                 scalar_field.arguments.iter().flat_map(get_variable)
             }
-            ServerFieldSelection::LinkedField(linked_field) => {
+            SelectionTypeContainingSelections::Object(linked_field) => {
                 linked_field.arguments.iter().flat_map(get_variable)
             }
         }
@@ -190,7 +201,7 @@ pub struct LinkedFieldSelection<TScalarField, TLinkedField> {
     pub name: WithLocation<ServerObjectSelectableName>,
     pub reader_alias: Option<WithLocation<SelectableAlias>>,
     pub associated_data: TLinkedField,
-    pub selection_set: Vec<WithSpan<ServerFieldSelection<TScalarField, TLinkedField>>>,
+    pub selection_set: Vec<WithSpan<SelectionTypeContainingSelections<TScalarField, TLinkedField>>>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
 }
 

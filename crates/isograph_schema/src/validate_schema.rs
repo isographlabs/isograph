@@ -10,7 +10,7 @@ use isograph_lang_types::{
     ClientFieldId, ClientPointerId, DefinitionLocation, LinkedFieldSelection,
     LoadableDirectiveParameters, NonConstantValue, ObjectSelectionDirectiveSet,
     ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionType,
-    ServerEntityId, ServerFieldSelection, ServerObjectId, ServerScalarSelectableId,
+    SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, ServerScalarSelectableId,
     VariableDefinition,
 };
 
@@ -30,7 +30,7 @@ pub type ValidatedSchemaServerField<TOutputFormat> = ServerScalarSelectable<
     TOutputFormat,
 >;
 
-pub type ValidatedSelection = ServerFieldSelection<
+pub type ValidatedSelection = SelectionTypeContainingSelections<
     <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
 >;

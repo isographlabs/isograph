@@ -4,7 +4,7 @@ use common_lang_types::{ClientScalarSelectableName, ObjectTypeAndFieldName, With
 use isograph_lang_types::{
     DefinitionLocation, EmptyDirectiveSet, LoadableDirectiveParameters,
     ObjectSelectionDirectiveSet, RefetchQueryIndex, ScalarSelectionDirectiveSet, SelectionType,
-    ServerFieldSelection,
+    SelectionTypeContainingSelections,
 };
 use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, ClientFieldOrPointer,
@@ -31,7 +31,7 @@ fn generate_reader_ast_node<TOutputFormat: OutputFormat>(
     initial_variable_context: &VariableContext,
 ) -> String {
     match &selection.item {
-        ServerFieldSelection::ScalarField(scalar_field_selection) => {
+        SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
             match scalar_field_selection.associated_data.location {
                 DefinitionLocation::Server(_) => server_defined_scalar_field_ast_node(
                     scalar_field_selection,
@@ -53,7 +53,7 @@ fn generate_reader_ast_node<TOutputFormat: OutputFormat>(
                 }
             }
         }
-        ServerFieldSelection::LinkedField(linked_field_selection) => {
+        SelectionTypeContainingSelections::Object(linked_field_selection) => {
             path.push(
                 NameAndArguments {
                     // TODO use alias
@@ -618,7 +618,7 @@ fn refetched_paths_with_path<TOutputFormat: OutputFormat>(
 
     for selection in selection_set {
         match &selection.item {
-            ServerFieldSelection::ScalarField(scalar_field_selection) => {
+            SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
                 match scalar_field_selection.associated_data.location {
                     DefinitionLocation::Server(_) => {
                         // Do nothing, we encountered a server field
@@ -656,7 +656,7 @@ fn refetched_paths_with_path<TOutputFormat: OutputFormat>(
                     }
                 }
             }
-            ServerFieldSelection::LinkedField(linked_field_selection) => {
+            SelectionTypeContainingSelections::Object(linked_field_selection) => {
                 path.push(
                     NameAndArguments {
                         // TODO use alias
