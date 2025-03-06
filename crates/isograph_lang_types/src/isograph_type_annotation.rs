@@ -62,6 +62,14 @@ impl<TInner: Ord> TypeAnnotation<TInner> {
         }
     }
 
+    pub fn into_inner(self) -> TInner {
+        match self {
+            TypeAnnotation::Scalar(s) => s,
+            TypeAnnotation::Union(union_type_annotation) => union_type_annotation.into_inner(),
+            TypeAnnotation::Plural(type_annotation) => type_annotation.into_inner(),
+        }
+    }
+
     // TODO this function should not exist, as we should not be treating "null" as special,
     // ideally
     pub fn inner_non_null(&self) -> &TInner {
@@ -123,11 +131,23 @@ impl<TInner: Ord> UnionTypeAnnotation<TInner> {
     pub fn inner(&self) -> &TInner {
         if let Some(item) = self.variants.first() {
             match item {
-                UnionVariant::Scalar(s) => return s,
-                UnionVariant::Plural(type_annotation) => return type_annotation.inner_non_null(),
+                UnionVariant::Scalar(s) => s,
+                UnionVariant::Plural(type_annotation) => type_annotation.inner_non_null(),
             }
+        } else {
+            panic!("Expected self.variants to not be empty");
         }
-        panic!("Expected self.variants to not be empty");
+    }
+
+    pub fn into_inner(self) -> TInner {
+        if let Some(item) = self.variants.into_iter().next() {
+            match item {
+                UnionVariant::Scalar(s) => s,
+                UnionVariant::Plural(type_annotation) => type_annotation.into_inner(),
+            }
+        } else {
+            panic!("Expected self.variants to not be empty");
+        }
     }
 }
 
