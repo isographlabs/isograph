@@ -32,7 +32,7 @@ Ok(
                             description: None,
                             selection_set: [
                                 WithSpan {
-                                    item: LinkedField(
+                                    item: Object(
                                         LinkedFieldSelection {
                                             name: WithLocation {
                                                 location: Embedded(

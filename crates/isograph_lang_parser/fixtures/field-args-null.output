@@ -32,7 +32,7 @@ Ok(
                             description: None,
                             selection_set: [
                                 WithSpan {
-                                    item: ScalarField(
+                                    item: Scalar(
                                         ScalarFieldSelection {
                                             name: WithLocation {
                                                 location: Embedded(
