@@ -75,6 +75,7 @@ pub struct LoadableDirectiveParameters {
     pub lazy_load_artifact: bool,
 }
 
+// TODO use SelectionType
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub enum ServerFieldSelection<TScalarField, TLinkedField> {
     ScalarField(ScalarFieldSelection<TScalarField>),

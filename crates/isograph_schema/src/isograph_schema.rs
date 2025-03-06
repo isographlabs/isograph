@@ -16,7 +16,7 @@ use lazy_static::lazy_static;
 use crate::{
     schema_validation_state::SchemaValidationState, ClientField, ClientFieldOrPointerId,
     ClientPointer, NormalizationKey, OutputFormat, SchemaObject, SchemaScalar, SchemaType,
-    ServerScalarSelectable,
+    ServerObjectSelectable, ServerScalarSelectable,
 };
 
 lazy_static! {
@@ -43,6 +43,10 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState, TOutputFormat: 
     pub server_scalar_selectables: Vec<
         ServerScalarSelectable<TSchemaValidationState::VariableDefinitionInnerType, TOutputFormat>,
     >,
+    pub server_object_selectables: Vec<
+        ServerObjectSelectable<TSchemaValidationState::VariableDefinitionInnerType, TOutputFormat>,
+    >,
+
     pub client_types: SelectionTypes<
         TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
         TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
