@@ -2,8 +2,8 @@ use common_lang_types::{SelectableName, WithLocation};
 use isograph_lang_types::{ServerObjectId, VariableDefinition};
 
 use crate::{
-    get_all_errors_or_all_ok, get_all_errors_or_all_ok_iter, OutputFormat, SchemaServerField,
-    ServerFieldData, UnvalidatedSchemaSchemaField, UnvalidatedVariableDefinition,
+    get_all_errors_or_all_ok, get_all_errors_or_all_ok_iter, OutputFormat, ServerFieldData,
+    ServerScalarSelectable, UnvalidatedSchemaSchemaField, UnvalidatedVariableDefinition,
     ValidateSchemaError, ValidateSchemaResult, ValidatedSchemaServerField,
     ValidatedVariableDefinition,
 };
@@ -48,7 +48,7 @@ fn validate_and_transform_server_field<TOutputFormat: OutputFormat>(
         };
 
     if let Some(valid_arguments) = valid_arguments {
-        return Ok(SchemaServerField {
+        return Ok(ServerScalarSelectable {
             description: field.description,
             name: field.name,
             id: field.id,

@@ -14,14 +14,14 @@ use graphql_lang_types::{
 use intern::string_key::{Intern, Lookup};
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
-    DefinitionLocation, SelectableServerFieldId, SelectionType, ServerFieldId, ServerObjectId,
-    ServerStrongIdFieldId, TypeAnnotation, VariableDefinition,
+    DefinitionLocation, SelectableServerFieldId, SelectionType, ServerObjectId,
+    ServerScalarSelectableId, ServerStrongIdFieldId, TypeAnnotation, VariableDefinition,
 };
 use isograph_schema::{
     EncounteredRootTypes, IsographObjectTypeDefinition, ProcessTypeSystemDocumentOutcome,
     ProcessedRootTypes, RootOperationName, RootTypes, Schema, SchemaObject, SchemaScalar,
-    SchemaServerField, SchemaServerLinkedFieldFieldVariant, TypeRefinementMaps, ID_GRAPHQL_TYPE,
-    STRING_JAVASCRIPT_TYPE, TYPENAME_FIELD_NAME,
+    SchemaServerLinkedFieldFieldVariant, ServerScalarSelectable, TypeRefinementMaps,
+    ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE, TYPENAME_FIELD_NAME,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
@@ -635,7 +635,7 @@ fn process_fields(
                         )),
                     };
 
-                    schema.server_fields.push(SchemaServerField {
+                    schema.server_fields.push(ServerScalarSelectable {
                         description: field.item.description.map(|d| d.item),
                         name: field.item.name,
                         id: next_server_field_id,
@@ -671,7 +671,7 @@ fn process_fields(
 /// - set the id field
 fn set_and_validate_id_field(
     id_field: &mut Option<ServerStrongIdFieldId>,
-    current_field_id: ServerFieldId,
+    current_field_id: ServerScalarSelectableId,
     field: &WithLocation<GraphQLFieldDefinition>,
     parent_type_name: IsographObjectTypeName,
     options: &CompilerConfigOptions,

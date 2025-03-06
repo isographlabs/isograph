@@ -7,13 +7,13 @@ use common_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     DefinitionLocation, EntrypointDeclaration, LinkedFieldSelection, ObjectSelectionDirectiveSet,
-    ScalarSelectionDirectiveSet, SelectableServerFieldId, ServerFieldId, ServerScalarId,
+    ScalarSelectionDirectiveSet, SelectableServerFieldId, ServerScalarId, ServerScalarSelectableId,
     VariableDefinition,
 };
 
 use crate::{
     schema_validation_state::SchemaValidationState, ClientField, ClientFieldOrPointerId,
-    ClientPointer, OutputFormat, Schema, SchemaScalar, SchemaServerField, ServerFieldData,
+    ClientPointer, OutputFormat, Schema, SchemaScalar, ServerFieldData, ServerScalarSelectable,
     UseRefetchFieldRefetchStrategy, ValidatedSelection,
 };
 use lazy_static::lazy_static;
@@ -40,7 +40,7 @@ pub enum SchemaServerLinkedFieldFieldVariant {
 
 #[derive(Debug, Clone)]
 pub struct ServerFieldTypeAssociatedDataInlineFragment {
-    pub server_field_id: ServerFieldId,
+    pub server_field_id: ServerScalarSelectableId,
     pub concrete_type: IsographObjectTypeName,
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 }
@@ -50,9 +50,10 @@ pub type UnvalidatedSchema<TOutputFormat> = Schema<UnvalidatedSchemaState, TOutp
 /// On unvalidated schema objects, the encountered types are either a type annotation
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the
 /// client field.)
-pub type UnvalidatedObjectFieldInfo = DefinitionLocation<ServerFieldId, ClientFieldOrPointerId>;
+pub type UnvalidatedObjectFieldInfo =
+    DefinitionLocation<ServerScalarSelectableId, ClientFieldOrPointerId>;
 
-pub type UnvalidatedSchemaSchemaField<TOutputFormat> = SchemaServerField<
+pub type UnvalidatedSchemaSchemaField<TOutputFormat> = ServerScalarSelectable<
     <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
     TOutputFormat,
 >;

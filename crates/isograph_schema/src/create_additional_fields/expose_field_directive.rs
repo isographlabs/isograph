@@ -9,8 +9,8 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
-    ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectionType, ServerFieldId,
-    ServerFieldSelection, ServerObjectId,
+    ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectionType, ServerFieldSelection,
+    ServerObjectId, ServerScalarSelectableId,
 };
 
 use serde::Deserialize;
@@ -367,7 +367,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         &self,
         field_arg: StringLiteralValue,
         mutation_object_id: ServerObjectId,
-    ) -> ProcessTypeDefinitionResult<ServerFieldId> {
+    ) -> ProcessTypeDefinitionResult<ServerScalarSelectableId> {
         let mutation = self.server_field_data.object(mutation_object_id);
 
         // TODO make this a no-op

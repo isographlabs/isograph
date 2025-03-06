@@ -3,11 +3,11 @@ use u32_newtypes::{u32_conversion, u32_newtype};
 use crate::SelectionType;
 
 // Any field defined on the server
-u32_newtype!(ServerFieldId);
+u32_newtype!(ServerScalarSelectableId);
 // A field that acts as an id
 u32_newtype!(ServerStrongIdFieldId);
 
-u32_conversion!(from: ServerStrongIdFieldId, to: ServerFieldId);
+u32_conversion!(from: ServerStrongIdFieldId, to: ServerScalarSelectableId);
 
 u32_newtype!(ClientFieldId);
 

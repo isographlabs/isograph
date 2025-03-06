@@ -11,8 +11,8 @@ use std::collections::BTreeMap;
 
 use isograph_lang_types::{
     graphql_type_annotation_from_type_annotation, DefinitionLocation, NonConstantValue,
-    SelectableServerFieldId, SelectionType, ServerFieldId, ServerObjectId, ServerScalarId,
-    VariableDefinition,
+    SelectableServerFieldId, SelectionType, ServerObjectId, ServerScalarId,
+    ServerScalarSelectableId, VariableDefinition,
 };
 
 use crate::{
@@ -404,7 +404,7 @@ fn get_non_nullable_missing_and_provided_fields<TOutputFormat: OutputFormat>(
 fn validate_no_extraneous_fields(
     object_fields: &BTreeMap<
         SelectableName,
-        DefinitionLocation<ServerFieldId, ClientFieldOrPointerId>,
+        DefinitionLocation<ServerScalarSelectableId, ClientFieldOrPointerId>,
     >,
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     location: Location,

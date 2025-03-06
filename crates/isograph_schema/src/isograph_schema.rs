@@ -9,14 +9,15 @@ use common_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, ClientPointerId, DefinitionLocation,
-    SelectableServerFieldId, SelectionType, ServerFieldId, ServerObjectId, ServerScalarId,
+    SelectableServerFieldId, SelectionType, ServerObjectId, ServerScalarId,
+    ServerScalarSelectableId,
 };
 use lazy_static::lazy_static;
 
 use crate::{
     schema_validation_state::SchemaValidationState, ClientField, ClientFieldOrPointerId,
-    ClientPointer, NormalizationKey, OutputFormat, SchemaObject, SchemaScalar, SchemaServerField,
-    SchemaType,
+    ClientPointer, NormalizationKey, OutputFormat, SchemaObject, SchemaScalar, SchemaType,
+    ServerScalarSelectable,
 };
 
 lazy_static! {
@@ -40,8 +41,9 @@ pub struct RootOperationName(pub String);
 /// the schema does not support removing items.
 #[derive(Debug)]
 pub struct Schema<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat> {
-    pub server_fields:
-        Vec<SchemaServerField<TSchemaValidationState::VariableDefinitionInnerType, TOutputFormat>>,
+    pub server_fields: Vec<
+        ServerScalarSelectable<TSchemaValidationState::VariableDefinitionInnerType, TOutputFormat>,
+    >,
     pub client_types: SelectionTypes<
         TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
         TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
@@ -112,7 +114,7 @@ pub type LinkedType<
     VariableDefinitionInnerType,
     TOutputFormat,
 > = DefinitionLocation<
-    &'a SchemaServerField<VariableDefinitionInnerType, TOutputFormat>,
+    &'a ServerScalarSelectable<VariableDefinitionInnerType, TOutputFormat>,
     &'a ClientPointer<
         SelectionTypeSelectionScalarFieldAssociatedData,
         SelectionTypeSelectionLinkedFieldAssociatedData,
@@ -144,8 +146,8 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     /// Get a reference to a given server field by its id.
     pub fn server_field(
         &self,
-        server_field_id: ServerFieldId,
-    ) -> &SchemaServerField<TSchemaValidationState::VariableDefinitionInnerType, TOutputFormat>
+        server_field_id: ServerScalarSelectableId,
+    ) -> &ServerScalarSelectable<TSchemaValidationState::VariableDefinitionInnerType, TOutputFormat>
     {
         &self.server_fields[server_field_id.as_usize()]
     }
@@ -171,7 +173,7 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
 
     pub fn linked_type(
         &self,
-        field_id: DefinitionLocation<ServerFieldId, ClientPointerId>,
+        field_id: DefinitionLocation<ServerScalarSelectableId, ClientPointerId>,
     ) -> LinkedType<
         TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
         TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,

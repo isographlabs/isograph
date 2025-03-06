@@ -7,9 +7,9 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    as_client_type, as_server_field, OutputFormat, SchemaServerField,
-    SchemaServerLinkedFieldFieldVariant, ServerFieldTypeAssociatedDataInlineFragment,
-    UnvalidatedSchema, ValidatedScalarSelectionAssociatedData, LINK_FIELD_NAME,
+    as_client_type, as_server_field, OutputFormat, SchemaServerLinkedFieldFieldVariant,
+    ServerFieldTypeAssociatedDataInlineFragment, ServerScalarSelectable, UnvalidatedSchema,
+    ValidatedScalarSelectionAssociatedData, LINK_FIELD_NAME,
 };
 use common_lang_types::Location;
 
@@ -109,7 +109,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                 ));
 
                 // TODO ... is this a server field? Yes, because it's an inline fragment?
-                let server_field = SchemaServerField {
+                let server_field = ServerScalarSelectable {
                     description: Some(
                         format!("A client pointer for the {} type.", subtype.name)
                             .intern()

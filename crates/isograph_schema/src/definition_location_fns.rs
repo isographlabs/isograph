@@ -2,7 +2,7 @@ use common_lang_types::DescriptionValue;
 use isograph_lang_types::{DefinitionLocation, SelectionType, ServerObjectId, TypeAnnotation};
 
 use crate::{
-    ClientPointer, OutputFormat, SchemaServerField, ValidatedClientPointer,
+    ClientPointer, OutputFormat, ServerScalarSelectable, ValidatedClientPointer,
     ValidatedSchemaServerField,
 };
 
@@ -14,7 +14,7 @@ pub fn description<
     TOutputFormat: OutputFormat,
 >(
     definition_location: &DefinitionLocation<
-        &SchemaServerField<TSelectionTypeVariableDefinitionAssociatedData, TOutputFormat>,
+        &ServerScalarSelectable<TSelectionTypeVariableDefinitionAssociatedData, TOutputFormat>,
         &ClientPointer<
             TSelectionTypeSelectionScalarFieldAssociatedData,
             TSelectionTypeSelectionLinkedFieldAssociatedData,

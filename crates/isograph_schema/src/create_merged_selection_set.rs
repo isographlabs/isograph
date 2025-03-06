@@ -12,8 +12,8 @@ use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
     RefetchQueryIndex, ScalarSelectionDirectiveSet, SelectableServerFieldId,
-    SelectionFieldArgument, SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId,
-    VariableDefinition,
+    SelectionFieldArgument, SelectionType, ServerFieldSelection, ServerObjectId,
+    ServerScalarSelectableId, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -32,8 +32,10 @@ use crate::{
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
 
 // Maybe this should be FNVHashMap? We don't really need stable iteration order
-pub type FieldToCompletedMergeTraversalStateMap =
-    BTreeMap<DefinitionLocation<ServerFieldId, ClientFieldOrPointerId>, FieldTraversalResult>;
+pub type FieldToCompletedMergeTraversalStateMap = BTreeMap<
+    DefinitionLocation<ServerScalarSelectableId, ClientFieldOrPointerId>,
+    FieldTraversalResult,
+>;
 
 #[derive(Clone, Debug)]
 pub struct FieldTraversalResult {
@@ -407,7 +409,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     parent_type: &SchemaObject<TOutputFormat>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
-    root_field_id: DefinitionLocation<ServerFieldId, ClientFieldOrPointerId>,
+    root_field_id: DefinitionLocation<ServerScalarSelectableId, ClientFieldOrPointerId>,
     variable_context: &VariableContext,
     // TODO return Cow?
 ) -> FieldTraversalResult {

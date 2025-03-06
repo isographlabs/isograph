@@ -10,8 +10,8 @@ use isograph_lang_types::{
     ClientFieldId, ClientPointerId, DefinitionLocation, LinkedFieldSelection,
     LoadableDirectiveParameters, NonConstantValue, ObjectSelectionDirectiveSet,
     ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectableServerFieldId,
-    SelectionFieldArgument, SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId,
-    VariableDefinition,
+    SelectionFieldArgument, SelectionType, ServerFieldSelection, ServerObjectId,
+    ServerScalarSelectableId, VariableDefinition,
 };
 
 use thiserror::Error;
@@ -21,11 +21,11 @@ use crate::{
     validate_client_field::validate_and_transform_client_types,
     validate_server_field::validate_and_transform_server_fields, ClientField, ClientFieldVariant,
     ClientPointer, ImperativelyLoadedFieldVariant, OutputFormat, Schema, SchemaObject,
-    SchemaServerField, ServerFieldData, UnvalidatedSchema, UseRefetchFieldRefetchStrategy,
+    ServerFieldData, ServerScalarSelectable, UnvalidatedSchema, UseRefetchFieldRefetchStrategy,
     ValidateEntrypointDeclarationError,
 };
 
-pub type ValidatedSchemaServerField<TOutputFormat> = SchemaServerField<
+pub type ValidatedSchemaServerField<TOutputFormat> = ServerScalarSelectable<
     <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
     TOutputFormat,
 >;
@@ -64,12 +64,13 @@ pub type ValidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
 >;
 
 /// The validated defined field that shows up in the TScalarField generic.
-pub type ValidatedFieldDefinitionLocation = DefinitionLocation<ServerFieldId, ClientFieldId>;
+pub type ValidatedFieldDefinitionLocation =
+    DefinitionLocation<ServerScalarSelectableId, ClientFieldId>;
 
 #[derive(Debug, Clone)]
 pub struct ValidatedLinkedFieldAssociatedData {
     pub parent_object_id: ServerObjectId,
-    pub field_id: DefinitionLocation<ServerFieldId, ClientPointerId>,
+    pub field_id: DefinitionLocation<ServerScalarSelectableId, ClientPointerId>,
     // N.B. we don't actually support loadable linked fields
     pub selection_variant: ObjectSelectionDirectiveSet,
     /// Some if the (destination?) object is concrete; None otherwise.

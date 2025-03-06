@@ -9,7 +9,7 @@ use isograph_lang_types::{
 
 use crate::{
     ClientField, ClientFieldOrPointer, ClientPointer, NameAndArguments, OutputFormat,
-    SchemaServerField, ValidatedVariableDefinition,
+    ServerScalarSelectable, ValidatedVariableDefinition,
 };
 
 #[derive(Debug)]
@@ -138,7 +138,7 @@ pub fn initial_variable_context<
 }
 
 impl<TClientFieldVariableDefinitionAssociatedData: Ord + Debug, TOutputFormat: OutputFormat>
-    SchemaServerField<TClientFieldVariableDefinitionAssociatedData, TOutputFormat>
+    ServerScalarSelectable<TClientFieldVariableDefinitionAssociatedData, TOutputFormat>
 {
     pub fn initial_variable_context(&self) -> VariableContext {
         let variable_context = self

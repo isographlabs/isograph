@@ -4,8 +4,8 @@ use common_lang_types::SelectableName;
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 
 use isograph_lang_types::{
-    DefinitionLocation, SelectableServerFieldId, SelectionType, ServerFieldId, TypeAnnotation,
-    UnionVariant,
+    DefinitionLocation, SelectableServerFieldId, SelectionType, ServerScalarSelectableId,
+    TypeAnnotation, UnionVariant,
 };
 use isograph_schema::{OutputFormat, ValidatedSchema};
 
@@ -79,7 +79,7 @@ fn format_server_field_type<TOutputFormat: OutputFormat>(
 fn format_field_definition<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
     name: &SelectableName,
-    server_field_id: ServerFieldId,
+    server_field_id: ServerScalarSelectableId,
     indentation_level: u8,
 ) -> String {
     let selection_type = &schema.server_field(server_field_id).target_server_entity;

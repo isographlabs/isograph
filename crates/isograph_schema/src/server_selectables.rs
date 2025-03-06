@@ -2,7 +2,7 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use common_lang_types::{DescriptionValue, ServerSelectableName, WithLocation};
 use isograph_lang_types::{
-    SelectionType, ServerFieldId, ServerObjectId, ServerScalarId, TypeAnnotation,
+    SelectionType, ServerObjectId, ServerScalarId, ServerScalarSelectableId, TypeAnnotation,
     VariableDefinition,
 };
 
@@ -10,7 +10,7 @@ use crate::{OutputFormat, SchemaServerLinkedFieldFieldVariant};
 
 // TODO convert this to two structs
 #[derive(Debug, Clone)]
-pub struct SchemaServerField<
+pub struct ServerScalarSelectable<
     TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
     TOutputFormat: OutputFormat,
 > {
@@ -18,7 +18,7 @@ pub struct SchemaServerField<
     /// The name of the server field and the location where it was defined
     /// (an iso literal or Location::Generated).
     pub name: WithLocation<ServerSelectableName>,
-    pub id: ServerFieldId,
+    pub id: ServerScalarSelectableId,
 
     pub target_server_entity: SelectionType<
         TypeAnnotation<ServerScalarId>,
