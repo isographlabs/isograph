@@ -9,6 +9,8 @@ use isograph_lang_types::{
 use crate::{OutputFormat, SchemaServerLinkedFieldFieldVariant};
 
 // TODO convert this to two structs
+// NOTE: for the time being, despite the name, this represents both
+// fields with point to scalar entities and object entities
 #[derive(Debug, Clone)]
 pub struct ServerScalarSelectable<
     TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
