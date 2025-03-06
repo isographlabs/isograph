@@ -816,7 +816,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                             query_type_declaration.push_str(&format!(
                                 "{}: {},\n",
                                 name_or_alias,
-                                print_javascript_type_declaration(&output_type)
+                                print_javascript_type_declaration(output_type)
                             ));
                         }
                         ScalarSelectionDirectiveSet::Loadable(_) => {
@@ -827,7 +827,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                                 "{}readonly {}: {},\n",
                                 "  ".repeat(indentation_level as usize),
                                 name_or_alias,
-                                print_javascript_type_declaration(&output_type)
+                                print_javascript_type_declaration(output_type)
                             ));
                         }
                     }
