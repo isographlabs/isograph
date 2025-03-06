@@ -171,7 +171,7 @@ fn format_type_annotation<TOutputFormat: OutputFormat>(
                             "ReadonlyArray<{}>",
                             format_server_field_type(
                                 schema,
-                                type_annotation.inner(),
+                                *type_annotation.inner(),
                                 indentation_level + 1
                             )
                         )
@@ -182,7 +182,7 @@ fn format_type_annotation<TOutputFormat: OutputFormat>(
         TypeAnnotation::Plural(type_annotation) => {
             format!(
                 "ReadonlyArray<{}>",
-                format_server_field_type(schema, type_annotation.inner(), indentation_level + 1)
+                format_server_field_type(schema, *type_annotation.inner(), indentation_level + 1)
             )
         }
     }

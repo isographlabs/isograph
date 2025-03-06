@@ -1,6 +1,9 @@
 #![allow(unused)]
 
-use std::{collections::BTreeSet, fmt::Debug};
+use std::{
+    collections::{btree_set::Union, BTreeSet},
+    fmt::Debug,
+};
 
 use common_lang_types::{Span, WithSpan};
 use graphql_lang_types::{
@@ -11,13 +14,13 @@ use graphql_lang_types::{
 /// This is annoying! We should find a better way to model lists.
 /// This gets us closer to a good solution, so it's fine.
 #[derive(PartialEq, PartialOrd, Ord, Eq, Clone, Debug)]
-pub enum TypeAnnotation<TInner: Ord + Debug> {
+pub enum TypeAnnotation<TInner> {
     Scalar(TInner),
     Union(UnionTypeAnnotation<TInner>),
     Plural(Box<TypeAnnotation<TInner>>),
 }
 
-impl<TInner: Ord + Copy + Debug> TypeAnnotation<TInner> {
+impl<TInner: Ord> TypeAnnotation<TInner> {
     pub fn from_graphql_type_annotation(other: GraphQLTypeAnnotation<TInner>) -> Self {
         match other {
             GraphQLTypeAnnotation::Named(named_type_annotation) => {
@@ -50,11 +53,10 @@ impl<TInner: Ord + Copy + Debug> TypeAnnotation<TInner> {
     }
 }
 
-impl<TInner: Ord + Copy + Debug> TypeAnnotation<TInner> {
-    // TODO don't require copy, just return a reference and deref
-    pub fn inner(&self) -> TInner {
+impl<TInner: Ord> TypeAnnotation<TInner> {
+    pub fn inner(&self) -> &TInner {
         match self {
-            TypeAnnotation::Scalar(s) => *s,
+            TypeAnnotation::Scalar(s) => s,
             TypeAnnotation::Union(union_type_annotation) => union_type_annotation.inner(),
             TypeAnnotation::Plural(type_annotation) => type_annotation.inner(),
         }
@@ -62,17 +64,15 @@ impl<TInner: Ord + Copy + Debug> TypeAnnotation<TInner> {
 
     // TODO this function should not exist, as we should not be treating "null" as special,
     // ideally
-    pub fn inner_non_null(&self) -> TInner {
+    pub fn inner_non_null(&self) -> &TInner {
         match self {
-            TypeAnnotation::Scalar(s) => *s,
+            TypeAnnotation::Scalar(s) => s,
             TypeAnnotation::Union(union_type_annotation) => union_type_annotation.inner(),
             TypeAnnotation::Plural(type_annotation) => type_annotation.inner_non_null(),
         }
     }
-}
 
-impl<TInner: Ord + Debug> TypeAnnotation<TInner> {
-    pub fn map<TInner2: Ord + Debug>(
+    pub fn map<TInner2: Ord>(
         self,
         map: &mut impl FnMut(TInner) -> TInner2,
     ) -> TypeAnnotation<TInner2> {
@@ -103,14 +103,14 @@ impl<TInner: Ord + Debug> TypeAnnotation<TInner> {
 }
 
 #[derive(Default, Ord, PartialEq, PartialOrd, Eq, Clone, Debug)]
-pub struct UnionTypeAnnotation<TInner: Ord + Debug> {
+pub struct UnionTypeAnnotation<TInner> {
     pub variants: BTreeSet<UnionVariant<TInner>>,
     // TODO this is incredibly hacky. null should be in the variants set, but
     // that doesn't work for a variety of reasons, namely mapping, etc.
     pub nullable: bool,
 }
 
-impl<TInner: Ord + Copy + Debug> UnionTypeAnnotation<TInner> {
+impl<TInner: Ord> UnionTypeAnnotation<TInner> {
     pub fn new_nullable(variant: UnionVariant<TInner>) -> Self {
         let mut variants = BTreeSet::new();
         variants.insert(variant);
@@ -120,10 +120,10 @@ impl<TInner: Ord + Copy + Debug> UnionTypeAnnotation<TInner> {
         }
     }
 
-    pub fn inner(&self) -> TInner {
+    pub fn inner(&self) -> &TInner {
         if let Some(item) = self.variants.first() {
             match item {
-                UnionVariant::Scalar(s) => return *s,
+                UnionVariant::Scalar(s) => return s,
                 UnionVariant::Plural(type_annotation) => return type_annotation.inner_non_null(),
             }
         }
@@ -132,7 +132,7 @@ impl<TInner: Ord + Copy + Debug> UnionTypeAnnotation<TInner> {
 }
 
 #[derive(Ord, PartialEq, PartialOrd, Eq, Clone, Debug)]
-pub enum UnionVariant<TInner: Ord + Debug> {
+pub enum UnionVariant<TInner> {
     Scalar(TInner),
     Plural(TypeAnnotation<TInner>),
 }

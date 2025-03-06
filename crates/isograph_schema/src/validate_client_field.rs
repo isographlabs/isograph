@@ -96,7 +96,7 @@ pub(crate) fn validate_and_transform_client_types<TOutputFormat: OutputFormat>(
         .map(|unvalidated_client_pointer| {
             (
                 unvalidated_client_pointer.id,
-                unvalidated_client_pointer.to.inner(),
+                *unvalidated_client_pointer.to.inner(),
             )
         })
         .collect::<ClientPointerTargetTypeMap>();
@@ -490,7 +490,7 @@ fn validate_field_type_exists_and_is_scalar<TOutputFormat: OutputFormat>(
                             field_type: "an object",
                             target_type_name: top_level_client_type_info
                                 .schema_data
-                                .object(type_annotation.inner())
+                                .object(*type_annotation.inner())
                                 .name
                                 .into(),
                             client_field_parent_type_name: top_level_client_type_info
@@ -634,7 +634,7 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
                             field_type: "a scalar",
                             target_type_name: top_level_client_type_info
                                 .schema_data
-                                .scalar(type_annotation.inner())
+                                .scalar(*type_annotation.inner())
                                 .name
                                 .item
                                 .into(),
@@ -654,7 +654,7 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
                     SelectionType::Object((_variant, type_annotation)) => {
                         let object_id = type_annotation.inner();
                         let linked_field_target_object =
-                            top_level_client_type_info.schema_data.object(object_id);
+                            top_level_client_type_info.schema_data.object(*object_id);
 
                         let missing_arguments = get_missing_arguments_and_validate_argument_types(
                             top_level_client_type_info.schema_data,
@@ -688,7 +688,7 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
                                 .collect::<Result<Vec<_>, _>>()?,
                             associated_data: ValidatedLinkedFieldAssociatedData {
                                 concrete_type: linked_field_target_object.concrete_type,
-                                parent_object_id: object_id,
+                                parent_object_id: *object_id,
                                 field_id: DefinitionLocation::Server(server_field.id),
                                 selection_variant: match linked_field_selection.associated_data {
                                     ObjectSelectionDirectiveSet::None(empty_struct)=> {

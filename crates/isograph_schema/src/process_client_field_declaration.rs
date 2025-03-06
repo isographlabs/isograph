@@ -210,7 +210,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
     ) -> ProcessClientFieldDeclarationResult<()> {
         let query_id = self.query_id();
-        let to_object = self.server_field_data.object(to_object_id.inner());
+        let to_object = self.server_field_data.object(*to_object_id.inner());
         let parent_object = self.server_field_data.object(parent_object_id);
         let client_pointer_pointer_name_ws = client_pointer_declaration.item.client_pointer_name;
         let client_pointer_name = client_pointer_pointer_name_ws.item;

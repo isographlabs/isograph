@@ -140,7 +140,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             }
             SelectionType::Object(object) => object,
         };
-        let payload_object_id = payload_object_type_annotation.inner();
+        let payload_object_id = *payload_object_type_annotation.inner();
 
         // TODO it's a bit annoying that we call .object twice!
         let mutation_field_payload_type_name =
@@ -182,11 +182,12 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                 match &server_field.target_server_entity {
                     SelectionType::Object((_variant, type_annotation)) => {
                         let client_field_parent_object_id = type_annotation.inner();
-                        let client_field_parent_object =
-                            self.server_field_data.object(client_field_parent_object_id);
+                        let client_field_parent_object = self
+                            .server_field_data
+                            .object(*client_field_parent_object_id);
 
                         Ok((
-                            client_field_parent_object_id,
+                            *client_field_parent_object_id,
                             // This is the parent type name (Pet)
                             client_field_parent_object.name,
                         ))
