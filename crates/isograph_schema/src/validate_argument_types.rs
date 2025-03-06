@@ -11,8 +11,8 @@ use std::collections::BTreeMap;
 
 use isograph_lang_types::{
     graphql_type_annotation_from_type_annotation, DefinitionLocation, NonConstantValue,
-    SelectableServerFieldId, SelectionType, ServerObjectId, ServerScalarId,
-    ServerScalarSelectableId, VariableDefinition,
+    SelectionType, ServerEntityId, ServerObjectId, ServerScalarId, ServerScalarSelectableId,
+    VariableDefinition,
 };
 
 use crate::{
@@ -42,7 +42,7 @@ fn graphql_type_to_nullable_type<TValue>(
 
 fn scalar_literal_satisfies_type<TOutputFormat: OutputFormat>(
     scalar_literal: &ServerScalarId,
-    type_: &GraphQLTypeAnnotation<SelectableServerFieldId>,
+    type_: &GraphQLTypeAnnotation<ServerEntityId>,
     schema_data: &ServerFieldData<TOutputFormat>,
     location: Location,
 ) -> Result<(), WithLocation<ValidateSchemaError>> {
@@ -87,8 +87,8 @@ fn scalar_literal_satisfies_type<TOutputFormat: OutputFormat>(
 }
 
 fn variable_type_satisfies_argument_type(
-    variable_type: &GraphQLTypeAnnotation<SelectableServerFieldId>,
-    argument_type: &GraphQLTypeAnnotation<SelectableServerFieldId>,
+    variable_type: &GraphQLTypeAnnotation<ServerEntityId>,
+    argument_type: &GraphQLTypeAnnotation<ServerEntityId>,
 ) -> bool {
     match argument_type {
         GraphQLTypeAnnotation::List(list_type) => {
@@ -127,7 +127,7 @@ fn variable_type_satisfies_argument_type(
 
 pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
-    field_argument_definition_type: &GraphQLTypeAnnotation<SelectableServerFieldId>,
+    field_argument_definition_type: &GraphQLTypeAnnotation<ServerEntityId>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     schema_data: &ServerFieldData<TOutputFormat>,
     server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
@@ -302,7 +302,7 @@ pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
 
 fn object_satisfies_type<TOutputFormat: OutputFormat>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
-    variable_definitions: &[WithSpan<VariableDefinition<SelectableServerFieldId>>],
+    variable_definitions: &[WithSpan<VariableDefinition<ServerEntityId>>],
     schema_data: &ServerFieldData<TOutputFormat>,
     server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
@@ -350,7 +350,7 @@ fn object_satisfies_type<TOutputFormat: OutputFormat>(
 
 enum ObjectLiteralFieldType {
     Provided(
-        GraphQLTypeAnnotation<SelectableServerFieldId>,
+        GraphQLTypeAnnotation<ServerEntityId>,
         NameValuePair<ValueKeyName, NonConstantValue>,
     ),
     Missing(SelectableName),
@@ -433,7 +433,7 @@ fn validate_no_extraneous_fields(
 }
 
 fn id_annotation_to_typename_annotation<TOutputFormat: OutputFormat>(
-    type_: &GraphQLTypeAnnotation<SelectableServerFieldId>,
+    type_: &GraphQLTypeAnnotation<ServerEntityId>,
     schema_data: &ServerFieldData<TOutputFormat>,
 ) -> GraphQLTypeAnnotation<UnvalidatedTypeName> {
     type_.clone().map(|type_id| match type_id {
@@ -444,7 +444,7 @@ fn id_annotation_to_typename_annotation<TOutputFormat: OutputFormat>(
 
 fn enum_satisfies_type<TOutputFormat: OutputFormat>(
     enum_literal_value: &EnumLiteralValue,
-    enum_type: &GraphQLNamedTypeAnnotation<SelectableServerFieldId>,
+    enum_type: &GraphQLNamedTypeAnnotation<ServerEntityId>,
     schema_data: &ServerFieldData<TOutputFormat>,
     location: Location,
 ) -> ValidateSchemaResult<()> {
@@ -472,7 +472,7 @@ fn enum_satisfies_type<TOutputFormat: OutputFormat>(
 
 fn list_satisfies_type<TOutputFormat: OutputFormat>(
     list: &[WithLocation<NonConstantValue>],
-    list_type: GraphQLListTypeAnnotation<SelectableServerFieldId>,
+    list_type: GraphQLListTypeAnnotation<ServerEntityId>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     schema_data: &ServerFieldData<TOutputFormat>,
     server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
@@ -492,7 +492,7 @@ fn get_variable_type<'a>(
     variable_name: &'a VariableName,
     variable_definitions: &'a [WithSpan<ValidatedVariableDefinition>],
     location: Location,
-) -> ValidateSchemaResult<&'a GraphQLTypeAnnotation<SelectableServerFieldId>> {
+) -> ValidateSchemaResult<&'a GraphQLTypeAnnotation<ServerEntityId>> {
     match variable_definitions
         .iter()
         .find(|definition| definition.item.name.item == *variable_name)

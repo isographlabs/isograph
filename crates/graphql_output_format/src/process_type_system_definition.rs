@@ -14,8 +14,8 @@ use graphql_lang_types::{
 use intern::string_key::{Intern, Lookup};
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
-    DefinitionLocation, SelectableServerFieldId, SelectionType, ServerObjectId,
-    ServerScalarSelectableId, ServerStrongIdFieldId, TypeAnnotation, VariableDefinition,
+    DefinitionLocation, SelectionType, ServerEntityId, ServerObjectId, ServerScalarSelectableId,
+    ServerStrongIdFieldId, TypeAnnotation, VariableDefinition,
 };
 use isograph_schema::{
     EncounteredRootTypes, IsographObjectTypeDefinition, ProcessTypeSystemDocumentOutcome,
@@ -373,7 +373,7 @@ fn process_object_type_definition(
                 output_associated_data: associated_data,
             });
 
-            vacant.insert(SelectableServerFieldId::Object(next_object_id));
+            vacant.insert(ServerEntityId::Object(next_object_id));
 
             let mut fields_to_insert = object_type_definition.fields;
 
@@ -466,7 +466,7 @@ fn process_scalar_definition(
                 output_format: std::marker::PhantomData,
             });
 
-            vacant.insert(SelectableServerFieldId::Scalar(next_scalar_id));
+            vacant.insert(ServerEntityId::Scalar(next_scalar_id));
         }
     }
     Ok(())
@@ -514,8 +514,8 @@ fn look_up_root_type(
         .defined_types
         .get(&type_name.item.into())
     {
-        Some(SelectableServerFieldId::Object(object_id)) => Ok(*object_id),
-        Some(SelectableServerFieldId::Scalar(_)) => Err(WithLocation::new(
+        Some(ServerEntityId::Object(object_id)) => Ok(*object_id),
+        Some(ServerEntityId::Scalar(_)) => Err(WithLocation::new(
             ProcessGraphqlTypeSystemDefinitionError::RootTypeMustBeObject,
             type_name.location,
         )),
@@ -545,7 +545,7 @@ fn process_graphql_type_system_extension(
                 );
 
             match *id {
-                SelectableServerFieldId::Object(object_id) => {
+                ServerEntityId::Object(object_id) => {
                     let schema_object = schema.server_field_data.object_mut(object_id);
 
                     if !object_extension.fields.is_empty() {
@@ -559,7 +559,7 @@ fn process_graphql_type_system_extension(
 
                     Ok(())
                 }
-                SelectableServerFieldId::Scalar(_) => Err(WithLocation::new(
+                ServerEntityId::Scalar(_) => Err(WithLocation::new(
                     ProcessGraphqlTypeSystemDefinitionError::TypeExtensionMismatch {
                         type_name: name.into(),
                         is_type: "a scalar",

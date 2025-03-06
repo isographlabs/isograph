@@ -7,7 +7,7 @@ use common_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     DefinitionLocation, EntrypointDeclaration, LinkedFieldSelection, ObjectSelectionDirectiveSet,
-    ScalarSelectionDirectiveSet, SelectableServerFieldId, ServerScalarId, ServerScalarSelectableId,
+    ScalarSelectionDirectiveSet, ServerEntityId, ServerScalarId, ServerScalarSelectableId,
     VariableDefinition,
 };
 
@@ -164,7 +164,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 
 fn add_schema_defined_scalar_type<TOutputFormat: OutputFormat>(
     scalars: &mut Vec<SchemaScalar<TOutputFormat>>,
-    defined_types: &mut HashMap<UnvalidatedTypeName, SelectableServerFieldId>,
+    defined_types: &mut HashMap<UnvalidatedTypeName, ServerEntityId>,
     field_name: &'static str,
     javascript_name: JavascriptName,
 ) -> ServerScalarId {
@@ -181,9 +181,6 @@ fn add_schema_defined_scalar_type<TOutputFormat: OutputFormat>(
         javascript_name,
         output_format: std::marker::PhantomData,
     });
-    defined_types.insert(
-        typename.item.into(),
-        SelectableServerFieldId::Scalar(scalar_id),
-    );
+    defined_types.insert(typename.item.into(), ServerEntityId::Scalar(scalar_id));
     scalar_id
 }

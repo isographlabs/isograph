@@ -4,14 +4,14 @@ use common_lang_types::SelectableName;
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 
 use isograph_lang_types::{
-    DefinitionLocation, SelectableServerFieldId, SelectionType, ServerScalarSelectableId,
-    TypeAnnotation, UnionVariant,
+    DefinitionLocation, SelectionType, ServerEntityId, ServerScalarSelectableId, TypeAnnotation,
+    UnionVariant,
 };
 use isograph_schema::{OutputFormat, ValidatedSchema};
 
 pub(crate) fn format_parameter_type<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
-    type_: GraphQLTypeAnnotation<SelectableServerFieldId>,
+    type_: GraphQLTypeAnnotation<ServerEntityId>,
     indentation_level: u8,
 ) -> String {
     match type_ {
@@ -43,11 +43,11 @@ pub(crate) fn format_parameter_type<TOutputFormat: OutputFormat>(
 
 fn format_server_field_type<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
-    field: SelectableServerFieldId,
+    field: ServerEntityId,
     indentation_level: u8,
 ) -> String {
     match field {
-        SelectableServerFieldId::Object(object_id) => {
+        ServerEntityId::Object(object_id) => {
             let mut s = "{\n".to_string();
             for (name, server_field_id) in schema
                 .server_field_data
@@ -68,7 +68,7 @@ fn format_server_field_type<TOutputFormat: OutputFormat>(
             s.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
             s
         }
-        SelectableServerFieldId::Scalar(scalar_id) => schema
+        ServerEntityId::Scalar(scalar_id) => schema
             .server_field_data
             .scalar(scalar_id)
             .javascript_name
@@ -113,7 +113,7 @@ fn is_nullable<T: Ord + Debug>(type_annotation: &TypeAnnotation<T>) -> bool {
 
 fn format_type_annotation<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
-    type_annotation: &TypeAnnotation<SelectableServerFieldId>,
+    type_annotation: &TypeAnnotation<ServerEntityId>,
     indentation_level: u8,
 ) -> String {
     match &type_annotation {

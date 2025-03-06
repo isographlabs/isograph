@@ -9,9 +9,9 @@ use intern::Lookup;
 use isograph_lang_types::{
     ClientFieldId, ClientPointerId, DefinitionLocation, LinkedFieldSelection,
     LoadableDirectiveParameters, NonConstantValue, ObjectSelectionDirectiveSet,
-    ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectableServerFieldId,
-    SelectionFieldArgument, SelectionType, ServerFieldSelection, ServerObjectId,
-    ServerScalarSelectableId, VariableDefinition,
+    ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionType,
+    ServerEntityId, ServerFieldSelection, ServerObjectId, ServerScalarSelectableId,
+    VariableDefinition,
 };
 
 use thiserror::Error;
@@ -43,7 +43,7 @@ pub type ValidatedScalarFieldSelection = ScalarFieldSelection<
     <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
 >;
 
-pub type ValidatedVariableDefinition = VariableDefinition<SelectableServerFieldId>;
+pub type ValidatedVariableDefinition = VariableDefinition<ServerEntityId>;
 pub type ValidatedClientField<TOutputFormat> = ClientField<
     <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
@@ -97,7 +97,7 @@ pub struct ValidatedSchemaState {}
 impl SchemaValidationState for ValidatedSchemaState {
     type SelectionTypeSelectionScalarFieldAssociatedData = ValidatedScalarSelectionAssociatedData;
     type SelectionTypeSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
-    type VariableDefinitionInnerType = SelectableServerFieldId;
+    type VariableDefinitionInnerType = ServerEntityId;
     type Entrypoint = HashMap<ClientFieldId, IsoLiteralText>;
 }
 

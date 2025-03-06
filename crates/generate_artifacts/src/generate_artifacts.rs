@@ -11,9 +11,9 @@ use core::panic;
 use isograph_config::CompilerConfig;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, NonConstantValue,
-    ObjectSelectionDirectiveSet, ScalarFieldSelection, ScalarSelectionDirectiveSet,
-    SelectableServerFieldId, SelectionType, ServerFieldSelection, ServerObjectId, TypeAnnotation,
-    UnionVariant, VariableDefinition,
+    ObjectSelectionDirectiveSet, ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectionType,
+    ServerEntityId, ServerFieldSelection, ServerObjectId, TypeAnnotation, UnionVariant,
+    VariableDefinition,
 };
 use isograph_schema::{
     accessible_client_fields, as_server_field, description, get_provided_arguments,
@@ -238,7 +238,7 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
                                 type_: GraphQLTypeAnnotation::NonNull(Box::new(
                                     GraphQLNonNullTypeAnnotation::Named(
                                         GraphQLNamedTypeAnnotation(WithSpan::new(
-                                            SelectableServerFieldId::Scalar(
+                                            ServerEntityId::Scalar(
                                                 schema.server_field_data.id_type_id,
                                             ),
                                             Span::todo_generated(),
@@ -946,17 +946,17 @@ fn get_loadable_field_type_from_arguments<TOutputFormat: OutputFormat>(
 
 fn format_type_for_js<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
-    type_: GraphQLTypeAnnotation<SelectableServerFieldId>,
+    type_: GraphQLTypeAnnotation<ServerEntityId>,
 ) -> String {
     let new_type = type_.map(
         |selectable_server_field_id| match selectable_server_field_id {
-            SelectableServerFieldId::Object(_) => {
+            ServerEntityId::Object(_) => {
                 panic!(
                     "Unexpected object. Objects are not supported as parameters, yet. \
                     This is indicative of an unimplemented feature in Isograph."
                 )
             }
-            SelectableServerFieldId::Scalar(scalar_id) => {
+            ServerEntityId::Scalar(scalar_id) => {
                 schema.server_field_data.scalar(scalar_id).javascript_name
             }
         },
@@ -988,7 +988,7 @@ fn format_type_for_js_inner(
 
 pub(crate) fn generate_parameters<'a, TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
-    argument_definitions: impl Iterator<Item = &'a VariableDefinition<SelectableServerFieldId>>,
+    argument_definitions: impl Iterator<Item = &'a VariableDefinition<ServerEntityId>>,
 ) -> String {
     let mut s = "{\n".to_string();
     let indent = "  ";

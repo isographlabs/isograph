@@ -3,8 +3,8 @@ use common_lang_types::{
     WithLocation, WithSpan,
 };
 use isograph_lang_types::{
-    ClientFieldId, DefinitionLocation, EntrypointDeclaration, SelectableServerFieldId,
-    SelectionType, ServerObjectId,
+    ClientFieldId, DefinitionLocation, EntrypointDeclaration, SelectionType, ServerEntityId,
+    ServerObjectId,
 };
 
 use thiserror::Error;
@@ -45,7 +45,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             ))?;
 
         match parent_type_id {
-            SelectableServerFieldId::Object(object_id) => {
+            ServerEntityId::Object(object_id) => {
                 if !self.fetchable_types.contains_key(object_id) {
                     Err(WithLocation::new(
                         ValidateEntrypointDeclarationError::NonFetchableParentType {
@@ -65,7 +65,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     Ok(*object_id)
                 }
             }
-            SelectableServerFieldId::Scalar(scalar_id) => {
+            ServerEntityId::Scalar(scalar_id) => {
                 let scalar_name = self.server_field_data.scalar(*scalar_id).name;
                 Err(WithLocation::new(
                     ValidateEntrypointDeclarationError::InvalidParentType {

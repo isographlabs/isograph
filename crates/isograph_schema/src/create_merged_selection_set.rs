@@ -11,9 +11,9 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
-    RefetchQueryIndex, ScalarSelectionDirectiveSet, SelectableServerFieldId,
-    SelectionFieldArgument, SelectionType, ServerFieldSelection, ServerObjectId,
-    ServerScalarSelectableId, VariableDefinition,
+    RefetchQueryIndex, ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionType,
+    ServerEntityId, ServerFieldSelection, ServerObjectId, ServerScalarSelectableId,
+    VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -177,7 +177,7 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
     pub merged_selection_set: MergedSelectionMap,
     /// Used to look up what type to narrow on in the generated refetch query,
     /// among other things.
-    pub variable_definitions: Vec<WithSpan<VariableDefinition<SelectableServerFieldId>>>,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<ServerEntityId>>>,
     pub root_parent_object: IsographObjectTypeName,
     pub root_fetchable_field: ClientScalarSelectableName,
     pub refetch_query_index: RefetchQueryIndex,
@@ -610,7 +610,7 @@ fn process_imperatively_loaded_field<TOutputFormat: OutputFormat>(
 fn get_used_variable_definitions<TOutputFormat: OutputFormat>(
     reachable_variables: &BTreeSet<VariableName>,
     entrypoint: &ValidatedClientField<TOutputFormat>,
-) -> Vec<WithSpan<VariableDefinition<SelectableServerFieldId>>> {
+) -> Vec<WithSpan<VariableDefinition<ServerEntityId>>> {
     reachable_variables
         .iter()
         .flat_map(|variable_name| {

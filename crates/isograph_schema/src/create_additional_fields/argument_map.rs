@@ -7,7 +7,7 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    DefinitionLocation, SelectableServerFieldId, SelectionType, ServerScalarSelectableId,
+    DefinitionLocation, SelectionType, ServerEntityId, ServerScalarSelectableId,
 };
 
 use crate::{OutputFormat, UnvalidatedSchema, UnvalidatedVariableDefinition};
@@ -77,7 +77,7 @@ impl ArgumentMap {
                             .get(&unmodified_argument.type_.inner().lookup().intern().into())
                         {
                             Some(defined_type) => match defined_type {
-                                SelectableServerFieldId::Object(_) => return Err(WithLocation::new(
+                                ServerEntityId::Object(_) => return Err(WithLocation::new(
                                     CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
                                         primary_type_name,
                                         field_name: split_to_arg
@@ -87,7 +87,7 @@ impl ArgumentMap {
                                     },
                                     Location::generated(),
                                 )),
-                                SelectableServerFieldId::Scalar(_) => {}
+                                ServerEntityId::Scalar(_) => {}
                             },
                             None => panic!(
                                 "Type is not found. This is indicative \
@@ -212,7 +212,7 @@ impl ModifiedArgument {
                     "Expected type to be defined by now. This is indicative of a bug in Isograph.",
                 );
             match defined_type_id {
-                SelectableServerFieldId::Object(object_id) => {
+                ServerEntityId::Object(object_id) => {
                     let object = schema.server_field_data.object(object_id);
 
                     ModifiedObject {
@@ -228,7 +228,7 @@ impl ModifiedArgument {
                             .collect(),
                     }
                 }
-                SelectableServerFieldId::Scalar(_scalar_id) => {
+                ServerEntityId::Scalar(_scalar_id) => {
                     // TODO don't be lazy, return an error
                     panic!("Cannot modify a scalar")
                 }

@@ -17,26 +17,26 @@ u32_newtype!(ServerObjectId);
 
 u32_newtype!(ServerScalarId);
 
-pub type SelectableServerFieldId = SelectionType<ServerScalarId, ServerObjectId>;
+pub type ServerEntityId = SelectionType<ServerScalarId, ServerObjectId>;
 
-impl TryFrom<SelectableServerFieldId> for ServerScalarId {
+impl TryFrom<ServerEntityId> for ServerScalarId {
     type Error = ();
 
-    fn try_from(value: SelectableServerFieldId) -> Result<Self, Self::Error> {
+    fn try_from(value: ServerEntityId) -> Result<Self, Self::Error> {
         match value {
-            SelectableServerFieldId::Object(_) => Err(()),
-            SelectableServerFieldId::Scalar(scalar_id) => Ok(scalar_id),
+            ServerEntityId::Object(_) => Err(()),
+            ServerEntityId::Scalar(scalar_id) => Ok(scalar_id),
         }
     }
 }
 
-impl TryFrom<SelectableServerFieldId> for ServerObjectId {
+impl TryFrom<ServerEntityId> for ServerObjectId {
     type Error = ();
 
-    fn try_from(value: SelectableServerFieldId) -> Result<Self, Self::Error> {
+    fn try_from(value: ServerEntityId) -> Result<Self, Self::Error> {
         match value {
-            SelectableServerFieldId::Object(object_id) => Ok(object_id),
-            SelectableServerFieldId::Scalar(_) => Err(()),
+            ServerEntityId::Object(object_id) => Ok(object_id),
+            ServerEntityId::Scalar(_) => Err(()),
         }
     }
 }

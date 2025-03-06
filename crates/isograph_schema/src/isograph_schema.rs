@@ -8,9 +8,8 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, ClientPointerId, DefinitionLocation,
-    SelectableServerFieldId, SelectionType, ServerObjectId, ServerScalarId,
-    ServerScalarSelectableId,
+    ArgumentKeyAndValue, ClientFieldId, ClientPointerId, DefinitionLocation, SelectionType,
+    ServerEntityId, ServerObjectId, ServerScalarId, ServerScalarSelectableId,
 };
 use lazy_static::lazy_static;
 
@@ -127,7 +126,7 @@ pub type LinkedType<
 pub struct ServerFieldData<TOutputFormat: OutputFormat> {
     pub server_objects: Vec<SchemaObject<TOutputFormat>>,
     pub server_scalars: Vec<SchemaScalar<TOutputFormat>>,
-    pub defined_types: HashMap<UnvalidatedTypeName, SelectableServerFieldId>,
+    pub defined_types: HashMap<UnvalidatedTypeName, ServerEntityId>,
 
     // Well known types
     pub id_type_id: ServerScalarId,
@@ -245,17 +244,10 @@ impl<TOutputFormat: OutputFormat> ServerFieldData<TOutputFormat> {
     }
 
     // TODO this function is horribly named
-    pub fn lookup_unvalidated_type(
-        &self,
-        type_id: SelectableServerFieldId,
-    ) -> SchemaType<TOutputFormat> {
+    pub fn lookup_unvalidated_type(&self, type_id: ServerEntityId) -> SchemaType<TOutputFormat> {
         match type_id {
-            SelectableServerFieldId::Object(object_id) => {
-                SchemaType::Object(self.object(object_id))
-            }
-            SelectableServerFieldId::Scalar(scalar_id) => {
-                SchemaType::Scalar(self.scalar(scalar_id))
-            }
+            ServerEntityId::Object(object_id) => SchemaType::Object(self.object(object_id)),
+            ServerEntityId::Scalar(scalar_id) => SchemaType::Scalar(self.scalar(scalar_id)),
         }
     }
 

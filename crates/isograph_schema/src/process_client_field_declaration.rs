@@ -6,8 +6,8 @@ use common_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration, ClientPointerId,
-    DefinitionLocation, DeserializationError, NonConstantValue, SelectableServerFieldId,
-    SelectionType, ServerObjectId, TypeAnnotation,
+    DefinitionLocation, DeserializationError, NonConstantValue, SelectionType, ServerEntityId,
+    ServerObjectId, TypeAnnotation,
 };
 use lazy_static::lazy_static;
 
@@ -38,11 +38,11 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             ))?;
 
         match parent_type_id {
-            SelectableServerFieldId::Object(object_id) => {
+            ServerEntityId::Object(object_id) => {
                 self.add_client_field_to_object(*object_id, client_field_declaration)
                     .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?;
             }
-            SelectableServerFieldId::Scalar(scalar_id) => {
+            ServerEntityId::Scalar(scalar_id) => {
                 let scalar_name = self.server_field_data.scalar(*scalar_id).name;
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
@@ -91,8 +91,8 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             ))?;
 
         match parent_type_id {
-            SelectableServerFieldId::Object(object_id) => match target_type_id {
-                SelectableServerFieldId::Object(to_object_id) => {
+            ServerEntityId::Object(object_id) => match target_type_id {
+                ServerEntityId::Object(to_object_id) => {
                     self.add_client_pointer_to_object(
                         *object_id,
                         TypeAnnotation::from_graphql_type_annotation(
@@ -106,7 +106,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     )
                     .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?;
                 }
-                SelectableServerFieldId::Scalar(scalar_id) => {
+                ServerEntityId::Scalar(scalar_id) => {
                     let scalar_name = self.server_field_data.scalar(*scalar_id).name;
                     return Err(WithLocation::new(
                         ProcessClientFieldDeclarationError::ClientPointerInvalidTargetType {
@@ -119,7 +119,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     ));
                 }
             },
-            SelectableServerFieldId::Scalar(scalar_id) => {
+            ServerEntityId::Scalar(scalar_id) => {
                 let scalar_name = self.server_field_data.scalar(*scalar_id).name;
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
