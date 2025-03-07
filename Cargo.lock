@@ -1004,6 +1004,7 @@ dependencies = [
  "lazy_static",
  "notify",
  "notify-debouncer-full",
+ "pathdiff",
  "pretty-duration",
  "regex",
  "thiserror",

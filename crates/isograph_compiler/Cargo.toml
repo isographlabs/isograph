@@ -18,6 +18,7 @@ lazy_static = { workspace = true }
 regex = { workspace = true }
 colored = { workspace = true }
 notify = { workspace = true }
+pathdiff = { workspace = true }
 tokio = { workspace = true }
 notify-debouncer-full = { workspace = true }
 pretty-duration = { workspace = true }
