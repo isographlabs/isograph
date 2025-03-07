@@ -1,4 +1,4 @@
-# Isograph data model (IDM)
+# Isograph data model
 
 ## Core building blocks
 
