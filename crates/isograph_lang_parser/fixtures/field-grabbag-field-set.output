@@ -1,602 +1,597 @@
 Ok(
-    (
-        RelativePathToSourceFile(
-            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-        ),
-        [
-            (
-                ClientFieldDeclaration(
-                    WithSpan {
-                        item: ClientFieldDeclaration {
-                            const_export_name: ConstExportName(
-                                "BasicField",
+    [
+        (
+            ClientFieldDeclaration(
+                WithSpan {
+                    item: ClientFieldDeclaration {
+                        const_export_name: ConstExportName(
+                            "BasicField",
+                        ),
+                        parent_type: WithSpan {
+                            item: UnvalidatedTypeName(
+                                "Type",
                             ),
-                            parent_type: WithSpan {
-                                item: UnvalidatedTypeName(
-                                    "Type",
-                                ),
-                                span: Span {
-                                    start: 9,
-                                    end: 13,
-                                },
-                            },
-                            client_field_name: WithSpan {
-                                item: ClientScalarSelectableName(
-                                    "Name",
-                                ),
-                                span: Span {
-                                    start: 14,
-                                    end: 18,
-                                },
-                            },
-                            description: None,
-                            selection_set: [
-                                WithSpan {
-                                    item: Scalar(
-                                        ScalarFieldSelection {
-                                            name: WithLocation {
-                                                location: Embedded(
-                                                    EmbeddedLocation {
-                                                        text_source: TextSource {
-                                                            current_working_directory: CurrentWorkingDirectory,
-                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                                            ),
-                                                            span: Some(
-                                                                Span {
-                                                                    start: 31,
-                                                                    end: 261,
-                                                                },
-                                                            ),
-                                                        },
-                                                        span: Span {
-                                                            start: 27,
-                                                            end: 33,
-                                                        },
-                                                    },
-                                                ),
-                                                item: ScalarSelectableName(
-                                                    "scalar",
-                                                ),
-                                            },
-                                            reader_alias: None,
-                                            associated_data: None(
-                                                EmptyDirectiveSet,
-                                            ),
-                                            arguments: [],
-                                        },
-                                    ),
-                                    span: Span {
-                                        start: 27,
-                                        end: 33,
-                                    },
-                                },
-                                WithSpan {
-                                    item: Object(
-                                        LinkedFieldSelection {
-                                            name: WithLocation {
-                                                location: Embedded(
-                                                    EmbeddedLocation {
-                                                        text_source: TextSource {
-                                                            current_working_directory: CurrentWorkingDirectory,
-                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                                            ),
-                                                            span: Some(
-                                                                Span {
-                                                                    start: 31,
-                                                                    end: 261,
-                                                                },
-                                                            ),
-                                                        },
-                                                        span: Span {
-                                                            start: 38,
-                                                            end: 44,
-                                                        },
-                                                    },
-                                                ),
-                                                item: ServerObjectSelectableName(
-                                                    "linked",
-                                                ),
-                                            },
-                                            reader_alias: None,
-                                            associated_data: None(
-                                                EmptyDirectiveSet,
-                                            ),
-                                            selection_set: [
-                                                WithSpan {
-                                                    item: Scalar(
-                                                        ScalarFieldSelection {
-                                                            name: WithLocation {
-                                                                location: Embedded(
-                                                                    EmbeddedLocation {
-                                                                        text_source: TextSource {
-                                                                            current_working_directory: CurrentWorkingDirectory,
-                                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                                                            ),
-                                                                            span: Some(
-                                                                                Span {
-                                                                                    start: 31,
-                                                                                    end: 261,
-                                                                                },
-                                                                            ),
-                                                                        },
-                                                                        span: Span {
-                                                                            start: 53,
-                                                                            end: 68,
-                                                                        },
-                                                                    },
-                                                                ),
-                                                                item: ScalarSelectableName(
-                                                                    "scalarWithComma",
-                                                                ),
-                                                            },
-                                                            reader_alias: None,
-                                                            associated_data: None(
-                                                                EmptyDirectiveSet,
-                                                            ),
-                                                            arguments: [],
-                                                        },
-                                                    ),
-                                                    span: Span {
-                                                        start: 53,
-                                                        end: 69,
-                                                    },
-                                                },
-                                            ],
-                                            arguments: [],
-                                        },
-                                    ),
-                                    span: Span {
-                                        start: 38,
-                                        end: 75,
-                                    },
-                                },
-                                WithSpan {
-                                    item: Object(
-                                        LinkedFieldSelection {
-                                            name: WithLocation {
-                                                location: Embedded(
-                                                    EmbeddedLocation {
-                                                        text_source: TextSource {
-                                                            current_working_directory: CurrentWorkingDirectory,
-                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                                            ),
-                                                            span: Some(
-                                                                Span {
-                                                                    start: 31,
-                                                                    end: 261,
-                                                                },
-                                                            ),
-                                                        },
-                                                        span: Span {
-                                                            start: 80,
-                                                            end: 95,
-                                                        },
-                                                    },
-                                                ),
-                                                item: ServerObjectSelectableName(
-                                                    "linkedWithComma",
-                                                ),
-                                            },
-                                            reader_alias: None,
-                                            associated_data: None(
-                                                EmptyDirectiveSet,
-                                            ),
-                                            selection_set: [
-                                                WithSpan {
-                                                    item: Scalar(
-                                                        ScalarFieldSelection {
-                                                            name: WithLocation {
-                                                                location: Embedded(
-                                                                    EmbeddedLocation {
-                                                                        text_source: TextSource {
-                                                                            current_working_directory: CurrentWorkingDirectory,
-                                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                                                            ),
-                                                                            span: Some(
-                                                                                Span {
-                                                                                    start: 31,
-                                                                                    end: 261,
-                                                                                },
-                                                                            ),
-                                                                        },
-                                                                        span: Span {
-                                                                            start: 104,
-                                                                            end: 108,
-                                                                        },
-                                                                    },
-                                                                ),
-                                                                item: ScalarSelectableName(
-                                                                    "blah",
-                                                                ),
-                                                            },
-                                                            reader_alias: None,
-                                                            associated_data: None(
-                                                                EmptyDirectiveSet,
-                                                            ),
-                                                            arguments: [],
-                                                        },
-                                                    ),
-                                                    span: Span {
-                                                        start: 104,
-                                                        end: 108,
-                                                    },
-                                                },
-                                            ],
-                                            arguments: [],
-                                        },
-                                    ),
-                                    span: Span {
-                                        start: 80,
-                                        end: 115,
-                                    },
-                                },
-                                WithSpan {
-                                    item: Scalar(
-                                        ScalarFieldSelection {
-                                            name: WithLocation {
-                                                location: Embedded(
-                                                    EmbeddedLocation {
-                                                        text_source: TextSource {
-                                                            current_working_directory: CurrentWorkingDirectory,
-                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                                            ),
-                                                            span: Some(
-                                                                Span {
-                                                                    start: 31,
-                                                                    end: 261,
-                                                                },
-                                                            ),
-                                                        },
-                                                        span: Span {
-                                                            start: 120,
-                                                            end: 128,
-                                                        },
-                                                    },
-                                                ),
-                                                item: ScalarSelectableName(
-                                                    "multiple",
-                                                ),
-                                            },
-                                            reader_alias: None,
-                                            associated_data: None(
-                                                EmptyDirectiveSet,
-                                            ),
-                                            arguments: [],
-                                        },
-                                    ),
-                                    span: Span {
-                                        start: 120,
-                                        end: 129,
-                                    },
-                                },
-                                WithSpan {
-                                    item: Scalar(
-                                        ScalarFieldSelection {
-                                            name: WithLocation {
-                                                location: Embedded(
-                                                    EmbeddedLocation {
-                                                        text_source: TextSource {
-                                                            current_working_directory: CurrentWorkingDirectory,
-                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                                            ),
-                                                            span: Some(
-                                                                Span {
-                                                                    start: 31,
-                                                                    end: 261,
-                                                                },
-                                                            ),
-                                                        },
-                                                        span: Span {
-                                                            start: 130,
-                                                            end: 132,
-                                                        },
-                                                    },
-                                                ),
-                                                item: ScalarSelectableName(
-                                                    "on",
-                                                ),
-                                            },
-                                            reader_alias: None,
-                                            associated_data: None(
-                                                EmptyDirectiveSet,
-                                            ),
-                                            arguments: [],
-                                        },
-                                    ),
-                                    span: Span {
-                                        start: 130,
-                                        end: 133,
-                                    },
-                                },
-                                WithSpan {
-                                    item: Scalar(
-                                        ScalarFieldSelection {
-                                            name: WithLocation {
-                                                location: Embedded(
-                                                    EmbeddedLocation {
-                                                        text_source: TextSource {
-                                                            current_working_directory: CurrentWorkingDirectory,
-                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                                            ),
-                                                            span: Some(
-                                                                Span {
-                                                                    start: 31,
-                                                                    end: 261,
-                                                                },
-                                                            ),
-                                                        },
-                                                        span: Span {
-                                                            start: 134,
-                                                            end: 137,
-                                                        },
-                                                    },
-                                                ),
-                                                item: ScalarSelectableName(
-                                                    "the",
-                                                ),
-                                            },
-                                            reader_alias: None,
-                                            associated_data: None(
-                                                EmptyDirectiveSet,
-                                            ),
-                                            arguments: [],
-                                        },
-                                    ),
-                                    span: Span {
-                                        start: 134,
-                                        end: 138,
-                                    },
-                                },
-                                WithSpan {
-                                    item: Scalar(
-                                        ScalarFieldSelection {
-                                            name: WithLocation {
-                                                location: Embedded(
-                                                    EmbeddedLocation {
-                                                        text_source: TextSource {
-                                                            current_working_directory: CurrentWorkingDirectory,
-                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                                            ),
-                                                            span: Some(
-                                                                Span {
-                                                                    start: 31,
-                                                                    end: 261,
-                                                                },
-                                                            ),
-                                                        },
-                                                        span: Span {
-                                                            start: 139,
-                                                            end: 143,
-                                                        },
-                                                    },
-                                                ),
-                                                item: ScalarSelectableName(
-                                                    "same",
-                                                ),
-                                            },
-                                            reader_alias: None,
-                                            associated_data: None(
-                                                EmptyDirectiveSet,
-                                            ),
-                                            arguments: [],
-                                        },
-                                    ),
-                                    span: Span {
-                                        start: 139,
-                                        end: 144,
-                                    },
-                                },
-                                WithSpan {
-                                    item: Scalar(
-                                        ScalarFieldSelection {
-                                            name: WithLocation {
-                                                location: Embedded(
-                                                    EmbeddedLocation {
-                                                        text_source: TextSource {
-                                                            current_working_directory: CurrentWorkingDirectory,
-                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                                            ),
-                                                            span: Some(
-                                                                Span {
-                                                                    start: 31,
-                                                                    end: 261,
-                                                                },
-                                                            ),
-                                                        },
-                                                        span: Span {
-                                                            start: 145,
-                                                            end: 149,
-                                                        },
-                                                    },
-                                                ),
-                                                item: ScalarSelectableName(
-                                                    "line",
-                                                ),
-                                            },
-                                            reader_alias: None,
-                                            associated_data: None(
-                                                EmptyDirectiveSet,
-                                            ),
-                                            arguments: [],
-                                        },
-                                    ),
-                                    span: Span {
-                                        start: 145,
-                                        end: 149,
-                                    },
-                                },
-                                WithSpan {
-                                    item: Scalar(
-                                        ScalarFieldSelection {
-                                            name: WithLocation {
-                                                location: Embedded(
-                                                    EmbeddedLocation {
-                                                        text_source: TextSource {
-                                                            current_working_directory: CurrentWorkingDirectory,
-                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                                            ),
-                                                            span: Some(
-                                                                Span {
-                                                                    start: 31,
-                                                                    end: 261,
-                                                                },
-                                                            ),
-                                                        },
-                                                        span: Span {
-                                                            start: 154,
-                                                            end: 163,
-                                                        },
-                                                    },
-                                                ),
-                                                item: ScalarSelectableName(
-                                                    "including",
-                                                ),
-                                            },
-                                            reader_alias: None,
-                                            associated_data: None(
-                                                EmptyDirectiveSet,
-                                            ),
-                                            arguments: [],
-                                        },
-                                    ),
-                                    span: Span {
-                                        start: 154,
-                                        end: 164,
-                                    },
-                                },
-                                WithSpan {
-                                    item: Object(
-                                        LinkedFieldSelection {
-                                            name: WithLocation {
-                                                location: Embedded(
-                                                    EmbeddedLocation {
-                                                        text_source: TextSource {
-                                                            current_working_directory: CurrentWorkingDirectory,
-                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                                            ),
-                                                            span: Some(
-                                                                Span {
-                                                                    start: 31,
-                                                                    end: 261,
-                                                                },
-                                                            ),
-                                                        },
-                                                        span: Span {
-                                                            start: 165,
-                                                            end: 190,
-                                                        },
-                                                    },
-                                                ),
-                                                item: ServerObjectSelectableName(
-                                                    "youCanEndWithALinkedField",
-                                                ),
-                                            },
-                                            reader_alias: None,
-                                            associated_data: None(
-                                                EmptyDirectiveSet,
-                                            ),
-                                            selection_set: [
-                                                WithSpan {
-                                                    item: Scalar(
-                                                        ScalarFieldSelection {
-                                                            name: WithLocation {
-                                                                location: Embedded(
-                                                                    EmbeddedLocation {
-                                                                        text_source: TextSource {
-                                                                            current_working_directory: CurrentWorkingDirectory,
-                                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                                                            ),
-                                                                            span: Some(
-                                                                                Span {
-                                                                                    start: 31,
-                                                                                    end: 261,
-                                                                                },
-                                                                            ),
-                                                                        },
-                                                                        span: Span {
-                                                                            start: 199,
-                                                                            end: 219,
-                                                                        },
-                                                                    },
-                                                                ),
-                                                                item: ScalarSelectableName(
-                                                                    "butWhyWouldYouDoThat",
-                                                                ),
-                                                            },
-                                                            reader_alias: None,
-                                                            associated_data: None(
-                                                                EmptyDirectiveSet,
-                                                            ),
-                                                            arguments: [],
-                                                        },
-                                                    ),
-                                                    span: Span {
-                                                        start: 199,
-                                                        end: 219,
-                                                    },
-                                                },
-                                            ],
-                                            arguments: [],
-                                        },
-                                    ),
-                                    span: Span {
-                                        start: 165,
-                                        end: 225,
-                                    },
-                                },
-                            ],
-                            directives: [],
-                            variable_definitions: [],
-                            definition_path: RelativePathToSourceFile(
-                                "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                            ),
-                            field_keyword: WithSpan {
-                                item: (),
-                                span: Span {
-                                    start: 3,
-                                    end: 8,
-                                },
-                            },
-                            dot: WithSpan {
-                                item: (),
-                                span: Span {
-                                    start: 13,
-                                    end: 14,
-                                },
+                            span: Span {
+                                start: 9,
+                                end: 13,
                             },
                         },
-                        span: Span {
-                            start: 9,
-                            end: 229,
+                        client_field_name: WithSpan {
+                            item: ClientScalarSelectableName(
+                                "Name",
+                            ),
+                            span: Span {
+                                start: 14,
+                                end: 18,
+                            },
+                        },
+                        description: None,
+                        selection_set: [
+                            WithSpan {
+                                item: Scalar(
+                                    ScalarFieldSelection {
+                                        name: WithLocation {
+                                            location: Embedded(
+                                                EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 31,
+                                                                end: 261,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 27,
+                                                        end: 33,
+                                                    },
+                                                },
+                                            ),
+                                            item: ScalarSelectableName(
+                                                "scalar",
+                                            ),
+                                        },
+                                        reader_alias: None,
+                                        associated_data: None(
+                                            EmptyDirectiveSet,
+                                        ),
+                                        arguments: [],
+                                    },
+                                ),
+                                span: Span {
+                                    start: 27,
+                                    end: 33,
+                                },
+                            },
+                            WithSpan {
+                                item: Object(
+                                    LinkedFieldSelection {
+                                        name: WithLocation {
+                                            location: Embedded(
+                                                EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 31,
+                                                                end: 261,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 38,
+                                                        end: 44,
+                                                    },
+                                                },
+                                            ),
+                                            item: ServerObjectSelectableName(
+                                                "linked",
+                                            ),
+                                        },
+                                        reader_alias: None,
+                                        associated_data: None(
+                                            EmptyDirectiveSet,
+                                        ),
+                                        selection_set: [
+                                            WithSpan {
+                                                item: Scalar(
+                                                    ScalarFieldSelection {
+                                                        name: WithLocation {
+                                                            location: Embedded(
+                                                                EmbeddedLocation {
+                                                                    text_source: TextSource {
+                                                                        current_working_directory: CurrentWorkingDirectory,
+                                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                                            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                                                        ),
+                                                                        span: Some(
+                                                                            Span {
+                                                                                start: 31,
+                                                                                end: 261,
+                                                                            },
+                                                                        ),
+                                                                    },
+                                                                    span: Span {
+                                                                        start: 53,
+                                                                        end: 68,
+                                                                    },
+                                                                },
+                                                            ),
+                                                            item: ScalarSelectableName(
+                                                                "scalarWithComma",
+                                                            ),
+                                                        },
+                                                        reader_alias: None,
+                                                        associated_data: None(
+                                                            EmptyDirectiveSet,
+                                                        ),
+                                                        arguments: [],
+                                                    },
+                                                ),
+                                                span: Span {
+                                                    start: 53,
+                                                    end: 69,
+                                                },
+                                            },
+                                        ],
+                                        arguments: [],
+                                    },
+                                ),
+                                span: Span {
+                                    start: 38,
+                                    end: 75,
+                                },
+                            },
+                            WithSpan {
+                                item: Object(
+                                    LinkedFieldSelection {
+                                        name: WithLocation {
+                                            location: Embedded(
+                                                EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 31,
+                                                                end: 261,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 80,
+                                                        end: 95,
+                                                    },
+                                                },
+                                            ),
+                                            item: ServerObjectSelectableName(
+                                                "linkedWithComma",
+                                            ),
+                                        },
+                                        reader_alias: None,
+                                        associated_data: None(
+                                            EmptyDirectiveSet,
+                                        ),
+                                        selection_set: [
+                                            WithSpan {
+                                                item: Scalar(
+                                                    ScalarFieldSelection {
+                                                        name: WithLocation {
+                                                            location: Embedded(
+                                                                EmbeddedLocation {
+                                                                    text_source: TextSource {
+                                                                        current_working_directory: CurrentWorkingDirectory,
+                                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                                            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                                                        ),
+                                                                        span: Some(
+                                                                            Span {
+                                                                                start: 31,
+                                                                                end: 261,
+                                                                            },
+                                                                        ),
+                                                                    },
+                                                                    span: Span {
+                                                                        start: 104,
+                                                                        end: 108,
+                                                                    },
+                                                                },
+                                                            ),
+                                                            item: ScalarSelectableName(
+                                                                "blah",
+                                                            ),
+                                                        },
+                                                        reader_alias: None,
+                                                        associated_data: None(
+                                                            EmptyDirectiveSet,
+                                                        ),
+                                                        arguments: [],
+                                                    },
+                                                ),
+                                                span: Span {
+                                                    start: 104,
+                                                    end: 108,
+                                                },
+                                            },
+                                        ],
+                                        arguments: [],
+                                    },
+                                ),
+                                span: Span {
+                                    start: 80,
+                                    end: 115,
+                                },
+                            },
+                            WithSpan {
+                                item: Scalar(
+                                    ScalarFieldSelection {
+                                        name: WithLocation {
+                                            location: Embedded(
+                                                EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 31,
+                                                                end: 261,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 120,
+                                                        end: 128,
+                                                    },
+                                                },
+                                            ),
+                                            item: ScalarSelectableName(
+                                                "multiple",
+                                            ),
+                                        },
+                                        reader_alias: None,
+                                        associated_data: None(
+                                            EmptyDirectiveSet,
+                                        ),
+                                        arguments: [],
+                                    },
+                                ),
+                                span: Span {
+                                    start: 120,
+                                    end: 129,
+                                },
+                            },
+                            WithSpan {
+                                item: Scalar(
+                                    ScalarFieldSelection {
+                                        name: WithLocation {
+                                            location: Embedded(
+                                                EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 31,
+                                                                end: 261,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 130,
+                                                        end: 132,
+                                                    },
+                                                },
+                                            ),
+                                            item: ScalarSelectableName(
+                                                "on",
+                                            ),
+                                        },
+                                        reader_alias: None,
+                                        associated_data: None(
+                                            EmptyDirectiveSet,
+                                        ),
+                                        arguments: [],
+                                    },
+                                ),
+                                span: Span {
+                                    start: 130,
+                                    end: 133,
+                                },
+                            },
+                            WithSpan {
+                                item: Scalar(
+                                    ScalarFieldSelection {
+                                        name: WithLocation {
+                                            location: Embedded(
+                                                EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 31,
+                                                                end: 261,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 134,
+                                                        end: 137,
+                                                    },
+                                                },
+                                            ),
+                                            item: ScalarSelectableName(
+                                                "the",
+                                            ),
+                                        },
+                                        reader_alias: None,
+                                        associated_data: None(
+                                            EmptyDirectiveSet,
+                                        ),
+                                        arguments: [],
+                                    },
+                                ),
+                                span: Span {
+                                    start: 134,
+                                    end: 138,
+                                },
+                            },
+                            WithSpan {
+                                item: Scalar(
+                                    ScalarFieldSelection {
+                                        name: WithLocation {
+                                            location: Embedded(
+                                                EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 31,
+                                                                end: 261,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 139,
+                                                        end: 143,
+                                                    },
+                                                },
+                                            ),
+                                            item: ScalarSelectableName(
+                                                "same",
+                                            ),
+                                        },
+                                        reader_alias: None,
+                                        associated_data: None(
+                                            EmptyDirectiveSet,
+                                        ),
+                                        arguments: [],
+                                    },
+                                ),
+                                span: Span {
+                                    start: 139,
+                                    end: 144,
+                                },
+                            },
+                            WithSpan {
+                                item: Scalar(
+                                    ScalarFieldSelection {
+                                        name: WithLocation {
+                                            location: Embedded(
+                                                EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 31,
+                                                                end: 261,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 145,
+                                                        end: 149,
+                                                    },
+                                                },
+                                            ),
+                                            item: ScalarSelectableName(
+                                                "line",
+                                            ),
+                                        },
+                                        reader_alias: None,
+                                        associated_data: None(
+                                            EmptyDirectiveSet,
+                                        ),
+                                        arguments: [],
+                                    },
+                                ),
+                                span: Span {
+                                    start: 145,
+                                    end: 149,
+                                },
+                            },
+                            WithSpan {
+                                item: Scalar(
+                                    ScalarFieldSelection {
+                                        name: WithLocation {
+                                            location: Embedded(
+                                                EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 31,
+                                                                end: 261,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 154,
+                                                        end: 163,
+                                                    },
+                                                },
+                                            ),
+                                            item: ScalarSelectableName(
+                                                "including",
+                                            ),
+                                        },
+                                        reader_alias: None,
+                                        associated_data: None(
+                                            EmptyDirectiveSet,
+                                        ),
+                                        arguments: [],
+                                    },
+                                ),
+                                span: Span {
+                                    start: 154,
+                                    end: 164,
+                                },
+                            },
+                            WithSpan {
+                                item: Object(
+                                    LinkedFieldSelection {
+                                        name: WithLocation {
+                                            location: Embedded(
+                                                EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 31,
+                                                                end: 261,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 165,
+                                                        end: 190,
+                                                    },
+                                                },
+                                            ),
+                                            item: ServerObjectSelectableName(
+                                                "youCanEndWithALinkedField",
+                                            ),
+                                        },
+                                        reader_alias: None,
+                                        associated_data: None(
+                                            EmptyDirectiveSet,
+                                        ),
+                                        selection_set: [
+                                            WithSpan {
+                                                item: Scalar(
+                                                    ScalarFieldSelection {
+                                                        name: WithLocation {
+                                                            location: Embedded(
+                                                                EmbeddedLocation {
+                                                                    text_source: TextSource {
+                                                                        current_working_directory: CurrentWorkingDirectory,
+                                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                                            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                                                        ),
+                                                                        span: Some(
+                                                                            Span {
+                                                                                start: 31,
+                                                                                end: 261,
+                                                                            },
+                                                                        ),
+                                                                    },
+                                                                    span: Span {
+                                                                        start: 199,
+                                                                        end: 219,
+                                                                    },
+                                                                },
+                                                            ),
+                                                            item: ScalarSelectableName(
+                                                                "butWhyWouldYouDoThat",
+                                                            ),
+                                                        },
+                                                        reader_alias: None,
+                                                        associated_data: None(
+                                                            EmptyDirectiveSet,
+                                                        ),
+                                                        arguments: [],
+                                                    },
+                                                ),
+                                                span: Span {
+                                                    start: 199,
+                                                    end: 219,
+                                                },
+                                            },
+                                        ],
+                                        arguments: [],
+                                    },
+                                ),
+                                span: Span {
+                                    start: 165,
+                                    end: 225,
+                                },
+                            },
+                        ],
+                        directives: [],
+                        variable_definitions: [],
+                        definition_path: RelativePathToSourceFile(
+                            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                        ),
+                        field_keyword: WithSpan {
+                            item: (),
+                            span: Span {
+                                start: 3,
+                                end: 8,
+                            },
+                        },
+                        dot: WithSpan {
+                            item: (),
+                            span: Span {
+                                start: 13,
+                                end: 14,
+                            },
                         },
                     },
-                ),
-                TextSource {
-                    current_working_directory: CurrentWorkingDirectory,
-                    relative_path_to_source_file: RelativePathToSourceFile(
-                        "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                    ),
-                    span: Some(
-                        Span {
-                            start: 31,
-                            end: 261,
-                        },
-                    ),
+                    span: Span {
+                        start: 9,
+                        end: 229,
+                    },
                 },
             ),
-        ],
-    ),
+            TextSource {
+                current_working_directory: CurrentWorkingDirectory,
+                relative_path_to_source_file: RelativePathToSourceFile(
+                    "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                ),
+                span: Some(
+                    Span {
+                        start: 31,
+                        end: 261,
+                    },
+                ),
+            },
+        ),
+    ],
 )

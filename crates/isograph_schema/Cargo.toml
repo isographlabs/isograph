@@ -13,6 +13,8 @@ impl_base_types_macro = { path = "../impl_base_types_macro" }
 intern = { path = "../../relay-crates/intern" }
 isograph_lang_types = { path = "../isograph_lang_types" }
 isograph_config = { path = "../isograph_config" }
+pico = { path = "../pico" }
+pico_macros = { path = "../pico_macros" }
 thiserror = { workspace = true }
 lazy_static = { workspace = true }
 colorize = { workspace = true }

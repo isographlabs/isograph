@@ -12,7 +12,7 @@ use intern::{string_key::Intern, Lookup};
 use strum::EnumString;
 
 // also Schema
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub enum GraphQLTypeSystemDefinition {
     ObjectTypeDefinition(GraphQLObjectTypeDefinition),
     ScalarTypeDefinition(GraphQLScalarTypeDefinition),
@@ -72,7 +72,7 @@ impl From<GraphQLSchemaDefinition> for GraphQLTypeSystemDefinition {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default, Hash)]
 pub struct GraphQLTypeSystemDocument(pub Vec<WithLocation<GraphQLTypeSystemDefinition>>);
 
 impl Deref for GraphQLTypeSystemDocument {
@@ -83,18 +83,18 @@ impl Deref for GraphQLTypeSystemDocument {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLTypeSystemExtensionDocument(
     pub Vec<WithLocation<GraphQLTypeSystemExtensionOrDefinition>>,
 );
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub enum GraphQLTypeSystemExtensionOrDefinition {
     Definition(GraphQLTypeSystemDefinition),
     Extension(GraphQLTypeSystemExtension),
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub enum GraphQLTypeSystemExtension {
     ObjectTypeExtension(GraphQLObjectTypeExtension),
     // ScalarTypeExtension
@@ -111,7 +111,7 @@ impl From<GraphQLObjectTypeExtension> for GraphQLTypeSystemExtension {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLObjectTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<GraphQLObjectTypeName>,
@@ -120,7 +120,7 @@ pub struct GraphQLObjectTypeDefinition {
     pub fields: Vec<WithLocation<GraphQLFieldDefinition>>,
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLObjectTypeExtension {
     pub name: WithLocation<GraphQLObjectTypeName>,
     pub interfaces: Vec<WithLocation<GraphQLInterfaceTypeName>>,
@@ -128,14 +128,14 @@ pub struct GraphQLObjectTypeExtension {
     pub fields: Vec<WithLocation<GraphQLFieldDefinition>>,
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLScalarTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<GraphQLScalarTypeName>,
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLInterfaceTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<GraphQLInterfaceTypeName>,
@@ -144,7 +144,7 @@ pub struct GraphQLInterfaceTypeDefinition {
     pub fields: Vec<WithLocation<GraphQLFieldDefinition>>,
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLInputObjectTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<GraphQLInterfaceTypeName>,
@@ -152,7 +152,7 @@ pub struct GraphQLInputObjectTypeDefinition {
     pub fields: Vec<WithLocation<GraphQLInputValueDefinition>>,
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLSchemaDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub query: Option<WithLocation<GraphQLObjectTypeName>>,
@@ -162,7 +162,7 @@ pub struct GraphQLSchemaDefinition {
 }
 
 #[allow(unused)]
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, EnumString)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, EnumString, Hash)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 pub enum DirectiveLocation {
     Query,
@@ -186,7 +186,7 @@ pub enum DirectiveLocation {
     InputFieldDefinition,
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLDirectiveDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<DirectiveName>,
@@ -195,7 +195,7 @@ pub struct GraphQLDirectiveDefinition {
     pub locations: Vec<WithSpan<DirectiveLocation>>,
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLEnumDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<DirectiveName>,
@@ -203,14 +203,14 @@ pub struct GraphQLEnumDefinition {
     pub enum_value_definitions: Vec<WithLocation<GraphQLEnumValueDefinition>>,
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLEnumValueDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub value: WithLocation<EnumLiteralValue>,
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLUnionTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<GraphQLUnionTypeName>,
@@ -233,7 +233,7 @@ impl From<GraphQLInputValueDefinition> for GraphQLFieldDefinition {
 }
 
 /// A server field definition on an object or interface
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLFieldDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<ServerSelectableName>,

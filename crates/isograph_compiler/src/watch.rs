@@ -14,7 +14,10 @@ use tokio::{runtime::Handle, sync::mpsc::Receiver};
 use tracing::info;
 
 use crate::{
-    batch_compile::print_result, compiler_state::CompilerState, with_duration::WithDuration,
+    batch_compile::print_result,
+    compiler_state::{compile, CompilerState},
+    source_files::SourceFiles,
+    with_duration::WithDuration,
 };
 
 const MAX_CHANGED_FILES: usize = 100;
@@ -23,11 +26,16 @@ pub async fn handle_watch_command<TOutputFormat: OutputFormat>(
     config_location: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(), Vec<Error>> {
-    let mut state = CompilerState::<TOutputFormat>::new(config_location, current_working_directory);
+    let mut state = CompilerState::new(config_location, current_working_directory);
     let (mut rx, mut watcher) = create_debounced_file_watcher(&state.config);
 
     info!("{}", "Starting to compile.".cyan());
-    let _ = print_result(WithDuration::new(|| state.compile()));
+    let _ = print_result(WithDuration::new(|| {
+        let source_files = SourceFiles::read_all(&mut state.db, &state.config)?;
+        let result = compile::<TOutputFormat>(&state.db, &source_files, &state.config);
+        state.source_files = Some(source_files);
+        result
+    }));
 
     while let Some(res) = rx.recv().await {
         match res {
@@ -44,18 +52,50 @@ pub async fn handle_watch_command<TOutputFormat: OutputFormat>(
                         );
                         watcher.stop();
                         (rx, watcher) = create_debounced_file_watcher(&state.config);
-                        WithDuration::new(|| state.compile())
+                        WithDuration::new(|| {
+                            let source_files = SourceFiles::read_all(&mut state.db, &state.config)?;
+                            let result =
+                                compile::<TOutputFormat>(&state.db, &source_files, &state.config);
+                            state.source_files = Some(source_files);
+                            result
+                        })
                     } else if changes.len() < MAX_CHANGED_FILES {
                         info!("{}", "File changes detected. Starting to compile.".cyan());
-                        WithDuration::new(|| state.update(&changes))
+                        WithDuration::new(|| {
+                            if let Some(source_files) = state.source_files.as_mut() {
+                                source_files.read_updates(
+                                    &mut state.db,
+                                    &state.config,
+                                    &changes,
+                                )?;
+                                compile::<TOutputFormat>(&state.db, source_files, &state.config)
+                            } else {
+                                let source_files =
+                                    SourceFiles::read_all(&mut state.db, &state.config)?;
+                                let result = compile::<TOutputFormat>(
+                                    &state.db,
+                                    &source_files,
+                                    &state.config,
+                                );
+                                state.source_files = Some(source_files);
+                                result
+                            }
+                        })
                     } else {
                         info!(
                             "{}",
                             "Too many changes. Starting a full compilation.".cyan()
                         );
-                        WithDuration::new(|| state.compile())
+                        WithDuration::new(|| {
+                            let source_files = SourceFiles::read_all(&mut state.db, &state.config)?;
+                            let result =
+                                compile::<TOutputFormat>(&state.db, &source_files, &state.config);
+                            state.source_files = Some(source_files);
+                            result
+                        })
                     };
                     let _ = print_result(result);
+                    state.run_garbage_collection();
                 }
             }
             Err(errors) => return Err(errors),

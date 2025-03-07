@@ -1,302 +1,297 @@
 Ok(
-    (
-        RelativePathToSourceFile(
-            "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
-        ),
-        [
-            (
-                ClientPointerDeclaration(
-                    WithSpan {
-                        item: ClientPointerDeclaration {
-                            directives: [
-                                WithSpan {
-                                    item: IsographFieldDirective {
-                                        name: WithSpan {
-                                            item: IsographDirectiveName(
-                                                "directives",
-                                            ),
-                                            span: Span {
-                                                start: 36,
-                                                end: 46,
-                                            },
-                                        },
-                                        arguments: [],
-                                    },
-                                    span: Span {
-                                        start: 35,
-                                        end: 46,
-                                    },
-                                },
-                                WithSpan {
-                                    item: IsographFieldDirective {
-                                        name: WithSpan {
-                                            item: IsographDirectiveName(
-                                                "allowed",
-                                            ),
-                                            span: Span {
-                                                start: 48,
-                                                end: 55,
-                                            },
-                                        },
-                                        arguments: [],
-                                    },
-                                    span: Span {
-                                        start: 47,
-                                        end: 55,
-                                    },
-                                },
-                                WithSpan {
-                                    item: IsographFieldDirective {
-                                        name: WithSpan {
-                                            item: IsographDirectiveName(
-                                                "at",
-                                            ),
-                                            span: Span {
-                                                start: 57,
-                                                end: 59,
-                                            },
-                                        },
-                                        arguments: [],
-                                    },
-                                    span: Span {
-                                        start: 56,
-                                        end: 59,
-                                    },
-                                },
-                                WithSpan {
-                                    item: IsographFieldDirective {
-                                        name: WithSpan {
-                                            item: IsographDirectiveName(
-                                                "parse",
-                                            ),
-                                            span: Span {
-                                                start: 61,
-                                                end: 66,
-                                            },
-                                        },
-                                        arguments: [],
-                                    },
-                                    span: Span {
-                                        start: 60,
-                                        end: 66,
-                                    },
-                                },
-                                WithSpan {
-                                    item: IsographFieldDirective {
-                                        name: WithSpan {
-                                            item: IsographDirectiveName(
-                                                "time",
-                                            ),
-                                            span: Span {
-                                                start: 68,
-                                                end: 72,
-                                            },
-                                        },
-                                        arguments: [],
-                                    },
-                                    span: Span {
-                                        start: 67,
-                                        end: 72,
-                                    },
-                                },
-                            ],
-                            const_export_name: ConstExportName(
-                                "pointer",
-                            ),
-                            parent_type: WithSpan {
-                                item: UnvalidatedTypeName(
-                                    "User",
-                                ),
-                                span: Span {
-                                    start: 11,
-                                    end: 15,
-                                },
-                            },
-                            target_type: Named(
-                                GraphQLNamedTypeAnnotation(
-                                    WithSpan {
-                                        item: UnvalidatedTypeName(
-                                            "User",
+    [
+        (
+            ClientPointerDeclaration(
+                WithSpan {
+                    item: ClientPointerDeclaration {
+                        directives: [
+                            WithSpan {
+                                item: IsographFieldDirective {
+                                    name: WithSpan {
+                                        item: IsographDirectiveName(
+                                            "directives",
                                         ),
                                         span: Span {
-                                            start: 30,
-                                            end: 34,
+                                            start: 36,
+                                            end: 46,
                                         },
                                     },
-                                ),
-                            ),
-                            client_pointer_name: WithSpan {
-                                item: ClientObjectSelectableName(
-                                    "bestFriend",
-                                ),
+                                    arguments: [],
+                                },
                                 span: Span {
-                                    start: 16,
-                                    end: 26,
+                                    start: 35,
+                                    end: 46,
                                 },
                             },
-                            description: None,
-                            selection_set: [
-                                WithSpan {
-                                    item: Object(
-                                        LinkedFieldSelection {
-                                            name: WithLocation {
-                                                location: Embedded(
-                                                    EmbeddedLocation {
-                                                        text_source: TextSource {
-                                                            current_working_directory: CurrentWorkingDirectory,
-                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
-                                                            ),
-                                                            span: Some(
-                                                                Span {
-                                                                    start: 112,
-                                                                    end: 236,
-                                                                },
-                                                            ),
-                                                        },
-                                                        span: Span {
-                                                            start: 79,
-                                                            end: 86,
-                                                        },
-                                                    },
-                                                ),
-                                                item: ServerObjectSelectableName(
-                                                    "friends",
-                                                ),
-                                            },
-                                            reader_alias: None,
-                                            associated_data: None(
-                                                EmptyDirectiveSet,
-                                            ),
-                                            selection_set: [
-                                                WithSpan {
-                                                    item: Scalar(
-                                                        ScalarFieldSelection {
-                                                            name: WithLocation {
-                                                                location: Embedded(
-                                                                    EmbeddedLocation {
-                                                                        text_source: TextSource {
-                                                                            current_working_directory: CurrentWorkingDirectory,
-                                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
-                                                                            ),
-                                                                            span: Some(
-                                                                                Span {
-                                                                                    start: 112,
-                                                                                    end: 236,
-                                                                                },
-                                                                            ),
-                                                                        },
-                                                                        span: Span {
-                                                                            start: 95,
-                                                                            end: 97,
-                                                                        },
-                                                                    },
-                                                                ),
-                                                                item: ScalarSelectableName(
-                                                                    "id",
-                                                                ),
-                                                            },
-                                                            reader_alias: None,
-                                                            associated_data: None(
-                                                                EmptyDirectiveSet,
-                                                            ),
-                                                            arguments: [],
-                                                        },
-                                                    ),
-                                                    span: Span {
-                                                        start: 95,
-                                                        end: 97,
-                                                    },
-                                                },
-                                                WithSpan {
-                                                    item: Scalar(
-                                                        ScalarFieldSelection {
-                                                            name: WithLocation {
-                                                                location: Embedded(
-                                                                    EmbeddedLocation {
-                                                                        text_source: TextSource {
-                                                                            current_working_directory: CurrentWorkingDirectory,
-                                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
-                                                                            ),
-                                                                            span: Some(
-                                                                                Span {
-                                                                                    start: 112,
-                                                                                    end: 236,
-                                                                                },
-                                                                            ),
-                                                                        },
-                                                                        span: Span {
-                                                                            start: 104,
-                                                                            end: 113,
-                                                                        },
-                                                                    },
-                                                                ),
-                                                                item: ScalarSelectableName(
-                                                                    "closeness",
-                                                                ),
-                                                            },
-                                                            reader_alias: None,
-                                                            associated_data: None(
-                                                                EmptyDirectiveSet,
-                                                            ),
-                                                            arguments: [],
-                                                        },
-                                                    ),
-                                                    span: Span {
-                                                        start: 104,
-                                                        end: 113,
-                                                    },
-                                                },
-                                            ],
-                                            arguments: [],
+                            WithSpan {
+                                item: IsographFieldDirective {
+                                    name: WithSpan {
+                                        item: IsographDirectiveName(
+                                            "allowed",
+                                        ),
+                                        span: Span {
+                                            start: 48,
+                                            end: 55,
                                         },
+                                    },
+                                    arguments: [],
+                                },
+                                span: Span {
+                                    start: 47,
+                                    end: 55,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographFieldDirective {
+                                    name: WithSpan {
+                                        item: IsographDirectiveName(
+                                            "at",
+                                        ),
+                                        span: Span {
+                                            start: 57,
+                                            end: 59,
+                                        },
+                                    },
+                                    arguments: [],
+                                },
+                                span: Span {
+                                    start: 56,
+                                    end: 59,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographFieldDirective {
+                                    name: WithSpan {
+                                        item: IsographDirectiveName(
+                                            "parse",
+                                        ),
+                                        span: Span {
+                                            start: 61,
+                                            end: 66,
+                                        },
+                                    },
+                                    arguments: [],
+                                },
+                                span: Span {
+                                    start: 60,
+                                    end: 66,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographFieldDirective {
+                                    name: WithSpan {
+                                        item: IsographDirectiveName(
+                                            "time",
+                                        ),
+                                        span: Span {
+                                            start: 68,
+                                            end: 72,
+                                        },
+                                    },
+                                    arguments: [],
+                                },
+                                span: Span {
+                                    start: 67,
+                                    end: 72,
+                                },
+                            },
+                        ],
+                        const_export_name: ConstExportName(
+                            "pointer",
+                        ),
+                        parent_type: WithSpan {
+                            item: UnvalidatedTypeName(
+                                "User",
+                            ),
+                            span: Span {
+                                start: 11,
+                                end: 15,
+                            },
+                        },
+                        target_type: Named(
+                            GraphQLNamedTypeAnnotation(
+                                WithSpan {
+                                    item: UnvalidatedTypeName(
+                                        "User",
                                     ),
                                     span: Span {
-                                        start: 79,
-                                        end: 119,
+                                        start: 30,
+                                        end: 34,
                                     },
                                 },
-                            ],
-                            variable_definitions: [],
-                            definition_path: RelativePathToSourceFile(
-                                "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
                             ),
-                            pointer_keyword: WithSpan {
-                                item: (),
-                                span: Span {
-                                    start: 3,
-                                    end: 10,
-                                },
-                            },
-                            dot: WithSpan {
-                                item: (),
-                                span: Span {
-                                    start: 15,
-                                    end: 16,
-                                },
+                        ),
+                        client_pointer_name: WithSpan {
+                            item: ClientObjectSelectableName(
+                                "bestFriend",
+                            ),
+                            span: Span {
+                                start: 16,
+                                end: 26,
                             },
                         },
-                        span: Span {
-                            start: 11,
-                            end: 123,
+                        description: None,
+                        selection_set: [
+                            WithSpan {
+                                item: Object(
+                                    LinkedFieldSelection {
+                                        name: WithLocation {
+                                            location: Embedded(
+                                                EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 112,
+                                                                end: 236,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 79,
+                                                        end: 86,
+                                                    },
+                                                },
+                                            ),
+                                            item: ServerObjectSelectableName(
+                                                "friends",
+                                            ),
+                                        },
+                                        reader_alias: None,
+                                        associated_data: None(
+                                            EmptyDirectiveSet,
+                                        ),
+                                        selection_set: [
+                                            WithSpan {
+                                                item: Scalar(
+                                                    ScalarFieldSelection {
+                                                        name: WithLocation {
+                                                            location: Embedded(
+                                                                EmbeddedLocation {
+                                                                    text_source: TextSource {
+                                                                        current_working_directory: CurrentWorkingDirectory,
+                                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                                            "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                                                        ),
+                                                                        span: Some(
+                                                                            Span {
+                                                                                start: 112,
+                                                                                end: 236,
+                                                                            },
+                                                                        ),
+                                                                    },
+                                                                    span: Span {
+                                                                        start: 95,
+                                                                        end: 97,
+                                                                    },
+                                                                },
+                                                            ),
+                                                            item: ScalarSelectableName(
+                                                                "id",
+                                                            ),
+                                                        },
+                                                        reader_alias: None,
+                                                        associated_data: None(
+                                                            EmptyDirectiveSet,
+                                                        ),
+                                                        arguments: [],
+                                                    },
+                                                ),
+                                                span: Span {
+                                                    start: 95,
+                                                    end: 97,
+                                                },
+                                            },
+                                            WithSpan {
+                                                item: Scalar(
+                                                    ScalarFieldSelection {
+                                                        name: WithLocation {
+                                                            location: Embedded(
+                                                                EmbeddedLocation {
+                                                                    text_source: TextSource {
+                                                                        current_working_directory: CurrentWorkingDirectory,
+                                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                                            "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                                                        ),
+                                                                        span: Some(
+                                                                            Span {
+                                                                                start: 112,
+                                                                                end: 236,
+                                                                            },
+                                                                        ),
+                                                                    },
+                                                                    span: Span {
+                                                                        start: 104,
+                                                                        end: 113,
+                                                                    },
+                                                                },
+                                                            ),
+                                                            item: ScalarSelectableName(
+                                                                "closeness",
+                                                            ),
+                                                        },
+                                                        reader_alias: None,
+                                                        associated_data: None(
+                                                            EmptyDirectiveSet,
+                                                        ),
+                                                        arguments: [],
+                                                    },
+                                                ),
+                                                span: Span {
+                                                    start: 104,
+                                                    end: 113,
+                                                },
+                                            },
+                                        ],
+                                        arguments: [],
+                                    },
+                                ),
+                                span: Span {
+                                    start: 79,
+                                    end: 119,
+                                },
+                            },
+                        ],
+                        variable_definitions: [],
+                        definition_path: RelativePathToSourceFile(
+                            "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                        ),
+                        pointer_keyword: WithSpan {
+                            item: (),
+                            span: Span {
+                                start: 3,
+                                end: 10,
+                            },
+                        },
+                        dot: WithSpan {
+                            item: (),
+                            span: Span {
+                                start: 15,
+                                end: 16,
+                            },
                         },
                     },
-                ),
-                TextSource {
-                    current_working_directory: CurrentWorkingDirectory,
-                    relative_path_to_source_file: RelativePathToSourceFile(
-                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
-                    ),
-                    span: Some(
-                        Span {
-                            start: 112,
-                            end: 236,
-                        },
-                    ),
+                    span: Span {
+                        start: 11,
+                        end: 123,
+                    },
                 },
             ),
-        ],
-    ),
+            TextSource {
+                current_working_directory: CurrentWorkingDirectory,
+                relative_path_to_source_file: RelativePathToSourceFile(
+                    "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                ),
+                span: Some(
+                    Span {
+                        start: 112,
+                        end: 236,
+                    },
+                ),
+            },
+        ),
+    ],
 )

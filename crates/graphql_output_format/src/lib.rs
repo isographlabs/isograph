@@ -7,6 +7,7 @@ pub use graphql_output_format::*;
 use isograph_schema::{
     Schema, SchemaObject, UnvalidatedSchema, ValidatedClientField, ValidatedSchema,
 };
+pub use read_schema::*;
 
 pub type ValidatedGraphqlSchema = ValidatedSchema<GraphQLOutputFormat>;
 pub type GraphqlSchema<TSchemaValidationState> =

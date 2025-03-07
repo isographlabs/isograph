@@ -1,19 +1,20 @@
 use std::error::Error;
 
-use common_lang_types::{QueryOperationName, QueryText, RelativePathToSourceFile};
+use common_lang_types::{QueryOperationName, QueryText};
 use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDocument};
-use isograph_config::{AbsolutePathAndRelativePath, CompilerConfig};
+use isograph_lang_types::SchemaSource;
 use isograph_schema::{
     MergedSelectionMap, OutputFormat, ProcessTypeSystemDocumentOutcome, RootOperationName,
     ValidatedSchema, ValidatedVariableDefinition,
 };
+use pico::{Database, MemoRef, SourceId};
 
 use crate::{
+    parse_graphql_schema, parse_schema_extensions_file,
     process_type_system_definition::{
         process_graphql_type_extension_document, process_graphql_type_system_document,
     },
     query_text::generate_query_text,
-    read_schema::{read_and_parse_graphql_schema, read_and_parse_schema_extensions},
     UnvalidatedGraphqlSchema,
 };
 
@@ -26,19 +27,18 @@ impl OutputFormat for GraphQLOutputFormat {
 
     type SchemaObjectAssociatedData = GraphQLSchemaObjectAssociatedData;
 
-    fn read_and_parse_type_system_document(
-        config: &CompilerConfig,
-    ) -> Result<Self::TypeSystemDocument, Box<dyn Error>> {
-        Ok(read_and_parse_graphql_schema(config)?)
+    fn parse_type_system_document(
+        db: &Database,
+        schema_source_id: SourceId<SchemaSource>,
+    ) -> Result<MemoRef<Self::TypeSystemDocument>, Box<dyn Error>> {
+        Ok(parse_graphql_schema(db, schema_source_id).to_owned()?)
     }
-    fn read_and_parse_type_system_extension_document(
-        schema_extension_path: &AbsolutePathAndRelativePath,
-        config: &CompilerConfig,
-    ) -> Result<(RelativePathToSourceFile, Self::TypeSystemExtensionDocument), Box<dyn Error>> {
-        Ok(read_and_parse_schema_extensions(
-            schema_extension_path,
-            config,
-        )?)
+
+    fn parse_type_system_extension_document(
+        db: &Database,
+        schema_extension_source_id: SourceId<SchemaSource>,
+    ) -> Result<MemoRef<Self::TypeSystemExtensionDocument>, Box<dyn Error>> {
+        Ok(parse_schema_extensions_file(db, schema_extension_source_id).to_owned()?)
     }
 
     fn process_type_system_document(

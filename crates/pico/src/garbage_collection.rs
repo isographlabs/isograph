@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use boxcar::Vec as BoxcarVec;
 use dashmap::DashMap;
+use tracing::debug;
 
 use crate::{
     dependency::{Dependency, NodeKind},
@@ -82,22 +83,35 @@ impl DatabaseStorage {
                 }
                 processed_params.insert(param_id);
 
-                let old_param_index = self.param_id_to_index.get_mut(&param_id).expect(
-                    "Expected param id to be present. This is indicative of a bug in Pico.",
-                );
+                if let Some(old_param_index) = self.param_id_to_index.get_mut(&param_id) {
+                    let old_param = self.params.get_mut(old_param_index.idx).expect(
+                        "Expected param to be present. This is indicative of a bug in Pico.",
+                    );
 
-                let old_param = self
-                    .params
-                    .get_mut(old_param_index.idx)
-                    .expect("Expected param to be present. This is indicative of a bug in Pico.");
+                    // Let's avoid cloning the param, as well
+                    let param = std::mem::replace(old_param, Box::new(()));
 
-                // Let's avoid cloning the param, as well
-                let param = std::mem::replace(old_param, Box::new(()));
-
-                let new_param_index: Index<ParamId> = Index::new(new_params.push(param));
-                new_param_id_to_index.insert(param_id, new_param_index);
+                    let new_param_index: Index<ParamId> = Index::new(new_params.push(param));
+                    new_param_id_to_index.insert(param_id, new_param_index);
+                } else {
+                    // This is MemoRef or SourceId argument and should not be stored in the params storage
+                }
             }
         }
+
+        debug!(
+            r#"Garbage collection finished:
+    params:
+        before: {}
+        after: {}
+    derived_nodes:
+        before: {}
+        after: {}"#,
+            self.params.count(),
+            new_params.count(),
+            self.derived_nodes.count(),
+            new_derived_nodes.count(),
+        );
 
         self.params = new_params;
         self.derived_nodes = new_derived_nodes;
