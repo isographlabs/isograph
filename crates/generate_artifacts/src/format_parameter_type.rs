@@ -1,15 +1,17 @@
+use std::fmt::Debug;
+
 use common_lang_types::SelectableName;
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 
 use isograph_lang_types::{
-    DefinitionLocation, SelectableServerFieldId, SelectionType, ServerFieldId, TypeAnnotation,
+    DefinitionLocation, SelectionType, ServerEntityId, ServerScalarSelectableId, TypeAnnotation,
     UnionVariant,
 };
-use isograph_schema::{ClientFieldOrPointerId, OutputFormat, ValidatedSchema};
+use isograph_schema::{OutputFormat, ValidatedSchema};
 
 pub(crate) fn format_parameter_type<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
-    type_: GraphQLTypeAnnotation<SelectableServerFieldId>,
+    type_: GraphQLTypeAnnotation<ServerEntityId>,
     indentation_level: u8,
 ) -> String {
     match type_ {
@@ -41,30 +43,32 @@ pub(crate) fn format_parameter_type<TOutputFormat: OutputFormat>(
 
 fn format_server_field_type<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
-    field: SelectableServerFieldId,
+    field: ServerEntityId,
     indentation_level: u8,
 ) -> String {
     match field {
-        SelectableServerFieldId::Object(object_id) => {
+        ServerEntityId::Object(object_id) => {
             let mut s = "{\n".to_string();
-            for (name, field_definition) in schema
+            for (name, server_field_id) in schema
                 .server_field_data
                 .object(object_id)
                 .encountered_fields
                 .iter()
-                .filter(|x| matches!(
-                    x.1,
-                    DefinitionLocation::Server(server_field_id) if !schema.server_field(*server_field_id).is_discriminator),
+                .filter_map(
+                    |(name, field_definition_location)| match field_definition_location {
+                        DefinitionLocation::Server(s) => Some((name, *s)),
+                        DefinitionLocation::Client(_) => None,
+                    },
                 )
             {
                 let field_type =
-                    format_field_definition(schema, name, field_definition, indentation_level + 1);
+                    format_field_definition(schema, name, server_field_id, indentation_level + 1);
                 s.push_str(&field_type)
             }
             s.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
             s
         }
-        SelectableServerFieldId::Scalar(scalar_id) => schema
+        ServerEntityId::Scalar(scalar_id) => schema
             .server_field_data
             .scalar(scalar_id)
             .javascript_name
@@ -75,46 +79,41 @@ fn format_server_field_type<TOutputFormat: OutputFormat>(
 fn format_field_definition<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
     name: &SelectableName,
-    type_: &DefinitionLocation<ServerFieldId, ClientFieldOrPointerId>,
+    server_field_id: ServerScalarSelectableId,
     indentation_level: u8,
 ) -> String {
-    match type_ {
-        DefinitionLocation::Server(server_field_id) => {
-            let type_annotation = match &schema.server_field(*server_field_id).associated_data {
-                SelectionType::Object(associated_data) => associated_data
-                    .type_name
-                    .clone()
-                    .map(&mut SelectionType::Object),
-                SelectionType::Scalar(type_name) => {
-                    type_name.clone().map(&mut SelectionType::Scalar)
-                }
-            };
-            let is_optional = match &type_annotation {
-                TypeAnnotation::Union(union) => union.nullable,
-                TypeAnnotation::Plural(_) => false,
-                TypeAnnotation::Scalar(_) => false,
-            };
+    let selection_type = &schema.server_field(server_field_id).target_server_entity;
+    let (is_optional, selection_type) = match selection_type {
+        SelectionType::Scalar(type_annotation) => (
+            is_nullable(type_annotation),
+            type_annotation.clone().map(&mut SelectionType::Scalar),
+        ),
+        SelectionType::Object((_, type_annotation)) => (
+            is_nullable(type_annotation),
+            type_annotation.clone().map(&mut SelectionType::Object),
+        ),
+    };
 
-            format!(
-                "{}readonly {}{}: {},\n",
-                "  ".repeat(indentation_level as usize),
-                name,
-                if is_optional { "?" } else { "" },
-                format_type_annotation(schema, &type_annotation, indentation_level + 1),
-            )
-        }
-        DefinitionLocation::Client(_) => {
-            panic!(
-                "Unexpected object. Client fields are not supported as parameters, yet. \
-                This is indicative of an unimplemented feature in Isograph."
-            )
-        }
+    format!(
+        "{}readonly {}{}: {},\n",
+        "  ".repeat(indentation_level as usize),
+        name,
+        if is_optional { "?" } else { "" },
+        format_type_annotation(schema, &selection_type, indentation_level + 1),
+    )
+}
+
+fn is_nullable<T: Ord + Debug>(type_annotation: &TypeAnnotation<T>) -> bool {
+    match type_annotation {
+        TypeAnnotation::Union(union) => union.nullable,
+        TypeAnnotation::Plural(_) => false,
+        TypeAnnotation::Scalar(_) => false,
     }
 }
 
 fn format_type_annotation<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
-    type_annotation: &TypeAnnotation<SelectableServerFieldId>,
+    type_annotation: &TypeAnnotation<ServerEntityId>,
     indentation_level: u8,
 ) -> String {
     match &type_annotation {
@@ -172,7 +171,7 @@ fn format_type_annotation<TOutputFormat: OutputFormat>(
                             "ReadonlyArray<{}>",
                             format_server_field_type(
                                 schema,
-                                type_annotation.inner(),
+                                *type_annotation.inner(),
                                 indentation_level + 1
                             )
                         )
@@ -183,7 +182,7 @@ fn format_type_annotation<TOutputFormat: OutputFormat>(
         TypeAnnotation::Plural(type_annotation) => {
             format!(
                 "ReadonlyArray<{}>",
-                format_server_field_type(schema, type_annotation.inner(), indentation_level + 1)
+                format_server_field_type(schema, *type_annotation.inner(), indentation_level + 1)
             )
         }
     }

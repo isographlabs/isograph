@@ -329,7 +329,7 @@ dependencies = [
 
 [[package]]
 name = "common_lang_types"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "intern",
  "pathdiff",
@@ -547,7 +547,7 @@ dependencies = [
 
 [[package]]
 name = "generate_artifacts"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
@@ -623,7 +623,7 @@ dependencies = [
 
 [[package]]
 name = "graphql_lang_types"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "common_lang_types",
  "intern",
@@ -634,7 +634,7 @@ dependencies = [
 
 [[package]]
 name = "graphql_output_format"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
@@ -650,7 +650,7 @@ dependencies = [
 
 [[package]]
 name = "graphql_schema_parser"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "common_lang_types",
  "graphql-syntax",
@@ -861,7 +861,7 @@ dependencies = [
 
 [[package]]
 name = "impl_base_types_macro"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -967,7 +967,7 @@ checksum = "7943c866cc5cd64cbc25b2e01621d07fa8eb2a1a23160ee81ce38704e97b8ecf"
 
 [[package]]
 name = "isograph_cli"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "clap 4.5.31",
  "colored",
@@ -990,7 +990,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_compiler"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "colored",
  "common_lang_types",
@@ -1013,7 +1013,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_config"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "colorize",
  "common_lang_types",
@@ -1026,7 +1026,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_fixture_tests"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "clap 4.5.31",
  "intern",
@@ -1038,7 +1038,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_lang_parser"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
@@ -1050,7 +1050,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_lang_types"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
@@ -1062,7 +1062,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_lsp"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "common_lang_types",
  "crossbeam",
@@ -1081,7 +1081,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_schema"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "colorize",
  "common_lang_types",
@@ -1815,7 +1815,7 @@ checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
 name = "string_key_newtype"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "intern",
 ]
@@ -1986,7 +1986,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "colorize",
  "common_lang_types",
@@ -2189,7 +2189,7 @@ dependencies = [
 
 [[package]]
 name = "u32_newtypes"
-version = "0.3.0"
+version = "0.3.1"
 
 [[package]]
 name = "u64_newtypes"

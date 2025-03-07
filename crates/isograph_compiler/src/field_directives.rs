@@ -2,7 +2,8 @@ use common_lang_types::{IsographDirectiveName, WithLocation, WithSpan};
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ClientFieldDeclaration, ClientPointerDeclaration, LinkedFieldSelection, ScalarFieldSelection,
-    ServerFieldSelection, UnvalidatedSelection, UnvalidatedSelectionWithUnvalidatedDirectives,
+    SelectionTypeContainingSelections, UnvalidatedSelection,
+    UnvalidatedSelectionWithUnvalidatedDirectives,
 };
 use isograph_schema::ProcessClientFieldDeclarationError;
 use lazy_static::lazy_static;
@@ -102,18 +103,19 @@ fn and_then_selection_set_and_collect_errors<
     TLinkedField2,
     E,
 >(
-    selection_set: Vec<WithSpan<ServerFieldSelection<TScalarField, TLinkedField>>>,
+    selection_set: Vec<WithSpan<SelectionTypeContainingSelections<TScalarField, TLinkedField>>>,
     and_then_scalar: &impl Fn(&ScalarFieldSelection<TScalarField>) -> Result<TScalarField2, E>,
     and_then_linked: &impl Fn(
         &LinkedFieldSelection<TScalarField, TLinkedField>,
     ) -> Result<TLinkedField2, E>,
-) -> Result<Vec<WithSpan<ServerFieldSelection<TScalarField2, TLinkedField2>>>, Vec<E>> {
+) -> Result<Vec<WithSpan<SelectionTypeContainingSelections<TScalarField2, TLinkedField2>>>, Vec<E>>
+{
     let mut errors = vec![];
     let mut transformed_selection_set = vec![];
 
     for with_span in selection_set {
         match with_span.item {
-            ServerFieldSelection::LinkedField(l) => {
+            SelectionTypeContainingSelections::Object(l) => {
                 let new_linked_field_data = and_then_linked(&l);
                 match new_linked_field_data {
                     Ok(new_linked_field) => {
@@ -124,7 +126,7 @@ fn and_then_selection_set_and_collect_errors<
                         );
                         match sub_errors {
                             Ok(new_selection_set) => transformed_selection_set.push(WithSpan::new(
-                                ServerFieldSelection::LinkedField(LinkedFieldSelection {
+                                SelectionTypeContainingSelections::Object(LinkedFieldSelection {
                                     name: l.name,
                                     reader_alias: l.reader_alias,
                                     associated_data: new_linked_field,
@@ -139,10 +141,10 @@ fn and_then_selection_set_and_collect_errors<
                     Err(e) => errors.push(e),
                 }
             }
-            ServerFieldSelection::ScalarField(s) => {
+            SelectionTypeContainingSelections::Scalar(s) => {
                 match and_then_scalar(&s) {
                     Ok(new_scalar_field_data) => transformed_selection_set.push(WithSpan::new(
-                        ServerFieldSelection::ScalarField(ScalarFieldSelection {
+                        SelectionTypeContainingSelections::Scalar(ScalarFieldSelection {
                             name: s.name,
                             reader_alias: s.reader_alias,
                             associated_data: new_scalar_field_data,

@@ -6,7 +6,9 @@ use common_lang_types::{
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::{string_key::Intern, Lookup};
-use isograph_lang_types::{DefinitionLocation, SelectableServerFieldId, ServerFieldId};
+use isograph_lang_types::{
+    DefinitionLocation, SelectionType, ServerEntityId, ServerScalarSelectableId,
+};
 
 use crate::{OutputFormat, UnvalidatedSchema, UnvalidatedVariableDefinition};
 
@@ -75,7 +77,7 @@ impl ArgumentMap {
                             .get(&unmodified_argument.type_.inner().lookup().intern().into())
                         {
                             Some(defined_type) => match defined_type {
-                                SelectableServerFieldId::Object(_) => return Err(WithLocation::new(
+                                ServerEntityId::Object(_) => return Err(WithLocation::new(
                                     CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
                                         primary_type_name,
                                         field_name: split_to_arg
@@ -85,7 +87,7 @@ impl ArgumentMap {
                                     },
                                     Location::generated(),
                                 )),
-                                SelectableServerFieldId::Scalar(_) => {}
+                                ServerEntityId::Scalar(_) => {}
                             },
                             None => panic!(
                                 "Type is not found. This is indicative \
@@ -155,7 +157,7 @@ pub(crate) struct ModifiedObject {
 
 #[derive(Debug)]
 pub(crate) enum PotentiallyModifiedField {
-    Unmodified(ServerFieldId),
+    Unmodified(ServerScalarSelectableId),
     // This is exercised in the case of 3+ segments, e.g. input.foo.id.
     // For now, we support only up to two segments.
     #[allow(dead_code)]
@@ -210,7 +212,7 @@ impl ModifiedArgument {
                     "Expected type to be defined by now. This is indicative of a bug in Isograph.",
                 );
             match defined_type_id {
-                SelectableServerFieldId::Object(object_id) => {
+                ServerEntityId::Object(object_id) => {
                     let object = schema.server_field_data.object(object_id);
 
                     ModifiedObject {
@@ -226,7 +228,7 @@ impl ModifiedArgument {
                             .collect(),
                     }
                 }
-                SelectableServerFieldId::Scalar(_scalar_id) => {
+                ServerEntityId::Scalar(_scalar_id) => {
                     // TODO don't be lazy, return an error
                     panic!("Cannot modify a scalar")
                 }
@@ -277,38 +279,22 @@ impl ModifiedArgument {
                         match field {
                             PotentiallyModifiedField::Unmodified(field_id) => {
                                 let field_object = schema.server_field(*field_id);
-                                let field_object_type =
-                                    field_object.associated_data.type_name.inner();
-
-                                // N.B. this should be done via a validation pass.
-                                match schema
-                                    .server_field_data
-                                    .defined_types
-                                    .get(field_object_type)
+                                if let SelectionType::Object(_) = field_object.target_server_entity
                                 {
-                                    Some(type_) => match type_ {
-                                        SelectableServerFieldId::Object(_) => {
-                                            // Otherwise, formatting breaks :(
-                                            use CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject;
-                                            return Err(WithLocation::new(
-                                                PrimaryDirectiveCannotRemapObject {
-                                                    primary_type_name,
-                                                    field_name: key.to_string(),
-                                                },
-                                                Location::generated(),
-                                            ));
-                                        }
-                                        SelectableServerFieldId::Scalar(_scalar_id) => {
-                                            // Cool! We found a scalar, we can remove it.
-                                            argument_object.field_map.remove(&key).expect(
-                                                "Expected to be able to remove item. \
-                                                This is indicative of a bug in Isograph.",
-                                            );
-                                        }
-                                    },
+                                    return Err(WithLocation::new(
+                                        CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
+                                            primary_type_name,
+                                            field_name: key.to_string(),
+                                        },
+                                        Location::generated(),
+                                    ));
+                                };
 
-                                    None => panic!("Encountered a non-existent type."),
-                                }
+                                // Cool! We found a scalar, we can remove it.
+                                argument_object.field_map.remove(&key).expect(
+                                    "Expected to be able to remove item. \
+                                        This is indicative of a bug in Isograph.",
+                                );
                             }
                             PotentiallyModifiedField::Modified(_) => {
                                 // A field can only be modified if it has an object type

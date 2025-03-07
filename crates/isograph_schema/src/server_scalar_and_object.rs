@@ -7,7 +7,7 @@ use common_lang_types::{
 use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective};
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
-    DefinitionLocation, SelectionType, ServerFieldId, ServerObjectId, ServerScalarId,
+    DefinitionLocation, SelectionType, ServerObjectId, ServerScalarId, ServerScalarSelectableId,
     ServerStrongIdFieldId,
 };
 
@@ -34,8 +34,10 @@ pub struct SchemaObject<TOutputFormat: OutputFormat> {
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
     /// to something else.
     pub id_field: Option<ServerStrongIdFieldId>,
-    pub encountered_fields:
-        BTreeMap<SelectableName, DefinitionLocation<ServerFieldId, ClientFieldOrPointerId>>,
+    pub encountered_fields: BTreeMap<
+        SelectableName,
+        DefinitionLocation<ServerScalarSelectableId, ClientFieldOrPointerId>,
+    >,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 

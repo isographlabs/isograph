@@ -2,24 +2,19 @@ use common_lang_types::DescriptionValue;
 use isograph_lang_types::{DefinitionLocation, SelectionType, ServerObjectId, TypeAnnotation};
 
 use crate::{
-    ClientPointer, OutputFormat, SchemaServerField, ValidatedClientPointer,
+    ClientPointer, OutputFormat, ServerScalarSelectable, ValidatedClientPointer,
     ValidatedSchemaServerField,
 };
 
 #[allow(clippy::type_complexity)]
 pub fn description<
-    ServerFieldTypeAssociatedData,
     TSelectionTypeSelectionScalarFieldAssociatedData,
     TSelectionTypeSelectionLinkedFieldAssociatedData,
     TSelectionTypeVariableDefinitionAssociatedData: Ord + std::fmt::Debug,
     TOutputFormat: OutputFormat,
 >(
     definition_location: &DefinitionLocation<
-        &SchemaServerField<
-            ServerFieldTypeAssociatedData,
-            TSelectionTypeVariableDefinitionAssociatedData,
-            TOutputFormat,
-        >,
+        &ServerScalarSelectable<TSelectionTypeVariableDefinitionAssociatedData, TOutputFormat>,
         &ClientPointer<
             TSelectionTypeSelectionScalarFieldAssociatedData,
             TSelectionTypeSelectionLinkedFieldAssociatedData,
@@ -34,20 +29,22 @@ pub fn description<
     }
 }
 
-pub fn output_type_annotation<TOutputFormat: OutputFormat>(
-    definition_location: &DefinitionLocation<
+pub fn output_type_annotation<'a, TOutputFormat: OutputFormat>(
+    definition_location: &'a DefinitionLocation<
         &ValidatedSchemaServerField<TOutputFormat>,
         &ValidatedClientPointer<TOutputFormat>,
     >,
-) -> TypeAnnotation<ServerObjectId> {
+) -> &'a TypeAnnotation<ServerObjectId> {
     match definition_location {
-        DefinitionLocation::Client(client_pointer) => client_pointer.to.clone(),
-        DefinitionLocation::Server(server_field) => match &server_field.associated_data {
-            SelectionType::Scalar(_) => panic!(
-                "output_type_id should be an object. \
+        DefinitionLocation::Client(client_pointer) => &client_pointer.to,
+        DefinitionLocation::Server(server_field) => match &server_field.target_server_entity {
+            SelectionType::Scalar(_) => {
+                panic!(
+                    "output_type_id should be an object. \
                     This is indicative of a bug in Isograph.",
-            ),
-            SelectionType::Object(associated_data) => associated_data.type_name.clone(),
+                )
+            }
+            SelectionType::Object((_, type_annotation)) => type_annotation,
         },
     }
 }

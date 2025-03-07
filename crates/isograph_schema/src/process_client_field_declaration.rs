@@ -6,8 +6,8 @@ use common_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration, ClientPointerId,
-    DefinitionLocation, DeserializationError, NonConstantValue, SelectableServerFieldId,
-    SelectionType, ServerObjectId, TypeAnnotation,
+    DefinitionLocation, DeserializationError, NonConstantValue, SelectionType, ServerEntityId,
+    ServerObjectId, TypeAnnotation,
 };
 use lazy_static::lazy_static;
 
@@ -38,11 +38,11 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             ))?;
 
         match parent_type_id {
-            SelectableServerFieldId::Object(object_id) => {
+            ServerEntityId::Object(object_id) => {
                 self.add_client_field_to_object(*object_id, client_field_declaration)
                     .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?;
             }
-            SelectableServerFieldId::Scalar(scalar_id) => {
+            ServerEntityId::Scalar(scalar_id) => {
                 let scalar_name = self.server_field_data.scalar(*scalar_id).name;
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
@@ -91,8 +91,8 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             ))?;
 
         match parent_type_id {
-            SelectableServerFieldId::Object(object_id) => match target_type_id {
-                SelectableServerFieldId::Object(to_object_id) => {
+            ServerEntityId::Object(object_id) => match target_type_id {
+                ServerEntityId::Object(to_object_id) => {
                     self.add_client_pointer_to_object(
                         *object_id,
                         TypeAnnotation::from_graphql_type_annotation(
@@ -106,7 +106,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     )
                     .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?;
                 }
-                SelectableServerFieldId::Scalar(scalar_id) => {
+                ServerEntityId::Scalar(scalar_id) => {
                     let scalar_name = self.server_field_data.scalar(*scalar_id).name;
                     return Err(WithLocation::new(
                         ProcessClientFieldDeclarationError::ClientPointerInvalidTargetType {
@@ -119,7 +119,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     ));
                 }
             },
-            SelectableServerFieldId::Scalar(scalar_id) => {
+            ServerEntityId::Scalar(scalar_id) => {
                 let scalar_name = self.server_field_data.scalar(*scalar_id).name;
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
@@ -210,7 +210,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
     ) -> ProcessClientFieldDeclarationResult<()> {
         let query_id = self.query_id();
-        let to_object = self.server_field_data.object(to_object_id.inner());
+        let to_object = self.server_field_data.object(*to_object_id.inner());
         let parent_object = self.server_field_data.object(parent_object_id);
         let client_pointer_pointer_name_ws = client_pointer_declaration.item.client_pointer_name;
         let client_pointer_name = client_pointer_pointer_name_ws.item;
@@ -272,6 +272,11 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             }?,
             to: to_object_id,
             output_format: std::marker::PhantomData,
+
+            info: UserWrittenClientPointerInfo {
+                const_export_name: client_pointer_declaration.item.const_export_name,
+                file_path: client_pointer_declaration.item.definition_path,
+            },
         }));
 
         let parent_object = self.server_field_data.object_mut(parent_object_id);
@@ -380,16 +385,23 @@ pub enum UserWrittenComponentVariant {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct UserWrittenClientFieldInfo {
+pub struct UserWrittenClientTypeInfo {
     // TODO use a shared struct
     pub const_export_name: ConstExportName,
     pub file_path: RelativePathToSourceFile,
     pub user_written_component_variant: UserWrittenComponentVariant,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+// TODO refactor this https://github.com/isographlabs/isograph/pull/435#discussion_r1970489356
+pub struct UserWrittenClientPointerInfo {
+    pub const_export_name: ConstExportName,
+    pub file_path: RelativePathToSourceFile,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ClientFieldVariant {
-    UserWritten(UserWrittenClientFieldInfo),
+    UserWritten(UserWrittenClientTypeInfo),
     ImperativelyLoadedField(ImperativelyLoadedFieldVariant),
     Link,
 }
@@ -401,14 +413,14 @@ lazy_static! {
 fn get_client_variant(client_field_declaration: &ClientFieldDeclaration) -> ClientFieldVariant {
     for directive in client_field_declaration.directives.iter() {
         if directive.item.name.item == *COMPONENT {
-            return ClientFieldVariant::UserWritten(UserWrittenClientFieldInfo {
+            return ClientFieldVariant::UserWritten(UserWrittenClientTypeInfo {
                 const_export_name: client_field_declaration.const_export_name,
                 file_path: client_field_declaration.definition_path,
                 user_written_component_variant: UserWrittenComponentVariant::Component,
             });
         }
     }
-    ClientFieldVariant::UserWritten(UserWrittenClientFieldInfo {
+    ClientFieldVariant::UserWritten(UserWrittenClientTypeInfo {
         const_export_name: client_field_declaration.const_export_name,
         file_path: client_field_declaration.definition_path,
         user_written_component_variant: UserWrittenComponentVariant::Eager,

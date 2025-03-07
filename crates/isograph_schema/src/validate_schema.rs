@@ -9,9 +9,9 @@ use intern::Lookup;
 use isograph_lang_types::{
     ClientFieldId, ClientPointerId, DefinitionLocation, LinkedFieldSelection,
     LoadableDirectiveParameters, NonConstantValue, ObjectSelectionDirectiveSet,
-    ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectableServerFieldId,
-    SelectionFieldArgument, SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId,
-    ServerScalarId, TypeAnnotation, VariableDefinition,
+    ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionType,
+    SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, ServerScalarSelectableId,
+    VariableDefinition,
 };
 
 use thiserror::Error;
@@ -20,18 +20,17 @@ use crate::{
     schema_validation_state::SchemaValidationState,
     validate_client_field::validate_and_transform_client_types,
     validate_server_field::validate_and_transform_server_fields, ClientField, ClientFieldVariant,
-    ClientPointer, ImperativelyLoadedFieldVariant, OutputFormat, Schema, SchemaIdField,
-    SchemaObject, SchemaServerField, ServerFieldData, ServerFieldTypeAssociatedData,
-    UnvalidatedSchema, UseRefetchFieldRefetchStrategy, ValidateEntrypointDeclarationError,
+    ClientPointer, ImperativelyLoadedFieldVariant, OutputFormat, Schema, SchemaObject,
+    ServerFieldData, ServerScalarSelectable, UnvalidatedSchema, UseRefetchFieldRefetchStrategy,
+    ValidateEntrypointDeclarationError,
 };
 
-pub type ValidatedSchemaServerField<TOutputFormat> = SchemaServerField<
-    <ValidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,
+pub type ValidatedSchemaServerField<TOutputFormat> = ServerScalarSelectable<
     <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
     TOutputFormat,
 >;
 
-pub type ValidatedSelection = ServerFieldSelection<
+pub type ValidatedSelection = SelectionTypeContainingSelections<
     <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
 >;
@@ -44,7 +43,7 @@ pub type ValidatedScalarFieldSelection = ScalarFieldSelection<
     <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
 >;
 
-pub type ValidatedVariableDefinition = VariableDefinition<SelectableServerFieldId>;
+pub type ValidatedVariableDefinition = VariableDefinition<ServerEntityId>;
 pub type ValidatedClientField<TOutputFormat> = ClientField<
     <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
@@ -65,14 +64,13 @@ pub type ValidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
 >;
 
 /// The validated defined field that shows up in the TScalarField generic.
-pub type ValidatedFieldDefinitionLocation = DefinitionLocation<ServerFieldId, ClientFieldId>;
-
-pub type ValidatedSchemaIdField = SchemaIdField<ServerScalarId>;
+pub type ValidatedFieldDefinitionLocation =
+    DefinitionLocation<ServerScalarSelectableId, ClientFieldId>;
 
 #[derive(Debug, Clone)]
 pub struct ValidatedLinkedFieldAssociatedData {
     pub parent_object_id: ServerObjectId,
-    pub field_id: DefinitionLocation<ServerFieldId, ClientPointerId>,
+    pub field_id: DefinitionLocation<ServerScalarSelectableId, ClientPointerId>,
     // N.B. we don't actually support loadable linked fields
     pub selection_variant: ObjectSelectionDirectiveSet,
     /// Some if the (destination?) object is concrete; None otherwise.
@@ -89,11 +87,6 @@ pub struct ValidatedScalarSelectionAssociatedData {
 
 pub type MissingArguments = Vec<ValidatedVariableDefinition>;
 
-pub type ValidatedServerFieldTypeAssociatedData = SelectionType<
-    TypeAnnotation<ServerScalarId>,
-    ServerFieldTypeAssociatedData<TypeAnnotation<ServerObjectId>>,
->;
-
 pub type ValidatedSelectionType<'a, TOutputFormat> = SelectionType<
     &'a ValidatedClientField<TOutputFormat>,
     &'a ValidatedClientPointer<TOutputFormat>,
@@ -102,10 +95,9 @@ pub type ValidatedSelectionType<'a, TOutputFormat> = SelectionType<
 #[derive(Debug)]
 pub struct ValidatedSchemaState {}
 impl SchemaValidationState for ValidatedSchemaState {
-    type ServerFieldTypeAssociatedData = ValidatedServerFieldTypeAssociatedData;
     type SelectionTypeSelectionScalarFieldAssociatedData = ValidatedScalarSelectionAssociatedData;
     type SelectionTypeSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
-    type VariableDefinitionInnerType = SelectableServerFieldId;
+    type VariableDefinitionInnerType = ServerEntityId;
     type Entrypoint = HashMap<ClientFieldId, IsoLiteralText>;
 }
 
@@ -140,7 +132,7 @@ impl<TOutputFormat: OutputFormat> ValidatedSchema<TOutputFormat> {
         }
 
         let Schema {
-            server_fields: fields,
+            server_scalar_selectables: fields,
             client_types,
             entrypoints: _,
             server_field_data: schema_data,
@@ -193,7 +185,7 @@ impl<TOutputFormat: OutputFormat> ValidatedSchema<TOutputFormat> {
                 .collect();
 
             Ok(Self {
-                server_fields: updated_server_fields,
+                server_scalar_selectables: updated_server_fields,
                 client_types: updated_client_types,
                 entrypoints: updated_entrypoints,
                 server_field_data: ServerFieldData {

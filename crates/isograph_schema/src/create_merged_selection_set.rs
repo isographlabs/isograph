@@ -11,8 +11,8 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
-    RefetchQueryIndex, ScalarSelectionDirectiveSet, SelectableServerFieldId,
-    SelectionFieldArgument, SelectionType, ServerFieldId, ServerFieldSelection, ServerObjectId,
+    RefetchQueryIndex, ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionType,
+    SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, ServerScalarSelectableId,
     VariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -24,16 +24,18 @@ use crate::{
     transform_name_and_arguments_with_child_variable_context, ClientFieldOrPointer,
     ClientFieldOrPointerId, ClientFieldVariant, ImperativelyLoadedFieldVariant, Loadability,
     NameAndArguments, OutputFormat, PathToRefetchField, RootOperationName, SchemaObject,
-    SchemaServerFieldVariant, UnvalidatedVariableDefinition, ValidatedClientField,
-    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSchemaIdField, ValidatedSelection,
-    ValidatedSelectionType, VariableContext,
+    SchemaServerLinkedFieldFieldVariant, UnvalidatedVariableDefinition, ValidatedClientField,
+    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSelection, ValidatedSelectionType,
+    VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
 
 // Maybe this should be FNVHashMap? We don't really need stable iteration order
-pub type FieldToCompletedMergeTraversalStateMap =
-    BTreeMap<DefinitionLocation<ServerFieldId, ClientFieldOrPointerId>, FieldTraversalResult>;
+pub type FieldToCompletedMergeTraversalStateMap = BTreeMap<
+    DefinitionLocation<ServerScalarSelectableId, ClientFieldOrPointerId>,
+    FieldTraversalResult,
+>;
 
 #[derive(Clone, Debug)]
 pub struct FieldTraversalResult {
@@ -175,7 +177,7 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
     pub merged_selection_set: MergedSelectionMap,
     /// Used to look up what type to narrow on in the generated refetch query,
     /// among other things.
-    pub variable_definitions: Vec<WithSpan<VariableDefinition<SelectableServerFieldId>>>,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<ServerEntityId>>>,
     pub root_parent_object: IsographObjectTypeName,
     pub root_fetchable_field: ClientScalarSelectableName,
     pub refetch_query_index: RefetchQueryIndex,
@@ -407,7 +409,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     parent_type: &SchemaObject<TOutputFormat>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
-    root_field_id: DefinitionLocation<ServerFieldId, ClientFieldOrPointerId>,
+    root_field_id: DefinitionLocation<ServerScalarSelectableId, ClientFieldOrPointerId>,
     variable_context: &VariableContext,
     // TODO return Cow?
 ) -> FieldTraversalResult {
@@ -608,7 +610,7 @@ fn process_imperatively_loaded_field<TOutputFormat: OutputFormat>(
 fn get_used_variable_definitions<TOutputFormat: OutputFormat>(
     reachable_variables: &BTreeSet<VariableName>,
     entrypoint: &ValidatedClientField<TOutputFormat>,
-) -> Vec<WithSpan<VariableDefinition<SelectableServerFieldId>>> {
+) -> Vec<WithSpan<VariableDefinition<ServerEntityId>>> {
     reachable_variables
         .iter()
         .flat_map(|variable_name| {
@@ -670,7 +672,7 @@ fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
 ) {
     for validated_selection in validated_selections.iter().filter(filter_id_fields) {
         match &validated_selection.item {
-            ServerFieldSelection::ScalarField(scalar_field_selection) => {
+            SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
                 match &scalar_field_selection.associated_data.location {
                     DefinitionLocation::Server(_) => {
                         match scalar_field_selection.associated_data.selection_variant {
@@ -758,7 +760,7 @@ fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
                     }
                 };
             }
-            ServerFieldSelection::LinkedField(linked_field_selection) => {
+            SelectionTypeContainingSelections::Object(linked_field_selection) => {
                 let type_id = linked_field_selection.associated_data.parent_object_id;
                 let linked_field_parent_type = schema.server_field_data.object(type_id);
 
@@ -781,11 +783,11 @@ fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
                     DefinitionLocation::Server(server_field_id) => {
                         let server_field = schema.server_field(server_field_id);
 
-                        match &server_field.associated_data {
+                        match &server_field.target_server_entity {
                             SelectionType::Scalar(_) => {}
-                            SelectionType::Object(object) => {
-                                match &object.variant {
-                                    SchemaServerFieldVariant::InlineFragment(
+                            SelectionType::Object((linked_field_variant, _)) => {
+                                match &linked_field_variant {
+                                    SchemaServerLinkedFieldFieldVariant::InlineFragment(
                                         inline_fragment_variant,
                                     ) => {
                                         let type_to_refine_to = linked_field_parent_type.name;
@@ -857,7 +859,7 @@ fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
                                             }
                                         }
                                     }
-                                    SchemaServerFieldVariant::LinkedField => {
+                                    SchemaServerLinkedFieldFieldVariant::LinkedField => {
                                         let normalization_key =
                                             create_transformed_name_and_arguments(
                                                 linked_field_selection.name.item.into(),
@@ -996,7 +998,7 @@ fn insert_imperative_field_into_refetch_paths<TOutputFormat: OutputFormat>(
 fn filter_id_fields(field: &&WithSpan<ValidatedSelection>) -> bool {
     // filter out id fields, and eventually other always-selected fields like __typename
     match &field.item {
-        ServerFieldSelection::ScalarField(scalar_field) => {
+        SelectionTypeContainingSelections::Scalar(scalar_field) => {
             // -------- HACK --------
             // Here, we check whether the field is named "id", but we should really
             // know whether it is an id field in some other way. There can be non-id fields
@@ -1004,7 +1006,7 @@ fn filter_id_fields(field: &&WithSpan<ValidatedSelection>) -> bool {
             scalar_field.name.item != "id".intern().into()
             // ------ END HACK ------
         }
-        ServerFieldSelection::LinkedField(_) => true,
+        SelectionTypeContainingSelections::Object(_) => true,
     }
 }
 
@@ -1101,12 +1103,8 @@ fn select_typename_and_id_fields_in_merged_selection<TOutputFormat: OutputFormat
         maybe_add_typename_selection(merged_selection_map)
     };
 
-    let id_field: Option<ValidatedSchemaIdField> = parent_type
-        .id_field
-        .map(|id_field_id| schema.id_field(id_field_id));
-
     // If the type has an id field, we must select it.
-    if let Some(id_field) = id_field {
+    if let Some(id_field) = parent_type.id_field {
         match merged_selection_map.entry(NormalizationKey::Id) {
             Entry::Occupied(occupied) => {
                 match occupied.get() {
@@ -1123,10 +1121,15 @@ fn select_typename_and_id_fields_in_merged_selection<TOutputFormat: OutputFormat
                 };
             }
             Entry::Vacant(vacant_entry) => {
+                // TODO why is this difficult. Can this be fixed with better modeling?
+                let name = schema
+                    .server_field(id_field.into())
+                    .name
+                    .item
+                    .unchecked_conversion();
                 vacant_entry.insert(MergedServerSelection::ScalarField(
                     MergedScalarFieldSelection {
-                        // major HACK alert
-                        name: id_field.name.item.lookup().intern().into(),
+                        name,
                         arguments: vec![],
                     },
                 ));

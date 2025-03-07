@@ -1,6 +1,7 @@
 use common_lang_types::{Span, WithSpan};
 use isograph_lang_types::{
-    ClientFieldDeclaration, ServerFieldSelection, UnvalidatedSelectionWithUnvalidatedDirectives,
+    ClientFieldDeclaration, SelectionTypeContainingSelections,
+    UnvalidatedSelectionWithUnvalidatedDirectives,
 };
 use lsp_types::SemanticToken;
 
@@ -92,7 +93,7 @@ fn selection_to_tokens(
     selection: WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>,
 ) {
     match selection.item {
-        ServerFieldSelection::ScalarField(scalar_field_selection) => {
+        SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
             let name_span = scalar_field_selection
                 .name
                 .location
@@ -112,7 +113,7 @@ fn selection_to_tokens(
 
             todo!("This doesn't work because we don't store directives at the moment. Rethink it!")
         }
-        ServerFieldSelection::LinkedField(linked_field_selection) => {
+        SelectionTypeContainingSelections::Object(linked_field_selection) => {
             let name_span = linked_field_selection
                 .name
                 .location

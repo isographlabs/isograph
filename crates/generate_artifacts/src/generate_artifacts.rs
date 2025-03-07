@@ -11,17 +11,17 @@ use core::panic;
 use isograph_config::CompilerConfig;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, NonConstantValue,
-    ObjectSelectionDirectiveSet, ScalarFieldSelection, ScalarSelectionDirectiveSet,
-    SelectableServerFieldId, SelectionType, ServerFieldSelection, ServerObjectId, TypeAnnotation,
+    ObjectSelectionDirectiveSet, ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectionType,
+    SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, TypeAnnotation,
     UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
     accessible_client_fields, as_server_field, description, get_provided_arguments,
     output_type_annotation, selection_map_wrapped, ClientFieldOrPointer, ClientFieldVariant,
     FieldTraversalResult, NameAndArguments, NormalizationKey, OutputFormat, RequiresRefinement,
-    Schema, SchemaObject, SchemaServerFieldVariant, UserWrittenComponentVariant,
-    ValidatedClientField, ValidatedScalarSelectionAssociatedData, ValidatedSchema,
-    ValidatedSchemaState, ValidatedSelection, ValidatedVariableDefinition,
+    Schema, SchemaObject, SchemaServerLinkedFieldFieldVariant, UserWrittenClientTypeInfo,
+    UserWrittenComponentVariant, ValidatedClientField, ValidatedScalarSelectionAssociatedData,
+    ValidatedSchema, ValidatedSchemaState, ValidatedSelection, ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -51,6 +51,11 @@ lazy_static! {
     pub static ref ENTRYPOINT: ArtifactFilePrefix = "entrypoint".intern().into();
     pub static ref ISO_TS_FILE_NAME: ArtifactFileName = "iso.ts".intern().into();
     pub static ref ISO_TS: ArtifactFilePrefix = "iso".intern().into();
+    pub static ref NORMALIZATION_AST_FILE_NAME: ArtifactFileName =
+        "normalization_ast.ts".intern().into();
+    pub static ref NORMALIZATION_AST: ArtifactFilePrefix = "normalization_ast".intern().into();
+    pub static ref QUERY_TEXT_FILE_NAME: ArtifactFileName = "query_text.ts".intern().into();
+    pub static ref QUERY_TEXT: ArtifactFilePrefix = "query_text".intern().into();
     pub static ref REFETCH_READER_FILE_NAME: ArtifactFileName = "refetch_reader.ts".intern().into();
     pub static ref REFETCH_READER: ArtifactFilePrefix = "refetch_reader".intern().into();
     pub static ref RESOLVER_OUTPUT_TYPE_FILE_NAME: ArtifactFileName =
@@ -141,11 +146,12 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
             DefinitionLocation::Server(encountered_server_field_id) => {
                 let encountered_server_field = schema.server_field(*encountered_server_field_id);
 
-                match &encountered_server_field.associated_data {
+                match &encountered_server_field.target_server_entity {
                     SelectionType::Scalar(_) => {}
-                    SelectionType::Object(associated_data) => match &associated_data.variant {
-                        SchemaServerFieldVariant::LinkedField => {}
-                        SchemaServerFieldVariant::InlineFragment(inline_fragment) => {
+                    SelectionType::Object((linked_field_variant, _)) => match &linked_field_variant
+                    {
+                        SchemaServerLinkedFieldFieldVariant::LinkedField => {}
+                        SchemaServerLinkedFieldFieldVariant::InlineFragment(inline_fragment) => {
                             path_and_contents.push(generate_eager_reader_condition_artifact(
                                 schema,
                                 encountered_server_field,
@@ -158,8 +164,22 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
                 };
             }
 
-            DefinitionLocation::Client(SelectionType::Object(_)) => {
-                todo!("generate client pointer reader artifacts is not implemented")
+            DefinitionLocation::Client(SelectionType::Object(encountered_client_pointer_id)) => {
+                let encountered_client_pointer =
+                    schema.client_pointer(*encountered_client_pointer_id);
+                path_and_contents.extend(generate_eager_reader_artifacts(
+                    schema,
+                    &SelectionType::Object(encountered_client_pointer),
+                    config,
+                    UserWrittenClientTypeInfo {
+                        const_export_name: encountered_client_pointer.info.const_export_name,
+                        file_path: encountered_client_pointer.info.file_path,
+                        user_written_component_variant: UserWrittenComponentVariant::Eager,
+                    },
+                    &traversal_state.refetch_paths,
+                    config.options.include_file_extensions_in_import_statements,
+                    traversal_state.has_updatable,
+                ));
             }
             DefinitionLocation::Client(SelectionType::Scalar(encountered_client_field_id)) => {
                 let encountered_client_field = schema.client_field(*encountered_client_field_id);
@@ -169,7 +189,7 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
                     ClientFieldVariant::UserWritten(info) => {
                         path_and_contents.extend(generate_eager_reader_artifacts(
                             schema,
-                            encountered_client_field,
+                            &SelectionType::Scalar(encountered_client_field),
                             config,
                             *info,
                             &traversal_state.refetch_paths,
@@ -218,7 +238,7 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
                                 type_: GraphQLTypeAnnotation::NonNull(Box::new(
                                     GraphQLNonNullTypeAnnotation::Named(
                                         GraphQLNamedTypeAnnotation(WithSpan::new(
-                                            SelectableServerFieldId::Scalar(
+                                            ServerEntityId::Scalar(
                                                 schema.server_field_data.id_type_id,
                                             ),
                                             Span::todo_generated(),
@@ -577,7 +597,7 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
     link_fields: &mut LinkImports,
 ) {
     match &selection.item {
-        ServerFieldSelection::ScalarField(scalar_field_selection) => {
+        SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
             match scalar_field_selection.associated_data.location {
                 DefinitionLocation::Server(_server_field) => {
                     let parent_field = as_server_field(
@@ -597,16 +617,14 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
 
                     let name_or_alias = scalar_field_selection.name_or_alias().item;
 
-                    let output_type = match &field.associated_data {
-                        // TODO there should be a clever way to print without cloning
-                        SelectionType::Scalar(type_name) => {
-                            type_name.clone().map(&mut |scalar_id| {
+                    let output_type = match &field.target_server_entity {
+                        SelectionType::Scalar(type_annotation) => {
+                            type_annotation.clone().map(&mut |scalar_id| {
                                 schema.server_field_data.scalar(scalar_id).javascript_name
                             })
                         }
-                        // TODO not just scalars, enums as well. Both should have a javascript name
                         SelectionType::Object(_) => {
-                            panic!("output_type_id should be a scalar")
+                            panic!("Output type should be a scalar");
                         }
                     };
 
@@ -629,7 +647,7 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
                 ),
             }
         }
-        ServerFieldSelection::LinkedField(linked_field) => {
+        SelectionTypeContainingSelections::Object(linked_field) => {
             let field = match linked_field.associated_data.field_id {
                 DefinitionLocation::Server(server_field_id) => {
                     DefinitionLocation::Server(schema.server_field(server_field_id))
@@ -765,7 +783,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
     updatable_fields: &mut UpdatableImports,
 ) {
     match &selection.item {
-        ServerFieldSelection::ScalarField(scalar_field_selection) => {
+        SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
             match scalar_field_selection.associated_data.location {
                 DefinitionLocation::Server(_server_field) => {
                     let parent_field = as_server_field(
@@ -785,16 +803,14 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
 
                     let name_or_alias = scalar_field_selection.name_or_alias().item;
 
-                    let output_type = match &field.associated_data {
-                        // TODO there should be a clever way to print without cloning
-                        SelectionType::Scalar(type_name) => {
-                            type_name.clone().map(&mut |scalar_id| {
+                    let output_type = match &field.target_server_entity {
+                        SelectionType::Scalar(type_annotation) => {
+                            type_annotation.clone().map(&mut |scalar_id| {
                                 schema.server_field_data.scalar(scalar_id).javascript_name
                             })
                         }
-                        // TODO not just scalars, enums as well. Both should have a javascript name
                         SelectionType::Object(_) => {
-                            panic!("output_type_id should be a scalar")
+                            panic!("Output type should be a scalar");
                         }
                     };
 
@@ -836,7 +852,7 @@ fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
                 }
             }
         }
-        ServerFieldSelection::LinkedField(linked_field) => {
+        SelectionTypeContainingSelections::Object(linked_field) => {
             let field = schema.linked_type(linked_field.associated_data.field_id);
 
             write_optional_description(
@@ -892,7 +908,7 @@ fn write_getter_and_setter(
     query_type_declaration: &mut String,
     indentation_level: u8,
     name_or_alias: SelectableNameOrAlias,
-    output_type_annotation: TypeAnnotation<ServerObjectId>,
+    output_type_annotation: &TypeAnnotation<ServerObjectId>,
     type_annotation: &TypeAnnotation<ClientFieldUpdatableDataType>,
 ) {
     query_type_declaration.push_str(&format!(
@@ -900,7 +916,9 @@ fn write_getter_and_setter(
         name_or_alias,
         print_javascript_type_declaration(type_annotation),
     ));
-    let setter_type_annotation = output_type_annotation.map(&mut |_| "{ link: Link }");
+    let setter_type_annotation = output_type_annotation
+        .clone()
+        .map(&mut |_| "{ link: Link }");
     query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
     query_type_declaration.push_str(&format!(
         "set {}(value: {}),\n",
@@ -934,17 +952,17 @@ fn get_loadable_field_type_from_arguments<TOutputFormat: OutputFormat>(
 
 fn format_type_for_js<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
-    type_: GraphQLTypeAnnotation<SelectableServerFieldId>,
+    type_: GraphQLTypeAnnotation<ServerEntityId>,
 ) -> String {
     let new_type = type_.map(
         |selectable_server_field_id| match selectable_server_field_id {
-            SelectableServerFieldId::Object(_) => {
+            ServerEntityId::Object(_) => {
                 panic!(
                     "Unexpected object. Objects are not supported as parameters, yet. \
                     This is indicative of an unimplemented feature in Isograph."
                 )
             }
-            SelectableServerFieldId::Scalar(scalar_id) => {
+            ServerEntityId::Scalar(scalar_id) => {
                 schema.server_field_data.scalar(scalar_id).javascript_name
             }
         },
@@ -976,7 +994,7 @@ fn format_type_for_js_inner(
 
 pub(crate) fn generate_parameters<'a, TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
-    argument_definitions: impl Iterator<Item = &'a VariableDefinition<SelectableServerFieldId>>,
+    argument_definitions: impl Iterator<Item = &'a VariableDefinition<ServerEntityId>>,
 ) -> String {
     let mut s = "{\n".to_string();
     let indent = "  ";

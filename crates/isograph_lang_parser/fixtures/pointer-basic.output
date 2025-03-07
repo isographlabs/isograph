@@ -46,7 +46,7 @@ Ok(
                             description: None,
                             selection_set: [
                                 WithSpan {
-                                    item: LinkedField(
+                                    item: Object(
                                         LinkedFieldSelection {
                                             name: WithLocation {
                                                 location: Embedded(
@@ -79,7 +79,7 @@ Ok(
                                             ),
                                             selection_set: [
                                                 WithSpan {
-                                                    item: ScalarField(
+                                                    item: Scalar(
                                                         ScalarFieldSelection {
                                                             name: WithLocation {
                                                                 location: Embedded(
@@ -119,7 +119,7 @@ Ok(
                                                     },
                                                 },
                                                 WithSpan {
-                                                    item: ScalarField(
+                                                    item: Scalar(
                                                         ScalarFieldSelection {
                                                             name: WithLocation {
                                                                 location: Embedded(

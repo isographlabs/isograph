@@ -3,4 +3,5 @@ edition = "2021"
 # imports_granularity = "Item"
 merge_derives = true
 use_field_init_shorthand = true
+newline_style = "Unix"
 # version = "Two"

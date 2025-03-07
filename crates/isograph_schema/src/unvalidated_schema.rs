@@ -4,17 +4,16 @@ use common_lang_types::{
     IsographObjectTypeName, JavascriptName, Location, TextSource, UnvalidatedTypeName,
     WithLocation, WithSpan,
 };
-use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::string_key::Intern;
 use isograph_lang_types::{
     DefinitionLocation, EntrypointDeclaration, LinkedFieldSelection, ObjectSelectionDirectiveSet,
-    ScalarSelectionDirectiveSet, SelectableServerFieldId, ServerFieldId, ServerScalarId,
+    ScalarSelectionDirectiveSet, ServerEntityId, ServerScalarId, ServerScalarSelectableId,
     VariableDefinition,
 };
 
 use crate::{
     schema_validation_state::SchemaValidationState, ClientField, ClientFieldOrPointerId,
-    ClientPointer, OutputFormat, Schema, SchemaScalar, SchemaServerField, ServerFieldData,
+    ClientPointer, OutputFormat, Schema, SchemaScalar, ServerFieldData, ServerScalarSelectable,
     UseRefetchFieldRefetchStrategy, ValidatedSelection,
 };
 use lazy_static::lazy_static;
@@ -26,11 +25,7 @@ lazy_static! {
 #[derive(Debug)]
 pub struct UnvalidatedSchemaState {}
 
-type UnvalidatedServerFieldTypeAssociatedData =
-    ServerFieldTypeAssociatedData<GraphQLTypeAnnotation<UnvalidatedTypeName>>;
-
 impl SchemaValidationState for UnvalidatedSchemaState {
-    type ServerFieldTypeAssociatedData = UnvalidatedServerFieldTypeAssociatedData;
     type SelectionTypeSelectionScalarFieldAssociatedData = ScalarSelectionDirectiveSet;
     type SelectionTypeSelectionLinkedFieldAssociatedData = ObjectSelectionDirectiveSet;
     type VariableDefinitionInnerType = UnvalidatedTypeName;
@@ -38,21 +33,14 @@ impl SchemaValidationState for UnvalidatedSchemaState {
 }
 
 #[derive(Debug, Clone)]
-
-pub struct ServerFieldTypeAssociatedData<TTypename> {
-    pub type_name: TTypename,
-    pub variant: SchemaServerFieldVariant,
-}
-
-#[derive(Debug, Clone)]
-pub enum SchemaServerFieldVariant {
+pub enum SchemaServerLinkedFieldFieldVariant {
     LinkedField,
     InlineFragment(ServerFieldTypeAssociatedDataInlineFragment),
 }
 
 #[derive(Debug, Clone)]
 pub struct ServerFieldTypeAssociatedDataInlineFragment {
-    pub server_field_id: ServerFieldId,
+    pub server_field_id: ServerScalarSelectableId,
     pub concrete_type: IsographObjectTypeName,
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 }
@@ -62,10 +50,10 @@ pub type UnvalidatedSchema<TOutputFormat> = Schema<UnvalidatedSchemaState, TOutp
 /// On unvalidated schema objects, the encountered types are either a type annotation
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the
 /// client field.)
-pub type UnvalidatedObjectFieldInfo = DefinitionLocation<ServerFieldId, ClientFieldOrPointerId>;
+pub type UnvalidatedObjectFieldInfo =
+    DefinitionLocation<ServerScalarSelectableId, ClientFieldOrPointerId>;
 
-pub type UnvalidatedSchemaSchemaField<TOutputFormat> = SchemaServerField<
-    <UnvalidatedSchemaState as SchemaValidationState>::ServerFieldTypeAssociatedData,
+pub type UnvalidatedSchemaSchemaField<TOutputFormat> = ServerScalarSelectable<
     <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
     TOutputFormat,
 >;
@@ -154,7 +142,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         );
 
         Self {
-            server_fields: fields,
+            server_scalar_selectables: fields,
             client_types: client_fields,
             entrypoints: Default::default(),
             server_field_data: ServerFieldData {
@@ -176,7 +164,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 
 fn add_schema_defined_scalar_type<TOutputFormat: OutputFormat>(
     scalars: &mut Vec<SchemaScalar<TOutputFormat>>,
-    defined_types: &mut HashMap<UnvalidatedTypeName, SelectableServerFieldId>,
+    defined_types: &mut HashMap<UnvalidatedTypeName, ServerEntityId>,
     field_name: &'static str,
     javascript_name: JavascriptName,
 ) -> ServerScalarId {
@@ -193,9 +181,6 @@ fn add_schema_defined_scalar_type<TOutputFormat: OutputFormat>(
         javascript_name,
         output_format: std::marker::PhantomData,
     });
-    defined_types.insert(
-        typename.item.into(),
-        SelectableServerFieldId::Scalar(scalar_id),
-    );
+    defined_types.insert(typename.item.into(), ServerEntityId::Scalar(scalar_id));
     scalar_id
 }

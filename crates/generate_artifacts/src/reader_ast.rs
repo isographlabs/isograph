@@ -4,14 +4,14 @@ use common_lang_types::{ClientScalarSelectableName, ObjectTypeAndFieldName, With
 use isograph_lang_types::{
     DefinitionLocation, EmptyDirectiveSet, LoadableDirectiveParameters,
     ObjectSelectionDirectiveSet, RefetchQueryIndex, ScalarSelectionDirectiveSet, SelectionType,
-    ServerFieldSelection,
+    SelectionTypeContainingSelections,
 };
 use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, ClientFieldOrPointer,
     ClientFieldVariant, Loadability, NameAndArguments, NormalizationKey, OutputFormat,
-    PathToRefetchField, RefetchedPathsMap, SchemaServerFieldVariant, ValidatedClientField,
-    ValidatedLinkedFieldSelection, ValidatedScalarFieldSelection, ValidatedSchema,
-    ValidatedSelection, VariableContext,
+    PathToRefetchField, RefetchedPathsMap, SchemaServerLinkedFieldFieldVariant,
+    ValidatedClientField, ValidatedLinkedFieldSelection, ValidatedScalarFieldSelection,
+    ValidatedSchema, ValidatedSelection, VariableContext,
 };
 
 use crate::{
@@ -31,7 +31,7 @@ fn generate_reader_ast_node<TOutputFormat: OutputFormat>(
     initial_variable_context: &VariableContext,
 ) -> String {
     match &selection.item {
-        ServerFieldSelection::ScalarField(scalar_field_selection) => {
+        SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
             match scalar_field_selection.associated_data.location {
                 DefinitionLocation::Server(_) => server_defined_scalar_field_ast_node(
                     scalar_field_selection,
@@ -53,7 +53,7 @@ fn generate_reader_ast_node<TOutputFormat: OutputFormat>(
                 }
             }
         }
-        ServerFieldSelection::LinkedField(linked_field_selection) => {
+        SelectionTypeContainingSelections::Object(linked_field_selection) => {
             path.push(
                 NameAndArguments {
                     // TODO use alias
@@ -132,10 +132,11 @@ fn linked_field_ast_node<TOutputFormat: OutputFormat>(
             )
         }
         DefinitionLocation::Server(server_field_id) => {
-            match &schema.server_field(server_field_id).associated_data {
+            let server_field = schema.server_field(server_field_id);
+            match &server_field.target_server_entity {
                 SelectionType::Scalar(_) => panic!("Expected object"),
-                SelectionType::Object(associated_data) => match &associated_data.variant {
-                    SchemaServerFieldVariant::InlineFragment(inline_fragment) => {
+                SelectionType::Object((linked_field_variant, _)) => match &linked_field_variant {
+                    SchemaServerLinkedFieldFieldVariant::InlineFragment(inline_fragment) => {
                         let parent_object_id = schema
                             .server_field(inline_fragment.server_field_id)
                             .parent_type_id;
@@ -154,7 +155,7 @@ fn linked_field_ast_node<TOutputFormat: OutputFormat>(
 
                         reader_artifact_import_name
                     }
-                    SchemaServerFieldVariant::LinkedField => "null".to_string(),
+                    SchemaServerLinkedFieldFieldVariant::LinkedField => "null".to_string(),
                 },
             }
         }
@@ -617,7 +618,7 @@ fn refetched_paths_with_path<TOutputFormat: OutputFormat>(
 
     for selection in selection_set {
         match &selection.item {
-            ServerFieldSelection::ScalarField(scalar_field_selection) => {
+            SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
                 match scalar_field_selection.associated_data.location {
                     DefinitionLocation::Server(_) => {
                         // Do nothing, we encountered a server field
@@ -655,7 +656,7 @@ fn refetched_paths_with_path<TOutputFormat: OutputFormat>(
                     }
                 }
             }
-            ServerFieldSelection::LinkedField(linked_field_selection) => {
+            SelectionTypeContainingSelections::Object(linked_field_selection) => {
                 path.push(
                     NameAndArguments {
                         // TODO use alias

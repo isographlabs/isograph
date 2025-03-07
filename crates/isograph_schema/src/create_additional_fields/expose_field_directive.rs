@@ -9,8 +9,8 @@ use graphql_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
-    ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectableServerFieldId, SelectionType,
-    ServerFieldId, ServerFieldSelection, ServerObjectId,
+    ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectionType,
+    SelectionTypeContainingSelections, ServerObjectId, ServerScalarSelectableId,
 };
 
 use serde::Deserialize;
@@ -130,180 +130,184 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 
         // TODO do not use mutation naming here
         let mutation_field = self.server_field(mutation_subfield_id);
-        let mutation_field_payload_type_name = *mutation_field.associated_data.type_name.inner();
+        let selection_type = &mutation_field.target_server_entity;
+        let (_variant, payload_object_type_annotation) = match selection_type {
+            SelectionType::Scalar(_) => {
+                panic!(
+                    "Expected selection type to be an object. \
+                    This is indicatve of a bug in Isograph."
+                )
+            }
+            SelectionType::Object(object) => object,
+        };
+        let payload_object_id = *payload_object_type_annotation.inner();
+
+        // TODO it's a bit annoying that we call .object twice!
+        let mutation_field_payload_type_name =
+            self.server_field_data.object(payload_object_id).name;
+
         let client_field_scalar_selection_name =
             expose_as.unwrap_or(mutation_field.name.item.into());
         // TODO what is going on here. Should mutation_field have a checked way of converting to LinkedField?
         let top_level_schema_field_name = mutation_field.name.item.lookup().intern().into();
         let mutation_field_arguments = mutation_field.arguments.clone();
         let description = mutation_field.description;
-        let payload_id = self
-            .server_field_data
-            .defined_types
-            .get(&mutation_field_payload_type_name)
-            .copied();
 
-        if let Some(SelectableServerFieldId::Object(mutation_field_object_id)) = payload_id {
-            let processed_field_map_items = skip_arguments_contained_in_field_map(
-                self,
-                mutation_field_arguments.clone(),
-                // TODO make this a no-op
-                mutation_field_payload_type_name.lookup().intern().into(),
-                parent_object_name,
-                client_field_scalar_selection_name,
-                // TODO don't clone
-                field_map.clone(),
-            )?;
+        let processed_field_map_items = skip_arguments_contained_in_field_map(
+            self,
+            mutation_field_arguments.clone(),
+            mutation_field_payload_type_name,
+            parent_object_name,
+            client_field_scalar_selection_name,
+            // TODO don't clone
+            field_map.clone(),
+        )?;
 
-            // payload object is the object type of the mutation field, e.g. SetBestFriendResponse
-            let payload_object = self.server_field_data.object(mutation_field_object_id);
-            let payload_object_name = payload_object.name;
+        let payload_object = self.server_field_data.object(payload_object_id);
 
-            // TODO make this zero cost
-            // TODO split path on .
-            let primary_field_name: ServerObjectSelectableName = path.lookup().intern().into();
+        // TODO split path on .
+        let primary_field_name: ServerObjectSelectableName = path.lookup().intern().into();
 
-            let primary_field = payload_object
-                .encountered_fields
-                .get(&primary_field_name.into());
+        let primary_field = payload_object
+            .encountered_fields
+            .get(&primary_field_name.into());
 
-            let (maybe_abstract_parent_object_id, maybe_abstract_parent_type_name) =
-                match primary_field {
-                    Some(DefinitionLocation::Server(server_field_id)) => {
-                        let server_field = self.server_field(*server_field_id);
+        let (maybe_abstract_parent_object_id, maybe_abstract_parent_type_name) = match primary_field
+        {
+            Some(DefinitionLocation::Server(server_field_id)) => {
+                let server_field = self.server_field(*server_field_id);
 
-                        // This is the parent type name (Pet)
-                        let inner = server_field.associated_data.type_name.inner();
+                // TODO validate that the payload object has no plural fields in between
 
-                        // TODO validate that the payload object has no plural fields in between
+                match &server_field.target_server_entity {
+                    SelectionType::Object((_variant, type_annotation)) => {
+                        let client_field_parent_object_id = type_annotation.inner();
+                        let client_field_parent_object = self
+                            .server_field_data
+                            .object(*client_field_parent_object_id);
 
-                        let primary_type = self.server_field_data.defined_types.get(inner);
-
-                        if let Some(SelectableServerFieldId::Object(
-                            client_field_parent_object_id,
-                        )) = primary_type
-                        {
-                            Ok((*client_field_parent_object_id, *inner))
-                        } else {
-                            Err(WithLocation::new(
-                                CreateAdditionalFieldsError::InvalidMutationField,
-                                Location::generated(),
-                            ))
-                        }
+                        Ok((
+                            *client_field_parent_object_id,
+                            // This is the parent type name (Pet)
+                            client_field_parent_object.name,
+                        ))
                     }
-                    _ => Err(WithLocation::new(
+                    SelectionType::Scalar(_) => Err(WithLocation::new(
                         CreateAdditionalFieldsError::InvalidMutationField,
                         Location::generated(),
                     )),
-                }?;
+                }
+            }
+            _ => Err(WithLocation::new(
+                CreateAdditionalFieldsError::InvalidMutationField,
+                Location::generated(),
+            )),
+        }?;
 
-            let fields = processed_field_map_items
-                .iter()
-                .map(|field_map_item| {
-                    let scalar_field_selection = ScalarFieldSelection {
-                        name: WithLocation::new(
-                            // TODO make this no-op
-                            // TODO split on . here; we should be able to have from: "best_friend.id" or whatnot.
-                            field_map_item.0.from.lookup().intern().into(),
-                            Location::generated(),
-                        ),
-                        reader_alias: None,
-                        associated_data: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
-                        // TODO what about arguments? How would we handle them?
-                        arguments: vec![],
-                    };
-
-                    WithSpan::new(
-                        ServerFieldSelection::ScalarField(scalar_field_selection),
-                        Span::todo_generated(),
-                    )
-                })
-                .collect::<Vec<_>>();
-
-            let mutation_field_client_field_id = self.client_types.len().into();
-            let top_level_arguments = mutation_field_arguments
-                .iter()
-                .map(|input_value_def| {
-                    let arg_name = input_value_def.item.name.item.lookup().intern();
-                    ArgumentKeyAndValue {
-                        key: arg_name.into(),
-                        value: NonConstantValue::Variable(arg_name.into()),
-                    }
-                })
-                .collect();
-
-            let top_level_schema_field_concrete_type = payload_object.concrete_type;
-            let primary_field_concrete_type = self
-                .server_field_data
-                .object(maybe_abstract_parent_object_id)
-                .concrete_type;
-
-            let mutation_client_field = ClientField {
-                description,
-                name: client_field_scalar_selection_name.unchecked_conversion(),
-                id: mutation_field_client_field_id,
-                reader_selection_set: vec![],
-
-                variant: ClientFieldVariant::ImperativelyLoadedField(
-                    ImperativelyLoadedFieldVariant {
-                        client_field_scalar_selection_name: client_field_scalar_selection_name
-                            .lookup()
-                            .intern()
-                            .into(),
-                        top_level_schema_field_name,
-                        top_level_schema_field_arguments: mutation_field_arguments
-                            .into_iter()
-                            .map(|x| x.item)
-                            .collect::<Vec<_>>(),
-                        top_level_schema_field_concrete_type,
-                        primary_field_info: Some(PrimaryFieldInfo {
-                            primary_field_name,
-                            primary_field_return_type_object_id: maybe_abstract_parent_object_id,
-                            primary_field_field_map: field_map.to_vec(),
-                            primary_field_concrete_type,
-                        }),
-
-                        root_object_id: parent_object_id,
-                    },
-                ),
-                variable_definitions: vec![],
-                type_and_field: ObjectTypeAndFieldName {
-                    // TODO make this zero cost?
-                    type_name: maybe_abstract_parent_type_name.lookup().intern().into(), // e.g. Pet
-                    field_name: client_field_scalar_selection_name, // set_pet_best_friend
-                },
-                parent_object_id: maybe_abstract_parent_object_id,
-                refetch_strategy: Some(crate::RefetchStrategy::UseRefetchField(
-                    generate_refetch_field_strategy(
-                        fields.to_vec(),
-                        // NOTE: this will probably panic if we're not exposing fields which are
-                        // originally on Mutation
-                        parent_object_id,
-                        format!("Mutation__{}", primary_field_name).intern().into(),
-                        top_level_schema_field_name,
-                        top_level_arguments,
-                        top_level_schema_field_concrete_type,
-                        // This is blatantly incorrect - at this point, we don't know whether
-                        // we require refinement, since the same field is copied from the abstract
-                        // type to the concrete type. So, when we do that, we need to account
-                        // for this.
-                        RequiresRefinement::No,
-                        Some(primary_field_name),
-                        primary_field_concrete_type,
+        let fields = processed_field_map_items
+            .iter()
+            .map(|field_map_item| {
+                let scalar_field_selection = ScalarFieldSelection {
+                    name: WithLocation::new(
+                        // TODO make this no-op
+                        // TODO split on . here; we should be able to have from: "best_friend.id" or whatnot.
+                        field_map_item.0.from.lookup().intern().into(),
+                        Location::generated(),
                     ),
-                )),
-                output_format: std::marker::PhantomData,
-            };
-            self.client_types
-                .push(SelectionType::Scalar(mutation_client_field));
+                    reader_alias: None,
+                    associated_data: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
+                    // TODO what about arguments? How would we handle them?
+                    arguments: vec![],
+                };
 
-            self.insert_client_field_on_object(
-                client_field_scalar_selection_name,
-                maybe_abstract_parent_object_id,
-                mutation_field_client_field_id,
-                payload_object_name,
-            )?;
-        }
+                WithSpan::new(
+                    SelectionTypeContainingSelections::Scalar(scalar_field_selection),
+                    Span::todo_generated(),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        let mutation_field_client_field_id = self.client_types.len().into();
+        let top_level_arguments = mutation_field_arguments
+            .iter()
+            .map(|input_value_def| {
+                let arg_name = input_value_def.item.name.item.lookup().intern();
+                ArgumentKeyAndValue {
+                    key: arg_name.into(),
+                    value: NonConstantValue::Variable(arg_name.into()),
+                }
+            })
+            .collect();
+
+        let top_level_schema_field_concrete_type = payload_object.concrete_type;
+        let primary_field_concrete_type = self
+            .server_field_data
+            .object(maybe_abstract_parent_object_id)
+            .concrete_type;
+
+        let mutation_client_field = ClientField {
+            description,
+            name: client_field_scalar_selection_name.unchecked_conversion(),
+            id: mutation_field_client_field_id,
+            reader_selection_set: vec![],
+
+            variant: ClientFieldVariant::ImperativelyLoadedField(ImperativelyLoadedFieldVariant {
+                client_field_scalar_selection_name: client_field_scalar_selection_name
+                    .lookup()
+                    .intern()
+                    .into(),
+                top_level_schema_field_name,
+                top_level_schema_field_arguments: mutation_field_arguments
+                    .into_iter()
+                    .map(|x| x.item)
+                    .collect::<Vec<_>>(),
+                top_level_schema_field_concrete_type,
+                primary_field_info: Some(PrimaryFieldInfo {
+                    primary_field_name,
+                    primary_field_return_type_object_id: maybe_abstract_parent_object_id,
+                    primary_field_field_map: field_map.to_vec(),
+                    primary_field_concrete_type,
+                }),
+
+                root_object_id: parent_object_id,
+            }),
+            variable_definitions: vec![],
+            type_and_field: ObjectTypeAndFieldName {
+                // TODO make this zero cost?
+                type_name: maybe_abstract_parent_type_name.lookup().intern().into(), // e.g. Pet
+                field_name: client_field_scalar_selection_name, // set_pet_best_friend
+            },
+            parent_object_id: maybe_abstract_parent_object_id,
+            refetch_strategy: Some(crate::RefetchStrategy::UseRefetchField(
+                generate_refetch_field_strategy(
+                    fields.to_vec(),
+                    // NOTE: this will probably panic if we're not exposing fields which are
+                    // originally on Mutation
+                    parent_object_id,
+                    format!("Mutation__{}", primary_field_name).intern().into(),
+                    top_level_schema_field_name,
+                    top_level_arguments,
+                    top_level_schema_field_concrete_type,
+                    // This is blatantly incorrect - at this point, we don't know whether
+                    // we require refinement, since the same field is copied from the abstract
+                    // type to the concrete type. So, when we do that, we need to account
+                    // for this.
+                    RequiresRefinement::No,
+                    Some(primary_field_name),
+                    primary_field_concrete_type,
+                ),
+            )),
+            output_format: std::marker::PhantomData,
+        };
+        self.client_types
+            .push(SelectionType::Scalar(mutation_client_field));
+
+        self.insert_client_field_on_object(
+            client_field_scalar_selection_name,
+            maybe_abstract_parent_object_id,
+            mutation_field_client_field_id,
+            mutation_field_payload_type_name,
+        )?;
         Ok(())
     }
 
@@ -363,7 +367,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         &self,
         field_arg: StringLiteralValue,
         mutation_object_id: ServerObjectId,
-    ) -> ProcessTypeDefinitionResult<ServerFieldId> {
+    ) -> ProcessTypeDefinitionResult<ServerScalarSelectableId> {
         let mutation = self.server_field_data.object(mutation_object_id);
 
         // TODO make this a no-op

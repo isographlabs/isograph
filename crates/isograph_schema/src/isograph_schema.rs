@@ -4,23 +4,19 @@ use std::{
 };
 
 use common_lang_types::{
-    ClientScalarSelectableName, DescriptionValue, GraphQLScalarTypeName, SelectableName,
-    ServerScalarSelectableName, UnvalidatedTypeName, WithLocation,
+    ClientScalarSelectableName, GraphQLScalarTypeName, SelectableName, UnvalidatedTypeName,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, ClientPointerId, DefinitionLocation,
-    SelectableServerFieldId, SelectionType, ServerFieldId, ServerObjectId, ServerScalarId,
-    ServerStrongIdFieldId, TypeAnnotation,
+    ArgumentKeyAndValue, ClientFieldId, ClientPointerId, DefinitionLocation, SelectionType,
+    ServerEntityId, ServerObjectId, ServerScalarId, ServerScalarSelectableId,
 };
 use lazy_static::lazy_static;
 
 use crate::{
-    field_and_pointer::{ClientField, ClientPointer},
-    schema_validation_state::SchemaValidationState,
-    server_scalar_and_object::{SchemaObject, SchemaScalar, SchemaType},
-    ClientFieldOrPointerId, NormalizationKey, OutputFormat, SchemaServerField,
-    ServerFieldTypeAssociatedData,
+    schema_validation_state::SchemaValidationState, ClientField, ClientFieldOrPointerId,
+    ClientPointer, NormalizationKey, OutputFormat, SchemaObject, SchemaScalar, SchemaType,
+    ServerScalarSelectable,
 };
 
 lazy_static! {
@@ -44,12 +40,8 @@ pub struct RootOperationName(pub String);
 /// the schema does not support removing items.
 #[derive(Debug)]
 pub struct Schema<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat> {
-    pub server_fields: Vec<
-        SchemaServerField<
-            TSchemaValidationState::ServerFieldTypeAssociatedData,
-            TSchemaValidationState::VariableDefinitionInnerType,
-            TOutputFormat,
-        >,
+    pub server_scalar_selectables: Vec<
+        ServerScalarSelectable<TSchemaValidationState::VariableDefinitionInnerType, TOutputFormat>,
     >,
     pub client_types: SelectionTypes<
         TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
@@ -116,17 +108,12 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
 
 pub type LinkedType<
     'a,
-    ServerFieldTypeAssociatedData,
     SelectionTypeSelectionScalarFieldAssociatedData,
     SelectionTypeSelectionLinkedFieldAssociatedData,
     VariableDefinitionInnerType,
     TOutputFormat,
 > = DefinitionLocation<
-    &'a SchemaServerField<
-        ServerFieldTypeAssociatedData,
-        VariableDefinitionInnerType,
-        TOutputFormat,
-    >,
+    &'a ServerScalarSelectable<VariableDefinitionInnerType, TOutputFormat>,
     &'a ClientPointer<
         SelectionTypeSelectionScalarFieldAssociatedData,
         SelectionTypeSelectionLinkedFieldAssociatedData,
@@ -139,7 +126,7 @@ pub type LinkedType<
 pub struct ServerFieldData<TOutputFormat: OutputFormat> {
     pub server_objects: Vec<SchemaObject<TOutputFormat>>,
     pub server_scalars: Vec<SchemaScalar<TOutputFormat>>,
-    pub defined_types: HashMap<UnvalidatedTypeName, SelectableServerFieldId>,
+    pub defined_types: HashMap<UnvalidatedTypeName, ServerEntityId>,
 
     // Well known types
     pub id_type_id: ServerScalarId,
@@ -158,13 +145,10 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     /// Get a reference to a given server field by its id.
     pub fn server_field(
         &self,
-        server_field_id: ServerFieldId,
-    ) -> &SchemaServerField<
-        TSchemaValidationState::ServerFieldTypeAssociatedData,
-        TSchemaValidationState::VariableDefinitionInnerType,
-        TOutputFormat,
-    > {
-        &self.server_fields[server_field_id.as_usize()]
+        server_field_id: ServerScalarSelectableId,
+    ) -> &ServerScalarSelectable<TSchemaValidationState::VariableDefinitionInnerType, TOutputFormat>
+    {
+        &self.server_scalar_selectables[server_field_id.as_usize()]
     }
 
     /// Get a reference to a given client field by its id.
@@ -188,9 +172,8 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
 
     pub fn linked_type(
         &self,
-        field_id: DefinitionLocation<ServerFieldId, ClientPointerId>,
+        field_id: DefinitionLocation<ServerScalarSelectableId, ClientPointerId>,
     ) -> LinkedType<
-        TSchemaValidationState::ServerFieldTypeAssociatedData,
         TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
         TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
         TSchemaValidationState::VariableDefinitionInnerType,
@@ -254,67 +237,17 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     }
 }
 
-impl<
-        TObjectFieldAssociatedData: Clone + Ord + Copy + Debug,
-        TScalarFieldAssociatedData: Clone + Ord + Copy + Debug,
-        TSchemaValidationState: SchemaValidationState<
-            ServerFieldTypeAssociatedData = SelectionType<
-                TypeAnnotation<TScalarFieldAssociatedData>,
-                ServerFieldTypeAssociatedData<TypeAnnotation<TObjectFieldAssociatedData>>,
-            >,
-        >,
-        TOutputFormat: OutputFormat,
-    > Schema<TSchemaValidationState, TOutputFormat>
-{
-    // This should not be this complicated!
-    /// Get a reference to a given id field by its id.
-    pub fn id_field<
-        TError: Debug,
-        TIdFieldAssociatedData: TryFrom<TScalarFieldAssociatedData, Error = TError> + Copy + Debug,
-    >(
-        &self,
-        id_field_id: ServerStrongIdFieldId,
-    ) -> SchemaIdField<TIdFieldAssociatedData> {
-        let field_id = id_field_id.into();
-
-        let field = self
-            .server_field(field_id)
-            .and_then(|e| match e {
-                SelectionType::Object(_) => panic!(
-                    "We had an id field, it should be scalar. This indicates a bug in Isograph.",
-                ),
-                SelectionType::Scalar(e) => e.inner_non_null().try_into(),
-            })
-            .expect(
-                // N.B. this expect should never be triggered. This is only because server_field
-                // does not have a .map method. TODO implement .map
-                "We had an id field, the type annotation should be named. \
-                    This indicates a bug in Isograph.",
-            );
-
-        field.try_into().expect(
-            "We had an id field, no arguments should exist. This indicates a bug in Isograph.",
-        )
-    }
-}
-
 impl<TOutputFormat: OutputFormat> ServerFieldData<TOutputFormat> {
     /// Get a reference to a given scalar type by its id.
     pub fn scalar(&self, scalar_id: ServerScalarId) -> &SchemaScalar<TOutputFormat> {
         &self.server_scalars[scalar_id.as_usize()]
     }
 
-    pub fn lookup_unvalidated_type(
-        &self,
-        type_id: SelectableServerFieldId,
-    ) -> SchemaType<TOutputFormat> {
+    // TODO this function is horribly named
+    pub fn lookup_unvalidated_type(&self, type_id: ServerEntityId) -> SchemaType<TOutputFormat> {
         match type_id {
-            SelectableServerFieldId::Object(id) => {
-                SchemaType::Object(self.server_objects.get(id.as_usize()).unwrap())
-            }
-            SelectableServerFieldId::Scalar(id) => {
-                SchemaType::Scalar(self.server_scalars.get(id.as_usize()).unwrap())
-            }
+            ServerEntityId::Object(object_id) => SchemaType::Object(self.object(object_id)),
+            ServerEntityId::Scalar(scalar_id) => SchemaType::Scalar(self.scalar(scalar_id)),
         }
     }
 
@@ -326,56 +259,6 @@ impl<TOutputFormat: OutputFormat> ServerFieldData<TOutputFormat> {
     /// Get a mutable reference to a given object type by its id.
     pub fn object_mut(&mut self, object_id: ServerObjectId) -> &mut SchemaObject<TOutputFormat> {
         &mut self.server_objects[object_id.as_usize()]
-    }
-}
-
-// TODO make SchemaServerField generic over TData, TId and TArguments, instead of just TData.
-// Then, SchemaIdField can be the same struct.
-#[derive(Debug, Clone, Copy)]
-pub struct SchemaIdField<TData> {
-    pub description: Option<DescriptionValue>,
-    pub name: WithLocation<ServerScalarSelectableName>,
-    pub id: ServerStrongIdFieldId,
-    pub associated_data: TData,
-    pub parent_type_id: ServerObjectId,
-    // pub directives: Vec<Directive<ConstantValue>>,
-}
-
-impl<
-        TData: Copy,
-        TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
-        TOutputFormat: OutputFormat,
-    > TryFrom<SchemaServerField<TData, TClientFieldVariableDefinitionAssociatedData, TOutputFormat>>
-    for SchemaIdField<TData>
-{
-    type Error = ();
-
-    fn try_from(
-        value: SchemaServerField<
-            TData,
-            TClientFieldVariableDefinitionAssociatedData,
-            TOutputFormat,
-        >,
-    ) -> Result<Self, Self::Error> {
-        // If the field is valid as an id field, we succeed, otherwise, fail.
-        // Initially, that will mean checking that there are no arguments.
-        // This will result in a lot of false positives, and that can be improved
-        // by requiring a specific directive or something.
-        //
-        // There are no arguments now, so this will always succeed.
-        //
-        // This comment is outdated:
-        // Also, before this is called, we have already converted the associated_data to be valid
-        // (it should go from TypeAnnotation<T> to NamedTypeAnnotation<T>) via
-        // inner_non_null_named_type. We should eventually add some NewType wrapper to
-        // enforce that we didn't just call .inner()
-        Ok(SchemaIdField {
-            description: value.description,
-            name: value.name.map(|x| x.unchecked_conversion()),
-            id: value.id.0.into(),
-            associated_data: value.associated_data,
-            parent_type_id: value.parent_type_id,
-        })
     }
 }
 
@@ -398,41 +281,5 @@ impl NameAndArguments {
         } else {
             NormalizationKey::ServerField(self.clone())
         }
-    }
-}
-
-impl<T, VariableDefinitionInnerType: Ord + Debug, TOutputFormat: OutputFormat>
-    SchemaServerField<T, VariableDefinitionInnerType, TOutputFormat>
-{
-    // TODO probably unnecessary, and can be replaced with .map and .transpose
-    pub fn split(
-        self,
-    ) -> (
-        SchemaServerField<(), VariableDefinitionInnerType, TOutputFormat>,
-        T,
-    ) {
-        let Self {
-            description,
-            name,
-            id,
-            associated_data,
-            parent_type_id,
-            arguments,
-            is_discriminator,
-            phantom_data,
-        } = self;
-        (
-            SchemaServerField {
-                description,
-                name,
-                id,
-                associated_data: (),
-                parent_type_id,
-                arguments,
-                is_discriminator,
-                phantom_data,
-            },
-            associated_data,
-        )
     }
 }

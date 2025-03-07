@@ -6,11 +6,11 @@ use common_lang_types::{
 };
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
-    ClientFieldId, ClientPointerId, SelectionType, ServerFieldSelection, ServerObjectId,
-    TypeAnnotation, VariableDefinition,
+    ClientFieldId, ClientPointerId, SelectionType, SelectionTypeContainingSelections,
+    ServerObjectId, TypeAnnotation, VariableDefinition,
 };
 
-use crate::{ClientFieldVariant, OutputFormat, RefetchStrategy};
+use crate::{ClientFieldVariant, OutputFormat, RefetchStrategy, UserWrittenClientPointerInfo};
 
 pub type ClientFieldOrPointerId = SelectionType<ClientFieldId, ClientPointerId>;
 
@@ -26,7 +26,7 @@ pub struct ClientField<
     pub id: ClientFieldId,
     pub reader_selection_set: Vec<
         WithSpan<
-            ServerFieldSelection<
+            SelectionTypeContainingSelections<
                 TSelectionTypeSelectionScalarFieldAssociatedData,
                 TSelectionTypeSelectionLinkedFieldAssociatedData,
             >,
@@ -70,7 +70,7 @@ pub struct ClientPointer<
 
     pub reader_selection_set: Vec<
         WithSpan<
-            ServerFieldSelection<
+            SelectionTypeContainingSelections<
                 TSelectionTypeSelectionScalarFieldAssociatedData,
                 TSelectionTypeSelectionLinkedFieldAssociatedData,
             >,
@@ -91,6 +91,7 @@ pub struct ClientPointer<
     pub parent_object_id: ServerObjectId,
 
     pub output_format: PhantomData<TOutputFormat>,
+    pub info: UserWrittenClientPointerInfo,
 }
 
 #[impl_for_selection_type]
@@ -109,7 +110,7 @@ pub trait ClientFieldOrPointer<
     fn reader_selection_set(
         &self,
     ) -> &[WithSpan<
-        ServerFieldSelection<
+        SelectionTypeContainingSelections<
             TSelectionTypeSelectionScalarFieldAssociatedData,
             TSelectionTypeSelectionLinkedFieldAssociatedData,
         >,
@@ -125,7 +126,7 @@ pub trait ClientFieldOrPointer<
     fn selection_set_for_parent_query(
         &self,
     ) -> &[WithSpan<
-        ServerFieldSelection<
+        SelectionTypeContainingSelections<
             TSelectionTypeSelectionScalarFieldAssociatedData,
             TSelectionTypeSelectionLinkedFieldAssociatedData,
         >,
@@ -177,7 +178,7 @@ impl<
     fn reader_selection_set(
         &self,
     ) -> &[WithSpan<
-        ServerFieldSelection<
+        SelectionTypeContainingSelections<
             TSelectionTypeSelectionScalarFieldAssociatedData,
             TSelectionTypeSelectionLinkedFieldAssociatedData,
         >,
@@ -199,7 +200,7 @@ impl<
     fn selection_set_for_parent_query(
         &self,
     ) -> &[WithSpan<
-        ServerFieldSelection<
+        SelectionTypeContainingSelections<
             TSelectionTypeSelectionScalarFieldAssociatedData,
             TSelectionTypeSelectionLinkedFieldAssociatedData,
         >,
@@ -265,7 +266,7 @@ impl<
     fn reader_selection_set(
         &self,
     ) -> &[WithSpan<
-        ServerFieldSelection<
+        SelectionTypeContainingSelections<
             TSelectionTypeSelectionScalarFieldAssociatedData,
             TSelectionTypeSelectionLinkedFieldAssociatedData,
         >,
@@ -287,7 +288,7 @@ impl<
     fn selection_set_for_parent_query(
         &self,
     ) -> &[WithSpan<
-        ServerFieldSelection<
+        SelectionTypeContainingSelections<
             TSelectionTypeSelectionScalarFieldAssociatedData,
             TSelectionTypeSelectionLinkedFieldAssociatedData,
         >,

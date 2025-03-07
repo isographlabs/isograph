@@ -7,7 +7,7 @@ use common_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, EmptyDirectiveSet, ObjectSelectionDirectiveSet, ScalarFieldSelection,
-    ScalarSelectionDirectiveSet, ServerFieldSelection, ServerObjectId,
+    ScalarSelectionDirectiveSet, SelectionTypeContainingSelections, ServerObjectId,
 };
 
 use crate::{
@@ -42,7 +42,7 @@ impl<
         &self,
     ) -> &Vec<
         WithSpan<
-            ServerFieldSelection<
+            SelectionTypeContainingSelections<
                 TSelectionTypeSelectionScalarFieldAssociatedData,
                 TSelectionTypeSelectionLinkedFieldAssociatedData,
             >,
@@ -62,7 +62,7 @@ pub fn generate_refetch_field_strategy<
 >(
     refetch_selection_set: Vec<
         WithSpan<
-            ServerFieldSelection<
+            SelectionTypeContainingSelections<
                 TSelectionTypeSelectionScalarFieldAssociatedData,
                 TSelectionTypeSelectionLinkedFieldAssociatedData,
             >,
@@ -104,7 +104,7 @@ pub struct UseRefetchFieldRefetchStrategy<
     /// select in the parent query?
     pub refetch_selection_set: Vec<
         WithSpan<
-            ServerFieldSelection<
+            SelectionTypeContainingSelections<
                 TSelectionTypeSelectionScalarFieldAssociatedData,
                 TSelectionTypeSelectionLinkedFieldAssociatedData,
             >,
@@ -164,10 +164,11 @@ impl GenerateRefetchQueryFn for GenerateRefetchQueryImpl {
     }
 }
 
-pub fn id_selection(
-) -> WithSpan<ServerFieldSelection<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>> {
+pub fn id_selection() -> WithSpan<
+    SelectionTypeContainingSelections<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
+> {
     WithSpan::new(
-        ServerFieldSelection::ScalarField(ScalarFieldSelection {
+        SelectionTypeContainingSelections::Scalar(ScalarFieldSelection {
             name: WithLocation::new("id".intern().into(), Location::generated()),
             reader_alias: None,
             associated_data: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
