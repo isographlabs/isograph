@@ -6,8 +6,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use common_lang_types::{RelativePathToSourceFile, TextSource};
-use intern::string_key::Intern;
+use common_lang_types::{
+    relative_path_from_absolute_and_working_directory, CurrentWorkingDirectory,
+    RelativePathToSourceFile, TextSource,
+};
+use intern::Lookup;
 use isograph_config::{absolute_and_relative_paths, CompilerConfig};
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_schema::{OutputFormat, UnvalidatedSchema};
@@ -156,12 +159,18 @@ impl<TOutputFormat: OutputFormat> SourceFiles<TOutputFormat> {
                 {
                     self.create_or_update_schema_extension(target_path, config)?;
                 } else {
-                    let interned_file_path = intern_file_path(source_path);
+                    let interned_file_path = relative_path_from_absolute_and_working_directory(
+                        config.current_working_directory,
+                        source_path,
+                    );
                     self.schema_extensions.remove(&interned_file_path);
                 }
             }
             SourceEventKind::Remove(path) => {
-                let interned_file_path = intern_file_path(path);
+                let interned_file_path = relative_path_from_absolute_and_working_directory(
+                    config.current_working_directory,
+                    path,
+                );
                 self.schema_extensions.remove(&interned_file_path);
             }
         }
@@ -178,13 +187,19 @@ impl<TOutputFormat: OutputFormat> SourceFiles<TOutputFormat> {
                 self.create_or_update_iso_literals(&config.project_root, path, config)?;
             }
             SourceEventKind::Rename((source_path, target_path)) => {
-                let source_file_path = intern_file_path(source_path);
+                let source_file_path = relative_path_from_absolute_and_working_directory(
+                    config.current_working_directory,
+                    source_path,
+                );
                 if self.contains_iso.remove(&source_file_path).is_some() {
                     self.create_or_update_iso_literals(&config.project_root, target_path, config)?
                 }
             }
             SourceEventKind::Remove(path) => {
-                let interned_file_path = intern_file_path(path);
+                let interned_file_path = relative_path_from_absolute_and_working_directory(
+                    config.current_working_directory,
+                    path,
+                );
                 self.contains_iso.remove(&interned_file_path);
             }
         }
@@ -206,9 +221,7 @@ impl<TOutputFormat: OutputFormat> SourceFiles<TOutputFormat> {
                 )?;
             }
             SourceEventKind::Rename((source_path, target_path)) => {
-                let path_string = source_path.to_string_lossy().to_string();
-                self.contains_iso
-                    .retain(|file_path, _| !file_path.to_string().starts_with(&path_string));
+                self.remove_iso_literals_from_folder(source_path, config.current_working_directory);
                 read_and_parse_iso_literals_from_folder(
                     &mut self.contains_iso,
                     target_path,
@@ -217,12 +230,24 @@ impl<TOutputFormat: OutputFormat> SourceFiles<TOutputFormat> {
                 )?;
             }
             SourceEventKind::Remove(path) => {
-                let path_string = path.to_string_lossy().to_string();
-                self.contains_iso
-                    .retain(|file_path, _| !file_path.to_string().starts_with(&path_string));
+                self.remove_iso_literals_from_folder(path, config.current_working_directory);
             }
         }
         Ok(())
+    }
+
+    fn remove_iso_literals_from_folder(
+        &mut self,
+        folder: &PathBuf,
+        current_working_directory: CurrentWorkingDirectory,
+    ) {
+        let relative_path =
+            pathdiff::diff_paths(folder, PathBuf::from(current_working_directory.lookup()))
+                .expect("Expected path to be diffable")
+                .to_string_lossy()
+                .to_string();
+        self.contains_iso
+            .retain(|file_path, _| !file_path.to_string().starts_with(&relative_path));
     }
 
     fn create_or_update_schema_extension(
@@ -293,10 +318,6 @@ fn read_and_parse_iso_literals_from_folder(
     } else {
         Err(iso_literal_parse_errors.into())
     }
-}
-
-fn intern_file_path(path: &Path) -> RelativePathToSourceFile {
-    path.to_string_lossy().into_owned().intern().into()
 }
 
 fn get_canonicalized_root_path(project_root: &PathBuf) -> Result<PathBuf, BatchCompileError> {
