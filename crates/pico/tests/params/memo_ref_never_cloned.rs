@@ -34,4 +34,4 @@ fn get_output(_db: &Database) -> Output {
 }
 
 #[memo]
-fn consume_output<'db1>(db: &'db1 Database, _output: MemoRef<'_, Output>) {}
+fn consume_output(db: &Database, _output: MemoRef<Output>) {}
