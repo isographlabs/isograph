@@ -1419,7 +1419,7 @@ checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
 
 [[package]]
 name = "pico"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "boxcar",
  "dashmap",
@@ -1437,7 +1437,7 @@ dependencies = [
 
 [[package]]
 name = "pico_macros"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2193,7 +2193,7 @@ version = "0.3.1"
 
 [[package]]
 name = "u64_newtypes"
-version = "0.3.0"
+version = "0.3.1"
 
 [[package]]
 name = "unicase"
