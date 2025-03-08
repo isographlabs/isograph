@@ -1,98 +1,46 @@
 use std::{
     collections::HashMap,
     error::Error,
-    marker::PhantomData,
-    ops::{Deref, DerefMut},
     path::{Path, PathBuf},
 };
 
 use common_lang_types::{
-    relative_path_from_absolute_and_working_directory, CurrentWorkingDirectory,
-    RelativePathToSourceFile, TextSource,
+    relative_path_from_absolute_and_working_directory, AbsolutePathAndRelativePath,
+    CurrentWorkingDirectory, RelativePathToSourceFile, TextSource,
 };
 use intern::Lookup;
 use isograph_config::{absolute_and_relative_paths, CompilerConfig};
-use isograph_lang_parser::IsoLiteralExtractionResult;
-use isograph_schema::{OutputFormat, UnvalidatedSchema};
+use isograph_lang_types::{IsoLiteralsSource, SchemaSource};
+use pico::{Database, SourceId};
 
 use crate::{
     batch_compile::BatchCompileError,
-    isograph_literals::{
-        parse_iso_literals_in_file_content, process_iso_literals, read_file, read_files_in_folder,
-    },
-    refetch_fields::add_refetch_fields_to_objects,
+    isograph_literals::{read_file, read_files_in_folder},
     watch::{ChangedFileKind, SourceEventKind, SourceFileEvent},
 };
 
-#[derive(Clone, Debug, Eq, PartialEq, Default)]
-pub struct SourceFiles<TOutputFormat: OutputFormat> {
-    pub schema: TOutputFormat::TypeSystemDocument,
-    pub schema_extensions:
-        HashMap<RelativePathToSourceFile, TOutputFormat::TypeSystemExtensionDocument>,
-    pub contains_iso: ContainsIso,
-    pub output_format: PhantomData<TOutputFormat>,
+#[derive(Debug, Clone)]
+pub struct SourceFiles {
+    pub schema: SourceId<SchemaSource>,
+    pub schema_extensions: HashMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
+    pub iso_literals: HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>,
 }
 
-impl<TOutputFormat: OutputFormat> SourceFiles<TOutputFormat> {
-    pub fn read_and_parse_all_files(config: &CompilerConfig) -> Result<Self, Box<dyn Error>> {
-        let schema = TOutputFormat::read_and_parse_type_system_document(config)?;
-
-        let mut schema_extensions = HashMap::new();
-        for schema_extension_path in config.schema_extensions.iter() {
-            let (file_path, extensions_document) =
-                TOutputFormat::read_and_parse_type_system_extension_document(
-                    schema_extension_path,
-                    config,
-                )?;
-            schema_extensions.insert(file_path, extensions_document);
-        }
-
-        let mut contains_iso = ContainsIso::default();
-        read_and_parse_iso_literals_from_folder(
-            &mut contains_iso,
-            &config.project_root,
-            &config.project_root,
-            config,
-        )?;
-
+impl SourceFiles {
+    pub fn read_all(db: &mut Database, config: &CompilerConfig) -> Result<Self, Box<dyn Error>> {
+        let schema = read_schema(db, &config.schema, config.current_working_directory)?;
+        let schema_extensions = read_schema_extensions(db, config)?;
+        let iso_literals = read_iso_literals_from_project_root(db, config)?;
         Ok(Self {
             schema,
             schema_extensions,
-            contains_iso,
-            output_format: PhantomData,
+            iso_literals,
         })
     }
 
-    pub fn create_unvalidated_schema(
-        self,
-        unvalidated_isograph_schema: &mut UnvalidatedSchema<TOutputFormat>,
-        config: &CompilerConfig,
-    ) -> Result<(), Box<dyn Error>> {
-        let outcome = TOutputFormat::process_type_system_document(
-            unvalidated_isograph_schema,
-            self.schema,
-            &config.options,
-        )?;
-        for extension_document in self.schema_extensions.into_values() {
-            TOutputFormat::process_type_system_extension_document(
-                unvalidated_isograph_schema,
-                extension_document,
-                &config.options,
-            )?;
-        }
-        process_iso_literals(unvalidated_isograph_schema, self.contains_iso)?;
-        process_exposed_fields(unvalidated_isograph_schema)?;
-        unvalidated_isograph_schema
-            .add_fields_to_subtypes(&outcome.type_refinement_maps.supertype_to_subtype_map)?;
-        unvalidated_isograph_schema.add_link_fields()?;
-        unvalidated_isograph_schema
-            .add_pointers_to_supertypes(&outcome.type_refinement_maps.subtype_to_supertype_map)?;
-        add_refetch_fields_to_objects(unvalidated_isograph_schema)?;
-        Ok(())
-    }
-
-    pub fn update(
+    pub fn read_updates(
         &mut self,
+        db: &mut Database,
         config: &CompilerConfig,
         changes: &[SourceFileEvent],
     ) -> Result<(), Box<dyn Error>> {
@@ -104,15 +52,15 @@ impl<TOutputFormat: OutputFormat> SourceFiles<TOutputFormat> {
                         "Unexpected config file change. This is indicative of a bug in Isograph."
                     );
                 }
-                ChangedFileKind::Schema => self.handle_update_schema(config, event).err(),
-                ChangedFileKind::SchemaExtension => {
-                    self.handle_update_schema_extensions(config, event).err()
-                }
+                ChangedFileKind::Schema => self.handle_update_schema(db, config, event).err(),
+                ChangedFileKind::SchemaExtension => self
+                    .handle_update_schema_extensions(db, config, event)
+                    .err(),
                 ChangedFileKind::JavaScriptSourceFile => {
-                    self.handle_update_source_file(config, event).err()
+                    self.handle_update_source_file(db, config, event).err()
                 }
                 ChangedFileKind::JavaScriptSourceFolder => {
-                    self.handle_update_source_folder(config, event).err()
+                    self.handle_update_source_folder(db, config, event).err()
                 }
             })
             .collect::<Vec<_>>();
@@ -125,12 +73,13 @@ impl<TOutputFormat: OutputFormat> SourceFiles<TOutputFormat> {
 
     fn handle_update_schema(
         &mut self,
+        db: &mut Database,
         config: &CompilerConfig,
         event_kind: &SourceEventKind,
     ) -> Result<(), Box<dyn Error>> {
         match event_kind {
             SourceEventKind::CreateOrModify(_) => {
-                self.schema = TOutputFormat::read_and_parse_type_system_document(config)?;
+                self.schema = read_schema(db, &config.schema, config.current_working_directory)?;
             }
             SourceEventKind::Rename((_, target_path)) => {
                 if config.schema.absolute_path != *target_path {
@@ -144,12 +93,13 @@ impl<TOutputFormat: OutputFormat> SourceFiles<TOutputFormat> {
 
     fn handle_update_schema_extensions(
         &mut self,
+        db: &mut Database,
         config: &CompilerConfig,
         event_kind: &SourceEventKind,
     ) -> Result<(), Box<dyn Error>> {
         match event_kind {
             SourceEventKind::CreateOrModify(path) => {
-                self.create_or_update_schema_extension(path, config)?;
+                self.create_or_update_schema_extension(db, path, config)?;
             }
             SourceEventKind::Rename((source_path, target_path)) => {
                 if config
@@ -157,7 +107,7 @@ impl<TOutputFormat: OutputFormat> SourceFiles<TOutputFormat> {
                     .iter()
                     .any(|x| x.absolute_path == *target_path)
                 {
-                    self.create_or_update_schema_extension(target_path, config)?;
+                    self.create_or_update_schema_extension(db, target_path, config)?;
                 } else {
                     let interned_file_path = relative_path_from_absolute_and_working_directory(
                         config.current_working_directory,
@@ -177,22 +127,37 @@ impl<TOutputFormat: OutputFormat> SourceFiles<TOutputFormat> {
         Ok(())
     }
 
+    fn create_or_update_schema_extension(
+        &mut self,
+        db: &mut Database,
+        path: &Path,
+        config: &CompilerConfig,
+    ) -> Result<(), Box<dyn Error>> {
+        let absolute_and_relative =
+            absolute_and_relative_paths(config.current_working_directory, path.to_path_buf());
+        let schema_id = read_schema(db, &absolute_and_relative, config.current_working_directory)?;
+        self.schema_extensions
+            .insert(absolute_and_relative.relative_path, schema_id);
+        Ok(())
+    }
+
     fn handle_update_source_file(
         &mut self,
+        db: &mut Database,
         config: &CompilerConfig,
         event_kind: &SourceEventKind,
     ) -> Result<(), Box<dyn Error>> {
         match event_kind {
             SourceEventKind::CreateOrModify(path) => {
-                self.create_or_update_iso_literals(&config.project_root, path, config)?;
+                self.create_or_update_iso_literals(db, path, config)?;
             }
             SourceEventKind::Rename((source_path, target_path)) => {
                 let source_file_path = relative_path_from_absolute_and_working_directory(
                     config.current_working_directory,
                     source_path,
                 );
-                if self.contains_iso.remove(&source_file_path).is_some() {
-                    self.create_or_update_iso_literals(&config.project_root, target_path, config)?
+                if self.iso_literals.remove(&source_file_path).is_some() {
+                    self.create_or_update_iso_literals(db, target_path, config)?
                 }
             }
             SourceEventKind::Remove(path) => {
@@ -200,34 +165,41 @@ impl<TOutputFormat: OutputFormat> SourceFiles<TOutputFormat> {
                     config.current_working_directory,
                     path,
                 );
-                self.contains_iso.remove(&interned_file_path);
+                self.iso_literals.remove(&interned_file_path);
             }
         }
         Ok(())
     }
 
+    fn create_or_update_iso_literals(
+        &mut self,
+        db: &mut Database,
+        path: &Path,
+        config: &CompilerConfig,
+    ) -> Result<(), Box<dyn Error>> {
+        let (relative_path, content) =
+            read_file(path.to_path_buf(), config.current_working_directory)?;
+        let source_id = db.set(IsoLiteralsSource {
+            relative_path,
+            content,
+        });
+        self.iso_literals.insert(relative_path, source_id);
+        Ok(())
+    }
+
     fn handle_update_source_folder(
         &mut self,
+        db: &mut Database,
         config: &CompilerConfig,
         event_kind: &SourceEventKind,
     ) -> Result<(), Box<dyn Error>> {
         match event_kind {
-            SourceEventKind::CreateOrModify(path) => {
-                read_and_parse_iso_literals_from_folder(
-                    &mut self.contains_iso,
-                    path,
-                    &config.project_root,
-                    config,
-                )?;
+            SourceEventKind::CreateOrModify(folder) => {
+                read_iso_literals_from_folder(db, &mut self.iso_literals, folder, config)?;
             }
             SourceEventKind::Rename((source_path, target_path)) => {
                 self.remove_iso_literals_from_folder(source_path, config.current_working_directory);
-                read_and_parse_iso_literals_from_folder(
-                    &mut self.contains_iso,
-                    target_path,
-                    &config.project_root,
-                    config,
-                )?;
+                read_iso_literals_from_folder(db, &mut self.iso_literals, target_path, config)?;
             }
             SourceEventKind::Remove(path) => {
                 self.remove_iso_literals_from_folder(path, config.current_working_directory);
@@ -246,152 +218,99 @@ impl<TOutputFormat: OutputFormat> SourceFiles<TOutputFormat> {
                 .expect("Expected path to be diffable")
                 .to_string_lossy()
                 .to_string();
-        self.contains_iso
+        self.iso_literals
             .retain(|file_path, _| !file_path.to_string().starts_with(&relative_path));
     }
-
-    fn create_or_update_schema_extension(
-        &mut self,
-        path: &Path,
-        config: &CompilerConfig,
-    ) -> Result<(), Box<dyn Error>> {
-        let absolute_and_relative =
-            absolute_and_relative_paths(config.current_working_directory, path.to_path_buf());
-        let (file_path, document) = TOutputFormat::read_and_parse_type_system_extension_document(
-            &absolute_and_relative,
-            config,
-        )?;
-        self.schema_extensions.insert(file_path, document);
-        Ok(())
-    }
-
-    fn create_or_update_iso_literals(
-        &mut self,
-        project_root: &PathBuf,
-        path: &Path,
-        config: &CompilerConfig,
-    ) -> Result<(), BatchCompileError> {
-        let canonicalized_root_path = get_canonicalized_root_path(project_root)?;
-        let (path_buf, file_content) = read_file(path.to_path_buf(), &canonicalized_root_path)?;
-        let (file_path, iso_literals) = parse_iso_literals_in_file_content(
-            path_buf,
-            file_content,
-            &canonicalized_root_path,
-            config,
-        )?;
-        if iso_literals.is_empty() {
-            self.contains_iso.remove(&file_path);
-        } else {
-            self.contains_iso.insert(file_path, iso_literals);
-        }
-        Ok(())
-    }
 }
 
-fn read_and_parse_iso_literals_from_folder(
-    contains_iso: &mut ContainsIso,
-    folder: &Path,
-    project_root: &PathBuf,
-    config: &CompilerConfig,
-) -> Result<(), BatchCompileError> {
-    let mut iso_literal_parse_errors = vec![];
-    let canonicalized_root_path = get_canonicalized_root_path(project_root)?;
-    for (path, file_content) in read_files_in_folder(folder, &canonicalized_root_path)? {
-        match parse_iso_literals_in_file_content(
-            path,
-            file_content,
-            &canonicalized_root_path,
-            config,
-        ) {
-            Ok((file_path, iso_literals)) => {
-                if !iso_literals.is_empty() {
-                    contains_iso.insert(file_path, iso_literals);
-                }
-            }
-            Err(e) => {
-                iso_literal_parse_errors.extend(e);
-            }
-        };
-    }
-    if iso_literal_parse_errors.is_empty() {
-        Ok(())
-    } else {
-        Err(iso_literal_parse_errors.into())
-    }
+pub fn read_schema(
+    db: &mut Database,
+    schema_path: &AbsolutePathAndRelativePath,
+    current_working_directory: CurrentWorkingDirectory,
+) -> Result<SourceId<SchemaSource>, Box<dyn Error>> {
+    let content = read_schema_file(&schema_path.absolute_path)?;
+    let text_source = TextSource {
+        relative_path_to_source_file: schema_path.relative_path,
+        span: None,
+        current_working_directory,
+    };
+    let schema_id = db.set(SchemaSource {
+        relative_path: schema_path.relative_path,
+        content,
+        text_source,
+    });
+    Ok(schema_id)
 }
 
-fn get_canonicalized_root_path(project_root: &PathBuf) -> Result<PathBuf, BatchCompileError> {
+pub fn read_schema_file(path: &PathBuf) -> Result<String, BatchCompileError> {
     let current_dir = std::env::current_dir().expect("current_dir should exist");
-    let joined = current_dir.join(project_root);
-    joined
-        .canonicalize()
-        .map_err(|e| BatchCompileError::UnableToLoadSchema {
-            path: joined.clone(),
+    let joined = current_dir.join(path);
+    let canonicalized_existing_path =
+        joined
+            .canonicalize()
+            .map_err(|e| BatchCompileError::UnableToLoadSchema {
+                path: joined,
+                message: e.to_string(),
+            })?;
+
+    if !canonicalized_existing_path.is_file() {
+        return Err(BatchCompileError::SchemaNotAFile {
+            path: canonicalized_existing_path,
+        });
+    }
+
+    let contents = std::fs::read(canonicalized_existing_path.clone()).map_err(|e| {
+        BatchCompileError::UnableToReadFile {
+            path: canonicalized_existing_path.clone(),
             message: e.to_string(),
-        })
+        }
+    })?;
+
+    let contents = std::str::from_utf8(&contents)
+        .map_err(|e| BatchCompileError::UnableToConvertToString {
+            path: canonicalized_existing_path.clone(),
+            reason: e,
+        })?
+        .to_owned();
+
+    Ok(contents)
 }
 
-/// Here, we are processing exposeAs fields. Note that we only process these
-/// directives on root objects (Query, Mutation, Subscription) and we should
-/// validate that no other types have exposeAs directives.
-fn process_exposed_fields<TOutputFormat: OutputFormat>(
-    schema: &mut UnvalidatedSchema<TOutputFormat>,
-) -> Result<(), BatchCompileError> {
-    let fetchable_types: Vec<_> = schema.fetchable_types.keys().copied().collect();
-    for fetchable_object_id in fetchable_types.into_iter() {
-        schema.add_exposed_fields_to_parent_object_types(fetchable_object_id)?;
+pub fn read_schema_extensions(
+    db: &mut Database,
+    config: &CompilerConfig,
+) -> Result<HashMap<RelativePathToSourceFile, SourceId<SchemaSource>>, Box<dyn Error>> {
+    let mut schema_extensions = HashMap::new();
+    for schema_extension_path in config.schema_extensions.iter() {
+        let schema_extension =
+            read_schema(db, schema_extension_path, config.current_working_directory)?;
+        schema_extensions.insert(schema_extension_path.relative_path, schema_extension);
+    }
+    Ok(schema_extensions)
+}
+
+pub fn read_iso_literals_from_project_root(
+    db: &mut Database,
+    config: &CompilerConfig,
+) -> Result<HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>, Box<dyn Error>> {
+    let mut iso_literals = HashMap::new();
+    read_iso_literals_from_folder(db, &mut iso_literals, &config.project_root, config)?;
+    Ok(iso_literals)
+}
+
+pub fn read_iso_literals_from_folder(
+    db: &mut Database,
+    iso_literals: &mut HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>,
+    folder: &Path,
+    config: &CompilerConfig,
+) -> Result<(), Box<dyn Error>> {
+    for (relative_path, content) in read_files_in_folder(folder, config.current_working_directory)?
+    {
+        let source_id = db.set(IsoLiteralsSource {
+            relative_path,
+            content,
+        });
+        iso_literals.insert(relative_path, source_id);
     }
     Ok(())
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Default)]
-pub struct ContainsIso {
-    pub files: HashMap<RelativePathToSourceFile, Vec<(IsoLiteralExtractionResult, TextSource)>>,
-}
-
-impl ContainsIso {
-    pub fn stats(&self) -> ContainsIsoStats {
-        let mut client_field_count: usize = 0;
-        let mut client_pointer_count: usize = 0;
-        let mut entrypoint_count: usize = 0;
-        for iso_literals in self.values() {
-            for (iso_literal, ..) in iso_literals {
-                match iso_literal {
-                    IsoLiteralExtractionResult::ClientFieldDeclaration(_) => {
-                        client_field_count += 1
-                    }
-                    IsoLiteralExtractionResult::EntrypointDeclaration(_) => entrypoint_count += 1,
-                    IsoLiteralExtractionResult::ClientPointerDeclaration(_) => {
-                        client_pointer_count += 1
-                    }
-                }
-            }
-        }
-        ContainsIsoStats {
-            client_field_count,
-            entrypoint_count,
-            client_pointer_count,
-        }
-    }
-}
-
-impl Deref for ContainsIso {
-    type Target = HashMap<RelativePathToSourceFile, Vec<(IsoLiteralExtractionResult, TextSource)>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.files
-    }
-}
-
-impl DerefMut for ContainsIso {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.files
-    }
-}
-
-pub struct ContainsIsoStats {
-    pub client_field_count: usize,
-    pub entrypoint_count: usize,
-    #[allow(unused)]
-    pub client_pointer_count: usize,
 }

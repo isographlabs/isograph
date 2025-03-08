@@ -3,8 +3,9 @@ mod config_for_test;
 use std::{ffi::OsStr, fs, path::PathBuf};
 
 use clap::Parser;
+use common_lang_types::relative_path_from_absolute_and_working_directory;
 use config_for_test::isograph_config_for_tests;
-use intern::string_key::Lookup;
+use intern::Lookup;
 use isograph_compiler::parse_iso_literals_in_file_content;
 use isograph_config::CompilerConfig;
 use lazy_static::lazy_static;
@@ -112,11 +113,16 @@ fn generate_content_for_output_file(
     content: String,
     config: &CompilerConfig,
 ) -> String {
+    let canonicalized_root_path = &PathBuf::from(config.current_working_directory.lookup());
+    let absolute_path = canonicalized_root_path.join(&input_file);
+    let relative_path_to_source_file = relative_path_from_absolute_and_working_directory(
+        config.current_working_directory,
+        &absolute_path,
+    );
     match parse_iso_literals_in_file_content(
-        input_file,
-        content,
-        &PathBuf::from(config.current_working_directory.lookup()),
-        config,
+        relative_path_to_source_file,
+        &content,
+        config.current_working_directory,
     ) {
         Ok(item) => {
             let item: Result<_, ()> = Ok(item);

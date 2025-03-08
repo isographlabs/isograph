@@ -1,13 +1,15 @@
 use common_lang_types::{
-    relative_path_from_absolute_and_working_directory, Location, RelativePathToSourceFile, Span,
-    TextSource, WithLocation,
+    relative_path_from_absolute_and_working_directory, CurrentWorkingDirectory, Location,
+    RelativePathToSourceFile, Span, TextSource, WithLocation,
 };
-use isograph_config::CompilerConfig;
 use isograph_lang_parser::{
     parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
 };
+use isograph_lang_types::IsoLiteralsSource;
 use isograph_schema::{OutputFormat, UnvalidatedSchema};
 use lazy_static::lazy_static;
+use pico::{Database, SourceId};
+use pico_macros::memo;
 use regex::Regex;
 use std::{
     fs::{self, DirEntry},
@@ -17,21 +19,14 @@ use std::{
 
 use crate::{
     batch_compile::BatchCompileError,
+    create_unvalidated_schema::ContainsIso,
     field_directives::{validate_isograph_field_directives, validate_isograph_pointer_directives},
-    source_files::ContainsIso,
 };
 
-pub(crate) fn read_files_in_folder(
+pub fn read_files_in_folder(
     folder: &Path,
-    canonicalized_root_path: &Path,
-) -> Result<Vec<(PathBuf, String)>, BatchCompileError> {
-    if !canonicalized_root_path.is_dir() {
-        return Err(BatchCompileError::ProjectRootNotADirectory {
-            // TODO avoid cloning
-            path: canonicalized_root_path.to_path_buf(),
-        });
-    }
-
+    current_working_directory: CurrentWorkingDirectory,
+) -> Result<Vec<(RelativePathToSourceFile, String)>, BatchCompileError> {
     read_dir_recursive(folder)?
         .into_iter()
         .filter(|p| {
@@ -47,34 +42,28 @@ pub(crate) fn read_files_in_folder(
                 .expect("Expected path to be stringable")
                 .contains("__isograph")
         })
-        .map(|path| read_file(path, canonicalized_root_path))
+        .map(|path| read_file(path, current_working_directory))
         .collect()
 }
 
 pub fn read_file(
     path: PathBuf,
-    canonicalized_root_path: &Path,
-) -> Result<(PathBuf, String), BatchCompileError> {
-    // This isn't ideal. We can avoid a clone if we changed .map_err to match
-    let path_2 = path.clone();
-
+    current_working_directory: CurrentWorkingDirectory,
+) -> Result<(RelativePathToSourceFile, String), BatchCompileError> {
     // N.B. we have previously ensured that path is a file
     let contents = std::fs::read(&path).map_err(|e| BatchCompileError::UnableToReadFile {
-        path: path_2,
+        path: path.clone(),
         message: e.to_string(),
     })?;
 
+    let relative_path =
+        relative_path_from_absolute_and_working_directory(current_working_directory, &path);
+
     let contents = std::str::from_utf8(&contents)
-        .map_err(|e| BatchCompileError::UnableToConvertToString {
-            path: path.clone(),
-            reason: e,
-        })?
+        .map_err(|e| BatchCompileError::UnableToConvertToString { path, reason: e })?
         .to_owned();
 
-    Ok((
-        path.strip_prefix(canonicalized_root_path)?.to_path_buf(),
-        contents,
-    ))
+    Ok((relative_path, contents))
 }
 
 fn read_dir_recursive(root_js_path: &Path) -> Result<Vec<PathBuf>, BatchCompileError> {
@@ -110,23 +99,13 @@ fn visit_dirs_skipping_isograph(dir: &Path, cb: &mut dyn FnMut(&DirEntry)) -> io
 // both valid and invalid iso literals.
 #[allow(clippy::type_complexity)]
 pub fn parse_iso_literals_in_file_content(
-    file_path: PathBuf,
-    file_content: String,
-    canonicalized_root_path: &Path,
-    config: &CompilerConfig,
+    relative_path_to_source_file: RelativePathToSourceFile,
+    file_content: &str,
+    current_working_directory: CurrentWorkingDirectory,
 ) -> Result<
-    (
-        RelativePathToSourceFile,
-        Vec<(IsoLiteralExtractionResult, TextSource)>,
-    ),
+    Vec<(IsoLiteralExtractionResult, TextSource)>,
     Vec<WithLocation<IsographLiteralParseError>>,
 > {
-    let absolute_path = canonicalized_root_path.join(&file_path);
-    let relative_path_to_source_file = relative_path_from_absolute_and_working_directory(
-        config.current_working_directory,
-        &absolute_path,
-    );
-
     let mut extraction_results = vec![];
     let mut isograph_literal_parse_errors = vec![];
 
@@ -134,8 +113,7 @@ pub fn parse_iso_literals_in_file_content(
         match process_iso_literal_extraction(
             iso_literal_extraction,
             relative_path_to_source_file,
-            relative_path_to_source_file,
-            config,
+            current_working_directory,
         ) {
             Ok(result) => extraction_results.push(result),
             Err(e) => isograph_literal_parse_errors.push(e),
@@ -143,10 +121,27 @@ pub fn parse_iso_literals_in_file_content(
     }
 
     if isograph_literal_parse_errors.is_empty() {
-        Ok((relative_path_to_source_file, extraction_results))
+        Ok(extraction_results)
     } else {
         Err(isograph_literal_parse_errors)
     }
+}
+
+#[allow(clippy::type_complexity)]
+#[memo]
+pub fn parse_iso_literal_in_source(
+    db: &Database,
+    iso_literals_source_id: SourceId<IsoLiteralsSource>,
+    current_working_directory: CurrentWorkingDirectory,
+) -> Result<
+    Vec<(IsoLiteralExtractionResult, TextSource)>,
+    Vec<WithLocation<IsographLiteralParseError>>,
+> {
+    let IsoLiteralsSource {
+        relative_path,
+        content,
+    } = db.get(iso_literals_source_id);
+    parse_iso_literals_in_file_content(*relative_path, content, current_working_directory)
 }
 
 pub(crate) fn process_iso_literals<TOutputFormat: OutputFormat>(
@@ -201,9 +196,8 @@ pub(crate) fn process_iso_literals<TOutputFormat: OutputFormat>(
 
 pub fn process_iso_literal_extraction(
     iso_literal_extraction: IsoLiteralExtraction<'_>,
-    file_name: RelativePathToSourceFile,
-    interned_file_path: RelativePathToSourceFile,
-    config: &CompilerConfig,
+    relative_path_to_source_file: RelativePathToSourceFile,
+    current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>> {
     let IsoLiteralExtraction {
         iso_literal_text,
@@ -213,12 +207,12 @@ pub fn process_iso_literal_extraction(
         iso_function_called_with_paren: has_paren,
     } = iso_literal_extraction;
     let text_source = TextSource {
-        relative_path_to_source_file: file_name,
+        relative_path_to_source_file,
         span: Some(Span::new(
             iso_literal_start_index as u32,
             (iso_literal_start_index + iso_literal_text.len()) as u32,
         )),
-        current_working_directory: config.current_working_directory,
+        current_working_directory,
     };
 
     if !has_paren {
@@ -231,7 +225,7 @@ pub fn process_iso_literal_extraction(
     // TODO return errors if any occurred, otherwise Ok
     let iso_literal_extraction_result = parse_iso_literal(
         iso_literal_text,
-        interned_file_path,
+        relative_path_to_source_file,
         const_export_name,
         text_source,
     )?;

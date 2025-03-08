@@ -1,7 +1,9 @@
 use std::{error::Error, fmt::Debug, hash::Hash};
 
-use common_lang_types::{QueryOperationName, QueryText, RelativePathToSourceFile};
-use isograph_config::{AbsolutePathAndRelativePath, CompilerConfig, CompilerConfigOptions};
+use common_lang_types::{QueryOperationName, QueryText};
+use isograph_config::CompilerConfigOptions;
+use isograph_lang_types::SchemaSource;
+use pico::{Database, MemoRef, SourceId};
 
 use crate::{
     EncounteredRootTypes, MergedSelectionMap, RootOperationName, TypeRefinementMaps,
@@ -15,18 +17,20 @@ where
 {
     // These two types should be combined into a single type, this is a
     // GraphQL-ism leaking in
-    type TypeSystemDocument: Debug + Clone;
-    type TypeSystemExtensionDocument: Debug + Clone;
+    type TypeSystemDocument: Debug + Clone + 'static;
+    type TypeSystemExtensionDocument: Debug + Clone + 'static;
 
     type SchemaObjectAssociatedData: Debug;
 
-    fn read_and_parse_type_system_document(
-        config: &CompilerConfig,
-    ) -> Result<Self::TypeSystemDocument, Box<dyn Error>>;
-    fn read_and_parse_type_system_extension_document(
-        schema_extension_path: &AbsolutePathAndRelativePath,
-        config: &CompilerConfig,
-    ) -> Result<(RelativePathToSourceFile, Self::TypeSystemExtensionDocument), Box<dyn Error>>;
+    fn parse_type_system_document(
+        db: &Database,
+        schema_source_id: SourceId<SchemaSource>,
+    ) -> Result<MemoRef<Self::TypeSystemDocument>, Box<dyn Error>>;
+
+    fn parse_type_system_extension_document(
+        db: &Database,
+        schema_extension_source_id: SourceId<SchemaSource>,
+    ) -> Result<MemoRef<Self::TypeSystemExtensionDocument>, Box<dyn Error>>;
 
     // TODO refactor this to return a Vec or Iterator of IsographObjectDefinition or the like,
     // instead of mutating the UnvalidatedSchema

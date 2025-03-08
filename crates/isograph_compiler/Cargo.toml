@@ -14,6 +14,8 @@ isograph_lang_types = { path = "../isograph_lang_types" }
 common_lang_types = { path = "../common_lang_types" }
 thiserror = "1.0.40"
 intern = { path = "../../relay-crates/intern" }
+pico = { path = "../pico" }
+pico_macros = { path = "../pico_macros" }
 lazy_static = { workspace = true }
 regex = { workspace = true }
 colored = { workspace = true }

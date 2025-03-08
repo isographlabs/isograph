@@ -645,6 +645,8 @@ dependencies = [
  "isograph_schema",
  "lazy_static",
  "pathdiff",
+ "pico",
+ "pico_macros",
  "thiserror",
 ]
 
@@ -1005,6 +1007,8 @@ dependencies = [
  "notify",
  "notify-debouncer-full",
  "pathdiff",
+ "pico",
+ "pico_macros",
  "pretty-duration",
  "regex",
  "thiserror",
@@ -1030,6 +1034,7 @@ name = "isograph_fixture_tests"
 version = "0.3.1"
 dependencies = [
  "clap 4.5.31",
+ "common_lang_types",
  "intern",
  "isograph_compiler",
  "isograph_config",
@@ -1056,6 +1061,8 @@ dependencies = [
  "common_lang_types",
  "graphql_lang_types",
  "intern",
+ "pico",
+ "pico_macros",
  "serde",
  "thiserror",
  "u32_newtypes",
@@ -1092,6 +1099,8 @@ dependencies = [
  "isograph_config",
  "isograph_lang_types",
  "lazy_static",
+ "pico",
+ "pico_macros",
  "serde",
  "thiserror",
 ]

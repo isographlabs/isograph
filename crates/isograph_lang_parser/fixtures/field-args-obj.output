@@ -1,40 +1,66 @@
 Ok(
-    (
-        RelativePathToSourceFile(
-            "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
-        ),
-        [
-            (
-                ClientFieldDeclaration(
-                    WithSpan {
-                        item: ClientFieldDeclaration {
-                            const_export_name: ConstExportName(
-                                "ValidArgs",
+    [
+        (
+            ClientFieldDeclaration(
+                WithSpan {
+                    item: ClientFieldDeclaration {
+                        const_export_name: ConstExportName(
+                            "ValidArgs",
+                        ),
+                        parent_type: WithSpan {
+                            item: UnvalidatedTypeName(
+                                "Type",
                             ),
-                            parent_type: WithSpan {
-                                item: UnvalidatedTypeName(
-                                    "Type",
-                                ),
-                                span: Span {
-                                    start: 9,
-                                    end: 13,
-                                },
+                            span: Span {
+                                start: 9,
+                                end: 13,
                             },
-                            client_field_name: WithSpan {
-                                item: ClientScalarSelectableName(
-                                    "Name",
-                                ),
-                                span: Span {
-                                    start: 14,
-                                    end: 18,
-                                },
+                        },
+                        client_field_name: WithSpan {
+                            item: ClientScalarSelectableName(
+                                "Name",
+                            ),
+                            span: Span {
+                                start: 14,
+                                end: 18,
                             },
-                            description: None,
-                            selection_set: [
-                                WithSpan {
-                                    item: Scalar(
-                                        ScalarFieldSelection {
-                                            name: WithLocation {
+                        },
+                        description: None,
+                        selection_set: [
+                            WithSpan {
+                                item: Scalar(
+                                    ScalarFieldSelection {
+                                        name: WithLocation {
+                                            location: Embedded(
+                                                EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 30,
+                                                                end: 86,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 25,
+                                                        end: 29,
+                                                    },
+                                                },
+                                            ),
+                                            item: ScalarSelectableName(
+                                                "args",
+                                            ),
+                                        },
+                                        reader_alias: None,
+                                        associated_data: None(
+                                            EmptyDirectiveSet,
+                                        ),
+                                        arguments: [
+                                            WithLocation {
                                                 location: Embedded(
                                                     EmbeddedLocation {
                                                         text_source: TextSource {
@@ -50,181 +76,150 @@ Ok(
                                                             ),
                                                         },
                                                         span: Span {
-                                                            start: 25,
-                                                            end: 29,
+                                                            start: 30,
+                                                            end: 50,
                                                         },
                                                     },
                                                 ),
-                                                item: ScalarSelectableName(
-                                                    "args",
-                                                ),
-                                            },
-                                            reader_alias: None,
-                                            associated_data: None(
-                                                EmptyDirectiveSet,
-                                            ),
-                                            arguments: [
-                                                WithLocation {
-                                                    location: Embedded(
-                                                        EmbeddedLocation {
-                                                            text_source: TextSource {
-                                                                current_working_directory: CurrentWorkingDirectory,
-                                                                relative_path_to_source_file: RelativePathToSourceFile(
-                                                                    "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
-                                                                ),
-                                                                span: Some(
-                                                                    Span {
-                                                                        start: 30,
-                                                                        end: 86,
-                                                                    },
-                                                                ),
-                                                            },
-                                                            span: Span {
-                                                                start: 30,
-                                                                end: 50,
-                                                            },
+                                                item: SelectionFieldArgument {
+                                                    name: WithSpan {
+                                                        item: FieldArgumentName(
+                                                            "arg1",
+                                                        ),
+                                                        span: Span {
+                                                            start: 30,
+                                                            end: 34,
                                                         },
-                                                    ),
-                                                    item: SelectionFieldArgument {
-                                                        name: WithSpan {
-                                                            item: FieldArgumentName(
-                                                                "arg1",
-                                                            ),
-                                                            span: Span {
-                                                                start: 30,
-                                                                end: 34,
+                                                    },
+                                                    value: WithLocation {
+                                                        location: Embedded(
+                                                            EmbeddedLocation {
+                                                                text_source: TextSource {
+                                                                    current_working_directory: CurrentWorkingDirectory,
+                                                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                                                        "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
+                                                                    ),
+                                                                    span: Some(
+                                                                        Span {
+                                                                            start: 30,
+                                                                            end: 86,
+                                                                        },
+                                                                    ),
+                                                                },
+                                                                span: Span {
+                                                                    start: 36,
+                                                                    end: 50,
+                                                                },
                                                             },
-                                                        },
-                                                        value: WithLocation {
-                                                            location: Embedded(
-                                                                EmbeddedLocation {
-                                                                    text_source: TextSource {
-                                                                        current_working_directory: CurrentWorkingDirectory,
-                                                                        relative_path_to_source_file: RelativePathToSourceFile(
-                                                                            "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
-                                                                        ),
-                                                                        span: Some(
-                                                                            Span {
-                                                                                start: 30,
-                                                                                end: 86,
+                                                        ),
+                                                        item: Object(
+                                                            [
+                                                                NameValuePair {
+                                                                    name: WithLocation {
+                                                                        location: Embedded(
+                                                                            EmbeddedLocation {
+                                                                                text_source: TextSource {
+                                                                                    current_working_directory: CurrentWorkingDirectory,
+                                                                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                                                                        "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
+                                                                                    ),
+                                                                                    span: Some(
+                                                                                        Span {
+                                                                                            start: 30,
+                                                                                            end: 86,
+                                                                                        },
+                                                                                    ),
+                                                                                },
+                                                                                span: Span {
+                                                                                    start: 38,
+                                                                                    end: 41,
+                                                                                },
                                                                             },
                                                                         ),
+                                                                        item: ValueKeyName(
+                                                                            "foo",
+                                                                        ),
                                                                     },
-                                                                    span: Span {
-                                                                        start: 36,
-                                                                        end: 50,
+                                                                    value: WithLocation {
+                                                                        location: Embedded(
+                                                                            EmbeddedLocation {
+                                                                                text_source: TextSource {
+                                                                                    current_working_directory: CurrentWorkingDirectory,
+                                                                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                                                                        "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
+                                                                                    ),
+                                                                                    span: Some(
+                                                                                        Span {
+                                                                                            start: 30,
+                                                                                            end: 86,
+                                                                                        },
+                                                                                    ),
+                                                                                },
+                                                                                span: Span {
+                                                                                    start: 43,
+                                                                                    end: 48,
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                        item: String(
+                                                                            StringLiteralValue(
+                                                                                "bar",
+                                                                            ),
+                                                                        ),
                                                                     },
                                                                 },
-                                                            ),
-                                                            item: Object(
-                                                                [
-                                                                    NameValuePair {
-                                                                        name: WithLocation {
-                                                                            location: Embedded(
-                                                                                EmbeddedLocation {
-                                                                                    text_source: TextSource {
-                                                                                        current_working_directory: CurrentWorkingDirectory,
-                                                                                        relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                            "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
-                                                                                        ),
-                                                                                        span: Some(
-                                                                                            Span {
-                                                                                                start: 30,
-                                                                                                end: 86,
-                                                                                            },
-                                                                                        ),
-                                                                                    },
-                                                                                    span: Span {
-                                                                                        start: 38,
-                                                                                        end: 41,
-                                                                                    },
-                                                                                },
-                                                                            ),
-                                                                            item: ValueKeyName(
-                                                                                "foo",
-                                                                            ),
-                                                                        },
-                                                                        value: WithLocation {
-                                                                            location: Embedded(
-                                                                                EmbeddedLocation {
-                                                                                    text_source: TextSource {
-                                                                                        current_working_directory: CurrentWorkingDirectory,
-                                                                                        relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                            "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
-                                                                                        ),
-                                                                                        span: Some(
-                                                                                            Span {
-                                                                                                start: 30,
-                                                                                                end: 86,
-                                                                                            },
-                                                                                        ),
-                                                                                    },
-                                                                                    span: Span {
-                                                                                        start: 43,
-                                                                                        end: 48,
-                                                                                    },
-                                                                                },
-                                                                            ),
-                                                                            item: String(
-                                                                                StringLiteralValue(
-                                                                                    "bar",
-                                                                                ),
-                                                                            ),
-                                                                        },
-                                                                    },
-                                                                ],
-                                                            ),
-                                                        },
+                                                            ],
+                                                        ),
                                                     },
                                                 },
-                                            ],
-                                        },
-                                    ),
-                                    span: Span {
-                                        start: 25,
-                                        end: 51,
+                                            },
+                                        ],
                                     },
-                                },
-                            ],
-                            directives: [],
-                            variable_definitions: [],
-                            definition_path: RelativePathToSourceFile(
-                                "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
-                            ),
-                            field_keyword: WithSpan {
-                                item: (),
+                                ),
                                 span: Span {
-                                    start: 3,
-                                    end: 8,
+                                    start: 25,
+                                    end: 51,
                                 },
                             },
-                            dot: WithSpan {
-                                item: (),
-                                span: Span {
-                                    start: 13,
-                                    end: 14,
-                                },
+                        ],
+                        directives: [],
+                        variable_definitions: [],
+                        definition_path: RelativePathToSourceFile(
+                            "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
+                        ),
+                        field_keyword: WithSpan {
+                            item: (),
+                            span: Span {
+                                start: 3,
+                                end: 8,
                             },
                         },
-                        span: Span {
-                            start: 9,
-                            end: 55,
+                        dot: WithSpan {
+                            item: (),
+                            span: Span {
+                                start: 13,
+                                end: 14,
+                            },
                         },
                     },
-                ),
-                TextSource {
-                    current_working_directory: CurrentWorkingDirectory,
-                    relative_path_to_source_file: RelativePathToSourceFile(
-                        "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
-                    ),
-                    span: Some(
-                        Span {
-                            start: 30,
-                            end: 86,
-                        },
-                    ),
+                    span: Span {
+                        start: 9,
+                        end: 55,
+                    },
                 },
             ),
-        ],
-    ),
+            TextSource {
+                current_working_directory: CurrentWorkingDirectory,
+                relative_path_to_source_file: RelativePathToSourceFile(
+                    "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
+                ),
+                span: Some(
+                    Span {
+                        start: 30,
+                        end: 86,
+                    },
+                ),
+            },
+        ),
+    ],
 )

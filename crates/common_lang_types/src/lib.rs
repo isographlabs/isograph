@@ -1,3 +1,4 @@
+mod absolute_and_relative_path;
 mod location;
 mod path_and_content;
 mod selectable_name;
@@ -7,6 +8,7 @@ mod string_types;
 mod text_with_carats;
 mod type_and_field;
 
+pub use absolute_and_relative_path::*;
 pub use location::*;
 pub use path_and_content::*;
 pub use selectable_name::*;

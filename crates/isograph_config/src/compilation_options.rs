@@ -1,6 +1,6 @@
 use common_lang_types::{
-    relative_path_from_absolute_and_working_directory, CurrentWorkingDirectory,
-    GeneratedFileHeader, RelativePathToSourceFile,
+    relative_path_from_absolute_and_working_directory, AbsolutePathAndRelativePath,
+    CurrentWorkingDirectory, GeneratedFileHeader,
 };
 use intern::string_key::Intern;
 use schemars::JsonSchema;
@@ -11,12 +11,6 @@ use tracing::warn;
 pub static ISOGRAPH_FOLDER: &str = "__isograph";
 
 use std::error::Error;
-
-#[derive(Debug, Clone)]
-pub struct AbsolutePathAndRelativePath {
-    pub absolute_path: PathBuf,
-    pub relative_path: RelativePathToSourceFile,
-}
 
 /// This struct is the internal representation of the schema. It
 /// is a transformed version of IsographProjectConfig.
