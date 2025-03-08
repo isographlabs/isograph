@@ -1,117 +1,112 @@
 Ok(
-    (
-        RelativePathToSourceFile(
-            "crates/isograph_lang_parser/fixtures/field-empty-linked-field-selection-set.input.js",
-        ),
-        [
-            (
-                ClientFieldDeclaration(
-                    WithSpan {
-                        item: ClientFieldDeclaration {
-                            const_export_name: ConstExportName(
-                                "BasicField",
+    [
+        (
+            ClientFieldDeclaration(
+                WithSpan {
+                    item: ClientFieldDeclaration {
+                        const_export_name: ConstExportName(
+                            "BasicField",
+                        ),
+                        parent_type: WithSpan {
+                            item: UnvalidatedTypeName(
+                                "Type",
                             ),
-                            parent_type: WithSpan {
-                                item: UnvalidatedTypeName(
-                                    "Type",
-                                ),
-                                span: Span {
-                                    start: 9,
-                                    end: 13,
-                                },
-                            },
-                            client_field_name: WithSpan {
-                                item: ClientScalarSelectableName(
-                                    "Name",
-                                ),
-                                span: Span {
-                                    start: 14,
-                                    end: 18,
-                                },
-                            },
-                            description: None,
-                            selection_set: [
-                                WithSpan {
-                                    item: Object(
-                                        LinkedFieldSelection {
-                                            name: WithLocation {
-                                                location: Embedded(
-                                                    EmbeddedLocation {
-                                                        text_source: TextSource {
-                                                            current_working_directory: CurrentWorkingDirectory,
-                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/field-empty-linked-field-selection-set.input.js",
-                                                            ),
-                                                            span: Some(
-                                                                Span {
-                                                                    start: 31,
-                                                                    end: 70,
-                                                                },
-                                                            ),
-                                                        },
-                                                        span: Span {
-                                                            start: 25,
-                                                            end: 31,
-                                                        },
-                                                    },
-                                                ),
-                                                item: ServerObjectSelectableName(
-                                                    "linked",
-                                                ),
-                                            },
-                                            reader_alias: None,
-                                            associated_data: None(
-                                                EmptyDirectiveSet,
-                                            ),
-                                            selection_set: [],
-                                            arguments: [],
-                                        },
-                                    ),
-                                    span: Span {
-                                        start: 25,
-                                        end: 34,
-                                    },
-                                },
-                            ],
-                            directives: [],
-                            variable_definitions: [],
-                            definition_path: RelativePathToSourceFile(
-                                "crates/isograph_lang_parser/fixtures/field-empty-linked-field-selection-set.input.js",
-                            ),
-                            field_keyword: WithSpan {
-                                item: (),
-                                span: Span {
-                                    start: 3,
-                                    end: 8,
-                                },
-                            },
-                            dot: WithSpan {
-                                item: (),
-                                span: Span {
-                                    start: 13,
-                                    end: 14,
-                                },
+                            span: Span {
+                                start: 9,
+                                end: 13,
                             },
                         },
-                        span: Span {
-                            start: 9,
-                            end: 38,
+                        client_field_name: WithSpan {
+                            item: ClientScalarSelectableName(
+                                "Name",
+                            ),
+                            span: Span {
+                                start: 14,
+                                end: 18,
+                            },
+                        },
+                        description: None,
+                        selection_set: [
+                            WithSpan {
+                                item: Object(
+                                    LinkedFieldSelection {
+                                        name: WithLocation {
+                                            location: Embedded(
+                                                EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/field-empty-linked-field-selection-set.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 31,
+                                                                end: 70,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 25,
+                                                        end: 31,
+                                                    },
+                                                },
+                                            ),
+                                            item: ServerObjectSelectableName(
+                                                "linked",
+                                            ),
+                                        },
+                                        reader_alias: None,
+                                        associated_data: None(
+                                            EmptyDirectiveSet,
+                                        ),
+                                        selection_set: [],
+                                        arguments: [],
+                                    },
+                                ),
+                                span: Span {
+                                    start: 25,
+                                    end: 34,
+                                },
+                            },
+                        ],
+                        directives: [],
+                        variable_definitions: [],
+                        definition_path: RelativePathToSourceFile(
+                            "crates/isograph_lang_parser/fixtures/field-empty-linked-field-selection-set.input.js",
+                        ),
+                        field_keyword: WithSpan {
+                            item: (),
+                            span: Span {
+                                start: 3,
+                                end: 8,
+                            },
+                        },
+                        dot: WithSpan {
+                            item: (),
+                            span: Span {
+                                start: 13,
+                                end: 14,
+                            },
                         },
                     },
-                ),
-                TextSource {
-                    current_working_directory: CurrentWorkingDirectory,
-                    relative_path_to_source_file: RelativePathToSourceFile(
-                        "crates/isograph_lang_parser/fixtures/field-empty-linked-field-selection-set.input.js",
-                    ),
-                    span: Some(
-                        Span {
-                            start: 31,
-                            end: 70,
-                        },
-                    ),
+                    span: Span {
+                        start: 9,
+                        end: 38,
+                    },
                 },
             ),
-        ],
-    ),
+            TextSource {
+                current_working_directory: CurrentWorkingDirectory,
+                relative_path_to_source_file: RelativePathToSourceFile(
+                    "crates/isograph_lang_parser/fixtures/field-empty-linked-field-selection-set.input.js",
+                ),
+                span: Some(
+                    Span {
+                        start: 31,
+                        end: 70,
+                    },
+                ),
+            },
+        ),
+    ],
 )

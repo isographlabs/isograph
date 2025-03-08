@@ -1,454 +1,449 @@
 Ok(
-    (
-        RelativePathToSourceFile(
-            "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+    [
+        (
+            ClientFieldDeclaration(
+                WithSpan {
+                    item: ClientFieldDeclaration {
+                        const_export_name: ConstExportName(
+                            "BasicField",
+                        ),
+                        parent_type: WithSpan {
+                            item: UnvalidatedTypeName(
+                                "Type",
+                            ),
+                            span: Span {
+                                start: 9,
+                                end: 13,
+                            },
+                        },
+                        client_field_name: WithSpan {
+                            item: ClientScalarSelectableName(
+                                "Name",
+                            ),
+                            span: Span {
+                                start: 14,
+                                end: 18,
+                            },
+                        },
+                        description: None,
+                        selection_set: [
+                            WithSpan {
+                                item: Scalar(
+                                    ScalarFieldSelection {
+                                        name: WithLocation {
+                                            location: Embedded(
+                                                EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 31,
+                                                                end: 77,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 25,
+                                                        end: 31,
+                                                    },
+                                                },
+                                            ),
+                                            item: ScalarSelectableName(
+                                                "scalar",
+                                            ),
+                                        },
+                                        reader_alias: None,
+                                        associated_data: Loadable(
+                                            LoadableDirectiveSet {
+                                                loadable: LoadableDirectiveParameters {
+                                                    complete_selection_set: false,
+                                                    lazy_load_artifact: false,
+                                                },
+                                            },
+                                        ),
+                                        arguments: [],
+                                    },
+                                ),
+                                span: Span {
+                                    start: 25,
+                                    end: 41,
+                                },
+                            },
+                        ],
+                        directives: [],
+                        variable_definitions: [],
+                        definition_path: RelativePathToSourceFile(
+                            "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                        ),
+                        field_keyword: WithSpan {
+                            item: (),
+                            span: Span {
+                                start: 3,
+                                end: 8,
+                            },
+                        },
+                        dot: WithSpan {
+                            item: (),
+                            span: Span {
+                                start: 13,
+                                end: 14,
+                            },
+                        },
+                    },
+                    span: Span {
+                        start: 9,
+                        end: 45,
+                    },
+                },
+            ),
+            TextSource {
+                current_working_directory: CurrentWorkingDirectory,
+                relative_path_to_source_file: RelativePathToSourceFile(
+                    "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                ),
+                span: Some(
+                    Span {
+                        start: 31,
+                        end: 77,
+                    },
+                ),
+            },
         ),
-        [
-            (
-                ClientFieldDeclaration(
-                    WithSpan {
-                        item: ClientFieldDeclaration {
-                            const_export_name: ConstExportName(
-                                "BasicField",
+        (
+            ClientFieldDeclaration(
+                WithSpan {
+                    item: ClientFieldDeclaration {
+                        const_export_name: ConstExportName(
+                            "BasicField2",
+                        ),
+                        parent_type: WithSpan {
+                            item: UnvalidatedTypeName(
+                                "Type",
                             ),
-                            parent_type: WithSpan {
-                                item: UnvalidatedTypeName(
-                                    "Type",
-                                ),
-                                span: Span {
-                                    start: 9,
-                                    end: 13,
-                                },
+                            span: Span {
+                                start: 9,
+                                end: 13,
                             },
-                            client_field_name: WithSpan {
-                                item: ClientScalarSelectableName(
-                                    "Name",
-                                ),
-                                span: Span {
-                                    start: 14,
-                                    end: 18,
-                                },
+                        },
+                        client_field_name: WithSpan {
+                            item: ClientScalarSelectableName(
+                                "Name",
+                            ),
+                            span: Span {
+                                start: 14,
+                                end: 18,
                             },
-                            description: None,
-                            selection_set: [
-                                WithSpan {
-                                    item: Scalar(
-                                        ScalarFieldSelection {
-                                            name: WithLocation {
-                                                location: Embedded(
-                                                    EmbeddedLocation {
-                                                        text_source: TextSource {
-                                                            current_working_directory: CurrentWorkingDirectory,
-                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                                            ),
-                                                            span: Some(
-                                                                Span {
-                                                                    start: 31,
-                                                                    end: 77,
-                                                                },
-                                                            ),
-                                                        },
-                                                        span: Span {
-                                                            start: 25,
-                                                            end: 31,
-                                                        },
+                        },
+                        description: None,
+                        selection_set: [
+                            WithSpan {
+                                item: Scalar(
+                                    ScalarFieldSelection {
+                                        name: WithLocation {
+                                            location: Embedded(
+                                                EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 116,
+                                                                end: 187,
+                                                            },
+                                                        ),
                                                     },
-                                                ),
-                                                item: ScalarSelectableName(
-                                                    "scalar",
-                                                ),
-                                            },
-                                            reader_alias: None,
-                                            associated_data: Loadable(
-                                                LoadableDirectiveSet {
-                                                    loadable: LoadableDirectiveParameters {
-                                                        complete_selection_set: false,
-                                                        lazy_load_artifact: false,
+                                                    span: Span {
+                                                        start: 25,
+                                                        end: 31,
                                                     },
                                                 },
                                             ),
-                                            arguments: [],
+                                            item: ScalarSelectableName(
+                                                "scalar",
+                                            ),
                                         },
-                                    ),
-                                    span: Span {
-                                        start: 25,
-                                        end: 41,
+                                        reader_alias: None,
+                                        associated_data: Loadable(
+                                            LoadableDirectiveSet {
+                                                loadable: LoadableDirectiveParameters {
+                                                    complete_selection_set: false,
+                                                    lazy_load_artifact: false,
+                                                },
+                                            },
+                                        ),
+                                        arguments: [],
                                     },
-                                },
-                            ],
-                            directives: [],
-                            variable_definitions: [],
-                            definition_path: RelativePathToSourceFile(
-                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                            ),
-                            field_keyword: WithSpan {
-                                item: (),
+                                ),
                                 span: Span {
-                                    start: 3,
-                                    end: 8,
+                                    start: 25,
+                                    end: 66,
                                 },
                             },
-                            dot: WithSpan {
-                                item: (),
-                                span: Span {
-                                    start: 13,
-                                    end: 14,
-                                },
+                        ],
+                        directives: [],
+                        variable_definitions: [],
+                        definition_path: RelativePathToSourceFile(
+                            "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                        ),
+                        field_keyword: WithSpan {
+                            item: (),
+                            span: Span {
+                                start: 3,
+                                end: 8,
                             },
                         },
-                        span: Span {
-                            start: 9,
-                            end: 45,
+                        dot: WithSpan {
+                            item: (),
+                            span: Span {
+                                start: 13,
+                                end: 14,
+                            },
                         },
                     },
-                ),
-                TextSource {
-                    current_working_directory: CurrentWorkingDirectory,
-                    relative_path_to_source_file: RelativePathToSourceFile(
-                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                    ),
-                    span: Some(
-                        Span {
-                            start: 31,
-                            end: 77,
-                        },
-                    ),
+                    span: Span {
+                        start: 9,
+                        end: 70,
+                    },
                 },
             ),
-            (
-                ClientFieldDeclaration(
-                    WithSpan {
-                        item: ClientFieldDeclaration {
-                            const_export_name: ConstExportName(
-                                "BasicField2",
+            TextSource {
+                current_working_directory: CurrentWorkingDirectory,
+                relative_path_to_source_file: RelativePathToSourceFile(
+                    "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                ),
+                span: Some(
+                    Span {
+                        start: 116,
+                        end: 187,
+                    },
+                ),
+            },
+        ),
+        (
+            ClientFieldDeclaration(
+                WithSpan {
+                    item: ClientFieldDeclaration {
+                        const_export_name: ConstExportName(
+                            "BasicField3",
+                        ),
+                        parent_type: WithSpan {
+                            item: UnvalidatedTypeName(
+                                "Type",
                             ),
-                            parent_type: WithSpan {
-                                item: UnvalidatedTypeName(
-                                    "Type",
-                                ),
-                                span: Span {
-                                    start: 9,
-                                    end: 13,
-                                },
+                            span: Span {
+                                start: 9,
+                                end: 13,
                             },
-                            client_field_name: WithSpan {
-                                item: ClientScalarSelectableName(
-                                    "Name",
-                                ),
-                                span: Span {
-                                    start: 14,
-                                    end: 18,
-                                },
+                        },
+                        client_field_name: WithSpan {
+                            item: ClientScalarSelectableName(
+                                "Name",
+                            ),
+                            span: Span {
+                                start: 14,
+                                end: 18,
                             },
-                            description: None,
-                            selection_set: [
-                                WithSpan {
-                                    item: Scalar(
-                                        ScalarFieldSelection {
-                                            name: WithLocation {
-                                                location: Embedded(
-                                                    EmbeddedLocation {
-                                                        text_source: TextSource {
-                                                            current_working_directory: CurrentWorkingDirectory,
-                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                                            ),
-                                                            span: Some(
-                                                                Span {
-                                                                    start: 116,
-                                                                    end: 187,
-                                                                },
-                                                            ),
-                                                        },
-                                                        span: Span {
-                                                            start: 25,
-                                                            end: 31,
-                                                        },
+                        },
+                        description: None,
+                        selection_set: [
+                            WithSpan {
+                                item: Scalar(
+                                    ScalarFieldSelection {
+                                        name: WithLocation {
+                                            location: Embedded(
+                                                EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 226,
+                                                                end: 296,
+                                                            },
+                                                        ),
                                                     },
-                                                ),
-                                                item: ScalarSelectableName(
-                                                    "scalar",
-                                                ),
-                                            },
-                                            reader_alias: None,
-                                            associated_data: Loadable(
-                                                LoadableDirectiveSet {
-                                                    loadable: LoadableDirectiveParameters {
-                                                        complete_selection_set: false,
-                                                        lazy_load_artifact: false,
+                                                    span: Span {
+                                                        start: 25,
+                                                        end: 31,
                                                     },
                                                 },
                                             ),
-                                            arguments: [],
+                                            item: ScalarSelectableName(
+                                                "scalar",
+                                            ),
                                         },
-                                    ),
-                                    span: Span {
-                                        start: 25,
-                                        end: 66,
+                                        reader_alias: None,
+                                        associated_data: Loadable(
+                                            LoadableDirectiveSet {
+                                                loadable: LoadableDirectiveParameters {
+                                                    complete_selection_set: false,
+                                                    lazy_load_artifact: true,
+                                                },
+                                            },
+                                        ),
+                                        arguments: [],
                                     },
-                                },
-                            ],
-                            directives: [],
-                            variable_definitions: [],
-                            definition_path: RelativePathToSourceFile(
-                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                            ),
-                            field_keyword: WithSpan {
-                                item: (),
+                                ),
                                 span: Span {
-                                    start: 3,
-                                    end: 8,
+                                    start: 25,
+                                    end: 65,
                                 },
                             },
-                            dot: WithSpan {
-                                item: (),
-                                span: Span {
-                                    start: 13,
-                                    end: 14,
-                                },
+                        ],
+                        directives: [],
+                        variable_definitions: [],
+                        definition_path: RelativePathToSourceFile(
+                            "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                        ),
+                        field_keyword: WithSpan {
+                            item: (),
+                            span: Span {
+                                start: 3,
+                                end: 8,
                             },
                         },
-                        span: Span {
-                            start: 9,
-                            end: 70,
+                        dot: WithSpan {
+                            item: (),
+                            span: Span {
+                                start: 13,
+                                end: 14,
+                            },
                         },
                     },
-                ),
-                TextSource {
-                    current_working_directory: CurrentWorkingDirectory,
-                    relative_path_to_source_file: RelativePathToSourceFile(
-                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                    ),
-                    span: Some(
-                        Span {
-                            start: 116,
-                            end: 187,
-                        },
-                    ),
+                    span: Span {
+                        start: 9,
+                        end: 69,
+                    },
                 },
             ),
-            (
-                ClientFieldDeclaration(
-                    WithSpan {
-                        item: ClientFieldDeclaration {
-                            const_export_name: ConstExportName(
-                                "BasicField3",
+            TextSource {
+                current_working_directory: CurrentWorkingDirectory,
+                relative_path_to_source_file: RelativePathToSourceFile(
+                    "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                ),
+                span: Some(
+                    Span {
+                        start: 226,
+                        end: 296,
+                    },
+                ),
+            },
+        ),
+        (
+            ClientFieldDeclaration(
+                WithSpan {
+                    item: ClientFieldDeclaration {
+                        const_export_name: ConstExportName(
+                            "updatable",
+                        ),
+                        parent_type: WithSpan {
+                            item: UnvalidatedTypeName(
+                                "Type",
                             ),
-                            parent_type: WithSpan {
-                                item: UnvalidatedTypeName(
-                                    "Type",
-                                ),
-                                span: Span {
-                                    start: 9,
-                                    end: 13,
-                                },
+                            span: Span {
+                                start: 9,
+                                end: 13,
                             },
-                            client_field_name: WithSpan {
-                                item: ClientScalarSelectableName(
-                                    "Name",
-                                ),
-                                span: Span {
-                                    start: 14,
-                                    end: 18,
-                                },
+                        },
+                        client_field_name: WithSpan {
+                            item: ClientScalarSelectableName(
+                                "Name",
+                            ),
+                            span: Span {
+                                start: 14,
+                                end: 18,
                             },
-                            description: None,
-                            selection_set: [
-                                WithSpan {
-                                    item: Scalar(
-                                        ScalarFieldSelection {
-                                            name: WithLocation {
-                                                location: Embedded(
-                                                    EmbeddedLocation {
-                                                        text_source: TextSource {
-                                                            current_working_directory: CurrentWorkingDirectory,
-                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                                            ),
-                                                            span: Some(
-                                                                Span {
-                                                                    start: 226,
-                                                                    end: 296,
-                                                                },
-                                                            ),
-                                                        },
-                                                        span: Span {
-                                                            start: 25,
-                                                            end: 31,
-                                                        },
+                        },
+                        description: None,
+                        selection_set: [
+                            WithSpan {
+                                item: Scalar(
+                                    ScalarFieldSelection {
+                                        name: WithLocation {
+                                            location: Embedded(
+                                                EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 333,
+                                                                end: 380,
+                                                            },
+                                                        ),
                                                     },
-                                                ),
-                                                item: ScalarSelectableName(
-                                                    "scalar",
-                                                ),
-                                            },
-                                            reader_alias: None,
-                                            associated_data: Loadable(
-                                                LoadableDirectiveSet {
-                                                    loadable: LoadableDirectiveParameters {
-                                                        complete_selection_set: false,
-                                                        lazy_load_artifact: true,
+                                                    span: Span {
+                                                        start: 25,
+                                                        end: 31,
                                                     },
                                                 },
                                             ),
-                                            arguments: [],
-                                        },
-                                    ),
-                                    span: Span {
-                                        start: 25,
-                                        end: 65,
-                                    },
-                                },
-                            ],
-                            directives: [],
-                            variable_definitions: [],
-                            definition_path: RelativePathToSourceFile(
-                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                            ),
-                            field_keyword: WithSpan {
-                                item: (),
-                                span: Span {
-                                    start: 3,
-                                    end: 8,
-                                },
-                            },
-                            dot: WithSpan {
-                                item: (),
-                                span: Span {
-                                    start: 13,
-                                    end: 14,
-                                },
-                            },
-                        },
-                        span: Span {
-                            start: 9,
-                            end: 69,
-                        },
-                    },
-                ),
-                TextSource {
-                    current_working_directory: CurrentWorkingDirectory,
-                    relative_path_to_source_file: RelativePathToSourceFile(
-                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                    ),
-                    span: Some(
-                        Span {
-                            start: 226,
-                            end: 296,
-                        },
-                    ),
-                },
-            ),
-            (
-                ClientFieldDeclaration(
-                    WithSpan {
-                        item: ClientFieldDeclaration {
-                            const_export_name: ConstExportName(
-                                "updatable",
-                            ),
-                            parent_type: WithSpan {
-                                item: UnvalidatedTypeName(
-                                    "Type",
-                                ),
-                                span: Span {
-                                    start: 9,
-                                    end: 13,
-                                },
-                            },
-                            client_field_name: WithSpan {
-                                item: ClientScalarSelectableName(
-                                    "Name",
-                                ),
-                                span: Span {
-                                    start: 14,
-                                    end: 18,
-                                },
-                            },
-                            description: None,
-                            selection_set: [
-                                WithSpan {
-                                    item: Scalar(
-                                        ScalarFieldSelection {
-                                            name: WithLocation {
-                                                location: Embedded(
-                                                    EmbeddedLocation {
-                                                        text_source: TextSource {
-                                                            current_working_directory: CurrentWorkingDirectory,
-                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                                            ),
-                                                            span: Some(
-                                                                Span {
-                                                                    start: 333,
-                                                                    end: 380,
-                                                                },
-                                                            ),
-                                                        },
-                                                        span: Span {
-                                                            start: 25,
-                                                            end: 31,
-                                                        },
-                                                    },
-                                                ),
-                                                item: ScalarSelectableName(
-                                                    "scalar",
-                                                ),
-                                            },
-                                            reader_alias: None,
-                                            associated_data: Updatable(
-                                                UpdatableDirectiveSet {
-                                                    updatable: UpdatableDirectiveParameters,
-                                                },
+                                            item: ScalarSelectableName(
+                                                "scalar",
                                             ),
-                                            arguments: [],
                                         },
-                                    ),
-                                    span: Span {
-                                        start: 25,
-                                        end: 42,
+                                        reader_alias: None,
+                                        associated_data: Updatable(
+                                            UpdatableDirectiveSet {
+                                                updatable: UpdatableDirectiveParameters,
+                                            },
+                                        ),
+                                        arguments: [],
                                     },
-                                },
-                            ],
-                            directives: [],
-                            variable_definitions: [],
-                            definition_path: RelativePathToSourceFile(
-                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                            ),
-                            field_keyword: WithSpan {
-                                item: (),
+                                ),
                                 span: Span {
-                                    start: 3,
-                                    end: 8,
+                                    start: 25,
+                                    end: 42,
                                 },
                             },
-                            dot: WithSpan {
-                                item: (),
-                                span: Span {
-                                    start: 13,
-                                    end: 14,
-                                },
+                        ],
+                        directives: [],
+                        variable_definitions: [],
+                        definition_path: RelativePathToSourceFile(
+                            "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                        ),
+                        field_keyword: WithSpan {
+                            item: (),
+                            span: Span {
+                                start: 3,
+                                end: 8,
                             },
                         },
-                        span: Span {
-                            start: 9,
-                            end: 46,
+                        dot: WithSpan {
+                            item: (),
+                            span: Span {
+                                start: 13,
+                                end: 14,
+                            },
                         },
                     },
-                ),
-                TextSource {
-                    current_working_directory: CurrentWorkingDirectory,
-                    relative_path_to_source_file: RelativePathToSourceFile(
-                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                    ),
-                    span: Some(
-                        Span {
-                            start: 333,
-                            end: 380,
-                        },
-                    ),
+                    span: Span {
+                        start: 9,
+                        end: 46,
+                    },
                 },
             ),
-        ],
-    ),
+            TextSource {
+                current_working_directory: CurrentWorkingDirectory,
+                relative_path_to_source_file: RelativePathToSourceFile(
+                    "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                ),
+                span: Some(
+                    Span {
+                        start: 333,
+                        end: 380,
+                    },
+                ),
+            },
+        ),
+    ],
 )

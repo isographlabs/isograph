@@ -48,7 +48,7 @@ pub(crate) type ProcessTypeDefinitionResult<T> =
     Result<T, WithLocation<CreateAdditionalFieldsError>>;
 
 /// Errors that make semantic sense when referring to creating a GraphQL schema in-memory representation
-#[derive(Error, Eq, PartialEq, Debug)]
+#[derive(Error, Clone, Eq, PartialEq, Debug)]
 pub enum CreateAdditionalFieldsError {
     #[error(
         "The Isograph compiler attempted to create a field named \

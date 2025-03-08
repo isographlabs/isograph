@@ -1,61 +1,30 @@
 use std::{path::PathBuf, str::Utf8Error};
 
-use common_lang_types::{RelativePathToSourceFile, TextSource, WithLocation};
+use common_lang_types::WithLocation;
 use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDocument};
 use graphql_schema_parser::{parse_schema, parse_schema_extensions, SchemaParseError};
-use isograph_config::{AbsolutePathAndRelativePath, CompilerConfig};
+use isograph_lang_types::SchemaSource;
+use pico::{Database, MemoRef, SourceId};
+use pico_macros::memo;
 use thiserror::Error;
 
-pub fn read_and_parse_graphql_schema(
-    config: &CompilerConfig,
-) -> Result<GraphQLTypeSystemDocument, BatchCompileError> {
-    let content = read_schema_file(&config.schema.absolute_path)?;
-    let schema_text_source = TextSource {
-        relative_path_to_source_file: config.schema.relative_path,
-        span: None,
-        current_working_directory: config.current_working_directory,
-    };
-    let schema = parse_schema(&content, schema_text_source)
-        .map_err(|with_span| with_span.to_with_location(schema_text_source))?;
+#[memo]
+pub fn parse_graphql_schema(
+    db: &Database,
+    schema_source_id: SourceId<SchemaSource>,
+) -> Result<MemoRef<GraphQLTypeSystemDocument>, BatchCompileError> {
+    let SchemaSource {
+        content,
+        text_source,
+        ..
+    } = db.get(schema_source_id);
+    let schema = parse_schema(content, *text_source)
+        .map(|document| db.intern(document))
+        .map_err(|with_span| with_span.to_with_location(*text_source))?;
     Ok(schema)
 }
 
-/// Read schema file
-fn read_schema_file(path: &PathBuf) -> Result<String, BatchCompileError> {
-    let current_dir = std::env::current_dir().expect("current_dir should exist");
-    let joined = current_dir.join(path);
-    let canonicalized_existing_path =
-        joined
-            .canonicalize()
-            .map_err(|e| BatchCompileError::UnableToLoadSchema {
-                path: joined,
-                message: e.to_string(),
-            })?;
-
-    if !canonicalized_existing_path.is_file() {
-        return Err(BatchCompileError::SchemaNotAFile {
-            path: canonicalized_existing_path,
-        });
-    }
-
-    let contents = std::fs::read(canonicalized_existing_path.clone()).map_err(|e| {
-        BatchCompileError::UnableToReadFile {
-            path: canonicalized_existing_path.clone(),
-            message: e.to_string(),
-        }
-    })?;
-
-    let contents = std::str::from_utf8(&contents)
-        .map_err(|e| BatchCompileError::UnableToConvertToString {
-            path: canonicalized_existing_path.clone(),
-            reason: e,
-        })?
-        .to_owned();
-
-    Ok(contents)
-}
-
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum BatchCompileError {
     #[error("Unable to load schema file at path {path:?}.\nReason: {message}")]
     UnableToLoadSchema { path: PathBuf, message: String },
@@ -84,19 +53,19 @@ pub enum BatchCompileError {
     UnableToParseSchema(#[from] WithLocation<SchemaParseError>),
 }
 
-pub fn read_and_parse_schema_extensions(
-    schema_extension_path: &AbsolutePathAndRelativePath,
-    config: &CompilerConfig,
-) -> Result<(RelativePathToSourceFile, GraphQLTypeSystemExtensionDocument), BatchCompileError> {
-    let extension_content = read_schema_file(&schema_extension_path.absolute_path)?;
-    let extension_text_source = TextSource {
-        relative_path_to_source_file: schema_extension_path.relative_path,
-        span: None,
-        current_working_directory: config.current_working_directory,
-    };
+#[memo]
+pub fn parse_schema_extensions_file(
+    db: &Database,
+    schema_extension_source_id: SourceId<SchemaSource>,
+) -> Result<MemoRef<GraphQLTypeSystemExtensionDocument>, BatchCompileError> {
+    let SchemaSource {
+        content,
+        text_source,
+        ..
+    } = db.get(schema_extension_source_id);
+    let schema_extensions = parse_schema_extensions(content, *text_source)
+        .map(|document| db.intern(document))
+        .map_err(|with_span| with_span.to_with_location(*text_source))?;
 
-    let schema_extensions = parse_schema_extensions(&extension_content, extension_text_source)
-        .map_err(|with_span| with_span.to_with_location(extension_text_source))?;
-
-    Ok((schema_extension_path.relative_path, schema_extensions))
+    Ok(schema_extensions)
 }

@@ -1,6 +1,6 @@
 use std::{path::PathBuf, str::Utf8Error};
 
-use crate::with_duration::WithDuration;
+use crate::{compiler_state::compile, source_files::SourceFiles, with_duration::WithDuration};
 use colored::Colorize;
 use common_lang_types::{CurrentWorkingDirectory, WithLocation};
 use isograph_lang_parser::IsographLiteralParseError;
@@ -23,8 +23,9 @@ pub fn compile_and_print<TOutputFormat: OutputFormat>(
 ) -> Result<(), Box<dyn std::error::Error>> {
     info!("{}", "Starting to compile.".cyan());
     print_result(WithDuration::new(|| {
-        CompilerState::<TOutputFormat>::new(config_location, current_working_directory)
-            .batch_compile()
+        let mut state = CompilerState::new(config_location, current_working_directory);
+        let sources = SourceFiles::read_all(&mut state.db, &state.config)?;
+        compile::<TOutputFormat>(&state.db, &sources, &state.config)
     }))
 }
 
@@ -72,6 +73,11 @@ pub enum BatchCompileError {
 
     #[error("Unable to read the file at the following path: {path:?}.\nReason: {message}")]
     UnableToReadFile { path: PathBuf, message: String },
+
+    #[error(
+        "Attempted to load the schema at the following path: {path:?}, but that is not a file."
+    )]
+    SchemaNotAFile { path: PathBuf },
 
     #[error("Unable to traverse directory.\nReason: {message}")]
     UnableToTraverseDirectory { message: String },

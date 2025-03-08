@@ -12,6 +12,8 @@ intern = { path = "../../relay-crates/intern" }
 isograph_config = { path = "../isograph_config" }
 isograph_lang_types = { path = "../isograph_lang_types" }
 isograph_schema = { path = "../isograph_schema" }
+pico = { path = "../pico" }
+pico_macros = { path = "../pico_macros" }
 lazy_static = { workspace = true }
 pathdiff = { workspace = true }
 thiserror = { workspace = true }
