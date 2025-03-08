@@ -1,0 +1,13 @@
+[package]
+name = "pico_macros"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }
+
+[lib]
+proc-macro = true
