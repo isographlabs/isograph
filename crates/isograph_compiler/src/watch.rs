@@ -84,6 +84,7 @@ fn categorize_and_filter_events(
                 process_modify_event(config, modify_kind, &event.paths)
             }
             EventKind::Remove(remove_kind) => {
+                // WOW WHAT A TRICK
                 process_remove_event(config, remove_kind, &event.paths)
             }
             _ => None,
