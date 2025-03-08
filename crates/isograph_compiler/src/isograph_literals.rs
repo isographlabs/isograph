@@ -109,7 +109,7 @@ pub fn parse_iso_literals_in_file_content(
     let mut extraction_results = vec![];
     let mut isograph_literal_parse_errors = vec![];
 
-    for iso_literal_extraction in extract_iso_literals_from_file_content(&file_content) {
+    for iso_literal_extraction in extract_iso_literals_from_file_content(file_content) {
         match process_iso_literal_extraction(
             iso_literal_extraction,
             relative_path_to_source_file,
