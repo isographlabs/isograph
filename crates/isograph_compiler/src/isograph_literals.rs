@@ -50,12 +50,9 @@ pub fn read_file(
     path: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(RelativePathToSourceFile, String), BatchCompileError> {
-    // This isn't ideal. We can avoid a clone if we changed .map_err to match
-    let path_2 = path.clone();
-
     // N.B. we have previously ensured that path is a file
     let contents = std::fs::read(&path).map_err(|e| BatchCompileError::UnableToReadFile {
-        path: path_2,
+        path: path.clone(),
         message: e.to_string(),
     })?;
 
@@ -103,7 +100,7 @@ fn visit_dirs_skipping_isograph(dir: &Path, cb: &mut dyn FnMut(&DirEntry)) -> io
 #[allow(clippy::type_complexity)]
 pub fn parse_iso_literals_in_file_content(
     relative_path_to_source_file: RelativePathToSourceFile,
-    file_content: String,
+    file_content: &str,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<
     Vec<(IsoLiteralExtractionResult, TextSource)>,
@@ -143,8 +140,8 @@ pub fn parse_iso_literal_in_source(
     let IsoLiteralsSource {
         relative_path,
         content,
-    } = db.get(iso_literals_source_id).clone();
-    parse_iso_literals_in_file_content(relative_path, content, current_working_directory)
+    } = db.get(iso_literals_source_id);
+    parse_iso_literals_in_file_content(*relative_path, content, current_working_directory)
 }
 
 pub(crate) fn process_iso_literals<TOutputFormat: OutputFormat>(

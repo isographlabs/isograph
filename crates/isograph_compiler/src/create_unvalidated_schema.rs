@@ -82,15 +82,15 @@ fn parse_iso_literals(
     let mut iso_literal_parse_errors = vec![];
     for (relative_path, iso_literals_source_id) in iso_literals_sources.iter() {
         match parse_iso_literal_in_source(db, *iso_literals_source_id, current_working_directory)
-            .to_owned()
+            .deref()
         {
             Ok(iso_literals) => {
                 if !iso_literals.is_empty() {
-                    contains_iso.insert(*relative_path, iso_literals);
+                    contains_iso.insert(*relative_path, iso_literals.to_owned());
                 }
             }
             Err(e) => {
-                iso_literal_parse_errors.extend(e);
+                iso_literal_parse_errors.extend(e.to_owned());
             }
         };
     }

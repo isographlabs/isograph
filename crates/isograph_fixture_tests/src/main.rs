@@ -121,7 +121,7 @@ fn generate_content_for_output_file(
     );
     match parse_iso_literals_in_file_content(
         relative_path_to_source_file,
-        content,
+        &content,
         config.current_working_directory,
     ) {
         Ok(item) => {
