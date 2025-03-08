@@ -55,12 +55,9 @@ pub fn read_file(
     path: PathBuf,
     canonicalized_root_path: &Path,
 ) -> Result<(PathBuf, String), BatchCompileError> {
-    // This isn't ideal. We can avoid a clone if we changed .map_err to match
-    let path_2 = path.clone();
-
     // N.B. we have previously ensured that path is a file
     let contents = std::fs::read(&path).map_err(|e| BatchCompileError::UnableToReadFile {
-        path: path_2,
+        path: path.clone(),
         message: e.to_string(),
     })?;
 
