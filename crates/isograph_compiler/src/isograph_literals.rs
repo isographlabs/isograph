@@ -17,11 +17,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{
-    batch_compile::BatchCompileError,
-    create_unvalidated_schema::ContainsIso,
-    field_directives::{validate_isograph_field_directives, validate_isograph_pointer_directives},
-};
+use crate::{batch_compile::BatchCompileError, create_unvalidated_schema::ContainsIso};
 
 pub fn read_files_in_folder(
     folder: &Path,
@@ -153,32 +149,20 @@ pub(crate) fn process_iso_literals<TOutputFormat: OutputFormat>(
         for (extraction_result, text_source) in iso_literals {
             match extraction_result {
                 IsoLiteralExtractionResult::ClientFieldDeclaration(client_field_declaration) => {
-                    match validate_isograph_field_directives(client_field_declaration) {
-                        Ok(validated_client_field_declaration) => {
-                            if let Err(e) = schema.process_client_field_declaration(
-                                validated_client_field_declaration,
-                                text_source,
-                            ) {
-                                errors.push(e);
-                            }
-                        }
-                        Err(e) => errors.extend(e),
-                    };
+                    if let Err(e) = schema
+                        .process_client_field_declaration(client_field_declaration, text_source)
+                    {
+                        errors.push(e);
+                    }
                 }
                 IsoLiteralExtractionResult::ClientPointerDeclaration(
                     client_pointer_declaration,
                 ) => {
-                    match validate_isograph_pointer_directives(client_pointer_declaration) {
-                        Ok(validated_client_pointer_declaration) => {
-                            if let Err(e) = schema.process_client_pointer_declaration(
-                                validated_client_pointer_declaration,
-                                text_source,
-                            ) {
-                                errors.push(e);
-                            }
-                        }
-                        Err(e) => errors.extend(e),
-                    };
+                    if let Err(e) = schema
+                        .process_client_pointer_declaration(client_pointer_declaration, text_source)
+                    {
+                        errors.push(e);
+                    }
                 }
 
                 IsoLiteralExtractionResult::EntrypointDeclaration(entrypoint_declaration) => schema

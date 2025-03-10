@@ -1,7 +1,6 @@
 pub mod batch_compile;
 mod compiler_state;
 mod create_unvalidated_schema;
-mod field_directives;
 mod isograph_literals;
 mod refetch_fields;
 mod source_files;
