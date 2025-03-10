@@ -71,7 +71,6 @@ pub type ValidatedFieldDefinitionLocation =
 pub struct ValidatedLinkedFieldAssociatedData {
     pub parent_object_id: ServerObjectId,
     pub field_id: DefinitionLocation<ServerScalarSelectableId, ClientPointerId>,
-    // N.B. we don't actually support loadable linked fields
     pub selection_variant: ObjectSelectionDirectiveSet,
     /// Some if the (destination?) object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
