@@ -14,7 +14,13 @@ const artifact: IsographEntrypoint<
   kind: "Entrypoint",
   networkRequestInfo: {
     kind: "NetworkRequestInfo",
-    queryText,
+    operation: {
+      kind: "Operation",
+      documentId: null,
+      operationName: "SetTagline",
+      operationKind: "Mutation",
+      text: queryText,
+    },
     normalizationAst,
   },
   concreteType: "Mutation",

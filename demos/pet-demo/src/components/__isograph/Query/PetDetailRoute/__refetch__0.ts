@@ -1,43 +1,5 @@
 import type { IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryNormalizationArtifact } from '@isograph/react';
-const queryText = 'query Pet__refetch ($id: ID!) {\
-  node____id___v_id: node(id: $id) {\
-    ... on Pet {\
-      __typename,\
-      id,\
-      age,\
-      best_friend_relationship {\
-        best_friend {\
-          id,\
-          name,\
-          picture,\
-        },\
-        picture_together,\
-      },\
-      checkins____skip___l_null____limit___l_null: checkins(skip: null, limit: null) {\
-        id,\
-        location,\
-        time,\
-      },\
-      favorite_phrase,\
-      name,\
-      nickname,\
-      potential_new_best_friends {\
-        id,\
-        name,\
-      },\
-      stats {\
-        cuteness,\
-        energy,\
-        hunger,\
-        intelligence,\
-        sociability,\
-        weight,\
-      },\
-      tagline,\
-    },\
-  },\
-}';
-
+import queryText from './__refetch__query_text__0.ts';
 const normalizationAst: NormalizationAst = {
   kind: "NormalizationAst",
   selections: [
@@ -226,7 +188,13 @@ const artifact: RefetchQueryNormalizationArtifact = {
   kind: "RefetchQuery",
   networkRequestInfo: {
     kind: "NetworkRequestInfo",
-    queryText,
+    operation: {
+      kind: "Operation",
+      documentId: null,
+      operationName: "Pet__refetch",
+      operationKind: "Query",
+      text: queryText,
+    },
     normalizationAst,
   },
   concreteType: "Query",

@@ -1,0 +1,11 @@
+{
+  "name": "pet-demo-persist-backend",
+  "version": "0.3.1",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "graphql": "16.10.0",
+    "graphql-yoga": "5.13.1",
+    "@graphql-yoga/plugin-persisted-operations": "3.13.2"
+  }
+}

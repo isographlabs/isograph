@@ -1,0 +1,33 @@
+extend type Mutation
+  @exposeField(
+    field: "set_pet_tagline"
+    path: "pet"
+    fieldMap: [{ from: "id", to: "input.id" }]
+  )
+  @exposeField(
+    as: "set_best_friend"
+    field: "set_pet_best_friend"
+    path: "pet"
+    fieldMap: [{ from: "id", to: "id" }]
+  )
+  @exposeField(
+    field: "make_checkin_super"
+    as: "make_super"
+    path: "checkin"
+    fieldMap: [{ from: "id", to: "checkin_id" }]
+  )
+  # this field should only be accessed in UnreachableFromEntrypoint.tsx
+  @exposeField(
+    field: "set_pet_best_friend"
+    as: "set_best_friend_do_not_use"
+    path: "pet"
+  )
+  # this field should not be accessed
+  @exposeField(
+    field: "set_pet_best_friend"
+    as: "set_best_friend_do_not_use_2"
+    path: "pet"
+  )
+
+extend type Query
+  @exposeField(field: "pet", path: "stats", as: "refetch_pet_stats")

@@ -19,9 +19,18 @@ export type ReaderWithRefetchQueries<
 
 export type NetworkRequestInfo<TNormalizationAst> = {
   readonly kind: 'NetworkRequestInfo';
-  readonly queryText: string;
+  readonly operation: IsographOperation;
   readonly normalizationAst: TNormalizationAst;
 };
+
+export type IsographOperation = {
+  readonly kind: 'Operation';
+  readonly documentId: string | null;
+  readonly operationName: string | null;
+  readonly operationKind: 'Query' | 'Mutation' | 'Subscription';
+  readonly text: string | null;
+};
+
 // This type should be treated as an opaque type.
 export type IsographEntrypoint<
   TReadFromStore extends UnknownTReadFromStore,

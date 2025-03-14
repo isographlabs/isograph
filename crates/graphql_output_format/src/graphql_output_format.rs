@@ -4,7 +4,7 @@ use common_lang_types::{QueryOperationName, QueryText};
 use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDocument};
 use isograph_lang_types::SchemaSource;
 use isograph_schema::{
-    MergedSelectionMap, OutputFormat, ProcessTypeSystemDocumentOutcome, RootOperationName,
+    Format, MergedSelectionMap, OutputFormat, ProcessTypeSystemDocumentOutcome, RootOperationName,
     ValidatedSchema, ValidatedVariableDefinition,
 };
 use pico::{Database, MemoRef, SourceId};
@@ -70,6 +70,7 @@ impl OutputFormat for GraphQLOutputFormat {
         selection_map: &MergedSelectionMap,
         query_variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
         root_operation_name: &RootOperationName,
+        format: Format,
     ) -> QueryText {
         generate_query_text(
             query_name,
@@ -77,6 +78,7 @@ impl OutputFormat for GraphQLOutputFormat {
             selection_map,
             query_variables,
             root_operation_name,
+            format,
         )
     }
 }

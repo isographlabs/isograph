@@ -1,11 +1,11 @@
 use common_lang_types::{
     relative_path_from_absolute_and_working_directory, AbsolutePathAndRelativePath,
-    CurrentWorkingDirectory, GeneratedFileHeader,
+    ArtifactFileName, CurrentWorkingDirectory, GeneratedFileHeader,
 };
 use intern::string_key::Intern;
 use schemars::JsonSchema;
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing::warn;
 
 pub static ISOGRAPH_FOLDER: &str = "__isograph";
@@ -40,6 +40,7 @@ pub struct CompilerConfigOptions {
     pub include_file_extensions_in_import_statements: GenerateFileExtensionsOption,
     pub module: JavascriptModule,
     pub generated_file_header: Option<GeneratedFileHeader>,
+    pub persisted_documents: Option<PersistedDocumentsOptions>,
 }
 
 #[derive(Default, Debug, Clone, Copy)]
@@ -96,6 +97,20 @@ pub enum JavascriptModule {
     CommonJs,
     #[default]
     EsModule,
+}
+
+#[derive(Debug, Clone)]
+pub struct PersistedDocumentsOptions {
+    pub directory: Option<AbsolutePathAndRelativePath>,
+    pub filename: ArtifactFileName,
+    pub algorithm: PersistedDocumentsHashAlgorithm,
+}
+
+#[derive(Default, Debug, Clone, Copy)]
+pub enum PersistedDocumentsHashAlgorithm {
+    Md5,
+    #[default]
+    Sha256,
 }
 
 /// This struct is deserialized from an isograph.config.json file.
@@ -158,6 +173,14 @@ pub fn create_config(
     let project_root_dir = config_dir.join(&config_parsed.project_root);
     std::fs::create_dir_all(&project_root_dir).expect("Unable to create project root directory");
 
+    if let Some(pd_config) = config_parsed.options.persisted_documents.as_ref() {
+        if let Some(directory) = pd_config.directory.as_ref() {
+            let absolute_path = config_dir.join(directory);
+            std::fs::create_dir_all(absolute_path)
+                .expect("Unable to create persisted documents directory");
+        }
+    }
+
     CompilerConfig {
         config_location: config_location.canonicalize().unwrap_or_else(|_| {
             panic!(
@@ -210,7 +233,11 @@ pub fn create_config(
                 )
             })
             .collect(),
-        options: create_options(config_parsed.options),
+        options: create_options(
+            current_working_directory,
+            &config_dir,
+            config_parsed.options,
+        ),
 
         current_working_directory,
     }
@@ -233,6 +260,8 @@ pub struct ConfigFileOptions {
     module: ConfigFileJavascriptModule,
     /// A string to generate, in a comment, at the top of every generated file.
     generated_file_header: Option<String>,
+    /// Persisted documents options
+    persisted_documents: Option<ConfigFilePersistedDocumentsOptions>,
 }
 
 #[derive(Deserialize, Debug, Clone, Copy, JsonSchema)]
@@ -260,7 +289,43 @@ pub enum ConfigFileJavascriptModule {
     EsModule,
 }
 
-fn create_options(options: ConfigFileOptions) -> CompilerConfigOptions {
+#[derive(Deserialize, JsonSchema)]
+#[serde(default, deny_unknown_fields)]
+pub struct ConfigFilePersistedDocumentsOptions {
+    /// The relative path to the directory where the compiler should create
+    /// the persisted documents file.
+    /// Defaults to the artifacts directory.
+    pub directory: Option<PathBuf>,
+    /// The file name used by the compiler to save persisted document information
+    /// Defaults to `persisted_documents.json`
+    pub filename: String,
+    /// The hashing algorithm used to compute document hashes.
+    pub algorithm: ConfigFilePersistedDocumentsHashAlgorithm,
+}
+
+impl Default for ConfigFilePersistedDocumentsOptions {
+    fn default() -> Self {
+        Self {
+            directory: None,
+            filename: "persisted_documents.json".to_string(),
+            algorithm: Default::default(),
+        }
+    }
+}
+
+#[derive(Deserialize, Default, Debug, Clone, Copy, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum ConfigFilePersistedDocumentsHashAlgorithm {
+    Md5,
+    #[default]
+    Sha256,
+}
+
+fn create_options(
+    current_working_directory: CurrentWorkingDirectory,
+    config_dir: &Path,
+    options: ConfigFileOptions,
+) -> CompilerConfigOptions {
     if let Some(header) = options.generated_file_header.as_ref() {
         let line_count = header.lines().count();
         if line_count > 1 {
@@ -278,6 +343,11 @@ fn create_options(options: ConfigFileOptions) -> CompilerConfigOptions {
         ),
         module: create_module(options.module),
         generated_file_header,
+        persisted_documents: create_persisted_documents(
+            current_working_directory,
+            config_dir,
+            options.persisted_documents,
+        ),
     }
 }
 
@@ -305,6 +375,37 @@ fn create_module(module: ConfigFileJavascriptModule) -> JavascriptModule {
         ConfigFileJavascriptModule::CommonJs => JavascriptModule::CommonJs,
         ConfigFileJavascriptModule::EsModule => JavascriptModule::EsModule,
     }
+}
+
+fn create_persisted_documents(
+    current_working_directory: CurrentWorkingDirectory,
+    config_dir: &Path,
+    persisted_documents: Option<ConfigFilePersistedDocumentsOptions>,
+) -> Option<PersistedDocumentsOptions> {
+    persisted_documents.map(|options| {
+        let algorithm = match options.algorithm {
+            ConfigFilePersistedDocumentsHashAlgorithm::Md5 => PersistedDocumentsHashAlgorithm::Md5,
+            ConfigFilePersistedDocumentsHashAlgorithm::Sha256 => {
+                PersistedDocumentsHashAlgorithm::Sha256
+            }
+        };
+        PersistedDocumentsOptions {
+            directory: options.directory.map(|dir| absolute_and_relative_paths(
+                current_working_directory,
+                config_dir
+                    .join(&dir)
+                    .canonicalize()
+                    .unwrap_or_else(|_| {
+                        panic!(
+                            "Unable to canonicalize persisted documents directory. Does {:?} exist?",
+                            dir
+                        )
+                    }),
+            )),
+            filename: options.filename.intern().into(),
+            algorithm,
+        }
+    })
 }
 
 pub fn absolute_and_relative_paths(

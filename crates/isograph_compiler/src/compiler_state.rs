@@ -95,10 +95,9 @@ pub fn compile<TOutputFormat: OutputFormat>(
     // disk can be as fast as possible and we minimize the chance that changes to the file
     // system occur while we're writing and we get unpredictable results.
 
-    let artifacts = get_artifact_path_and_content(&validated_schema, config);
+    let (artifacts, persisted_documents) = get_artifact_path_and_content(&validated_schema, config);
 
-    let total_artifacts_written =
-        write_artifacts_to_disk(artifacts, &config.artifact_directory.absolute_path)?;
+    let total_artifacts_written = write_artifacts_to_disk(artifacts, persisted_documents, config)?;
     Ok(CompilationStats {
         client_field_count: stats.client_field_count,
         entrypoint_count: stats.entrypoint_count,

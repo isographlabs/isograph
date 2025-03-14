@@ -75,6 +75,7 @@ export {
   type NormalizationLinkedField,
   type NormalizationScalarField,
   type IsographEntrypoint,
+  type IsographOperation,
   assertIsEntrypoint,
   type RefetchQueryNormalizationArtifact,
   type RefetchQueryNormalizationArtifactWrapper,

@@ -2,6 +2,7 @@ import {
   createIsographEnvironment,
   createIsographStore,
   IsographEnvironmentProvider,
+  IsographOperation,
   type Link,
   type StoreRecord,
 } from '@isograph/react';
@@ -9,7 +10,7 @@ import type { AppProps } from 'next/app';
 import { useMemo } from 'react';
 
 function makeNetworkRequest<T>(
-  queryText: string,
+  operation: IsographOperation,
   variables: unknown,
 ): Promise<T> {
   const promise = fetch('http://localhost:4000/graphql', {
@@ -17,7 +18,7 @@ function makeNetworkRequest<T>(
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ query: queryText, variables }),
+    body: JSON.stringify({ query: operation.text, variables }),
   }).then(async (response) => {
     const json = await response.json();
 
