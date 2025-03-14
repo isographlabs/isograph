@@ -36,6 +36,16 @@ macro_rules! string_key_newtype {
             }
         }
 
+        impl serde::Serialize for $named {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                use intern::Lookup;
+                serializer.serialize_str(self.lookup())
+            }
+        }
+
         impl $named {
             pub fn unchecked_conversion<T: From<intern::string_key::StringKey>>(self) -> T {
                 self.0.into()

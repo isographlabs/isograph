@@ -51,10 +51,17 @@ where
         selection_map: &MergedSelectionMap,
         query_variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
         root_operation_name: &RootOperationName,
+        format: Format,
     ) -> QueryText;
 }
 
 pub struct ProcessTypeSystemDocumentOutcome {
     pub type_refinement_maps: TypeRefinementMaps,
     pub root_types: EncounteredRootTypes,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Format {
+    Pretty,
+    Compact,
 }

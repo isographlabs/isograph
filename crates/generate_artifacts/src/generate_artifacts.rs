@@ -1,6 +1,7 @@
 use common_lang_types::{
     derive_display, ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent, DescriptionValue,
-    Location, ObjectTypeAndFieldName, SelectableNameOrAlias, Span, WithLocation, WithSpan,
+    DocumentId, Location, ObjectTypeAndFieldName, QueryText, SelectableNameOrAlias, Span,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
@@ -98,8 +99,9 @@ lazy_static! {
 pub fn get_artifact_path_and_content<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
     config: &CompilerConfig,
-) -> Vec<ArtifactPathAndContent> {
-    let mut artifact_path_and_content = get_artifact_path_and_content_impl(schema, config);
+) -> (Vec<ArtifactPathAndContent>, BTreeMap<DocumentId, QueryText>) {
+    let (mut artifact_path_and_content, persisted_documents) =
+        get_artifact_path_and_content_impl(schema, config);
     if let Some(header) = config.options.generated_file_header {
         let header = header.lookup();
         for artifact_path_and_content in artifact_path_and_content.iter_mut() {
@@ -107,26 +109,30 @@ pub fn get_artifact_path_and_content<TOutputFormat: OutputFormat>(
                 format!("// {header}\n{}", artifact_path_and_content.file_content);
         }
     }
-    artifact_path_and_content
+    (artifact_path_and_content, persisted_documents)
 }
 
 fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
     config: &CompilerConfig,
-) -> Vec<ArtifactPathAndContent> {
+) -> (Vec<ArtifactPathAndContent>, BTreeMap<DocumentId, QueryText>) {
     let mut encountered_client_type_map = BTreeMap::new();
     let mut path_and_contents = vec![];
     let mut encountered_output_types = HashSet::<ClientFieldId>::new();
+    let mut persisted_documents = BTreeMap::new();
 
     // For each entrypoint, generate an entrypoint artifact and refetch artifacts
     for entrypoint_id in schema.entrypoints.keys() {
-        let entrypoint_path_and_content = generate_entrypoint_artifacts(
-            schema,
-            *entrypoint_id,
-            &mut encountered_client_type_map,
-            config.options.include_file_extensions_in_import_statements,
-        );
+        let (entrypoint_path_and_content, entrypoint_persisted_documents) =
+            generate_entrypoint_artifacts(
+                schema,
+                *entrypoint_id,
+                &mut encountered_client_type_map,
+                config.options.include_file_extensions_in_import_statements,
+                config.options.persisted_documents.as_ref(),
+            );
         path_and_contents.extend(entrypoint_path_and_content);
+        persisted_documents.extend(entrypoint_persisted_documents);
 
         // We also need to generate output types for entrypoints
         encountered_output_types.insert(*entrypoint_id);
@@ -272,7 +278,7 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
                                 })
                                 .collect();
 
-                            path_and_contents.extend(
+                            let (entrypoint_path_and_content, entrypoint_persisted_documents) =
                                 generate_entrypoint_artifacts_with_client_field_traversal_result(
                                     schema,
                                     encountered_client_field,
@@ -282,8 +288,10 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
                                     variable_definitions_iter,
                                     &schema.find_query(),
                                     config.options.include_file_extensions_in_import_statements,
-                                ),
-                            );
+                                    config.options.persisted_documents.as_ref(),
+                                );
+                            path_and_contents.extend(entrypoint_path_and_content);
+                            persisted_documents.extend(entrypoint_persisted_documents);
                         }
                     }
                     ClientFieldVariant::ImperativelyLoadedField(variant) => {
@@ -366,7 +374,7 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
         config.options.no_babel_transform,
     ));
 
-    path_and_contents
+    (path_and_contents, persisted_documents)
 }
 
 pub(crate) fn get_serialized_field_arguments(
@@ -1121,3 +1129,11 @@ derive_display!(NormalizationAstText);
 #[derive(Debug)]
 pub(crate) struct RefetchQueryArtifactImport(pub String);
 derive_display!(RefetchQueryArtifactImport);
+
+#[derive(Debug)]
+pub(crate) struct QueryTextImport(pub String);
+derive_display!(QueryTextImport);
+
+#[derive(Debug)]
+pub(crate) struct OperationText(pub String);
+derive_display!(OperationText);

@@ -117,6 +117,51 @@
               "$ref": "#/definitions/ConfigFileOptionalValidationLevel"
             }
           ]
+        },
+        "persisted_documents": {
+          "description": "Persisted documents options",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ConfigFilePersistedDocumentsOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ConfigFilePersistedDocumentsHashAlgorithm": {
+      "type": "string",
+      "enum": [
+        "md5",
+        "sha256"
+      ]
+    },
+    "ConfigFilePersistedDocumentsOptions": {
+      "type": "object",
+      "properties": {
+        "algorithm": {
+          "description": "The hashing algorithm used to compute document hashes.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ConfigFilePersistedDocumentsHashAlgorithm"
+            }
+          ]
+        },
+        "directory": {
+          "description": "The relative path to the directory where the compiler should create the persisted documents file. Defaults to the artifacts directory.",
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "filename": {
+          "description": "The file name used by the compiler to save persisted document information Defaults to `persisted_documents.json`",
+          "default": "persisted_documents.json",
+          "type": "string"
         }
       },
       "additionalProperties": false
