@@ -1,0 +1,25 @@
+{
+  "name": "@isograph/plugin-swc",
+  "version": "1.5.118",
+  "description": "SWC plugin for Isograph",
+  "main": "swc_plugin_relay.wasm",
+  "types": "./types.d.ts",
+  "scripts": {
+    "prepack": "cp ../../target/wasm32-wasi/release/swc_plugin_relay.wasm ."
+  },
+  "homepage": "https://swc.rs",
+  "repository": {
+    "type": "git",
+    "url": "+https://github.com/isograph/isograph.git"
+  },
+  "bugs": {
+    "url": "https://github.com/isograph/isograph/issues"
+  },
+  "author": "강동윤 <kdy1997.dev@gmail.com>",
+  "keywords": [],
+  "license": "Apache-2.0",
+  "preferUnplugged": true,
+  "dependencies": {
+    "@swc/counter": "^0.1.3"
+  }
+}

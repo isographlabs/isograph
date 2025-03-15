@@ -1,0 +1,9 @@
+{
+  "$schema": "../../../../../../../libs/isograph-compiler/isograph-config-schema.json",
+  "project_root": "./components",
+  "schema": "./backend/schema.graphql",
+  "schema_extensions": ["./backend/schema-extension.graphql"],
+  "options": {
+    "on_invalid_id_type": "error"
+  }
+}
