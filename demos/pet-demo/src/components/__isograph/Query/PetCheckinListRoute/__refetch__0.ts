@@ -1,15 +1,5 @@
 import type { IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryNormalizationArtifact } from '@isograph/react';
-const queryText = 'mutation Query__make_super ($checkin_id: ID!) {\
-  make_checkin_super____checkin_id___v_checkin_id: make_checkin_super(checkin_id: $checkin_id) {\
-    checkin {\
-      ... on Checkin {\
-        __typename,\
-        id,\
-        location,\
-      },\
-    },\
-  },\
-}';
+import queryText from './__refetch__query_text__0';
 
 const normalizationAst: NormalizationAst = {
   kind: "NormalizationAst",
