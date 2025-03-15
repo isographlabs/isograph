@@ -198,9 +198,10 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
             index,
         );
 
-        paths_and_contents.push(get_artifact_for_imperatively_loaded_field(
+        paths_and_contents.extend(get_artifact_for_imperatively_loaded_field(
             schema,
             artifact_info,
+            file_extensions,
         ))
     }
 
