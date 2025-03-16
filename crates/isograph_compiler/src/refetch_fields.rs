@@ -2,7 +2,9 @@ use std::collections::btree_map::Entry;
 
 use common_lang_types::ObjectTypeAndFieldName;
 use intern::string_key::Intern;
-use isograph_lang_types::{DefinitionLocation, SelectionType, ServerObjectId};
+use isograph_lang_types::{
+    DefinitionLocation, SelectionType, ServerObjectId, ServerStrongIdFieldId,
+};
 use isograph_schema::{
     generate_refetch_field_strategy, id_arguments, id_selection, id_top_level_arguments,
     ClientField, ClientFieldVariant, ImperativelyLoadedFieldVariant, OutputFormat, RefetchStrategy,
@@ -17,14 +19,9 @@ pub fn add_refetch_fields_to_objects<TOutputFormat: OutputFormat>(
 ) -> Result<(), BatchCompileError> {
     let query_id = schema.query_id();
 
-    'objects: for object in schema.server_field_data.server_objects.iter_mut() {
-        if object.id_field.is_none() {
-            continue 'objects;
-        }
-
-        if let Some(value) = add_refetch_field_to_object(object, &mut schema.client_types, query_id)
-        {
-            return value;
+    for object in schema.server_field_data.server_objects.iter_mut() {
+        if let Some(id_field) = object.id_field {
+            add_refetch_field_to_object(object, &mut schema.client_types, query_id, id_field)?;
         }
     }
     Ok(())
@@ -39,12 +36,13 @@ fn add_refetch_field_to_object<TOutputFormat: OutputFormat>(
         >,
     >,
     query_id: ServerObjectId,
-) -> Option<Result<(), BatchCompileError>> {
+    _id_field: ServerStrongIdFieldId,
+) -> Result<(), BatchCompileError> {
     match object
         .encountered_fields
         .entry((*REFETCH_FIELD_NAME).into())
     {
-        Entry::Occupied(_) => return Some(Err(BatchCompileError::DuplicateRefetchField)),
+        Entry::Occupied(_) => Err(BatchCompileError::DuplicateRefetchField),
         Entry::Vacant(vacant_entry) => {
             let next_client_field_id = client_fields.len().into();
 
@@ -78,9 +76,8 @@ fn add_refetch_field_to_object<TOutputFormat: OutputFormat>(
                     field_name: "__refetch".intern().into(),
                 },
                 parent_object_id: object.id,
-                refetch_strategy: object.id_field.map(|_| {
-                    // Assume that if we have an id field, this implements Node
-                    RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
+                refetch_strategy: Some(RefetchStrategy::UseRefetchField(
+                    generate_refetch_field_strategy(
                         vec![id_selection()],
                         query_id,
                         format!("refetch__{}", object.name).intern().into(),
@@ -90,11 +87,11 @@ fn add_refetch_field_to_object<TOutputFormat: OutputFormat>(
                         RequiresRefinement::Yes(object.name),
                         None,
                         None,
-                    ))
-                }),
+                    ),
+                )),
                 output_format: std::marker::PhantomData,
             }));
+            Ok(())
         }
     }
-    None
 }
