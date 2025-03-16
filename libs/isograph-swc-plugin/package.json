@@ -1,23 +1,26 @@
 {
   "name": "@isograph/plugin-swc",
-  "version": "1.5.118",
+  "version": "0.2.1",
   "description": "SWC plugin for Isograph",
+  "homepage": "https://isograph.dev",
   "main": "swc_plugin_relay.wasm",
-  "types": "./types.d.ts",
+  "author": "Isograph Labs",
+  "license": "MIT",
   "scripts": {
-    "prepack": "cp ../../target/wasm32-wasi/release/swc_plugin_relay.wasm ."
+    "prepack": "cd ../../crates/swc_isograph_plugin && cargo build --release -p swc_isograph_plugin  --target wasm32-wasip1 && cp ../../target/wasm32-wasip1/release/swc_isograph_plugin.wasm ../../libs/isograph-swc-plugin/",
+    "debug": "cd ../../crates/swc_isograph_plugin && cargo build -p swc_isograph_plugin  --target wasm32-wasip1 && cp ../../target/wasm32-wasip1/debug/swc_isograph_plugin.wasm ../../libs/isograph-swc-plugin/"
   },
-  "homepage": "https://swc.rs",
   "repository": {
     "type": "git",
-    "url": "+https://github.com/isograph/isograph.git"
+    "url": "git+https://github.com/isographlabs/isograph.git",
+    "directory": "libs/isograph-react-disposable-state"
   },
-  "bugs": {
-    "url": "https://github.com/isograph/isograph/issues"
-  },
-  "author": "강동윤 <kdy1997.dev@gmail.com>",
-  "keywords": [],
-  "license": "Apache-2.0",
+  "keywords": [
+    "graphql",
+    "isograph",
+    "swc",
+    "swc-plugin"
+  ],
   "preferUnplugged": true,
   "dependencies": {
     "@swc/counter": "^0.1.3"
