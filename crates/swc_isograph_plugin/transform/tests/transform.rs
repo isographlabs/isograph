@@ -1,11 +1,11 @@
-use std::{fs::read_to_string, path::PathBuf};
-use intern::string_key::Intern;
-use swc_isograph::isograph;
-use swc_common::FileName;
-use swc_ecma_transforms_testing::test_fixture;
-use swc_ecma_parser::{EsConfig, Syntax};
-use isograph_config::CompilerConfig;
 use common_lang_types::CurrentWorkingDirectory;
+use intern::string_key::Intern;
+use isograph_config::CompilerConfig;
+use std::path::PathBuf;
+use swc_common::FileName;
+use swc_ecma_parser::{EsConfig, Syntax};
+use swc_ecma_transforms_testing::test_fixture;
+use swc_isograph::isograph;
 
 fn current_working_directory() -> CurrentWorkingDirectory {
     std::env::current_dir()
@@ -19,7 +19,7 @@ fn current_working_directory() -> CurrentWorkingDirectory {
 #[testing::fixture("tests/fixtures/**/*/input.js")]
 fn fixture(input: PathBuf) {
     let dir = input.parent().unwrap();
-    
+
     let config: CompilerConfig = isograph_config::create_config(
         dir.join("isograph.config.json").into(),
         current_working_directory(),
@@ -33,13 +33,7 @@ fn fixture(input: PathBuf) {
             jsx: true,
             ..Default::default()
         }),
-        &|_| {
-            isograph(
-                &config,
-                FileName::Real("file.js".parse().unwrap()),
-                None,
-            )
-        },
+        &|_| isograph(&config, FileName::Real("file.js".parse().unwrap()), None),
         &input,
         &output,
         Default::default(),

@@ -44,8 +44,8 @@ impl RelayImport {
 struct Isograph<'a> {
     // root_dir: PathBuf,
     // pages_dir: Option<PathBuf>,
-    file_name: FileName,
     config: &'a CompilerConfig,
+    file_name: FileName,
     // imports: Vec<RelayImport>,
     unresolved_mark: Option<Mark>,
 }
@@ -209,8 +209,8 @@ pub fn isograph(
     unresolved_mark: Option<Mark>,
 ) -> impl Fold + '_ {
     Isograph {
-        file_name,
         config,
+        file_name,
         unresolved_mark,
     }
 }

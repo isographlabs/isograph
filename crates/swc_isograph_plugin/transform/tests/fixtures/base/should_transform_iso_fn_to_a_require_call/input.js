@@ -1,0 +1,1 @@
+iso(`entrypoint Query.HomeRoute`);

@@ -1,0 +1,1 @@
+require("components/__isograph/Query/HomeRoute/entrypoint.ts").default;
