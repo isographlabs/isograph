@@ -191,7 +191,13 @@ const artifact: RefetchQueryNormalizationArtifact = {
   kind: "RefetchQuery",
   networkRequestInfo: {
     kind: "NetworkRequestInfo",
-    queryText,
+    operation: {
+      kind: "Operation",
+      documentId: null,
+      operationName: "Query__set_best_friend",
+      operationKind: "Mutation",
+      text: queryText,
+    },
     normalizationAst,
   },
   concreteType: "Mutation",

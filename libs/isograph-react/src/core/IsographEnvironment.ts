@@ -1,5 +1,5 @@
 import { ParentCache } from '@isograph/react-disposable-state';
-import { IsographEntrypoint } from './entrypoint';
+import { IsographEntrypoint, IsographOperation } from './entrypoint';
 import {
   FragmentReference,
   Variables,
@@ -80,7 +80,7 @@ export type MissingFieldHandler = (
 ) => Link | undefined;
 
 export type IsographNetworkFunction = (
-  queryText: string,
+  operation: IsographOperation,
   variables: Variables,
 ) => Promise<any>;
 

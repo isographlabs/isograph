@@ -13,9 +13,9 @@ use isograph_schema::{
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
     get_reachable_variables, initial_variable_context, ClientFieldOrPointer,
-    FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, MergedSelectionMap, OutputFormat,
-    RootOperationName, RootRefetchedPath, ScalarClientFieldTraversalState, SchemaObject,
-    ValidatedClientField, ValidatedSchema, ValidatedVariableDefinition,
+    FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, Format, MergedSelectionMap,
+    OutputFormat, RootOperationName, RootRefetchedPath, ScalarClientFieldTraversalState,
+    SchemaObject, ValidatedClientField, ValidatedSchema, ValidatedVariableDefinition,
 };
 
 use crate::{
@@ -26,6 +26,8 @@ use crate::{
     },
     imperatively_loaded_fields::get_artifact_for_imperatively_loaded_field,
     normalization_ast_text::generate_normalization_ast_text,
+    operation_text::{generate_operation_text, OperationText},
+    persisted_documents::PersistedDocuments,
 };
 
 #[derive(Debug)]
@@ -33,6 +35,7 @@ struct EntrypointArtifactInfo<'schema, TOutputFormat: OutputFormat> {
     query_name: QueryOperationName,
     parent_type: &'schema SchemaObject<TOutputFormat>,
     query_text: QueryText,
+    operation_text: OperationText,
     normalization_ast_text: NormalizationAstText,
     refetch_query_artifact_import: RefetchQueryArtifactImport,
     concrete_type: IsographObjectTypeName,
@@ -43,6 +46,7 @@ pub(crate) fn generate_entrypoint_artifacts<TOutputFormat: OutputFormat>(
     entrypoint_id: ClientFieldId,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     file_extensions: GenerateFileExtensionsOption,
+    persisted_documents: &mut Option<PersistedDocuments>,
 ) -> Vec<ArtifactPathAndContent> {
     let entrypoint = schema.client_field(entrypoint_id);
 
@@ -71,6 +75,7 @@ pub(crate) fn generate_entrypoint_artifacts<TOutputFormat: OutputFormat>(
             .map(|variable_definition| &variable_definition.item),
         &schema.find_mutation(),
         file_extensions,
+        persisted_documents,
     )
 }
 
@@ -84,9 +89,10 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     merged_selection_map: &MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,
     encountered_client_type_map: &FieldToCompletedMergeTraversalStateMap,
-    variable_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
+    variable_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + Clone + 'a,
     default_root_operation: &Option<(&ServerObjectId, &RootOperationName)>,
     file_extensions: GenerateFileExtensionsOption,
+    persisted_documents: &mut Option<PersistedDocuments>,
 ) -> Vec<ArtifactPathAndContent> {
     let query_name = entrypoint.name.into();
     // TODO when we do not call generate_entrypoint_artifact extraneously,
@@ -114,8 +120,9 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         query_name,
         schema,
         merged_selection_map,
-        variable_definitions,
+        variable_definitions.clone(),
         root_operation_name,
+        Format::Pretty,
     );
     let refetch_paths_with_variables = traversal_state
         .refetch_paths
@@ -176,8 +183,20 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         },
     );
 
+    let operation_text = generate_operation_text(
+        query_name,
+        schema,
+        merged_selection_map,
+        variable_definitions,
+        root_operation_name,
+        concrete_type.name,
+        persisted_documents,
+        1,
+    );
+
     let mut paths_and_contents = EntrypointArtifactInfo {
         query_text,
+        operation_text,
         query_name,
         parent_type: parent_object,
         normalization_ast_text,
@@ -202,6 +221,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
             schema,
             artifact_info,
             file_extensions,
+            persisted_documents,
         ))
     }
 
@@ -314,6 +334,7 @@ impl<TOutputFormat: OutputFormat> EntrypointArtifactInfo<'_, TOutputFormat> {
             query_name,
             parent_type,
             concrete_type,
+            operation_text,
             ..
         } = self;
         let ts_file_extension = file_extensions.ts();
@@ -343,7 +364,7 @@ impl<TOutputFormat: OutputFormat> EntrypointArtifactInfo<'_, TOutputFormat> {
             {}kind: \"Entrypoint\",\n\
             {}networkRequestInfo: {{\n\
             {}  kind: \"NetworkRequestInfo\",\n\
-            {}  queryText,\n\
+            {}  operation: {operation_text},\n\
             {}  normalizationAst,\n\
             {}}},\n\
             {}concreteType: \"{concrete_type}\",\n\
