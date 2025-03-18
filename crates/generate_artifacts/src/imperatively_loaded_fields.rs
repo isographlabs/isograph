@@ -3,13 +3,14 @@ use common_lang_types::{
     ObjectTypeAndFieldName, QueryText,
 };
 use intern::string_key::Intern;
+use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::RefetchQueryIndex;
 use isograph_schema::{
     ImperativelyLoadedFieldArtifactInfo, OutputFormat, ValidatedSchema, REFETCH_FIELD_NAME,
 };
 
 use crate::{
-    generate_artifacts::NormalizationAstText,
+    generate_artifacts::{NormalizationAstText, QUERY_TEXT},
     normalization_ast_text::generate_normalization_ast_text,
 };
 
@@ -24,11 +25,15 @@ pub(crate) struct ImperativelyLoadedEntrypointArtifactInfo {
 }
 
 impl ImperativelyLoadedEntrypointArtifactInfo {
-    pub fn path_and_content(self) -> ArtifactPathAndContent {
+    pub fn path_and_content(
+        self,
+        file_extensions: GenerateFileExtensionsOption,
+    ) -> Vec<ArtifactPathAndContent> {
         let ImperativelyLoadedEntrypointArtifactInfo {
             root_fetchable_field,
             root_fetchable_field_parent_object,
             refetch_query_index,
+            query_text,
             ..
         } = &self;
 
@@ -36,32 +41,54 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
             .intern()
             .into();
 
+        let query_text_file_name = format!(
+            "{}__{}__{}.ts",
+            *REFETCH_FIELD_NAME, *QUERY_TEXT, refetch_query_index.0
+        )
+        .intern()
+        .into();
+
         let type_name = *root_fetchable_field_parent_object;
         let field_name = *root_fetchable_field;
 
-        ArtifactPathAndContent {
-            file_content: self.file_contents(),
-            file_name: file_name_prefix,
-            type_and_field: Some(ObjectTypeAndFieldName {
-                type_name,
-                field_name: field_name.into(),
-            }),
-        }
+        vec![
+            ArtifactPathAndContent {
+                file_content: format!("export default '{}';", query_text),
+                file_name: query_text_file_name,
+                type_and_field: Some(ObjectTypeAndFieldName {
+                    type_name,
+                    field_name: field_name.into(),
+                }),
+            },
+            ArtifactPathAndContent {
+                file_content: self.file_contents(file_extensions),
+                file_name: file_name_prefix,
+                type_and_field: Some(ObjectTypeAndFieldName {
+                    type_name,
+                    field_name: field_name.into(),
+                }),
+            },
+        ]
     }
 }
 
 impl ImperativelyLoadedEntrypointArtifactInfo {
-    pub(crate) fn file_contents(self) -> String {
+    pub(crate) fn file_contents(self, file_extensions: GenerateFileExtensionsOption) -> String {
         let ImperativelyLoadedEntrypointArtifactInfo {
             normalization_ast_text: normalization_ast,
-            query_text,
             concrete_type,
+            refetch_query_index,
             ..
         } = self;
+        let ts_file_extension = file_extensions.ts();
+        let query_text_file_name = format!(
+            "{}__{}__{}",
+            *REFETCH_FIELD_NAME, *QUERY_TEXT, refetch_query_index.0,
+        );
 
         format!(
             "import type {{ IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryNormalizationArtifact }} from '@isograph/react';\n\
-            const queryText = '{query_text}';\n\n\
+            import queryText from './{query_text_file_name}{ts_file_extension}';\n\n\
             const normalizationAst: NormalizationAst = {{\n\
             {}kind: \"NormalizationAst\",\n\
             {}selections: {normalization_ast},\n\
@@ -93,7 +120,8 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
 pub(crate) fn get_artifact_for_imperatively_loaded_field<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
     imperatively_loaded_field_artifact_info: ImperativelyLoadedFieldArtifactInfo,
-) -> ArtifactPathAndContent {
+    file_extensions: GenerateFileExtensionsOption,
+) -> Vec<ArtifactPathAndContent> {
     let ImperativelyLoadedFieldArtifactInfo {
         merged_selection_set,
         root_fetchable_field,
@@ -126,5 +154,5 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field<TOutputFormat: OutputFo
         refetch_query_index,
         concrete_type,
     }
-    .path_and_content()
+    .path_and_content(file_extensions)
 }
