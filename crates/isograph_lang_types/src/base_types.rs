@@ -71,3 +71,19 @@ impl<T0: Into<UnvalidatedTypeName>, T1: Into<UnvalidatedTypeName>> From<Selectio
         }
     }
 }
+
+impl<TScalar, TObject> SelectionType<TScalar, TObject> {
+    pub fn as_scalar(&self) -> Option<&TScalar> {
+        match self {
+            SelectionType::Scalar(s) => Some(s),
+            SelectionType::Object(_) => None,
+        }
+    }
+
+    pub fn as_object(&self) -> Option<&TObject> {
+        match self {
+            SelectionType::Scalar(_) => None,
+            SelectionType::Object(o) => Some(o),
+        }
+    }
+}
