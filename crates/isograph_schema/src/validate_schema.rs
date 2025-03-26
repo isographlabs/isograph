@@ -18,17 +18,13 @@ use thiserror::Error;
 
 use crate::{
     schema_validation_state::SchemaValidationState,
-    validate_client_field::validate_and_transform_client_types,
-    validate_server_field::validate_and_transform_server_fields, ClientField, ClientFieldVariant,
+    validate_client_field::validate_and_transform_client_types, ClientField, ClientFieldVariant,
     ClientPointer, ImperativelyLoadedFieldVariant, OutputFormat, Schema, SchemaObject,
     ServerFieldData, ServerScalarSelectable, UnvalidatedSchema, UseRefetchFieldRefetchStrategy,
     ValidateEntrypointDeclarationError,
 };
 
-pub type ValidatedSchemaServerField<TOutputFormat> = ServerScalarSelectable<
-    <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
-    TOutputFormat,
->;
+pub type ValidatedSchemaServerField<TOutputFormat> = ServerScalarSelectable<TOutputFormat>;
 
 pub type ValidatedSelection = SelectionTypeContainingSelections<
     <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
@@ -139,30 +135,14 @@ impl<TOutputFormat: OutputFormat> ValidatedSchema<TOutputFormat> {
             ..
         } = unvalidated_schema;
 
-        let updated_server_fields = match validate_and_transform_server_fields(fields, &schema_data)
-        {
-            Ok(fields) => fields,
-            Err(new_errors) => {
-                errors.extend(new_errors);
-                return Err(errors);
-
-                // Because fields flows into updated_client_fields, we cannot optimistically
-                // continue here.
-                // TODO: figure out whether this can be worked around.
-            }
-        };
-
-        let updated_client_types = match validate_and_transform_client_types(
-            client_types,
-            &schema_data,
-            &updated_server_fields,
-        ) {
-            Ok(client_types) => client_types,
-            Err(new_errors) => {
-                errors.extend(new_errors);
-                vec![]
-            }
-        };
+        let updated_client_types =
+            match validate_and_transform_client_types(client_types, &schema_data, &fields) {
+                Ok(client_types) => client_types,
+                Err(new_errors) => {
+                    errors.extend(new_errors);
+                    vec![]
+                }
+            };
 
         let ServerFieldData {
             server_objects,
@@ -184,7 +164,7 @@ impl<TOutputFormat: OutputFormat> ValidatedSchema<TOutputFormat> {
                 .collect();
 
             Ok(Self {
-                server_scalar_selectables: updated_server_fields,
+                server_scalar_selectables: fields,
                 client_types: updated_client_types,
                 entrypoints: updated_entrypoints,
                 server_field_data: ServerFieldData {
@@ -384,16 +364,6 @@ pub enum ValidateSchemaError {
         parent_type_name: IsographObjectTypeName,
         field_name: SelectableName,
         field_type: UnvalidatedTypeName,
-    },
-
-    #[error(
-        "The argument `{argument_name}` on field `{parent_type_name}.{field_name}` has inner type `{argument_type}`, which does not exist."
-    )]
-    FieldArgumentTypeDoesNotExist {
-        argument_name: VariableName,
-        parent_type_name: IsographObjectTypeName,
-        field_name: SelectableName,
-        argument_type: UnvalidatedTypeName,
     },
 
     #[error("Expected input of type {expected_type}, found variable {variable_name} of type {variable_type}")]

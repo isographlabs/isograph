@@ -10,7 +10,8 @@ use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
     ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectionType,
-    SelectionTypeContainingSelections, ServerObjectId, ServerScalarSelectableId,
+    SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, ServerScalarSelectableId,
+    VariableDefinition,
 };
 
 use serde::Deserialize;
@@ -18,7 +19,6 @@ use serde::Deserialize;
 use crate::{
     generate_refetch_field_strategy, ClientField, ClientFieldVariant,
     ImperativelyLoadedFieldVariant, OutputFormat, PrimaryFieldInfo, UnvalidatedSchema,
-    UnvalidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -399,7 +399,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 fn skip_arguments_contained_in_field_map<TOutputFormat: OutputFormat>(
     // TODO move this to impl Schema
     schema: &mut UnvalidatedSchema<TOutputFormat>,
-    arguments: Vec<WithLocation<UnvalidatedVariableDefinition>>,
+    arguments: Vec<WithLocation<VariableDefinition<ServerEntityId>>>,
     primary_type_name: IsographObjectTypeName,
     mutation_object_name: IsographObjectTypeName,
     mutation_field_name: SelectableName,

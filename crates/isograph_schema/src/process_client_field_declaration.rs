@@ -7,7 +7,7 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration, ClientPointerId,
     DefinitionLocation, DeserializationError, NonConstantValue, SelectionType, ServerEntityId,
-    ServerObjectId, TypeAnnotation,
+    ServerObjectId, TypeAnnotation, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -16,8 +16,7 @@ use thiserror::Error;
 use crate::{
     expose_field_directive::RequiresRefinement,
     refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
-    ClientField, ClientPointer, FieldMapItem, OutputFormat, UnvalidatedSchema,
-    UnvalidatedVariableDefinition, NODE_FIELD_NAME,
+    ClientField, ClientPointer, FieldMapItem, OutputFormat, UnvalidatedSchema, NODE_FIELD_NAME,
 };
 
 impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
@@ -365,7 +364,7 @@ pub struct ImperativelyLoadedFieldVariant {
     pub top_level_schema_field_name: ServerObjectSelectableName,
     /// The arguments we must pass to the top level schema field, e.g. id: ID!
     /// for node(id: $id)
-    pub top_level_schema_field_arguments: Vec<UnvalidatedVariableDefinition>,
+    pub top_level_schema_field_arguments: Vec<VariableDefinition<ServerEntityId>>,
 
     /// Some if the object is concrete; None otherwise.
     pub top_level_schema_field_concrete_type: Option<IsographObjectTypeName>,

@@ -12,8 +12,8 @@ use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
     RefetchQueryIndex, ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionType,
-    SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, ServerScalarSelectableId,
-    VariableDefinition,
+    SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, ServerScalarId,
+    ServerScalarSelectableId, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -24,9 +24,8 @@ use crate::{
     transform_name_and_arguments_with_child_variable_context, ClientFieldOrPointer,
     ClientFieldOrPointerId, ClientFieldVariant, ImperativelyLoadedFieldVariant, Loadability,
     NameAndArguments, OutputFormat, PathToRefetchField, RootOperationName, SchemaObject,
-    SchemaServerLinkedFieldFieldVariant, UnvalidatedVariableDefinition, ValidatedClientField,
-    ValidatedScalarFieldSelection, ValidatedSchema, ValidatedSelection, ValidatedSelectionType,
-    VariableContext,
+    SchemaServerLinkedFieldFieldVariant, ValidatedClientField, ValidatedScalarFieldSelection,
+    ValidatedSchema, ValidatedSelection, ValidatedSelectionType, VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -533,29 +532,20 @@ fn process_imperatively_loaded_field<TOutputFormat: OutputFormat>(
             .iter()
             // TODO don't clone
             .cloned()
-            .map(|x| {
-                let variable_name = x.name;
+            .map(|variable_definition| {
+                let variable_name = variable_definition.name;
                 definitions_of_used_variables.push(WithSpan {
                     item: VariableDefinition {
                         name: variable_name,
-                        type_: x.type_.clone().map(|type_name| {
-                            *schema
-                                .server_field_data
-                                .defined_types
-                                .get(&type_name)
-                                .expect(
-                                    "Expected type to be found, \
-                                    this indicates a bug in Isograph",
-                                )
-                        }),
-                        default_value: x.default_value,
+                        type_: variable_definition.type_,
+                        default_value: variable_definition.default_value,
                     },
                     span: Span::todo_generated(),
                 });
 
                 ArgumentKeyAndValue {
-                    key: x.name.item.lookup().intern().into(),
-                    value: NonConstantValue::Variable(x.name.item),
+                    key: variable_definition.name.item.lookup().intern().into(),
+                    value: NonConstantValue::Variable(variable_definition.name.item),
                 }
             })
             .collect(),
@@ -1232,11 +1222,14 @@ fn get_aliased_mutation_field_name(
     s
 }
 
-pub fn id_arguments() -> Vec<UnvalidatedVariableDefinition> {
+pub fn id_arguments(id_type_id: ServerScalarId) -> Vec<VariableDefinition<ServerEntityId>> {
     vec![VariableDefinition {
         name: WithLocation::new("id".intern().into(), Location::generated()),
         type_: GraphQLTypeAnnotation::NonNull(Box::new(GraphQLNonNullTypeAnnotation::Named(
-            GraphQLNamedTypeAnnotation(WithSpan::new("ID".intern().into(), Span::todo_generated())),
+            GraphQLNamedTypeAnnotation(WithSpan::new(
+                SelectionType::Scalar(id_type_id),
+                Span::todo_generated(),
+            )),
         ))),
         default_value: None,
     }]

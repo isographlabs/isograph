@@ -53,10 +53,7 @@ pub type UnvalidatedSchema<TOutputFormat> = Schema<UnvalidatedSchemaState, TOutp
 pub type UnvalidatedObjectFieldInfo =
     DefinitionLocation<ServerScalarSelectableId, ClientFieldOrPointerId>;
 
-pub type UnvalidatedSchemaSchemaField<TOutputFormat> = ServerScalarSelectable<
-    <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
-    TOutputFormat,
->;
+pub type UnvalidatedSchemaSchemaField<TOutputFormat> = ServerScalarSelectable<TOutputFormat>;
 
 pub type UnvalidatedVariableDefinition = VariableDefinition<
     <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,

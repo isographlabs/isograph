@@ -7,10 +7,10 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    DefinitionLocation, SelectionType, ServerEntityId, ServerScalarSelectableId,
+    DefinitionLocation, SelectionType, ServerEntityId, ServerScalarSelectableId, VariableDefinition,
 };
 
-use crate::{OutputFormat, UnvalidatedSchema, UnvalidatedVariableDefinition};
+use crate::{OutputFormat, UnvalidatedSchema};
 
 use super::create_additional_fields_error::{
     CreateAdditionalFieldsError, FieldMapItem, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
@@ -21,7 +21,7 @@ pub(crate) struct ArgumentMap {
 }
 
 impl ArgumentMap {
-    pub(crate) fn new(arguments: Vec<WithLocation<UnvalidatedVariableDefinition>>) -> Self {
+    pub(crate) fn new(arguments: Vec<WithLocation<VariableDefinition<ServerEntityId>>>) -> Self {
         Self {
             arguments: arguments
                 .into_iter()
@@ -71,28 +71,14 @@ impl ArgumentMap {
             PotentiallyModifiedArgument::Unmodified(unmodified_argument) => {
                 match split_to_arg.to_field_names.split_first() {
                     None => {
-                        match schema
-                            .server_field_data
-                            .defined_types
-                            .get(&unmodified_argument.type_.inner().lookup().intern().into())
-                        {
-                            Some(defined_type) => match defined_type {
-                                ServerEntityId::Object(_) => return Err(WithLocation::new(
-                                    CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
-                                        primary_type_name,
-                                        field_name: split_to_arg
-                                            .to_argument_name
-                                            .lookup()
-                                            .to_string(),
-                                    },
-                                    Location::generated(),
-                                )),
-                                ServerEntityId::Scalar(_) => {}
-                            },
-                            None => panic!(
-                                "Type is not found. This is indicative \
-                                of a bug in Isograph, and will be solved by validating first."
-                            ),
+                        if unmodified_argument.type_.inner().as_object().is_some() {
+                            return Err(WithLocation::new(
+                                CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
+                                    primary_type_name,
+                                    field_name: split_to_arg.to_argument_name.lookup().to_string(),
+                                },
+                                Location::generated(),
+                            ));
                         }
 
                         self.arguments.swap_remove(index_of_argument);
@@ -142,7 +128,7 @@ impl ArgumentMap {
 }
 
 enum PotentiallyModifiedArgument {
-    Unmodified(UnvalidatedVariableDefinition),
+    Unmodified(VariableDefinition<ServerEntityId>),
     Modified(ModifiedArgument),
 }
 
@@ -198,20 +184,13 @@ impl ModifiedArgument {
     ///
     /// This panics if unmodified's type is a scalar.
     pub fn from_unmodified<TOutputFormat: OutputFormat>(
-        unmodified: &UnvalidatedVariableDefinition,
+        unmodified: &VariableDefinition<ServerEntityId>,
         schema: &UnvalidatedSchema<TOutputFormat>,
     ) -> Self {
         // TODO I think we have validated that the item exists already.
         // But we should double check that, and return an error if necessary
         let object = unmodified.type_.clone().map(|input_type_name| {
-            let defined_type_id = *schema
-                .server_field_data
-                .defined_types
-                .get(&input_type_name)
-                .expect(
-                    "Expected type to be defined by now. This is indicative of a bug in Isograph.",
-                );
-            match defined_type_id {
+            match input_type_name {
                 ServerEntityId::Object(object_id) => {
                     let object = schema.server_field_data.object(object_id);
 

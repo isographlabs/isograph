@@ -40,9 +40,7 @@ pub struct RootOperationName(pub String);
 /// the schema does not support removing items.
 #[derive(Debug)]
 pub struct Schema<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat> {
-    pub server_scalar_selectables: Vec<
-        ServerScalarSelectable<TSchemaValidationState::VariableDefinitionInnerType, TOutputFormat>,
-    >,
+    pub server_scalar_selectables: Vec<ServerScalarSelectable<TOutputFormat>>,
     pub client_types: SelectionTypes<
         TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
         TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
@@ -113,7 +111,7 @@ pub type LinkedType<
     VariableDefinitionInnerType,
     TOutputFormat,
 > = DefinitionLocation<
-    &'a ServerScalarSelectable<VariableDefinitionInnerType, TOutputFormat>,
+    &'a ServerScalarSelectable<TOutputFormat>,
     &'a ClientPointer<
         SelectionTypeSelectionScalarFieldAssociatedData,
         SelectionTypeSelectionLinkedFieldAssociatedData,
@@ -146,8 +144,7 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     pub fn server_field(
         &self,
         server_field_id: ServerScalarSelectableId,
-    ) -> &ServerScalarSelectable<TSchemaValidationState::VariableDefinitionInnerType, TOutputFormat>
-    {
+    ) -> &ServerScalarSelectable<TOutputFormat> {
         &self.server_scalar_selectables[server_field_id.as_usize()]
     }
 

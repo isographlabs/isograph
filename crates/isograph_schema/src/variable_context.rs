@@ -137,9 +137,7 @@ pub fn initial_variable_context<
     VariableContext(variable_context)
 }
 
-impl<TClientFieldVariableDefinitionAssociatedData: Ord + Debug, TOutputFormat: OutputFormat>
-    ServerScalarSelectable<TClientFieldVariableDefinitionAssociatedData, TOutputFormat>
-{
+impl<TOutputFormat: OutputFormat> ServerScalarSelectable<TOutputFormat> {
     pub fn initial_variable_context(&self) -> VariableContext {
         let variable_context = self
             .arguments

@@ -283,6 +283,16 @@ pub(crate) enum ProcessGraphqlTypeSystemDefinitionError {
         type_name: UnvalidatedTypeName,
     },
 
+    #[error(
+        "The argument `{argument_name}` on field `{parent_type_name}.{field_name}` has inner type `{argument_type}`, which does not exist."
+    )]
+    FieldArgumentTypeDoesNotExist {
+        argument_name: VariableName,
+        parent_type_name: IsographObjectTypeName,
+        field_name: SelectableName,
+        argument_type: UnvalidatedTypeName,
+    },
+
     // TODO include info about where the field was previously defined
     #[error("Duplicate field named \"{field_name}\" on type \"{parent_type}\"")]
     DuplicateField {
@@ -587,10 +597,10 @@ fn process_fields(
 ) -> ProcessTypeDefinitionResult<()> {
     // TODO
     for (object_id, fields) in field_queue {
-        let server_field_data = &mut schema.server_field_data;
+        let server_objects = &mut schema.server_field_data.server_objects;
         // Calling .objects takes a reference to all of server_field_data, but we need
         // to also access .defined_types
-        let parent_object = &mut server_field_data.server_objects[object_id.as_usize()];
+        let parent_object = &mut server_objects[object_id.as_usize()];
 
         for field in fields.into_iter() {
             let next_server_field_id = schema.server_scalar_selectables.len().into();
@@ -612,11 +622,12 @@ fn process_fields(
                     }
 
                     let inner_type = field.item.type_.inner();
-                    let target_server_entity = match server_field_data
+                    let target_server_entity = match schema
+                        .server_field_data
                         .defined_types
-                        .entry(*inner_type)
+                        .get(inner_type)
                     {
-                        HashMapEntry::Occupied(occupied_entry) => match occupied_entry.get() {
+                        Some(selection_type) => match selection_type {
                             SelectionType::Scalar(scalar_id) => SelectionType::Scalar(
                                 TypeAnnotation::from_graphql_type_annotation(field.item.type_)
                                     .map(&mut |_| *scalar_id),
@@ -627,7 +638,7 @@ fn process_fields(
                                     .map(&mut |_| *object_id),
                             )),
                         },
-                        HashMapEntry::Vacant(_) => return Err(WithLocation::new(
+                        None => return Err(WithLocation::new(
                             ProcessGraphqlTypeSystemDefinitionError::FieldTypenameDoesNotExist {
                                 unvalidated_type_name: *inner_type,
                             },
@@ -647,7 +658,14 @@ fn process_fields(
                                 .item
                                 .arguments
                                 .into_iter()
-                                .map(graphql_input_value_definition_to_variable_definition)
+                                .map(|input_value_definition| {
+                                    graphql_input_value_definition_to_variable_definition(
+                                        &schema.server_field_data.defined_types,
+                                        input_value_definition,
+                                        parent_object.name,
+                                        field.item.name.item.into(),
+                                    )
+                                })
                                 .collect::<Result<Vec<_>, _>>()?,
                             phantom_data: std::marker::PhantomData,
                         });
@@ -771,8 +789,11 @@ fn lookup_object_in_schema(
 }
 
 pub fn graphql_input_value_definition_to_variable_definition(
+    defined_types: &HashMap<UnvalidatedTypeName, ServerEntityId>,
     input_value_definition: WithLocation<GraphQLInputValueDefinition>,
-) -> ProcessTypeDefinitionResult<WithLocation<VariableDefinition<UnvalidatedTypeName>>> {
+    parent_type_name: IsographObjectTypeName,
+    field_name: SelectableName,
+) -> ProcessTypeDefinitionResult<WithLocation<VariableDefinition<ServerEntityId>>> {
     let default_value = input_value_definition
         .item
         .default_value
@@ -785,13 +806,32 @@ pub fn graphql_input_value_definition_to_variable_definition(
             ))
         })
         .transpose()?;
+
+    let type_ = input_value_definition
+        .item
+        .type_
+        .clone()
+        .and_then(|input_type_name| {
+            defined_types
+                .get(&(*input_value_definition.item.type_.inner()).into())
+                .ok_or_else(|| {
+                    WithLocation::new(
+                        ProcessGraphqlTypeSystemDefinitionError::FieldArgumentTypeDoesNotExist {
+                            argument_type: input_type_name.into(),
+                            argument_name: input_value_definition.item.name.item.into(),
+                            parent_type_name,
+                            field_name,
+                        },
+                        input_value_definition.location,
+                    )
+                })
+                .map(|x| *x)
+        })?;
+
     Ok(WithLocation::new(
         VariableDefinition {
             name: input_value_definition.item.name.map(VariableName::from),
-            type_: input_value_definition
-                .item
-                .type_
-                .map(UnvalidatedTypeName::from),
+            type_,
             default_value,
         },
         input_value_definition.location,

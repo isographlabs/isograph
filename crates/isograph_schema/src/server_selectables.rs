@@ -2,8 +2,8 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use common_lang_types::{DescriptionValue, ServerSelectableName, WithLocation};
 use isograph_lang_types::{
-    SelectionType, ServerObjectId, ServerScalarId, ServerScalarSelectableId, TypeAnnotation,
-    VariableDefinition,
+    SelectionType, ServerEntityId, ServerObjectId, ServerScalarId, ServerScalarSelectableId,
+    TypeAnnotation, VariableDefinition,
 };
 
 use crate::{OutputFormat, SchemaServerLinkedFieldFieldVariant};
@@ -12,10 +12,7 @@ use crate::{OutputFormat, SchemaServerLinkedFieldFieldVariant};
 // NOTE: for the time being, despite the name, this represents both
 // fields with point to scalar entities and object entities
 #[derive(Debug, Clone)]
-pub struct ServerScalarSelectable<
-    TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
-    TOutputFormat: OutputFormat,
-> {
+pub struct ServerScalarSelectable<TOutputFormat: OutputFormat> {
     pub description: Option<DescriptionValue>,
     /// The name of the server field and the location where it was defined
     /// (an iso literal or Location::Generated).
@@ -31,7 +28,6 @@ pub struct ServerScalarSelectable<
     >,
 
     pub parent_type_id: ServerObjectId,
-    pub arguments:
-        Vec<WithLocation<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
+    pub arguments: Vec<WithLocation<VariableDefinition<ServerEntityId>>>,
     pub phantom_data: PhantomData<TOutputFormat>,
 }

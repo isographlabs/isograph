@@ -17,7 +17,6 @@ mod validate_argument_types;
 mod validate_client_field;
 mod validate_entrypoint;
 mod validate_schema;
-mod validate_server_field;
 mod variable_context;
 
 pub use accessible_client_fields_iterator::*;

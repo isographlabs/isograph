@@ -3,7 +3,7 @@ use std::collections::btree_map::Entry;
 use common_lang_types::ObjectTypeAndFieldName;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    DefinitionLocation, SelectionType, ServerObjectId, ServerStrongIdFieldId,
+    DefinitionLocation, SelectionType, ServerObjectId, ServerScalarId, ServerStrongIdFieldId,
 };
 use isograph_schema::{
     generate_refetch_field_strategy, id_arguments, id_selection, id_top_level_arguments,
@@ -21,7 +21,13 @@ pub fn add_refetch_fields_to_objects<TOutputFormat: OutputFormat>(
 
     for object in schema.server_field_data.server_objects.iter_mut() {
         if let Some(id_field) = object.id_field {
-            add_refetch_field_to_object(object, &mut schema.client_types, query_id, id_field)?;
+            add_refetch_field_to_object(
+                object,
+                &mut schema.client_types,
+                query_id,
+                id_field,
+                schema.server_field_data.id_type_id,
+            )?;
         }
     }
     Ok(())
@@ -37,6 +43,7 @@ fn add_refetch_field_to_object<TOutputFormat: OutputFormat>(
     >,
     query_id: ServerObjectId,
     _id_field: ServerStrongIdFieldId,
+    id_type_id: ServerScalarId,
 ) -> Result<(), BatchCompileError> {
     match object
         .encountered_fields
@@ -63,7 +70,7 @@ fn add_refetch_field_to_object<TOutputFormat: OutputFormat>(
                     ImperativelyLoadedFieldVariant {
                         client_field_scalar_selection_name: *REFETCH_FIELD_NAME,
                         top_level_schema_field_name: *NODE_FIELD_NAME,
-                        top_level_schema_field_arguments: id_arguments(),
+                        top_level_schema_field_arguments: id_arguments(id_type_id),
                         top_level_schema_field_concrete_type: None,
                         primary_field_info: None,
 

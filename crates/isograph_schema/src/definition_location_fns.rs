@@ -14,7 +14,7 @@ pub fn description<
     TOutputFormat: OutputFormat,
 >(
     definition_location: &DefinitionLocation<
-        &ServerScalarSelectable<TSelectionTypeVariableDefinitionAssociatedData, TOutputFormat>,
+        &ServerScalarSelectable<TOutputFormat>,
         &ClientPointer<
             TSelectionTypeSelectionScalarFieldAssociatedData,
             TSelectionTypeSelectionLinkedFieldAssociatedData,
