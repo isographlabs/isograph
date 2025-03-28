@@ -3,7 +3,5 @@
   "project_root": "./src/components",
   "schema": "./backend/schema.graphql",
   "schema_extensions": ["./backend/schema-extension.graphql"],
-  "options": {
-    "module": "commonjs"
-  }
+  "options": { "module": "esmodule" }
 }

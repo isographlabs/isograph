@@ -153,10 +153,10 @@ pub fn create_config(
                 .unwrap_or(&config_parsed.project_root),
         )
         .join(ISOGRAPH_FOLDER);
-    std::fs::create_dir_all(&artifact_dir).expect("Unable to create artifact directory");
+    // std::fs::create_dir_all(&artifact_dir).expect("Unable to create artifact directory");
 
     let project_root_dir = config_dir.join(&config_parsed.project_root);
-    std::fs::create_dir_all(&project_root_dir).expect("Unable to create project root directory");
+    // std::fs::create_dir_all(&project_root_dir).expect("Unable to create project root directory");
 
     CompilerConfig {
         config_location: config_location.canonicalize().unwrap_or_else(|_| {

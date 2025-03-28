@@ -11,6 +11,7 @@
 **/next-env.d.ts
 **/*.d.ts
 **/.DS_Store
+**/.swc/**
 
 # the built binary is downloaded into this folder during CI
 artifacts

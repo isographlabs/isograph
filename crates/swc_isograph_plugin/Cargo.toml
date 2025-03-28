@@ -1,6 +1,6 @@
 
 [package]
-authors = ["Robert Balicki <robert.balicki@gmail.com>", "Edmondo Porcu <edmondo.porcu@gmail.com>"]
+authors = ["Robert Balicki <robert.balicki@gmail.com>", "Edmondo Porcu <edmondo.porcu@gmail.com>", "Pablo Crovetto <jpcc077@gmail.com>"]
 description = "SWC plugin for Isograph"
 edition = "2021"
 license = "Apache-2.0"
@@ -27,3 +27,14 @@ swc_ecma_visit = "0.98.2"
 swc_isograph = { path = "./transform" }
 swc_plugin_macro = "0.9.16"
 tracing = { workspace = true, features = ["release_max_level_off"] }
+
+[profile.release]
+codegen-units = 1
+# debug = true
+lto = true
+
+# Optimize for size
+opt-level = "s"
+
+# Strip debug symbols
+strip = "symbols"
