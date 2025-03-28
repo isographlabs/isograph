@@ -6,7 +6,6 @@ import { describe, expect, test } from 'vitest';
 
 const pluginName = 'swc_isograph_plugin.wasm';
 
-console.log('Starting directory: ' + process.cwd());
 const transformCode = (code: string, options = {}, filename = '') => {
   return transform(code, {
     jsc: {
@@ -49,15 +48,17 @@ async function walkDir(
     const inputFilePath = path.join(baseDir, dir, 'input.js');
     const configPath = path.join(baseDir, dir, 'isograph.config.json');
 
-    // const config = await fs.readFile(configPath, 'utf-8').then(
-    //   (json) => {
-    //     return JSON.parse(json);
-    //   },
-    //   (_) => undefined,
-    // );
+    const isographConfig = await fs.readFile(configPath, 'utf-8').then(
+      (json) => {
+        return JSON.parse(json);
+      },
+      (_) => undefined,
+    );
 
     const config = {
-      rootDir: path.join(baseDir, dir),
+      // must be an absolute path
+      root_dir: path.join(baseDir, dir),
+      ...(isographConfig || {}),
     };
 
     const filename = path.join(
@@ -84,7 +85,6 @@ describe('Should load swc-plugin-isograph wasm plugin correctly', async () => {
     ),
     async (dir, input, config, filename) => {
       await test(`Should transform ${dir} correctly`, async () => {
-        console.log(config);
         const { code } = await transformCode(input, config, filename);
         expect(code).toMatchSnapshot();
       });

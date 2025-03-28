@@ -1,1 +1,3 @@
-iso(`entrypoint Query.HomeRoute`);
+function test() {
+  const a = iso(`entrypoint Query.HomeRoute`);
+}

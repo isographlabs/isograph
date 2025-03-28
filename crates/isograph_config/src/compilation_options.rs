@@ -99,7 +99,7 @@ pub enum JavascriptModule {
 }
 
 /// This struct is deserialized from an isograph.config.json file.
-#[derive(Deserialize, JsonSchema)]
+#[derive(Deserialize, JsonSchema, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct IsographProjectConfig {
     /// The user may hard-code the JSON Schema for their version of the config.
@@ -153,10 +153,10 @@ pub fn create_config(
                 .unwrap_or(&config_parsed.project_root),
         )
         .join(ISOGRAPH_FOLDER);
-    // std::fs::create_dir_all(&artifact_dir).expect("Unable to create artifact directory");
+    std::fs::create_dir_all(&artifact_dir).expect("Unable to create artifact directory");
 
     let project_root_dir = config_dir.join(&config_parsed.project_root);
-    // std::fs::create_dir_all(&project_root_dir).expect("Unable to create project root directory");
+    std::fs::create_dir_all(&project_root_dir).expect("Unable to create project root directory");
 
     CompilerConfig {
         config_location: config_location.canonicalize().unwrap_or_else(|_| {
@@ -216,7 +216,7 @@ pub fn create_config(
     }
 }
 
-#[derive(Deserialize, Default, JsonSchema)]
+#[derive(Deserialize, Default, JsonSchema, Debug)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConfigFileOptions {
     /// What the compiler should do if it encounters an id field whose
@@ -230,7 +230,7 @@ pub struct ConfigFileOptions {
     /// The babel plugin transforms isograph literals containing entrypoints
     /// into imports or requires of the generated entrypoint.ts file. Should
     /// it generate require calls or esmodule imports?
-    module: ConfigFileJavascriptModule,
+    pub module: ConfigFileJavascriptModule,
     /// A string to generate, in a comment, at the top of every generated file.
     generated_file_header: Option<String>,
 }

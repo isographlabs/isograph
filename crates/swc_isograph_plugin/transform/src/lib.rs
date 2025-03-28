@@ -1,6 +1,6 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
-use isograph_config::{CompilerConfig, JavascriptModule};
+use isograph_config::{ConfigFileJavascriptModule, IsographProjectConfig, ISOGRAPH_FOLDER};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::path::{Path, PathBuf};
@@ -46,7 +46,8 @@ impl IsographImport {
 struct Isograph<'a> {
     // root_dir: PathBuf,
     // pages_dir: Option<PathBuf>,
-    config: &'a CompilerConfig,
+    root_dir: &'a Path,
+    config: &'a IsographProjectConfig,
     filepath: &'a Path,
     imports: Vec<IsographImport>,
     unresolved_mark: Option<Mark>,
@@ -103,11 +104,22 @@ impl IsographEntrypoint {
     fn path_for_artifact(
         &self,
         real_filepath: &Path,
-        config: &CompilerConfig,
+        config: &IsographProjectConfig,
+        root_dir: &Path,
     ) -> Result<PathBuf, BuildRequirePathError> {
         debug!("real_filepath: {:?}", real_filepath);
         let folder = PathBuf::from(real_filepath.parent().unwrap());
-        let artifact_directory = config.artifact_directory.absolute_path.as_path();
+        let cwd = PathBuf::from(root_dir);
+        debug!("cwd: {:?}", cwd);
+        let artifact_directory = cwd
+            .join(
+                config
+                    .artifact_directory
+                    .as_ref()
+                    .unwrap_or(&config.project_root),
+            )
+            .join(ISOGRAPH_FOLDER);
+        let artifact_directory = artifact_directory.as_path();
         debug!("artifact_directory: {:#?}", artifact_directory);
 
         let file_to_artifact_dir = &pathdiff::diff_paths(artifact_directory, folder)
@@ -166,7 +178,7 @@ enum BuildRequirePathError {
 impl<'a> Isograph<'a> {
     pub fn compile_import_statement(&mut self, entrypoint: &IsographEntrypoint) -> Expr {
         let file_to_artifact = entrypoint
-            .path_for_artifact(self.filepath, self.config)
+            .path_for_artifact(self.filepath, self.config, self.root_dir)
             .expect("Failed to get path for artifact.");
 
         debug!("gen expr for artifact: {}", file_to_artifact.display());
@@ -174,11 +186,11 @@ impl<'a> Isograph<'a> {
         debug!("options module: {:?}", self.config.options.module);
 
         match self.config.options.module {
-            JavascriptModule::CommonJs => entrypoint.build_require_expr_from_path(
+            ConfigFileJavascriptModule::CommonJs => entrypoint.build_require_expr_from_path(
                 &file_to_artifact.display().to_string(),
                 self.unresolved_mark,
             ),
-            JavascriptModule::EsModule => {
+            ConfigFileJavascriptModule::EsModule => {
                 let ident_name = format!("_{}", entrypoint.field_name);
 
                 // hoist import
@@ -312,8 +324,9 @@ impl<'a> Fold for Isograph<'a> {
 }
 
 pub fn isograph<'a>(
-    config: &'a CompilerConfig,
+    config: &'a IsographProjectConfig,
     filepath: &'a Path,
+    root_dir: &'a Path,
     unresolved_mark: Option<Mark>,
 ) -> impl Fold + 'a {
     Isograph {
@@ -321,5 +334,6 @@ pub fn isograph<'a>(
         filepath,
         unresolved_mark,
         imports: vec![],
+        root_dir,
     }
 }

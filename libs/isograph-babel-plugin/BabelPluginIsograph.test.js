@@ -5,11 +5,12 @@ import plugin from './BabelPluginIsograph';
 // @ts-ignore
 async function mock(mockedUri, stub) {
   const { Module } = await import('module');
+  const path = await import('path');
   // @ts-ignore
   Module._load_original = Module._load;
   // @ts-ignore
   Module._load = (uri, parent) => {
-    if (uri === mockedUri) return stub;
+    if (uri === mockedUri) return stub(path);
     // @ts-ignore
     return Module._load_original(uri, parent);
   };
@@ -18,7 +19,8 @@ async function mock(mockedUri, stub) {
 // In order to test `require`
 vi.hoisted(
   () =>
-    void mock('cosmiconfig', () => ({
+    // @ts-ignore
+    void mock('cosmiconfig', (path) => () => ({
       searchSync: () => ({
         config: {
           project_root: './src/components',
@@ -28,8 +30,7 @@ vi.hoisted(
             module: 'esmodule',
           },
         },
-        filepath:
-          '/home/pablocrov/code/isograph/libs/isograph-babel-plugin/isograph.config.json',
+        filepath: `${path.resolve('.')}/isograph.config.json`,
       }),
     })),
 );
@@ -82,15 +83,15 @@ describe('Babel plugin Isograph', () => {
   });
 
   test('should transform the iso function to a require call', () => {
-    const code = `iso(\`entrypoint Query.HomeRoute\`);`;
+    const code = `function test() { const a=iso(\`entrypoint Query.HomeRoute\`); }`;
 
     const result = transform(code, transformerOpts) ?? { code: '' };
 
-    expect(result.code).toMatchInlineSnapshot(
-      `
+    expect(result.code).toMatchInlineSnapshot(`
       "import _HomeRoute from "../../__isograph/Query/HomeRoute/entrypoint.ts";
-      _HomeRoute;"
-    `,
-    );
+      function test() {
+        const a = _HomeRoute;
+      }"
+    `);
   });
 });
