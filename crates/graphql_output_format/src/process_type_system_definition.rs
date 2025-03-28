@@ -825,7 +825,7 @@ pub fn graphql_input_value_definition_to_variable_definition(
                         input_value_definition.location,
                     )
                 })
-                .map(|x| *x)
+                .copied()
         })?;
 
     Ok(WithLocation::new(
