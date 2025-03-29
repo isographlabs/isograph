@@ -137,9 +137,10 @@ impl IsographEntrypoint {
         #[cfg(target_os = "windows")]
         let file_to_artifact = file_to_artifact.replace("\\", "/");
 
-        if file_to_artifact.starts_with("/") {
-            file_to_artifact = PathBuf::from(format!(".{}", file_to_artifact.display()));
+        if file_to_artifact.starts_with(ISOGRAPH_FOLDER) {
+            file_to_artifact = PathBuf::from(format!("./{}", file_to_artifact.display()));
         }
+
         Ok(file_to_artifact)
     }
 }
@@ -268,6 +269,8 @@ impl<'a> Fold for Isograph<'a> {
                     if ident.sym == "iso" {
                         debug!("found iso function ---.");
                         if let Some(build_expr) = self.compile_iso_call_statement(args, None) {
+                            // might have `iso` functions inside the build expr
+                            let build_expr = build_expr.fold_children_with(self);
                             return build_expr;
                         }
                     }
@@ -278,7 +281,6 @@ impl<'a> Fold for Isograph<'a> {
                     ..
                 }) => {
                     debug!("Call executed");
-                    debug!("args: {:?}", args);
                     match &**child_callee {
                         Expr::Ident(ident) => {
                             if ident.sym == "iso" {
@@ -286,6 +288,8 @@ impl<'a> Fold for Isograph<'a> {
                                 if let Some(build_expr) =
                                     self.compile_iso_call_statement(child_args, Some(args))
                                 {
+                                    // might have `iso` functions inside the build expr
+                                    let build_expr = build_expr.fold_children_with(self);
                                     return build_expr;
                                 } else {
                                     HANDLER.with(|handler| {

@@ -17,7 +17,7 @@ fn fixture(input: PathBuf) {
     let config: IsographProjectConfig = serde_json::from_str(&isograph_config).unwrap();
 
     let output = root_dir.join("output.js");
-    let filename = format!("{}/src/components/Home/Header/File.ts", root_dir.display());
+    let filename = format!("{}/src/components/HomeRoute.tsx", root_dir.display());
 
     test_fixture(
         Syntax::Es(EsConfig {

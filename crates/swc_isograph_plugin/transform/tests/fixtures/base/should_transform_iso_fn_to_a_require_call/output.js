@@ -1,3 +1,1 @@
-function test() {
-  const a = require("../../__isograph/Query/HomeRoute/entrypoint.ts").default;
-}
+const { fragmentReference } = useLazyReference(require("./__isograph/Query/HomeRoute/entrypoint.ts").default, {});

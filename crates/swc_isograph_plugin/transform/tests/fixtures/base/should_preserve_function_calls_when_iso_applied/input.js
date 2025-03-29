@@ -1,9 +1,14 @@
 export const HomeRoute = iso(`
-    field Query.HomeRoute @component {
-      pets {
-        id
-      }
+  field Query.HomeRoute @component {
+    pets {
+      id
+      PetSummaryCard
     }
-  `)(function HomeRouteComponent() {
-  return 'Render';
+  }
+`)(function HomeRouteComponent({ data }) {
+  const { fragmentReference, loadFragmentReference } = useImperativeReference(
+    iso(`entrypoint Query.PetFavoritePhrase`),
+  );
+  
+  return "Render";
 });

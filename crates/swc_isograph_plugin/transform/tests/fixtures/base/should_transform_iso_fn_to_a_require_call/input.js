@@ -1,3 +1,4 @@
-function test() {
-  const a = iso(`entrypoint Query.HomeRoute`);
-}
+const { fragmentReference } = useLazyReference(
+  iso(`entrypoint Query.HomeRoute`),
+  {},
+);
