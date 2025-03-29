@@ -117,3 +117,20 @@ macro_rules! string_key_one_way_conversion {
         }
     };
 }
+
+#[macro_export]
+macro_rules! string_key_equality {
+    ($left:ident, $right:ident) => {
+        impl std::cmp::PartialEq<$left> for $right {
+            fn eq(&self, other: &$left) -> bool {
+                self.0 == other.0
+            }
+        }
+
+        impl std::cmp::PartialEq<$right> for $left {
+            fn eq(&self, other: &$right) -> bool {
+                self.0 == other.0
+            }
+        }
+    };
+}

@@ -101,7 +101,6 @@ pub fn get_artifact_path_and_content<TOutputFormat: OutputFormat>(
 ) -> Vec<ArtifactPathAndContent> {
     let mut artifact_path_and_content = get_artifact_path_and_content_impl(schema, config);
     if let Some(header) = config.options.generated_file_header {
-        let header = header.lookup();
         for artifact_path_and_content in artifact_path_and_content.iter_mut() {
             artifact_path_and_content.file_content =
                 format!("// {header}\n{}", artifact_path_and_content.file_content);
@@ -481,7 +480,7 @@ fn get_serialized_field_argument(
                 .map(|entry| {
                     get_serialized_field_argument(
                         &ArgumentKeyAndValue {
-                            key: entry.name.item.lookup().intern().into(),
+                            key: entry.name.item.unchecked_conversion(),
                             value: entry.value.item.clone(),
                         },
                         indentation_level + 3,

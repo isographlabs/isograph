@@ -6,7 +6,6 @@ use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
     GraphQLTypeAnnotation, NameValuePair,
 };
-use intern::Lookup;
 use std::collections::BTreeMap;
 
 use isograph_lang_types::{
@@ -383,7 +382,7 @@ fn get_non_nullable_missing_and_provided_fields<TOutputFormat: OutputFormat>(
 
             let object_literal_supplied_field = object_literal
                 .iter()
-                .find(|field| field.name.item.lookup() == field_name.lookup());
+                .find(|field| field.name.item == *field_name);
 
             match object_literal_supplied_field {
                 Some(selection_supplied_argument_value) => Some(ObjectLiteralFieldType::Provided(
@@ -414,7 +413,7 @@ fn validate_no_extraneous_fields(
         .filter_map(|field| {
             let is_defined = object_fields
                 .iter()
-                .any(|(field_name, _)| field_name.lookup() == field.name.item.lookup());
+                .any(|(field_name, _)| *field_name == field.name.item);
 
             if !is_defined {
                 return Some(field.clone());

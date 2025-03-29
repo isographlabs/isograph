@@ -1,4 +1,3 @@
-use intern::Lookup;
 use std::{collections::HashMap, fmt::Debug};
 
 use common_lang_types::{SelectableName, VariableName, WithLocation, WithSpan};
@@ -38,10 +37,10 @@ impl VariableContext {
             .map(|variable_definition| {
                 let variable_name = variable_definition.item.name.item;
 
-                let matching_arg = match selection_arguments.iter().find(|s| {
-                    // TODO don't require a lookup
-                    s.item.name.item.lookup() == variable_name.lookup()
-                }) {
+                let matching_arg = match selection_arguments
+                    .iter()
+                    .find(|s| s.item.name.item == variable_name)
+                {
                     Some(arg) => arg,
                     None => {
                         if matches!(selection_variant, ScalarSelectionDirectiveSet::Loadable(_)) {

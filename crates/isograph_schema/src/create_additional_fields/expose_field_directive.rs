@@ -6,7 +6,7 @@ use common_lang_types::{
 use graphql_lang_types::{
     from_graph_ql_directive, DeserializationError, GraphQLConstantValue, GraphQLDirective,
 };
-use intern::{string_key::Intern, Lookup};
+use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
     ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectionType,
@@ -149,7 +149,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         let client_field_scalar_selection_name =
             expose_as.unwrap_or(mutation_field.name.item.into());
         // TODO what is going on here. Should mutation_field have a checked way of converting to LinkedField?
-        let top_level_schema_field_name = mutation_field.name.item.lookup().intern().into();
+        let top_level_schema_field_name = mutation_field.name.item.unchecked_conversion();
         let mutation_field_arguments = mutation_field.arguments.clone();
         let description = mutation_field.description;
 
@@ -166,7 +166,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         let payload_object = self.server_field_data.object(payload_object_id);
 
         // TODO split path on .
-        let primary_field_name: ServerObjectSelectableName = path.lookup().intern().into();
+        let primary_field_name: ServerObjectSelectableName = path.unchecked_conversion();
 
         let primary_field = payload_object
             .encountered_fields
@@ -211,7 +211,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     name: WithLocation::new(
                         // TODO make this no-op
                         // TODO split on . here; we should be able to have from: "best_friend.id" or whatnot.
-                        field_map_item.0.from.lookup().intern().into(),
+                        field_map_item.0.from.unchecked_conversion(),
                         Location::generated(),
                     ),
                     reader_alias: None,
@@ -230,12 +230,9 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         let mutation_field_client_field_id = self.client_types.len().into();
         let top_level_arguments = mutation_field_arguments
             .iter()
-            .map(|input_value_def| {
-                let arg_name = input_value_def.item.name.item.lookup().intern();
-                ArgumentKeyAndValue {
-                    key: arg_name.into(),
-                    value: NonConstantValue::Variable(arg_name.into()),
-                }
+            .map(|input_value_def| ArgumentKeyAndValue {
+                key: input_value_def.item.name.item.unchecked_conversion(),
+                value: NonConstantValue::Variable(input_value_def.item.name.item),
             })
             .collect();
 
@@ -253,9 +250,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 
             variant: ClientFieldVariant::ImperativelyLoadedField(ImperativelyLoadedFieldVariant {
                 client_field_scalar_selection_name: client_field_scalar_selection_name
-                    .lookup()
-                    .intern()
-                    .into(),
+                    .unchecked_conversion(),
                 top_level_schema_field_name,
                 top_level_schema_field_arguments: mutation_field_arguments
                     .into_iter()
@@ -274,7 +269,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             variable_definitions: vec![],
             type_and_field: ObjectTypeAndFieldName {
                 // TODO make this zero cost?
-                type_name: maybe_abstract_parent_type_name.lookup().intern().into(), // e.g. Pet
+                type_name: maybe_abstract_parent_type_name.unchecked_conversion(), // e.g. Pet
                 field_name: client_field_scalar_selection_name, // set_pet_best_friend
             },
             parent_object_id: maybe_abstract_parent_object_id,
@@ -375,7 +370,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             .iter()
             .find_map(|(name, field_id)| {
                 if let DefinitionLocation::Server(server_field_id) = field_id {
-                    if name.lookup() == field_arg.lookup() {
+                    if *name == field_arg {
                         return Some(server_field_id);
                     }
                 }

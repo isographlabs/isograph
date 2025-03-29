@@ -5,7 +5,7 @@ use common_lang_types::{
     WithLocation,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
-use intern::{string_key::Intern, Lookup};
+use intern::Lookup;
 use isograph_lang_types::{
     DefinitionLocation, SelectionType, ServerEntityId, ServerScalarSelectableId, VariableDefinition,
 };
@@ -50,7 +50,7 @@ impl ArgumentMap {
                         modified_argument.name.item
                     }
                 };
-                name.lookup() == split_to_arg.to_argument_name.lookup()
+                name == split_to_arg.to_argument_name
             })
             .ok_or_else(|| {
                 WithLocation::new(
@@ -58,7 +58,7 @@ impl ArgumentMap {
                         primary_type_name,
                         mutation_object_name,
                         mutation_field_name,
-                        field_name: split_to_arg.to_argument_name.lookup().to_string(),
+                        field_name: split_to_arg.to_argument_name,
                     },
                     Location::generated(),
                 )
@@ -109,7 +109,7 @@ impl ArgumentMap {
                         return Err(WithLocation::new(
                             CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
                                 primary_type_name,
-                                field_name: split_to_arg.to_argument_name.to_string(),
+                                field_name: split_to_arg.to_argument_name.lookup().to_string(),
                             },
                             Location::generated(),
                         ));
@@ -230,7 +230,7 @@ impl ModifiedArgument {
     ) -> ProcessTypeDefinitionResult<()> {
         let argument_object = self.object.inner_mut();
 
-        let key = first.lookup().intern().into();
+        let key = first.unchecked_conversion();
         match argument_object
             .field_map
             // TODO make this a no-op
@@ -263,7 +263,7 @@ impl ModifiedArgument {
                                     return Err(WithLocation::new(
                                         CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
                                             primary_type_name,
-                                            field_name: key.to_string(),
+                                            field_name: key.lookup().to_string(),
                                         },
                                         Location::generated(),
                                     ));

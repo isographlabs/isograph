@@ -5,7 +5,6 @@ use common_lang_types::{
     SelectableName, UnvalidatedTypeName, ValueKeyName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLTypeAnnotation, NameValuePair};
-use intern::Lookup;
 use isograph_lang_types::{
     ClientFieldId, ClientPointerId, DefinitionLocation, LinkedFieldSelection,
     LoadableDirectiveParameters, NonConstantValue, ObjectSelectionDirectiveSet,
@@ -342,8 +341,7 @@ pub fn get_provided_arguments<'a>(
         .filter_map(|definition| {
             let user_has_supplied_argument = arguments
                 .iter()
-                // TODO do not call .lookup
-                .any(|arg| definition.name.item.lookup() == arg.item.name.item.lookup());
+                .any(|arg| definition.name.item == arg.item.name.item);
             if user_has_supplied_argument {
                 Some(definition.clone())
             } else {

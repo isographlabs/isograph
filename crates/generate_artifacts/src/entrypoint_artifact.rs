@@ -4,7 +4,6 @@ use common_lang_types::{
     ArtifactPathAndContent, IsographObjectTypeName, ObjectTypeAndFieldName, QueryOperationName,
     QueryText, VariableName,
 };
-use intern::{string_key::Intern, Lookup};
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
     ClientFieldId, DefinitionLocation, ScalarSelectionDirectiveSet, SelectionType, ServerObjectId,
@@ -238,7 +237,7 @@ fn generate_refetch_query_artifact_import(
                 .imperatively_loaded_field_variant
                 .top_level_schema_field_arguments
                 .iter()
-                .map(|x| x.name.item.lookup().intern().into()),
+                .map(|x| x.name.item.unchecked_conversion()),
         );
         array_syntax.push_str(&format!(
             "  {{ artifact: refetchQuery{}, allowedVariables: {} }},\n",

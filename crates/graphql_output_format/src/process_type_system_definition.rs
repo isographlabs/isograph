@@ -11,7 +11,7 @@ use graphql_lang_types::{
     GraphQLTypeSystemExtensionDocument, GraphQLTypeSystemExtensionOrDefinition, NameValuePair,
     RootOperationKind,
 };
-use intern::string_key::{Intern, Lookup};
+use intern::string_key::Intern;
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
     DefinitionLocation, SelectionType, ServerEntityId, ServerObjectId, ServerScalarSelectableId,
@@ -142,7 +142,7 @@ pub fn process_graphql_type_system_document(
                     schema,
                     GraphQLScalarTypeDefinition {
                         description: enum_definition.description,
-                        name: enum_definition.name.map(|x| x.lookup().intern().into()),
+                        name: enum_definition.name.map(|x| x.unchecked_conversion()),
                         directives: enum_definition.directives,
                     },
                 )?;
@@ -706,7 +706,7 @@ fn set_and_validate_id_field(
 
     match field.item.type_.inner_non_null_named_type() {
         Some(type_) => {
-            if type_.0.item.lookup() != ID_GRAPHQL_TYPE.lookup() {
+            if type_.0.item != *ID_GRAPHQL_TYPE {
                 options.on_invalid_id_type.on_failure(|| {
                     WithLocation::new(
                         ProcessGraphqlTypeSystemDefinitionError::IdFieldMustBeNonNullIdType {

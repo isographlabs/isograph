@@ -74,7 +74,7 @@ pub enum CreateAdditionalFieldsError {
         primary_type_name: IsographObjectTypeName,
         mutation_object_name: IsographObjectTypeName,
         mutation_field_name: SelectableName,
-        field_name: String,
+        field_name: StringLiteralValue,
     },
 
     #[error(

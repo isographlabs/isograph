@@ -8,7 +8,7 @@ use common_lang_types::{
     WithLocation, WithSpan,
 };
 
-use intern::{string_key::Intern, Lookup};
+use intern::string_key::Intern;
 use isograph_lang_types::{
     reachable_variables, ClientFieldId, ClientPointerId, DefinitionLocation, LinkedFieldSelection,
     ObjectSelectionDirectiveSet, ScalarFieldSelection, ScalarSelectionDirectiveSet,
@@ -915,10 +915,7 @@ fn get_missing_and_provided_arguments<'a>(
         .filter_map(move |field_argument_definition| {
             let selection_supplied_argument = selection_supplied_arguments
                 .iter()
-                // TODO do not call .lookup
-                .find(|arg| {
-                    field_argument_definition.name.item.lookup() == arg.item.name.item.lookup()
-                });
+                .find(|arg| field_argument_definition.name.item == arg.item.name.item);
 
             if let Some(selection_supplied_argument) = selection_supplied_argument {
                 Some(ArgumentType::Provided(
@@ -979,7 +976,7 @@ fn validate_no_extraneous_arguments(
 
             let is_defined = field_argument_definitions
                 .iter()
-                .any(|definition| definition.name.item.lookup() == arg.item.name.item.lookup());
+                .any(|definition| definition.name.item == arg.item.name.item);
 
             if !is_defined {
                 return Some(arg.clone());

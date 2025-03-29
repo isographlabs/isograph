@@ -8,7 +8,7 @@ use common_lang_types::{
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
 };
-use intern::{string_key::Intern, Lookup};
+use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
     RefetchQueryIndex, ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionType,
@@ -527,7 +527,7 @@ fn process_imperatively_loaded_field<TOutputFormat: OutputFormat>(
     let wrapped_selection_map = selection_map_wrapped(
         selection_map.clone(),
         // TODO why are these types different
-        top_level_schema_field_name.lookup().intern().into(),
+        top_level_schema_field_name.unchecked_conversion(),
         top_level_schema_field_arguments
             .iter()
             // TODO don't clone
@@ -544,7 +544,7 @@ fn process_imperatively_loaded_field<TOutputFormat: OutputFormat>(
                 });
 
                 ArgumentKeyAndValue {
-                    key: variable_definition.name.item.lookup().intern().into(),
+                    key: variable_definition.name.item.unchecked_conversion(),
                     value: NonConstantValue::Variable(variable_definition.name.item),
                 }
             })
@@ -552,7 +552,7 @@ fn process_imperatively_loaded_field<TOutputFormat: OutputFormat>(
         top_level_schema_field_concrete_type,
         primary_field_info
             .as_ref()
-            .map(|x| x.primary_field_name.lookup().intern().into()),
+            .map(|x| x.primary_field_name.unchecked_conversion()),
         primary_field_info
             .as_ref()
             .and_then(|x| x.primary_field_concrete_type),

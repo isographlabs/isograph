@@ -1,5 +1,6 @@
 use string_key_newtype::{
-    string_key_newtype, string_key_newtype_no_display, string_key_one_way_conversion,
+    string_key_equality, string_key_newtype, string_key_newtype_no_display,
+    string_key_one_way_conversion,
 };
 
 use crate::{ClientScalarSelectableName, SelectableName};
@@ -13,9 +14,12 @@ string_key_one_way_conversion!(from: InputValueName, to: FieldArgumentName);
 
 string_key_newtype!(EnumLiteralValue);
 string_key_newtype!(StringLiteralValue);
+string_key_equality!(StringLiteralValue, VariableName);
+string_key_equality!(StringLiteralValue, SelectableName);
 string_key_newtype!(DescriptionValue);
 string_key_newtype!(VariableName);
 string_key_newtype!(ValueKeyName);
+string_key_equality!(ValueKeyName, SelectableName);
 
 // OutputTypeName and InputTypeName should **only** exist on the schema parsing
 // side! Later, they should be converted to some sort of enums. These represent
@@ -88,6 +92,7 @@ string_key_newtype!(JavascriptName);
 string_key_newtype!(IsographDirectiveName);
 
 string_key_newtype!(FieldArgumentName);
+string_key_equality!(FieldArgumentName, VariableName);
 
 string_key_newtype!(ArtifactFilePrefix);
 string_key_newtype!(ArtifactFileName);
