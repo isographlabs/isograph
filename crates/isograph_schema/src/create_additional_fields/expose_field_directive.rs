@@ -370,15 +370,12 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     ) -> ProcessTypeDefinitionResult<ServerScalarSelectableId> {
         let mutation = self.server_field_data.object(mutation_object_id);
 
-        // TODO make this a no-op
-        let field_arg = field_arg.lookup().intern().into();
-
         let field_id = mutation
             .encountered_fields
             .iter()
             .find_map(|(name, field_id)| {
                 if let DefinitionLocation::Server(server_field_id) = field_id {
-                    if *name == field_arg {
+                    if name.lookup() == field_arg.lookup() {
                         return Some(server_field_id);
                     }
                 }

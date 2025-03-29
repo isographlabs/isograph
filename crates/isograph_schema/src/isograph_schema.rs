@@ -273,7 +273,7 @@ pub struct NameAndArguments {
 
 impl NameAndArguments {
     pub fn normalization_key(&self) -> NormalizationKey {
-        if self.name == "id".intern().into() {
+        if self.name == "id" {
             NormalizationKey::Id
         } else {
             NormalizationKey::ServerField(self.clone())

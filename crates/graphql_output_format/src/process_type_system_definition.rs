@@ -611,7 +611,7 @@ fn process_fields(
                 Entry::Vacant(vacant_entry) => {
                     vacant_entry.insert(DefinitionLocation::Server(next_server_field_id));
 
-                    if field.item.name.item == (*ID_FIELD_NAME).into() {
+                    if field.item.name.item == *ID_FIELD_NAME {
                         set_and_validate_id_field(
                             &mut parent_object.id_field,
                             next_server_field_id,

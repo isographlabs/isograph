@@ -605,7 +605,7 @@ fn get_used_variable_definitions<TOutputFormat: OutputFormat>(
         .iter()
         .flat_map(|variable_name| {
             // HACK
-            if variable_name == &"id".intern().into() {
+            if *variable_name == "id" {
                 None
             } else {
                 Some(
@@ -993,7 +993,7 @@ fn filter_id_fields(field: &&WithSpan<ValidatedSelection>) -> bool {
             // Here, we check whether the field is named "id", but we should really
             // know whether it is an id field in some other way. There can be non-id fields
             // named id and id fields not named "id".
-            scalar_field.name.item != "id".intern().into()
+            scalar_field.name.item != "id"
             // ------ END HACK ------
         }
         SelectionTypeContainingSelections::Object(_) => true,

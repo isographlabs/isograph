@@ -41,6 +41,20 @@ macro_rules! string_key_newtype {
                 self.0.into()
             }
         }
+
+        impl std::cmp::PartialEq<&'static str> for $named {
+            fn eq(&self, other: &&'static str) -> bool {
+                use intern::Lookup;
+                self.lookup() == *other
+            }
+        }
+
+        impl std::cmp::PartialEq<$named> for &'static str {
+            fn eq(&self, other: &$named) -> bool {
+                use intern::Lookup;
+                *self == other.lookup()
+            }
+        }
     };
 }
 
@@ -87,6 +101,18 @@ macro_rules! string_key_one_way_conversion {
         impl From<$from> for $to {
             fn from(other: $from) -> Self {
                 Self(other.0)
+            }
+        }
+
+        impl std::cmp::PartialEq<$from> for $to {
+            fn eq(&self, other: &$from) -> bool {
+                self.0 == other.0
+            }
+        }
+
+        impl std::cmp::PartialEq<$to> for $from {
+            fn eq(&self, other: &$to) -> bool {
+                self.0 == other.0
             }
         }
     };
