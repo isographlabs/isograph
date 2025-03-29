@@ -595,7 +595,6 @@ fn process_fields(
     field_queue: HashMap<ServerObjectId, Vec<WithLocation<GraphQLFieldDefinition>>>,
     options: &CompilerConfigOptions,
 ) -> ProcessTypeDefinitionResult<()> {
-    // TODO
     for (object_id, fields) in field_queue {
         let server_objects = &mut schema.server_field_data.server_objects;
         // Calling .objects takes a reference to all of server_field_data, but we need
