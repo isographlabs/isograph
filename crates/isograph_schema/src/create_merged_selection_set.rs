@@ -219,7 +219,7 @@ pub struct ScalarClientFieldTraversalState {
     traversal_path: Vec<NormalizationKey>,
 
     /// Client fields that are directly accessed by this client field
-    pub accessible_client_fields: HashSet<ClientFieldId>,
+    pub accessible_client_fields: HashSet<ClientFieldOrPointerId>,
     pub has_updatable: bool,
 }
 
@@ -746,7 +746,7 @@ fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
 
                         merge_traversal_state
                             .accessible_client_fields
-                            .insert(*client_field_id);
+                            .insert(SelectionType::Scalar(*client_field_id));
                     }
                 };
             }
@@ -768,7 +768,11 @@ fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
                             encountered_client_field_map,
                             variable_context,
                             &linked_field_selection.arguments,
-                        )
+                        );
+
+                        merge_traversal_state
+                            .accessible_client_fields
+                            .insert(SelectionType::Object(client_pointer_id));
                     }
                     DefinitionLocation::Server(server_field_id) => {
                         let server_field = schema.server_field(server_field_id);

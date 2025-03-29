@@ -17,11 +17,12 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     accessible_client_fields, as_server_field, description, get_provided_arguments,
-    output_type_annotation, selection_map_wrapped, ClientFieldOrPointer, ClientFieldVariant,
-    FieldTraversalResult, NameAndArguments, NormalizationKey, OutputFormat, RequiresRefinement,
-    Schema, SchemaObject, SchemaServerLinkedFieldFieldVariant, UserWrittenClientTypeInfo,
-    UserWrittenComponentVariant, ValidatedClientField, ValidatedScalarSelectionAssociatedData,
-    ValidatedSchema, ValidatedSchemaState, ValidatedSelection, ValidatedVariableDefinition,
+    output_type_annotation, selection_map_wrapped, ClientFieldOrPointer, ClientFieldOrPointerId,
+    ClientFieldVariant, FieldTraversalResult, NameAndArguments, NormalizationKey, OutputFormat,
+    RequiresRefinement, Schema, SchemaObject, SchemaServerLinkedFieldFieldVariant,
+    UserWrittenClientTypeInfo, UserWrittenComponentVariant, ValidatedClientField,
+    ValidatedScalarSelectionAssociatedData, ValidatedSchema, ValidatedSchemaState,
+    ValidatedSelection, ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -116,7 +117,7 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
 ) -> Vec<ArtifactPathAndContent> {
     let mut encountered_client_type_map = BTreeMap::new();
     let mut path_and_contents = vec![];
-    let mut encountered_output_types = HashSet::<ClientFieldId>::new();
+    let mut encountered_output_types = HashSet::<ClientFieldOrPointerId>::new();
 
     // For each entrypoint, generate an entrypoint artifact and refetch artifacts
     for entrypoint_id in schema.entrypoints.keys() {
@@ -129,7 +130,7 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
         path_and_contents.extend(entrypoint_path_and_content);
 
         // We also need to generate output types for entrypoints
-        encountered_output_types.insert(*entrypoint_id);
+        encountered_output_types.insert(SelectionType::Scalar(*entrypoint_id));
     }
 
     for (
@@ -332,32 +333,49 @@ fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
                 for nested_client_field in
                     accessible_client_fields(&user_written_client_type, schema)
                 {
-                    encountered_output_types.insert(nested_client_field.id);
+                    encountered_output_types.insert(nested_client_field.id());
                 }
             }
         }
     }
 
     for output_type_id in encountered_output_types {
-        let client_field = schema.client_field(output_type_id);
-        let artifact_path_and_content = match client_field.variant {
-            ClientFieldVariant::Link => None,
-            ClientFieldVariant::UserWritten(info) => {
+        let client_type = schema.client_type(output_type_id);
+
+        let artifact_path_and_content = match client_type {
+            SelectionType::Object(client_pointer) => {
                 Some(generate_eager_reader_output_type_artifact(
                     schema,
-                    client_field,
+                    &SelectionType::Object(client_pointer),
                     config,
-                    info,
+                    UserWrittenClientTypeInfo {
+                        const_export_name: client_pointer.info.const_export_name,
+                        file_path: client_pointer.info.file_path,
+                        user_written_component_variant: UserWrittenComponentVariant::Eager,
+                    },
                     config.options.include_file_extensions_in_import_statements,
                 ))
             }
-            ClientFieldVariant::ImperativelyLoadedField(_) => {
-                Some(generate_refetch_output_type_artifact(schema, client_field))
-            }
+            SelectionType::Scalar(client_field) => match client_field.variant {
+                ClientFieldVariant::Link => None,
+                ClientFieldVariant::UserWritten(info) => {
+                    Some(generate_eager_reader_output_type_artifact(
+                        schema,
+                        &SelectionType::Scalar(client_field),
+                        config,
+                        info,
+                        config.options.include_file_extensions_in_import_statements,
+                    ))
+                }
+                ClientFieldVariant::ImperativelyLoadedField(_) => {
+                    Some(generate_refetch_output_type_artifact(schema, client_field))
+                }
+            },
         };
+
         if let Some(path_and_content) = artifact_path_and_content {
             path_and_contents.push(path_and_content);
-        };
+        }
     }
 
     path_and_contents.push(build_iso_overload_artifact(
