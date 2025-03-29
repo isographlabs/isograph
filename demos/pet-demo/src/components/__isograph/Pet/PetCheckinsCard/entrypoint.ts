@@ -17,7 +17,13 @@ const artifact: IsographEntrypoint<
   kind: "Entrypoint",
   networkRequestInfo: {
     kind: "NetworkRequestInfo",
-    queryText,
+    operation: {
+      kind: "Operation",
+      documentId: null,
+      operationName: "PetCheckinsCard",
+      operationKind: "Query",
+      text: queryText,
+    },
     normalizationAst,
   },
   concreteType: "Query",
