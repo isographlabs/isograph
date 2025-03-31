@@ -167,6 +167,24 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
         }
     }
 
+    pub fn client_field_mut(
+        &mut self,
+        client_field_id: ClientFieldId,
+    ) -> &mut ClientField<
+        TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
+        TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
+        TSchemaValidationState::VariableDefinitionInnerType,
+        TOutputFormat,
+    > {
+        match &mut self.client_types[client_field_id.as_usize()] {
+            SelectionType::Scalar(client_field) => client_field,
+            SelectionType::Object(_) => panic!(
+                "encountered ClientPointer under ClientFieldId. \
+                This is indicative of a bug in Isograph."
+            ),
+        }
+    }
+
     pub fn linked_type(
         &self,
         field_id: DefinitionLocation<ServerScalarSelectableId, ClientPointerId>,
@@ -197,6 +215,24 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
         TOutputFormat,
     > {
         match &self.client_types[client_pointer_id.as_usize()] {
+            SelectionType::Object(client_pointer) => client_pointer,
+            SelectionType::Scalar(_) => panic!(
+                "encountered ClientField under ClientPointerId. \
+                This is indicative of a bug in Isograph."
+            ),
+        }
+    }
+
+    pub fn client_pointer_mut(
+        &mut self,
+        client_pointer_id: ClientPointerId,
+    ) -> &mut ClientPointer<
+        TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
+        TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
+        TSchemaValidationState::VariableDefinitionInnerType,
+        TOutputFormat,
+    > {
+        match &mut self.client_types[client_pointer_id.as_usize()] {
             SelectionType::Object(client_pointer) => client_pointer,
             SelectionType::Scalar(_) => panic!(
                 "encountered ClientField under ClientPointerId. \
