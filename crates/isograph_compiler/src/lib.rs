@@ -1,3 +1,4 @@
+mod add_selection_sets;
 pub mod batch_compile;
 mod compiler_state;
 mod create_unvalidated_schema;

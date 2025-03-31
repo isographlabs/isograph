@@ -1,13 +1,18 @@
+use std::collections::HashMap;
+
 use common_lang_types::{
     ClientScalarSelectableName, ConstExportName, IsographDirectiveName, IsographObjectTypeName,
     Location, ObjectTypeAndFieldName, RelativePathToSourceFile, SelectableName,
-    ServerObjectSelectableName, TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
+    ServerObjectSelectableName, TextSource, UnvalidatedTypeName, VariableName, WithLocation,
+    WithSpan,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration, ClientPointerId,
-    DefinitionLocation, DeserializationError, NonConstantValue, SelectionType, ServerEntityId,
-    ServerObjectId, TypeAnnotation, VariableDefinition,
+    ArgumentKeyAndValue, ClientFieldDeclaration, ClientFieldId, ClientPointerDeclaration,
+    ClientPointerId, DefinitionLocation, DeserializationError, NonConstantValue,
+    ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionType,
+    SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, TypeAnnotation,
+    VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -19,12 +24,29 @@ use crate::{
     ClientField, ClientPointer, FieldMapItem, OutputFormat, UnvalidatedSchema, NODE_FIELD_NAME,
 };
 
+pub type UnprocessedSelection = WithSpan<
+    SelectionTypeContainingSelections<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
+>;
+
+pub struct UnprocessedClientFieldItem {
+    pub client_field_id: ClientFieldId,
+    pub reader_selection_set: Vec<UnprocessedSelection>,
+    pub refetch_strategy:
+        Option<RefetchStrategy<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>>,
+}
+pub struct UnprocessedClientPointerItem {
+    pub client_pointer_id: ClientPointerId,
+    pub reader_selection_set: Vec<UnprocessedSelection>,
+    pub refetch_selection_set: Vec<UnprocessedSelection>,
+}
+pub type UnprocessedItem = SelectionType<UnprocessedClientFieldItem, UnprocessedClientPointerItem>;
+
 impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     pub fn process_client_field_declaration(
         &mut self,
         client_field_declaration: WithSpan<ClientFieldDeclaration>,
         text_source: TextSource,
-    ) -> Result<(), WithLocation<ProcessClientFieldDeclarationError>> {
+    ) -> Result<UnprocessedClientFieldItem, WithLocation<ProcessClientFieldDeclarationError>> {
         let parent_type_id = self
             .server_field_data
             .defined_types
@@ -36,11 +58,10 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                 Location::new(text_source, client_field_declaration.item.parent_type.span),
             ))?;
 
-        match parent_type_id {
-            ServerEntityId::Object(object_id) => {
-                self.add_client_field_to_object(*object_id, client_field_declaration)
-                    .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?;
-            }
+        let unprocess_client_field_items = match parent_type_id {
+            ServerEntityId::Object(object_id) => self
+                .add_client_field_to_object(*object_id, client_field_declaration)
+                .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?,
             ServerEntityId::Scalar(scalar_id) => {
                 let scalar_name = self.server_field_data.scalar(*scalar_id).name;
                 return Err(WithLocation::new(
@@ -51,16 +72,17 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     Location::new(text_source, client_field_declaration.item.parent_type.span),
                 ));
             }
-        }
+        };
 
-        Ok(())
+        Ok(unprocess_client_field_items)
     }
 
     pub fn process_client_pointer_declaration(
         &mut self,
         client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
         text_source: TextSource,
-    ) -> Result<(), WithLocation<ProcessClientFieldDeclarationError>> {
+    ) -> Result<UnprocessedClientPointerItem, WithLocation<ProcessClientFieldDeclarationError>>
+    {
         let parent_type_id = self
             .server_field_data
             .defined_types
@@ -89,10 +111,10 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                 ),
             ))?;
 
-        match parent_type_id {
+        let unprocessed_client_pointer_items = match parent_type_id {
             ServerEntityId::Object(object_id) => match target_type_id {
-                ServerEntityId::Object(to_object_id) => {
-                    self.add_client_pointer_to_object(
+                ServerEntityId::Object(to_object_id) => self
+                    .add_client_pointer_to_object(
                         *object_id,
                         TypeAnnotation::from_graphql_type_annotation(
                             client_pointer_declaration
@@ -103,8 +125,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                         ),
                         client_pointer_declaration,
                     )
-                    .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?;
-                }
+                    .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?,
                 ServerEntityId::Scalar(scalar_id) => {
                     let scalar_name = self.server_field_data.scalar(*scalar_id).name;
                     return Err(WithLocation::new(
@@ -131,16 +152,15 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     ),
                 ));
             }
-        }
-
-        Ok(())
+        };
+        Ok(unprocessed_client_pointer_items)
     }
 
     fn add_client_field_to_object(
         &mut self,
         parent_object_id: ServerObjectId,
         client_field_declaration: WithSpan<ClientFieldDeclaration>,
-    ) -> ProcessClientFieldDeclarationResult<()> {
+    ) -> ProcessClientFieldDeclarationResult<UnprocessedClientFieldItem> {
         let query_id = self.query_id();
         let object = &mut self.server_field_data.server_objects[parent_object_id.as_usize()];
         let client_field_field_name_ws = client_field_declaration.item.client_field_name;
@@ -174,32 +194,52 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             description: client_field_declaration.item.description.map(|x| x.item),
             name,
             id: next_client_field_id,
-            reader_selection_set: client_field_declaration.item.selection_set,
+            reader_selection_set: vec![],
             variant,
-            variable_definitions: client_field_declaration.item.variable_definitions,
+            variable_definitions: client_field_declaration
+                .item
+                .variable_definitions
+                .into_iter()
+                .map(|variable_definition| {
+                    validate_variable_definition(
+                        &self.server_field_data.defined_types,
+                        variable_definition,
+                        object.name,
+                        client_field_name.into(),
+                    )
+                })
+                .collect::<Result<_, _>>()?,
             type_and_field: ObjectTypeAndFieldName {
                 type_name: object.name,
                 field_name: name.into(),
             },
 
             parent_object_id,
-            refetch_strategy: object.id_field.map(|_| {
-                // Assume that if we have an id field, this implements Node
-                RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
-                    vec![id_selection()],
-                    query_id,
-                    format!("refetch__{}", object.name).intern().into(),
-                    *NODE_FIELD_NAME,
-                    id_top_level_arguments(),
-                    None,
-                    RequiresRefinement::Yes(object.name),
-                    None,
-                    None,
-                ))
-            }),
+            refetch_strategy: None,
             output_format: std::marker::PhantomData,
         }));
-        Ok(())
+
+        let selections = client_field_declaration.item.selection_set;
+        let refetch_strategy = object.id_field.map(|_| {
+            // Assume that if we have an id field, this implements Node
+            RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
+                vec![id_selection()],
+                query_id,
+                format!("refetch__{}", object.name).intern().into(),
+                *NODE_FIELD_NAME,
+                id_top_level_arguments(),
+                None,
+                RequiresRefinement::Yes(object.name),
+                None,
+                None,
+            ))
+        });
+
+        Ok(UnprocessedClientFieldItem {
+            client_field_id: next_client_field_id,
+            reader_selection_set: selections,
+            refetch_strategy,
+        })
     }
 
     fn add_client_pointer_to_object(
@@ -207,7 +247,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         parent_object_id: ServerObjectId,
         to_object_id: TypeAnnotation<ServerObjectId>,
         client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
-    ) -> ProcessClientFieldDeclarationResult<()> {
+    ) -> ProcessClientFieldDeclarationResult<UnprocessedClientPointerItem> {
         let query_id = self.query_id();
         let to_object = self.server_field_data.object(*to_object_id.inner());
         let parent_object = self.server_field_data.object(parent_object_id);
@@ -232,43 +272,59 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             }));
         }
 
+        let unprocessed_fields = client_pointer_declaration.item.selection_set;
+
+        let refetch_strategy = match to_object.id_field {
+            None => Err(WithSpan::new(
+                ProcessClientFieldDeclarationError::ClientPointerTargetTypeHasNoId {
+                    target_type_name: *client_pointer_declaration.item.target_type.inner(),
+                },
+                *client_pointer_declaration.item.target_type.span(),
+            )),
+            Some(_) => {
+                // Assume that if we have an id field, this implements Node
+                Ok(RefetchStrategy::UseRefetchField(
+                    generate_refetch_field_strategy(
+                        vec![],
+                        query_id,
+                        format!("refetch__{}", to_object.name).intern().into(),
+                        *NODE_FIELD_NAME,
+                        id_top_level_arguments(),
+                        None,
+                        RequiresRefinement::Yes(to_object.name),
+                        None,
+                        None,
+                    ),
+                ))
+            }
+        }?;
+
         self.client_types.push(SelectionType::Object(ClientPointer {
             description: client_pointer_declaration.item.description.map(|x| x.item),
             name,
             id: next_client_pointer_id,
-            reader_selection_set: client_pointer_declaration.item.selection_set,
+            reader_selection_set: vec![],
 
-            variable_definitions: client_pointer_declaration.item.variable_definitions,
+            variable_definitions: client_pointer_declaration
+                .item
+                .variable_definitions
+                .into_iter()
+                .map(|variable_definition| {
+                    validate_variable_definition(
+                        &self.server_field_data.defined_types,
+                        variable_definition,
+                        parent_object.name,
+                        client_pointer_name.into(),
+                    )
+                })
+                .collect::<Result<_, _>>()?,
             type_and_field: ObjectTypeAndFieldName {
                 type_name: parent_object.name,
                 field_name: name.into(),
             },
 
             parent_object_id,
-            refetch_strategy: match to_object.id_field {
-                None => Err(WithSpan::new(
-                    ProcessClientFieldDeclarationError::ClientPointerTargetTypeHasNoId {
-                        target_type_name: *client_pointer_declaration.item.target_type.inner(),
-                    },
-                    *client_pointer_declaration.item.target_type.span(),
-                )),
-                Some(_) => {
-                    // Assume that if we have an id field, this implements Node
-                    Ok(RefetchStrategy::UseRefetchField(
-                        generate_refetch_field_strategy(
-                            vec![id_selection()],
-                            query_id,
-                            format!("refetch__{}", to_object.name).intern().into(),
-                            *NODE_FIELD_NAME,
-                            id_top_level_arguments(),
-                            None,
-                            RequiresRefinement::Yes(to_object.name),
-                            None,
-                            None,
-                        ),
-                    ))
-                }
-            }?,
+            refetch_strategy,
             to: to_object_id,
             output_format: std::marker::PhantomData,
 
@@ -297,7 +353,11 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             ));
         }
 
-        Ok(())
+        Ok(UnprocessedClientPointerItem {
+            client_pointer_id: next_client_pointer_id,
+            reader_selection_set: unprocessed_fields,
+            refetch_selection_set: vec![id_selection()],
+        })
     }
 }
 
@@ -345,6 +405,16 @@ pub enum ProcessClientFieldDeclarationError {
 
     #[error("Error when deserializing directives. Message: {message}")]
     UnableToDeserializeDirectives { message: DeserializationError },
+
+    #[error(
+        "The argument `{argument_name}` on field `{parent_type_name}.{field_name}` has inner type `{argument_type}`, which does not exist."
+    )]
+    FieldArgumentTypeDoesNotExist {
+        argument_name: VariableName,
+        parent_type_name: IsographObjectTypeName,
+        field_name: SelectableName,
+        argument_type: UnvalidatedTypeName,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -431,4 +501,41 @@ pub fn id_top_level_arguments() -> Vec<ArgumentKeyAndValue> {
         key: "id".intern().into(),
         value: NonConstantValue::Variable("id".intern().into()),
     }]
+}
+
+pub fn validate_variable_definition(
+    defined_types: &HashMap<UnvalidatedTypeName, ServerEntityId>,
+    variable_definition: WithSpan<VariableDefinition<UnvalidatedTypeName>>,
+    parent_type_name: IsographObjectTypeName,
+    field_name: SelectableName,
+) -> ProcessClientFieldDeclarationResult<WithSpan<VariableDefinition<ServerEntityId>>> {
+    let type_ = variable_definition
+        .item
+        .type_
+        .clone()
+        .and_then(|input_type_name| {
+            defined_types
+                .get(variable_definition.item.type_.inner())
+                .ok_or_else(|| {
+                    WithSpan::new(
+                        ProcessClientFieldDeclarationError::FieldArgumentTypeDoesNotExist {
+                            argument_type: input_type_name,
+                            argument_name: variable_definition.item.name.item,
+                            parent_type_name,
+                            field_name,
+                        },
+                        variable_definition.span,
+                    )
+                })
+                .copied()
+        })?;
+
+    Ok(WithSpan::new(
+        VariableDefinition {
+            name: variable_definition.item.name.map(VariableName::from),
+            type_,
+            default_value: variable_definition.item.default_value,
+        },
+        variable_definition.span,
+    ))
 }

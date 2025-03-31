@@ -4,10 +4,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use common_lang_types::CurrentWorkingDirectory;
+use common_lang_types::{CurrentWorkingDirectory, WithLocation};
 use generate_artifacts::get_artifact_path_and_content;
 use isograph_config::{create_config, CompilerConfig};
-use isograph_schema::{OutputFormat, Schema};
+use isograph_schema::{validate_use_of_arguments, OutputFormat, Schema};
 use pico::Database;
 
 use crate::{
@@ -90,6 +90,17 @@ pub fn compile<TOutputFormat: OutputFormat>(
     // Validate
     let validated_schema = Schema::validate_and_construct(unvalidated_schema)
         .map_err(|messages| BatchCompileError::UnableToValidateSchema { messages })?;
+
+    validate_use_of_arguments(&validated_schema).map_err(|messages| {
+        Box::new(BatchCompileError::MultipleErrorsWithLocations {
+            messages: messages
+                .into_iter()
+                .map(|x| {
+                    WithLocation::new(Box::new(x.item) as Box<dyn std::error::Error>, x.location)
+                })
+                .collect(),
+        })
+    })?;
 
     // Note: we calculate all of the artifact paths and contents first, so that writing to
     // disk can be as fast as possible and we minimize the chance that changes to the file

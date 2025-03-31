@@ -18,7 +18,8 @@ use serde::Deserialize;
 
 use crate::{
     generate_refetch_field_strategy, ClientField, ClientFieldVariant,
-    ImperativelyLoadedFieldVariant, OutputFormat, PrimaryFieldInfo, UnvalidatedSchema,
+    ImperativelyLoadedFieldVariant, OutputFormat, PrimaryFieldInfo, RefetchStrategy,
+    UnprocessedClientFieldItem, UnvalidatedSchema,
 };
 use lazy_static::lazy_static;
 
@@ -86,7 +87,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
     pub fn add_exposed_fields_to_parent_object_types(
         &mut self,
         parent_object_id: ServerObjectId,
-    ) -> ProcessTypeDefinitionResult<()> {
+    ) -> ProcessTypeDefinitionResult<Vec<UnprocessedClientFieldItem>> {
         // TODO don't clone if possible
         let parent_object = self.server_field_data.object(parent_object_id);
         let parent_object_name = parent_object.name;
@@ -102,15 +103,16 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
             .flatten()
             .collect::<Vec<_>>();
 
+        let mut unprocessed_client_field_items = vec![];
         for expose_field_directive in expose_field_directives.iter() {
-            self.create_new_exposed_field(
+            unprocessed_client_field_items.push(self.create_new_exposed_field(
                 expose_field_directive,
                 parent_object_name,
                 parent_object_id,
-            )?;
+            )?);
         }
 
-        Ok(())
+        Ok(unprocessed_client_field_items)
     }
 
     fn create_new_exposed_field(
@@ -118,7 +120,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
         expose_field_directive: &ExposeFieldDirective,
         parent_object_name: IsographObjectTypeName,
         parent_object_id: ServerObjectId,
-    ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
+    ) -> Result<UnprocessedClientFieldItem, WithLocation<CreateAdditionalFieldsError>> {
         let ExposeFieldDirective {
             expose_as,
             path,
@@ -273,7 +275,22 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                 field_name: client_field_scalar_selection_name, // set_pet_best_friend
             },
             parent_object_id: maybe_abstract_parent_object_id,
-            refetch_strategy: Some(crate::RefetchStrategy::UseRefetchField(
+            refetch_strategy: None,
+            output_format: std::marker::PhantomData,
+        };
+        self.client_types
+            .push(SelectionType::Scalar(mutation_client_field));
+
+        self.insert_client_field_on_object(
+            client_field_scalar_selection_name,
+            maybe_abstract_parent_object_id,
+            mutation_field_client_field_id,
+            mutation_field_payload_type_name,
+        )?;
+        Ok(UnprocessedClientFieldItem {
+            client_field_id: mutation_field_client_field_id,
+            reader_selection_set: vec![],
+            refetch_strategy: Some(RefetchStrategy::UseRefetchField(
                 generate_refetch_field_strategy(
                     fields.to_vec(),
                     // NOTE: this will probably panic if we're not exposing fields which are
@@ -292,18 +309,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                     primary_field_concrete_type,
                 ),
             )),
-            output_format: std::marker::PhantomData,
-        };
-        self.client_types
-            .push(SelectionType::Scalar(mutation_client_field));
-
-        self.insert_client_field_on_object(
-            client_field_scalar_selection_name,
-            maybe_abstract_parent_object_id,
-            mutation_field_client_field_id,
-            mutation_field_payload_type_name,
-        )?;
-        Ok(())
+        })
     }
 
     // TODO this should be defined elsewhere, probably

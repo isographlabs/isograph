@@ -14,10 +14,11 @@ mod server_scalar_and_object;
 mod server_selectables;
 mod unvalidated_schema;
 mod validate_argument_types;
-mod validate_client_field;
 mod validate_entrypoint;
 mod validate_schema;
+mod validate_use_of_arguments;
 mod variable_context;
+mod visit_selection_set;
 
 pub use accessible_client_fields_iterator::*;
 pub use create_additional_fields::*;
@@ -35,4 +36,5 @@ pub use server_selectables::*;
 pub use unvalidated_schema::*;
 pub use validate_entrypoint::*;
 pub use validate_schema::*;
+pub use validate_use_of_arguments::*;
 pub use variable_context::*;

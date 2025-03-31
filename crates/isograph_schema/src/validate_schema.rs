@@ -16,10 +16,9 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    schema_validation_state::SchemaValidationState,
-    validate_client_field::validate_and_transform_client_types, ClientField, ClientFieldVariant,
-    ClientPointer, ImperativelyLoadedFieldVariant, OutputFormat, Schema, SchemaObject,
-    ServerFieldData, ServerScalarSelectable, UnvalidatedSchema, UseRefetchFieldRefetchStrategy,
+    schema_validation_state::SchemaValidationState, ClientField, ClientFieldVariant, ClientPointer,
+    ImperativelyLoadedFieldVariant, OutputFormat, Schema, SchemaObject, ServerFieldData,
+    ServerScalarSelectable, UnvalidatedSchema, UseRefetchFieldRefetchStrategy,
     ValidateEntrypointDeclarationError,
 };
 
@@ -42,14 +41,12 @@ pub type ValidatedVariableDefinition = VariableDefinition<ServerEntityId>;
 pub type ValidatedClientField<TOutputFormat> = ClientField<
     <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
-    <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
     TOutputFormat,
 >;
 
 pub type ValidatedClientPointer<TOutputFormat> = ClientPointer<
     <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
     <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
-    <ValidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
     TOutputFormat,
 >;
 
@@ -91,7 +88,6 @@ pub struct ValidatedSchemaState {}
 impl SchemaValidationState for ValidatedSchemaState {
     type SelectionTypeSelectionScalarFieldAssociatedData = ValidatedScalarSelectionAssociatedData;
     type SelectionTypeSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
-    type VariableDefinitionInnerType = ServerEntityId;
     type Entrypoint = HashMap<ClientFieldId, IsoLiteralText>;
 }
 
@@ -134,15 +130,6 @@ impl<TOutputFormat: OutputFormat> ValidatedSchema<TOutputFormat> {
             ..
         } = unvalidated_schema;
 
-        let updated_client_types =
-            match validate_and_transform_client_types(client_types, &schema_data, &fields) {
-                Ok(client_types) => client_types,
-                Err(new_errors) => {
-                    errors.extend(new_errors);
-                    vec![]
-                }
-            };
-
         let ServerFieldData {
             server_objects,
             server_scalars,
@@ -164,7 +151,7 @@ impl<TOutputFormat: OutputFormat> ValidatedSchema<TOutputFormat> {
 
             Ok(Self {
                 server_scalar_selectables: fields,
-                client_types: updated_client_types,
+                client_types,
                 entrypoints: updated_entrypoints,
                 server_field_data: ServerFieldData {
                     server_objects,
@@ -225,62 +212,8 @@ fn transform_object_field_ids<TOutputFormat: OutputFormat>(
     }
 }
 
-pub(crate) fn get_all_errors_or_all_ok_as_hashmap<K: std::cmp::Eq + std::hash::Hash, V, E>(
-    items: impl Iterator<Item = Result<(K, V), E>>,
-) -> Result<HashMap<K, V>, Vec<E>> {
-    let mut oks = HashMap::new();
-    let mut errors = vec![];
-
-    for item in items {
-        match item {
-            Ok((k, v)) => {
-                oks.insert(k, v);
-            }
-            Err(e) => errors.push(e),
-        }
-    }
-
-    if errors.is_empty() {
-        Ok(oks)
-    } else {
-        Err(errors)
-    }
-}
-
-pub(crate) fn get_all_errors_or_all_ok<T, E>(
-    items: impl Iterator<Item = Result<T, E>>,
-) -> Result<Vec<T>, Vec<E>> {
-    let mut oks = vec![];
-    let mut errors = vec![];
-
-    for item in items {
-        match item {
-            Ok(ok) => oks.push(ok),
-            Err(e) => errors.push(e),
-        }
-    }
-
-    if errors.is_empty() {
-        Ok(oks)
-    } else {
-        Err(errors)
-    }
-}
-
-pub(crate) fn get_all_errors_or_tuple_ok<T1, T2, E>(
-    a: Result<T1, impl IntoIterator<Item = E>>,
-    b: Result<T2, impl IntoIterator<Item = E>>,
-) -> Result<(T1, T2), Vec<E>> {
-    match (a, b) {
-        (Ok(v1), Ok(v2)) => Ok((v1, v2)),
-        (Err(e1), Err(e2)) => Err(e1.into_iter().chain(e2).collect()),
-        (_, Err(e)) => Err(e.into_iter().collect()),
-        (Err(e), _) => Err(e.into_iter().collect()),
-    }
-}
-
-pub(crate) fn get_all_errors_or_all_ok_iter<T, E>(
-    items: impl Iterator<Item = Result<T, impl Iterator<Item = E>>>,
+pub fn get_all_errors_or_all_ok<T, E>(
+    items: impl Iterator<Item = Result<T, Vec<E>>>,
 ) -> Result<Vec<T>, Vec<E>> {
     let mut oks = vec![];
     let mut errors = vec![];
@@ -351,7 +284,7 @@ pub fn get_provided_arguments<'a>(
         .collect()
 }
 
-pub(crate) type ValidateSchemaResult<T> = Result<T, WithLocation<ValidateSchemaError>>;
+pub type ValidateSchemaResult<T> = Result<T, WithLocation<ValidateSchemaError>>;
 
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum ValidateSchemaError {
@@ -481,16 +414,6 @@ pub enum ValidateSchemaError {
     )]
     MissingFields {
         missing_fields_names: Vec<SelectableName>,
-    },
-
-    #[error(
-        "The variable `{variable_name}` has type `{type_}`, but the inner type \
-        `{inner_type}` does not exist."
-    )]
-    VariableDefinitionInnerTypeDoesNotExist {
-        variable_name: VariableName,
-        type_: String,
-        inner_type: UnvalidatedTypeName,
     },
 
     #[error("Error when validating iso entrypoint calls.\nMessage: {message}")]

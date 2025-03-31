@@ -144,6 +144,17 @@ pub enum BatchCompileError {
     MultipleErrors {
         messages: Vec<Box<dyn std::error::Error>>,
     },
+
+    #[error(
+        "{}",
+        messages.iter().fold(String::new(), |mut output, x| {
+            output.push_str(&format!("\n\n{}", x));
+            output
+        })
+    )]
+    MultipleErrorsWithLocations {
+        messages: Vec<WithLocation<Box<dyn std::error::Error>>>,
+    },
 }
 
 impl From<Vec<WithLocation<IsographLiteralParseError>>> for BatchCompileError {

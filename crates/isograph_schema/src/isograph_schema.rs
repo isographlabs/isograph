@@ -44,7 +44,6 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState, TOutputFormat: 
     pub client_types: SelectionTypes<
         TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
         TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
-        TSchemaValidationState::VariableDefinitionInnerType,
         TOutputFormat,
     >,
     // TODO consider whether this belongs here. It could just be a free variable.
@@ -58,20 +57,17 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState, TOutputFormat: 
 type SelectionTypes<
     TSelectionTypeSelectionScalarFieldAssociatedData,
     TSelectionTypeSelectionLinkedFieldAssociatedData,
-    TClientFieldVariableDefinitionAssociatedData,
     TOutputFormat,
 > = Vec<
     SelectionType<
         ClientField<
             TSelectionTypeSelectionScalarFieldAssociatedData,
             TSelectionTypeSelectionLinkedFieldAssociatedData,
-            TClientFieldVariableDefinitionAssociatedData,
             TOutputFormat,
         >,
         ClientPointer<
             TSelectionTypeSelectionScalarFieldAssociatedData,
             TSelectionTypeSelectionLinkedFieldAssociatedData,
-            TClientFieldVariableDefinitionAssociatedData,
             TOutputFormat,
         >,
     >,
@@ -108,14 +104,12 @@ pub type LinkedType<
     'a,
     SelectionTypeSelectionScalarFieldAssociatedData,
     SelectionTypeSelectionLinkedFieldAssociatedData,
-    VariableDefinitionInnerType,
     TOutputFormat,
 > = DefinitionLocation<
     &'a ServerScalarSelectable<TOutputFormat>,
     &'a ClientPointer<
         SelectionTypeSelectionScalarFieldAssociatedData,
         SelectionTypeSelectionLinkedFieldAssociatedData,
-        VariableDefinitionInnerType,
         TOutputFormat,
     >,
 >;
@@ -155,7 +149,6 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     ) -> &ClientField<
         TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
         TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
-        TSchemaValidationState::VariableDefinitionInnerType,
         TOutputFormat,
     > {
         match &self.client_types[client_field_id.as_usize()] {
@@ -173,7 +166,6 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     ) -> &mut ClientField<
         TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
         TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
-        TSchemaValidationState::VariableDefinitionInnerType,
         TOutputFormat,
     > {
         match &mut self.client_types[client_field_id.as_usize()] {
@@ -191,7 +183,6 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     ) -> LinkedType<
         TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
         TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
-        TSchemaValidationState::VariableDefinitionInnerType,
         TOutputFormat,
     > {
         match field_id {
@@ -204,14 +195,12 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
         }
     }
 
-    /// Get a reference to a given client pointer by its id.
     pub fn client_pointer(
         &self,
         client_pointer_id: ClientPointerId,
     ) -> &ClientPointer<
         TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
         TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
-        TSchemaValidationState::VariableDefinitionInnerType,
         TOutputFormat,
     > {
         match &self.client_types[client_pointer_id.as_usize()] {
@@ -229,7 +218,6 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     ) -> &mut ClientPointer<
         TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
         TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
-        TSchemaValidationState::VariableDefinitionInnerType,
         TOutputFormat,
     > {
         match &mut self.client_types[client_pointer_id.as_usize()] {
@@ -249,13 +237,11 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
         &ClientField<
             TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
             TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
-            TSchemaValidationState::VariableDefinitionInnerType,
             TOutputFormat,
         >,
         &ClientPointer<
             TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
             TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
-            TSchemaValidationState::VariableDefinitionInnerType,
             TOutputFormat,
         >,
     > {

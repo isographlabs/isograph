@@ -88,20 +88,17 @@ impl VariableContext {
 pub fn initial_variable_context<
     TSelectionTypeSelectionScalarFieldAssociatedData,
     TSelectionTypeSelectionLinkedFieldAssociatedData,
-    TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
     TOutputFormat: OutputFormat,
 >(
     selection_type: &SelectionType<
         &ClientField<
             TSelectionTypeSelectionScalarFieldAssociatedData,
             TSelectionTypeSelectionLinkedFieldAssociatedData,
-            TClientFieldVariableDefinitionAssociatedData,
             TOutputFormat,
         >,
         &ClientPointer<
             TSelectionTypeSelectionScalarFieldAssociatedData,
             TSelectionTypeSelectionLinkedFieldAssociatedData,
-            TClientFieldVariableDefinitionAssociatedData,
             TOutputFormat,
         >,
     >,
