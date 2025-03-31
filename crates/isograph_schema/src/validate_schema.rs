@@ -429,14 +429,13 @@ pub enum ValidateSchemaError {
     #[error(
         "In the client {client_type} `{client_field_parent_type_name}.{client_field_name}`, \
         the field `{field_parent_type_name}.{field_name}` is selected as a linked field, \
-        but that field's type is `{target_type_name}`, which is {field_type}."
+        but that field's type is `{target_type_name}`, which is a scalar."
     )]
     SelectionTypeSelectionFieldIsScalar {
         client_field_parent_type_name: IsographObjectTypeName,
         client_field_name: SelectableName,
         field_parent_type_name: IsographObjectTypeName,
         field_name: SelectableName,
-        field_type: &'static str,
         target_type_name: UnvalidatedTypeName,
         client_type: String,
     },

@@ -631,7 +631,6 @@ fn validate_field_type_exists_and_is_linked<TOutputFormat: OutputFormat>(
                         ValidateSchemaError::SelectionTypeSelectionFieldIsScalar {
                             field_parent_type_name: field_parent_object.name,
                             field_name: linked_field_name,
-                            field_type: "a scalar",
                             target_type_name: top_level_client_type_info
                                 .schema_data
                                 .scalar(*type_annotation.inner())
