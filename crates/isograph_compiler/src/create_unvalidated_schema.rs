@@ -8,10 +8,11 @@ use common_lang_types::{CurrentWorkingDirectory, RelativePathToSourceFile, TextS
 use isograph_config::CompilerConfig;
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{IsoLiteralsSource, SchemaSource};
-use isograph_schema::{OutputFormat, UnvalidatedSchema};
+use isograph_schema::{OutputFormat, UnprocessedItem, UnvalidatedSchema};
 use pico::{Database, SourceId};
 
 use crate::{
+    add_selection_sets::add_selection_sets_to_client_selectables,
     batch_compile::BatchCompileError,
     isograph_literals::{parse_iso_literal_in_source, process_iso_literals},
     refetch_fields::add_refetch_fields_to_objects,
@@ -24,10 +25,11 @@ pub fn create_unvalidated_schema<TOutputFormat: OutputFormat>(
     config: &CompilerConfig,
 ) -> Result<(UnvalidatedSchema<TOutputFormat>, ContainsIsoStats), Box<dyn Error>> {
     let mut unvalidated_isograph_schema = UnvalidatedSchema::<TOutputFormat>::new();
-    let schema = TOutputFormat::parse_type_system_document(db, source_files.schema)?.to_owned();
+    let type_system_document =
+        TOutputFormat::parse_type_system_document(db, source_files.schema)?.to_owned();
     let outcome = TOutputFormat::process_type_system_document(
         &mut unvalidated_isograph_schema,
-        schema,
+        type_system_document,
         &config.options,
     )?;
     let schema_extensions =
@@ -45,14 +47,42 @@ pub fn create_unvalidated_schema<TOutputFormat: OutputFormat>(
         config.current_working_directory,
     )?;
     let contains_iso_stats = contains_iso.stats();
-    process_iso_literals(&mut unvalidated_isograph_schema, contains_iso)?;
-    process_exposed_fields(&mut unvalidated_isograph_schema)?;
+
+    // Step one: we can create client selectables. However, we must create all
+    // client selectables before being able to create their selection sets, because
+    // selection sets refer to client selectables. We hold onto these selection sets
+    // (both reader selection sets and refetch selection sets) in the unprocess_items
+    // vec, then process it later.
+    let mut unprocessed_items = vec![];
+
+    unprocessed_items.extend(process_iso_literals(
+        &mut unvalidated_isograph_schema,
+        contains_iso,
+    )?);
+
+    unprocessed_items.extend(process_exposed_fields(&mut unvalidated_isograph_schema)?);
+
+    // TODO investigate why we don't have unprocessed items here
     unvalidated_isograph_schema
         .add_fields_to_subtypes(&outcome.type_refinement_maps.supertype_to_subtype_map)?;
     unvalidated_isograph_schema.add_link_fields()?;
     unvalidated_isograph_schema
         .add_pointers_to_supertypes(&outcome.type_refinement_maps.subtype_to_supertype_map)?;
-    add_refetch_fields_to_objects(&mut unvalidated_isograph_schema)?;
+
+    unprocessed_items.extend(add_refetch_fields_to_objects(
+        &mut unvalidated_isograph_schema,
+    )?);
+
+    // Step two: now, we can create the selection sets. Creating a selection set involves
+    // looking up client selectables, to:
+    // - determine if the selectable exists,
+    // - to determine if we are selecting it appropriately (e.g. client fields as scalars, etc)
+    // - to validate arguments (e.g. no missing arguments, etc.)
+    // - validate loadability/updatability, and
+    // - to store the selectable id,
+    add_selection_sets_to_client_selectables(&mut unvalidated_isograph_schema, unprocessed_items)
+        .map_err(|messages| BatchCompileError::UnableToValidateSchema { messages })?;
+
     Ok((unvalidated_isograph_schema, contains_iso_stats))
 }
 
@@ -106,12 +136,19 @@ fn parse_iso_literals(
 /// validate that no other types have exposeAs directives.
 fn process_exposed_fields<TOutputFormat: OutputFormat>(
     schema: &mut UnvalidatedSchema<TOutputFormat>,
-) -> Result<(), BatchCompileError> {
+) -> Result<Vec<UnprocessedItem>, BatchCompileError> {
     let fetchable_types: Vec<_> = schema.fetchable_types.keys().copied().collect();
+    let mut unprocessed_items = vec![];
     for fetchable_object_id in fetchable_types.into_iter() {
-        schema.add_exposed_fields_to_parent_object_types(fetchable_object_id)?;
+        let unprocessed_client_field_item =
+            schema.add_exposed_fields_to_parent_object_types(fetchable_object_id)?;
+        unprocessed_items.extend(
+            unprocessed_client_field_item
+                .into_iter()
+                .map(UnprocessedItem::Scalar),
+        );
     }
-    Ok(())
+    Ok(unprocessed_items)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Default)]

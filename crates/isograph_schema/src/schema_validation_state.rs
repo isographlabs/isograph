@@ -16,11 +16,6 @@ pub trait SchemaValidationState: Debug {
     /// - Validated: ObjectId
     type SelectionTypeSelectionLinkedFieldAssociatedData: Debug;
 
-    /// The associated data type of client fields' variable definitions
-    /// - Unvalidated: UnvalidatedTypeName
-    /// - Validated: FieldDefinition
-    type VariableDefinitionInnerType: Debug + Clone + Ord;
-
     /// What we store in entrypoints
     /// - Unvalidated: (TextSource, WithSpan<ObjectTypeAndField>)
     /// - Validated: (ObjectId, ClientFieldId)

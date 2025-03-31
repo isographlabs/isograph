@@ -6,15 +6,15 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    DefinitionLocation, EntrypointDeclaration, LinkedFieldSelection, ObjectSelectionDirectiveSet,
-    ScalarSelectionDirectiveSet, ServerEntityId, ServerScalarId, ServerScalarSelectableId,
-    VariableDefinition,
+    DefinitionLocation, EntrypointDeclaration, LinkedFieldSelection, ServerEntityId,
+    ServerScalarId, ServerScalarSelectableId, VariableDefinition,
 };
 
 use crate::{
     schema_validation_state::SchemaValidationState, ClientField, ClientFieldOrPointerId,
     ClientPointer, OutputFormat, Schema, SchemaScalar, ServerFieldData, ServerScalarSelectable,
-    UseRefetchFieldRefetchStrategy, ValidatedSelection,
+    UseRefetchFieldRefetchStrategy, ValidatedLinkedFieldAssociatedData,
+    ValidatedScalarSelectionAssociatedData, ValidatedSelection,
 };
 use lazy_static::lazy_static;
 
@@ -26,9 +26,8 @@ lazy_static! {
 pub struct UnvalidatedSchemaState {}
 
 impl SchemaValidationState for UnvalidatedSchemaState {
-    type SelectionTypeSelectionScalarFieldAssociatedData = ScalarSelectionDirectiveSet;
-    type SelectionTypeSelectionLinkedFieldAssociatedData = ObjectSelectionDirectiveSet;
-    type VariableDefinitionInnerType = UnvalidatedTypeName;
+    type SelectionTypeSelectionScalarFieldAssociatedData = ValidatedScalarSelectionAssociatedData;
+    type SelectionTypeSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
     type Entrypoint = Vec<(TextSource, WithSpan<EntrypointDeclaration>)>;
 }
 
@@ -55,21 +54,17 @@ pub type UnvalidatedObjectFieldInfo =
 
 pub type UnvalidatedSchemaSchemaField<TOutputFormat> = ServerScalarSelectable<TOutputFormat>;
 
-pub type UnvalidatedVariableDefinition = VariableDefinition<
-    <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
->;
+pub type UnvalidatedVariableDefinition = VariableDefinition<ServerEntityId>;
 
 pub type UnvalidatedClientField<TOutputFormat> = ClientField<
     <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
-    <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
     TOutputFormat,
 >;
 
 pub type UnvalidatedClientPointer<TOutputFormat> = ClientPointer<
     <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
     <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
-    <UnvalidatedSchemaState as SchemaValidationState>::VariableDefinitionInnerType,
     TOutputFormat,
 >;
 

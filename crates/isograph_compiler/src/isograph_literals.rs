@@ -5,8 +5,8 @@ use common_lang_types::{
 use isograph_lang_parser::{
     parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
 };
-use isograph_lang_types::IsoLiteralsSource;
-use isograph_schema::{OutputFormat, UnvalidatedSchema};
+use isograph_lang_types::{IsoLiteralsSource, SelectionType};
+use isograph_schema::{OutputFormat, UnprocessedItem, UnvalidatedSchema};
 use lazy_static::lazy_static;
 use pico::{Database, SourceId};
 use pico_macros::memo;
@@ -143,25 +143,34 @@ pub fn parse_iso_literal_in_source(
 pub(crate) fn process_iso_literals<TOutputFormat: OutputFormat>(
     schema: &mut UnvalidatedSchema<TOutputFormat>,
     contains_iso: ContainsIso,
-) -> Result<(), BatchCompileError> {
+) -> Result<Vec<UnprocessedItem>, BatchCompileError> {
     let mut errors = vec![];
+    let mut unprocess_client_field_items = vec![];
     for iso_literals in contains_iso.files.into_values() {
         for (extraction_result, text_source) in iso_literals {
             match extraction_result {
                 IsoLiteralExtractionResult::ClientFieldDeclaration(client_field_declaration) => {
-                    if let Err(e) = schema
+                    match schema
                         .process_client_field_declaration(client_field_declaration, text_source)
                     {
-                        errors.push(e);
+                        Ok(unprocessed_client_field_items) => unprocess_client_field_items
+                            .push(SelectionType::Scalar(unprocessed_client_field_items)),
+                        Err(e) => {
+                            errors.push(e);
+                        }
                     }
                 }
                 IsoLiteralExtractionResult::ClientPointerDeclaration(
                     client_pointer_declaration,
                 ) => {
-                    if let Err(e) = schema
+                    match schema
                         .process_client_pointer_declaration(client_pointer_declaration, text_source)
                     {
-                        errors.push(e);
+                        Ok(unprocessed_client_pointer_item) => unprocess_client_field_items
+                            .push(SelectionType::Object(unprocessed_client_pointer_item)),
+                        Err(e) => {
+                            errors.push(e);
+                        }
                     }
                 }
 
@@ -172,7 +181,7 @@ pub(crate) fn process_iso_literals<TOutputFormat: OutputFormat>(
         }
     }
     if errors.is_empty() {
-        Ok(())
+        Ok(unprocess_client_field_items)
     } else {
         Err(errors.into())
     }

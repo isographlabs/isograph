@@ -7,7 +7,7 @@ use common_lang_types::{
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
     ClientFieldId, ClientPointerId, SelectionType, SelectionTypeContainingSelections,
-    ServerObjectId, TypeAnnotation, VariableDefinition,
+    ServerEntityId, ServerObjectId, TypeAnnotation, VariableDefinition,
 };
 
 use crate::{ClientFieldVariant, OutputFormat, RefetchStrategy, UserWrittenClientPointerInfo};
@@ -18,7 +18,6 @@ pub type ClientFieldOrPointerId = SelectionType<ClientFieldId, ClientPointerId>;
 pub struct ClientField<
     TSelectionTypeSelectionScalarFieldAssociatedData,
     TSelectionTypeSelectionLinkedFieldAssociatedData,
-    TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
     TOutputFormat: OutputFormat,
 > {
     pub description: Option<DescriptionValue>,
@@ -46,8 +45,7 @@ pub struct ClientField<
     // TODO we should probably model this differently
     pub variant: ClientFieldVariant,
 
-    pub variable_definitions:
-        Vec<WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<ServerEntityId>>>,
 
     // Why is this not calculated when needed?
     pub type_and_field: ObjectTypeAndFieldName,
@@ -60,7 +58,6 @@ pub struct ClientField<
 pub struct ClientPointer<
     TSelectionTypeSelectionScalarFieldAssociatedData,
     TSelectionTypeSelectionLinkedFieldAssociatedData,
-    TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
     TOutputFormat: OutputFormat,
 > {
     pub description: Option<DescriptionValue>,
@@ -82,8 +79,7 @@ pub struct ClientPointer<
         TSelectionTypeSelectionLinkedFieldAssociatedData,
     >,
 
-    pub variable_definitions:
-        Vec<WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<ServerEntityId>>>,
 
     // Why is this not calculated when needed?
     pub type_and_field: ObjectTypeAndFieldName,
@@ -98,7 +94,6 @@ pub struct ClientPointer<
 pub trait ClientFieldOrPointer<
     TSelectionTypeSelectionScalarFieldAssociatedData,
     TSelectionTypeSelectionLinkedFieldAssociatedData,
-    TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
 >
 {
     fn description(&self) -> Option<DescriptionValue>;
@@ -132,9 +127,7 @@ pub trait ClientFieldOrPointer<
         >,
     >];
 
-    fn variable_definitions(
-        &self,
-    ) -> &[WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>];
+    fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityId>>];
 
     fn client_type(&self) -> &'static str;
 }
@@ -142,18 +135,15 @@ pub trait ClientFieldOrPointer<
 impl<
         TSelectionTypeSelectionScalarFieldAssociatedData,
         TSelectionTypeSelectionLinkedFieldAssociatedData,
-        TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
         TOutputFormat: OutputFormat,
     >
     ClientFieldOrPointer<
         TSelectionTypeSelectionScalarFieldAssociatedData,
         TSelectionTypeSelectionLinkedFieldAssociatedData,
-        TClientFieldVariableDefinitionAssociatedData,
     >
     for &ClientField<
         TSelectionTypeSelectionScalarFieldAssociatedData,
         TSelectionTypeSelectionLinkedFieldAssociatedData,
-        TClientFieldVariableDefinitionAssociatedData,
         TOutputFormat,
     >
 {
@@ -220,9 +210,7 @@ impl<
         }
     }
 
-    fn variable_definitions(
-        &self,
-    ) -> &[WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>] {
+    fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityId>>] {
         &self.variable_definitions
     }
 
@@ -234,18 +222,15 @@ impl<
 impl<
         TSelectionTypeSelectionScalarFieldAssociatedData,
         TSelectionTypeSelectionLinkedFieldAssociatedData,
-        TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
         TOutputFormat: OutputFormat,
     >
     ClientFieldOrPointer<
         TSelectionTypeSelectionScalarFieldAssociatedData,
         TSelectionTypeSelectionLinkedFieldAssociatedData,
-        TClientFieldVariableDefinitionAssociatedData,
     >
     for &ClientPointer<
         TSelectionTypeSelectionScalarFieldAssociatedData,
         TSelectionTypeSelectionLinkedFieldAssociatedData,
-        TClientFieldVariableDefinitionAssociatedData,
         TOutputFormat,
     >
 {
@@ -302,9 +287,7 @@ impl<
         &self.reader_selection_set
     }
 
-    fn variable_definitions(
-        &self,
-    ) -> &[WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>] {
+    fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityId>>] {
         &self.variable_definitions
     }
 

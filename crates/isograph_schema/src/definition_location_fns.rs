@@ -10,7 +10,6 @@ use crate::{
 pub fn description<
     TSelectionTypeSelectionScalarFieldAssociatedData,
     TSelectionTypeSelectionLinkedFieldAssociatedData,
-    TSelectionTypeVariableDefinitionAssociatedData: Ord + std::fmt::Debug,
     TOutputFormat: OutputFormat,
 >(
     definition_location: &DefinitionLocation<
@@ -18,7 +17,6 @@ pub fn description<
         &ClientPointer<
             TSelectionTypeSelectionScalarFieldAssociatedData,
             TSelectionTypeSelectionLinkedFieldAssociatedData,
-            TSelectionTypeVariableDefinitionAssociatedData,
             TOutputFormat,
         >,
     >,
