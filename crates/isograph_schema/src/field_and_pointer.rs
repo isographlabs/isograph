@@ -10,24 +10,23 @@ use isograph_lang_types::{
     ServerEntityId, ServerObjectId, TypeAnnotation, VariableDefinition,
 };
 
-use crate::{ClientFieldVariant, OutputFormat, RefetchStrategy, UserWrittenClientPointerInfo};
+use crate::{
+    ClientFieldVariant, OutputFormat, RefetchStrategy, UserWrittenClientPointerInfo,
+    ValidatedLinkedFieldAssociatedData, ValidatedScalarSelectionAssociatedData,
+};
 
 pub type ClientFieldOrPointerId = SelectionType<ClientFieldId, ClientPointerId>;
 
 #[derive(Debug)]
-pub struct ClientField<
-    TSelectionTypeSelectionScalarFieldAssociatedData,
-    TSelectionTypeSelectionLinkedFieldAssociatedData,
-    TOutputFormat: OutputFormat,
-> {
+pub struct ClientField<TOutputFormat: OutputFormat> {
     pub description: Option<DescriptionValue>,
     pub name: ClientScalarSelectableName,
     pub id: ClientFieldId,
     pub reader_selection_set: Vec<
         WithSpan<
             SelectionTypeContainingSelections<
-                TSelectionTypeSelectionScalarFieldAssociatedData,
-                TSelectionTypeSelectionLinkedFieldAssociatedData,
+                ValidatedScalarSelectionAssociatedData,
+                ValidatedLinkedFieldAssociatedData,
             >,
         >,
     >,
@@ -36,10 +35,7 @@ pub struct ClientField<
     // TODO - this is only used if variant === imperatively loaded field
     // consider moving it into that struct.
     pub refetch_strategy: Option<
-        RefetchStrategy<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-        >,
+        RefetchStrategy<ValidatedScalarSelectionAssociatedData, ValidatedLinkedFieldAssociatedData>,
     >,
 
     // TODO we should probably model this differently
@@ -55,11 +51,7 @@ pub struct ClientField<
 }
 
 #[derive(Debug)]
-pub struct ClientPointer<
-    TSelectionTypeSelectionScalarFieldAssociatedData,
-    TSelectionTypeSelectionLinkedFieldAssociatedData,
-    TOutputFormat: OutputFormat,
-> {
+pub struct ClientPointer<TOutputFormat: OutputFormat> {
     pub description: Option<DescriptionValue>,
     pub name: ClientObjectSelectableName,
     pub id: ClientPointerId,
@@ -68,16 +60,14 @@ pub struct ClientPointer<
     pub reader_selection_set: Vec<
         WithSpan<
             SelectionTypeContainingSelections<
-                TSelectionTypeSelectionScalarFieldAssociatedData,
-                TSelectionTypeSelectionLinkedFieldAssociatedData,
+                ValidatedScalarSelectionAssociatedData,
+                ValidatedLinkedFieldAssociatedData,
             >,
         >,
     >,
 
-    pub refetch_strategy: RefetchStrategy<
-        TSelectionTypeSelectionScalarFieldAssociatedData,
-        TSelectionTypeSelectionLinkedFieldAssociatedData,
-    >,
+    pub refetch_strategy:
+        RefetchStrategy<ValidatedScalarSelectionAssociatedData, ValidatedLinkedFieldAssociatedData>,
 
     pub variable_definitions: Vec<WithSpan<VariableDefinition<ServerEntityId>>>,
 
@@ -91,11 +81,7 @@ pub struct ClientPointer<
 }
 
 #[impl_for_selection_type]
-pub trait ClientFieldOrPointer<
-    TSelectionTypeSelectionScalarFieldAssociatedData,
-    TSelectionTypeSelectionLinkedFieldAssociatedData,
->
-{
+pub trait ClientFieldOrPointer {
     fn description(&self) -> Option<DescriptionValue>;
     fn name(&self) -> ClientSelectableName;
     fn id(&self) -> ClientFieldOrPointerId;
@@ -106,24 +92,24 @@ pub trait ClientFieldOrPointer<
         &self,
     ) -> &[WithSpan<
         SelectionTypeContainingSelections<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
+            ValidatedScalarSelectionAssociatedData,
+            ValidatedLinkedFieldAssociatedData,
         >,
     >];
     fn refetch_strategy(
         &self,
     ) -> Option<
         &RefetchStrategy<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
+            ValidatedScalarSelectionAssociatedData,
+            ValidatedLinkedFieldAssociatedData,
         >,
     >;
     fn selection_set_for_parent_query(
         &self,
     ) -> &[WithSpan<
         SelectionTypeContainingSelections<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
+            ValidatedScalarSelectionAssociatedData,
+            ValidatedLinkedFieldAssociatedData,
         >,
     >];
 
@@ -132,21 +118,7 @@ pub trait ClientFieldOrPointer<
     fn client_type(&self) -> &'static str;
 }
 
-impl<
-        TSelectionTypeSelectionScalarFieldAssociatedData,
-        TSelectionTypeSelectionLinkedFieldAssociatedData,
-        TOutputFormat: OutputFormat,
-    >
-    ClientFieldOrPointer<
-        TSelectionTypeSelectionScalarFieldAssociatedData,
-        TSelectionTypeSelectionLinkedFieldAssociatedData,
-    >
-    for &ClientField<
-        TSelectionTypeSelectionScalarFieldAssociatedData,
-        TSelectionTypeSelectionLinkedFieldAssociatedData,
-        TOutputFormat,
-    >
-{
+impl<TOutputFormat: OutputFormat> ClientFieldOrPointer for &ClientField<TOutputFormat> {
     fn description(&self) -> Option<DescriptionValue> {
         self.description
     }
@@ -171,8 +143,8 @@ impl<
         &self,
     ) -> &[WithSpan<
         SelectionTypeContainingSelections<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
+            ValidatedScalarSelectionAssociatedData,
+            ValidatedLinkedFieldAssociatedData,
         >,
     >] {
         &self.reader_selection_set
@@ -182,8 +154,8 @@ impl<
         &self,
     ) -> Option<
         &RefetchStrategy<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
+            ValidatedScalarSelectionAssociatedData,
+            ValidatedLinkedFieldAssociatedData,
         >,
     > {
         self.refetch_strategy.as_ref()
@@ -193,8 +165,8 @@ impl<
         &self,
     ) -> &[WithSpan<
         SelectionTypeContainingSelections<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
+            ValidatedScalarSelectionAssociatedData,
+            ValidatedLinkedFieldAssociatedData,
         >,
     >] {
         match self.variant {
@@ -219,21 +191,7 @@ impl<
     }
 }
 
-impl<
-        TSelectionTypeSelectionScalarFieldAssociatedData,
-        TSelectionTypeSelectionLinkedFieldAssociatedData,
-        TOutputFormat: OutputFormat,
-    >
-    ClientFieldOrPointer<
-        TSelectionTypeSelectionScalarFieldAssociatedData,
-        TSelectionTypeSelectionLinkedFieldAssociatedData,
-    >
-    for &ClientPointer<
-        TSelectionTypeSelectionScalarFieldAssociatedData,
-        TSelectionTypeSelectionLinkedFieldAssociatedData,
-        TOutputFormat,
-    >
-{
+impl<TOutputFormat: OutputFormat> ClientFieldOrPointer for &ClientPointer<TOutputFormat> {
     fn description(&self) -> Option<DescriptionValue> {
         self.description
     }
@@ -258,8 +216,8 @@ impl<
         &self,
     ) -> &[WithSpan<
         SelectionTypeContainingSelections<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
+            ValidatedScalarSelectionAssociatedData,
+            ValidatedLinkedFieldAssociatedData,
         >,
     >] {
         &self.reader_selection_set
@@ -269,8 +227,8 @@ impl<
         &self,
     ) -> Option<
         &RefetchStrategy<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
+            ValidatedScalarSelectionAssociatedData,
+            ValidatedLinkedFieldAssociatedData,
         >,
     > {
         Some(&self.refetch_strategy)
@@ -280,8 +238,8 @@ impl<
         &self,
     ) -> &[WithSpan<
         SelectionTypeContainingSelections<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
+            ValidatedScalarSelectionAssociatedData,
+            ValidatedLinkedFieldAssociatedData,
         >,
     >] {
         &self.reader_selection_set

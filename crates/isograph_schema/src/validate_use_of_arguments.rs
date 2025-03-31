@@ -13,8 +13,7 @@ use lazy_static::lazy_static;
 
 use crate::{
     validate_argument_types::value_satisfies_type, visit_selection_set::visit_selection_set,
-    ClientFieldOrPointer, OutputFormat, ValidateSchemaError, ValidateSchemaResult,
-    ValidatedLinkedFieldAssociatedData, ValidatedScalarSelectionAssociatedData, ValidatedSchema,
+    ClientFieldOrPointer, OutputFormat, ValidateSchemaError, ValidateSchemaResult, ValidatedSchema,
     ValidatedVariableDefinition,
 };
 
@@ -66,10 +65,7 @@ pub fn validate_use_of_arguments<TOutputFormat: OutputFormat>(
 
 fn validate_use_of_arguments_for_client_type<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
-    client_type: impl ClientFieldOrPointer<
-        ValidatedScalarSelectionAssociatedData,
-        ValidatedLinkedFieldAssociatedData,
-    >,
+    client_type: impl ClientFieldOrPointer,
     errors: &mut Vec<WithLocation<ValidateSchemaError>>,
 ) {
     let mut reachable_variables = BTreeSet::new();

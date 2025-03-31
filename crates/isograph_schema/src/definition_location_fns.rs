@@ -7,18 +7,10 @@ use crate::{
 };
 
 #[allow(clippy::type_complexity)]
-pub fn description<
-    TSelectionTypeSelectionScalarFieldAssociatedData,
-    TSelectionTypeSelectionLinkedFieldAssociatedData,
-    TOutputFormat: OutputFormat,
->(
+pub fn description<TOutputFormat: OutputFormat>(
     definition_location: &DefinitionLocation<
         &ServerScalarSelectable<TOutputFormat>,
-        &ClientPointer<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-            TOutputFormat,
-        >,
+        &ClientPointer<TOutputFormat>,
     >,
 ) -> Option<DescriptionValue> {
     match definition_location {

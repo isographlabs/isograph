@@ -89,10 +89,7 @@ fn get_validated_selection_set<TOutputFormat: OutputFormat>(
         >,
     >,
     parent_object: &SchemaObject<TOutputFormat>,
-    top_level_field_or_pointer: &impl ClientFieldOrPointer<
-        ValidatedScalarSelectionAssociatedData,
-        ValidatedLinkedFieldAssociatedData,
-    >,
+    top_level_field_or_pointer: &impl ClientFieldOrPointer,
 ) -> ValidateSchemaResultWithMultipleErrors<Vec<WithSpan<ValidatedSelection>>> {
     get_all_errors_or_all_ok(selection_set.into_iter().map(|selection| {
         get_validated_selection(schema, selection, parent_object, top_level_field_or_pointer)
@@ -105,10 +102,7 @@ fn get_validated_selection<TOutputFormat: OutputFormat>(
         SelectionTypeContainingSelections<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
     >,
     selection_parent_object: &SchemaObject<TOutputFormat>,
-    top_level_field_or_pointer: &impl ClientFieldOrPointer<
-        ValidatedScalarSelectionAssociatedData,
-        ValidatedLinkedFieldAssociatedData,
-    >,
+    top_level_field_or_pointer: &impl ClientFieldOrPointer,
 ) -> ValidateSchemaResultWithMultipleErrors<WithSpan<ValidatedSelection>> {
     with_span.and_then(|selection| match selection {
         SelectionType::Scalar(scalar_selection) => Ok(SelectionType::Scalar(
@@ -134,10 +128,7 @@ fn get_validated_selection<TOutputFormat: OutputFormat>(
 fn get_validated_scalar_selection<TOutputFormat: OutputFormat>(
     schema: &UnvalidatedSchema<TOutputFormat>,
     selection_parent_object: &SchemaObject<TOutputFormat>,
-    top_level_field_or_pointer: &impl ClientFieldOrPointer<
-        ValidatedScalarSelectionAssociatedData,
-        ValidatedLinkedFieldAssociatedData,
-    >,
+    top_level_field_or_pointer: &impl ClientFieldOrPointer,
     scalar_selection: UnvalidatedScalarFieldSelection,
 ) -> ValidateSchemaResult<ValidatedScalarFieldSelection> {
     let location = selection_parent_object
@@ -227,10 +218,7 @@ fn get_validated_scalar_selection<TOutputFormat: OutputFormat>(
 fn get_validated_object_selection<TOutputFormat: OutputFormat>(
     schema: &UnvalidatedSchema<TOutputFormat>,
     selection_parent_object: &SchemaObject<TOutputFormat>,
-    top_level_field_or_pointer: &impl ClientFieldOrPointer<
-        ValidatedScalarSelectionAssociatedData,
-        ValidatedLinkedFieldAssociatedData,
-    >,
+    top_level_field_or_pointer: &impl ClientFieldOrPointer,
     object_selection: LinkedFieldSelection<
         ScalarSelectionDirectiveSet,
         ObjectSelectionDirectiveSet,
@@ -335,10 +323,7 @@ fn get_validated_refetch_strategy<TOutputFormat: OutputFormat>(
         RefetchStrategy<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
     >,
     parent_object: &SchemaObject<TOutputFormat>,
-    top_level_field_or_pointer: &impl ClientFieldOrPointer<
-        ValidatedScalarSelectionAssociatedData,
-        ValidatedLinkedFieldAssociatedData,
-    >,
+    top_level_field_or_pointer: &impl ClientFieldOrPointer,
 ) -> ValidateSchemaResultWithMultipleErrors<
     Option<
         RefetchStrategy<ValidatedScalarSelectionAssociatedData, ValidatedLinkedFieldAssociatedData>,

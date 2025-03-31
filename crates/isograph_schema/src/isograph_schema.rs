@@ -41,11 +41,7 @@ pub struct RootOperationName(pub String);
 #[derive(Debug)]
 pub struct Schema<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat> {
     pub server_scalar_selectables: Vec<ServerScalarSelectable<TOutputFormat>>,
-    pub client_types: SelectionTypes<
-        TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
-        TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
-        TOutputFormat,
-    >,
+    pub client_types: SelectionTypes<TOutputFormat>,
     // TODO consider whether this belongs here. It could just be a free variable.
     pub entrypoints: TSchemaValidationState::Entrypoint,
     pub server_field_data: ServerFieldData<TOutputFormat>,
@@ -54,24 +50,8 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState, TOutputFormat: 
     pub fetchable_types: BTreeMap<ServerObjectId, RootOperationName>,
 }
 
-type SelectionTypes<
-    TSelectionTypeSelectionScalarFieldAssociatedData,
-    TSelectionTypeSelectionLinkedFieldAssociatedData,
-    TOutputFormat,
-> = Vec<
-    SelectionType<
-        ClientField<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-            TOutputFormat,
-        >,
-        ClientPointer<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-            TOutputFormat,
-        >,
-    >,
->;
+type SelectionTypes<TOutputFormat> =
+    Vec<SelectionType<ClientField<TOutputFormat>, ClientPointer<TOutputFormat>>>;
 
 impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     Schema<TSchemaValidationState, TOutputFormat>
@@ -100,19 +80,8 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     }
 }
 
-pub type LinkedType<
-    'a,
-    SelectionTypeSelectionScalarFieldAssociatedData,
-    SelectionTypeSelectionLinkedFieldAssociatedData,
-    TOutputFormat,
-> = DefinitionLocation<
-    &'a ServerScalarSelectable<TOutputFormat>,
-    &'a ClientPointer<
-        SelectionTypeSelectionScalarFieldAssociatedData,
-        SelectionTypeSelectionLinkedFieldAssociatedData,
-        TOutputFormat,
-    >,
->;
+pub type LinkedType<'a, TOutputFormat> =
+    DefinitionLocation<&'a ServerScalarSelectable<TOutputFormat>, &'a ClientPointer<TOutputFormat>>;
 
 #[derive(Debug)]
 pub struct ServerFieldData<TOutputFormat: OutputFormat> {
@@ -143,14 +112,7 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     }
 
     /// Get a reference to a given client field by its id.
-    pub fn client_field(
-        &self,
-        client_field_id: ClientFieldId,
-    ) -> &ClientField<
-        TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
-        TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
-        TOutputFormat,
-    > {
+    pub fn client_field(&self, client_field_id: ClientFieldId) -> &ClientField<TOutputFormat> {
         match &self.client_types[client_field_id.as_usize()] {
             SelectionType::Scalar(client_field) => client_field,
             SelectionType::Object(_) => panic!(
@@ -163,11 +125,7 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     pub fn client_field_mut(
         &mut self,
         client_field_id: ClientFieldId,
-    ) -> &mut ClientField<
-        TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
-        TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
-        TOutputFormat,
-    > {
+    ) -> &mut ClientField<TOutputFormat> {
         match &mut self.client_types[client_field_id.as_usize()] {
             SelectionType::Scalar(client_field) => client_field,
             SelectionType::Object(_) => panic!(
@@ -180,11 +138,7 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     pub fn linked_type(
         &self,
         field_id: DefinitionLocation<ServerScalarSelectableId, ClientPointerId>,
-    ) -> LinkedType<
-        TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
-        TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
-        TOutputFormat,
-    > {
+    ) -> LinkedType<TOutputFormat> {
         match field_id {
             DefinitionLocation::Server(server_field_id) => {
                 DefinitionLocation::Server(self.server_field(server_field_id))
@@ -198,11 +152,7 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     pub fn client_pointer(
         &self,
         client_pointer_id: ClientPointerId,
-    ) -> &ClientPointer<
-        TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
-        TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
-        TOutputFormat,
-    > {
+    ) -> &ClientPointer<TOutputFormat> {
         match &self.client_types[client_pointer_id.as_usize()] {
             SelectionType::Object(client_pointer) => client_pointer,
             SelectionType::Scalar(_) => panic!(
@@ -215,11 +165,7 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     pub fn client_pointer_mut(
         &mut self,
         client_pointer_id: ClientPointerId,
-    ) -> &mut ClientPointer<
-        TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
-        TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
-        TOutputFormat,
-    > {
+    ) -> &mut ClientPointer<TOutputFormat> {
         match &mut self.client_types[client_pointer_id.as_usize()] {
             SelectionType::Object(client_pointer) => client_pointer,
             SelectionType::Scalar(_) => panic!(
@@ -233,18 +179,7 @@ impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
     pub fn client_type(
         &self,
         client_type_id: ClientFieldOrPointerId,
-    ) -> SelectionType<
-        &ClientField<
-            TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
-            TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
-            TOutputFormat,
-        >,
-        &ClientPointer<
-            TSchemaValidationState::SelectionTypeSelectionScalarFieldAssociatedData,
-            TSchemaValidationState::SelectionTypeSelectionLinkedFieldAssociatedData,
-            TOutputFormat,
-        >,
-    > {
+    ) -> SelectionType<&ClientField<TOutputFormat>, &ClientPointer<TOutputFormat>> {
         match client_type_id {
             SelectionType::Scalar(client_field_id) => {
                 SelectionType::Scalar(self.client_field(client_field_id))

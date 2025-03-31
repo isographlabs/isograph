@@ -25,34 +25,25 @@ use crate::{
 pub type ValidatedSchemaServerField<TOutputFormat> = ServerScalarSelectable<TOutputFormat>;
 
 pub type ValidatedSelection = SelectionTypeContainingSelections<
-    <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
-    <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
+    ValidatedScalarSelectionAssociatedData,
+    ValidatedLinkedFieldAssociatedData,
 >;
 
 pub type ValidatedLinkedFieldSelection = LinkedFieldSelection<
-    <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
-    <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
+    ValidatedScalarSelectionAssociatedData,
+    ValidatedLinkedFieldAssociatedData,
 >;
-pub type ValidatedScalarFieldSelection = ScalarFieldSelection<
-    <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
->;
+pub type ValidatedScalarFieldSelection =
+    ScalarFieldSelection<ValidatedScalarSelectionAssociatedData>;
 
 pub type ValidatedVariableDefinition = VariableDefinition<ServerEntityId>;
-pub type ValidatedClientField<TOutputFormat> = ClientField<
-    <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
-    <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
-    TOutputFormat,
->;
+pub type ValidatedClientField<TOutputFormat> = ClientField<TOutputFormat>;
 
-pub type ValidatedClientPointer<TOutputFormat> = ClientPointer<
-    <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
-    <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
-    TOutputFormat,
->;
+pub type ValidatedClientPointer<TOutputFormat> = ClientPointer<TOutputFormat>;
 
 pub type ValidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
-    <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
-    <ValidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
+    ValidatedScalarSelectionAssociatedData,
+    ValidatedLinkedFieldAssociatedData,
 >;
 
 /// The validated defined field that shows up in the TScalarField generic.
@@ -86,8 +77,6 @@ pub type ValidatedSelectionType<'a, TOutputFormat> = SelectionType<
 #[derive(Debug)]
 pub struct ValidatedSchemaState {}
 impl SchemaValidationState for ValidatedSchemaState {
-    type SelectionTypeSelectionScalarFieldAssociatedData = ValidatedScalarSelectionAssociatedData;
-    type SelectionTypeSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
     type Entrypoint = HashMap<ClientFieldId, IsoLiteralText>;
 }
 

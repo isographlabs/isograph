@@ -26,8 +26,6 @@ lazy_static! {
 pub struct UnvalidatedSchemaState {}
 
 impl SchemaValidationState for UnvalidatedSchemaState {
-    type SelectionTypeSelectionScalarFieldAssociatedData = ValidatedScalarSelectionAssociatedData;
-    type SelectionTypeSelectionLinkedFieldAssociatedData = ValidatedLinkedFieldAssociatedData;
     type Entrypoint = Vec<(TextSource, WithSpan<EntrypointDeclaration>)>;
 }
 
@@ -56,26 +54,18 @@ pub type UnvalidatedSchemaSchemaField<TOutputFormat> = ServerScalarSelectable<TO
 
 pub type UnvalidatedVariableDefinition = VariableDefinition<ServerEntityId>;
 
-pub type UnvalidatedClientField<TOutputFormat> = ClientField<
-    <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
-    <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
-    TOutputFormat,
->;
+pub type UnvalidatedClientField<TOutputFormat> = ClientField<TOutputFormat>;
 
-pub type UnvalidatedClientPointer<TOutputFormat> = ClientPointer<
-    <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
-    <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
-    TOutputFormat,
->;
+pub type UnvalidatedClientPointer<TOutputFormat> = ClientPointer<TOutputFormat>;
 
 pub type UnvalidatedLinkedFieldSelection = LinkedFieldSelection<
-    <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
-    <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
+    ValidatedScalarSelectionAssociatedData,
+    ValidatedLinkedFieldAssociatedData,
 >;
 
 pub type UnvalidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
-    <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
-    <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
+    ValidatedScalarSelectionAssociatedData,
+    ValidatedLinkedFieldAssociatedData,
 >;
 
 impl<TOutputFormat: OutputFormat> Default for UnvalidatedSchema<TOutputFormat> {

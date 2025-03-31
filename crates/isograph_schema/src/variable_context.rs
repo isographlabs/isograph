@@ -84,24 +84,8 @@ impl VariableContext {
     }
 }
 
-#[allow(clippy::type_complexity)]
-pub fn initial_variable_context<
-    TSelectionTypeSelectionScalarFieldAssociatedData,
-    TSelectionTypeSelectionLinkedFieldAssociatedData,
-    TOutputFormat: OutputFormat,
->(
-    selection_type: &SelectionType<
-        &ClientField<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-            TOutputFormat,
-        >,
-        &ClientPointer<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-            TOutputFormat,
-        >,
-    >,
+pub fn initial_variable_context<TOutputFormat: OutputFormat>(
+    selection_type: &SelectionType<&ClientField<TOutputFormat>, &ClientPointer<TOutputFormat>>,
 ) -> VariableContext {
     // This is used in two places: before we generate a merged selection set for an
     // entrypoint and when generating reader ASTs.
