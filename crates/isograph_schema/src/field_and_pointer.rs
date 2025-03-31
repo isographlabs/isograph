@@ -135,6 +135,8 @@ pub trait ClientFieldOrPointer<
     fn variable_definitions(
         &self,
     ) -> &[WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>];
+
+    fn client_type(&self) -> &'static str;
 }
 
 impl<
@@ -223,6 +225,10 @@ impl<
     ) -> &[WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>] {
         &self.variable_definitions
     }
+
+    fn client_type(&self) -> &'static str {
+        "field"
+    }
 }
 
 impl<
@@ -300,5 +306,9 @@ impl<
         &self,
     ) -> &[WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>] {
         &self.variable_definitions
+    }
+
+    fn client_type(&self) -> &'static str {
+        "pointer"
     }
 }
