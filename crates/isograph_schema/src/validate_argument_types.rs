@@ -16,8 +16,8 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    as_server_field, ClientFieldOrPointerId, NetworkProtocol, SchemaObject, ServerFieldData,
-    ServerScalarSelectable, ValidatedVariableDefinition,
+    ClientFieldOrPointerId, NetworkProtocol, SchemaObject, ServerFieldData, ServerScalarSelectable,
+    ValidatedVariableDefinition,
 };
 
 fn graphql_type_to_non_null_type<TValue>(
@@ -364,7 +364,7 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
         .encountered_fields
         .iter()
         .filter_map(|(field_name, field_type)| {
-            let field = &server_fields[as_server_field(field_type)?.as_usize()];
+            let field = &server_fields[field_type.as_server()?.as_usize()];
 
             let field_type_annotation = &field.target_server_entity;
 

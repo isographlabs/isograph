@@ -7,7 +7,7 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    as_client_type, as_server_field, NetworkProtocol, Schema, SchemaServerObjectSelectableVariant,
+    NetworkProtocol, Schema, SchemaServerObjectSelectableVariant,
     ServerFieldTypeAssociatedDataInlineFragment, ServerScalarSelectable,
     ValidatedScalarSelectionAssociatedData, LINK_FIELD_NAME,
 };
@@ -43,13 +43,12 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         arguments: vec![],
                         associated_data: ValidatedScalarSelectionAssociatedData {
                             location: DefinitionLocation::Server(
-                                *as_server_field(
-                                    subtype
-                                        .encountered_fields
-                                        .get(&"__typename".intern().into())
-                                        .expect("Expected __typename to exist"),
-                                )
-                                .expect("Expected __typename to be server field"),
+                                *subtype
+                                    .encountered_fields
+                                    .get(&"__typename".intern().into())
+                                    .expect("Expected __typename to exist")
+                                    .as_server()
+                                    .expect("Expected __typename to be server field"),
                             ),
                             selection_variant: ScalarSelectionDirectiveSet::None(
                                 EmptyDirectiveSet {},
@@ -69,15 +68,14 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         arguments: vec![],
                         associated_data: ValidatedScalarSelectionAssociatedData {
                             location: DefinitionLocation::Client(
-                                match *as_client_type(
-                                    subtype
-                                        .encountered_fields
-                                        .get(&(*LINK_FIELD_NAME).into())
-                                        .expect("Expected link to exist"),
-                                )
-                                .expect("Expected link to be client field")
+                                match subtype
+                                    .encountered_fields
+                                    .get(&(*LINK_FIELD_NAME).into())
+                                    .expect("Expected link to exist")
+                                    .as_client()
+                                    .expect("Expected link to be client field")
                                 {
-                                    SelectionType::Scalar(client_field_id) => client_field_id,
+                                    SelectionType::Scalar(client_field_id) => *client_field_id,
                                     SelectionType::Object(_) => {
                                         panic!("Expected link to be client field")
                                     }

@@ -16,12 +16,11 @@ use isograph_lang_types::{
     ServerObjectId, TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
-    accessible_client_fields, as_server_field, description, output_type_annotation,
-    selection_map_wrapped, ClientField, ClientFieldOrPointer, ClientFieldVariant,
-    FieldTraversalResult, NameAndArguments, NetworkProtocol, NormalizationKey, RequiresRefinement,
-    Schema, SchemaObject, SchemaServerObjectSelectableVariant, UserWrittenClientTypeInfo,
-    UserWrittenComponentVariant, ValidatedScalarSelectionAssociatedData, ValidatedSelection,
-    ValidatedVariableDefinition,
+    accessible_client_fields, description, output_type_annotation, selection_map_wrapped,
+    ClientField, ClientFieldOrPointer, ClientFieldVariant, FieldTraversalResult, NameAndArguments,
+    NetworkProtocol, NormalizationKey, RequiresRefinement, Schema, SchemaObject,
+    SchemaServerObjectSelectableVariant, UserWrittenClientTypeInfo, UserWrittenComponentVariant,
+    ValidatedScalarSelectionAssociatedData, ValidatedSelection, ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -600,13 +599,12 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
         SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
             match scalar_field_selection.associated_data.location {
                 DefinitionLocation::Server(_server_field) => {
-                    let parent_field = as_server_field(
-                        parent_type
-                            .encountered_fields
-                            .get(&scalar_field_selection.name.item.into())
-                            .expect("parent_field should exist 1"),
-                    )
-                    .expect("parent_field should exist and be server field");
+                    let parent_field = parent_type
+                        .encountered_fields
+                        .get(&scalar_field_selection.name.item.into())
+                        .expect("parent_field should exist 1")
+                        .as_server()
+                        .expect("parent_field should exist and be server field");
                     let field = schema.server_scalar_selectable(*parent_field);
 
                     write_optional_description(
@@ -786,13 +784,12 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
         SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
             match scalar_field_selection.associated_data.location {
                 DefinitionLocation::Server(_server_field) => {
-                    let parent_field = as_server_field(
-                        parent_type
-                            .encountered_fields
-                            .get(&scalar_field_selection.name.item.into())
-                            .expect("parent_field should exist 1"),
-                    )
-                    .expect("parent_field should exist and be server field");
+                    let parent_field = parent_type
+                        .encountered_fields
+                        .get(&scalar_field_selection.name.item.into())
+                        .expect("parent_field should exist 1")
+                        .as_server()
+                        .expect("parent_field should exist and be server field");
                     let field = schema.server_scalar_selectable(*parent_field);
 
                     write_optional_description(

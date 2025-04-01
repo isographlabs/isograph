@@ -35,21 +35,3 @@ pub fn output_type_annotation<'a, TNetworkProtocol: NetworkProtocol>(
         },
     }
 }
-
-pub fn as_server_field<TFieldAssociatedData, TClientFieldType>(
-    definition_location: &DefinitionLocation<TFieldAssociatedData, TClientFieldType>,
-) -> Option<&TFieldAssociatedData> {
-    match definition_location {
-        DefinitionLocation::Server(server_field) => Some(server_field),
-        DefinitionLocation::Client(_) => None,
-    }
-}
-
-pub fn as_client_type<TFieldAssociatedData, TClientFieldType>(
-    definition_location: &DefinitionLocation<TFieldAssociatedData, TClientFieldType>,
-) -> Option<&TClientFieldType> {
-    match definition_location {
-        DefinitionLocation::Server(_) => None,
-        DefinitionLocation::Client(client_field) => Some(client_field),
-    }
-}

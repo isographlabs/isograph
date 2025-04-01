@@ -17,6 +17,22 @@ pub enum DefinitionLocation<TServer, TClient> {
     Client(TClient),
 }
 
+impl<TServer, TClient> DefinitionLocation<TServer, TClient> {
+    pub fn as_server(&self) -> Option<&TServer> {
+        match self {
+            DefinitionLocation::Server(s) => Some(s),
+            DefinitionLocation::Client(_) => None,
+        }
+    }
+
+    pub fn as_client(&self) -> Option<&TClient> {
+        match self {
+            DefinitionLocation::Server(_) => None,
+            DefinitionLocation::Client(c) => Some(c),
+        }
+    }
+}
+
 /// Distinguishes between items are are "scalar-like" and objects that
 /// are "object-like". Examples include:
 ///
