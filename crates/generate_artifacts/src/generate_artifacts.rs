@@ -11,17 +11,17 @@ use core::panic;
 use isograph_config::CompilerConfig;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, NonConstantValue,
-    ObjectSelectionDirectiveSet, ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectionType,
-    SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, TypeAnnotation,
-    UnionVariant, VariableDefinition,
+    ObjectSelectionDirectiveSet, ScalarFieldSelection, ScalarSelectionDirectiveSet,
+    SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, ServerEntityId,
+    ServerObjectId, TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
-    accessible_client_fields, as_server_field, description, get_provided_arguments,
-    output_type_annotation, selection_map_wrapped, ClientField, ClientFieldOrPointer,
-    ClientFieldVariant, FieldTraversalResult, NameAndArguments, NormalizationKey, OutputFormat,
-    RequiresRefinement, Schema, SchemaObject, SchemaServerLinkedFieldFieldVariant,
-    UserWrittenClientTypeInfo, UserWrittenComponentVariant, ValidatedScalarSelectionAssociatedData,
-    ValidatedSelection, ValidatedVariableDefinition,
+    accessible_client_fields, as_server_field, description, output_type_annotation,
+    selection_map_wrapped, ClientField, ClientFieldOrPointer, ClientFieldVariant,
+    FieldTraversalResult, NameAndArguments, NormalizationKey, OutputFormat, RequiresRefinement,
+    Schema, SchemaObject, SchemaServerLinkedFieldFieldVariant, UserWrittenClientTypeInfo,
+    UserWrittenComponentVariant, ValidatedScalarSelectionAssociatedData, ValidatedSelection,
+    ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -1120,3 +1120,21 @@ derive_display!(NormalizationAstText);
 #[derive(Debug)]
 pub(crate) struct RefetchQueryArtifactImport(pub String);
 derive_display!(RefetchQueryArtifactImport);
+
+pub fn get_provided_arguments<'a>(
+    argument_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
+    arguments: &[WithLocation<SelectionFieldArgument>],
+) -> Vec<ValidatedVariableDefinition> {
+    argument_definitions
+        .filter_map(|definition| {
+            let user_has_supplied_argument = arguments
+                .iter()
+                .any(|arg| definition.name.item == arg.item.name.item);
+            if user_has_supplied_argument {
+                Some(definition.clone())
+            } else {
+                None
+            }
+        })
+        .collect()
+}

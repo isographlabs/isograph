@@ -1,10 +1,9 @@
-use common_lang_types::{IsographObjectTypeName, WithLocation};
+use common_lang_types::IsographObjectTypeName;
 use isograph_lang_types::{
     ClientFieldId, ClientPointerId, DefinitionLocation, LinkedFieldSelection,
     LoadableDirectiveParameters, ObjectSelectionDirectiveSet, ScalarFieldSelection,
-    ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionType,
-    SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, ServerScalarSelectableId,
-    VariableDefinition,
+    ScalarSelectionDirectiveSet, SelectionType, SelectionTypeContainingSelections, ServerEntityId,
+    ServerObjectId, ServerScalarSelectableId, VariableDefinition,
 };
 
 use crate::{
@@ -87,22 +86,4 @@ pub fn categorize_field_loadability<'a, TOutputFormat: OutputFormat>(
             Some(Loadability::ImperativelyLoadedField(i))
         }
     }
-}
-
-pub fn get_provided_arguments<'a>(
-    argument_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
-    arguments: &[WithLocation<SelectionFieldArgument>],
-) -> Vec<ValidatedVariableDefinition> {
-    argument_definitions
-        .filter_map(|definition| {
-            let user_has_supplied_argument = arguments
-                .iter()
-                .any(|arg| definition.name.item == arg.item.name.item);
-            if user_has_supplied_argument {
-                Some(definition.clone())
-            } else {
-                None
-            }
-        })
-        .collect()
 }
