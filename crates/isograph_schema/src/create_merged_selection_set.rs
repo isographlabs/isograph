@@ -663,7 +663,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
 ) {
     for validated_selection in validated_selections.iter().filter(filter_id_fields) {
         match &validated_selection.item {
-            SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
+            SelectionType::Scalar(scalar_field_selection) => {
                 match &scalar_field_selection.associated_data.location {
                     DefinitionLocation::Server(_) => {
                         match scalar_field_selection.associated_data.selection_variant {
@@ -751,7 +751,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                     }
                 };
             }
-            SelectionTypeContainingSelections::Object(linked_field_selection) => {
+            SelectionType::Object(linked_field_selection) => {
                 let type_id = linked_field_selection.associated_data.parent_object_id;
                 let linked_field_parent_type = schema.server_field_data.object(type_id);
 
