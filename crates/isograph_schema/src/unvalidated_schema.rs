@@ -36,12 +36,6 @@ pub struct ServerFieldTypeAssociatedDataInlineFragment {
 pub type UnvalidatedObjectFieldInfo =
     DefinitionLocation<ServerScalarSelectableId, ClientFieldOrPointerId>;
 
-impl<TOutputFormat: OutputFormat> Default for Schema<TOutputFormat> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl<TOutputFormat: OutputFormat> Schema<TOutputFormat> {
     pub fn new() -> Self {
         // TODO add __typename
