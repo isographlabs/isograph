@@ -140,6 +140,7 @@ pub fn parse_iso_literal_in_source(
     parse_iso_literals_in_file_content(*relative_path, content, current_working_directory)
 }
 
+#[allow(clippy::type_complexity)]
 pub(crate) fn process_iso_literals<TOutputFormat: OutputFormat>(
     schema: &mut Schema<TOutputFormat>,
     contains_iso: ContainsIso,

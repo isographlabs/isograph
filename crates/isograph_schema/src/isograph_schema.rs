@@ -53,6 +53,12 @@ pub struct Schema<TOutputFormat: OutputFormat> {
 type SelectionTypes<TOutputFormat> =
     Vec<SelectionType<ClientField<TOutputFormat>, ClientPointer<TOutputFormat>>>;
 
+impl<TOutputFormat: OutputFormat> Default for Schema<TOutputFormat> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<TOutputFormat: OutputFormat> Schema<TOutputFormat> {
     pub fn new() -> Self {
         // TODO add __typename
