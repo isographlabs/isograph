@@ -1,11 +1,11 @@
 use common_lang_types::{
     relative_path_from_absolute_and_working_directory, CurrentWorkingDirectory, Location,
-    RelativePathToSourceFile, Span, TextSource, WithLocation,
+    RelativePathToSourceFile, Span, TextSource, WithLocation, WithSpan,
 };
 use isograph_lang_parser::{
     parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
 };
-use isograph_lang_types::{IsoLiteralsSource, SelectionType};
+use isograph_lang_types::{EntrypointDeclaration, IsoLiteralsSource, SelectionType};
 use isograph_schema::{OutputFormat, UnprocessedItem, UnvalidatedSchema};
 use lazy_static::lazy_static;
 use pico::{Database, SourceId};
@@ -143,9 +143,16 @@ pub fn parse_iso_literal_in_source(
 pub(crate) fn process_iso_literals<TOutputFormat: OutputFormat>(
     schema: &mut UnvalidatedSchema<TOutputFormat>,
     contains_iso: ContainsIso,
-) -> Result<Vec<UnprocessedItem>, BatchCompileError> {
+) -> Result<
+    (
+        Vec<UnprocessedItem>,
+        Vec<(TextSource, WithSpan<EntrypointDeclaration>)>,
+    ),
+    BatchCompileError,
+> {
     let mut errors = vec![];
     let mut unprocess_client_field_items = vec![];
+    let mut unprocessed_entrypoints = vec![];
     for iso_literals in contains_iso.files.into_values() {
         for (extraction_result, text_source) in iso_literals {
             match extraction_result {
@@ -174,14 +181,14 @@ pub(crate) fn process_iso_literals<TOutputFormat: OutputFormat>(
                     }
                 }
 
-                IsoLiteralExtractionResult::EntrypointDeclaration(entrypoint_declaration) => schema
-                    .entrypoints
-                    .push((text_source, entrypoint_declaration)),
+                IsoLiteralExtractionResult::EntrypointDeclaration(entrypoint_declaration) => {
+                    unprocessed_entrypoints.push((text_source, entrypoint_declaration))
+                }
             }
         }
     }
     if errors.is_empty() {
-        Ok(unprocess_client_field_items)
+        Ok((unprocess_client_field_items, unprocessed_entrypoints))
     } else {
         Err(errors.into())
     }

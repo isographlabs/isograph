@@ -1,30 +1,21 @@
 use std::collections::{BTreeMap, HashMap};
 
 use common_lang_types::{
-    IsographObjectTypeName, JavascriptName, Location, TextSource, UnvalidatedTypeName,
-    WithLocation, WithSpan,
+    IsographObjectTypeName, JavascriptName, Location, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    DefinitionLocation, EntrypointDeclaration, ServerEntityId, ServerScalarId,
-    ServerScalarSelectableId,
+    DefinitionLocation, ServerEntityId, ServerScalarId, ServerScalarSelectableId,
 };
 
 use crate::{
-    schema_validation_state::SchemaValidationState, ClientFieldOrPointerId, OutputFormat, Schema,
-    SchemaScalar, ServerFieldData, ValidatedSelection,
+    ClientFieldOrPointerId, OutputFormat, Schema, SchemaScalar, ServerFieldData,
+    ValidatedSchemaState, ValidatedSelection,
 };
 use lazy_static::lazy_static;
 
 lazy_static! {
     pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
-}
-
-#[derive(Debug)]
-pub struct UnvalidatedSchemaState {}
-
-impl SchemaValidationState for UnvalidatedSchemaState {
-    type Entrypoint = Vec<(TextSource, WithSpan<EntrypointDeclaration>)>;
 }
 
 #[derive(Debug, Clone)]
@@ -40,7 +31,7 @@ pub struct ServerFieldTypeAssociatedDataInlineFragment {
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 }
 
-pub type UnvalidatedSchema<TOutputFormat> = Schema<UnvalidatedSchemaState, TOutputFormat>;
+pub type UnvalidatedSchema<TOutputFormat> = Schema<ValidatedSchemaState, TOutputFormat>;
 
 /// On unvalidated schema objects, the encountered types are either a type annotation
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the

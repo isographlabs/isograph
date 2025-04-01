@@ -4,11 +4,13 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use common_lang_types::{CurrentWorkingDirectory, RelativePathToSourceFile, TextSource};
+use common_lang_types::{
+    CurrentWorkingDirectory, RelativePathToSourceFile, TextSource, WithLocation,
+};
 use isograph_config::CompilerConfig;
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{IsoLiteralsSource, SchemaSource};
-use isograph_schema::{OutputFormat, UnprocessedItem, UnvalidatedSchema};
+use isograph_schema::{validate_entrypoints, OutputFormat, UnprocessedItem, UnvalidatedSchema};
 use pico::{Database, SourceId};
 
 use crate::{
@@ -55,10 +57,9 @@ pub fn create_unvalidated_schema<TOutputFormat: OutputFormat>(
     // vec, then process it later.
     let mut unprocessed_items = vec![];
 
-    unprocessed_items.extend(process_iso_literals(
-        &mut unvalidated_isograph_schema,
-        contains_iso,
-    )?);
+    let (unprocessed_client_types, unprocessed_entrypoints) =
+        process_iso_literals(&mut unvalidated_isograph_schema, contains_iso)?;
+    unprocessed_items.extend(unprocessed_client_types);
 
     unprocessed_items.extend(process_exposed_fields(&mut unvalidated_isograph_schema)?);
 
@@ -73,6 +74,17 @@ pub fn create_unvalidated_schema<TOutputFormat: OutputFormat>(
         &mut unvalidated_isograph_schema,
     )?);
 
+    unvalidated_isograph_schema.entrypoints = validate_entrypoints(
+        &unvalidated_isograph_schema,
+        unprocessed_entrypoints,
+    )
+    .map_err(|e| BatchCompileError::MultipleErrorsWithLocations {
+        messages: e
+            .into_iter()
+            .map(|x| WithLocation::new(Box::new(x.item) as Box<dyn std::error::Error>, x.location))
+            .collect(),
+    })?;
+
     // Step two: now, we can create the selection sets. Creating a selection set involves
     // looking up client selectables, to:
     // - determine if the selectable exists,
@@ -81,7 +93,12 @@ pub fn create_unvalidated_schema<TOutputFormat: OutputFormat>(
     // - validate loadability/updatability, and
     // - to store the selectable id,
     add_selection_sets_to_client_selectables(&mut unvalidated_isograph_schema, unprocessed_items)
-        .map_err(|messages| BatchCompileError::UnableToValidateSchema { messages })?;
+        .map_err(|messages| BatchCompileError::MultipleErrorsWithLocations {
+        messages: messages
+            .into_iter()
+            .map(|x| WithLocation::new(Box::new(x.item) as Box<dyn std::error::Error>, x.location))
+            .collect(),
+    })?;
 
     Ok((unvalidated_isograph_schema, contains_iso_stats))
 }

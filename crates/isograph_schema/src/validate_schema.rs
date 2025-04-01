@@ -18,7 +18,7 @@ use thiserror::Error;
 use crate::{
     schema_validation_state::SchemaValidationState, ClientField, ClientFieldVariant, ClientPointer,
     ImperativelyLoadedFieldVariant, OutputFormat, Schema, ServerScalarSelectable,
-    UnvalidatedSchema, UseRefetchFieldRefetchStrategy, ValidateEntrypointDeclarationError,
+    UseRefetchFieldRefetchStrategy, ValidateEntrypointDeclarationError,
 };
 
 pub type ValidatedSchemaServerField<TOutputFormat> = ServerScalarSelectable<TOutputFormat>;
@@ -75,56 +75,6 @@ impl SchemaValidationState for ValidatedSchemaState {
 }
 
 pub type ValidatedSchema<TOutputFormat> = Schema<ValidatedSchemaState, TOutputFormat>;
-
-impl<TOutputFormat: OutputFormat> ValidatedSchema<TOutputFormat> {
-    pub fn validate_and_construct(
-        unvalidated_schema: UnvalidatedSchema<TOutputFormat>,
-    ) -> Result<Self, Vec<WithLocation<ValidateSchemaError>>> {
-        let mut errors = vec![];
-
-        let mut updated_entrypoints = HashMap::new();
-        for (text_source, entrypoint_type_and_field) in unvalidated_schema.entrypoints.iter() {
-            match unvalidated_schema
-                .validate_entrypoint_type_and_field(*text_source, *entrypoint_type_and_field)
-                .map_err(|e| {
-                    WithLocation::new(
-                        ValidateSchemaError::ErrorValidatingEntrypointDeclaration {
-                            message: e.item,
-                        },
-                        e.location,
-                    )
-                }) {
-                Ok(client_field_id) => {
-                    updated_entrypoints.insert(
-                        client_field_id,
-                        entrypoint_type_and_field.item.iso_literal_text,
-                    );
-                }
-                Err(e) => errors.push(e),
-            }
-        }
-
-        let Schema {
-            server_scalar_selectables: fields,
-            client_types,
-            entrypoints: _,
-            server_field_data,
-            fetchable_types,
-        } = unvalidated_schema;
-
-        if errors.is_empty() {
-            Ok(Self {
-                server_scalar_selectables: fields,
-                client_types,
-                entrypoints: updated_entrypoints,
-                server_field_data,
-                fetchable_types,
-            })
-        } else {
-            Err(errors)
-        }
-    }
-}
 
 pub fn get_all_errors_or_all_ok<T, E>(
     items: impl Iterator<Item = Result<T, Vec<E>>>,

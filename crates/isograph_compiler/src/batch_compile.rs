@@ -116,18 +116,6 @@ pub enum BatchCompileError {
     #[error("Unable to strip prefix.\nReason: {0}")]
     UnableToStripPrefix(#[from] std::path::StripPrefixError),
 
-    #[error(
-        "{} when validating schema, client fields and entrypoint declarations.{}",
-        if messages.len() == 1 { "Error" } else { "Errors" },
-        messages.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{}", x));
-            output
-        })
-    )]
-    UnableToValidateSchema {
-        messages: Vec<WithLocation<isograph_schema::ValidateSchemaError>>,
-    },
-
     #[error("Unable to convert file {path:?} to utf8.\nDetailed reason: {reason}")]
     UnableToConvertToString { path: PathBuf, reason: Utf8Error },
 
