@@ -8,15 +8,15 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     generate_refetch_field_strategy, id_arguments, id_selection, id_top_level_arguments,
-    ClientField, ClientFieldVariant, ClientPointer, ImperativelyLoadedFieldVariant, OutputFormat,
-    RefetchStrategy, RequiresRefinement, Schema, SchemaObject, UnprocessedClientFieldItem,
-    UnprocessedItem, NODE_FIELD_NAME, REFETCH_FIELD_NAME,
+    ClientField, ClientFieldVariant, ClientPointer, ImperativelyLoadedFieldVariant,
+    NetworkProtocol, RefetchStrategy, RequiresRefinement, Schema, SchemaObject,
+    UnprocessedClientFieldItem, UnprocessedItem, NODE_FIELD_NAME, REFETCH_FIELD_NAME,
 };
 
 use crate::batch_compile::BatchCompileError;
 
-pub fn add_refetch_fields_to_objects<TOutputFormat: OutputFormat>(
-    schema: &mut Schema<TOutputFormat>,
+pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
+    schema: &mut Schema<TNetworkProtocol>,
 ) -> Result<Vec<UnprocessedItem>, BatchCompileError> {
     let query_id = schema.query_id();
 
@@ -66,10 +66,10 @@ pub fn add_refetch_fields_to_objects<TOutputFormat: OutputFormat>(
     }
 }
 
-fn add_refetch_field_to_object<TOutputFormat: OutputFormat>(
-    object: &mut SchemaObject<TOutputFormat>,
+fn add_refetch_field_to_object<TNetworkProtocol: NetworkProtocol>(
+    object: &mut SchemaObject<TNetworkProtocol>,
     client_fields: &mut Vec<
-        SelectionType<ClientField<TOutputFormat>, ClientPointer<TOutputFormat>>,
+        SelectionType<ClientField<TNetworkProtocol>, ClientPointer<TNetworkProtocol>>,
     >,
     query_id: ServerObjectId,
     _id_field: ServerStrongIdFieldId,

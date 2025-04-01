@@ -11,10 +11,10 @@ use isograph_lang_types::{
 
 use thiserror::Error;
 
-use crate::{OutputFormat, Schema};
+use crate::{NetworkProtocol, Schema};
 
-pub fn validate_entrypoints<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     entrypoint_declarations: Vec<(TextSource, WithSpan<EntrypointDeclaration>)>,
 ) -> Result<
     HashMap<ClientFieldId, IsoLiteralText>,
@@ -43,8 +43,8 @@ pub fn validate_entrypoints<TOutputFormat: OutputFormat>(
     }
 }
 
-fn validate_entrypoint_type_and_field<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn validate_entrypoint_type_and_field<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     text_source: TextSource,
     entrypoint_declaration: WithSpan<EntrypointDeclaration>,
 ) -> Result<ClientFieldId, WithLocation<ValidateEntrypointDeclarationError>> {
@@ -60,8 +60,8 @@ fn validate_entrypoint_type_and_field<TOutputFormat: OutputFormat>(
     Ok(client_field_id)
 }
 
-fn validate_parent_object_id<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn validate_parent_object_id<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     parent_type: WithSpan<UnvalidatedTypeName>,
     text_source: TextSource,
 ) -> Result<ServerObjectId, WithLocation<ValidateEntrypointDeclarationError>> {
@@ -110,8 +110,8 @@ fn validate_parent_object_id<TOutputFormat: OutputFormat>(
     }
 }
 
-fn validate_client_field<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     field_name: WithSpan<ServerScalarSelectableName>,
     text_source: TextSource,
     parent_object_id: ServerObjectId,

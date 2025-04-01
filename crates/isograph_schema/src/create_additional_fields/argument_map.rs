@@ -10,7 +10,7 @@ use isograph_lang_types::{
     DefinitionLocation, SelectionType, ServerEntityId, ServerScalarSelectableId, VariableDefinition,
 };
 
-use crate::{OutputFormat, Schema};
+use crate::{NetworkProtocol, Schema};
 
 use super::create_additional_fields_error::{
     CreateAdditionalFieldsError, FieldMapItem, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
@@ -30,13 +30,13 @@ impl ArgumentMap {
         }
     }
 
-    pub(crate) fn remove_field_map_item<TOutputFormat: OutputFormat>(
+    pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol>(
         &mut self,
         field_map_item: FieldMapItem,
         primary_type_name: IsographObjectTypeName,
         mutation_object_name: IsographObjectTypeName,
         mutation_field_name: SelectableName,
-        schema: &mut Schema<TOutputFormat>,
+        schema: &mut Schema<TNetworkProtocol>,
     ) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem> {
         let split_to_arg = field_map_item.split_to_arg();
         let (index_of_argument, argument) = self
@@ -183,9 +183,9 @@ impl ModifiedArgument {
     /// an existing object.
     ///
     /// This panics if unmodified's type is a scalar.
-    pub fn from_unmodified<TOutputFormat: OutputFormat>(
+    pub fn from_unmodified<TNetworkProtocol: NetworkProtocol>(
         unmodified: &VariableDefinition<ServerEntityId>,
-        schema: &Schema<TOutputFormat>,
+        schema: &Schema<TNetworkProtocol>,
     ) -> Self {
         // TODO I think we have validated that the item exists already.
         // But we should double check that, and return an error if necessary
@@ -221,9 +221,9 @@ impl ModifiedArgument {
         }
     }
 
-    pub fn remove_to_field<TOutputFormat: OutputFormat>(
+    pub fn remove_to_field<TNetworkProtocol: NetworkProtocol>(
         &mut self,
-        schema: &Schema<TOutputFormat>,
+        schema: &Schema<TNetworkProtocol>,
         first: StringLiteralValue,
         rest: &[StringLiteralValue],
         primary_type_name: IsographObjectTypeName,

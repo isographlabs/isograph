@@ -12,9 +12,9 @@ use isograph_schema::{
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
     get_reachable_variables, initial_variable_context, ClientField, ClientFieldOrPointer,
-    FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, MergedSelectionMap, OutputFormat,
-    RootOperationName, RootRefetchedPath, ScalarClientFieldTraversalState, Schema, SchemaObject,
-    ValidatedVariableDefinition,
+    FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, MergedSelectionMap,
+    NetworkProtocol, RootOperationName, RootRefetchedPath, ScalarClientFieldTraversalState, Schema,
+    SchemaObject, ValidatedVariableDefinition,
 };
 
 use crate::{
@@ -28,17 +28,17 @@ use crate::{
 };
 
 #[derive(Debug)]
-struct EntrypointArtifactInfo<'schema, TOutputFormat: OutputFormat> {
+struct EntrypointArtifactInfo<'schema, TNetworkProtocol: NetworkProtocol> {
     query_name: QueryOperationName,
-    parent_type: &'schema SchemaObject<TOutputFormat>,
+    parent_type: &'schema SchemaObject<TNetworkProtocol>,
     query_text: QueryText,
     normalization_ast_text: NormalizationAstText,
     refetch_query_artifact_import: RefetchQueryArtifactImport,
     concrete_type: IsographObjectTypeName,
 }
 
-pub(crate) fn generate_entrypoint_artifacts<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     entrypoint_id: ClientFieldId,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     file_extensions: GenerateFileExtensionsOption,
@@ -76,10 +76,10 @@ pub(crate) fn generate_entrypoint_artifacts<TOutputFormat: OutputFormat>(
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     'a,
-    TOutputFormat: OutputFormat,
+    TNetworkProtocol: NetworkProtocol,
 >(
-    schema: &Schema<TOutputFormat>,
-    entrypoint: &ClientField<TOutputFormat>,
+    schema: &Schema<TNetworkProtocol>,
+    entrypoint: &ClientField<TNetworkProtocol>,
     merged_selection_map: &MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,
     encountered_client_type_map: &FieldToCompletedMergeTraversalStateMap,
@@ -109,7 +109,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         });
 
     let parent_object = schema.server_field_data.object(entrypoint.parent_object_id);
-    let query_text = TOutputFormat::generate_query_text(
+    let query_text = TNetworkProtocol::generate_query_text(
         query_name,
         schema,
         merged_selection_map,
@@ -256,7 +256,7 @@ fn generate_refetch_query_artifact_import(
     RefetchQueryArtifactImport(output)
 }
 
-impl<TOutputFormat: OutputFormat> EntrypointArtifactInfo<'_, TOutputFormat> {
+impl<TNetworkProtocol: NetworkProtocol> EntrypointArtifactInfo<'_, TNetworkProtocol> {
     fn path_and_content(
         self,
         file_extensions: GenerateFileExtensionsOption,

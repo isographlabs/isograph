@@ -7,7 +7,7 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ClientField, ClientFieldOrPointer, ClientPointer, NameAndArguments, OutputFormat,
+    ClientField, ClientFieldOrPointer, ClientPointer, NameAndArguments, NetworkProtocol,
     ServerScalarSelectable, ValidatedVariableDefinition,
 };
 
@@ -84,8 +84,11 @@ impl VariableContext {
     }
 }
 
-pub fn initial_variable_context<TOutputFormat: OutputFormat>(
-    selection_type: &SelectionType<&ClientField<TOutputFormat>, &ClientPointer<TOutputFormat>>,
+pub fn initial_variable_context<TNetworkProtocol: NetworkProtocol>(
+    selection_type: &SelectionType<
+        &ClientField<TNetworkProtocol>,
+        &ClientPointer<TNetworkProtocol>,
+    >,
 ) -> VariableContext {
     // This is used in two places: before we generate a merged selection set for an
     // entrypoint and when generating reader ASTs.
@@ -117,7 +120,7 @@ pub fn initial_variable_context<TOutputFormat: OutputFormat>(
     VariableContext(variable_context)
 }
 
-impl<TOutputFormat: OutputFormat> ServerScalarSelectable<TOutputFormat> {
+impl<TNetworkProtocol: NetworkProtocol> ServerScalarSelectable<TNetworkProtocol> {
     pub fn initial_variable_context(&self) -> VariableContext {
         let variable_context = self
             .arguments

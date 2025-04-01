@@ -1,9 +1,9 @@
-mod graphql_output_format;
+mod graphql_network_format;
 mod process_type_system_definition;
 mod query_text;
 mod read_schema;
 
-pub use graphql_output_format::*;
+pub use graphql_network_format::*;
 use isograph_schema::{ClientField, Schema, SchemaObject};
 pub use read_schema::*;
 

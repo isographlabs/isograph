@@ -24,7 +24,7 @@ use crate::{
     initial_variable_context, transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context, ClientField, ClientFieldOrPointer,
     ClientFieldOrPointerId, ClientFieldVariant, ImperativelyLoadedFieldVariant, NameAndArguments,
-    OutputFormat, PathToRefetchField, RootOperationName, Schema, SchemaObject,
+    NetworkProtocol, PathToRefetchField, RootOperationName, Schema, SchemaObject,
     SchemaServerLinkedFieldFieldVariant, ValidatedScalarSelection, ValidatedSelection,
     ValidatedSelectionType, VariableContext,
 };
@@ -403,10 +403,10 @@ fn transform_child_map_with_parent_context(
 }
 
 pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
-    TOutputFormat: OutputFormat,
+    TNetworkProtocol: NetworkProtocol,
 >(
-    schema: &Schema<TOutputFormat>,
-    parent_type: &SchemaObject<TOutputFormat>,
+    schema: &Schema<TNetworkProtocol>,
+    parent_type: &SchemaObject<TNetworkProtocol>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     root_field_id: DefinitionLocation<ServerScalarSelectableId, ClientFieldOrPointerId>,
@@ -449,9 +449,9 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     }
 }
 
-pub fn get_imperatively_loaded_artifact_info<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
-    entrypoint: &ClientField<TOutputFormat>,
+pub fn get_imperatively_loaded_artifact_info<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    entrypoint: &ClientField<TNetworkProtocol>,
     root_refetch_path: RootRefetchedPath,
     nested_selection_map: &MergedSelectionMap,
     reachable_variables: &BTreeSet<VariableName>,
@@ -490,15 +490,15 @@ pub fn get_reachable_variables(selection_map: &MergedSelectionMap) -> BTreeSet<V
 }
 
 #[allow(clippy::too_many_arguments)]
-fn process_imperatively_loaded_field<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     variant: ImperativelyLoadedFieldVariant,
     refetch_field_parent_id: ServerObjectId,
     selection_map: &MergedSelectionMap,
-    entrypoint: &ClientField<TOutputFormat>,
+    entrypoint: &ClientField<TNetworkProtocol>,
     index: usize,
     reachable_variables: &BTreeSet<VariableName>,
-    client_field: &ClientField<TOutputFormat>,
+    client_field: &ClientField<TNetworkProtocol>,
 ) -> ImperativelyLoadedFieldArtifactInfo {
     let ImperativelyLoadedFieldVariant {
         client_field_scalar_selection_name,
@@ -598,9 +598,9 @@ fn process_imperatively_loaded_field<TOutputFormat: OutputFormat>(
     }
 }
 
-fn get_used_variable_definitions<TOutputFormat: OutputFormat>(
+fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
     reachable_variables: &BTreeSet<VariableName>,
-    entrypoint: &ClientField<TOutputFormat>,
+    entrypoint: &ClientField<TNetworkProtocol>,
 ) -> Vec<WithSpan<VariableDefinition<ServerEntityId>>> {
     reachable_variables
         .iter()
@@ -630,9 +630,9 @@ fn get_used_variable_definitions<TOutputFormat: OutputFormat>(
         .collect::<Vec<_>>()
 }
 
-fn create_selection_map_with_merge_traversal_state<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
-    parent_type: &SchemaObject<TOutputFormat>,
+fn create_selection_map_with_merge_traversal_state<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    parent_type: &SchemaObject<TNetworkProtocol>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
@@ -652,10 +652,10 @@ fn create_selection_map_with_merge_traversal_state<TOutputFormat: OutputFormat>(
     merged_selection_map
 }
 
-fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
-    parent_type: &SchemaObject<TOutputFormat>,
+    parent_type: &SchemaObject<TNetworkProtocol>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
@@ -935,12 +935,12 @@ fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
     select_typename_and_id_fields_in_merged_selection(schema, parent_map, parent_type);
 }
 
-fn insert_imperative_field_into_refetch_paths<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    newly_encountered_scalar_client_field: &ClientField<TOutputFormat>,
-    parent_type: &SchemaObject<TOutputFormat>,
+    newly_encountered_scalar_client_field: &ClientField<TNetworkProtocol>,
+    parent_type: &SchemaObject<TNetworkProtocol>,
     variant: &ImperativelyLoadedFieldVariant,
 ) {
     let path = PathToRefetchField {
@@ -1002,12 +1002,12 @@ fn filter_id_fields(field: &&WithSpan<ValidatedSelection>) -> bool {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn merge_non_loadable_client_type<TOutputFormat: OutputFormat>(
-    parent_type: &SchemaObject<TOutputFormat>,
-    schema: &Schema<TOutputFormat>,
+fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
+    parent_type: &SchemaObject<TNetworkProtocol>,
+    schema: &Schema<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
     parent_merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    newly_encountered_client_type: ValidatedSelectionType<TOutputFormat>,
+    newly_encountered_client_type: ValidatedSelectionType<TNetworkProtocol>,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     parent_variable_context: &VariableContext,
     selection_arguments: &[WithLocation<SelectionFieldArgument>],
@@ -1085,10 +1085,10 @@ fn merge_scalar_server_field(
     }
 }
 
-fn select_typename_and_id_fields_in_merged_selection<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     merged_selection_map: &mut MergedSelectionMap,
-    parent_type: &SchemaObject<TOutputFormat>,
+    parent_type: &SchemaObject<TNetworkProtocol>,
 ) {
     if parent_type.concrete_type.is_none() {
         maybe_add_typename_selection(merged_selection_map)

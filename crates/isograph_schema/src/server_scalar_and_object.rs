@@ -11,21 +11,21 @@ use isograph_lang_types::{
     ServerStrongIdFieldId,
 };
 
-use crate::{ClientFieldOrPointerId, OutputFormat};
+use crate::{ClientFieldOrPointerId, NetworkProtocol};
 
 /// A scalar type in the schema.
 #[derive(Debug)]
-pub struct SchemaScalar<TOutputFormat: OutputFormat> {
+pub struct SchemaScalar<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<GraphQLScalarTypeName>,
     pub id: ServerScalarId,
     pub javascript_name: JavascriptName,
-    pub output_format: PhantomData<TOutputFormat>,
+    pub output_format: PhantomData<TNetworkProtocol>,
 }
 
 /// An object type in the schema.
 #[derive(Debug)]
-pub struct SchemaObject<TOutputFormat: OutputFormat> {
+pub struct SchemaObject<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: IsographObjectTypeName,
     pub id: ServerObjectId,
@@ -41,24 +41,24 @@ pub struct SchemaObject<TOutputFormat: OutputFormat> {
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 
-    pub output_associated_data: TOutputFormat::SchemaObjectAssociatedData,
+    pub output_associated_data: TNetworkProtocol::SchemaObjectAssociatedData,
 }
 
-pub type SchemaType<'a, TOutputFormat> =
-    SelectionType<&'a SchemaScalar<TOutputFormat>, &'a SchemaObject<TOutputFormat>>;
+pub type SchemaType<'a, TNetworkProtocol> =
+    SelectionType<&'a SchemaScalar<TNetworkProtocol>, &'a SchemaObject<TNetworkProtocol>>;
 
 #[impl_for_selection_type]
 pub trait SchemaScalarOrObject {
     fn name(&self) -> SelectionType<GraphQLScalarTypeName, IsographObjectTypeName>;
 }
 
-impl<TOutputFormat: OutputFormat> SchemaScalarOrObject for &SchemaScalar<TOutputFormat> {
+impl<TNetworkProtocol: NetworkProtocol> SchemaScalarOrObject for &SchemaScalar<TNetworkProtocol> {
     fn name(&self) -> SelectionType<GraphQLScalarTypeName, IsographObjectTypeName> {
         SelectionType::Scalar(self.name.item)
     }
 }
 
-impl<TOutputFormat: OutputFormat> SchemaScalarOrObject for &SchemaObject<TOutputFormat> {
+impl<TNetworkProtocol: NetworkProtocol> SchemaScalarOrObject for &SchemaObject<TNetworkProtocol> {
     fn name(&self) -> SelectionType<GraphQLScalarTypeName, IsographObjectTypeName> {
         SelectionType::Object(self.name)
     }

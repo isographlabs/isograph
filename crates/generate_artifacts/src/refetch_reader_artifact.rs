@@ -4,7 +4,7 @@ use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
-    initial_variable_context, ClientField, ClientFieldOrPointer, FieldMapItem, OutputFormat,
+    initial_variable_context, ClientField, ClientFieldOrPointer, FieldMapItem, NetworkProtocol,
     PrimaryFieldInfo, RefetchedPathsMap, Schema,
 };
 
@@ -17,9 +17,9 @@ use crate::{
     reader_ast::generate_reader_ast,
 };
 
-pub(crate) fn generate_refetch_reader_artifact<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
-    client_field: &ClientField<TOutputFormat>,
+pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    client_field: &ClientField<TNetworkProtocol>,
     primary_field_info: Option<&PrimaryFieldInfo>,
     refetched_paths: &RefetchedPathsMap,
     was_selected_loadably: bool,
@@ -83,9 +83,9 @@ pub(crate) fn generate_refetch_reader_artifact<TOutputFormat: OutputFormat>(
     }
 }
 
-pub(crate) fn generate_refetch_output_type_artifact<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
-    client_field: &ClientField<TOutputFormat>,
+pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    client_field: &ClientField<TNetworkProtocol>,
 ) -> ArtifactPathAndContent {
     let parent_type = schema
         .server_field_data

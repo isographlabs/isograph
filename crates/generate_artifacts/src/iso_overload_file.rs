@@ -5,14 +5,14 @@ use std::cmp::Ordering;
 
 use common_lang_types::{ArtifactPathAndContent, IsoLiteralText, SelectableName};
 use isograph_schema::{
-    ClientField, ClientFieldOrPointer, ClientFieldVariant, OutputFormat, Schema,
+    ClientField, ClientFieldOrPointer, ClientFieldVariant, NetworkProtocol, Schema,
     UserWrittenComponentVariant, ValidatedSelectionType,
 };
 
 use crate::generate_artifacts::ISO_TS_FILE_NAME;
 
-fn build_iso_overload_for_entrypoint<TOutputFormat: OutputFormat>(
-    validated_client_field: &ClientField<TOutputFormat>,
+fn build_iso_overload_for_entrypoint<TNetworkProtocol: NetworkProtocol>(
+    validated_client_field: &ClientField<TNetworkProtocol>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> (String, String) {
     let formatted_field = format!(
@@ -40,9 +40,9 @@ export function iso<T>(
     (import, s)
 }
 
-fn build_iso_overload_for_client_defined_type<TOutputFormat: OutputFormat>(
+fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol>(
     client_type_and_variant: (
-        ValidatedSelectionType<TOutputFormat>,
+        ValidatedSelectionType<TNetworkProtocol>,
         UserWrittenComponentVariant,
     ),
     file_extensions: GenerateFileExtensionsOption,
@@ -87,8 +87,8 @@ export function iso<T>(
     (import, s)
 }
 
-pub(crate) fn build_iso_overload_artifact<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+pub(crate) fn build_iso_overload_artifact<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     file_extensions: GenerateFileExtensionsOption,
     no_babel_transform: bool,
 ) -> ArtifactPathAndContent {
@@ -219,10 +219,10 @@ export function iso(isographLiteralText: string):
     }
 }
 
-fn sorted_user_written_types<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
 ) -> Vec<(
-    ValidatedSelectionType<TOutputFormat>,
+    ValidatedSelectionType<TNetworkProtocol>,
     UserWrittenComponentVariant,
 )> {
     let mut client_types = user_written_fields(schema).collect::<Vec<_>>();
@@ -244,9 +244,9 @@ fn sorted_user_written_types<TOutputFormat: OutputFormat>(
     client_types
 }
 
-fn sorted_entrypoints<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
-) -> Vec<(&ClientField<TOutputFormat>, &IsoLiteralText)> {
+fn sorted_entrypoints<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+) -> Vec<(&ClientField<TNetworkProtocol>, &IsoLiteralText)> {
     let mut entrypoints = schema
         .entrypoints
         .iter()
@@ -294,11 +294,11 @@ fn sort_field_name(field_1: SelectableName, field_2: SelectableName) -> Ordering
     }
 }
 
-fn user_written_fields<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn user_written_fields<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
 ) -> impl Iterator<
     Item = (
-        ValidatedSelectionType<TOutputFormat>,
+        ValidatedSelectionType<TNetworkProtocol>,
         UserWrittenComponentVariant,
     ),
 > + '_ {

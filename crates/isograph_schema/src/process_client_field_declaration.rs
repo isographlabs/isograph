@@ -21,7 +21,7 @@ use thiserror::Error;
 use crate::{
     expose_field_directive::RequiresRefinement,
     refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
-    ClientField, ClientPointer, FieldMapItem, OutputFormat, Schema, NODE_FIELD_NAME,
+    ClientField, ClientPointer, FieldMapItem, NetworkProtocol, Schema, NODE_FIELD_NAME,
 };
 
 pub type UnprocessedSelection = WithSpan<
@@ -41,7 +41,7 @@ pub struct UnprocessedClientPointerItem {
 }
 pub type UnprocessedItem = SelectionType<UnprocessedClientFieldItem, UnprocessedClientPointerItem>;
 
-impl<TOutputFormat: OutputFormat> Schema<TOutputFormat> {
+impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn process_client_field_declaration(
         &mut self,
         client_field_declaration: WithSpan<ClientFieldDeclaration>,

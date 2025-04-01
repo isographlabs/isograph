@@ -7,7 +7,7 @@ use std::{
 use common_lang_types::{CurrentWorkingDirectory, WithLocation};
 use generate_artifacts::get_artifact_path_and_content;
 use isograph_config::{create_config, CompilerConfig};
-use isograph_schema::{validate_use_of_arguments, OutputFormat};
+use isograph_schema::{validate_use_of_arguments, NetworkProtocol};
 use pico::Database;
 
 use crate::{
@@ -78,14 +78,14 @@ impl CompilerState {
 ///
 /// These are less "core" to the overall mission, and thus invite the question
 /// of whether they belong in this function, or at all.
-pub fn compile<TOutputFormat: OutputFormat>(
+pub fn compile<TNetworkProtocol: NetworkProtocol>(
     db: &Database,
     source_files: &SourceFiles,
     config: &CompilerConfig,
 ) -> Result<CompilationStats, Box<dyn Error>> {
     // Create schema
     let (isograph_schema, stats) =
-        create_unvalidated_schema::<TOutputFormat>(db, source_files, config)?;
+        create_unvalidated_schema::<TNetworkProtocol>(db, source_files, config)?;
 
     validate_use_of_arguments(&isograph_schema).map_err(|messages| {
         Box::new(BatchCompileError::MultipleErrorsWithLocations {

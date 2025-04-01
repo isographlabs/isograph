@@ -10,7 +10,7 @@ use common_lang_types::{
 use isograph_config::CompilerConfig;
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{IsoLiteralsSource, SchemaSource};
-use isograph_schema::{validate_entrypoints, OutputFormat, Schema, UnprocessedItem};
+use isograph_schema::{validate_entrypoints, NetworkProtocol, Schema, UnprocessedItem};
 use pico::{Database, SourceId};
 
 use crate::{
@@ -21,23 +21,23 @@ use crate::{
     source_files::SourceFiles,
 };
 
-pub fn create_unvalidated_schema<TOutputFormat: OutputFormat>(
+pub fn create_unvalidated_schema<TNetworkProtocol: NetworkProtocol>(
     db: &Database,
     source_files: &SourceFiles,
     config: &CompilerConfig,
-) -> Result<(Schema<TOutputFormat>, ContainsIsoStats), Box<dyn Error>> {
-    let mut unvalidated_isograph_schema = Schema::<TOutputFormat>::new();
+) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), Box<dyn Error>> {
+    let mut unvalidated_isograph_schema = Schema::<TNetworkProtocol>::new();
     let type_system_document =
-        TOutputFormat::parse_type_system_document(db, source_files.schema)?.to_owned();
-    let outcome = TOutputFormat::process_type_system_document(
+        TNetworkProtocol::parse_type_system_document(db, source_files.schema)?.to_owned();
+    let outcome = TNetworkProtocol::process_type_system_document(
         &mut unvalidated_isograph_schema,
         type_system_document,
         &config.options,
     )?;
     let schema_extensions =
-        parse_schema_extensions::<TOutputFormat>(db, &source_files.schema_extensions)?;
+        parse_schema_extensions::<TNetworkProtocol>(db, &source_files.schema_extensions)?;
     for extension_document in schema_extensions.into_values() {
-        TOutputFormat::process_type_system_extension_document(
+        TNetworkProtocol::process_type_system_extension_document(
             &mut unvalidated_isograph_schema,
             extension_document,
             &config.options,
@@ -103,18 +103,20 @@ pub fn create_unvalidated_schema<TOutputFormat: OutputFormat>(
     Ok((unvalidated_isograph_schema, contains_iso_stats))
 }
 
-fn parse_schema_extensions<TOutputFormat: OutputFormat>(
+fn parse_schema_extensions<TNetworkProtocol: NetworkProtocol>(
     db: &Database,
     schema_extensions_sources: &HashMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
 ) -> Result<
-    HashMap<RelativePathToSourceFile, TOutputFormat::TypeSystemExtensionDocument>,
+    HashMap<RelativePathToSourceFile, TNetworkProtocol::TypeSystemExtensionDocument>,
     Box<dyn Error>,
 > {
     let mut schema_extensions = HashMap::new();
     for (relative_path, schema_extension_source_id) in schema_extensions_sources.iter() {
-        let extensions_document =
-            TOutputFormat::parse_type_system_extension_document(db, *schema_extension_source_id)?
-                .to_owned();
+        let extensions_document = TNetworkProtocol::parse_type_system_extension_document(
+            db,
+            *schema_extension_source_id,
+        )?
+        .to_owned();
         schema_extensions.insert(*relative_path, extensions_document);
     }
     Ok(schema_extensions)
@@ -151,8 +153,8 @@ fn parse_iso_literals(
 /// Here, we are processing exposeAs fields. Note that we only process these
 /// directives on root objects (Query, Mutation, Subscription) and we should
 /// validate that no other types have exposeAs directives.
-fn process_exposed_fields<TOutputFormat: OutputFormat>(
-    schema: &mut Schema<TOutputFormat>,
+fn process_exposed_fields<TNetworkProtocol: NetworkProtocol>(
+    schema: &mut Schema<TNetworkProtocol>,
 ) -> Result<Vec<UnprocessedItem>, BatchCompileError> {
     let fetchable_types: Vec<_> = schema.fetchable_types.keys().copied().collect();
     let mut unprocessed_items = vec![];

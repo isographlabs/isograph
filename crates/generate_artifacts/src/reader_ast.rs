@@ -8,8 +8,8 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, ClientField,
-    ClientFieldOrPointer, ClientFieldVariant, Loadability, NameAndArguments, NormalizationKey,
-    OutputFormat, PathToRefetchField, RefetchedPathsMap, Schema,
+    ClientFieldOrPointer, ClientFieldVariant, Loadability, NameAndArguments, NetworkProtocol,
+    NormalizationKey, PathToRefetchField, RefetchedPathsMap, Schema,
     SchemaServerLinkedFieldFieldVariant, ValidatedObjectSelection, ValidatedScalarSelection,
     ValidatedSelection, VariableContext,
 };
@@ -20,9 +20,9 @@ use crate::{
 };
 
 // Can we do this when visiting the client field in when generating entrypoints?
-fn generate_reader_ast_node<TOutputFormat: OutputFormat>(
+fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
     selection: &WithSpan<ValidatedSelection>,
-    schema: &Schema<TOutputFormat>,
+    schema: &Schema<TNetworkProtocol>,
     indentation_level: u8,
     reader_imports: &mut ReaderImports,
     // TODO use this to generate usedRefetchQueries
@@ -96,8 +96,8 @@ fn generate_reader_ast_node<TOutputFormat: OutputFormat>(
     }
 }
 
-fn linked_field_ast_node<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     linked_field: &ValidatedObjectSelection,
     indentation_level: u8,
     inner_reader_ast: ReaderAst,
@@ -180,10 +180,10 @@ fn linked_field_ast_node<TOutputFormat: OutputFormat>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn scalar_client_defined_field_ast_node<TOutputFormat: OutputFormat>(
+fn scalar_client_defined_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     scalar_field_selection: &ValidatedScalarSelection,
-    schema: &Schema<TOutputFormat>,
-    client_field: &ClientField<TOutputFormat>,
+    schema: &Schema<TNetworkProtocol>,
+    client_field: &ClientField<TNetworkProtocol>,
     indentation_level: u8,
     path: &mut Vec<NormalizationKey>,
     root_refetched_paths: &RefetchedPathsMap,
@@ -257,11 +257,11 @@ fn link_variant_ast_node(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn user_written_variant_ast_node<TOutputFormat: OutputFormat>(
+fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
     scalar_field_selection: &ValidatedScalarSelection,
     indentation_level: u8,
-    nested_client_field: &ClientField<TOutputFormat>,
-    schema: &Schema<TOutputFormat>,
+    nested_client_field: &ClientField<TNetworkProtocol>,
+    schema: &Schema<TNetworkProtocol>,
     path: &mut Vec<NormalizationKey>,
     root_refetched_paths: &RefetchedPathsMap,
     reader_imports: &mut ReaderImports,
@@ -322,8 +322,8 @@ fn user_written_variant_ast_node<TOutputFormat: OutputFormat>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn imperatively_loaded_variant_ast_node<TOutputFormat: OutputFormat>(
-    nested_client_field: &ClientField<TOutputFormat>,
+fn imperatively_loaded_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
+    nested_client_field: &ClientField<TNetworkProtocol>,
     reader_imports: &mut ReaderImports,
     root_refetched_paths: &RefetchedPathsMap,
     path: &[NormalizationKey],
@@ -367,9 +367,9 @@ fn imperatively_loaded_variant_ast_node<TOutputFormat: OutputFormat>(
     )
 }
 
-fn loadably_selected_field_ast_node<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
-    client_field: &ClientField<TOutputFormat>,
+fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    client_field: &ClientField<TNetworkProtocol>,
     reader_imports: &mut ReaderImports,
     indentation_level: u8,
     scalar_field_selection: &ValidatedScalarSelection,
@@ -483,8 +483,8 @@ fn server_defined_scalar_field_ast_node(
     )
 }
 
-fn generate_reader_ast_with_path<'schema, TOutputFormat: OutputFormat>(
-    schema: &'schema Schema<TOutputFormat>,
+fn generate_reader_ast_with_path<'schema, TNetworkProtocol: NetworkProtocol>(
+    schema: &'schema Schema<TNetworkProtocol>,
     selection_set: &'schema [WithSpan<ValidatedSelection>],
     indentation_level: u8,
     nested_client_field_imports: &mut ReaderImports,
@@ -562,8 +562,8 @@ fn find_imperatively_fetchable_query_index(
         .expect("Expected refetch query to be found")
 }
 
-pub(crate) fn generate_reader_ast<'schema, TOutputFormat: OutputFormat>(
-    schema: &'schema Schema<TOutputFormat>,
+pub(crate) fn generate_reader_ast<'schema, TNetworkProtocol: NetworkProtocol>(
+    schema: &'schema Schema<TNetworkProtocol>,
     selection_set: &'schema [WithSpan<ValidatedSelection>],
     indentation_level: u8,
     // N.B. this is not root_refetched_paths when we're generating an entrypoint :(
@@ -586,9 +586,9 @@ pub(crate) fn generate_reader_ast<'schema, TOutputFormat: OutputFormat>(
     (reader_ast, client_field_imports)
 }
 
-fn refetched_paths_for_client_field<TOutputFormat: OutputFormat>(
-    nested_client_field: &ClientField<TOutputFormat>,
-    schema: &Schema<TOutputFormat>,
+fn refetched_paths_for_client_field<TNetworkProtocol: NetworkProtocol>(
+    nested_client_field: &ClientField<TNetworkProtocol>,
+    schema: &Schema<TNetworkProtocol>,
     path: &mut Vec<NormalizationKey>,
     client_field_variable_context: &VariableContext,
 ) -> Vec<PathToRefetchField> {
@@ -608,9 +608,9 @@ fn refetched_paths_for_client_field<TOutputFormat: OutputFormat>(
     paths
 }
 
-fn refetched_paths_with_path<TOutputFormat: OutputFormat>(
+fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
     selection_set: &[WithSpan<ValidatedSelection>],
-    schema: &Schema<TOutputFormat>,
+    schema: &Schema<TNetworkProtocol>,
     path: &mut Vec<NormalizationKey>,
     initial_variable_context: &VariableContext,
 ) -> HashSet<PathToRefetchField> {

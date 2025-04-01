@@ -17,7 +17,7 @@ use isograph_lang_types::{
 use lazy_static::lazy_static;
 
 use crate::{
-    ClientField, ClientFieldOrPointerId, ClientPointer, NormalizationKey, OutputFormat,
+    ClientField, ClientFieldOrPointerId, ClientPointer, NetworkProtocol, NormalizationKey,
     SchemaObject, SchemaScalar, SchemaType, ServerScalarSelectable, UseRefetchFieldRefetchStrategy,
 };
 
@@ -36,32 +36,32 @@ pub struct RootOperationName(pub String);
 /// consuming an instance and creating a new instance with another
 /// TSchemaValidationState.
 ///
-/// The TOutputFormat type param will stay constant as the schema is validated.
+/// The TNetworkProtocol type param will stay constant as the schema is validated.
 ///
 /// Invariant: a schema is append-only, because pointers into the Schema are in the
 /// form of newtype wrappers around u32 indexes (e.g. FieldId, etc.) As a result,
 /// the schema does not support removing items.
 #[derive(Debug)]
-pub struct Schema<TOutputFormat: OutputFormat> {
-    pub server_scalar_selectables: Vec<ServerScalarSelectable<TOutputFormat>>,
-    pub client_types: SelectionTypes<TOutputFormat>,
+pub struct Schema<TNetworkProtocol: NetworkProtocol> {
+    pub server_scalar_selectables: Vec<ServerScalarSelectable<TNetworkProtocol>>,
+    pub client_types: SelectionTypes<TNetworkProtocol>,
     pub entrypoints: HashMap<ClientFieldId, IsoLiteralText>,
-    pub server_field_data: ServerFieldData<TOutputFormat>,
+    pub server_field_data: ServerFieldData<TNetworkProtocol>,
 
     /// These are root types like Query, Mutation, Subscription
     pub fetchable_types: BTreeMap<ServerObjectId, RootOperationName>,
 }
 
-type SelectionTypes<TOutputFormat> =
-    Vec<SelectionType<ClientField<TOutputFormat>, ClientPointer<TOutputFormat>>>;
+type SelectionTypes<TNetworkProtocol> =
+    Vec<SelectionType<ClientField<TNetworkProtocol>, ClientPointer<TNetworkProtocol>>>;
 
-impl<TOutputFormat: OutputFormat> Default for Schema<TOutputFormat> {
+impl<TNetworkProtocol: NetworkProtocol> Default for Schema<TNetworkProtocol> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<TOutputFormat: OutputFormat> Schema<TOutputFormat> {
+impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn new() -> Self {
         // TODO add __typename
         let fields = vec![];
@@ -154,13 +154,15 @@ impl<TOutputFormat: OutputFormat> Schema<TOutputFormat> {
     }
 }
 
-pub type LinkedType<'a, TOutputFormat> =
-    DefinitionLocation<&'a ServerScalarSelectable<TOutputFormat>, &'a ClientPointer<TOutputFormat>>;
+pub type LinkedType<'a, TNetworkProtocol> = DefinitionLocation<
+    &'a ServerScalarSelectable<TNetworkProtocol>,
+    &'a ClientPointer<TNetworkProtocol>,
+>;
 
 #[derive(Debug)]
-pub struct ServerFieldData<TOutputFormat: OutputFormat> {
-    pub server_objects: Vec<SchemaObject<TOutputFormat>>,
-    pub server_scalars: Vec<SchemaScalar<TOutputFormat>>,
+pub struct ServerFieldData<TNetworkProtocol: NetworkProtocol> {
+    pub server_objects: Vec<SchemaObject<TNetworkProtocol>>,
+    pub server_scalars: Vec<SchemaScalar<TNetworkProtocol>>,
     pub defined_types: HashMap<UnvalidatedTypeName, ServerEntityId>,
 
     // Well known types
@@ -174,17 +176,17 @@ pub struct ServerFieldData<TOutputFormat: OutputFormat> {
     pub null_type_id: ServerScalarId,
 }
 
-impl<TOutputFormat: OutputFormat> Schema<TOutputFormat> {
+impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     /// Get a reference to a given server field by its id.
     pub fn server_field(
         &self,
         server_field_id: ServerScalarSelectableId,
-    ) -> &ServerScalarSelectable<TOutputFormat> {
+    ) -> &ServerScalarSelectable<TNetworkProtocol> {
         &self.server_scalar_selectables[server_field_id.as_usize()]
     }
 
     /// Get a reference to a given client field by its id.
-    pub fn client_field(&self, client_field_id: ClientFieldId) -> &ClientField<TOutputFormat> {
+    pub fn client_field(&self, client_field_id: ClientFieldId) -> &ClientField<TNetworkProtocol> {
         match &self.client_types[client_field_id.as_usize()] {
             SelectionType::Scalar(client_field) => client_field,
             SelectionType::Object(_) => panic!(
@@ -197,7 +199,7 @@ impl<TOutputFormat: OutputFormat> Schema<TOutputFormat> {
     pub fn client_field_mut(
         &mut self,
         client_field_id: ClientFieldId,
-    ) -> &mut ClientField<TOutputFormat> {
+    ) -> &mut ClientField<TNetworkProtocol> {
         match &mut self.client_types[client_field_id.as_usize()] {
             SelectionType::Scalar(client_field) => client_field,
             SelectionType::Object(_) => panic!(
@@ -210,7 +212,7 @@ impl<TOutputFormat: OutputFormat> Schema<TOutputFormat> {
     pub fn linked_type(
         &self,
         field_id: DefinitionLocation<ServerScalarSelectableId, ClientPointerId>,
-    ) -> LinkedType<TOutputFormat> {
+    ) -> LinkedType<TNetworkProtocol> {
         match field_id {
             DefinitionLocation::Server(server_field_id) => {
                 DefinitionLocation::Server(self.server_field(server_field_id))
@@ -224,7 +226,7 @@ impl<TOutputFormat: OutputFormat> Schema<TOutputFormat> {
     pub fn client_pointer(
         &self,
         client_pointer_id: ClientPointerId,
-    ) -> &ClientPointer<TOutputFormat> {
+    ) -> &ClientPointer<TNetworkProtocol> {
         match &self.client_types[client_pointer_id.as_usize()] {
             SelectionType::Object(client_pointer) => client_pointer,
             SelectionType::Scalar(_) => panic!(
@@ -237,7 +239,7 @@ impl<TOutputFormat: OutputFormat> Schema<TOutputFormat> {
     pub fn client_pointer_mut(
         &mut self,
         client_pointer_id: ClientPointerId,
-    ) -> &mut ClientPointer<TOutputFormat> {
+    ) -> &mut ClientPointer<TNetworkProtocol> {
         match &mut self.client_types[client_pointer_id.as_usize()] {
             SelectionType::Object(client_pointer) => client_pointer,
             SelectionType::Scalar(_) => panic!(
@@ -251,7 +253,7 @@ impl<TOutputFormat: OutputFormat> Schema<TOutputFormat> {
     pub fn client_type(
         &self,
         client_type_id: ClientFieldOrPointerId,
-    ) -> SelectionType<&ClientField<TOutputFormat>, &ClientPointer<TOutputFormat>> {
+    ) -> SelectionType<&ClientField<TNetworkProtocol>, &ClientPointer<TNetworkProtocol>> {
         match client_type_id {
             SelectionType::Scalar(client_field_id) => {
                 SelectionType::Scalar(self.client_field(client_field_id))
@@ -263,14 +265,14 @@ impl<TOutputFormat: OutputFormat> Schema<TOutputFormat> {
     }
 }
 
-impl<TOutputFormat: OutputFormat> ServerFieldData<TOutputFormat> {
+impl<TNetworkProtocol: NetworkProtocol> ServerFieldData<TNetworkProtocol> {
     /// Get a reference to a given scalar type by its id.
-    pub fn scalar(&self, scalar_id: ServerScalarId) -> &SchemaScalar<TOutputFormat> {
+    pub fn scalar(&self, scalar_id: ServerScalarId) -> &SchemaScalar<TNetworkProtocol> {
         &self.server_scalars[scalar_id.as_usize()]
     }
 
     // TODO this function is horribly named
-    pub fn lookup_unvalidated_type(&self, type_id: ServerEntityId) -> SchemaType<TOutputFormat> {
+    pub fn lookup_unvalidated_type(&self, type_id: ServerEntityId) -> SchemaType<TNetworkProtocol> {
         match type_id {
             ServerEntityId::Object(object_id) => SchemaType::Object(self.object(object_id)),
             ServerEntityId::Scalar(scalar_id) => SchemaType::Scalar(self.scalar(scalar_id)),
@@ -278,12 +280,12 @@ impl<TOutputFormat: OutputFormat> ServerFieldData<TOutputFormat> {
     }
 
     /// Get a reference to a given object type by its id.
-    pub fn object(&self, object_id: ServerObjectId) -> &SchemaObject<TOutputFormat> {
+    pub fn object(&self, object_id: ServerObjectId) -> &SchemaObject<TNetworkProtocol> {
         &self.server_objects[object_id.as_usize()]
     }
 
     /// Get a mutable reference to a given object type by its id.
-    pub fn object_mut(&mut self, object_id: ServerObjectId) -> &mut SchemaObject<TOutputFormat> {
+    pub fn object_mut(&mut self, object_id: ServerObjectId) -> &mut SchemaObject<TNetworkProtocol> {
         &mut self.server_objects[object_id.as_usize()]
     }
 }
@@ -310,8 +312,8 @@ impl NameAndArguments {
     }
 }
 
-fn add_schema_defined_scalar_type<TOutputFormat: OutputFormat>(
-    scalars: &mut Vec<SchemaScalar<TOutputFormat>>,
+fn add_schema_defined_scalar_type<TNetworkProtocol: NetworkProtocol>(
+    scalars: &mut Vec<SchemaScalar<TNetworkProtocol>>,
     defined_types: &mut HashMap<UnvalidatedTypeName, ServerEntityId>,
     field_name: &'static str,
     javascript_name: JavascriptName,
@@ -384,5 +386,5 @@ pub struct ValidatedScalarSelectionAssociatedData {
     pub selection_variant: ScalarSelectionDirectiveSet,
 }
 
-pub type ValidatedSelectionType<'a, TOutputFormat> =
-    SelectionType<&'a ClientField<TOutputFormat>, &'a ClientPointer<TOutputFormat>>;
+pub type ValidatedSelectionType<'a, TNetworkProtocol> =
+    SelectionType<&'a ClientField<TNetworkProtocol>, &'a ClientPointer<TNetworkProtocol>>;

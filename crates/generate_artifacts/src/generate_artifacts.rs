@@ -18,7 +18,7 @@ use isograph_lang_types::{
 use isograph_schema::{
     accessible_client_fields, as_server_field, description, output_type_annotation,
     selection_map_wrapped, ClientField, ClientFieldOrPointer, ClientFieldVariant,
-    FieldTraversalResult, NameAndArguments, NormalizationKey, OutputFormat, RequiresRefinement,
+    FieldTraversalResult, NameAndArguments, NetworkProtocol, NormalizationKey, RequiresRefinement,
     Schema, SchemaObject, SchemaServerLinkedFieldFieldVariant, UserWrittenClientTypeInfo,
     UserWrittenComponentVariant, ValidatedScalarSelectionAssociatedData, ValidatedSelection,
     ValidatedVariableDefinition,
@@ -95,8 +95,8 @@ lazy_static! {
 /// output_type artifact.
 ///
 /// TODO this should go through OutputFormat
-pub fn get_artifact_path_and_content<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     config: &CompilerConfig,
 ) -> Vec<ArtifactPathAndContent> {
     let mut artifact_path_and_content = get_artifact_path_and_content_impl(schema, config);
@@ -109,8 +109,8 @@ pub fn get_artifact_path_and_content<TOutputFormat: OutputFormat>(
     artifact_path_and_content
 }
 
-fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     config: &CompilerConfig,
 ) -> Vec<ArtifactPathAndContent> {
     let mut encountered_client_type_map = BTreeMap::new();
@@ -492,8 +492,8 @@ fn get_serialized_field_argument(
     }
 }
 
-pub(crate) fn generate_output_type<TOutputFormat: OutputFormat>(
-    client_field: &ClientField<TOutputFormat>,
+pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
+    client_field: &ClientField<TNetworkProtocol>,
 ) -> ClientFieldOutputType {
     let variant = &client_field.variant;
     match variant {
@@ -520,10 +520,10 @@ pub(crate) fn generate_output_type<TOutputFormat: OutputFormat>(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn generate_client_field_parameter_type<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     selection_map: &[WithSpan<ValidatedSelection>],
-    parent_type: &SchemaObject<TOutputFormat>,
+    parent_type: &SchemaObject<TNetworkProtocol>,
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
@@ -550,10 +550,10 @@ pub(crate) fn generate_client_field_parameter_type<TOutputFormat: OutputFormat>(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn generate_client_field_updatable_data_type<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+pub(crate) fn generate_client_field_updatable_data_type<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     selection_map: &[WithSpan<ValidatedSelection>],
-    parent_type: &SchemaObject<TOutputFormat>,
+    parent_type: &SchemaObject<TNetworkProtocol>,
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
@@ -585,11 +585,11 @@ pub(crate) fn generate_client_field_updatable_data_type<TOutputFormat: OutputFor
 }
 
 #[allow(clippy::too_many_arguments)]
-fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
-    parent_type: &SchemaObject<TOutputFormat>,
+    parent_type: &SchemaObject<TNetworkProtocol>,
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
@@ -691,8 +691,8 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn write_param_type_from_client_field<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     query_type_declaration: &mut String,
     nested_client_field_imports: &mut BTreeSet<ObjectTypeAndFieldName>,
     loadable_fields: &mut BTreeSet<ObjectTypeAndFieldName>,
@@ -770,11 +770,11 @@ fn write_param_type_from_client_field<TOutputFormat: OutputFormat>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
-    parent_type: &SchemaObject<TOutputFormat>,
+    parent_type: &SchemaObject<TNetworkProtocol>,
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
@@ -926,8 +926,8 @@ fn write_getter_and_setter(
     ));
 }
 
-fn get_loadable_field_type_from_arguments<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn get_loadable_field_type_from_arguments<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     arguments: Vec<ValidatedVariableDefinition>,
 ) -> String {
     let mut loadable_field_type = "{".to_string();
@@ -949,8 +949,8 @@ fn get_loadable_field_type_from_arguments<TOutputFormat: OutputFormat>(
     loadable_field_type
 }
 
-fn format_type_for_js<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn format_type_for_js<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     type_: GraphQLTypeAnnotation<ServerEntityId>,
 ) -> String {
     let new_type = type_.map(
@@ -991,8 +991,8 @@ fn format_type_for_js_inner(
     }
 }
 
-pub(crate) fn generate_parameters<'a, TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+pub(crate) fn generate_parameters<'a, TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     argument_definitions: impl Iterator<Item = &'a VariableDefinition<ServerEntityId>>,
 ) -> String {
     let mut s = "{\n".to_string();

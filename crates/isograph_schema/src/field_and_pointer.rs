@@ -11,7 +11,7 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ClientFieldVariant, OutputFormat, RefetchStrategy, UserWrittenClientPointerInfo,
+    ClientFieldVariant, NetworkProtocol, RefetchStrategy, UserWrittenClientPointerInfo,
     ValidatedObjectSelectionAssociatedData, ValidatedScalarSelectionAssociatedData,
     ValidatedSelection,
 };
@@ -19,7 +19,7 @@ use crate::{
 pub type ClientFieldOrPointerId = SelectionType<ClientFieldId, ClientPointerId>;
 
 #[derive(Debug)]
-pub struct ClientField<TOutputFormat: OutputFormat> {
+pub struct ClientField<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: ClientScalarSelectableName,
     pub id: ClientFieldId,
@@ -44,11 +44,11 @@ pub struct ClientField<TOutputFormat: OutputFormat> {
     pub type_and_field: ObjectTypeAndFieldName,
 
     pub parent_object_id: ServerObjectId,
-    pub output_format: PhantomData<TOutputFormat>,
+    pub output_format: PhantomData<TNetworkProtocol>,
 }
 
 #[derive(Debug)]
-pub struct ClientPointer<TOutputFormat: OutputFormat> {
+pub struct ClientPointer<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: ClientObjectSelectableName,
     pub id: ClientPointerId,
@@ -68,7 +68,7 @@ pub struct ClientPointer<TOutputFormat: OutputFormat> {
 
     pub parent_object_id: ServerObjectId,
 
-    pub output_format: PhantomData<TOutputFormat>,
+    pub output_format: PhantomData<TNetworkProtocol>,
     pub info: UserWrittenClientPointerInfo,
 }
 
@@ -96,7 +96,7 @@ pub trait ClientFieldOrPointer {
     fn client_type(&self) -> &'static str;
 }
 
-impl<TOutputFormat: OutputFormat> ClientFieldOrPointer for &ClientField<TOutputFormat> {
+impl<TNetworkProtocol: NetworkProtocol> ClientFieldOrPointer for &ClientField<TNetworkProtocol> {
     fn description(&self) -> Option<DescriptionValue> {
         self.description
     }
@@ -155,7 +155,7 @@ impl<TOutputFormat: OutputFormat> ClientFieldOrPointer for &ClientField<TOutputF
     }
 }
 
-impl<TOutputFormat: OutputFormat> ClientFieldOrPointer for &ClientPointer<TOutputFormat> {
+impl<TNetworkProtocol: NetworkProtocol> ClientFieldOrPointer for &ClientPointer<TNetworkProtocol> {
     fn description(&self) -> Option<DescriptionValue> {
         self.description
     }

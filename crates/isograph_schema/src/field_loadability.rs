@@ -2,7 +2,7 @@
 
 use isograph_lang_types::{LoadableDirectiveParameters, ScalarSelectionDirectiveSet};
 
-use crate::{ClientField, ClientFieldVariant, ImperativelyLoadedFieldVariant, OutputFormat};
+use crate::{ClientField, ClientFieldVariant, ImperativelyLoadedFieldVariant, NetworkProtocol};
 
 pub enum Loadability<'a> {
     LoadablySelectedField(&'a LoadableDirectiveParameters),
@@ -19,8 +19,8 @@ pub enum Loadability<'a> {
 /// as an immediate follow-up request. Once we do this, there will always be one
 /// source of truth for whether a field is fetched imperatively: the presence of the
 /// @loadable directive.
-pub fn categorize_field_loadability<'a, TOutputFormat: OutputFormat>(
-    client_field: &'a ClientField<TOutputFormat>,
+pub fn categorize_field_loadability<'a, TNetworkProtocol: NetworkProtocol>(
+    client_field: &'a ClientField<TNetworkProtocol>,
     selection_variant: &'a ScalarSelectionDirectiveSet,
 ) -> Option<Loadability<'a>> {
     match &client_field.variant {

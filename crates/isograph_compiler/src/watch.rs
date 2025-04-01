@@ -1,7 +1,7 @@
 use colored::Colorize;
 use common_lang_types::CurrentWorkingDirectory;
 use isograph_config::CompilerConfig;
-use isograph_schema::OutputFormat;
+use isograph_schema::NetworkProtocol;
 use notify::{
     event::{CreateKind, ModifyKind, RemoveKind, RenameMode},
     Error, EventKind, RecommendedWatcher, RecursiveMode,
@@ -22,7 +22,7 @@ use crate::{
 
 const MAX_CHANGED_FILES: usize = 100;
 
-pub async fn handle_watch_command<TOutputFormat: OutputFormat>(
+pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
     config_location: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(), Vec<Error>> {
@@ -32,7 +32,7 @@ pub async fn handle_watch_command<TOutputFormat: OutputFormat>(
     info!("{}", "Starting to compile.".cyan());
     let _ = print_result(WithDuration::new(|| {
         let source_files = SourceFiles::read_all(&mut state.db, &state.config)?;
-        let result = compile::<TOutputFormat>(&state.db, &source_files, &state.config);
+        let result = compile::<TNetworkProtocol>(&state.db, &source_files, &state.config);
         state.source_files = Some(source_files);
         result
     }));
@@ -54,8 +54,11 @@ pub async fn handle_watch_command<TOutputFormat: OutputFormat>(
                         (rx, watcher) = create_debounced_file_watcher(&state.config);
                         WithDuration::new(|| {
                             let source_files = SourceFiles::read_all(&mut state.db, &state.config)?;
-                            let result =
-                                compile::<TOutputFormat>(&state.db, &source_files, &state.config);
+                            let result = compile::<TNetworkProtocol>(
+                                &state.db,
+                                &source_files,
+                                &state.config,
+                            );
                             state.source_files = Some(source_files);
                             result
                         })
@@ -68,11 +71,11 @@ pub async fn handle_watch_command<TOutputFormat: OutputFormat>(
                                     &state.config,
                                     &changes,
                                 )?;
-                                compile::<TOutputFormat>(&state.db, source_files, &state.config)
+                                compile::<TNetworkProtocol>(&state.db, source_files, &state.config)
                             } else {
                                 let source_files =
                                     SourceFiles::read_all(&mut state.db, &state.config)?;
-                                let result = compile::<TOutputFormat>(
+                                let result = compile::<TNetworkProtocol>(
                                     &state.db,
                                     &source_files,
                                     &state.config,
@@ -88,8 +91,11 @@ pub async fn handle_watch_command<TOutputFormat: OutputFormat>(
                         );
                         WithDuration::new(|| {
                             let source_files = SourceFiles::read_all(&mut state.db, &state.config)?;
-                            let result =
-                                compile::<TOutputFormat>(&state.db, &source_files, &state.config);
+                            let result = compile::<TNetworkProtocol>(
+                                &state.db,
+                                &source_files,
+                                &state.config,
+                            );
                             state.source_files = Some(source_files);
                             result
                         })

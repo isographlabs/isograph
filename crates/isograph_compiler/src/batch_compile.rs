@@ -4,7 +4,7 @@ use crate::{compiler_state::compile, source_files::SourceFiles, with_duration::W
 use colored::Colorize;
 use common_lang_types::{CurrentWorkingDirectory, WithLocation};
 use isograph_lang_parser::IsographLiteralParseError;
-use isograph_schema::{OutputFormat, ProcessClientFieldDeclarationError};
+use isograph_schema::{NetworkProtocol, ProcessClientFieldDeclarationError};
 use pretty_duration::pretty_duration;
 use thiserror::Error;
 use tracing::{error, info};
@@ -17,7 +17,7 @@ pub struct CompilationStats {
     pub total_artifacts_written: usize,
 }
 
-pub fn compile_and_print<TOutputFormat: OutputFormat>(
+pub fn compile_and_print<TNetworkProtocol: NetworkProtocol>(
     config_location: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -25,7 +25,7 @@ pub fn compile_and_print<TOutputFormat: OutputFormat>(
     print_result(WithDuration::new(|| {
         let mut state = CompilerState::new(config_location, current_working_directory);
         let sources = SourceFiles::read_all(&mut state.db, &state.config)?;
-        compile::<TOutputFormat>(&state.db, &sources, &state.config)
+        compile::<TNetworkProtocol>(&state.db, &sources, &state.config)
     }))
 }
 

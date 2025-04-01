@@ -7,10 +7,10 @@ use isograph_lang_types::{
     DefinitionLocation, SelectionType, ServerEntityId, ServerScalarSelectableId, TypeAnnotation,
     UnionVariant,
 };
-use isograph_schema::{OutputFormat, Schema};
+use isograph_schema::{NetworkProtocol, Schema};
 
-pub(crate) fn format_parameter_type<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     type_: GraphQLTypeAnnotation<ServerEntityId>,
     indentation_level: u8,
 ) -> String {
@@ -41,8 +41,8 @@ pub(crate) fn format_parameter_type<TOutputFormat: OutputFormat>(
     }
 }
 
-fn format_server_field_type<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     field: ServerEntityId,
     indentation_level: u8,
 ) -> String {
@@ -76,8 +76,8 @@ fn format_server_field_type<TOutputFormat: OutputFormat>(
     }
 }
 
-fn format_field_definition<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     name: &SelectableName,
     server_field_id: ServerScalarSelectableId,
     indentation_level: u8,
@@ -111,8 +111,8 @@ fn is_nullable<T: Ord + Debug>(type_annotation: &TypeAnnotation<T>) -> bool {
     }
 }
 
-fn format_type_annotation<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn format_type_annotation<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     type_annotation: &TypeAnnotation<ServerEntityId>,
     indentation_level: u8,
 ) -> String {

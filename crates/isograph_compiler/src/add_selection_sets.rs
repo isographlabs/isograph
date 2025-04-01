@@ -7,7 +7,7 @@ use isograph_lang_types::{
     UnvalidatedSelection,
 };
 use isograph_schema::{
-    ClientFieldOrPointer, OutputFormat, RefetchStrategy, Schema, SchemaObject,
+    ClientFieldOrPointer, NetworkProtocol, RefetchStrategy, Schema, SchemaObject,
     UnprocessedClientFieldItem, UnprocessedItem, UseRefetchFieldRefetchStrategy,
     ValidatedObjectSelection, ValidatedObjectSelectionAssociatedData, ValidatedScalarSelection,
     ValidatedScalarSelectionAssociatedData, ValidatedSelection,
@@ -17,8 +17,8 @@ use thiserror::Error;
 pub type ValidateAddSelectionSetsResultWithMultipleErrors<T> =
     Result<T, Vec<WithLocation<AddSelectionSetsError>>>;
 
-pub(crate) fn add_selection_sets_to_client_selectables<TOutputFormat: OutputFormat>(
-    schema: &mut Schema<TOutputFormat>,
+pub(crate) fn add_selection_sets_to_client_selectables<TNetworkProtocol: NetworkProtocol>(
+    schema: &mut Schema<TNetworkProtocol>,
     unprocessed_items: Vec<UnprocessedItem>,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
     let mut errors = vec![];
@@ -43,8 +43,8 @@ pub(crate) fn add_selection_sets_to_client_selectables<TOutputFormat: OutputForm
 
 // TODO we should not be mutating items in the schema. Instead, we should be creating
 // new items (the refetch and reader selection sets).
-fn process_unprocessed_client_field_item<TOutputFormat: OutputFormat>(
-    schema: &mut Schema<TOutputFormat>,
+fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
+    schema: &mut Schema<TNetworkProtocol>,
     unprocessed_item: UnprocessedClientFieldItem,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
     let client_field = schema.client_field(unprocessed_item.client_field_id);
@@ -80,10 +80,10 @@ fn process_unprocessed_client_field_item<TOutputFormat: OutputFormat>(
 ///   as scalars, etc)
 /// - validate loadability/selectability (e.g. client fields cannot be selected updatably), and
 /// - include the selectable id in the associated data
-fn get_validated_selection_set<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     selection_set: Vec<WithSpan<UnvalidatedSelection>>,
-    parent_object: &SchemaObject<TOutputFormat>,
+    parent_object: &SchemaObject<TNetworkProtocol>,
     top_level_field_or_pointer: &impl ClientFieldOrPointer,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<Vec<WithSpan<ValidatedSelection>>> {
     get_all_errors_or_all_ok(selection_set.into_iter().map(|selection| {
@@ -91,10 +91,10 @@ fn get_validated_selection_set<TOutputFormat: OutputFormat>(
     }))
 }
 
-fn get_validated_selection<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     with_span: WithSpan<UnvalidatedSelection>,
-    selection_parent_object: &SchemaObject<TOutputFormat>,
+    selection_parent_object: &SchemaObject<TNetworkProtocol>,
     top_level_field_or_pointer: &impl ClientFieldOrPointer,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<WithSpan<ValidatedSelection>> {
     with_span.and_then(|selection| match selection {
@@ -118,9 +118,9 @@ fn get_validated_selection<TOutputFormat: OutputFormat>(
     })
 }
 
-fn get_validated_scalar_selection<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
-    selection_parent_object: &SchemaObject<TOutputFormat>,
+fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    selection_parent_object: &SchemaObject<TNetworkProtocol>,
     top_level_field_or_pointer: &impl ClientFieldOrPointer,
     scalar_selection: UnvalidatedScalarFieldSelection,
 ) -> AddSelectionSetsResult<ValidatedScalarSelection> {
@@ -208,9 +208,9 @@ fn get_validated_scalar_selection<TOutputFormat: OutputFormat>(
     })
 }
 
-fn get_validated_object_selection<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
-    selection_parent_object: &SchemaObject<TOutputFormat>,
+fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    selection_parent_object: &SchemaObject<TNetworkProtocol>,
     top_level_field_or_pointer: &impl ClientFieldOrPointer,
     object_selection: ObjectSelection<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<ValidatedObjectSelection> {
@@ -307,12 +307,12 @@ fn get_validated_object_selection<TOutputFormat: OutputFormat>(
     })
 }
 
-fn get_validated_refetch_strategy<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     refetch_strategy: Option<
         RefetchStrategy<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
     >,
-    parent_object: &SchemaObject<TOutputFormat>,
+    parent_object: &SchemaObject<TNetworkProtocol>,
     top_level_field_or_pointer: &impl ClientFieldOrPointer,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<
     Option<

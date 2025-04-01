@@ -16,7 +16,7 @@ use thiserror::Error;
 use crate::{
     validate_argument_types::{value_satisfies_type, ValidateArgumentTypesError},
     visit_selection_set::visit_selection_set,
-    ClientFieldOrPointer, OutputFormat, Schema, ValidatedVariableDefinition,
+    ClientFieldOrPointer, NetworkProtocol, Schema, ValidatedVariableDefinition,
 };
 
 type UsedVariables = BTreeSet<VariableName>;
@@ -35,8 +35,8 @@ lazy_static! {
 /// This should not be validated here, and can be fixed with better modeling (i.e.
 /// have different associated data for fields that points to server objects and
 /// fields that point to client objects.)
-pub fn validate_use_of_arguments<TOutputFormat: OutputFormat>(
-    validated_schema: &Schema<TOutputFormat>,
+pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
+    validated_schema: &Schema<TNetworkProtocol>,
 ) -> Result<(), Vec<WithLocation<ValidateUseOfArgumentsError>>> {
     let mut errors = vec![];
     for client_type in &validated_schema.client_types {
@@ -65,8 +65,8 @@ pub fn validate_use_of_arguments<TOutputFormat: OutputFormat>(
     }
 }
 
-fn validate_use_of_arguments_for_client_type<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     client_type: impl ClientFieldOrPointer,
     errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError>>,
 ) {
@@ -151,8 +151,8 @@ fn validate_use_of_arguments_for_client_type<TOutputFormat: OutputFormat>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn validate_use_of_arguments_impl<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
+fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError>>,
     reachable_variables: &mut BTreeSet<VariableName>,
     field_argument_definitions: Vec<&ValidatedVariableDefinition>,

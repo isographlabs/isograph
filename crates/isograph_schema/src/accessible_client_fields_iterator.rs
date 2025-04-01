@@ -2,15 +2,15 @@ use common_lang_types::WithSpan;
 use isograph_lang_types::{DefinitionLocation, SelectionTypeContainingSelections};
 
 use crate::{
-    ClientField, ClientFieldOrPointer, OutputFormat, Schema, ValidatedSelection,
+    ClientField, ClientFieldOrPointer, NetworkProtocol, Schema, ValidatedSelection,
     ValidatedSelectionType,
 };
 
 // This should really be replaced with a proper visitor, or something
-pub fn accessible_client_fields<'a, TOutputFormat: OutputFormat>(
-    selection_type: &'a ValidatedSelectionType<'a, TOutputFormat>,
-    schema: &'a Schema<TOutputFormat>,
-) -> impl Iterator<Item = &'a ClientField<TOutputFormat>> + 'a {
+pub fn accessible_client_fields<'a, TNetworkProtocol: NetworkProtocol>(
+    selection_type: &'a ValidatedSelectionType<'a, TNetworkProtocol>,
+    schema: &'a Schema<TNetworkProtocol>,
+) -> impl Iterator<Item = &'a ClientField<TNetworkProtocol>> + 'a {
     AccessibleClientFieldIterator {
         selection_set: selection_type.selection_set_for_parent_query(),
         index: 0,
@@ -19,17 +19,17 @@ pub fn accessible_client_fields<'a, TOutputFormat: OutputFormat>(
     }
 }
 
-struct AccessibleClientFieldIterator<'a, TOutputFormat: OutputFormat> {
+struct AccessibleClientFieldIterator<'a, TNetworkProtocol: NetworkProtocol> {
     selection_set: &'a [WithSpan<ValidatedSelection>],
-    schema: &'a Schema<TOutputFormat>,
+    schema: &'a Schema<TNetworkProtocol>,
     index: usize,
-    sub_iterator: Option<Box<AccessibleClientFieldIterator<'a, TOutputFormat>>>,
+    sub_iterator: Option<Box<AccessibleClientFieldIterator<'a, TNetworkProtocol>>>,
 }
 
-impl<'a, TOutputFormat: OutputFormat> Iterator
-    for AccessibleClientFieldIterator<'a, TOutputFormat>
+impl<'a, TNetworkProtocol: NetworkProtocol> Iterator
+    for AccessibleClientFieldIterator<'a, TNetworkProtocol>
 {
-    type Item = &'a ClientField<TOutputFormat>;
+    type Item = &'a ClientField<TNetworkProtocol>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(iterator) = &mut self.sub_iterator {

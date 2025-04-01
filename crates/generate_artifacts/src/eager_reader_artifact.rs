@@ -4,7 +4,7 @@ use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
 use isograph_schema::{
-    initial_variable_context, ClientField, ClientFieldOrPointer, OutputFormat, Schema,
+    initial_variable_context, ClientField, ClientFieldOrPointer, NetworkProtocol, Schema,
     ValidatedSelectionType,
 };
 use isograph_schema::{
@@ -28,9 +28,9 @@ use crate::{
     reader_ast::generate_reader_ast,
 };
 
-pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
-    selection_type: &ValidatedSelectionType<TOutputFormat>,
+pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    selection_type: &ValidatedSelectionType<TNetworkProtocol>,
     config: &CompilerConfig,
     info: UserWrittenClientTypeInfo,
     refetched_paths: &RefetchedPathsMap,
@@ -149,9 +149,9 @@ pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
     path_and_contents
 }
 
-pub(crate) fn generate_eager_reader_condition_artifact<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
-    encountered_server_field: &ServerScalarSelectable<TOutputFormat>,
+pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    encountered_server_field: &ServerScalarSelectable<TNetworkProtocol>,
     inline_fragment: &ServerFieldTypeAssociatedDataInlineFragment,
     refetch_paths: &RefetchedPathsMap,
     file_extensions: GenerateFileExtensionsOption,
@@ -207,9 +207,9 @@ pub(crate) fn generate_eager_reader_condition_artifact<TOutputFormat: OutputForm
     }
 }
 
-pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
-    client_field: &ValidatedSelectionType<TOutputFormat>,
+pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    client_field: &ValidatedSelectionType<TNetworkProtocol>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
     let ts_file_extension = file_extensions.ts();
@@ -311,9 +311,9 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
     }
 }
 
-pub(crate) fn generate_eager_reader_output_type_artifact<TOutputFormat: OutputFormat>(
-    schema: &Schema<TOutputFormat>,
-    client_field: &ClientField<TOutputFormat>,
+pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    client_field: &ClientField<TNetworkProtocol>,
     config: &CompilerConfig,
     info: UserWrittenClientTypeInfo,
     file_extensions: GenerateFileExtensionsOption,

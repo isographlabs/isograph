@@ -10,7 +10,7 @@ use crate::{
     ValidatedVariableDefinition,
 };
 
-pub trait OutputFormat:
+pub trait NetworkProtocol:
     Debug + Clone + Copy + Eq + PartialEq + Ord + PartialOrd + Hash + Default
 where
     Self: Sized,
