@@ -154,7 +154,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     }
 }
 
-pub type LinkedType<'a, TNetworkProtocol> = DefinitionLocation<
+pub type ObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
     &'a ServerScalarSelectable<TNetworkProtocol>,
     &'a ClientPointer<TNetworkProtocol>,
 >;
@@ -209,10 +209,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         }
     }
 
-    pub fn linked_type(
+    pub fn object_selectable(
         &self,
         field_id: DefinitionLocation<ServerScalarSelectableId, ClientPointerId>,
-    ) -> LinkedType<TNetworkProtocol> {
+    ) -> ObjectSelectable<TNetworkProtocol> {
         match field_id {
             DefinitionLocation::Server(server_field_id) => {
                 DefinitionLocation::Server(self.server_field(server_field_id))
