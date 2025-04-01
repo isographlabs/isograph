@@ -3,8 +3,8 @@ use common_lang_types::{
 };
 use isograph_lang_types::{
     DefinitionLocation, LinkedFieldSelection, ObjectSelectionDirectiveSet, ScalarFieldSelection,
-    ScalarSelectionDirectiveSet, SelectionType, SelectionTypeContainingSelections,
-    UnvalidatedScalarFieldSelection,
+    ScalarSelectionDirectiveSet, SelectionType, UnvalidatedScalarFieldSelection,
+    UnvalidatedSelection,
 };
 use isograph_schema::{
     ClientFieldOrPointer, OutputFormat, RefetchStrategy, Schema, SchemaObject,
@@ -82,14 +82,7 @@ fn process_unprocessed_client_field_item<TOutputFormat: OutputFormat>(
 /// - include the selectable id in the associated data
 fn get_validated_selection_set<TOutputFormat: OutputFormat>(
     schema: &Schema<TOutputFormat>,
-    selection_set: Vec<
-        WithSpan<
-            SelectionTypeContainingSelections<
-                ScalarSelectionDirectiveSet,
-                ObjectSelectionDirectiveSet,
-            >,
-        >,
-    >,
+    selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     parent_object: &SchemaObject<TOutputFormat>,
     top_level_field_or_pointer: &impl ClientFieldOrPointer,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<Vec<WithSpan<ValidatedSelection>>> {
@@ -100,9 +93,7 @@ fn get_validated_selection_set<TOutputFormat: OutputFormat>(
 
 fn get_validated_selection<TOutputFormat: OutputFormat>(
     schema: &Schema<TOutputFormat>,
-    with_span: WithSpan<
-        SelectionTypeContainingSelections<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
-    >,
+    with_span: WithSpan<UnvalidatedSelection>,
     selection_parent_object: &SchemaObject<TOutputFormat>,
     top_level_field_or_pointer: &impl ClientFieldOrPointer,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<WithSpan<ValidatedSelection>> {

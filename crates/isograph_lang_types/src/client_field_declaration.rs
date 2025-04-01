@@ -13,20 +13,10 @@ use crate::{
     IsographFieldDirective, ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionType,
 };
 
-// This name makes no sense anymore... directives are validated!
-pub type UnvalidatedSelectionWithUnvalidatedDirectives =
+pub type UnvalidatedSelection =
     SelectionTypeContainingSelections<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>;
 
-pub type UnvalidatedSelection = SelectionTypeContainingSelections<
-    // <SchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
-    ScalarSelectionDirectiveSet,
-    // <SchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
-    ObjectSelectionDirectiveSet,
->;
-pub type UnvalidatedScalarFieldSelection = ScalarFieldSelection<
-    // <SchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
-    ScalarSelectionDirectiveSet,
->;
+pub type UnvalidatedScalarFieldSelection = ScalarFieldSelection<ScalarSelectionDirectiveSet>;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct ClientFieldDeclaration {
@@ -34,14 +24,7 @@ pub struct ClientFieldDeclaration {
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub client_field_name: WithSpan<ClientScalarSelectableName>,
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub selection_set: Vec<
-        WithSpan<
-            SelectionTypeContainingSelections<
-                ScalarSelectionDirectiveSet,
-                ObjectSelectionDirectiveSet,
-            >,
-        >,
-    >,
+    pub selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     // TODO remove, or put on a generic
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
@@ -61,14 +44,7 @@ pub struct ClientPointerDeclaration {
     pub target_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     pub client_pointer_name: WithSpan<ClientObjectSelectableName>,
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub selection_set: Vec<
-        WithSpan<
-            SelectionTypeContainingSelections<
-                ScalarSelectionDirectiveSet,
-                ObjectSelectionDirectiveSet,
-            >,
-        >,
-    >,
+    pub selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: RelativePathToSourceFile,
 

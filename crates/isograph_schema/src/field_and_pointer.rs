@@ -6,13 +6,13 @@ use common_lang_types::{
 };
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
-    ClientFieldId, ClientPointerId, SelectionType, SelectionTypeContainingSelections,
-    ServerEntityId, ServerObjectId, TypeAnnotation, VariableDefinition,
+    ClientFieldId, ClientPointerId, SelectionType, ServerEntityId, ServerObjectId, TypeAnnotation,
+    VariableDefinition,
 };
 
 use crate::{
     ClientFieldVariant, OutputFormat, RefetchStrategy, UserWrittenClientPointerInfo,
-    ValidatedLinkedFieldAssociatedData, ValidatedScalarSelectionAssociatedData,
+    ValidatedLinkedFieldAssociatedData, ValidatedScalarSelectionAssociatedData, ValidatedSelection,
 };
 
 pub type ClientFieldOrPointerId = SelectionType<ClientFieldId, ClientPointerId>;
@@ -22,14 +22,7 @@ pub struct ClientField<TOutputFormat: OutputFormat> {
     pub description: Option<DescriptionValue>,
     pub name: ClientScalarSelectableName,
     pub id: ClientFieldId,
-    pub reader_selection_set: Vec<
-        WithSpan<
-            SelectionTypeContainingSelections<
-                ValidatedScalarSelectionAssociatedData,
-                ValidatedLinkedFieldAssociatedData,
-            >,
-        >,
-    >,
+    pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 
     // None -> not refetchable
     // TODO - this is only used if variant === imperatively loaded field
@@ -57,14 +50,7 @@ pub struct ClientPointer<TOutputFormat: OutputFormat> {
     pub id: ClientPointerId,
     pub to: TypeAnnotation<ServerObjectId>,
 
-    pub reader_selection_set: Vec<
-        WithSpan<
-            SelectionTypeContainingSelections<
-                ValidatedScalarSelectionAssociatedData,
-                ValidatedLinkedFieldAssociatedData,
-            >,
-        >,
-    >,
+    pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 
     pub refetch_strategy:
         RefetchStrategy<ValidatedScalarSelectionAssociatedData, ValidatedLinkedFieldAssociatedData>,
@@ -88,14 +74,7 @@ pub trait ClientFieldOrPointer {
     fn type_and_field(&self) -> ObjectTypeAndFieldName;
     fn parent_object_id(&self) -> ServerObjectId;
     // the following are unsupported, for now, because the return values include a generic
-    fn reader_selection_set(
-        &self,
-    ) -> &[WithSpan<
-        SelectionTypeContainingSelections<
-            ValidatedScalarSelectionAssociatedData,
-            ValidatedLinkedFieldAssociatedData,
-        >,
-    >];
+    fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>];
     fn refetch_strategy(
         &self,
     ) -> Option<
@@ -104,14 +83,7 @@ pub trait ClientFieldOrPointer {
             ValidatedLinkedFieldAssociatedData,
         >,
     >;
-    fn selection_set_for_parent_query(
-        &self,
-    ) -> &[WithSpan<
-        SelectionTypeContainingSelections<
-            ValidatedScalarSelectionAssociatedData,
-            ValidatedLinkedFieldAssociatedData,
-        >,
-    >];
+    fn selection_set_for_parent_query(&self) -> &[WithSpan<ValidatedSelection>];
 
     fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityId>>];
 
@@ -139,14 +111,7 @@ impl<TOutputFormat: OutputFormat> ClientFieldOrPointer for &ClientField<TOutputF
         self.parent_object_id
     }
 
-    fn reader_selection_set(
-        &self,
-    ) -> &[WithSpan<
-        SelectionTypeContainingSelections<
-            ValidatedScalarSelectionAssociatedData,
-            ValidatedLinkedFieldAssociatedData,
-        >,
-    >] {
+    fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>] {
         &self.reader_selection_set
     }
 
@@ -161,14 +126,7 @@ impl<TOutputFormat: OutputFormat> ClientFieldOrPointer for &ClientField<TOutputF
         self.refetch_strategy.as_ref()
     }
 
-    fn selection_set_for_parent_query(
-        &self,
-    ) -> &[WithSpan<
-        SelectionTypeContainingSelections<
-            ValidatedScalarSelectionAssociatedData,
-            ValidatedLinkedFieldAssociatedData,
-        >,
-    >] {
+    fn selection_set_for_parent_query(&self) -> &[WithSpan<ValidatedSelection>] {
         match self.variant {
             ClientFieldVariant::ImperativelyLoadedField(_) => self
                 .refetch_strategy
@@ -212,14 +170,7 @@ impl<TOutputFormat: OutputFormat> ClientFieldOrPointer for &ClientPointer<TOutpu
         self.parent_object_id
     }
 
-    fn reader_selection_set(
-        &self,
-    ) -> &[WithSpan<
-        SelectionTypeContainingSelections<
-            ValidatedScalarSelectionAssociatedData,
-            ValidatedLinkedFieldAssociatedData,
-        >,
-    >] {
+    fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>] {
         &self.reader_selection_set
     }
 
@@ -234,14 +185,7 @@ impl<TOutputFormat: OutputFormat> ClientFieldOrPointer for &ClientPointer<TOutpu
         Some(&self.refetch_strategy)
     }
 
-    fn selection_set_for_parent_query(
-        &self,
-    ) -> &[WithSpan<
-        SelectionTypeContainingSelections<
-            ValidatedScalarSelectionAssociatedData,
-            ValidatedLinkedFieldAssociatedData,
-        >,
-    >] {
+    fn selection_set_for_parent_query(&self) -> &[WithSpan<ValidatedSelection>] {
         &self.reader_selection_set
     }
 
