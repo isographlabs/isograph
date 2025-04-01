@@ -12,7 +12,8 @@ use isograph_lang_types::{
 
 use crate::{
     ClientFieldVariant, OutputFormat, RefetchStrategy, UserWrittenClientPointerInfo,
-    ValidatedLinkedFieldAssociatedData, ValidatedScalarSelectionAssociatedData, ValidatedSelection,
+    ValidatedObjectSelectionAssociatedData, ValidatedScalarSelectionAssociatedData,
+    ValidatedSelection,
 };
 
 pub type ClientFieldOrPointerId = SelectionType<ClientFieldId, ClientPointerId>;
@@ -28,7 +29,10 @@ pub struct ClientField<TOutputFormat: OutputFormat> {
     // TODO - this is only used if variant === imperatively loaded field
     // consider moving it into that struct.
     pub refetch_strategy: Option<
-        RefetchStrategy<ValidatedScalarSelectionAssociatedData, ValidatedLinkedFieldAssociatedData>,
+        RefetchStrategy<
+            ValidatedScalarSelectionAssociatedData,
+            ValidatedObjectSelectionAssociatedData,
+        >,
     >,
 
     // TODO we should probably model this differently
@@ -52,8 +56,10 @@ pub struct ClientPointer<TOutputFormat: OutputFormat> {
 
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 
-    pub refetch_strategy:
-        RefetchStrategy<ValidatedScalarSelectionAssociatedData, ValidatedLinkedFieldAssociatedData>,
+    pub refetch_strategy: RefetchStrategy<
+        ValidatedScalarSelectionAssociatedData,
+        ValidatedObjectSelectionAssociatedData,
+    >,
 
     pub variable_definitions: Vec<WithSpan<VariableDefinition<ServerEntityId>>>,
 
@@ -80,7 +86,7 @@ pub trait ClientFieldOrPointer {
     ) -> Option<
         &RefetchStrategy<
             ValidatedScalarSelectionAssociatedData,
-            ValidatedLinkedFieldAssociatedData,
+            ValidatedObjectSelectionAssociatedData,
         >,
     >;
     fn selection_set_for_parent_query(&self) -> &[WithSpan<ValidatedSelection>];
@@ -120,7 +126,7 @@ impl<TOutputFormat: OutputFormat> ClientFieldOrPointer for &ClientField<TOutputF
     ) -> Option<
         &RefetchStrategy<
             ValidatedScalarSelectionAssociatedData,
-            ValidatedLinkedFieldAssociatedData,
+            ValidatedObjectSelectionAssociatedData,
         >,
     > {
         self.refetch_strategy.as_ref()
@@ -179,7 +185,7 @@ impl<TOutputFormat: OutputFormat> ClientFieldOrPointer for &ClientPointer<TOutpu
     ) -> Option<
         &RefetchStrategy<
             ValidatedScalarSelectionAssociatedData,
-            ValidatedLinkedFieldAssociatedData,
+            ValidatedObjectSelectionAssociatedData,
         >,
     > {
         Some(&self.refetch_strategy)

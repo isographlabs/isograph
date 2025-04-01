@@ -9,7 +9,7 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, ClientPointerId, DefinitionLocation, LinkedFieldSelection,
+    ArgumentKeyAndValue, ClientFieldId, ClientPointerId, DefinitionLocation, ObjectSelection,
     ObjectSelectionDirectiveSet, ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectionType,
     SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, ServerScalarId,
     ServerScalarSelectableId, VariableDefinition,
@@ -348,21 +348,19 @@ pub struct ServerFieldTypeAssociatedDataInlineFragment {
 
 pub type ValidatedSelection = SelectionTypeContainingSelections<
     ValidatedScalarSelectionAssociatedData,
-    ValidatedLinkedFieldAssociatedData,
+    ValidatedObjectSelectionAssociatedData,
 >;
 
-pub type ValidatedLinkedFieldSelection = LinkedFieldSelection<
-    ValidatedScalarSelectionAssociatedData,
-    ValidatedLinkedFieldAssociatedData,
->;
-pub type ValidatedScalarFieldSelection =
-    ScalarFieldSelection<ValidatedScalarSelectionAssociatedData>;
+pub type ValidatedObjectSelection =
+    ObjectSelection<ValidatedScalarSelectionAssociatedData, ValidatedObjectSelectionAssociatedData>;
+
+pub type ValidatedScalarSelection = ScalarFieldSelection<ValidatedScalarSelectionAssociatedData>;
 
 pub type ValidatedVariableDefinition = VariableDefinition<ServerEntityId>;
 
-pub type ValidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
+pub type ValidatedUseRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
     ValidatedScalarSelectionAssociatedData,
-    ValidatedLinkedFieldAssociatedData,
+    ValidatedObjectSelectionAssociatedData,
 >;
 
 /// The validated defined field that shows up in the TScalarField generic.
@@ -370,7 +368,7 @@ pub type ValidatedFieldDefinitionLocation =
     DefinitionLocation<ServerScalarSelectableId, ClientFieldId>;
 
 #[derive(Debug, Clone)]
-pub struct ValidatedLinkedFieldAssociatedData {
+pub struct ValidatedObjectSelectionAssociatedData {
     pub parent_object_id: ServerObjectId,
     pub field_id: DefinitionLocation<ServerScalarSelectableId, ClientPointerId>,
     pub selection_variant: ObjectSelectionDirectiveSet,

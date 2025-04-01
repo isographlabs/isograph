@@ -25,7 +25,7 @@ use crate::{
     transform_name_and_arguments_with_child_variable_context, ClientField, ClientFieldOrPointer,
     ClientFieldOrPointerId, ClientFieldVariant, ImperativelyLoadedFieldVariant, NameAndArguments,
     OutputFormat, PathToRefetchField, RootOperationName, Schema, SchemaObject,
-    SchemaServerLinkedFieldFieldVariant, ValidatedScalarFieldSelection, ValidatedSelection,
+    SchemaServerLinkedFieldFieldVariant, ValidatedScalarSelection, ValidatedSelection,
     ValidatedSelectionType, VariableContext,
 };
 
@@ -1044,7 +1044,7 @@ fn merge_non_loadable_client_type<TOutputFormat: OutputFormat>(
 }
 
 fn merge_scalar_server_field(
-    scalar_field: &ValidatedScalarFieldSelection,
+    scalar_field: &ValidatedScalarSelection,
     parent_map: &mut MergedSelectionMap,
     variable_context: &VariableContext,
 ) {

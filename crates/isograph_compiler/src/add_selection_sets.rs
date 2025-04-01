@@ -2,15 +2,15 @@ use common_lang_types::{
     IsographObjectTypeName, Location, SelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use isograph_lang_types::{
-    DefinitionLocation, LinkedFieldSelection, ObjectSelectionDirectiveSet, ScalarFieldSelection,
+    DefinitionLocation, ObjectSelection, ObjectSelectionDirectiveSet, ScalarFieldSelection,
     ScalarSelectionDirectiveSet, SelectionType, UnvalidatedScalarFieldSelection,
     UnvalidatedSelection,
 };
 use isograph_schema::{
     ClientFieldOrPointer, OutputFormat, RefetchStrategy, Schema, SchemaObject,
     UnprocessedClientFieldItem, UnprocessedItem, UseRefetchFieldRefetchStrategy,
-    ValidatedLinkedFieldAssociatedData, ValidatedLinkedFieldSelection,
-    ValidatedScalarFieldSelection, ValidatedScalarSelectionAssociatedData, ValidatedSelection,
+    ValidatedObjectSelection, ValidatedObjectSelectionAssociatedData, ValidatedScalarSelection,
+    ValidatedScalarSelectionAssociatedData, ValidatedSelection,
 };
 use thiserror::Error;
 
@@ -123,7 +123,7 @@ fn get_validated_scalar_selection<TOutputFormat: OutputFormat>(
     selection_parent_object: &SchemaObject<TOutputFormat>,
     top_level_field_or_pointer: &impl ClientFieldOrPointer,
     scalar_selection: UnvalidatedScalarFieldSelection,
-) -> AddSelectionSetsResult<ValidatedScalarFieldSelection> {
+) -> AddSelectionSetsResult<ValidatedScalarSelection> {
     let location = selection_parent_object
         .encountered_fields
         .get(&scalar_selection.name.item.into())
@@ -212,11 +212,8 @@ fn get_validated_object_selection<TOutputFormat: OutputFormat>(
     schema: &Schema<TOutputFormat>,
     selection_parent_object: &SchemaObject<TOutputFormat>,
     top_level_field_or_pointer: &impl ClientFieldOrPointer,
-    object_selection: LinkedFieldSelection<
-        ScalarSelectionDirectiveSet,
-        ObjectSelectionDirectiveSet,
-    >,
-) -> ValidateAddSelectionSetsResultWithMultipleErrors<ValidatedLinkedFieldSelection> {
+    object_selection: ObjectSelection<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
+) -> ValidateAddSelectionSetsResultWithMultipleErrors<ValidatedObjectSelection> {
     let location = selection_parent_object
         .encountered_fields
         .get(&object_selection.name.item.into())
@@ -291,10 +288,10 @@ fn get_validated_object_selection<TOutputFormat: OutputFormat>(
 
     let new_parent_object = schema.server_field_data.object(new_parent_object_id);
 
-    Ok(LinkedFieldSelection {
+    Ok(ObjectSelection {
         name: object_selection.name,
         reader_alias: object_selection.reader_alias,
-        associated_data: ValidatedLinkedFieldAssociatedData {
+        associated_data: ValidatedObjectSelectionAssociatedData {
             parent_object_id: new_parent_object_id,
             field_id: location,
             selection_variant: object_selection.associated_data,
@@ -319,7 +316,10 @@ fn get_validated_refetch_strategy<TOutputFormat: OutputFormat>(
     top_level_field_or_pointer: &impl ClientFieldOrPointer,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<
     Option<
-        RefetchStrategy<ValidatedScalarSelectionAssociatedData, ValidatedLinkedFieldAssociatedData>,
+        RefetchStrategy<
+            ValidatedScalarSelectionAssociatedData,
+            ValidatedObjectSelectionAssociatedData,
+        >,
     >,
 > {
     match refetch_strategy {

@@ -10,8 +10,8 @@ use graphql_lang_types::{
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
     from_isograph_field_directives, ClientFieldDeclaration, ClientPointerDeclaration,
-    ConstantValue, EntrypointDeclaration, IsographFieldDirective, LinkedFieldSelection,
-    NonConstantValue, ScalarFieldSelection, SelectionFieldArgument,
+    ConstantValue, EntrypointDeclaration, IsographFieldDirective, NonConstantValue,
+    ObjectSelection, ScalarFieldSelection, SelectionFieldArgument,
     SelectionTypeContainingSelections, UnvalidatedSelection, VariableDefinition,
 };
 use std::{collections::HashSet, ops::ControlFlow};
@@ -433,7 +433,7 @@ fn parse_selection(
                                 .unwrap_or_else(Span::todo_generated),
                         )
                     })?;
-                SelectionTypeContainingSelections::Object(LinkedFieldSelection {
+                SelectionTypeContainingSelections::Object(ObjectSelection {
                     name: field_name.map(|string_key| string_key.into()),
                     reader_alias: alias
                         .map(|with_span| with_span.map(|string_key| string_key.into())),

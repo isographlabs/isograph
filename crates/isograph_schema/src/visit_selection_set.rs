@@ -1,6 +1,6 @@
 use common_lang_types::WithSpan;
 use isograph_lang_types::{
-    LinkedFieldSelection, ScalarFieldSelection, SelectionType, SelectionTypeContainingSelections,
+    ObjectSelection, ScalarFieldSelection, SelectionType, SelectionTypeContainingSelections,
 };
 
 pub(crate) fn visit_selection_set<
@@ -16,7 +16,7 @@ pub(crate) fn visit_selection_set<
     visit_selection: &mut impl FnMut(
         SelectionType<
             &ScalarFieldSelection<TSelectionTypeSelectionScalarFieldAssociatedData>,
-            &LinkedFieldSelection<
+            &ObjectSelection<
                 TSelectionTypeSelectionScalarFieldAssociatedData,
                 TSelectionTypeSelectionLinkedFieldAssociatedData,
             >,

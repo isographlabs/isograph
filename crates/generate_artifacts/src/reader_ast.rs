@@ -10,8 +10,8 @@ use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, ClientField,
     ClientFieldOrPointer, ClientFieldVariant, Loadability, NameAndArguments, NormalizationKey,
     OutputFormat, PathToRefetchField, RefetchedPathsMap, Schema,
-    SchemaServerLinkedFieldFieldVariant, ValidatedLinkedFieldSelection,
-    ValidatedScalarFieldSelection, ValidatedSelection, VariableContext,
+    SchemaServerLinkedFieldFieldVariant, ValidatedObjectSelection, ValidatedScalarSelection,
+    ValidatedSelection, VariableContext,
 };
 
 use crate::{
@@ -98,7 +98,7 @@ fn generate_reader_ast_node<TOutputFormat: OutputFormat>(
 
 fn linked_field_ast_node<TOutputFormat: OutputFormat>(
     schema: &Schema<TOutputFormat>,
-    linked_field: &ValidatedLinkedFieldSelection,
+    linked_field: &ValidatedObjectSelection,
     indentation_level: u8,
     inner_reader_ast: ReaderAst,
     initial_variable_context: &VariableContext,
@@ -181,7 +181,7 @@ fn linked_field_ast_node<TOutputFormat: OutputFormat>(
 
 #[allow(clippy::too_many_arguments)]
 fn scalar_client_defined_field_ast_node<TOutputFormat: OutputFormat>(
-    scalar_field_selection: &ValidatedScalarFieldSelection,
+    scalar_field_selection: &ValidatedScalarSelection,
     schema: &Schema<TOutputFormat>,
     client_field: &ClientField<TOutputFormat>,
     indentation_level: u8,
@@ -241,7 +241,7 @@ fn scalar_client_defined_field_ast_node<TOutputFormat: OutputFormat>(
 }
 
 fn link_variant_ast_node(
-    scalar_field_selection: &ValidatedScalarFieldSelection,
+    scalar_field_selection: &ValidatedScalarSelection,
     indentation_level: u8,
 ) -> String {
     let alias = scalar_field_selection.name_or_alias().item;
@@ -258,7 +258,7 @@ fn link_variant_ast_node(
 
 #[allow(clippy::too_many_arguments)]
 fn user_written_variant_ast_node<TOutputFormat: OutputFormat>(
-    scalar_field_selection: &ValidatedScalarFieldSelection,
+    scalar_field_selection: &ValidatedScalarSelection,
     indentation_level: u8,
     nested_client_field: &ClientField<TOutputFormat>,
     schema: &Schema<TOutputFormat>,
@@ -328,7 +328,7 @@ fn imperatively_loaded_variant_ast_node<TOutputFormat: OutputFormat>(
     root_refetched_paths: &RefetchedPathsMap,
     path: &[NormalizationKey],
     indentation_level: u8,
-    scalar_field_selection: &ValidatedScalarFieldSelection,
+    scalar_field_selection: &ValidatedScalarSelection,
 ) -> String {
     let alias = scalar_field_selection.name_or_alias().item;
     let indent_1 = "  ".repeat(indentation_level as usize);
@@ -372,7 +372,7 @@ fn loadably_selected_field_ast_node<TOutputFormat: OutputFormat>(
     client_field: &ClientField<TOutputFormat>,
     reader_imports: &mut ReaderImports,
     indentation_level: u8,
-    scalar_field_selection: &ValidatedScalarFieldSelection,
+    scalar_field_selection: &ValidatedScalarSelection,
     client_field_variable_context: &VariableContext,
     loadable_directive_parameters: &LoadableDirectiveParameters,
 ) -> String {
@@ -446,7 +446,7 @@ fn loadably_selected_field_ast_node<TOutputFormat: OutputFormat>(
 }
 
 fn server_defined_scalar_field_ast_node(
-    scalar_field_selection: &ValidatedScalarFieldSelection,
+    scalar_field_selection: &ValidatedScalarSelection,
     indentation_level: u8,
     initial_variable_context: &VariableContext,
 ) -> String {

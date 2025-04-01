@@ -63,10 +63,8 @@ pub struct LoadableDirectiveParameters {
     pub lazy_load_artifact: bool,
 }
 
-pub type SelectionTypeContainingSelections<TScalarField, TLinkedField> = SelectionType<
-    ScalarFieldSelection<TScalarField>,
-    LinkedFieldSelection<TScalarField, TLinkedField>,
->;
+pub type SelectionTypeContainingSelections<TScalarField, TLinkedField> =
+    SelectionType<ScalarFieldSelection<TScalarField>, ObjectSelection<TScalarField, TLinkedField>>;
 
 impl<TScalarField, TLinkedField> SelectionTypeContainingSelections<TScalarField, TLinkedField> {
     pub fn map<TNewScalarField, TNewLinkedField>(
@@ -75,9 +73,8 @@ impl<TScalarField, TLinkedField> SelectionTypeContainingSelections<TScalarField,
             ScalarFieldSelection<TScalarField>,
         ) -> ScalarFieldSelection<TNewScalarField>,
         map_linked_field: &mut impl FnMut(
-            LinkedFieldSelection<TScalarField, TLinkedField>,
-        )
-            -> LinkedFieldSelection<TNewScalarField, TNewLinkedField>,
+            ObjectSelection<TScalarField, TLinkedField>,
+        ) -> ObjectSelection<TNewScalarField, TNewLinkedField>,
     ) -> SelectionTypeContainingSelections<TNewScalarField, TNewLinkedField> {
         match self {
             SelectionTypeContainingSelections::Scalar(s) => {
@@ -96,9 +93,9 @@ impl<TScalarField, TLinkedField> SelectionTypeContainingSelections<TScalarField,
         )
             -> Result<ScalarFieldSelection<TNewScalarField>, E>,
         and_then_linked_field: &mut impl FnMut(
-            LinkedFieldSelection<TScalarField, TLinkedField>,
+            ObjectSelection<TScalarField, TLinkedField>,
         ) -> Result<
-            LinkedFieldSelection<TNewScalarField, TNewLinkedField>,
+            ObjectSelection<TNewScalarField, TNewLinkedField>,
             E,
         >,
     ) -> Result<SelectionTypeContainingSelections<TNewScalarField, TNewLinkedField>, E> {
@@ -173,7 +170,7 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub struct LinkedFieldSelection<TScalarField, TLinkedField> {
+pub struct ObjectSelection<TScalarField, TLinkedField> {
     pub name: WithLocation<ServerObjectSelectableName>,
     pub reader_alias: Option<WithLocation<SelectableAlias>>,
     pub associated_data: TLinkedField,
@@ -181,13 +178,13 @@ pub struct LinkedFieldSelection<TScalarField, TLinkedField> {
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
 }
 
-impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField> {
+impl<TScalarField, TLinkedField> ObjectSelection<TScalarField, TLinkedField> {
     pub fn map<U, V>(
         self,
         map_scalar: &impl Fn(TScalarField) -> U,
         map_linked: &impl Fn(TLinkedField) -> V,
-    ) -> LinkedFieldSelection<U, V> {
-        LinkedFieldSelection {
+    ) -> ObjectSelection<U, V> {
+        ObjectSelection {
             name: self.name,
             reader_alias: self.reader_alias,
             associated_data: map_linked(self.associated_data),
