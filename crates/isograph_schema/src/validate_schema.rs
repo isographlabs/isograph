@@ -67,26 +67,6 @@ pub type ValidatedSelectionType<'a, TOutputFormat> =
 
 pub type ValidatedSchema<TOutputFormat> = Schema<TOutputFormat>;
 
-pub fn get_all_errors_or_all_ok<T, E>(
-    items: impl Iterator<Item = Result<T, Vec<E>>>,
-) -> Result<Vec<T>, Vec<E>> {
-    let mut oks = vec![];
-    let mut errors = vec![];
-
-    for item in items {
-        match item {
-            Ok(ok) => oks.push(ok),
-            Err(e) => errors.extend(e),
-        }
-    }
-
-    if errors.is_empty() {
-        Ok(oks)
-    } else {
-        Err(errors)
-    }
-}
-
 pub enum Loadability<'a> {
     LoadablySelectedField(&'a LoadableDirectiveParameters),
     ImperativelyLoadedField(&'a ImperativelyLoadedFieldVariant),
