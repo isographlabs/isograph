@@ -10,7 +10,7 @@ use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, ClientField,
     ClientFieldOrPointer, ClientFieldVariant, Loadability, NameAndArguments, NetworkProtocol,
     NormalizationKey, PathToRefetchField, RefetchedPathsMap, Schema,
-    SchemaServerObjectFieldFieldVariant, ValidatedObjectSelection, ValidatedScalarSelection,
+    SchemaServerObjectSelectableVariant, ValidatedObjectSelection, ValidatedScalarSelection,
     ValidatedSelection, VariableContext,
 };
 
@@ -136,7 +136,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
             match &server_field.target_server_entity {
                 SelectionType::Scalar(_) => panic!("Expected object"),
                 SelectionType::Object((linked_field_variant, _)) => match &linked_field_variant {
-                    SchemaServerObjectFieldFieldVariant::InlineFragment(inline_fragment) => {
+                    SchemaServerObjectSelectableVariant::InlineFragment(inline_fragment) => {
                         let parent_object_id = schema
                             .server_scalar_selectable(inline_fragment.server_field_id)
                             .parent_type_id;
@@ -155,7 +155,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
 
                         reader_artifact_import_name
                     }
-                    SchemaServerObjectFieldFieldVariant::LinkedField => "null".to_string(),
+                    SchemaServerObjectSelectableVariant::LinkedField => "null".to_string(),
                 },
             }
         }

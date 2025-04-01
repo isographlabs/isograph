@@ -19,7 +19,7 @@ use isograph_schema::{
     accessible_client_fields, as_server_field, description, output_type_annotation,
     selection_map_wrapped, ClientField, ClientFieldOrPointer, ClientFieldVariant,
     FieldTraversalResult, NameAndArguments, NetworkProtocol, NormalizationKey, RequiresRefinement,
-    Schema, SchemaObject, SchemaServerObjectFieldFieldVariant, UserWrittenClientTypeInfo,
+    Schema, SchemaObject, SchemaServerObjectSelectableVariant, UserWrittenClientTypeInfo,
     UserWrittenComponentVariant, ValidatedScalarSelectionAssociatedData, ValidatedSelection,
     ValidatedVariableDefinition,
 };
@@ -150,8 +150,8 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     SelectionType::Scalar(_) => {}
                     SelectionType::Object((linked_field_variant, _)) => match &linked_field_variant
                     {
-                        SchemaServerObjectFieldFieldVariant::LinkedField => {}
-                        SchemaServerObjectFieldFieldVariant::InlineFragment(inline_fragment) => {
+                        SchemaServerObjectSelectableVariant::LinkedField => {}
+                        SchemaServerObjectSelectableVariant::InlineFragment(inline_fragment) => {
                             path_and_contents.push(generate_eager_reader_condition_artifact(
                                 schema,
                                 encountered_server_field,

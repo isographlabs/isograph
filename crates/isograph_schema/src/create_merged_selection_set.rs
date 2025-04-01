@@ -25,7 +25,7 @@ use crate::{
     transform_name_and_arguments_with_child_variable_context, ClientField, ClientFieldOrPointer,
     ClientFieldOrPointerId, ClientFieldVariant, ImperativelyLoadedFieldVariant, NameAndArguments,
     NetworkProtocol, PathToRefetchField, RootOperationName, Schema, SchemaObject,
-    SchemaServerObjectFieldFieldVariant, ValidatedScalarSelection, ValidatedSelection,
+    SchemaServerObjectSelectableVariant, ValidatedScalarSelection, ValidatedSelection,
     ValidatedSelectionType, VariableContext,
 };
 
@@ -778,7 +778,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             SelectionType::Scalar(_) => {}
                             SelectionType::Object((linked_field_variant, _)) => {
                                 match &linked_field_variant {
-                                    SchemaServerObjectFieldFieldVariant::InlineFragment(
+                                    SchemaServerObjectSelectableVariant::InlineFragment(
                                         inline_fragment_variant,
                                     ) => {
                                         let type_to_refine_to = linked_field_parent_type.name;
@@ -850,7 +850,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                             }
                                         }
                                     }
-                                    SchemaServerObjectFieldFieldVariant::LinkedField => {
+                                    SchemaServerObjectSelectableVariant::LinkedField => {
                                         let normalization_key =
                                             create_transformed_name_and_arguments(
                                                 linked_field_selection.name.item.into(),

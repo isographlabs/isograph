@@ -7,7 +7,7 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    as_client_type, as_server_field, NetworkProtocol, Schema, SchemaServerObjectFieldFieldVariant,
+    as_client_type, as_server_field, NetworkProtocol, Schema, SchemaServerObjectSelectableVariant,
     ServerFieldTypeAssociatedDataInlineFragment, ServerScalarSelectable,
     ValidatedScalarSelectionAssociatedData, LINK_FIELD_NAME,
 };
@@ -96,7 +96,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 let reader_selection_set = vec![typename_selection, link_selection];
 
                 let target_server_entity = SelectionType::Object((
-                    SchemaServerObjectFieldFieldVariant::InlineFragment(
+                    SchemaServerObjectSelectableVariant::InlineFragment(
                         ServerFieldTypeAssociatedDataInlineFragment {
                             server_field_id: next_server_field_id,
                             concrete_type,

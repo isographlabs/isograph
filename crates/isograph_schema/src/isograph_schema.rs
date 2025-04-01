@@ -336,7 +336,7 @@ fn add_schema_defined_scalar_type<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[derive(Debug, Clone)]
-pub enum SchemaServerObjectFieldFieldVariant {
+pub enum SchemaServerObjectSelectableVariant {
     LinkedField,
     InlineFragment(ServerFieldTypeAssociatedDataInlineFragment),
 }
