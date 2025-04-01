@@ -17,9 +17,8 @@ use thiserror::Error;
 
 use crate::{
     schema_validation_state::SchemaValidationState, ClientField, ClientFieldVariant, ClientPointer,
-    ImperativelyLoadedFieldVariant, OutputFormat, Schema, SchemaObject, ServerFieldData,
-    ServerScalarSelectable, UnvalidatedSchema, UseRefetchFieldRefetchStrategy,
-    ValidateEntrypointDeclarationError,
+    ImperativelyLoadedFieldVariant, OutputFormat, Schema, ServerScalarSelectable,
+    UnvalidatedSchema, UseRefetchFieldRefetchStrategy, ValidateEntrypointDeclarationError,
 };
 
 pub type ValidatedSchemaServerField<TOutputFormat> = ServerScalarSelectable<TOutputFormat>;
@@ -109,90 +108,21 @@ impl<TOutputFormat: OutputFormat> ValidatedSchema<TOutputFormat> {
             server_scalar_selectables: fields,
             client_types,
             entrypoints: _,
-            server_field_data: schema_data,
-            fetchable_types: root_types,
-            ..
+            server_field_data,
+            fetchable_types,
         } = unvalidated_schema;
 
-        let ServerFieldData {
-            server_objects,
-            server_scalars,
-            defined_types,
-            id_type_id: id_type,
-            string_type_id: string_type,
-            float_type_id,
-            boolean_type_id,
-            int_type_id,
-            null_type_id,
-            ..
-        } = schema_data;
-
         if errors.is_empty() {
-            let server_objects = server_objects
-                .into_iter()
-                .map(transform_object_field_ids)
-                .collect();
-
             Ok(Self {
                 server_scalar_selectables: fields,
                 client_types,
                 entrypoints: updated_entrypoints,
-                server_field_data: ServerFieldData {
-                    server_objects,
-                    server_scalars,
-                    defined_types,
-
-                    id_type_id: id_type,
-                    string_type_id: string_type,
-                    float_type_id,
-                    boolean_type_id,
-                    int_type_id,
-                    null_type_id,
-                },
-                fetchable_types: root_types,
+                server_field_data,
+                fetchable_types,
             })
         } else {
             Err(errors)
         }
-    }
-}
-
-fn transform_object_field_ids<TOutputFormat: OutputFormat>(
-    unvalidated_object: SchemaObject<TOutputFormat>,
-) -> SchemaObject<TOutputFormat> {
-    let SchemaObject {
-        name,
-        description,
-        id,
-        encountered_fields: unvalidated_encountered_fields,
-        id_field,
-        directives,
-        concrete_type,
-        output_associated_data,
-    } = unvalidated_object;
-
-    let validated_encountered_fields = unvalidated_encountered_fields
-        .into_iter()
-        .map(|(encountered_field_name, value)| match value {
-            DefinitionLocation::Server(server_field_id) => (encountered_field_name, {
-                DefinitionLocation::Server(server_field_id)
-            }),
-            DefinitionLocation::Client(client_field_id) => (
-                encountered_field_name,
-                DefinitionLocation::Client(client_field_id),
-            ),
-        })
-        .collect();
-
-    SchemaObject {
-        description,
-        name,
-        id,
-        encountered_fields: validated_encountered_fields,
-        id_field,
-        directives,
-        concrete_type,
-        output_associated_data,
     }
 }
 
