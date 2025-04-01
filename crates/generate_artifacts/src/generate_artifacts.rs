@@ -19,7 +19,7 @@ use isograph_schema::{
     accessible_client_fields, as_server_field, description, output_type_annotation,
     selection_map_wrapped, ClientField, ClientFieldOrPointer, ClientFieldVariant,
     FieldTraversalResult, NameAndArguments, NetworkProtocol, NormalizationKey, RequiresRefinement,
-    Schema, SchemaObject, SchemaServerLinkedFieldFieldVariant, UserWrittenClientTypeInfo,
+    Schema, SchemaObject, SchemaServerObjectFieldFieldVariant, UserWrittenClientTypeInfo,
     UserWrittenComponentVariant, ValidatedScalarSelectionAssociatedData, ValidatedSelection,
     ValidatedVariableDefinition,
 };
@@ -143,14 +143,15 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
     {
         match encountered_field_id {
             DefinitionLocation::Server(encountered_server_field_id) => {
-                let encountered_server_field = schema.server_field(*encountered_server_field_id);
+                let encountered_server_field =
+                    schema.server_scalar_selectable(*encountered_server_field_id);
 
                 match &encountered_server_field.target_server_entity {
                     SelectionType::Scalar(_) => {}
                     SelectionType::Object((linked_field_variant, _)) => match &linked_field_variant
                     {
-                        SchemaServerLinkedFieldFieldVariant::LinkedField => {}
-                        SchemaServerLinkedFieldFieldVariant::InlineFragment(inline_fragment) => {
+                        SchemaServerObjectFieldFieldVariant::LinkedField => {}
+                        SchemaServerObjectFieldFieldVariant::InlineFragment(inline_fragment) => {
                             path_and_contents.push(generate_eager_reader_condition_artifact(
                                 schema,
                                 encountered_server_field,
@@ -606,7 +607,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                             .expect("parent_field should exist 1"),
                     )
                     .expect("parent_field should exist and be server field");
-                    let field = schema.server_field(*parent_field);
+                    let field = schema.server_scalar_selectable(*parent_field);
 
                     write_optional_description(
                         field.description,
@@ -649,7 +650,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
         SelectionTypeContainingSelections::Object(linked_field) => {
             let field = match linked_field.associated_data.field_id {
                 DefinitionLocation::Server(server_field_id) => {
-                    DefinitionLocation::Server(schema.server_field(server_field_id))
+                    DefinitionLocation::Server(schema.server_scalar_selectable(server_field_id))
                 }
                 DefinitionLocation::Client(client_pointer_id) => {
                     DefinitionLocation::Client(schema.client_pointer(client_pointer_id))
@@ -792,7 +793,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                             .expect("parent_field should exist 1"),
                     )
                     .expect("parent_field should exist and be server field");
-                    let field = schema.server_field(*parent_field);
+                    let field = schema.server_scalar_selectable(*parent_field);
 
                     write_optional_description(
                         field.description,

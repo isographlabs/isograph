@@ -20,7 +20,7 @@ use isograph_lang_types::{
 use isograph_schema::{
     EncounteredRootTypes, IsographObjectTypeDefinition, ProcessTypeSystemDocumentOutcome,
     ProcessedRootTypes, RootOperationName, RootTypes, Schema, SchemaObject, SchemaScalar,
-    SchemaServerLinkedFieldFieldVariant, ServerScalarSelectable, TypeRefinementMaps,
+    SchemaServerObjectFieldFieldVariant, ServerScalarSelectable, TypeRefinementMaps,
     ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE, TYPENAME_FIELD_NAME,
 };
 use lazy_static::lazy_static;
@@ -632,7 +632,7 @@ fn process_fields(
                                     .map(&mut |_| *scalar_id),
                             ),
                             SelectionType::Object(object_id) => SelectionType::Object((
-                                SchemaServerLinkedFieldFieldVariant::LinkedField,
+                                SchemaServerObjectFieldFieldVariant::LinkedField,
                                 TypeAnnotation::from_graphql_type_annotation(field.item.type_)
                                     .map(&mut |_| *object_id),
                             )),

@@ -6,7 +6,7 @@ use isograph_lang_types::{
     TypeAnnotation, VariableDefinition,
 };
 
-use crate::{NetworkProtocol, SchemaServerLinkedFieldFieldVariant};
+use crate::{NetworkProtocol, SchemaServerObjectFieldFieldVariant};
 
 // TODO convert this to two structs
 // NOTE: for the time being, despite the name, this represents both
@@ -22,7 +22,7 @@ pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub target_server_entity: SelectionType<
         TypeAnnotation<ServerScalarId>,
         (
-            SchemaServerLinkedFieldFieldVariant,
+            SchemaServerObjectFieldFieldVariant,
             TypeAnnotation<ServerObjectId>,
         ),
     >,

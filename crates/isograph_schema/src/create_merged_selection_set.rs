@@ -25,7 +25,7 @@ use crate::{
     transform_name_and_arguments_with_child_variable_context, ClientField, ClientFieldOrPointer,
     ClientFieldOrPointerId, ClientFieldVariant, ImperativelyLoadedFieldVariant, NameAndArguments,
     NetworkProtocol, PathToRefetchField, RootOperationName, Schema, SchemaObject,
-    SchemaServerLinkedFieldFieldVariant, ValidatedScalarSelection, ValidatedSelection,
+    SchemaServerObjectFieldFieldVariant, ValidatedScalarSelection, ValidatedSelection,
     ValidatedSelectionType, VariableContext,
 };
 
@@ -772,13 +772,13 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                         )
                     }
                     DefinitionLocation::Server(server_field_id) => {
-                        let server_field = schema.server_field(server_field_id);
+                        let server_field = schema.server_scalar_selectable(server_field_id);
 
                         match &server_field.target_server_entity {
                             SelectionType::Scalar(_) => {}
                             SelectionType::Object((linked_field_variant, _)) => {
                                 match &linked_field_variant {
-                                    SchemaServerLinkedFieldFieldVariant::InlineFragment(
+                                    SchemaServerObjectFieldFieldVariant::InlineFragment(
                                         inline_fragment_variant,
                                     ) => {
                                         let type_to_refine_to = linked_field_parent_type.name;
@@ -835,7 +835,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                                     variable_context,
                                                 );
 
-                                                let server_field = schema.server_field(
+                                                let server_field = schema.server_scalar_selectable(
                                                     inline_fragment_variant.server_field_id,
                                                 );
 
@@ -850,7 +850,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                             }
                                         }
                                     }
-                                    SchemaServerLinkedFieldFieldVariant::LinkedField => {
+                                    SchemaServerObjectFieldFieldVariant::LinkedField => {
                                         let normalization_key =
                                             create_transformed_name_and_arguments(
                                                 linked_field_selection.name.item.into(),
@@ -1114,7 +1114,7 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
             Entry::Vacant(vacant_entry) => {
                 // TODO why is this difficult. Can this be fixed with better modeling?
                 let name = schema
-                    .server_field(id_field.into())
+                    .server_scalar_selectable(id_field.into())
                     .name
                     .item
                     .unchecked_conversion();

@@ -82,7 +82,9 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
     server_field_id: ServerScalarSelectableId,
     indentation_level: u8,
 ) -> String {
-    let selection_type = &schema.server_field(server_field_id).target_server_entity;
+    let selection_type = &schema
+        .server_scalar_selectable(server_field_id)
+        .target_server_entity;
     let (is_optional, selection_type) = match selection_type {
         SelectionType::Scalar(type_annotation) => (
             is_nullable(type_annotation),

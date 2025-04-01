@@ -10,7 +10,7 @@ use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, ClientField,
     ClientFieldOrPointer, ClientFieldVariant, Loadability, NameAndArguments, NetworkProtocol,
     NormalizationKey, PathToRefetchField, RefetchedPathsMap, Schema,
-    SchemaServerLinkedFieldFieldVariant, ValidatedObjectSelection, ValidatedScalarSelection,
+    SchemaServerObjectFieldFieldVariant, ValidatedObjectSelection, ValidatedScalarSelection,
     ValidatedSelection, VariableContext,
 };
 
@@ -132,13 +132,13 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
             )
         }
         DefinitionLocation::Server(server_field_id) => {
-            let server_field = schema.server_field(server_field_id);
+            let server_field = schema.server_scalar_selectable(server_field_id);
             match &server_field.target_server_entity {
                 SelectionType::Scalar(_) => panic!("Expected object"),
                 SelectionType::Object((linked_field_variant, _)) => match &linked_field_variant {
-                    SchemaServerLinkedFieldFieldVariant::InlineFragment(inline_fragment) => {
+                    SchemaServerObjectFieldFieldVariant::InlineFragment(inline_fragment) => {
                         let parent_object_id = schema
-                            .server_field(inline_fragment.server_field_id)
+                            .server_scalar_selectable(inline_fragment.server_field_id)
                             .parent_type_id;
                         let object = schema.server_field_data.object(parent_object_id);
 
@@ -155,7 +155,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
 
                         reader_artifact_import_name
                     }
-                    SchemaServerLinkedFieldFieldVariant::LinkedField => "null".to_string(),
+                    SchemaServerObjectFieldFieldVariant::LinkedField => "null".to_string(),
                 },
             }
         }

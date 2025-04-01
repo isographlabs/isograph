@@ -257,7 +257,7 @@ impl ModifiedArgument {
 
                         match field {
                             PotentiallyModifiedField::Unmodified(field_id) => {
-                                let field_object = schema.server_field(*field_id);
+                                let field_object = schema.server_scalar_selectable(*field_id);
                                 if let SelectionType::Object(_) = field_object.target_server_entity
                                 {
                                     return Err(WithLocation::new(

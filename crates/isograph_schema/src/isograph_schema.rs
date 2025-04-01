@@ -178,7 +178,7 @@ pub struct ServerFieldData<TNetworkProtocol: NetworkProtocol> {
 
 impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     /// Get a reference to a given server field by its id.
-    pub fn server_field(
+    pub fn server_scalar_selectable(
         &self,
         server_field_id: ServerScalarSelectableId,
     ) -> &ServerScalarSelectable<TNetworkProtocol> {
@@ -215,7 +215,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     ) -> ObjectSelectable<TNetworkProtocol> {
         match field_id {
             DefinitionLocation::Server(server_field_id) => {
-                DefinitionLocation::Server(self.server_field(server_field_id))
+                DefinitionLocation::Server(self.server_scalar_selectable(server_field_id))
             }
             DefinitionLocation::Client(client_pointer_id) => {
                 DefinitionLocation::Client(self.client_pointer(client_pointer_id))
@@ -336,7 +336,7 @@ fn add_schema_defined_scalar_type<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[derive(Debug, Clone)]
-pub enum SchemaServerLinkedFieldFieldVariant {
+pub enum SchemaServerObjectFieldFieldVariant {
     LinkedField,
     InlineFragment(ServerFieldTypeAssociatedDataInlineFragment),
 }

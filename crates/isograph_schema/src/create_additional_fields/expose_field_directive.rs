@@ -131,7 +131,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let mutation_subfield_id = self.parse_mutation_subfield_id(*field, parent_object_id)?;
 
         // TODO do not use mutation naming here
-        let mutation_field = self.server_field(mutation_subfield_id);
+        let mutation_field = self.server_scalar_selectable(mutation_subfield_id);
         let selection_type = &mutation_field.target_server_entity;
         let (_variant, payload_object_type_annotation) = match selection_type {
             SelectionType::Scalar(_) => {
@@ -177,7 +177,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let (maybe_abstract_parent_object_id, maybe_abstract_parent_type_name) = match primary_field
         {
             Some(DefinitionLocation::Server(server_field_id)) => {
-                let server_field = self.server_field(*server_field_id);
+                let server_field = self.server_scalar_selectable(*server_field_id);
 
                 // TODO validate that the payload object has no plural fields in between
 

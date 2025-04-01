@@ -156,7 +156,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
                 ));
             }
 
-            let selection = schema.server_field(server_scalar_selectable_id);
+            let selection = schema.server_scalar_selectable(server_scalar_selectable_id);
             if let Some((_, object_id)) = selection.target_server_entity.as_object() {
                 let object = schema.server_field_data.object(*object_id.inner());
 
@@ -234,7 +234,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
 
     let (location, new_parent_object_id) = match *location {
         DefinitionLocation::Server(server_scalar_selectable_id) => {
-            let selection = schema.server_field(server_scalar_selectable_id);
+            let selection = schema.server_scalar_selectable(server_scalar_selectable_id);
             let new_parent_object_id = match &selection.target_server_entity {
                 SelectionType::Scalar(scalar) => {
                     let scalar_object_name =
