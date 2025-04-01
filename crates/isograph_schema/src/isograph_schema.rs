@@ -4,8 +4,8 @@ use std::{
 };
 
 use common_lang_types::{
-    ClientScalarSelectableName, GraphQLScalarTypeName, IsoLiteralText, SelectableName,
-    UnvalidatedTypeName,
+    ClientScalarSelectableName, GraphQLScalarTypeName, IsoLiteralText, IsographObjectTypeName,
+    JavascriptName, Location, SelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -16,11 +16,12 @@ use lazy_static::lazy_static;
 
 use crate::{
     ClientField, ClientFieldOrPointerId, ClientPointer, NormalizationKey, OutputFormat,
-    SchemaObject, SchemaScalar, SchemaType, ServerScalarSelectable,
+    SchemaObject, SchemaScalar, SchemaType, ServerScalarSelectable, ValidatedSelection,
 };
 
 lazy_static! {
     pub static ref ID_GRAPHQL_TYPE: GraphQLScalarTypeName = "ID".intern().into();
+    pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
 }
 
 #[derive(Debug, Clone)]
@@ -53,6 +54,74 @@ type SelectionTypes<TOutputFormat> =
     Vec<SelectionType<ClientField<TOutputFormat>, ClientPointer<TOutputFormat>>>;
 
 impl<TOutputFormat: OutputFormat> Schema<TOutputFormat> {
+    pub fn new() -> Self {
+        // TODO add __typename
+        let fields = vec![];
+        let client_fields = vec![];
+        let objects = vec![];
+        let mut scalars = vec![];
+        let mut defined_types = HashMap::default();
+
+        let id_type_id = add_schema_defined_scalar_type(
+            &mut scalars,
+            &mut defined_types,
+            "ID",
+            *STRING_JAVASCRIPT_TYPE,
+        );
+        let string_type_id = add_schema_defined_scalar_type(
+            &mut scalars,
+            &mut defined_types,
+            "String",
+            *STRING_JAVASCRIPT_TYPE,
+        );
+        let boolean_type_id = add_schema_defined_scalar_type(
+            &mut scalars,
+            &mut defined_types,
+            "Boolean",
+            "boolean".intern().into(),
+        );
+        let float_type_id = add_schema_defined_scalar_type(
+            &mut scalars,
+            &mut defined_types,
+            "Float",
+            "number".intern().into(),
+        );
+        let int_type_id = add_schema_defined_scalar_type(
+            &mut scalars,
+            &mut defined_types,
+            "Int",
+            "number".intern().into(),
+        );
+        let null_type_id = add_schema_defined_scalar_type(
+            &mut scalars,
+            &mut defined_types,
+            // The Null type should never be printed, at least for GraphQL.
+            // TODO we should make this an Option and emit an error (or less
+            // ideally, panic) if this is printed.
+            "NullDoesNotExistIfThisIsPrintedThisIsABug",
+            "number".intern().into(),
+        );
+
+        Self {
+            server_scalar_selectables: fields,
+            client_types: client_fields,
+            entrypoints: Default::default(),
+            server_field_data: ServerFieldData {
+                server_objects: objects,
+                server_scalars: scalars,
+                defined_types,
+
+                id_type_id,
+                string_type_id,
+                int_type_id,
+                float_type_id,
+                boolean_type_id,
+                null_type_id,
+            },
+            fetchable_types: BTreeMap::new(),
+        }
+    }
+
     /// This is a smell, and we should refactor away from it, or all schema's
     /// should have a root type.
     pub fn query_id(&self) -> ServerObjectId {
@@ -231,4 +300,40 @@ impl NameAndArguments {
             NormalizationKey::ServerField(self.clone())
         }
     }
+}
+
+fn add_schema_defined_scalar_type<TOutputFormat: OutputFormat>(
+    scalars: &mut Vec<SchemaScalar<TOutputFormat>>,
+    defined_types: &mut HashMap<UnvalidatedTypeName, ServerEntityId>,
+    field_name: &'static str,
+    javascript_name: JavascriptName,
+) -> ServerScalarId {
+    let scalar_id = scalars.len().into();
+
+    // TODO this is problematic, we have no span (or really, no location) associated with this
+    // schema-defined scalar, so we will not be able to properly show error messages if users
+    // e.g. have Foo implements String
+    let typename = WithLocation::new(field_name.intern().into(), Location::generated());
+    scalars.push(SchemaScalar {
+        description: None,
+        name: typename,
+        id: scalar_id,
+        javascript_name,
+        output_format: std::marker::PhantomData,
+    });
+    defined_types.insert(typename.item.into(), ServerEntityId::Scalar(scalar_id));
+    scalar_id
+}
+
+#[derive(Debug, Clone)]
+pub enum SchemaServerLinkedFieldFieldVariant {
+    LinkedField,
+    InlineFragment(ServerFieldTypeAssociatedDataInlineFragment),
+}
+
+#[derive(Debug, Clone)]
+pub struct ServerFieldTypeAssociatedDataInlineFragment {
+    pub server_field_id: ServerScalarSelectableId,
+    pub concrete_type: IsographObjectTypeName,
+    pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 }
