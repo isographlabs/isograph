@@ -1,4 +1,6 @@
-use common_lang_types::{Location, WithLocation, WithSpan};
+use common_lang_types::{
+    IsographObjectTypeName, Location, SelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
+};
 use isograph_lang_types::{
     DefinitionLocation, LinkedFieldSelection, ObjectSelectionDirectiveSet, ScalarFieldSelection,
     ScalarSelectionDirectiveSet, SelectionType, SelectionTypeContainingSelections,
@@ -7,18 +9,18 @@ use isograph_lang_types::{
 use isograph_schema::{
     ClientFieldOrPointer, OutputFormat, RefetchStrategy, Schema, SchemaObject,
     UnprocessedClientFieldItem, UnprocessedItem, UseRefetchFieldRefetchStrategy,
-    ValidateSchemaError, ValidateSchemaResult, ValidatedLinkedFieldAssociatedData,
-    ValidatedLinkedFieldSelection, ValidatedScalarFieldSelection,
-    ValidatedScalarSelectionAssociatedData, ValidatedSelection,
+    ValidatedLinkedFieldAssociatedData, ValidatedLinkedFieldSelection,
+    ValidatedScalarFieldSelection, ValidatedScalarSelectionAssociatedData, ValidatedSelection,
 };
+use thiserror::Error;
 
-pub type ValidateSchemaResultWithMultipleErrors<T> =
-    Result<T, Vec<WithLocation<ValidateSchemaError>>>;
+pub type ValidateAddSelectionSetsResultWithMultipleErrors<T> =
+    Result<T, Vec<WithLocation<AddSelectionSetsError>>>;
 
 pub(crate) fn add_selection_sets_to_client_selectables<TOutputFormat: OutputFormat>(
     schema: &mut Schema<TOutputFormat>,
     unprocessed_items: Vec<UnprocessedItem>,
-) -> ValidateSchemaResultWithMultipleErrors<()> {
+) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
     let mut errors = vec![];
     for unprocessed_item in unprocessed_items {
         match unprocessed_item {
@@ -44,7 +46,7 @@ pub(crate) fn add_selection_sets_to_client_selectables<TOutputFormat: OutputForm
 fn process_unprocessed_client_field_item<TOutputFormat: OutputFormat>(
     schema: &mut Schema<TOutputFormat>,
     unprocessed_item: UnprocessedClientFieldItem,
-) -> ValidateSchemaResultWithMultipleErrors<()> {
+) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
     let client_field = schema.client_field(unprocessed_item.client_field_id);
     let parent_object = schema
         .server_field_data
@@ -90,7 +92,7 @@ fn get_validated_selection_set<TOutputFormat: OutputFormat>(
     >,
     parent_object: &SchemaObject<TOutputFormat>,
     top_level_field_or_pointer: &impl ClientFieldOrPointer,
-) -> ValidateSchemaResultWithMultipleErrors<Vec<WithSpan<ValidatedSelection>>> {
+) -> ValidateAddSelectionSetsResultWithMultipleErrors<Vec<WithSpan<ValidatedSelection>>> {
     get_all_errors_or_all_ok(selection_set.into_iter().map(|selection| {
         get_validated_selection(schema, selection, parent_object, top_level_field_or_pointer)
     }))
@@ -103,7 +105,7 @@ fn get_validated_selection<TOutputFormat: OutputFormat>(
     >,
     selection_parent_object: &SchemaObject<TOutputFormat>,
     top_level_field_or_pointer: &impl ClientFieldOrPointer,
-) -> ValidateSchemaResultWithMultipleErrors<WithSpan<ValidatedSelection>> {
+) -> ValidateAddSelectionSetsResultWithMultipleErrors<WithSpan<ValidatedSelection>> {
     with_span.and_then(|selection| match selection {
         SelectionType::Scalar(scalar_selection) => Ok(SelectionType::Scalar(
             get_validated_scalar_selection(
@@ -130,13 +132,13 @@ fn get_validated_scalar_selection<TOutputFormat: OutputFormat>(
     selection_parent_object: &SchemaObject<TOutputFormat>,
     top_level_field_or_pointer: &impl ClientFieldOrPointer,
     scalar_selection: UnvalidatedScalarFieldSelection,
-) -> ValidateSchemaResult<ValidatedScalarFieldSelection> {
+) -> AddSelectionSetsResult<ValidatedScalarFieldSelection> {
     let location = selection_parent_object
         .encountered_fields
         .get(&scalar_selection.name.item.into())
         .ok_or_else(|| {
             WithLocation::new(
-                ValidateSchemaError::SelectionTypeSelectionFieldDoesNotExist {
+                AddSelectionSetsError::SelectionTypeSelectionFieldDoesNotExist {
                     client_field_parent_type_name: top_level_field_or_pointer
                         .type_and_field()
                         .type_name,
@@ -156,7 +158,7 @@ fn get_validated_scalar_selection<TOutputFormat: OutputFormat>(
                 ScalarSelectionDirectiveSet::Loadable(_)
             ) {
                 return Err(WithLocation::new(
-                    ValidateSchemaError::ServerFieldCannotBeSelectedLoadably {
+                    AddSelectionSetsError::ServerFieldCannotBeSelectedLoadably {
                         server_field_name: scalar_selection.name.item.into(),
                     },
                     scalar_selection.name.location,
@@ -168,7 +170,7 @@ fn get_validated_scalar_selection<TOutputFormat: OutputFormat>(
                 let object = schema.server_field_data.object(*object_id.inner());
 
                 return Err(WithLocation::new(
-                    ValidateSchemaError::SelectionTypeSelectionFieldIsNotScalar {
+                    AddSelectionSetsError::SelectionTypeSelectionFieldIsNotScalar {
                         client_field_parent_type_name: top_level_field_or_pointer
                             .type_and_field()
                             .type_name,
@@ -188,7 +190,7 @@ fn get_validated_scalar_selection<TOutputFormat: OutputFormat>(
         DefinitionLocation::Client(client_type) => {
             let client_field_id = *client_type.as_scalar().ok_or_else(|| {
                 WithLocation::new(
-                    ValidateSchemaError::SelectionTypeSelectionClientPointerSelectedAsScalar {
+                    AddSelectionSetsError::SelectionTypeSelectionClientPointerSelectedAsScalar {
                         client_field_parent_type_name: top_level_field_or_pointer
                             .type_and_field()
                             .type_name,
@@ -223,13 +225,13 @@ fn get_validated_object_selection<TOutputFormat: OutputFormat>(
         ScalarSelectionDirectiveSet,
         ObjectSelectionDirectiveSet,
     >,
-) -> ValidateSchemaResultWithMultipleErrors<ValidatedLinkedFieldSelection> {
+) -> ValidateAddSelectionSetsResultWithMultipleErrors<ValidatedLinkedFieldSelection> {
     let location = selection_parent_object
         .encountered_fields
         .get(&object_selection.name.item.into())
         .ok_or_else(|| {
             vec![WithLocation::new(
-                ValidateSchemaError::SelectionTypeSelectionFieldDoesNotExist {
+                AddSelectionSetsError::SelectionTypeSelectionFieldDoesNotExist {
                     client_field_parent_type_name: top_level_field_or_pointer
                         .type_and_field()
                         .type_name,
@@ -251,7 +253,7 @@ fn get_validated_object_selection<TOutputFormat: OutputFormat>(
                         schema.server_field_data.scalar(*scalar.inner()).name.item;
 
                     return Err(vec![WithLocation::new(
-                        ValidateSchemaError::SelectionTypeSelectionFieldIsScalar {
+                        AddSelectionSetsError::SelectionTypeSelectionFieldIsScalar {
                             client_field_parent_type_name: top_level_field_or_pointer
                                 .type_and_field()
                                 .type_name,
@@ -275,7 +277,7 @@ fn get_validated_object_selection<TOutputFormat: OutputFormat>(
         DefinitionLocation::Client(client_type) => {
             let client_pointer_id = *client_type.as_object().ok_or_else(|| {
                 vec![WithLocation::new(
-                    ValidateSchemaError::SelectionTypeSelectionClientPointerSelectedAsScalar {
+                    AddSelectionSetsError::SelectionTypeSelectionClientPointerSelectedAsScalar {
                         client_field_parent_type_name: top_level_field_or_pointer
                             .type_and_field()
                             .type_name,
@@ -324,7 +326,7 @@ fn get_validated_refetch_strategy<TOutputFormat: OutputFormat>(
     >,
     parent_object: &SchemaObject<TOutputFormat>,
     top_level_field_or_pointer: &impl ClientFieldOrPointer,
-) -> ValidateSchemaResultWithMultipleErrors<
+) -> ValidateAddSelectionSetsResultWithMultipleErrors<
     Option<
         RefetchStrategy<ValidatedScalarSelectionAssociatedData, ValidatedLinkedFieldAssociatedData>,
     >,
@@ -365,4 +367,67 @@ pub fn get_all_errors_or_all_ok<T, E>(
     } else {
         Err(errors)
     }
+}
+
+type AddSelectionSetsResult<T> = Result<T, WithLocation<AddSelectionSetsError>>;
+
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+pub enum AddSelectionSetsError {
+    #[error(
+        "In the client {client_type} `{client_field_parent_type_name}.{client_field_name}`, \
+        the field `{field_parent_type_name}.{field_name}` is selected, but that \
+        field does not exist on `{field_parent_type_name}`"
+    )]
+    SelectionTypeSelectionFieldDoesNotExist {
+        client_field_parent_type_name: IsographObjectTypeName,
+        client_field_name: SelectableName,
+        field_parent_type_name: IsographObjectTypeName,
+        field_name: SelectableName,
+        client_type: String,
+    },
+
+    #[error(
+        "In the client {client_type} `{client_field_parent_type_name}.{client_field_name}`, \
+        the field `{field_parent_type_name}.{field_name}` is selected as a scalar, \
+        but that field's type is `{target_type_name}`, which is {field_type}."
+    )]
+    SelectionTypeSelectionFieldIsNotScalar {
+        client_field_parent_type_name: IsographObjectTypeName,
+        client_field_name: SelectableName,
+        field_parent_type_name: IsographObjectTypeName,
+        field_name: SelectableName,
+        field_type: &'static str,
+        target_type_name: UnvalidatedTypeName,
+        client_type: String,
+    },
+
+    #[error(
+        "In the client {client_type} `{client_field_parent_type_name}.{client_field_name}`, \
+        the field `{field_parent_type_name}.{field_name}` is selected as a linked field, \
+        but that field's type is `{target_type_name}`, which is a scalar."
+    )]
+    SelectionTypeSelectionFieldIsScalar {
+        client_field_parent_type_name: IsographObjectTypeName,
+        client_field_name: SelectableName,
+        field_parent_type_name: IsographObjectTypeName,
+        field_name: SelectableName,
+        target_type_name: UnvalidatedTypeName,
+        client_type: String,
+    },
+
+    #[error(
+        "In the client {client_type} `{client_field_parent_type_name}.{client_field_name}`, the \
+        pointer `{field_parent_type_name}.{field_name}` is selected as a scalar. \
+        However, client pointers can only be selected as linked fields."
+    )]
+    SelectionTypeSelectionClientPointerSelectedAsScalar {
+        client_field_parent_type_name: IsographObjectTypeName,
+        client_field_name: SelectableName,
+        field_parent_type_name: IsographObjectTypeName,
+        field_name: SelectableName,
+        client_type: String,
+    },
+
+    #[error("`{server_field_name}` is a server field, and cannot be selected with `@loadable`")]
+    ServerFieldCannotBeSelectedLoadably { server_field_name: SelectableName },
 }

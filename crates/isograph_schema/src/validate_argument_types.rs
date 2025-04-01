@@ -1,12 +1,13 @@
 use common_lang_types::{
-    EnumLiteralValue, Location, SelectableName, UnvalidatedTypeName, ValueKeyName, VariableName,
-    WithLocation, WithSpan,
+    EnumLiteralValue, GraphQLScalarTypeName, Location, SelectableName, UnvalidatedTypeName,
+    ValueKeyName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
     GraphQLTypeAnnotation, NameValuePair,
 };
 use std::collections::BTreeMap;
+use thiserror::Error;
 
 use isograph_lang_types::{
     graphql_type_annotation_from_type_annotation, DefinitionLocation, NonConstantValue,
@@ -16,7 +17,7 @@ use isograph_lang_types::{
 
 use crate::{
     as_server_field, ClientFieldOrPointerId, OutputFormat, SchemaObject, ServerFieldData,
-    ServerScalarSelectable, ValidateSchemaError, ValidateSchemaResult, ValidatedVariableDefinition,
+    ServerScalarSelectable, ValidatedVariableDefinition,
 };
 
 fn graphql_type_to_non_null_type<TValue>(
@@ -43,13 +44,13 @@ fn scalar_literal_satisfies_type<TOutputFormat: OutputFormat>(
     type_: &GraphQLTypeAnnotation<ServerEntityId>,
     schema_data: &ServerFieldData<TOutputFormat>,
     location: Location,
-) -> Result<(), WithLocation<ValidateSchemaError>> {
+) -> Result<(), WithLocation<ValidateArgumentTypesError>> {
     match graphql_type_to_non_null_type(type_.clone()) {
         GraphQLNonNullTypeAnnotation::List(_) => {
             let actual = schema_data.scalar(*scalar_literal).name.item;
 
             Err(WithLocation::new(
-                ValidateSchemaError::ExpectedTypeFoundScalar {
+                ValidateArgumentTypesError::ExpectedTypeFoundScalar {
                     expected: id_annotation_to_typename_annotation(type_, schema_data),
                     actual,
                 },
@@ -66,7 +67,7 @@ fn scalar_literal_satisfies_type<TOutputFormat: OutputFormat>(
                 let expected = id_annotation_to_typename_annotation(type_, schema_data);
 
                 Err(WithLocation::new(
-                    ValidateSchemaError::ExpectedTypeFoundScalar { expected, actual },
+                    ValidateArgumentTypesError::ExpectedTypeFoundScalar { expected, actual },
                     location,
                 ))
             }
@@ -76,7 +77,7 @@ fn scalar_literal_satisfies_type<TOutputFormat: OutputFormat>(
                 let expected = id_annotation_to_typename_annotation(type_, schema_data);
 
                 Err(WithLocation::new(
-                    ValidateSchemaError::ExpectedTypeFoundScalar { expected, actual },
+                    ValidateArgumentTypesError::ExpectedTypeFoundScalar { expected, actual },
                     location,
                 ))
             }
@@ -129,7 +130,7 @@ pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     schema_data: &ServerFieldData<TOutputFormat>,
     server_fields: &[ServerScalarSelectable<TOutputFormat>],
-) -> ValidateSchemaResult<()> {
+) -> ValidateArgumentTypesResult<()> {
     match &selection_supplied_argument_value.item {
         NonConstantValue::Variable(variable_name) => {
             let variable_type = get_variable_type(
@@ -148,7 +149,7 @@ pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
                 let actual = id_annotation_to_typename_annotation(variable_type, schema_data);
 
                 Err(WithLocation::new(
-                    ValidateSchemaError::ExpectedTypeFoundVariable {
+                    ValidateArgumentTypesError::ExpectedTypeFoundVariable {
                         expected_type: expected,
                         variable_type: actual,
                         variable_name: *variable_name,
@@ -211,7 +212,7 @@ pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
         NonConstantValue::Enum(enum_literal_value) => {
             match graphql_type_to_non_null_type(field_argument_definition_type.clone()) {
                 GraphQLNonNullTypeAnnotation::List(_) => Err(WithLocation::new(
-                    ValidateSchemaError::ExpectedTypeFoundEnum {
+                    ValidateArgumentTypesError::ExpectedTypeFoundEnum {
                         expected: id_annotation_to_typename_annotation(
                             field_argument_definition_type,
                             schema_data,
@@ -233,7 +234,7 @@ pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
                 Ok(())
             } else {
                 Err(WithLocation::new(
-                    ValidateSchemaError::ExpectedNonNullTypeFoundNull {
+                    ValidateArgumentTypesError::ExpectedNonNullTypeFoundNull {
                         expected: id_annotation_to_typename_annotation(
                             field_argument_definition_type,
                             schema_data,
@@ -253,7 +254,7 @@ pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
                     server_fields,
                 ),
                 GraphQLNonNullTypeAnnotation::Named(_) => Err(WithLocation::new(
-                    ValidateSchemaError::ExpectedTypeFoundList {
+                    ValidateArgumentTypesError::ExpectedTypeFoundList {
                         expected: id_annotation_to_typename_annotation(
                             field_argument_definition_type,
                             schema_data,
@@ -266,7 +267,7 @@ pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
         NonConstantValue::Object(object_literal) => {
             match graphql_type_to_non_null_type(field_argument_definition_type.clone()) {
                 GraphQLNonNullTypeAnnotation::List(_) => Err(WithLocation::new(
-                    ValidateSchemaError::ExpectedTypeFoundObject {
+                    ValidateArgumentTypesError::ExpectedTypeFoundObject {
                         expected: id_annotation_to_typename_annotation(
                             field_argument_definition_type,
                             schema_data,
@@ -276,7 +277,7 @@ pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
                 )),
                 GraphQLNonNullTypeAnnotation::Named(named_type) => match named_type.0.item {
                     SelectionType::Scalar(_) => Err(WithLocation::new(
-                        ValidateSchemaError::ExpectedTypeFoundObject {
+                        ValidateArgumentTypesError::ExpectedTypeFoundObject {
                             expected: id_annotation_to_typename_annotation(
                                 field_argument_definition_type,
                                 schema_data,
@@ -305,7 +306,7 @@ fn object_satisfies_type<TOutputFormat: OutputFormat>(
     server_fields: &[ServerScalarSelectable<TOutputFormat>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     object_id: ServerObjectId,
-) -> Result<(), WithLocation<ValidateSchemaError>> {
+) -> Result<(), WithLocation<ValidateArgumentTypesError>> {
     let object = schema_data.object(object_id);
     validate_no_extraneous_fields(
         &object.encountered_fields,
@@ -338,7 +339,7 @@ fn object_satisfies_type<TOutputFormat: OutputFormat>(
         Ok(())
     } else {
         Err(WithLocation::new(
-            ValidateSchemaError::MissingFields {
+            ValidateArgumentTypesError::MissingFields {
                 missing_fields_names: missing_fields,
             },
             selection_supplied_argument_value.location,
@@ -406,7 +407,7 @@ fn validate_no_extraneous_fields(
     >,
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     location: Location,
-) -> ValidateSchemaResult<()> {
+) -> ValidateArgumentTypesResult<()> {
     let extra_fields: Vec<_> = object_literal
         .iter()
         .filter_map(|field| {
@@ -423,7 +424,7 @@ fn validate_no_extraneous_fields(
 
     if !extra_fields.is_empty() {
         return Err(WithLocation::new(
-            ValidateSchemaError::ExtraneousFields { extra_fields },
+            ValidateArgumentTypesError::ExtraneousFields { extra_fields },
             location,
         ));
     }
@@ -445,7 +446,7 @@ fn enum_satisfies_type<TOutputFormat: OutputFormat>(
     enum_type: &GraphQLNamedTypeAnnotation<ServerEntityId>,
     schema_data: &ServerFieldData<TOutputFormat>,
     location: Location,
-) -> ValidateSchemaResult<()> {
+) -> ValidateArgumentTypesResult<()> {
     match enum_type.item {
         SelectionType::Object(object_id) => {
             let expected = GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
@@ -455,7 +456,7 @@ fn enum_satisfies_type<TOutputFormat: OutputFormat>(
             ));
 
             Err(WithLocation::new(
-                ValidateSchemaError::ExpectedTypeFoundEnum {
+                ValidateArgumentTypesError::ExpectedTypeFoundEnum {
                     expected,
                     actual: *enum_literal_value,
                 },
@@ -474,7 +475,7 @@ fn list_satisfies_type<TOutputFormat: OutputFormat>(
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     schema_data: &ServerFieldData<TOutputFormat>,
     server_fields: &[ServerScalarSelectable<TOutputFormat>],
-) -> ValidateSchemaResult<()> {
+) -> ValidateArgumentTypesResult<()> {
     list.iter().try_for_each(|element| {
         value_satisfies_type(
             element,
@@ -490,17 +491,75 @@ fn get_variable_type<'a>(
     variable_name: &'a VariableName,
     variable_definitions: &'a [WithSpan<ValidatedVariableDefinition>],
     location: Location,
-) -> ValidateSchemaResult<&'a GraphQLTypeAnnotation<ServerEntityId>> {
+) -> ValidateArgumentTypesResult<&'a GraphQLTypeAnnotation<ServerEntityId>> {
     match variable_definitions
         .iter()
         .find(|definition| definition.item.name.item == *variable_name)
     {
         Some(variable) => Ok(&variable.item.type_),
         None => Err(WithLocation::new(
-            ValidateSchemaError::UsedUndefinedVariable {
+            ValidateArgumentTypesError::UsedUndefinedVariable {
                 undefined_variable: *variable_name,
             },
             location,
         )),
     }
+}
+
+type ValidateArgumentTypesResult<T> = Result<T, WithLocation<ValidateArgumentTypesError>>;
+
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+pub enum ValidateArgumentTypesError {
+    #[error("Expected input of type {expected_type}, found variable {variable_name} of type {variable_type}")]
+    ExpectedTypeFoundVariable {
+        expected_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+        variable_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+        variable_name: VariableName,
+    },
+
+    #[error("Expected input of type {expected}, found {actual} scalar literal")]
+    ExpectedTypeFoundScalar {
+        expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+        actual: GraphQLScalarTypeName,
+    },
+
+    #[error("Expected input of type {expected}, found object literal")]
+    ExpectedTypeFoundObject {
+        expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+    },
+
+    #[error("Expected input of type {expected}, found list literal")]
+    ExpectedTypeFoundList {
+        expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+    },
+
+    #[error("Expected non null input of type {expected}, found null")]
+    ExpectedNonNullTypeFoundNull {
+        expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+    },
+
+    #[error("Expected input of type {expected}, found {actual} enum literal")]
+    ExpectedTypeFoundEnum {
+        expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+        actual: EnumLiteralValue,
+    },
+
+    #[error("This variable is not defined: ${undefined_variable}")]
+    UsedUndefinedVariable { undefined_variable: VariableName },
+
+    #[error(
+        "This object has missing fields: {0}",
+        missing_fields_names.iter().map(|field_name| format!("${}", field_name)).collect::<Vec<_>>().join(", ")
+    )]
+    MissingFields {
+        missing_fields_names: Vec<SelectableName>,
+    },
+
+    #[error(
+        "This object has extra fields: {0}",
+        extra_fields.iter().map(|field| format!("{}", field.name.item)).collect::<Vec<_>>().join(", ")
+    )]
+    ExtraneousFields {
+        extra_fields: Vec<NameValuePair<ValueKeyName, NonConstantValue>>,
+    },
 }

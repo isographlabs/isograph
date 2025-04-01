@@ -1,7 +1,8 @@
 use std::collections::BTreeSet;
 
 use common_lang_types::{
-    FieldArgumentName, Location, ObjectTypeAndFieldName, VariableName, WithLocation, WithSpan,
+    FieldArgumentName, IsographObjectTypeName, Location, ObjectTypeAndFieldName, SelectableName,
+    VariableName, WithLocation, WithSpan,
 };
 
 use intern::string_key::Intern;
@@ -10,11 +11,12 @@ use isograph_lang_types::{
     SelectionType,
 };
 use lazy_static::lazy_static;
+use thiserror::Error;
 
 use crate::{
-    validate_argument_types::value_satisfies_type, visit_selection_set::visit_selection_set,
-    ClientFieldOrPointer, OutputFormat, Schema, ValidateSchemaError, ValidateSchemaResult,
-    ValidatedVariableDefinition,
+    validate_argument_types::{value_satisfies_type, ValidateArgumentTypesError},
+    visit_selection_set::visit_selection_set,
+    ClientFieldOrPointer, OutputFormat, Schema, ValidatedVariableDefinition,
 };
 
 type UsedVariables = BTreeSet<VariableName>;
@@ -35,7 +37,7 @@ lazy_static! {
 /// fields that point to client objects.)
 pub fn validate_use_of_arguments<TOutputFormat: OutputFormat>(
     validated_schema: &Schema<TOutputFormat>,
-) -> Result<(), Vec<WithLocation<ValidateSchemaError>>> {
+) -> Result<(), Vec<WithLocation<ValidateUseOfArgumentsError>>> {
     let mut errors = vec![];
     for client_type in &validated_schema.client_types {
         match client_type {
@@ -66,7 +68,7 @@ pub fn validate_use_of_arguments<TOutputFormat: OutputFormat>(
 fn validate_use_of_arguments_for_client_type<TOutputFormat: OutputFormat>(
     schema: &Schema<TOutputFormat>,
     client_type: impl ClientFieldOrPointer,
-    errors: &mut Vec<WithLocation<ValidateSchemaError>>,
+    errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError>>,
 ) {
     let mut reachable_variables = BTreeSet::new();
 
@@ -151,7 +153,7 @@ fn validate_use_of_arguments_for_client_type<TOutputFormat: OutputFormat>(
 #[allow(clippy::too_many_arguments)]
 fn validate_use_of_arguments_impl<TOutputFormat: OutputFormat>(
     schema: &Schema<TOutputFormat>,
-    errors: &mut Vec<WithLocation<ValidateSchemaError>>,
+    errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError>>,
     reachable_variables: &mut BTreeSet<VariableName>,
     field_argument_definitions: Vec<&ValidatedVariableDefinition>,
     client_type_variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
@@ -177,7 +179,8 @@ fn validate_use_of_arguments_impl<TOutputFormat: OutputFormat>(
                         client_type_variable_definitions,
                         &schema.server_field_data,
                         &schema.server_scalar_selectables,
-                    ),
+                    )
+                    .map_err(|with_location| with_location.map(|e| e.into())),
                 );
             }
         }
@@ -207,7 +210,7 @@ fn validate_all_variables_are_used(
     used_variables: UsedVariables,
     top_level_type_and_field_name: ObjectTypeAndFieldName,
     location: Location,
-) -> ValidateSchemaResult<()> {
+) -> ValidateUseOfArgumentsResult<()> {
     let unused_variables = variable_definitions
         .iter()
         .filter_map(|variable| {
@@ -222,7 +225,7 @@ fn validate_all_variables_are_used(
 
     if !unused_variables.is_empty() {
         return Err(WithLocation::new(
-            ValidateSchemaError::UnusedVariables {
+            ValidateUseOfArgumentsError::UnusedVariables {
                 unused_variables,
                 type_name: top_level_type_and_field_name.type_name,
                 field_name: top_level_type_and_field_name.field_name,
@@ -236,10 +239,10 @@ fn validate_all_variables_are_used(
 fn assert_no_missing_arguments(
     missing_arguments: Vec<ValidatedVariableDefinition>,
     location: Location,
-) -> ValidateSchemaResult<()> {
+) -> ValidateUseOfArgumentsResult<()> {
     if !missing_arguments.is_empty() {
         return Err(WithLocation::new(
-            ValidateSchemaError::MissingArguments { missing_arguments },
+            ValidateUseOfArgumentsError::MissingArguments { missing_arguments },
             location,
         ));
     }
@@ -284,7 +287,7 @@ fn validate_no_extraneous_arguments(
     field_argument_definitions: &[&ValidatedVariableDefinition],
     selection_supplied_arguments: &[WithLocation<SelectionFieldArgument>],
     location: Location,
-) -> ValidateSchemaResult<()> {
+) -> ValidateUseOfArgumentsResult<()> {
     let extra_arguments: Vec<_> = selection_supplied_arguments
         .iter()
         .filter_map(|arg| {
@@ -310,7 +313,7 @@ fn validate_no_extraneous_arguments(
 
     if !extra_arguments.is_empty() {
         return Err(WithLocation::new(
-            ValidateSchemaError::ExtraneousArgument { extra_arguments },
+            ValidateUseOfArgumentsError::ExtraneousArgument { extra_arguments },
             location,
         ));
     }
@@ -353,4 +356,41 @@ fn maybe_push_errors<E>(errors: &mut Vec<E>, result: Result<(), E>) {
     if let Err(e) = result {
         errors.push(e)
     }
+}
+
+type MissingArguments = Vec<ValidatedVariableDefinition>;
+
+type ValidateUseOfArgumentsResult<T> = Result<T, WithLocation<ValidateUseOfArgumentsError>>;
+
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+pub enum ValidateUseOfArgumentsError {
+    #[error(
+        "This field has missing arguments: {0}",
+        missing_arguments.iter().map(|arg| format!("${}", arg.name.item)).collect::<Vec<_>>().join(", ")
+    )]
+    MissingArguments { missing_arguments: MissingArguments },
+
+    #[error(
+        "This field has extra arguments: {0}",
+        extra_arguments.iter().map(|arg| format!("{}", arg.item.name)).collect::<Vec<_>>().join(", ")
+    )]
+    ExtraneousArgument {
+        extra_arguments: Vec<WithLocation<SelectionFieldArgument>>,
+    },
+
+    #[error(
+        "The field `{type_name}.{field_name}` has unused variables: {0}",
+        unused_variables.iter().map(|variable| format!("${}", variable.item.name.item)).collect::<Vec<_>>().join(", ")
+    )]
+    UnusedVariables {
+        unused_variables: Vec<WithSpan<ValidatedVariableDefinition>>,
+        type_name: IsographObjectTypeName,
+        field_name: SelectableName,
+    },
+
+    #[error("{message}")]
+    ValidateArgumentType {
+        #[from]
+        message: ValidateArgumentTypesError,
+    },
 }
