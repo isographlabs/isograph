@@ -9,7 +9,6 @@ mod output_format;
 mod process_client_field_declaration;
 mod refetch_strategy;
 mod root_types;
-mod schema_validation_state;
 mod server_scalar_and_object;
 mod server_selectables;
 mod unvalidated_schema;

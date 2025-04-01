@@ -9,8 +9,7 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ClientFieldOrPointerId, OutputFormat, Schema, SchemaScalar, ServerFieldData,
-    ValidatedSchemaState, ValidatedSelection,
+    ClientFieldOrPointerId, OutputFormat, Schema, SchemaScalar, ServerFieldData, ValidatedSelection,
 };
 use lazy_static::lazy_static;
 
@@ -31,7 +30,7 @@ pub struct ServerFieldTypeAssociatedDataInlineFragment {
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 }
 
-pub type UnvalidatedSchema<TOutputFormat> = Schema<ValidatedSchemaState, TOutputFormat>;
+pub type UnvalidatedSchema<TOutputFormat> = Schema<TOutputFormat>;
 
 /// On unvalidated schema objects, the encountered types are either a type annotation
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the

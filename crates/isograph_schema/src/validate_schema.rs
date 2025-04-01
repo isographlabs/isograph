@@ -1,8 +1,6 @@
-use std::collections::HashMap;
-
 use common_lang_types::{
-    EnumLiteralValue, GraphQLScalarTypeName, IsoLiteralText, IsographObjectTypeName,
-    SelectableName, UnvalidatedTypeName, ValueKeyName, VariableName, WithLocation, WithSpan,
+    EnumLiteralValue, GraphQLScalarTypeName, IsographObjectTypeName, SelectableName,
+    UnvalidatedTypeName, ValueKeyName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLTypeAnnotation, NameValuePair};
 use isograph_lang_types::{
@@ -16,9 +14,9 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    schema_validation_state::SchemaValidationState, ClientField, ClientFieldVariant, ClientPointer,
-    ImperativelyLoadedFieldVariant, OutputFormat, Schema, ServerScalarSelectable,
-    UseRefetchFieldRefetchStrategy, ValidateEntrypointDeclarationError,
+    ClientField, ClientFieldVariant, ClientPointer, ImperativelyLoadedFieldVariant, OutputFormat,
+    Schema, ServerScalarSelectable, UseRefetchFieldRefetchStrategy,
+    ValidateEntrypointDeclarationError,
 };
 
 pub type ValidatedSchemaServerField<TOutputFormat> = ServerScalarSelectable<TOutputFormat>;
@@ -68,13 +66,7 @@ pub type MissingArguments = Vec<ValidatedVariableDefinition>;
 pub type ValidatedSelectionType<'a, TOutputFormat> =
     SelectionType<&'a ClientField<TOutputFormat>, &'a ClientPointer<TOutputFormat>>;
 
-#[derive(Debug)]
-pub struct ValidatedSchemaState {}
-impl SchemaValidationState for ValidatedSchemaState {
-    type Entrypoint = HashMap<ClientFieldId, IsoLiteralText>;
-}
-
-pub type ValidatedSchema<TOutputFormat> = Schema<ValidatedSchemaState, TOutputFormat>;
+pub type ValidatedSchema<TOutputFormat> = Schema<TOutputFormat>;
 
 pub fn get_all_errors_or_all_ok<T, E>(
     items: impl Iterator<Item = Result<T, Vec<E>>>,

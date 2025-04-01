@@ -4,7 +4,8 @@ use std::{
 };
 
 use common_lang_types::{
-    ClientScalarSelectableName, GraphQLScalarTypeName, SelectableName, UnvalidatedTypeName,
+    ClientScalarSelectableName, GraphQLScalarTypeName, IsoLiteralText, SelectableName,
+    UnvalidatedTypeName,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -14,9 +15,8 @@ use isograph_lang_types::{
 use lazy_static::lazy_static;
 
 use crate::{
-    schema_validation_state::SchemaValidationState, ClientField, ClientFieldOrPointerId,
-    ClientPointer, NormalizationKey, OutputFormat, SchemaObject, SchemaScalar, SchemaType,
-    ServerScalarSelectable,
+    ClientField, ClientFieldOrPointerId, ClientPointer, NormalizationKey, OutputFormat,
+    SchemaObject, SchemaScalar, SchemaType, ServerScalarSelectable,
 };
 
 lazy_static! {
@@ -39,11 +39,10 @@ pub struct RootOperationName(pub String);
 /// form of newtype wrappers around u32 indexes (e.g. FieldId, etc.) As a result,
 /// the schema does not support removing items.
 #[derive(Debug)]
-pub struct Schema<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat> {
+pub struct Schema<TOutputFormat: OutputFormat> {
     pub server_scalar_selectables: Vec<ServerScalarSelectable<TOutputFormat>>,
     pub client_types: SelectionTypes<TOutputFormat>,
-    // TODO consider whether this belongs here. It could just be a free variable.
-    pub entrypoints: TSchemaValidationState::Entrypoint,
+    pub entrypoints: HashMap<ClientFieldId, IsoLiteralText>,
     pub server_field_data: ServerFieldData<TOutputFormat>,
 
     /// These are root types like Query, Mutation, Subscription
@@ -53,9 +52,7 @@ pub struct Schema<TSchemaValidationState: SchemaValidationState, TOutputFormat: 
 type SelectionTypes<TOutputFormat> =
     Vec<SelectionType<ClientField<TOutputFormat>, ClientPointer<TOutputFormat>>>;
 
-impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
-    Schema<TSchemaValidationState, TOutputFormat>
-{
+impl<TOutputFormat: OutputFormat> Schema<TOutputFormat> {
     /// This is a smell, and we should refactor away from it, or all schema's
     /// should have a root type.
     pub fn query_id(&self) -> ServerObjectId {
@@ -100,9 +97,7 @@ pub struct ServerFieldData<TOutputFormat: OutputFormat> {
     pub null_type_id: ServerScalarId,
 }
 
-impl<TSchemaValidationState: SchemaValidationState, TOutputFormat: OutputFormat>
-    Schema<TSchemaValidationState, TOutputFormat>
-{
+impl<TOutputFormat: OutputFormat> Schema<TOutputFormat> {
     /// Get a reference to a given server field by its id.
     pub fn server_field(
         &self,

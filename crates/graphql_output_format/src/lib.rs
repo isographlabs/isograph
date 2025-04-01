@@ -8,8 +8,7 @@ use isograph_schema::{ClientField, Schema, SchemaObject, UnvalidatedSchema, Vali
 pub use read_schema::*;
 
 pub type ValidatedGraphqlSchema = ValidatedSchema<GraphQLOutputFormat>;
-pub type GraphqlSchema<TSchemaValidationState> =
-    Schema<TSchemaValidationState, GraphQLOutputFormat>;
+pub type GraphqlSchema = Schema<GraphQLOutputFormat>;
 pub type UnvalidatedGraphqlSchema = UnvalidatedSchema<GraphQLOutputFormat>;
 
 pub type ValidatedGraphqlClientField = ClientField<GraphQLOutputFormat>;

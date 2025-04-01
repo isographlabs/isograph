@@ -21,7 +21,7 @@ use isograph_schema::{
     ClientFieldVariant, FieldTraversalResult, NameAndArguments, NormalizationKey, OutputFormat,
     RequiresRefinement, Schema, SchemaObject, SchemaServerLinkedFieldFieldVariant,
     UserWrittenClientTypeInfo, UserWrittenComponentVariant, ValidatedScalarSelectionAssociatedData,
-    ValidatedSchema, ValidatedSchemaState, ValidatedSelection, ValidatedVariableDefinition,
+    ValidatedSchema, ValidatedSelection, ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -692,7 +692,7 @@ fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
 
 #[allow(clippy::too_many_arguments)]
 fn write_param_type_from_client_field<TOutputFormat: OutputFormat>(
-    schema: &Schema<ValidatedSchemaState, TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     query_type_declaration: &mut String,
     nested_client_field_imports: &mut BTreeSet<ObjectTypeAndFieldName>,
     loadable_fields: &mut BTreeSet<ObjectTypeAndFieldName>,
