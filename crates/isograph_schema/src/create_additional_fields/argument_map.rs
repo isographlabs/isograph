@@ -10,7 +10,7 @@ use isograph_lang_types::{
     DefinitionLocation, SelectionType, ServerEntityId, ServerScalarSelectableId, VariableDefinition,
 };
 
-use crate::{OutputFormat, UnvalidatedSchema};
+use crate::{OutputFormat, Schema};
 
 use super::create_additional_fields_error::{
     CreateAdditionalFieldsError, FieldMapItem, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
@@ -36,7 +36,7 @@ impl ArgumentMap {
         primary_type_name: IsographObjectTypeName,
         mutation_object_name: IsographObjectTypeName,
         mutation_field_name: SelectableName,
-        schema: &mut UnvalidatedSchema<TOutputFormat>,
+        schema: &mut Schema<TOutputFormat>,
     ) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem> {
         let split_to_arg = field_map_item.split_to_arg();
         let (index_of_argument, argument) = self
@@ -185,7 +185,7 @@ impl ModifiedArgument {
     /// This panics if unmodified's type is a scalar.
     pub fn from_unmodified<TOutputFormat: OutputFormat>(
         unmodified: &VariableDefinition<ServerEntityId>,
-        schema: &UnvalidatedSchema<TOutputFormat>,
+        schema: &Schema<TOutputFormat>,
     ) -> Self {
         // TODO I think we have validated that the item exists already.
         // But we should double check that, and return an error if necessary
@@ -223,7 +223,7 @@ impl ModifiedArgument {
 
     pub fn remove_to_field<TOutputFormat: OutputFormat>(
         &mut self,
-        schema: &UnvalidatedSchema<TOutputFormat>,
+        schema: &Schema<TOutputFormat>,
         first: StringLiteralValue,
         rest: &[StringLiteralValue],
         primary_type_name: IsographObjectTypeName,

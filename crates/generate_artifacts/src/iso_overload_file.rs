@@ -5,8 +5,8 @@ use std::cmp::Ordering;
 
 use common_lang_types::{ArtifactPathAndContent, IsoLiteralText, SelectableName};
 use isograph_schema::{
-    ClientField, ClientFieldOrPointer, ClientFieldVariant, OutputFormat,
-    UserWrittenComponentVariant, ValidatedSchema, ValidatedSelectionType,
+    ClientField, ClientFieldOrPointer, ClientFieldVariant, OutputFormat, Schema,
+    UserWrittenComponentVariant, ValidatedSelectionType,
 };
 
 use crate::generate_artifacts::ISO_TS_FILE_NAME;
@@ -88,7 +88,7 @@ export function iso<T>(
 }
 
 pub(crate) fn build_iso_overload_artifact<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     file_extensions: GenerateFileExtensionsOption,
     no_babel_transform: bool,
 ) -> ArtifactPathAndContent {
@@ -220,7 +220,7 @@ export function iso(isographLiteralText: string):
 }
 
 fn sorted_user_written_types<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
 ) -> Vec<(
     ValidatedSelectionType<TOutputFormat>,
     UserWrittenComponentVariant,
@@ -245,7 +245,7 @@ fn sorted_user_written_types<TOutputFormat: OutputFormat>(
 }
 
 fn sorted_entrypoints<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
 ) -> Vec<(&ClientField<TOutputFormat>, &IsoLiteralText)> {
     let mut entrypoints = schema
         .entrypoints
@@ -295,7 +295,7 @@ fn sort_field_name(field_1: SelectableName, field_2: SelectableName) -> Ordering
 }
 
 fn user_written_fields<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
 ) -> impl Iterator<
     Item = (
         ValidatedSelectionType<TOutputFormat>,

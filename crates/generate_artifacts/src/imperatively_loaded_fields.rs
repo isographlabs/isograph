@@ -6,7 +6,7 @@ use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::RefetchQueryIndex;
 use isograph_schema::{
-    ImperativelyLoadedFieldArtifactInfo, OutputFormat, ValidatedSchema, REFETCH_FIELD_NAME,
+    ImperativelyLoadedFieldArtifactInfo, OutputFormat, Schema, REFETCH_FIELD_NAME,
 };
 
 use crate::{
@@ -118,7 +118,7 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
 }
 
 pub(crate) fn get_artifact_for_imperatively_loaded_field<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     imperatively_loaded_field_artifact_info: ImperativelyLoadedFieldArtifactInfo,
     file_extensions: GenerateFileExtensionsOption,
 ) -> Vec<ArtifactPathAndContent> {

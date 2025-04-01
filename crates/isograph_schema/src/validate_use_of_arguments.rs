@@ -13,7 +13,7 @@ use lazy_static::lazy_static;
 
 use crate::{
     validate_argument_types::value_satisfies_type, visit_selection_set::visit_selection_set,
-    ClientFieldOrPointer, OutputFormat, ValidateSchemaError, ValidateSchemaResult, ValidatedSchema,
+    ClientFieldOrPointer, OutputFormat, Schema, ValidateSchemaError, ValidateSchemaResult,
     ValidatedVariableDefinition,
 };
 
@@ -34,7 +34,7 @@ lazy_static! {
 /// have different associated data for fields that points to server objects and
 /// fields that point to client objects.)
 pub fn validate_use_of_arguments<TOutputFormat: OutputFormat>(
-    validated_schema: &ValidatedSchema<TOutputFormat>,
+    validated_schema: &Schema<TOutputFormat>,
 ) -> Result<(), Vec<WithLocation<ValidateSchemaError>>> {
     let mut errors = vec![];
     for client_type in &validated_schema.client_types {
@@ -64,7 +64,7 @@ pub fn validate_use_of_arguments<TOutputFormat: OutputFormat>(
 }
 
 fn validate_use_of_arguments_for_client_type<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     client_type: impl ClientFieldOrPointer,
     errors: &mut Vec<WithLocation<ValidateSchemaError>>,
 ) {
@@ -150,7 +150,7 @@ fn validate_use_of_arguments_for_client_type<TOutputFormat: OutputFormat>(
 
 #[allow(clippy::too_many_arguments)]
 fn validate_use_of_arguments_impl<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     errors: &mut Vec<WithLocation<ValidateSchemaError>>,
     reachable_variables: &mut BTreeSet<VariableName>,
     field_argument_definitions: Vec<&ValidatedVariableDefinition>,

@@ -13,8 +13,8 @@ use isograph_schema::{
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
     get_reachable_variables, initial_variable_context, ClientField, ClientFieldOrPointer,
     FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, MergedSelectionMap, OutputFormat,
-    RootOperationName, RootRefetchedPath, ScalarClientFieldTraversalState, SchemaObject,
-    ValidatedSchema, ValidatedVariableDefinition,
+    RootOperationName, RootRefetchedPath, ScalarClientFieldTraversalState, Schema, SchemaObject,
+    ValidatedVariableDefinition,
 };
 
 use crate::{
@@ -38,7 +38,7 @@ struct EntrypointArtifactInfo<'schema, TOutputFormat: OutputFormat> {
 }
 
 pub(crate) fn generate_entrypoint_artifacts<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     entrypoint_id: ClientFieldId,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     file_extensions: GenerateFileExtensionsOption,
@@ -78,7 +78,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     'a,
     TOutputFormat: OutputFormat,
 >(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     entrypoint: &ClientField<TOutputFormat>,
     merged_selection_map: &MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,

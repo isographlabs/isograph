@@ -23,9 +23,9 @@ use crate::{
     transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context, ClientField, ClientFieldOrPointer,
     ClientFieldOrPointerId, ClientFieldVariant, ImperativelyLoadedFieldVariant, Loadability,
-    NameAndArguments, OutputFormat, PathToRefetchField, RootOperationName, SchemaObject,
-    SchemaServerLinkedFieldFieldVariant, ValidatedScalarFieldSelection, ValidatedSchema,
-    ValidatedSelection, ValidatedSelectionType, VariableContext,
+    NameAndArguments, OutputFormat, PathToRefetchField, RootOperationName, Schema, SchemaObject,
+    SchemaServerLinkedFieldFieldVariant, ValidatedScalarFieldSelection, ValidatedSelection,
+    ValidatedSelectionType, VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -404,7 +404,7 @@ fn transform_child_map_with_parent_context(
 pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     TOutputFormat: OutputFormat,
 >(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     parent_type: &SchemaObject<TOutputFormat>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
@@ -449,7 +449,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
 }
 
 pub fn get_imperatively_loaded_artifact_info<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     entrypoint: &ClientField<TOutputFormat>,
     root_refetch_path: RootRefetchedPath,
     nested_selection_map: &MergedSelectionMap,
@@ -490,7 +490,7 @@ pub fn get_reachable_variables(selection_map: &MergedSelectionMap) -> BTreeSet<V
 
 #[allow(clippy::too_many_arguments)]
 fn process_imperatively_loaded_field<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     variant: ImperativelyLoadedFieldVariant,
     refetch_field_parent_id: ServerObjectId,
     selection_map: &MergedSelectionMap,
@@ -630,7 +630,7 @@ fn get_used_variable_definitions<TOutputFormat: OutputFormat>(
 }
 
 fn create_selection_map_with_merge_traversal_state<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     parent_type: &SchemaObject<TOutputFormat>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
@@ -652,7 +652,7 @@ fn create_selection_map_with_merge_traversal_state<TOutputFormat: OutputFormat>(
 }
 
 fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     parent_map: &mut MergedSelectionMap,
     parent_type: &SchemaObject<TOutputFormat>,
     validated_selections: &[WithSpan<ValidatedSelection>],
@@ -935,7 +935,7 @@ fn merge_validated_selections_into_selection_map<TOutputFormat: OutputFormat>(
 }
 
 fn insert_imperative_field_into_refetch_paths<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     newly_encountered_scalar_client_field: &ClientField<TOutputFormat>,
@@ -1003,7 +1003,7 @@ fn filter_id_fields(field: &&WithSpan<ValidatedSelection>) -> bool {
 #[allow(clippy::too_many_arguments)]
 fn merge_non_loadable_client_type<TOutputFormat: OutputFormat>(
     parent_type: &SchemaObject<TOutputFormat>,
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     parent_map: &mut MergedSelectionMap,
     parent_merge_traversal_state: &mut ScalarClientFieldTraversalState,
     newly_encountered_client_type: ValidatedSelectionType<TOutputFormat>,
@@ -1085,7 +1085,7 @@ fn merge_scalar_server_field(
 }
 
 fn select_typename_and_id_fields_in_merged_selection<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     merged_selection_map: &mut MergedSelectionMap,
     parent_type: &SchemaObject<TOutputFormat>,
 ) {

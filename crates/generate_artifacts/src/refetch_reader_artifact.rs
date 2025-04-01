@@ -5,7 +5,7 @@ use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
     initial_variable_context, ClientField, ClientFieldOrPointer, FieldMapItem, OutputFormat,
-    PrimaryFieldInfo, RefetchedPathsMap, ValidatedSchema,
+    PrimaryFieldInfo, RefetchedPathsMap, Schema,
 };
 
 use crate::{
@@ -18,7 +18,7 @@ use crate::{
 };
 
 pub(crate) fn generate_refetch_reader_artifact<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     client_field: &ClientField<TOutputFormat>,
     primary_field_info: Option<&PrimaryFieldInfo>,
     refetched_paths: &RefetchedPathsMap,
@@ -84,7 +84,7 @@ pub(crate) fn generate_refetch_reader_artifact<TOutputFormat: OutputFormat>(
 }
 
 pub(crate) fn generate_refetch_output_type_artifact<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     client_field: &ClientField<TOutputFormat>,
 ) -> ArtifactPathAndContent {
     let parent_type = schema

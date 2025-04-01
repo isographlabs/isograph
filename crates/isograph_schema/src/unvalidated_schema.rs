@@ -30,21 +30,19 @@ pub struct ServerFieldTypeAssociatedDataInlineFragment {
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 }
 
-pub type UnvalidatedSchema<TOutputFormat> = Schema<TOutputFormat>;
-
 /// On unvalidated schema objects, the encountered types are either a type annotation
 /// for server fields with an unvalidated inner type, or a ScalarFieldName (the name of the
 /// client field.)
 pub type UnvalidatedObjectFieldInfo =
     DefinitionLocation<ServerScalarSelectableId, ClientFieldOrPointerId>;
 
-impl<TOutputFormat: OutputFormat> Default for UnvalidatedSchema<TOutputFormat> {
+impl<TOutputFormat: OutputFormat> Default for Schema<TOutputFormat> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
+impl<TOutputFormat: OutputFormat> Schema<TOutputFormat> {
     pub fn new() -> Self {
         // TODO add __typename
         let fields = vec![];

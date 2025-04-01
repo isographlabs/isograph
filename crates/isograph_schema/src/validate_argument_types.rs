@@ -16,8 +16,7 @@ use isograph_lang_types::{
 
 use crate::{
     as_server_field, ClientFieldOrPointerId, OutputFormat, SchemaObject, ServerFieldData,
-    ValidateSchemaError, ValidateSchemaResult, ValidatedSchemaServerField,
-    ValidatedVariableDefinition,
+    ServerScalarSelectable, ValidateSchemaError, ValidateSchemaResult, ValidatedVariableDefinition,
 };
 
 fn graphql_type_to_non_null_type<TValue>(
@@ -129,7 +128,7 @@ pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
     field_argument_definition_type: &GraphQLTypeAnnotation<ServerEntityId>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     schema_data: &ServerFieldData<TOutputFormat>,
-    server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
+    server_fields: &[ServerScalarSelectable<TOutputFormat>],
 ) -> ValidateSchemaResult<()> {
     match &selection_supplied_argument_value.item {
         NonConstantValue::Variable(variable_name) => {
@@ -303,7 +302,7 @@ fn object_satisfies_type<TOutputFormat: OutputFormat>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
     variable_definitions: &[WithSpan<VariableDefinition<ServerEntityId>>],
     schema_data: &ServerFieldData<TOutputFormat>,
-    server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
+    server_fields: &[ServerScalarSelectable<TOutputFormat>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     object_id: ServerObjectId,
 ) -> Result<(), WithLocation<ValidateSchemaError>> {
@@ -356,7 +355,7 @@ enum ObjectLiteralFieldType {
 }
 
 fn get_non_nullable_missing_and_provided_fields<TOutputFormat: OutputFormat>(
-    server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
+    server_fields: &[ServerScalarSelectable<TOutputFormat>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     object: &SchemaObject<TOutputFormat>,
 ) -> Vec<ObjectLiteralFieldType> {
@@ -474,7 +473,7 @@ fn list_satisfies_type<TOutputFormat: OutputFormat>(
     list_type: GraphQLListTypeAnnotation<ServerEntityId>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     schema_data: &ServerFieldData<TOutputFormat>,
-    server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
+    server_fields: &[ServerScalarSelectable<TOutputFormat>],
 ) -> ValidateSchemaResult<()> {
     list.iter().try_for_each(|element| {
         value_satisfies_type(

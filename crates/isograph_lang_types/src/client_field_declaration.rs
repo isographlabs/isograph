@@ -18,13 +18,13 @@ pub type UnvalidatedSelectionWithUnvalidatedDirectives =
     SelectionTypeContainingSelections<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>;
 
 pub type UnvalidatedSelection = SelectionTypeContainingSelections<
-    // <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
+    // <SchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
     ScalarSelectionDirectiveSet,
-    // <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
+    // <SchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
     ObjectSelectionDirectiveSet,
 >;
 pub type UnvalidatedScalarFieldSelection = ScalarFieldSelection<
-    // <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
+    // <SchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
     ScalarSelectionDirectiveSet,
 >;
 

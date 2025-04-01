@@ -7,10 +7,10 @@ use isograph_lang_types::{
     DefinitionLocation, SelectionType, ServerEntityId, ServerScalarSelectableId, TypeAnnotation,
     UnionVariant,
 };
-use isograph_schema::{OutputFormat, ValidatedSchema};
+use isograph_schema::{OutputFormat, Schema};
 
 pub(crate) fn format_parameter_type<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     type_: GraphQLTypeAnnotation<ServerEntityId>,
     indentation_level: u8,
 ) -> String {
@@ -42,7 +42,7 @@ pub(crate) fn format_parameter_type<TOutputFormat: OutputFormat>(
 }
 
 fn format_server_field_type<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     field: ServerEntityId,
     indentation_level: u8,
 ) -> String {
@@ -77,7 +77,7 @@ fn format_server_field_type<TOutputFormat: OutputFormat>(
 }
 
 fn format_field_definition<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     name: &SelectableName,
     server_field_id: ServerScalarSelectableId,
     indentation_level: u8,
@@ -112,7 +112,7 @@ fn is_nullable<T: Ord + Debug>(type_annotation: &TypeAnnotation<T>) -> bool {
 }
 
 fn format_type_annotation<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     type_annotation: &TypeAnnotation<ServerEntityId>,
     indentation_level: u8,
 ) -> String {

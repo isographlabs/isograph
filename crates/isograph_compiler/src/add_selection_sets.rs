@@ -5,17 +5,18 @@ use isograph_lang_types::{
     UnvalidatedScalarFieldSelection,
 };
 use isograph_schema::{
-    ClientFieldOrPointer, OutputFormat, RefetchStrategy, SchemaObject, UnprocessedClientFieldItem,
-    UnprocessedItem, UnvalidatedSchema, UseRefetchFieldRefetchStrategy, ValidateSchemaError,
-    ValidateSchemaResult, ValidatedLinkedFieldAssociatedData, ValidatedLinkedFieldSelection,
-    ValidatedScalarFieldSelection, ValidatedScalarSelectionAssociatedData, ValidatedSelection,
+    ClientFieldOrPointer, OutputFormat, RefetchStrategy, Schema, SchemaObject,
+    UnprocessedClientFieldItem, UnprocessedItem, UseRefetchFieldRefetchStrategy,
+    ValidateSchemaError, ValidateSchemaResult, ValidatedLinkedFieldAssociatedData,
+    ValidatedLinkedFieldSelection, ValidatedScalarFieldSelection,
+    ValidatedScalarSelectionAssociatedData, ValidatedSelection,
 };
 
 pub type ValidateSchemaResultWithMultipleErrors<T> =
     Result<T, Vec<WithLocation<ValidateSchemaError>>>;
 
 pub(crate) fn add_selection_sets_to_client_selectables<TOutputFormat: OutputFormat>(
-    schema: &mut UnvalidatedSchema<TOutputFormat>,
+    schema: &mut Schema<TOutputFormat>,
     unprocessed_items: Vec<UnprocessedItem>,
 ) -> ValidateSchemaResultWithMultipleErrors<()> {
     let mut errors = vec![];
@@ -41,7 +42,7 @@ pub(crate) fn add_selection_sets_to_client_selectables<TOutputFormat: OutputForm
 // TODO we should not be mutating items in the schema. Instead, we should be creating
 // new items (the refetch and reader selection sets).
 fn process_unprocessed_client_field_item<TOutputFormat: OutputFormat>(
-    schema: &mut UnvalidatedSchema<TOutputFormat>,
+    schema: &mut Schema<TOutputFormat>,
     unprocessed_item: UnprocessedClientFieldItem,
 ) -> ValidateSchemaResultWithMultipleErrors<()> {
     let client_field = schema.client_field(unprocessed_item.client_field_id);
@@ -78,7 +79,7 @@ fn process_unprocessed_client_field_item<TOutputFormat: OutputFormat>(
 /// - validate loadability/selectability (e.g. client fields cannot be selected updatably), and
 /// - include the selectable id in the associated data
 fn get_validated_selection_set<TOutputFormat: OutputFormat>(
-    schema: &UnvalidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     selection_set: Vec<
         WithSpan<
             SelectionTypeContainingSelections<
@@ -96,7 +97,7 @@ fn get_validated_selection_set<TOutputFormat: OutputFormat>(
 }
 
 fn get_validated_selection<TOutputFormat: OutputFormat>(
-    schema: &UnvalidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     with_span: WithSpan<
         SelectionTypeContainingSelections<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
     >,
@@ -125,7 +126,7 @@ fn get_validated_selection<TOutputFormat: OutputFormat>(
 }
 
 fn get_validated_scalar_selection<TOutputFormat: OutputFormat>(
-    schema: &UnvalidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     selection_parent_object: &SchemaObject<TOutputFormat>,
     top_level_field_or_pointer: &impl ClientFieldOrPointer,
     scalar_selection: UnvalidatedScalarFieldSelection,
@@ -215,7 +216,7 @@ fn get_validated_scalar_selection<TOutputFormat: OutputFormat>(
 }
 
 fn get_validated_object_selection<TOutputFormat: OutputFormat>(
-    schema: &UnvalidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     selection_parent_object: &SchemaObject<TOutputFormat>,
     top_level_field_or_pointer: &impl ClientFieldOrPointer,
     object_selection: LinkedFieldSelection<
@@ -317,7 +318,7 @@ fn get_validated_object_selection<TOutputFormat: OutputFormat>(
 }
 
 fn get_validated_refetch_strategy<TOutputFormat: OutputFormat>(
-    schema: &UnvalidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     refetch_strategy: Option<
         RefetchStrategy<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
     >,

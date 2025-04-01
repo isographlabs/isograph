@@ -15,10 +15,8 @@ use thiserror::Error;
 
 use crate::{
     ClientField, ClientFieldVariant, ClientPointer, ImperativelyLoadedFieldVariant, OutputFormat,
-    Schema, ServerScalarSelectable, UseRefetchFieldRefetchStrategy,
+    UseRefetchFieldRefetchStrategy,
 };
-
-pub type ValidatedSchemaServerField<TOutputFormat> = ServerScalarSelectable<TOutputFormat>;
 
 pub type ValidatedSelection = SelectionTypeContainingSelections<
     ValidatedScalarSelectionAssociatedData,
@@ -64,8 +62,6 @@ pub type MissingArguments = Vec<ValidatedVariableDefinition>;
 
 pub type ValidatedSelectionType<'a, TOutputFormat> =
     SelectionType<&'a ClientField<TOutputFormat>, &'a ClientPointer<TOutputFormat>>;
-
-pub type ValidatedSchema<TOutputFormat> = Schema<TOutputFormat>;
 
 pub enum Loadability<'a> {
     LoadablySelectedField(&'a LoadableDirectiveParameters),

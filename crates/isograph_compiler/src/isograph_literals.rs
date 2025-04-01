@@ -6,7 +6,7 @@ use isograph_lang_parser::{
     parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
 };
 use isograph_lang_types::{EntrypointDeclaration, IsoLiteralsSource, SelectionType};
-use isograph_schema::{OutputFormat, UnprocessedItem, UnvalidatedSchema};
+use isograph_schema::{OutputFormat, Schema, UnprocessedItem};
 use lazy_static::lazy_static;
 use pico::{Database, SourceId};
 use pico_macros::memo;
@@ -141,7 +141,7 @@ pub fn parse_iso_literal_in_source(
 }
 
 pub(crate) fn process_iso_literals<TOutputFormat: OutputFormat>(
-    schema: &mut UnvalidatedSchema<TOutputFormat>,
+    schema: &mut Schema<TOutputFormat>,
     contains_iso: ContainsIso,
 ) -> Result<
     (

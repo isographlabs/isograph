@@ -1,13 +1,13 @@
 use common_lang_types::{Location, WithLocation};
 use isograph_lang_types::DefinitionLocation;
 
-use crate::{OutputFormat, UnvalidatedSchema};
+use crate::{OutputFormat, Schema};
 
 use super::create_additional_fields_error::{
     CreateAdditionalFieldsError, ProcessTypeDefinitionResult, ValidatedTypeRefinementMap,
 };
 
-impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
+impl<TOutputFormat: OutputFormat> Schema<TOutputFormat> {
     /// For each supertype (e.g. Node), add the fields defined on it (e.g. Node.MyComponent)
     /// to subtypes (e.g. creating User.MyComponent).
     ///

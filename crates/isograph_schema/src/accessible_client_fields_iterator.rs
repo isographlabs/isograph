@@ -2,14 +2,14 @@ use common_lang_types::WithSpan;
 use isograph_lang_types::{DefinitionLocation, SelectionTypeContainingSelections};
 
 use crate::{
-    ClientField, ClientFieldOrPointer, OutputFormat, ValidatedSchema, ValidatedSelection,
+    ClientField, ClientFieldOrPointer, OutputFormat, Schema, ValidatedSelection,
     ValidatedSelectionType,
 };
 
 // This should really be replaced with a proper visitor, or something
 pub fn accessible_client_fields<'a, TOutputFormat: OutputFormat>(
     selection_type: &'a ValidatedSelectionType<'a, TOutputFormat>,
-    schema: &'a ValidatedSchema<TOutputFormat>,
+    schema: &'a Schema<TOutputFormat>,
 ) -> impl Iterator<Item = &'a ClientField<TOutputFormat>> + 'a {
     AccessibleClientFieldIterator {
         selection_set: selection_type.selection_set_for_parent_query(),
@@ -21,7 +21,7 @@ pub fn accessible_client_fields<'a, TOutputFormat: OutputFormat>(
 
 struct AccessibleClientFieldIterator<'a, TOutputFormat: OutputFormat> {
     selection_set: &'a [WithSpan<ValidatedSelection>],
-    schema: &'a ValidatedSchema<TOutputFormat>,
+    schema: &'a Schema<TOutputFormat>,
     index: usize,
     sub_iterator: Option<Box<AccessibleClientFieldIterator<'a, TOutputFormat>>>,
 }

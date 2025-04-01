@@ -1,4 +1,4 @@
-use crate::{ClientField, ClientFieldVariant, OutputFormat, UnvalidatedSchema, LINK_FIELD_NAME};
+use crate::{ClientField, ClientFieldVariant, OutputFormat, Schema, LINK_FIELD_NAME};
 use common_lang_types::{Location, ObjectTypeAndFieldName, WithLocation};
 use intern::string_key::Intern;
 use isograph_lang_types::{DefinitionLocation, SelectionType};
@@ -7,7 +7,7 @@ use super::create_additional_fields_error::{
     CreateAdditionalFieldsError, ProcessTypeDefinitionResult,
 };
 
-impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
+impl<TOutputFormat: OutputFormat> Schema<TOutputFormat> {
     pub fn add_link_fields(&mut self) -> ProcessTypeDefinitionResult<()> {
         for object in &mut self.server_field_data.server_objects {
             let field_name = *LINK_FIELD_NAME;

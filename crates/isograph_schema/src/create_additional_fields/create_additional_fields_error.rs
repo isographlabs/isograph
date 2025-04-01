@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{OutputFormat, UnvalidatedSchema};
+use crate::{OutputFormat, Schema};
 use common_lang_types::{IsographObjectTypeName, SelectableName, StringLiteralValue, WithLocation};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::ServerObjectId;
@@ -11,7 +11,7 @@ use thiserror::Error;
 // When constructing the final map, we can replace object type names with ids.
 pub type ValidatedTypeRefinementMap = HashMap<ServerObjectId, Vec<ServerObjectId>>;
 
-impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {}
+impl<TOutputFormat: OutputFormat> Schema<TOutputFormat> {}
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, PartialOrd, Ord, Hash)]
 #[serde(deny_unknown_fields)]

@@ -21,7 +21,7 @@ use isograph_schema::{
     ClientFieldVariant, FieldTraversalResult, NameAndArguments, NormalizationKey, OutputFormat,
     RequiresRefinement, Schema, SchemaObject, SchemaServerLinkedFieldFieldVariant,
     UserWrittenClientTypeInfo, UserWrittenComponentVariant, ValidatedScalarSelectionAssociatedData,
-    ValidatedSchema, ValidatedSelection, ValidatedVariableDefinition,
+    ValidatedSelection, ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -96,7 +96,7 @@ lazy_static! {
 ///
 /// TODO this should go through OutputFormat
 pub fn get_artifact_path_and_content<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     config: &CompilerConfig,
 ) -> Vec<ArtifactPathAndContent> {
     let mut artifact_path_and_content = get_artifact_path_and_content_impl(schema, config);
@@ -110,7 +110,7 @@ pub fn get_artifact_path_and_content<TOutputFormat: OutputFormat>(
 }
 
 fn get_artifact_path_and_content_impl<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     config: &CompilerConfig,
 ) -> Vec<ArtifactPathAndContent> {
     let mut encountered_client_type_map = BTreeMap::new();
@@ -521,7 +521,7 @@ pub(crate) fn generate_output_type<TOutputFormat: OutputFormat>(
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn generate_client_field_parameter_type<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     selection_map: &[WithSpan<ValidatedSelection>],
     parent_type: &SchemaObject<TOutputFormat>,
     nested_client_field_imports: &mut ParamTypeImports,
@@ -551,7 +551,7 @@ pub(crate) fn generate_client_field_parameter_type<TOutputFormat: OutputFormat>(
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn generate_client_field_updatable_data_type<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     selection_map: &[WithSpan<ValidatedSelection>],
     parent_type: &SchemaObject<TOutputFormat>,
     nested_client_field_imports: &mut ParamTypeImports,
@@ -586,7 +586,7 @@ pub(crate) fn generate_client_field_updatable_data_type<TOutputFormat: OutputFor
 
 #[allow(clippy::too_many_arguments)]
 fn write_param_type_from_selection<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
     parent_type: &SchemaObject<TOutputFormat>,
@@ -771,7 +771,7 @@ fn write_param_type_from_client_field<TOutputFormat: OutputFormat>(
 
 #[allow(clippy::too_many_arguments)]
 fn write_updatable_data_type_from_selection<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
     parent_type: &SchemaObject<TOutputFormat>,
@@ -927,7 +927,7 @@ fn write_getter_and_setter(
 }
 
 fn get_loadable_field_type_from_arguments<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     arguments: Vec<ValidatedVariableDefinition>,
 ) -> String {
     let mut loadable_field_type = "{".to_string();
@@ -950,7 +950,7 @@ fn get_loadable_field_type_from_arguments<TOutputFormat: OutputFormat>(
 }
 
 fn format_type_for_js<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     type_: GraphQLTypeAnnotation<ServerEntityId>,
 ) -> String {
     let new_type = type_.map(
@@ -992,7 +992,7 @@ fn format_type_for_js_inner(
 }
 
 pub(crate) fn generate_parameters<'a, TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     argument_definitions: impl Iterator<Item = &'a VariableDefinition<ServerEntityId>>,
 ) -> String {
     let mut s = "{\n".to_string();

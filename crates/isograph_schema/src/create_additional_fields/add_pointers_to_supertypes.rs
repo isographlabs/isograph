@@ -7,8 +7,8 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    as_client_type, as_server_field, OutputFormat, SchemaServerLinkedFieldFieldVariant,
-    ServerFieldTypeAssociatedDataInlineFragment, ServerScalarSelectable, UnvalidatedSchema,
+    as_client_type, as_server_field, OutputFormat, Schema, SchemaServerLinkedFieldFieldVariant,
+    ServerFieldTypeAssociatedDataInlineFragment, ServerScalarSelectable,
     ValidatedScalarSelectionAssociatedData, LINK_FIELD_NAME,
 };
 use common_lang_types::Location;
@@ -16,7 +16,7 @@ use common_lang_types::Location;
 use super::create_additional_fields_error::{
     CreateAdditionalFieldsError, ProcessTypeDefinitionResult, ValidatedTypeRefinementMap,
 };
-impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
+impl<TOutputFormat: OutputFormat> Schema<TOutputFormat> {
     /// For each supertype (e.g. Node), add the pointers for each subtype (e.g. User implements Node)
     /// to supertype (e.g. creating Node.asUser).
     pub fn add_pointers_to_supertypes(

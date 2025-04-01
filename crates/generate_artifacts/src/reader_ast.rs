@@ -9,9 +9,9 @@ use isograph_lang_types::{
 use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, ClientField,
     ClientFieldOrPointer, ClientFieldVariant, Loadability, NameAndArguments, NormalizationKey,
-    OutputFormat, PathToRefetchField, RefetchedPathsMap, SchemaServerLinkedFieldFieldVariant,
-    ValidatedLinkedFieldSelection, ValidatedScalarFieldSelection, ValidatedSchema,
-    ValidatedSelection, VariableContext,
+    OutputFormat, PathToRefetchField, RefetchedPathsMap, Schema,
+    SchemaServerLinkedFieldFieldVariant, ValidatedLinkedFieldSelection,
+    ValidatedScalarFieldSelection, ValidatedSelection, VariableContext,
 };
 
 use crate::{
@@ -22,7 +22,7 @@ use crate::{
 // Can we do this when visiting the client field in when generating entrypoints?
 fn generate_reader_ast_node<TOutputFormat: OutputFormat>(
     selection: &WithSpan<ValidatedSelection>,
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     indentation_level: u8,
     reader_imports: &mut ReaderImports,
     // TODO use this to generate usedRefetchQueries
@@ -97,7 +97,7 @@ fn generate_reader_ast_node<TOutputFormat: OutputFormat>(
 }
 
 fn linked_field_ast_node<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     linked_field: &ValidatedLinkedFieldSelection,
     indentation_level: u8,
     inner_reader_ast: ReaderAst,
@@ -182,7 +182,7 @@ fn linked_field_ast_node<TOutputFormat: OutputFormat>(
 #[allow(clippy::too_many_arguments)]
 fn scalar_client_defined_field_ast_node<TOutputFormat: OutputFormat>(
     scalar_field_selection: &ValidatedScalarFieldSelection,
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     client_field: &ClientField<TOutputFormat>,
     indentation_level: u8,
     path: &mut Vec<NormalizationKey>,
@@ -261,7 +261,7 @@ fn user_written_variant_ast_node<TOutputFormat: OutputFormat>(
     scalar_field_selection: &ValidatedScalarFieldSelection,
     indentation_level: u8,
     nested_client_field: &ClientField<TOutputFormat>,
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     path: &mut Vec<NormalizationKey>,
     root_refetched_paths: &RefetchedPathsMap,
     reader_imports: &mut ReaderImports,
@@ -368,7 +368,7 @@ fn imperatively_loaded_variant_ast_node<TOutputFormat: OutputFormat>(
 }
 
 fn loadably_selected_field_ast_node<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     client_field: &ClientField<TOutputFormat>,
     reader_imports: &mut ReaderImports,
     indentation_level: u8,
@@ -484,7 +484,7 @@ fn server_defined_scalar_field_ast_node(
 }
 
 fn generate_reader_ast_with_path<'schema, TOutputFormat: OutputFormat>(
-    schema: &'schema ValidatedSchema<TOutputFormat>,
+    schema: &'schema Schema<TOutputFormat>,
     selection_set: &'schema [WithSpan<ValidatedSelection>],
     indentation_level: u8,
     nested_client_field_imports: &mut ReaderImports,
@@ -563,7 +563,7 @@ fn find_imperatively_fetchable_query_index(
 }
 
 pub(crate) fn generate_reader_ast<'schema, TOutputFormat: OutputFormat>(
-    schema: &'schema ValidatedSchema<TOutputFormat>,
+    schema: &'schema Schema<TOutputFormat>,
     selection_set: &'schema [WithSpan<ValidatedSelection>],
     indentation_level: u8,
     // N.B. this is not root_refetched_paths when we're generating an entrypoint :(
@@ -588,7 +588,7 @@ pub(crate) fn generate_reader_ast<'schema, TOutputFormat: OutputFormat>(
 
 fn refetched_paths_for_client_field<TOutputFormat: OutputFormat>(
     nested_client_field: &ClientField<TOutputFormat>,
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     path: &mut Vec<NormalizationKey>,
     client_field_variable_context: &VariableContext,
 ) -> Vec<PathToRefetchField> {
@@ -610,7 +610,7 @@ fn refetched_paths_for_client_field<TOutputFormat: OutputFormat>(
 
 fn refetched_paths_with_path<TOutputFormat: OutputFormat>(
     selection_set: &[WithSpan<ValidatedSelection>],
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     path: &mut Vec<NormalizationKey>,
     initial_variable_context: &VariableContext,
 ) -> HashSet<PathToRefetchField> {

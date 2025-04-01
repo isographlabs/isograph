@@ -18,8 +18,8 @@ use serde::Deserialize;
 
 use crate::{
     generate_refetch_field_strategy, ClientField, ClientFieldVariant,
-    ImperativelyLoadedFieldVariant, OutputFormat, PrimaryFieldInfo, RefetchStrategy,
-    UnprocessedClientFieldItem, UnvalidatedSchema,
+    ImperativelyLoadedFieldVariant, OutputFormat, PrimaryFieldInfo, RefetchStrategy, Schema,
+    UnprocessedClientFieldItem,
 };
 use lazy_static::lazy_static;
 
@@ -73,7 +73,7 @@ pub enum RequiresRefinement {
     No,
 }
 
-impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
+impl<TOutputFormat: OutputFormat> Schema<TOutputFormat> {
     /// Add magical mutation fields.
     ///
     /// Using the MagicMutationFieldInfo (derived from @exposeField directives),
@@ -396,7 +396,7 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
 
 fn skip_arguments_contained_in_field_map<TOutputFormat: OutputFormat>(
     // TODO move this to impl Schema
-    schema: &mut UnvalidatedSchema<TOutputFormat>,
+    schema: &mut Schema<TOutputFormat>,
     arguments: Vec<WithLocation<VariableDefinition<ServerEntityId>>>,
     primary_type_name: IsographObjectTypeName,
     mutation_object_name: IsographObjectTypeName,

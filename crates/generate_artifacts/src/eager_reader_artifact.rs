@@ -4,12 +4,12 @@ use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
 use isograph_schema::{
-    initial_variable_context, ClientField, ClientFieldOrPointer, OutputFormat, ValidatedSchema,
+    initial_variable_context, ClientField, ClientFieldOrPointer, OutputFormat, Schema,
     ValidatedSelectionType,
 };
 use isograph_schema::{
-    RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment, UserWrittenClientTypeInfo,
-    UserWrittenComponentVariant, ValidatedSchemaServerField,
+    RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment, ServerScalarSelectable,
+    UserWrittenClientTypeInfo, UserWrittenComponentVariant,
 };
 
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
@@ -29,7 +29,7 @@ use crate::{
 };
 
 pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     selection_type: &ValidatedSelectionType<TOutputFormat>,
     config: &CompilerConfig,
     info: UserWrittenClientTypeInfo,
@@ -150,8 +150,8 @@ pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
 }
 
 pub(crate) fn generate_eager_reader_condition_artifact<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
-    encountered_server_field: &ValidatedSchemaServerField<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
+    encountered_server_field: &ServerScalarSelectable<TOutputFormat>,
     inline_fragment: &ServerFieldTypeAssociatedDataInlineFragment,
     refetch_paths: &RefetchedPathsMap,
     file_extensions: GenerateFileExtensionsOption,
@@ -208,7 +208,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TOutputFormat: OutputForm
 }
 
 pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     client_field: &ValidatedSelectionType<TOutputFormat>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
@@ -312,7 +312,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
 }
 
 pub(crate) fn generate_eager_reader_output_type_artifact<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TOutputFormat>,
     client_field: &ClientField<TOutputFormat>,
     config: &CompilerConfig,
     info: UserWrittenClientTypeInfo,

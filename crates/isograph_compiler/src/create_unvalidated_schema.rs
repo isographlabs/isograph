@@ -10,7 +10,7 @@ use common_lang_types::{
 use isograph_config::CompilerConfig;
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{IsoLiteralsSource, SchemaSource};
-use isograph_schema::{validate_entrypoints, OutputFormat, UnprocessedItem, UnvalidatedSchema};
+use isograph_schema::{validate_entrypoints, OutputFormat, Schema, UnprocessedItem};
 use pico::{Database, SourceId};
 
 use crate::{
@@ -25,8 +25,8 @@ pub fn create_unvalidated_schema<TOutputFormat: OutputFormat>(
     db: &Database,
     source_files: &SourceFiles,
     config: &CompilerConfig,
-) -> Result<(UnvalidatedSchema<TOutputFormat>, ContainsIsoStats), Box<dyn Error>> {
-    let mut unvalidated_isograph_schema = UnvalidatedSchema::<TOutputFormat>::new();
+) -> Result<(Schema<TOutputFormat>, ContainsIsoStats), Box<dyn Error>> {
+    let mut unvalidated_isograph_schema = Schema::<TOutputFormat>::new();
     let type_system_document =
         TOutputFormat::parse_type_system_document(db, source_files.schema)?.to_owned();
     let outcome = TOutputFormat::process_type_system_document(
@@ -152,7 +152,7 @@ fn parse_iso_literals(
 /// directives on root objects (Query, Mutation, Subscription) and we should
 /// validate that no other types have exposeAs directives.
 fn process_exposed_fields<TOutputFormat: OutputFormat>(
-    schema: &mut UnvalidatedSchema<TOutputFormat>,
+    schema: &mut Schema<TOutputFormat>,
 ) -> Result<Vec<UnprocessedItem>, BatchCompileError> {
     let fetchable_types: Vec<_> = schema.fetchable_types.keys().copied().collect();
     let mut unprocessed_items = vec![];

@@ -57,8 +57,8 @@ impl CompilerState {
 /// - Read and parse things:
 ///   - Read and parse the GraphQL schema
 ///   - Read and parse the Isograph literals
-/// - Combine everything into an UnvalidatedSchema.
-/// - Turn the UnvalidatedSchema into a ValidatedSchema
+/// - Combine everything into an Schema.
+/// - Turn the Schema into a Schema
 ///   - Note: at this point, we do most of the validations, like ensuring that
 ///     all selected fields exist and are of the correct types, parameters are
 ///     passed when needed, etc.
