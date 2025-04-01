@@ -7,11 +7,11 @@ use isograph_lang_types::{
     SelectionTypeContainingSelections,
 };
 use isograph_schema::{
-    categorize_field_loadability, transform_arguments_with_child_context, ClientFieldOrPointer,
-    ClientFieldVariant, Loadability, NameAndArguments, NormalizationKey, OutputFormat,
-    PathToRefetchField, RefetchedPathsMap, SchemaServerLinkedFieldFieldVariant,
-    ValidatedClientField, ValidatedLinkedFieldSelection, ValidatedScalarFieldSelection,
-    ValidatedSchema, ValidatedSelection, VariableContext,
+    categorize_field_loadability, transform_arguments_with_child_context, ClientField,
+    ClientFieldOrPointer, ClientFieldVariant, Loadability, NameAndArguments, NormalizationKey,
+    OutputFormat, PathToRefetchField, RefetchedPathsMap, SchemaServerLinkedFieldFieldVariant,
+    ValidatedLinkedFieldSelection, ValidatedScalarFieldSelection, ValidatedSchema,
+    ValidatedSelection, VariableContext,
 };
 
 use crate::{
@@ -183,7 +183,7 @@ fn linked_field_ast_node<TOutputFormat: OutputFormat>(
 fn scalar_client_defined_field_ast_node<TOutputFormat: OutputFormat>(
     scalar_field_selection: &ValidatedScalarFieldSelection,
     schema: &ValidatedSchema<TOutputFormat>,
-    client_field: &ValidatedClientField<TOutputFormat>,
+    client_field: &ClientField<TOutputFormat>,
     indentation_level: u8,
     path: &mut Vec<NormalizationKey>,
     root_refetched_paths: &RefetchedPathsMap,
@@ -260,7 +260,7 @@ fn link_variant_ast_node(
 fn user_written_variant_ast_node<TOutputFormat: OutputFormat>(
     scalar_field_selection: &ValidatedScalarFieldSelection,
     indentation_level: u8,
-    nested_client_field: &ValidatedClientField<TOutputFormat>,
+    nested_client_field: &ClientField<TOutputFormat>,
     schema: &ValidatedSchema<TOutputFormat>,
     path: &mut Vec<NormalizationKey>,
     root_refetched_paths: &RefetchedPathsMap,
@@ -323,7 +323,7 @@ fn user_written_variant_ast_node<TOutputFormat: OutputFormat>(
 
 #[allow(clippy::too_many_arguments)]
 fn imperatively_loaded_variant_ast_node<TOutputFormat: OutputFormat>(
-    nested_client_field: &ValidatedClientField<TOutputFormat>,
+    nested_client_field: &ClientField<TOutputFormat>,
     reader_imports: &mut ReaderImports,
     root_refetched_paths: &RefetchedPathsMap,
     path: &[NormalizationKey],
@@ -369,7 +369,7 @@ fn imperatively_loaded_variant_ast_node<TOutputFormat: OutputFormat>(
 
 fn loadably_selected_field_ast_node<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
-    client_field: &ValidatedClientField<TOutputFormat>,
+    client_field: &ClientField<TOutputFormat>,
     reader_imports: &mut ReaderImports,
     indentation_level: u8,
     scalar_field_selection: &ValidatedScalarFieldSelection,
@@ -587,7 +587,7 @@ pub(crate) fn generate_reader_ast<'schema, TOutputFormat: OutputFormat>(
 }
 
 fn refetched_paths_for_client_field<TOutputFormat: OutputFormat>(
-    nested_client_field: &ValidatedClientField<TOutputFormat>,
+    nested_client_field: &ClientField<TOutputFormat>,
     schema: &ValidatedSchema<TOutputFormat>,
     path: &mut Vec<NormalizationKey>,
     client_field_variable_context: &VariableContext,

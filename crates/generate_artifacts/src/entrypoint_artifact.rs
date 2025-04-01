@@ -11,10 +11,10 @@ use isograph_lang_types::{
 use isograph_schema::{
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
-    get_reachable_variables, initial_variable_context, ClientFieldOrPointer,
+    get_reachable_variables, initial_variable_context, ClientField, ClientFieldOrPointer,
     FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, MergedSelectionMap, OutputFormat,
     RootOperationName, RootRefetchedPath, ScalarClientFieldTraversalState, SchemaObject,
-    ValidatedClientField, ValidatedSchema, ValidatedVariableDefinition,
+    ValidatedSchema, ValidatedVariableDefinition,
 };
 
 use crate::{
@@ -79,7 +79,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     TOutputFormat: OutputFormat,
 >(
     schema: &ValidatedSchema<TOutputFormat>,
-    entrypoint: &ValidatedClientField<TOutputFormat>,
+    entrypoint: &ClientField<TOutputFormat>,
     merged_selection_map: &MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,
     encountered_client_type_map: &FieldToCompletedMergeTraversalStateMap,

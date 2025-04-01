@@ -21,11 +21,11 @@ use crate::{
     categorize_field_loadability, create_transformed_name_and_arguments,
     expose_field_directive::RequiresRefinement, initial_variable_context,
     transform_arguments_with_child_context,
-    transform_name_and_arguments_with_child_variable_context, ClientFieldOrPointer,
+    transform_name_and_arguments_with_child_variable_context, ClientField, ClientFieldOrPointer,
     ClientFieldOrPointerId, ClientFieldVariant, ImperativelyLoadedFieldVariant, Loadability,
     NameAndArguments, OutputFormat, PathToRefetchField, RootOperationName, SchemaObject,
-    SchemaServerLinkedFieldFieldVariant, ValidatedClientField, ValidatedScalarFieldSelection,
-    ValidatedSchema, ValidatedSelection, ValidatedSelectionType, VariableContext,
+    SchemaServerLinkedFieldFieldVariant, ValidatedScalarFieldSelection, ValidatedSchema,
+    ValidatedSelection, ValidatedSelectionType, VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -450,7 +450,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
 
 pub fn get_imperatively_loaded_artifact_info<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
-    entrypoint: &ValidatedClientField<TOutputFormat>,
+    entrypoint: &ClientField<TOutputFormat>,
     root_refetch_path: RootRefetchedPath,
     nested_selection_map: &MergedSelectionMap,
     reachable_variables: &BTreeSet<VariableName>,
@@ -494,10 +494,10 @@ fn process_imperatively_loaded_field<TOutputFormat: OutputFormat>(
     variant: ImperativelyLoadedFieldVariant,
     refetch_field_parent_id: ServerObjectId,
     selection_map: &MergedSelectionMap,
-    entrypoint: &ValidatedClientField<TOutputFormat>,
+    entrypoint: &ClientField<TOutputFormat>,
     index: usize,
     reachable_variables: &BTreeSet<VariableName>,
-    client_field: &ValidatedClientField<TOutputFormat>,
+    client_field: &ClientField<TOutputFormat>,
 ) -> ImperativelyLoadedFieldArtifactInfo {
     let ImperativelyLoadedFieldVariant {
         client_field_scalar_selection_name,
@@ -599,7 +599,7 @@ fn process_imperatively_loaded_field<TOutputFormat: OutputFormat>(
 
 fn get_used_variable_definitions<TOutputFormat: OutputFormat>(
     reachable_variables: &BTreeSet<VariableName>,
-    entrypoint: &ValidatedClientField<TOutputFormat>,
+    entrypoint: &ClientField<TOutputFormat>,
 ) -> Vec<WithSpan<VariableDefinition<ServerEntityId>>> {
     reachable_variables
         .iter()
@@ -938,7 +938,7 @@ fn insert_imperative_field_into_refetch_paths<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    newly_encountered_scalar_client_field: &ValidatedClientField<TOutputFormat>,
+    newly_encountered_scalar_client_field: &ClientField<TOutputFormat>,
     parent_type: &SchemaObject<TOutputFormat>,
     variant: &ImperativelyLoadedFieldVariant,
 ) {

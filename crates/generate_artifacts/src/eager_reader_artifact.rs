@@ -4,8 +4,8 @@ use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
 use isograph_schema::{
-    initial_variable_context, ClientFieldOrPointer, OutputFormat, ValidatedClientField,
-    ValidatedSchema, ValidatedSelectionType,
+    initial_variable_context, ClientField, ClientFieldOrPointer, OutputFormat, ValidatedSchema,
+    ValidatedSelectionType,
 };
 use isograph_schema::{
     RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment, UserWrittenClientTypeInfo,
@@ -313,7 +313,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
 
 pub(crate) fn generate_eager_reader_output_type_artifact<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
-    client_field: &ValidatedClientField<TOutputFormat>,
+    client_field: &ClientField<TOutputFormat>,
     config: &CompilerConfig,
     info: UserWrittenClientTypeInfo,
     file_extensions: GenerateFileExtensionsOption,

@@ -17,10 +17,10 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     accessible_client_fields, as_server_field, description, get_provided_arguments,
-    output_type_annotation, selection_map_wrapped, ClientFieldOrPointer, ClientFieldVariant,
-    FieldTraversalResult, NameAndArguments, NormalizationKey, OutputFormat, RequiresRefinement,
-    Schema, SchemaObject, SchemaServerLinkedFieldFieldVariant, UserWrittenClientTypeInfo,
-    UserWrittenComponentVariant, ValidatedClientField, ValidatedScalarSelectionAssociatedData,
+    output_type_annotation, selection_map_wrapped, ClientField, ClientFieldOrPointer,
+    ClientFieldVariant, FieldTraversalResult, NameAndArguments, NormalizationKey, OutputFormat,
+    RequiresRefinement, Schema, SchemaObject, SchemaServerLinkedFieldFieldVariant,
+    UserWrittenClientTypeInfo, UserWrittenComponentVariant, ValidatedScalarSelectionAssociatedData,
     ValidatedSchema, ValidatedSchemaState, ValidatedSelection, ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -493,7 +493,7 @@ fn get_serialized_field_argument(
 }
 
 pub(crate) fn generate_output_type<TOutputFormat: OutputFormat>(
-    client_field: &ValidatedClientField<TOutputFormat>,
+    client_field: &ClientField<TOutputFormat>,
 ) -> ClientFieldOutputType {
     let variant = &client_field.variant;
     match variant {

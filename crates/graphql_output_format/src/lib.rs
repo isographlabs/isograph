@@ -4,9 +4,7 @@ mod query_text;
 mod read_schema;
 
 pub use graphql_output_format::*;
-use isograph_schema::{
-    Schema, SchemaObject, UnvalidatedSchema, ValidatedClientField, ValidatedSchema,
-};
+use isograph_schema::{ClientField, Schema, SchemaObject, UnvalidatedSchema, ValidatedSchema};
 pub use read_schema::*;
 
 pub type ValidatedGraphqlSchema = ValidatedSchema<GraphQLOutputFormat>;
@@ -14,6 +12,6 @@ pub type GraphqlSchema<TSchemaValidationState> =
     Schema<TSchemaValidationState, GraphQLOutputFormat>;
 pub type UnvalidatedGraphqlSchema = UnvalidatedSchema<GraphQLOutputFormat>;
 
-pub type ValidatedGraphqlClientField = ValidatedClientField<GraphQLOutputFormat>;
+pub type ValidatedGraphqlClientField = ClientField<GraphQLOutputFormat>;
 
 pub type GraphqlSchemaObject = SchemaObject<GraphQLOutputFormat>;

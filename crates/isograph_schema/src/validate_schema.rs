@@ -37,9 +37,6 @@ pub type ValidatedScalarFieldSelection =
     ScalarFieldSelection<ValidatedScalarSelectionAssociatedData>;
 
 pub type ValidatedVariableDefinition = VariableDefinition<ServerEntityId>;
-pub type ValidatedClientField<TOutputFormat> = ClientField<TOutputFormat>;
-
-pub type ValidatedClientPointer<TOutputFormat> = ClientPointer<TOutputFormat>;
 
 pub type ValidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
     ValidatedScalarSelectionAssociatedData,
@@ -69,10 +66,8 @@ pub struct ValidatedScalarSelectionAssociatedData {
 
 pub type MissingArguments = Vec<ValidatedVariableDefinition>;
 
-pub type ValidatedSelectionType<'a, TOutputFormat> = SelectionType<
-    &'a ValidatedClientField<TOutputFormat>,
-    &'a ValidatedClientPointer<TOutputFormat>,
->;
+pub type ValidatedSelectionType<'a, TOutputFormat> =
+    SelectionType<&'a ClientField<TOutputFormat>, &'a ClientPointer<TOutputFormat>>;
 
 #[derive(Debug)]
 pub struct ValidatedSchemaState {}
@@ -237,7 +232,7 @@ pub enum Loadability<'a> {
 /// source of truth for whether a field is fetched imperatively: the presence of the
 /// @loadable directive.
 pub fn categorize_field_loadability<'a, TOutputFormat: OutputFormat>(
-    client_field: &'a ValidatedClientField<TOutputFormat>,
+    client_field: &'a ClientField<TOutputFormat>,
     selection_variant: &'a ScalarSelectionDirectiveSet,
 ) -> Option<Loadability<'a>> {
     match &client_field.variant {

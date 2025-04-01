@@ -6,15 +6,13 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    DefinitionLocation, EntrypointDeclaration, LinkedFieldSelection, ServerEntityId,
-    ServerScalarId, ServerScalarSelectableId, VariableDefinition,
+    DefinitionLocation, EntrypointDeclaration, ServerEntityId, ServerScalarId,
+    ServerScalarSelectableId,
 };
 
 use crate::{
-    schema_validation_state::SchemaValidationState, ClientField, ClientFieldOrPointerId,
-    ClientPointer, OutputFormat, Schema, SchemaScalar, ServerFieldData, ServerScalarSelectable,
-    UseRefetchFieldRefetchStrategy, ValidatedLinkedFieldAssociatedData,
-    ValidatedScalarSelectionAssociatedData, ValidatedSelection,
+    schema_validation_state::SchemaValidationState, ClientFieldOrPointerId, OutputFormat, Schema,
+    SchemaScalar, ServerFieldData, ValidatedSelection,
 };
 use lazy_static::lazy_static;
 
@@ -49,24 +47,6 @@ pub type UnvalidatedSchema<TOutputFormat> = Schema<UnvalidatedSchemaState, TOutp
 /// client field.)
 pub type UnvalidatedObjectFieldInfo =
     DefinitionLocation<ServerScalarSelectableId, ClientFieldOrPointerId>;
-
-pub type UnvalidatedSchemaSchemaField<TOutputFormat> = ServerScalarSelectable<TOutputFormat>;
-
-pub type UnvalidatedVariableDefinition = VariableDefinition<ServerEntityId>;
-
-pub type UnvalidatedClientField<TOutputFormat> = ClientField<TOutputFormat>;
-
-pub type UnvalidatedClientPointer<TOutputFormat> = ClientPointer<TOutputFormat>;
-
-pub type UnvalidatedLinkedFieldSelection = LinkedFieldSelection<
-    ValidatedScalarSelectionAssociatedData,
-    ValidatedLinkedFieldAssociatedData,
->;
-
-pub type UnvalidatedRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
-    ValidatedScalarSelectionAssociatedData,
-    ValidatedLinkedFieldAssociatedData,
->;
 
 impl<TOutputFormat: OutputFormat> Default for UnvalidatedSchema<TOutputFormat> {
     fn default() -> Self {

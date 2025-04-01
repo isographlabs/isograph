@@ -5,14 +5,14 @@ use std::cmp::Ordering;
 
 use common_lang_types::{ArtifactPathAndContent, IsoLiteralText, SelectableName};
 use isograph_schema::{
-    ClientFieldOrPointer, ClientFieldVariant, OutputFormat, UserWrittenComponentVariant,
-    ValidatedClientField, ValidatedSchema, ValidatedSelectionType,
+    ClientField, ClientFieldOrPointer, ClientFieldVariant, OutputFormat,
+    UserWrittenComponentVariant, ValidatedSchema, ValidatedSelectionType,
 };
 
 use crate::generate_artifacts::ISO_TS_FILE_NAME;
 
 fn build_iso_overload_for_entrypoint<TOutputFormat: OutputFormat>(
-    validated_client_field: &ValidatedClientField<TOutputFormat>,
+    validated_client_field: &ClientField<TOutputFormat>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> (String, String) {
     let formatted_field = format!(
@@ -246,7 +246,7 @@ fn sorted_user_written_types<TOutputFormat: OutputFormat>(
 
 fn sorted_entrypoints<TOutputFormat: OutputFormat>(
     schema: &ValidatedSchema<TOutputFormat>,
-) -> Vec<(&ValidatedClientField<TOutputFormat>, &IsoLiteralText)> {
+) -> Vec<(&ClientField<TOutputFormat>, &IsoLiteralText)> {
     let mut entrypoints = schema
         .entrypoints
         .iter()

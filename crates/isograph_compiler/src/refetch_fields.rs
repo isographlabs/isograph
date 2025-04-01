@@ -8,10 +8,9 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     generate_refetch_field_strategy, id_arguments, id_selection, id_top_level_arguments,
-    ClientField, ClientFieldVariant, ImperativelyLoadedFieldVariant, OutputFormat, RefetchStrategy,
-    RequiresRefinement, SchemaObject, UnprocessedClientFieldItem, UnprocessedItem,
-    UnvalidatedClientField, UnvalidatedClientPointer, UnvalidatedSchema, NODE_FIELD_NAME,
-    REFETCH_FIELD_NAME,
+    ClientField, ClientFieldVariant, ClientPointer, ImperativelyLoadedFieldVariant, OutputFormat,
+    RefetchStrategy, RequiresRefinement, SchemaObject, UnprocessedClientFieldItem, UnprocessedItem,
+    UnvalidatedSchema, NODE_FIELD_NAME, REFETCH_FIELD_NAME,
 };
 
 use crate::batch_compile::BatchCompileError;
@@ -70,10 +69,7 @@ pub fn add_refetch_fields_to_objects<TOutputFormat: OutputFormat>(
 fn add_refetch_field_to_object<TOutputFormat: OutputFormat>(
     object: &mut SchemaObject<TOutputFormat>,
     client_fields: &mut Vec<
-        SelectionType<
-            UnvalidatedClientField<TOutputFormat>,
-            UnvalidatedClientPointer<TOutputFormat>,
-        >,
+        SelectionType<ClientField<TOutputFormat>, ClientPointer<TOutputFormat>>,
     >,
     query_id: ServerObjectId,
     _id_field: ServerStrongIdFieldId,

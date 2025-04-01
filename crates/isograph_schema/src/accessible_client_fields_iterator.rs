@@ -2,7 +2,7 @@ use common_lang_types::WithSpan;
 use isograph_lang_types::{DefinitionLocation, SelectionTypeContainingSelections};
 
 use crate::{
-    ClientFieldOrPointer, OutputFormat, ValidatedClientField, ValidatedSchema, ValidatedSelection,
+    ClientField, ClientFieldOrPointer, OutputFormat, ValidatedSchema, ValidatedSelection,
     ValidatedSelectionType,
 };
 
@@ -10,7 +10,7 @@ use crate::{
 pub fn accessible_client_fields<'a, TOutputFormat: OutputFormat>(
     selection_type: &'a ValidatedSelectionType<'a, TOutputFormat>,
     schema: &'a ValidatedSchema<TOutputFormat>,
-) -> impl Iterator<Item = &'a ValidatedClientField<TOutputFormat>> + 'a {
+) -> impl Iterator<Item = &'a ClientField<TOutputFormat>> + 'a {
     AccessibleClientFieldIterator {
         selection_set: selection_type.selection_set_for_parent_query(),
         index: 0,
@@ -29,7 +29,7 @@ struct AccessibleClientFieldIterator<'a, TOutputFormat: OutputFormat> {
 impl<'a, TOutputFormat: OutputFormat> Iterator
     for AccessibleClientFieldIterator<'a, TOutputFormat>
 {
-    type Item = &'a ValidatedClientField<TOutputFormat>;
+    type Item = &'a ClientField<TOutputFormat>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(iterator) = &mut self.sub_iterator {
