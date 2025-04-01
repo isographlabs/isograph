@@ -18,12 +18,13 @@ use isograph_lang_types::{
 use lazy_static::lazy_static;
 
 use crate::{
-    categorize_field_loadability, create_transformed_name_and_arguments,
-    expose_field_directive::RequiresRefinement, initial_variable_context,
-    transform_arguments_with_child_context,
+    create_transformed_name_and_arguments,
+    expose_field_directive::RequiresRefinement,
+    field_loadability::{categorize_field_loadability, Loadability},
+    initial_variable_context, transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context, ClientField, ClientFieldOrPointer,
-    ClientFieldOrPointerId, ClientFieldVariant, ImperativelyLoadedFieldVariant, Loadability,
-    NameAndArguments, OutputFormat, PathToRefetchField, RootOperationName, Schema, SchemaObject,
+    ClientFieldOrPointerId, ClientFieldVariant, ImperativelyLoadedFieldVariant, NameAndArguments,
+    OutputFormat, PathToRefetchField, RootOperationName, Schema, SchemaObject,
     SchemaServerLinkedFieldFieldVariant, ValidatedScalarFieldSelection, ValidatedSelection,
     ValidatedSelectionType, VariableContext,
 };
