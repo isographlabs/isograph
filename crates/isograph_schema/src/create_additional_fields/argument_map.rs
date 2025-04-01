@@ -10,7 +10,7 @@ use isograph_lang_types::{
     DefinitionLocation, SelectionType, ServerEntityId, ServerScalarSelectableId, VariableDefinition,
 };
 
-use crate::{NetworkProtocol, Schema};
+use crate::{NetworkProtocol, Schema, ValidatedVariableDefinition};
 
 use super::create_additional_fields_error::{
     CreateAdditionalFieldsError, FieldMapItem, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
@@ -128,7 +128,7 @@ impl ArgumentMap {
 }
 
 enum PotentiallyModifiedArgument {
-    Unmodified(VariableDefinition<ServerEntityId>),
+    Unmodified(ValidatedVariableDefinition),
     Modified(ModifiedArgument),
 }
 
