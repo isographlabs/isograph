@@ -16,7 +16,6 @@ use thiserror::Error;
 use crate::{
     ClientField, ClientFieldVariant, ClientPointer, ImperativelyLoadedFieldVariant, OutputFormat,
     Schema, ServerScalarSelectable, UseRefetchFieldRefetchStrategy,
-    ValidateEntrypointDeclarationError,
 };
 
 pub type ValidatedSchemaServerField<TOutputFormat> = ServerScalarSelectable<TOutputFormat>;
@@ -144,15 +143,6 @@ pub type ValidateSchemaResult<T> = Result<T, WithLocation<ValidateSchemaError>>;
 
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum ValidateSchemaError {
-    #[error(
-        "The field `{parent_type_name}.{field_name}` has inner type `{field_type}`, which does not exist."
-    )]
-    FieldTypenameDoesNotExist {
-        parent_type_name: IsographObjectTypeName,
-        field_name: SelectableName,
-        field_type: UnvalidatedTypeName,
-    },
-
     #[error("Expected input of type {expected_type}, found variable {variable_name} of type {variable_type}")]
     ExpectedTypeFoundVariable {
         expected_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
@@ -231,19 +221,6 @@ pub enum ValidateSchemaError {
 
     #[error(
         "In the client {client_type} `{client_field_parent_type_name}.{client_field_name}`, the \
-        field `{field_parent_type_name}.{field_name}` is selected as a linked field, \
-        but that field is a client field, which can only be selected as a scalar."
-    )]
-    SelectionTypeSelectionClientFieldSelectedAsLinked {
-        client_field_parent_type_name: IsographObjectTypeName,
-        client_field_name: SelectableName,
-        field_parent_type_name: IsographObjectTypeName,
-        field_name: SelectableName,
-        client_type: String,
-    },
-
-    #[error(
-        "In the client {client_type} `{client_field_parent_type_name}.{client_field_name}`, the \
         pointer `{field_parent_type_name}.{field_name}` is selected as a scalar. \
         However, client pointers can only be selected as linked fields."
     )]
@@ -270,11 +247,6 @@ pub enum ValidateSchemaError {
     )]
     MissingFields {
         missing_fields_names: Vec<SelectableName>,
-    },
-
-    #[error("Error when validating iso entrypoint calls.\nMessage: {message}")]
-    ErrorValidatingEntrypointDeclaration {
-        message: ValidateEntrypointDeclarationError,
     },
 
     #[error(
