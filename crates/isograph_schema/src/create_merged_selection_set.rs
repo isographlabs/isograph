@@ -655,7 +655,7 @@ fn create_selection_map_with_merge_traversal_state<TNetworkProtocol: NetworkProt
 fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
-    parent_type: &SchemaObject<TNetworkProtocol>,
+    parent_object: &SchemaObject<TNetworkProtocol>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
@@ -693,7 +693,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             Some(Loadability::LoadablySelectedField(_loadable_variant)) => {
                                 create_merged_selection_map_for_field_and_insert_into_global_map(
                                     schema,
-                                    parent_type,
+                                    parent_object,
                                     newly_encountered_scalar_client_field
                                         .selection_set_for_parent_query(),
                                     encountered_client_field_map,
@@ -721,7 +721,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                     encountered_client_field_map,
                                     merge_traversal_state,
                                     newly_encountered_scalar_client_field,
-                                    parent_type,
+                                    parent_object,
                                     variant,
                                 );
                             }
@@ -730,7 +730,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                 ClientFieldVariant::ImperativelyLoadedField(_)
                                 | ClientFieldVariant::UserWritten(_) => {
                                     merge_non_loadable_client_type(
-                                        parent_type,
+                                        parent_object,
                                         schema,
                                         parent_map,
                                         merge_traversal_state,
@@ -751,24 +751,24 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                     }
                 };
             }
-            SelectionType::Object(linked_field_selection) => {
-                let type_id = linked_field_selection.associated_data.parent_object_id;
-                let linked_field_parent_type = schema.server_field_data.object(type_id);
+            SelectionType::Object(object_selection) => {
+                let type_id = object_selection.associated_data.parent_object_id;
+                let object_selection_parent_object = schema.server_field_data.object(type_id);
 
-                match linked_field_selection.associated_data.field_id {
+                match object_selection.associated_data.field_id {
                     DefinitionLocation::Client(client_pointer_id) => {
                         let newly_encountered_client_pointer =
                             schema.client_pointer(client_pointer_id);
 
                         merge_non_loadable_client_type(
-                            parent_type,
+                            parent_object,
                             schema,
                             parent_map,
                             merge_traversal_state,
                             SelectionType::Object(newly_encountered_client_pointer),
                             encountered_client_field_map,
                             variable_context,
-                            &linked_field_selection.arguments,
+                            &object_selection.arguments,
                         )
                     }
                     DefinitionLocation::Server(server_field_id) => {
@@ -776,12 +776,12 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
 
                         match &server_field.target_server_entity {
                             SelectionType::Scalar(_) => {}
-                            SelectionType::Object((linked_field_variant, _)) => {
-                                match &linked_field_variant {
+                            SelectionType::Object((object_selectable_variant, _)) => {
+                                match &object_selectable_variant {
                                     SchemaServerObjectSelectableVariant::InlineFragment(
                                         inline_fragment_variant,
                                     ) => {
-                                        let type_to_refine_to = linked_field_parent_type.name;
+                                        let type_to_refine_to = object_selection_parent_object.name;
                                         let normalization_key =
                                             NormalizationKey::InlineFragment(type_to_refine_to);
 
@@ -812,14 +812,14 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                             MergedServerSelection::InlineFragment(
                                                 existing_inline_fragment,
                                             ) => {
-                                                let linked_field_parent_type = schema
+                                                let object_selection_parent_object = schema
                                                     .server_field_data
-                                                    .object(linked_field_parent_type.id);
+                                                    .object(object_selection_parent_object.id);
 
                                                 merge_validated_selections_into_selection_map(
                                                     schema,
                                                     &mut existing_inline_fragment.selection_map,
-                                                    linked_field_parent_type,
+                                                    object_selection_parent_object,
                                                     &inline_fragment_variant.reader_selection_set,
                                                     merge_traversal_state,
                                                     encountered_client_field_map,
@@ -828,8 +828,8 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                                 merge_validated_selections_into_selection_map(
                                                     schema,
                                                     &mut existing_inline_fragment.selection_map,
-                                                    linked_field_parent_type,
-                                                    &linked_field_selection.selection_set,
+                                                    object_selection_parent_object,
+                                                    &object_selection.selection_set,
                                                     merge_traversal_state,
                                                     encountered_client_field_map,
                                                     variable_context,
@@ -841,8 +841,8 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
 
                                                 create_merged_selection_map_for_field_and_insert_into_global_map(
                                                     schema,
-                                                    parent_type,
-                                                    &linked_field_selection.selection_set,
+                                                    parent_object,
+                                                    &object_selection.selection_set,
                                                     encountered_client_field_map,
                                                     DefinitionLocation::Server(inline_fragment_variant.server_field_id),
                                                     &server_field.initial_variable_context()
@@ -853,8 +853,8 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                     SchemaServerObjectSelectableVariant::LinkedField => {
                                         let normalization_key =
                                             create_transformed_name_and_arguments(
-                                                linked_field_selection.name.item.into(),
-                                                &linked_field_selection.arguments,
+                                                object_selection.name.item.into(),
+                                                &object_selection.arguments,
                                                 variable_context,
                                             )
                                             .normalization_key();
@@ -874,14 +874,14 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                             .or_insert_with(|| {
                                                 MergedServerSelection::LinkedField(
                                                     MergedLinkedFieldSelection {
-                                                        concrete_type: linked_field_selection
+                                                        concrete_type: object_selection
                                                             .associated_data
                                                             .concrete_type,
-                                                        name: linked_field_selection.name.item,
+                                                        name: object_selection.name.item,
                                                         selection_map: BTreeMap::new(),
                                                         arguments:
                                                             transform_arguments_with_child_context(
-                                                                linked_field_selection
+                                                                object_selection
                                                                     .arguments
                                                                     .iter()
                                                                     .map(|arg| {
@@ -906,8 +906,8 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                                 merge_validated_selections_into_selection_map(
                                                     schema,
                                                     &mut existing_linked_field.selection_map,
-                                                    linked_field_parent_type,
-                                                    &linked_field_selection.selection_set,
+                                                    object_selection_parent_object,
+                                                    &object_selection.selection_set,
                                                     merge_traversal_state,
                                                     encountered_client_field_map,
                                                     variable_context,
@@ -932,7 +932,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
         }
     }
 
-    select_typename_and_id_fields_in_merged_selection(schema, parent_map, parent_type);
+    select_typename_and_id_fields_in_merged_selection(schema, parent_map, parent_object);
 }
 
 fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
