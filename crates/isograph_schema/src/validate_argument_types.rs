@@ -127,7 +127,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     field_argument_definition_type: &GraphQLTypeAnnotation<ServerEntityId>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     schema_data: &ServerFieldData<TNetworkProtocol>,
-    server_fields: &[ServerScalarSelectable<TNetworkProtocol>],
+    server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
 ) -> ValidateArgumentTypesResult<()> {
     match &selection_supplied_argument_value.item {
         NonConstantValue::Variable(variable_name) => {
@@ -249,7 +249,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                     list_type,
                     variable_definitions,
                     schema_data,
-                    server_fields,
+                    server_scalar_selectables,
                 ),
                 GraphQLNonNullTypeAnnotation::Named(_) => Err(WithLocation::new(
                     ValidateArgumentTypesError::ExpectedTypeFoundList {
@@ -287,7 +287,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                         selection_supplied_argument_value,
                         variable_definitions,
                         schema_data,
-                        server_fields,
+                        server_scalar_selectables,
                         object_literal,
                         object_id,
                     ),
@@ -301,7 +301,7 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
     variable_definitions: &[WithSpan<VariableDefinition<ServerEntityId>>],
     schema_data: &ServerFieldData<TNetworkProtocol>,
-    server_fields: &[ServerScalarSelectable<TNetworkProtocol>],
+    server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     object_id: ServerObjectId,
 ) -> Result<(), WithLocation<ValidateArgumentTypesError>> {
@@ -312,26 +312,29 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
         selection_supplied_argument_value.location,
     )?;
 
-    let missing_fields =
-        get_non_nullable_missing_and_provided_fields(server_fields, object_literal, object)
-            .iter()
-            .filter_map(|field| match field {
-                ObjectLiteralFieldType::Provided(
-                    field_type_annotation,
-                    selection_supplied_argument_value,
-                ) => match value_satisfies_type(
-                    &selection_supplied_argument_value.value,
-                    field_type_annotation,
-                    variable_definitions,
-                    schema_data,
-                    server_fields,
-                ) {
-                    Ok(_) => None,
-                    Err(e) => Some(Err(e)),
-                },
-                ObjectLiteralFieldType::Missing(field_name) => Some(Ok(*field_name)),
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+    let missing_fields = get_non_nullable_missing_and_provided_fields(
+        server_scalar_selectables,
+        object_literal,
+        object,
+    )
+    .iter()
+    .filter_map(|field| match field {
+        ObjectLiteralFieldType::Provided(
+            field_type_annotation,
+            selection_supplied_argument_value,
+        ) => match value_satisfies_type(
+            &selection_supplied_argument_value.value,
+            field_type_annotation,
+            variable_definitions,
+            schema_data,
+            server_scalar_selectables,
+        ) {
+            Ok(_) => None,
+            Err(e) => Some(Err(e)),
+        },
+        ObjectLiteralFieldType::Missing(field_name) => Some(Ok(*field_name)),
+    })
+    .collect::<Result<Vec<_>, _>>()?;
 
     if missing_fields.is_empty() {
         Ok(())
@@ -354,7 +357,7 @@ enum ObjectLiteralFieldType {
 }
 
 fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtocol>(
-    server_fields: &[ServerScalarSelectable<TNetworkProtocol>],
+    server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     object: &SchemaObject<TNetworkProtocol>,
 ) -> Vec<ObjectLiteralFieldType> {
@@ -362,7 +365,7 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
         .encountered_fields
         .iter()
         .filter_map(|(field_name, field_type)| {
-            let field = &server_fields[field_type.as_server()?.as_usize()];
+            let field = &server_scalar_selectables[field_type.as_server()?.as_usize()];
 
             let field_type_annotation = &field.target_server_entity;
 
@@ -469,7 +472,7 @@ fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     list_type: GraphQLListTypeAnnotation<ServerEntityId>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     schema_data: &ServerFieldData<TNetworkProtocol>,
-    server_fields: &[ServerScalarSelectable<TNetworkProtocol>],
+    server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
 ) -> ValidateArgumentTypesResult<()> {
     list.iter().try_for_each(|element| {
         value_satisfies_type(
@@ -477,7 +480,7 @@ fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             &list_type.0,
             variable_definitions,
             schema_data,
-            server_fields,
+            server_scalar_selectables,
         )
     })
 }
