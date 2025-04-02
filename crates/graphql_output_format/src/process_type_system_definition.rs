@@ -614,9 +614,10 @@ fn process_fields(
                         set_and_validate_id_field(
                             &mut parent_object.id_field,
                             next_server_field_id,
-                            &field,
                             parent_object.name,
                             options,
+                            field.item.type_.inner_non_null_named_type(),
+                            field.location,
                         )?;
                     }
 
@@ -691,9 +692,10 @@ fn process_fields(
 fn set_and_validate_id_field(
     id_field: &mut Option<ServerStrongIdFieldId>,
     current_field_id: ServerScalarSelectableId,
-    field: &WithLocation<GraphQLFieldDefinition>,
     parent_type_name: IsographObjectTypeName,
     options: &CompilerConfigOptions,
+    inner_non_null_named_type: Option<&GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
+    location: Location,
 ) -> ProcessTypeDefinitionResult<()> {
     // N.B. id_field is guaranteed to be None; otherwise field_names_to_type_name would
     // have contained this field name already.
@@ -703,7 +705,7 @@ fn set_and_validate_id_field(
     // type specific to the concrete type, e.g. UserID.
     *id_field = Some(current_field_id.unchecked_conversion());
 
-    match field.item.type_.inner_non_null_named_type() {
+    match inner_non_null_named_type {
         Some(type_) => {
             if type_.0.item != *ID_GRAPHQL_TYPE {
                 options.on_invalid_id_type.on_failure(|| {
@@ -713,7 +715,7 @@ fn set_and_validate_id_field(
                             parent_type: parent_type_name,
                         },
                         // TODO this shows the wrong span?
-                        field.location,
+                        location,
                     )
                 })?;
             }
@@ -727,7 +729,7 @@ fn set_and_validate_id_field(
                         parent_type: parent_type_name,
                     },
                     // TODO this shows the wrong span?
-                    field.location,
+                    location,
                 )
             })?;
             Ok(())
