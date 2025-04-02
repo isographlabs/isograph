@@ -10,7 +10,7 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
     ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectionType,
-    SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, ServerScalarSelectableId,
+    SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, ServerObjectSelectableId,
     VariableDefinition,
 };
 
@@ -131,17 +131,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let mutation_subfield_id = self.parse_mutation_subfield_id(*field, parent_object_id)?;
 
         // TODO do not use mutation naming here
-        let mutation_field = self.server_scalar_selectable(mutation_subfield_id);
-        let selection_type = &mutation_field.target_server_entity;
-        let (_variant, payload_object_type_annotation) = match selection_type {
-            SelectionType::Scalar(_) => {
-                panic!(
-                    "Expected selection type to be an object. \
-                    This is indicatve of a bug in Isograph."
-                )
-            }
-            SelectionType::Object(object) => object,
-        };
+        let mutation_field = self.server_object_selectable(mutation_subfield_id);
+        let payload_object_type_annotation = &mutation_field.target_object_entity;
         let payload_object_id = *payload_object_type_annotation.inner();
 
         // TODO it's a bit annoying that we call .object twice!
@@ -176,29 +167,22 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         let (maybe_abstract_parent_object_id, maybe_abstract_parent_type_name) = match primary_field
         {
-            Some(DefinitionLocation::Server(server_field_id)) => {
-                let server_field = self.server_scalar_selectable(*server_field_id);
+            Some(DefinitionLocation::Server(SelectionType::Object(object_selectable_id))) => {
+                let server_object_selectable = self.server_object_selectable(*object_selectable_id);
 
                 // TODO validate that the payload object has no plural fields in between
 
-                match &server_field.target_server_entity {
-                    SelectionType::Object((_variant, type_annotation)) => {
-                        let client_field_parent_object_id = type_annotation.inner();
-                        let client_field_parent_object = self
-                            .server_field_data
-                            .object(*client_field_parent_object_id);
+                let client_field_parent_object_id =
+                    server_object_selectable.target_object_entity.inner();
+                let client_field_parent_object = self
+                    .server_field_data
+                    .object(*client_field_parent_object_id);
 
-                        Ok((
-                            *client_field_parent_object_id,
-                            // This is the parent type name (Pet)
-                            client_field_parent_object.name,
-                        ))
-                    }
-                    SelectionType::Scalar(_) => Err(WithLocation::new(
-                        CreateAdditionalFieldsError::InvalidMutationField,
-                        Location::generated(),
-                    )),
-                }
+                Ok((
+                    *client_field_parent_object_id,
+                    // This is the parent type name (Pet)
+                    client_field_parent_object.name,
+                ))
             }
             _ => Err(WithLocation::new(
                 CreateAdditionalFieldsError::InvalidMutationField,
@@ -368,14 +352,15 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &self,
         field_arg: StringLiteralValue,
         mutation_object_id: ServerObjectId,
-    ) -> ProcessTypeDefinitionResult<ServerScalarSelectableId> {
+    ) -> ProcessTypeDefinitionResult<ServerObjectSelectableId> {
         let mutation = self.server_field_data.object(mutation_object_id);
 
         let field_id = mutation
             .encountered_fields
             .iter()
             .find_map(|(name, field_id)| {
-                if let DefinitionLocation::Server(server_field_id) = field_id {
+                if let DefinitionLocation::Server(SelectionType::Object(server_field_id)) = field_id
+                {
                     if *name == field_arg {
                         return Some(server_field_id);
                     }

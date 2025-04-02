@@ -18,7 +18,7 @@ use isograph_lang_types::{
 use isograph_schema::{
     accessible_client_fields, description, output_type_annotation, selection_map_wrapped,
     ClientField, ClientFieldOrPointer, ClientFieldVariant, FieldTraversalResult, NameAndArguments,
-    NetworkProtocol, NormalizationKey, RequiresRefinement, Schema, SchemaObject,
+    NetworkProtocol, NormalizationKey, RequiresRefinement, Schema,
     SchemaServerObjectSelectableVariant, UserWrittenClientTypeInfo, UserWrittenComponentVariant,
     ValidatedScalarSelectionAssociatedData, ValidatedSelection, ValidatedVariableDefinition,
 };
@@ -143,24 +143,19 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
         match encountered_field_id {
             DefinitionLocation::Server(encountered_server_field_id) => {
                 let encountered_server_field =
-                    schema.server_scalar_selectable(*encountered_server_field_id);
-
-                match &encountered_server_field.target_server_entity {
-                    SelectionType::Scalar(_) => {}
-                    SelectionType::Object((linked_field_variant, _)) => match &linked_field_variant
-                    {
-                        SchemaServerObjectSelectableVariant::LinkedField => {}
-                        SchemaServerObjectSelectableVariant::InlineFragment(inline_fragment) => {
-                            path_and_contents.push(generate_eager_reader_condition_artifact(
-                                schema,
-                                encountered_server_field,
-                                inline_fragment,
-                                &traversal_state.refetch_paths,
-                                config.options.include_file_extensions_in_import_statements,
-                            ));
-                        }
-                    },
-                };
+                    schema.server_object_selectable(*encountered_server_field_id);
+                match &encountered_server_field.object_selectable_variant {
+                    SchemaServerObjectSelectableVariant::LinkedField => {}
+                    SchemaServerObjectSelectableVariant::InlineFragment(inline_fragment) => {
+                        path_and_contents.push(generate_eager_reader_condition_artifact(
+                            schema,
+                            encountered_server_field,
+                            inline_fragment,
+                            &traversal_state.refetch_paths,
+                            config.options.include_file_extensions_in_import_statements,
+                        ));
+                    }
+                }
             }
 
             DefinitionLocation::Client(SelectionType::Object(encountered_client_pointer_id)) => {
@@ -523,7 +518,6 @@ pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
 pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     selection_map: &[WithSpan<ValidatedSelection>],
-    parent_type: &SchemaObject<TNetworkProtocol>,
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
@@ -537,7 +531,6 @@ pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProt
             schema,
             &mut client_field_parameter_type,
             selection,
-            parent_type,
             nested_client_field_imports,
             loadable_fields,
             indentation_level + 1,
@@ -553,7 +546,6 @@ pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProt
 pub(crate) fn generate_client_field_updatable_data_type<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     selection_map: &[WithSpan<ValidatedSelection>],
-    parent_type: &SchemaObject<TNetworkProtocol>,
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
@@ -569,7 +561,6 @@ pub(crate) fn generate_client_field_updatable_data_type<TNetworkProtocol: Networ
             schema,
             &mut client_field_updatable_data_type,
             selection,
-            parent_type,
             nested_client_field_imports,
             loadable_fields,
             indentation_level + 1,
@@ -589,7 +580,6 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
-    parent_type: &SchemaObject<TNetworkProtocol>,
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
@@ -598,14 +588,8 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     match &selection.item {
         SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
             match scalar_field_selection.associated_data.location {
-                DefinitionLocation::Server(_server_field) => {
-                    let parent_field = parent_type
-                        .encountered_fields
-                        .get(&scalar_field_selection.name.item.into())
-                        .expect("parent_field should exist 1")
-                        .as_server()
-                        .expect("parent_field should exist and be server field");
-                    let field = schema.server_scalar_selectable(*parent_field);
+                DefinitionLocation::Server(server_scalar_selectable_id) => {
+                    let field = schema.server_scalar_selectable(server_scalar_selectable_id);
 
                     write_optional_description(
                         field.description,
@@ -615,16 +599,9 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 
                     let name_or_alias = scalar_field_selection.name_or_alias().item;
 
-                    let output_type = match &field.target_server_entity {
-                        SelectionType::Scalar(type_annotation) => {
-                            type_annotation.clone().map(&mut |scalar_id| {
-                                schema.server_field_data.scalar(scalar_id).javascript_name
-                            })
-                        }
-                        SelectionType::Object(_) => {
-                            panic!("Output type should be a scalar");
-                        }
-                    };
+                    let output_type = field.target_scalar_entity.clone().map(&mut |scalar_id| {
+                        schema.server_field_data.scalar(scalar_id).javascript_name
+                    });
 
                     query_type_declaration.push_str(&format!(
                         "{}readonly {}: {},\n",
@@ -647,8 +624,10 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
         }
         SelectionTypeContainingSelections::Object(linked_field) => {
             let field = match linked_field.associated_data.field_id {
-                DefinitionLocation::Server(server_field_id) => {
-                    DefinitionLocation::Server(schema.server_scalar_selectable(server_field_id))
+                DefinitionLocation::Server(server_object_selectable_id) => {
+                    DefinitionLocation::Server(
+                        schema.server_object_selectable(server_object_selectable_id),
+                    )
                 }
                 DefinitionLocation::Client(client_pointer_id) => {
                     DefinitionLocation::Client(schema.client_pointer(client_pointer_id))
@@ -663,22 +642,16 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
             let name_or_alias = linked_field.name_or_alias().item;
 
-            let type_annotation =
-                output_type_annotation(&field)
-                    .clone()
-                    .map(&mut |output_type_id| {
-                        let object_id = output_type_id;
-                        let object = schema.server_field_data.object(object_id);
-                        generate_client_field_parameter_type(
-                            schema,
-                            &linked_field.selection_set,
-                            object,
-                            nested_client_field_imports,
-                            loadable_fields,
-                            indentation_level,
-                            link_fields,
-                        )
-                    });
+            let type_annotation = output_type_annotation(&field).clone().map(&mut |_| {
+                generate_client_field_parameter_type(
+                    schema,
+                    &linked_field.selection_set,
+                    nested_client_field_imports,
+                    loadable_fields,
+                    indentation_level,
+                    link_fields,
+                )
+            });
 
             query_type_declaration.push_str(&format!(
                 "readonly {}: {},\n",
@@ -773,7 +746,6 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
-    parent_type: &SchemaObject<TNetworkProtocol>,
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
@@ -783,14 +755,8 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     match &selection.item {
         SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
             match scalar_field_selection.associated_data.location {
-                DefinitionLocation::Server(_server_field) => {
-                    let parent_field = parent_type
-                        .encountered_fields
-                        .get(&scalar_field_selection.name.item.into())
-                        .expect("parent_field should exist 1")
-                        .as_server()
-                        .expect("parent_field should exist and be server field");
-                    let field = schema.server_scalar_selectable(*parent_field);
+                DefinitionLocation::Server(server_scalar_selectable_id) => {
+                    let field = schema.server_scalar_selectable(server_scalar_selectable_id);
 
                     write_optional_description(
                         field.description,
@@ -800,16 +766,9 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 
                     let name_or_alias = scalar_field_selection.name_or_alias().item;
 
-                    let output_type = match &field.target_server_entity {
-                        SelectionType::Scalar(type_annotation) => {
-                            type_annotation.clone().map(&mut |scalar_id| {
-                                schema.server_field_data.scalar(scalar_id).javascript_name
-                            })
-                        }
-                        SelectionType::Object(_) => {
-                            panic!("Output type should be a scalar");
-                        }
-                    };
+                    let output_type = field.target_scalar_entity.clone().map(&mut |scalar_id| {
+                        schema.server_field_data.scalar(scalar_id).javascript_name
+                    });
 
                     match scalar_field_selection.associated_data.selection_variant {
                         ScalarSelectionDirectiveSet::Updatable(_) => {
@@ -860,23 +819,17 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
             let name_or_alias = linked_field.name_or_alias().item;
 
-            let type_annotation =
-                output_type_annotation(&field)
-                    .clone()
-                    .map(&mut |output_type_id| {
-                        let object_id = output_type_id;
-                        let object = schema.server_field_data.object(object_id);
-                        generate_client_field_updatable_data_type(
-                            schema,
-                            &linked_field.selection_set,
-                            object,
-                            nested_client_field_imports,
-                            loadable_fields,
-                            indentation_level,
-                            link_fields,
-                            updatable_fields,
-                        )
-                    });
+            let type_annotation = output_type_annotation(&field).clone().map(&mut |_| {
+                generate_client_field_updatable_data_type(
+                    schema,
+                    &linked_field.selection_set,
+                    nested_client_field_imports,
+                    loadable_fields,
+                    indentation_level,
+                    link_fields,
+                    updatable_fields,
+                )
+            });
 
             match linked_field.associated_data.selection_variant {
                 ObjectSelectionDirectiveSet::Updatable(_) => {

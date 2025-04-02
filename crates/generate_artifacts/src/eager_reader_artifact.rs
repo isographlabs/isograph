@@ -5,11 +5,11 @@ use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
 use isograph_schema::{
     initial_variable_context, ClientField, ClientFieldOrPointer, NetworkProtocol, Schema,
-    ValidatedSelectionType,
+    ServerObjectSelectable, ValidatedSelectionType,
 };
 use isograph_schema::{
-    RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment, ServerScalarSelectable,
-    UserWrittenClientTypeInfo, UserWrittenComponentVariant,
+    RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment, UserWrittenClientTypeInfo,
+    UserWrittenComponentVariant,
 };
 
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
@@ -151,7 +151,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
 
 pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    encountered_server_field: &ServerScalarSelectable<TNetworkProtocol>,
+    encountered_server_field: &ServerObjectSelectable<TNetworkProtocol>,
     inline_fragment: &ServerFieldTypeAssociatedDataInlineFragment,
     refetch_paths: &RefetchedPathsMap,
     file_extensions: GenerateFileExtensionsOption,
@@ -224,7 +224,6 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     let client_field_parameter_type = generate_client_field_parameter_type(
         schema,
         client_field.selection_set_for_parent_query(),
-        parent_type,
         &mut param_type_imports,
         &mut loadable_fields,
         1,
@@ -233,7 +232,6 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     let updatable_data_type = generate_client_field_updatable_data_type(
         schema,
         client_field.selection_set_for_parent_query(),
-        parent_type,
         &mut param_type_imports,
         &mut loadable_fields,
         1,

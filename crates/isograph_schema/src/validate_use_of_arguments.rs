@@ -110,14 +110,14 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
             }
             SelectionType::Object(object_selection) => {
                 let field_argument_definitions = match object_selection.associated_data.field_id {
-                    DefinitionLocation::Server(s) => schema
-                        .server_scalar_selectable(s)
+                    DefinitionLocation::Server(object_selectable_id) => schema
+                        .server_object_selectable(object_selectable_id)
                         .arguments
                         .iter()
                         .map(|x| &x.item)
                         .collect::<Vec<_>>(),
-                    DefinitionLocation::Client(c) => schema
-                        .client_pointer(c)
+                    DefinitionLocation::Client(pointer_id) => schema
+                        .client_pointer(pointer_id)
                         .variable_definitions
                         .iter()
                         .map(|x| &x.item)
@@ -179,6 +179,7 @@ fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
                         client_type_variable_definitions,
                         &schema.server_field_data,
                         &schema.server_scalar_selectables,
+                        &schema.server_object_selectables,
                     )
                     .map_err(|with_location| with_location.map(|e| e.into())),
                 );

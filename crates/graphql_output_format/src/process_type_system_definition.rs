@@ -20,8 +20,8 @@ use isograph_lang_types::{
 use isograph_schema::{
     EncounteredRootTypes, IsographObjectTypeDefinition, ProcessTypeSystemDocumentOutcome,
     ProcessedRootTypes, RootOperationName, RootTypes, Schema, SchemaObject, SchemaScalar,
-    SchemaServerObjectSelectableVariant, ServerScalarSelectable, TypeRefinementMaps,
-    ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE, TYPENAME_FIELD_NAME,
+    SchemaServerObjectSelectableVariant, ServerObjectSelectable, ServerScalarSelectable,
+    TypeRefinementMaps, ID_GRAPHQL_TYPE, STRING_JAVASCRIPT_TYPE, TYPENAME_FIELD_NAME,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
@@ -608,67 +608,95 @@ fn process_fields(
                 .entry(field.item.name.item.into())
             {
                 Entry::Vacant(vacant_entry) => {
-                    vacant_entry.insert(DefinitionLocation::Server(next_server_field_id));
-
-                    if field.item.name.item == *ID_FIELD_NAME {
-                        set_and_validate_id_field(
-                            &mut parent_object.id_field,
-                            next_server_field_id,
-                            parent_object.name,
-                            options,
-                            field.item.type_.inner_non_null_named_type(),
-                            field.location,
-                        )?;
-                    }
-
                     let inner_type = field.item.type_.inner();
-                    let target_server_entity = match schema
+
+                    let selection_type = schema
                         .server_field_data
                         .defined_types
                         .get(inner_type)
-                    {
-                        Some(selection_type) => match selection_type {
-                            SelectionType::Scalar(scalar_id) => SelectionType::Scalar(
-                                TypeAnnotation::from_graphql_type_annotation(field.item.type_)
-                                    .map(&mut |_| *scalar_id),
-                            ),
-                            SelectionType::Object(object_id) => SelectionType::Object((
-                                SchemaServerObjectSelectableVariant::LinkedField,
-                                TypeAnnotation::from_graphql_type_annotation(field.item.type_)
-                                    .map(&mut |_| *object_id),
-                            )),
-                        },
-                        None => return Err(WithLocation::new(
-                            ProcessGraphqlTypeSystemDefinitionError::FieldTypenameDoesNotExist {
-                                unvalidated_type_name: *inner_type,
-                            },
-                            field.item.name.location,
-                        )),
-                    };
+                        .ok_or_else(|| {
+                            WithLocation::new(
+                                ProcessGraphqlTypeSystemDefinitionError::FieldTypenameDoesNotExist {
+                                    unvalidated_type_name: *inner_type,
+                                },
+                                field.item.name.location,
+                            )
+                        })?;
+                    let arguments = field
+                        .item
+                        .arguments
+                        .into_iter()
+                        .map(|input_value_definition| {
+                            graphql_input_value_definition_to_variable_definition(
+                                &schema.server_field_data.defined_types,
+                                input_value_definition,
+                                parent_object.name,
+                                field.item.name.item.into(),
+                            )
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    let description = field.item.description.map(|d| d.item);
+                    match selection_type {
+                        SelectionType::Scalar(scalar_id) => {
+                            let next_server_scalar_selectable_id =
+                                schema.server_scalar_selectables.len().into();
+                            vacant_entry.insert(DefinitionLocation::Server(SelectionType::Scalar(
+                                next_server_scalar_selectable_id,
+                            )));
 
-                    schema
-                        .server_scalar_selectables
-                        .push(ServerScalarSelectable {
-                            description: field.item.description.map(|d| d.item),
-                            name: field.item.name,
-                            id: next_server_field_id,
-                            target_server_entity,
-                            parent_type_id: parent_object.id,
-                            arguments: field
-                                .item
-                                .arguments
-                                .into_iter()
-                                .map(|input_value_definition| {
-                                    graphql_input_value_definition_to_variable_definition(
-                                        &schema.server_field_data.defined_types,
-                                        input_value_definition,
-                                        parent_object.name,
-                                        field.item.name.item.into(),
-                                    )
+                            if field.item.name.item == *ID_FIELD_NAME {
+                                set_and_validate_id_field(
+                                    &mut parent_object.id_field,
+                                    next_server_field_id,
+                                    parent_object.name,
+                                    options,
+                                    field.item.type_.inner_non_null_named_type(),
+                                    field.location,
+                                )?;
+                            }
+
+                            schema
+                                .server_scalar_selectables
+                                .push(ServerScalarSelectable {
+                                    description,
+                                    name: field.item.name.map(|x| x.unchecked_conversion()),
+                                    id: next_server_field_id,
+                                    target_scalar_entity:
+                                        TypeAnnotation::from_graphql_type_annotation(
+                                            field.item.type_,
+                                        )
+                                        .map(&mut |_| *scalar_id),
+                                    parent_type_id: parent_object.id,
+                                    arguments,
+                                    phantom_data: std::marker::PhantomData,
                                 })
-                                .collect::<Result<Vec<_>, _>>()?,
-                            phantom_data: std::marker::PhantomData,
-                        });
+                        }
+                        SelectionType::Object(object_id) => {
+                            let next_server_object_selectable_id =
+                                schema.server_object_selectables.len().into();
+                            vacant_entry.insert(DefinitionLocation::Server(SelectionType::Object(
+                                next_server_object_selectable_id,
+                            )));
+
+                            schema
+                                .server_object_selectables
+                                .push(ServerObjectSelectable {
+                                    description,
+                                    name: field.item.name.map(|x| x.unchecked_conversion()),
+                                    id: next_server_object_selectable_id,
+                                    target_object_entity:
+                                        TypeAnnotation::from_graphql_type_annotation(
+                                            field.item.type_,
+                                        )
+                                        .map(&mut |_| *object_id),
+                                    parent_type_id: parent_object.id,
+                                    arguments,
+                                    phantom_data: std::marker::PhantomData,
+                                    object_selectable_variant:
+                                        SchemaServerObjectSelectableVariant::LinkedField,
+                                })
+                        }
+                    }
                 }
                 Entry::Occupied(_) => {
                     return Err(WithLocation::new(

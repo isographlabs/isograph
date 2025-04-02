@@ -8,7 +8,7 @@ use isograph_lang_types::{
 
 use crate::{
     ClientField, ClientFieldOrPointer, ClientPointer, NameAndArguments, NetworkProtocol,
-    ServerScalarSelectable, ValidatedVariableDefinition,
+    ServerObjectSelectable, ServerScalarSelectable, ValidatedVariableDefinition,
 };
 
 #[derive(Debug)]
@@ -121,6 +121,23 @@ pub fn initial_variable_context<TNetworkProtocol: NetworkProtocol>(
 }
 
 impl<TNetworkProtocol: NetworkProtocol> ServerScalarSelectable<TNetworkProtocol> {
+    pub fn initial_variable_context(&self) -> VariableContext {
+        let variable_context = self
+            .arguments
+            .iter()
+            .map(|variable_definition| {
+                (
+                    variable_definition.item.name.item,
+                    NonConstantValue::Variable(variable_definition.item.name.item),
+                )
+            })
+            .collect();
+
+        VariableContext(variable_context)
+    }
+}
+
+impl<TNetworkProtocol: NetworkProtocol> ServerObjectSelectable<TNetworkProtocol> {
     pub fn initial_variable_context(&self) -> VariableContext {
         let variable_context = self
             .arguments

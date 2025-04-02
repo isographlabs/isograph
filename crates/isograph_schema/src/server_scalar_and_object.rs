@@ -7,11 +7,10 @@ use common_lang_types::{
 use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective};
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
-    DefinitionLocation, SelectionType, ServerObjectId, ServerScalarId, ServerScalarSelectableId,
-    ServerStrongIdFieldId,
+    DefinitionLocation, SelectionType, ServerObjectId, ServerScalarId, ServerStrongIdFieldId,
 };
 
-use crate::{ClientFieldOrPointerId, NetworkProtocol};
+use crate::{ClientFieldOrPointerId, NetworkProtocol, ServerScalarOrObjectSelectableId};
 
 /// A scalar type in the schema.
 #[derive(Debug)]
@@ -23,8 +22,10 @@ pub struct SchemaScalar<TNetworkProtocol: NetworkProtocol> {
     pub output_format: PhantomData<TNetworkProtocol>,
 }
 
-pub type ObjectEncounteredFields =
-    BTreeMap<SelectableName, DefinitionLocation<ServerScalarSelectableId, ClientFieldOrPointerId>>;
+pub type ObjectEncounteredFields = BTreeMap<
+    SelectableName,
+    DefinitionLocation<ServerScalarOrObjectSelectableId, ClientFieldOrPointerId>,
+>;
 
 /// An object type in the schema.
 #[derive(Debug)]

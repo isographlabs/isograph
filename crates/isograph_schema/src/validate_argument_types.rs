@@ -15,7 +15,7 @@ use isograph_lang_types::{
 
 use crate::{
     NetworkProtocol, ObjectEncounteredFields, SchemaObject, ServerFieldData,
-    ServerScalarSelectable, ValidatedVariableDefinition,
+    ServerObjectSelectable, ServerScalarSelectable, ValidatedVariableDefinition,
 };
 
 fn graphql_type_to_non_null_type<TValue>(
@@ -128,6 +128,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     schema_data: &ServerFieldData<TNetworkProtocol>,
     server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
+    server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
 ) -> ValidateArgumentTypesResult<()> {
     match &selection_supplied_argument_value.item {
         NonConstantValue::Variable(variable_name) => {
@@ -250,6 +251,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                     variable_definitions,
                     schema_data,
                     server_scalar_selectables,
+                    server_object_selectables,
                 ),
                 GraphQLNonNullTypeAnnotation::Named(_) => Err(WithLocation::new(
                     ValidateArgumentTypesError::ExpectedTypeFoundList {
@@ -288,6 +290,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                         variable_definitions,
                         schema_data,
                         server_scalar_selectables,
+                        server_object_selectables,
                         object_literal,
                         object_id,
                     ),
@@ -302,6 +305,7 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     variable_definitions: &[WithSpan<VariableDefinition<ServerEntityId>>],
     schema_data: &ServerFieldData<TNetworkProtocol>,
     server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
+    server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     object_id: ServerObjectId,
 ) -> Result<(), WithLocation<ValidateArgumentTypesError>> {
@@ -314,6 +318,7 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 
     let missing_fields = get_non_nullable_missing_and_provided_fields(
         server_scalar_selectables,
+        server_object_selectables,
         object_literal,
         object,
     )
@@ -328,6 +333,7 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             variable_definitions,
             schema_data,
             server_scalar_selectables,
+            server_object_selectables,
         ) {
             Ok(_) => None,
             Err(e) => Some(Err(e)),
@@ -358,6 +364,7 @@ enum ObjectLiteralFieldType {
 
 fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtocol>(
     server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
+    server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     object: &SchemaObject<TNetworkProtocol>,
 ) -> Vec<ObjectLiteralFieldType> {
@@ -365,16 +372,20 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
         .encountered_fields
         .iter()
         .filter_map(|(field_name, field_type)| {
-            let field = &server_scalar_selectables[field_type.as_server()?.as_usize()];
-
-            let field_type_annotation = &field.target_server_entity;
-
-            let iso_type_annotation = match field_type_annotation {
-                SelectionType::Scalar(type_annotation) => {
-                    type_annotation.clone().map(&mut SelectionType::Scalar)
+            let iso_type_annotation = match field_type.as_server()? {
+                SelectionType::Scalar(scalar_selectable_id) => {
+                    let field = &server_scalar_selectables[scalar_selectable_id.as_usize()];
+                    let field_type_annotation = &field.target_scalar_entity;
+                    field_type_annotation
+                        .clone()
+                        .map(&mut SelectionType::Scalar)
                 }
-                SelectionType::Object((_variant, type_annotation)) => {
-                    type_annotation.clone().map(&mut SelectionType::Object)
+                SelectionType::Object(object_selectable_id) => {
+                    let field = &server_object_selectables[object_selectable_id.as_usize()];
+                    let field_type_annotation = &field.target_object_entity;
+                    field_type_annotation
+                        .clone()
+                        .map(&mut SelectionType::Object)
                 }
             };
 
@@ -473,6 +484,7 @@ fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     schema_data: &ServerFieldData<TNetworkProtocol>,
     server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
+    server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
 ) -> ValidateArgumentTypesResult<()> {
     list.iter().try_for_each(|element| {
         value_satisfies_type(
@@ -481,6 +493,7 @@ fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             variable_definitions,
             schema_data,
             server_scalar_selectables,
+            server_object_selectables,
         )
     })
 }

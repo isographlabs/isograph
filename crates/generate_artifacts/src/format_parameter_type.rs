@@ -4,10 +4,9 @@ use common_lang_types::SelectableName;
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 
 use isograph_lang_types::{
-    DefinitionLocation, SelectionType, ServerEntityId, ServerScalarSelectableId, TypeAnnotation,
-    UnionVariant,
+    DefinitionLocation, SelectionType, ServerEntityId, TypeAnnotation, UnionVariant,
 };
-use isograph_schema::{NetworkProtocol, Schema};
+use isograph_schema::{NetworkProtocol, Schema, ServerScalarOrObjectSelectableId};
 
 pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
@@ -83,20 +82,23 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
 fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     name: &SelectableName,
-    server_field_id: ServerScalarSelectableId,
+    server_selectable_id: ServerScalarOrObjectSelectableId,
     indentation_level: u8,
 ) -> String {
-    let selection_type = &schema
-        .server_scalar_selectable(server_field_id)
-        .target_server_entity;
-    let (is_optional, selection_type) = match selection_type {
-        SelectionType::Scalar(type_annotation) => (
-            is_nullable(type_annotation),
-            type_annotation.clone().map(&mut SelectionType::Scalar),
+    let (is_optional, selection_type) = match schema.server_selectable(server_selectable_id) {
+        SelectionType::Scalar(scalar_selectable) => (
+            is_nullable(&scalar_selectable.target_scalar_entity),
+            scalar_selectable
+                .target_scalar_entity
+                .clone()
+                .map(&mut SelectionType::Scalar),
         ),
-        SelectionType::Object((_, type_annotation)) => (
-            is_nullable(type_annotation),
-            type_annotation.clone().map(&mut SelectionType::Object),
+        SelectionType::Object(object_selectable) => (
+            is_nullable(&object_selectable.target_object_entity),
+            object_selectable
+                .target_object_entity
+                .clone()
+                .map(&mut SelectionType::Object),
         ),
     };
 
