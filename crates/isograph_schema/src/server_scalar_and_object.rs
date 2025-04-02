@@ -23,6 +23,9 @@ pub struct SchemaScalar<TNetworkProtocol: NetworkProtocol> {
     pub output_format: PhantomData<TNetworkProtocol>,
 }
 
+pub type ObjectEncounteredFields =
+    BTreeMap<SelectableName, DefinitionLocation<ServerScalarSelectableId, ClientFieldOrPointerId>>;
+
 /// An object type in the schema.
 #[derive(Debug)]
 pub struct SchemaObject<TNetworkProtocol: NetworkProtocol> {
@@ -34,10 +37,7 @@ pub struct SchemaObject<TNetworkProtocol: NetworkProtocol> {
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
     /// to something else.
     pub id_field: Option<ServerStrongIdFieldId>,
-    pub encountered_fields: BTreeMap<
-        SelectableName,
-        DefinitionLocation<ServerScalarSelectableId, ClientFieldOrPointerId>,
-    >,
+    pub encountered_fields: ObjectEncounteredFields,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 

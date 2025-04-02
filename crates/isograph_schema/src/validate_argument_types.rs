@@ -6,18 +6,16 @@ use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
     GraphQLTypeAnnotation, NameValuePair,
 };
-use std::collections::BTreeMap;
 use thiserror::Error;
 
 use isograph_lang_types::{
-    graphql_type_annotation_from_type_annotation, DefinitionLocation, NonConstantValue,
-    SelectionType, ServerEntityId, ServerObjectId, ServerScalarId, ServerScalarSelectableId,
-    VariableDefinition,
+    graphql_type_annotation_from_type_annotation, NonConstantValue, SelectionType, ServerEntityId,
+    ServerObjectId, ServerScalarId, VariableDefinition,
 };
 
 use crate::{
-    ClientFieldOrPointerId, NetworkProtocol, SchemaObject, ServerFieldData, ServerScalarSelectable,
-    ValidatedVariableDefinition,
+    NetworkProtocol, ObjectEncounteredFields, SchemaObject, ServerFieldData,
+    ServerScalarSelectable, ValidatedVariableDefinition,
 };
 
 fn graphql_type_to_non_null_type<TValue>(
@@ -401,10 +399,7 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
 }
 
 fn validate_no_extraneous_fields(
-    object_fields: &BTreeMap<
-        SelectableName,
-        DefinitionLocation<ServerScalarSelectableId, ClientFieldOrPointerId>,
-    >,
+    object_fields: &ObjectEncounteredFields,
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     location: Location,
 ) -> ValidateArgumentTypesResult<()> {
