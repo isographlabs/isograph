@@ -8,9 +8,7 @@ use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
 use isograph_lang_types::{DefinitionLocation, ServerEntityId, VariableDefinition};
 
-use crate::{
-    NetworkProtocol, Schema, ServerScalarOrObjectSelectableId, ValidatedVariableDefinition,
-};
+use crate::{NetworkProtocol, Schema, ServerSelectableId, ValidatedVariableDefinition};
 
 use super::create_additional_fields_error::{
     CreateAdditionalFieldsError, FieldMapItem, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
@@ -143,7 +141,7 @@ pub(crate) struct ModifiedObject {
 
 #[derive(Debug)]
 pub(crate) enum PotentiallyModifiedField {
-    Unmodified(ServerScalarOrObjectSelectableId),
+    Unmodified(ServerSelectableId),
     // This is exercised in the case of 3+ segments, e.g. input.foo.id.
     // For now, we support only up to two segments.
     #[allow(dead_code)]

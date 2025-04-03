@@ -6,7 +6,7 @@ use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 use isograph_lang_types::{
     DefinitionLocation, SelectionType, ServerEntityId, TypeAnnotation, UnionVariant,
 };
-use isograph_schema::{NetworkProtocol, Schema, ServerScalarOrObjectSelectableId};
+use isograph_schema::{NetworkProtocol, Schema, ServerSelectableId};
 
 pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
@@ -82,7 +82,7 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
 fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     name: &SelectableName,
-    server_selectable_id: ServerScalarOrObjectSelectableId,
+    server_selectable_id: ServerSelectableId,
     indentation_level: u8,
 ) -> String {
     let (is_optional, selection_type) = match schema.server_selectable(server_selectable_id) {

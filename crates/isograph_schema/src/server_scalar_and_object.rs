@@ -10,7 +10,7 @@ use isograph_lang_types::{
     DefinitionLocation, SelectionType, ServerObjectId, ServerScalarId, ServerStrongIdFieldId,
 };
 
-use crate::{ClientFieldOrPointerId, NetworkProtocol, ServerScalarOrObjectSelectableId};
+use crate::{ClientFieldOrPointerId, NetworkProtocol, ServerSelectableId};
 
 /// A scalar type in the schema.
 #[derive(Debug)]
@@ -22,10 +22,8 @@ pub struct SchemaScalar<TNetworkProtocol: NetworkProtocol> {
     pub output_format: PhantomData<TNetworkProtocol>,
 }
 
-pub type ObjectEncounteredFields = BTreeMap<
-    SelectableName,
-    DefinitionLocation<ServerScalarOrObjectSelectableId, ClientFieldOrPointerId>,
->;
+pub type ObjectEncounteredFields =
+    BTreeMap<SelectableName, DefinitionLocation<ServerSelectableId, ClientFieldOrPointerId>>;
 
 /// An object type in the schema.
 #[derive(Debug)]

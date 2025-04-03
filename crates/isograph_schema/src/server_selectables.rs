@@ -39,9 +39,7 @@ pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub phantom_data: PhantomData<TNetworkProtocol>,
 }
 
-// TODO rename this ServerSelectableId
-pub type ServerScalarOrObjectSelectableId =
-    SelectionType<ServerScalarSelectableId, ServerObjectSelectableId>;
+pub type ServerSelectableId = SelectionType<ServerScalarSelectableId, ServerObjectSelectableId>;
 
 pub type ServerSelectable<'a, TNetworkProtocol> = SelectionType<
     &'a ServerScalarSelectable<TNetworkProtocol>,
@@ -51,7 +49,7 @@ pub type ServerSelectable<'a, TNetworkProtocol> = SelectionType<
 pub trait ServerScalarOrObjectSelectable {
     fn description(&self) -> Option<DescriptionValue>;
     fn name(&self) -> WithLocation<ServerSelectableName>;
-    fn id(&self) -> ServerScalarOrObjectSelectableId;
+    fn id(&self) -> ServerSelectableId;
     fn target_entity_id(&self) -> TypeAnnotation<ServerEntityId>;
     fn parent_type_id(&self) -> ServerObjectId;
     fn arguments(&self) -> &[WithLocation<VariableDefinition<ServerEntityId>>];
@@ -68,7 +66,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
         self.name.map(|x| x.into())
     }
 
-    fn id(&self) -> ServerScalarOrObjectSelectableId {
+    fn id(&self) -> ServerSelectableId {
         SelectionType::Object(self.id)
     }
 
@@ -98,7 +96,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
         self.name.map(|x| x.into())
     }
 
-    fn id(&self) -> ServerScalarOrObjectSelectableId {
+    fn id(&self) -> ServerSelectableId {
         SelectionType::Scalar(self.id)
     }
 
@@ -134,7 +132,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
         }
     }
 
-    fn id(&self) -> ServerScalarOrObjectSelectableId {
+    fn id(&self) -> ServerSelectableId {
         match self {
             SelectionType::Scalar(s) => s.id(),
             SelectionType::Object(o) => o.id(),

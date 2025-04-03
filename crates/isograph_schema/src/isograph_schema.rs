@@ -18,9 +18,8 @@ use lazy_static::lazy_static;
 
 use crate::{
     ClientField, ClientFieldOrPointerId, ClientPointer, NetworkProtocol, NormalizationKey,
-    SchemaObject, SchemaScalar, SchemaType, ServerObjectSelectable,
-    ServerScalarOrObjectSelectableId, ServerScalarSelectable, ServerSelectable,
-    UseRefetchFieldRefetchStrategy,
+    SchemaObject, SchemaScalar, SchemaType, ServerObjectSelectable, ServerScalarSelectable,
+    ServerSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
 };
 
 lazy_static! {
@@ -194,7 +193,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     pub fn server_selectable(
         &self,
-        server_selectable_id: ServerScalarOrObjectSelectableId,
+        server_selectable_id: ServerSelectableId,
     ) -> ServerSelectable<TNetworkProtocol> {
         match server_selectable_id {
             SelectionType::Scalar(server_scalar_selectable_id) => {
