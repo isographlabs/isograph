@@ -143,6 +143,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         ));
                     }
                 }
+            } else {
+                // This is indicative of bad modeling
+                panic!("Expected subtype to be concrete. This is indicative of a bug in Isograph.");
             }
         }
         Ok(())
