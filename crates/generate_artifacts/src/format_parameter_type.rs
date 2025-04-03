@@ -49,7 +49,7 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
     match field {
         ServerEntityId::Object(object_id) => {
             let mut s = "{\n".to_string();
-            for (name, server_field_id) in schema
+            for (name, server_selectable_id) in schema
                 .server_field_data
                 .object(object_id)
                 .encountered_fields
@@ -61,8 +61,12 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
                     },
                 )
             {
-                let field_type =
-                    format_field_definition(schema, name, server_field_id, indentation_level + 1);
+                let field_type = format_field_definition(
+                    schema,
+                    name,
+                    server_selectable_id,
+                    indentation_level + 1,
+                );
                 s.push_str(&field_type)
             }
             s.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
