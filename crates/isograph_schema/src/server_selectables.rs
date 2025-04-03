@@ -1,33 +1,164 @@
 use std::{fmt::Debug, marker::PhantomData};
 
-use common_lang_types::{DescriptionValue, ServerSelectableName, WithLocation};
+use common_lang_types::{
+    DescriptionValue, ServerObjectSelectableName, ServerScalarSelectableName, ServerSelectableName,
+    WithLocation,
+};
 use isograph_lang_types::{
-    SelectionType, ServerEntityId, ServerObjectId, ServerScalarId, ServerScalarSelectableId,
-    TypeAnnotation, VariableDefinition,
+    SelectionType, ServerEntityId, ServerObjectId, ServerObjectSelectableId, ServerScalarId,
+    ServerScalarSelectableId, TypeAnnotation, VariableDefinition,
 };
 
 use crate::{NetworkProtocol, SchemaServerObjectSelectableVariant};
 
-// TODO convert this to two structs
-// NOTE: for the time being, despite the name, this represents both
-// fields with point to scalar entities and object entities
 #[derive(Debug, Clone)]
 pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
-    /// The name of the server field and the location where it was defined
-    /// (an iso literal or Location::Generated).
-    pub name: WithLocation<ServerSelectableName>,
+    pub name: WithLocation<ServerScalarSelectableName>,
     pub id: ServerScalarSelectableId,
 
-    pub target_server_entity: SelectionType<
-        TypeAnnotation<ServerScalarId>,
-        (
-            SchemaServerObjectSelectableVariant,
-            TypeAnnotation<ServerObjectId>,
-        ),
-    >,
+    pub target_scalar_entity: TypeAnnotation<ServerScalarId>,
 
     pub parent_type_id: ServerObjectId,
     pub arguments: Vec<WithLocation<VariableDefinition<ServerEntityId>>>,
     pub phantom_data: PhantomData<TNetworkProtocol>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
+    pub description: Option<DescriptionValue>,
+    pub name: WithLocation<ServerObjectSelectableName>,
+    pub id: ServerObjectSelectableId,
+
+    pub target_object_entity: TypeAnnotation<ServerObjectId>,
+
+    pub object_selectable_variant: SchemaServerObjectSelectableVariant,
+
+    pub parent_type_id: ServerObjectId,
+    pub arguments: Vec<WithLocation<VariableDefinition<ServerEntityId>>>,
+    pub phantom_data: PhantomData<TNetworkProtocol>,
+}
+
+// TODO rename this ServerSelectableId
+pub type ServerScalarOrObjectSelectableId =
+    SelectionType<ServerScalarSelectableId, ServerObjectSelectableId>;
+
+pub type ServerSelectable<'a, TNetworkProtocol> = SelectionType<
+    &'a ServerScalarSelectable<TNetworkProtocol>,
+    &'a ServerObjectSelectable<TNetworkProtocol>,
+>;
+
+pub trait ServerScalarOrObjectSelectable {
+    fn description(&self) -> Option<DescriptionValue>;
+    fn name(&self) -> WithLocation<ServerSelectableName>;
+    fn id(&self) -> ServerScalarOrObjectSelectableId;
+    fn target_entity_id(&self) -> TypeAnnotation<ServerEntityId>;
+    fn parent_type_id(&self) -> ServerObjectId;
+    fn arguments(&self) -> &[WithLocation<VariableDefinition<ServerEntityId>>];
+}
+
+impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
+    for ServerObjectSelectable<TNetworkProtocol>
+{
+    fn description(&self) -> Option<DescriptionValue> {
+        self.description
+    }
+
+    fn name(&self) -> WithLocation<ServerSelectableName> {
+        self.name.map(|x| x.into())
+    }
+
+    fn id(&self) -> ServerScalarOrObjectSelectableId {
+        SelectionType::Object(self.id)
+    }
+
+    fn target_entity_id(&self) -> TypeAnnotation<ServerEntityId> {
+        self.target_object_entity
+            .clone()
+            .map(&mut SelectionType::Object)
+    }
+
+    fn parent_type_id(&self) -> ServerObjectId {
+        self.parent_type_id
+    }
+
+    fn arguments(&self) -> &[WithLocation<VariableDefinition<ServerEntityId>>] {
+        &self.arguments
+    }
+}
+
+impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
+    for ServerScalarSelectable<TNetworkProtocol>
+{
+    fn description(&self) -> Option<DescriptionValue> {
+        self.description
+    }
+
+    fn name(&self) -> WithLocation<ServerSelectableName> {
+        self.name.map(|x| x.into())
+    }
+
+    fn id(&self) -> ServerScalarOrObjectSelectableId {
+        SelectionType::Scalar(self.id)
+    }
+
+    fn target_entity_id(&self) -> TypeAnnotation<ServerEntityId> {
+        self.target_scalar_entity
+            .clone()
+            .map(&mut SelectionType::Scalar)
+    }
+
+    fn parent_type_id(&self) -> ServerObjectId {
+        self.parent_type_id
+    }
+
+    fn arguments(&self) -> &[WithLocation<VariableDefinition<ServerEntityId>>] {
+        &self.arguments
+    }
+}
+
+impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
+    for ServerSelectable<'_, TNetworkProtocol>
+{
+    fn description(&self) -> Option<DescriptionValue> {
+        match self {
+            SelectionType::Scalar(s) => s.description(),
+            SelectionType::Object(o) => o.description(),
+        }
+    }
+
+    fn name(&self) -> WithLocation<ServerSelectableName> {
+        match self {
+            SelectionType::Scalar(s) => s.name(),
+            SelectionType::Object(o) => o.name(),
+        }
+    }
+
+    fn id(&self) -> ServerScalarOrObjectSelectableId {
+        match self {
+            SelectionType::Scalar(s) => s.id(),
+            SelectionType::Object(o) => o.id(),
+        }
+    }
+
+    fn target_entity_id(&self) -> TypeAnnotation<ServerEntityId> {
+        match self {
+            SelectionType::Scalar(s) => s.target_entity_id(),
+            SelectionType::Object(o) => o.target_entity_id(),
+        }
+    }
+
+    fn parent_type_id(&self) -> ServerObjectId {
+        match self {
+            SelectionType::Scalar(s) => s.parent_type_id(),
+            SelectionType::Object(o) => o.parent_type_id(),
+        }
+    }
+
+    fn arguments(&self) -> &[WithLocation<VariableDefinition<ServerEntityId>>] {
+        match self {
+            SelectionType::Scalar(s) => s.arguments(),
+            SelectionType::Object(o) => o.arguments(),
+        }
+    }
 }

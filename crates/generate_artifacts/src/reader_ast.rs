@@ -3,7 +3,7 @@ use std::collections::{BTreeSet, HashSet};
 use common_lang_types::{ClientScalarSelectableName, ObjectTypeAndFieldName, WithSpan};
 use isograph_lang_types::{
     DefinitionLocation, EmptyDirectiveSet, LoadableDirectiveParameters,
-    ObjectSelectionDirectiveSet, RefetchQueryIndex, ScalarSelectionDirectiveSet, SelectionType,
+    ObjectSelectionDirectiveSet, RefetchQueryIndex, ScalarSelectionDirectiveSet,
     SelectionTypeContainingSelections,
 };
 use isograph_schema::{
@@ -132,31 +132,24 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
             )
         }
         DefinitionLocation::Server(server_field_id) => {
-            let server_field = schema.server_scalar_selectable(server_field_id);
-            match &server_field.target_server_entity {
-                SelectionType::Scalar(_) => panic!("Expected object"),
-                SelectionType::Object((linked_field_variant, _)) => match &linked_field_variant {
-                    SchemaServerObjectSelectableVariant::InlineFragment(inline_fragment) => {
-                        let parent_object_id = schema
-                            .server_scalar_selectable(inline_fragment.server_field_id)
-                            .parent_type_id;
-                        let object = schema.server_field_data.object(parent_object_id);
+            let server_field = schema.server_object_selectable(server_field_id);
+            match &server_field.object_selectable_variant {
+                SchemaServerObjectSelectableVariant::InlineFragment(_) => {
+                    let object = schema.server_field_data.object(server_field.parent_type_id);
 
-                        let type_and_field = ObjectTypeAndFieldName {
-                            field_name: linked_field.name.item.into(),
-                            type_name: object.name,
-                        };
+                    let type_and_field = ObjectTypeAndFieldName {
+                        field_name: linked_field.name.item.into(),
+                        type_name: object.name,
+                    };
 
-                        let reader_artifact_import_name =
-                            format!("{}__resolver_reader", type_and_field.underscore_separated());
+                    let reader_artifact_import_name =
+                        format!("{}__resolver_reader", type_and_field.underscore_separated());
 
-                        reader_imports
-                            .insert((type_and_field, ImportedFileCategory::ResolverReader));
+                    reader_imports.insert((type_and_field, ImportedFileCategory::ResolverReader));
 
-                        reader_artifact_import_name
-                    }
-                    SchemaServerObjectSelectableVariant::LinkedField => "null".to_string(),
-                },
+                    reader_artifact_import_name
+                }
+                SchemaServerObjectSelectableVariant::LinkedField => "null".to_string(),
             }
         }
     };

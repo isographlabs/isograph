@@ -6,11 +6,11 @@ use common_lang_types::{
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
-use isograph_lang_types::{
-    DefinitionLocation, SelectionType, ServerEntityId, ServerScalarSelectableId, VariableDefinition,
-};
+use isograph_lang_types::{DefinitionLocation, ServerEntityId, VariableDefinition};
 
-use crate::{NetworkProtocol, Schema, ValidatedVariableDefinition};
+use crate::{
+    NetworkProtocol, Schema, ServerScalarOrObjectSelectableId, ValidatedVariableDefinition,
+};
 
 use super::create_additional_fields_error::{
     CreateAdditionalFieldsError, FieldMapItem, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
@@ -89,7 +89,7 @@ impl ArgumentMap {
                         let mut arg =
                             ModifiedArgument::from_unmodified(unmodified_argument, schema);
 
-                        arg.remove_to_field(schema, *first, rest, primary_type_name)?;
+                        arg.remove_to_field(*first, rest, primary_type_name)?;
 
                         *argument =
                             WithLocation::new(PotentiallyModifiedArgument::Modified(arg), location);
@@ -115,7 +115,7 @@ impl ArgumentMap {
                         ));
                     }
                     Some((first, rest)) => {
-                        modified.remove_to_field(schema, *first, rest, primary_type_name)?;
+                        modified.remove_to_field(*first, rest, primary_type_name)?;
                         // TODO WAT
                         ProcessedFieldMapItem(field_map_item.clone())
                     }
@@ -143,7 +143,7 @@ pub(crate) struct ModifiedObject {
 
 #[derive(Debug)]
 pub(crate) enum PotentiallyModifiedField {
-    Unmodified(ServerScalarSelectableId),
+    Unmodified(ServerScalarOrObjectSelectableId),
     // This is exercised in the case of 3+ segments, e.g. input.foo.id.
     // For now, we support only up to two segments.
     #[allow(dead_code)]
@@ -221,9 +221,8 @@ impl ModifiedArgument {
         }
     }
 
-    pub fn remove_to_field<TNetworkProtocol: NetworkProtocol>(
+    pub fn remove_to_field(
         &mut self,
-        schema: &Schema<TNetworkProtocol>,
         first: StringLiteralValue,
         rest: &[StringLiteralValue],
         primary_type_name: IsographObjectTypeName,
@@ -257,9 +256,7 @@ impl ModifiedArgument {
 
                         match field {
                             PotentiallyModifiedField::Unmodified(field_id) => {
-                                let field_object = schema.server_scalar_selectable(*field_id);
-                                if let SelectionType::Object(_) = field_object.target_server_entity
-                                {
+                                if field_id.as_object().is_some() {
                                     return Err(WithLocation::new(
                                         CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
                                             primary_type_name,
@@ -267,7 +264,7 @@ impl ModifiedArgument {
                                         },
                                         Location::generated(),
                                     ));
-                                };
+                                }
 
                                 // Cool! We found a scalar, we can remove it.
                                 argument_object.field_map.remove(&key).expect(

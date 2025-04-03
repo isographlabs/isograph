@@ -4,6 +4,7 @@ use crate::SelectionType;
 
 // Any field defined on the server
 u32_newtype!(ServerScalarSelectableId);
+u32_newtype!(ServerObjectSelectableId);
 // A field that acts as an id
 u32_newtype!(ServerStrongIdFieldId);
 

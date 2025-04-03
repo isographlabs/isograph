@@ -1,4 +1,4 @@
-use common_lang_types::{ServerSelectableName, Span, UnvalidatedTypeName, WithLocation, WithSpan};
+use common_lang_types::{Span, UnvalidatedTypeName, WithLocation, WithSpan};
 use graphql_lang_types::{GraphQLNamedTypeAnnotation, GraphQLTypeAnnotation};
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -8,7 +8,7 @@ use isograph_lang_types::{
 
 use crate::{
     NetworkProtocol, Schema, SchemaServerObjectSelectableVariant,
-    ServerFieldTypeAssociatedDataInlineFragment, ServerScalarSelectable,
+    ServerFieldTypeAssociatedDataInlineFragment, ServerObjectSelectable,
     ValidatedScalarSelectionAssociatedData, LINK_FIELD_NAME,
 };
 use common_lang_types::Location;
@@ -27,10 +27,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             let subtype = self.server_field_data.object(*subtype_id);
 
             if let Some(concrete_type) = subtype.concrete_type {
-                let field_name: ServerSelectableName =
-                    format!("as{}", subtype.name).intern().into();
+                let field_name = format!("as{}", subtype.name).intern().into();
 
-                let next_server_field_id = self.server_scalar_selectables.len().into();
+                let next_server_object_field_id = self.server_object_selectables.len().into();
 
                 let graphql_type_annotation: GraphQLTypeAnnotation<UnvalidatedTypeName> =
                     GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(WithSpan {
@@ -48,7 +47,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                                     .get(&"__typename".intern().into())
                                     .expect("Expected __typename to exist")
                                     .as_server()
-                                    .expect("Expected __typename to be server field"),
+                                    .expect("Expected __typename to be server field")
+                                    .as_scalar()
+                                    .expect("Expected __typename to be scalar"),
                             ),
                             selection_variant: ScalarSelectionDirectiveSet::None(
                                 EmptyDirectiveSet {},
@@ -93,35 +94,33 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
                 let reader_selection_set = vec![typename_selection, link_selection];
 
-                let target_server_entity = SelectionType::Object((
-                    SchemaServerObjectSelectableVariant::InlineFragment(
-                        ServerFieldTypeAssociatedDataInlineFragment {
-                            server_field_id: next_server_field_id,
-                            concrete_type,
-                            reader_selection_set,
-                        },
-                    ),
-                    TypeAnnotation::from_graphql_type_annotation(
-                        graphql_type_annotation.map(|_| *subtype_id),
-                    ),
-                ));
-
                 // TODO ... is this a server field? Yes, because it's an inline fragment?
-                let server_field = ServerScalarSelectable {
+                let server_object_selectable = ServerObjectSelectable {
                     description: Some(
                         format!("A client pointer for the {} type.", subtype.name)
                             .intern()
                             .into(),
                     ),
-                    id: next_server_field_id,
+                    id: next_server_object_field_id,
                     name: WithLocation::new(field_name, Location::generated()),
                     parent_type_id: subtype.id,
                     arguments: vec![],
-                    target_server_entity,
+                    target_object_entity: TypeAnnotation::from_graphql_type_annotation(
+                        graphql_type_annotation.map(|_| *subtype_id),
+                    ),
+
                     phantom_data: std::marker::PhantomData,
+                    object_selectable_variant: SchemaServerObjectSelectableVariant::InlineFragment(
+                        ServerFieldTypeAssociatedDataInlineFragment {
+                            server_object_selectable_id: next_server_object_field_id,
+                            concrete_type,
+                            reader_selection_set,
+                        },
+                    ),
                 };
 
-                self.server_scalar_selectables.push(server_field);
+                self.server_object_selectables
+                    .push(server_object_selectable);
 
                 for supertype_id in supertype_ids {
                     let supertype = self.server_field_data.object_mut(*supertype_id);
@@ -130,7 +129,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         .encountered_fields
                         .insert(
                             field_name.into(),
-                            DefinitionLocation::Server(next_server_field_id),
+                            DefinitionLocation::Server(SelectionType::Object(
+                                next_server_object_field_id,
+                            )),
                         )
                         .is_some()
                     {

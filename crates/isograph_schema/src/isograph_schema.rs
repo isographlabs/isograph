@@ -11,14 +11,16 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, ClientPointerId, DefinitionLocation, ObjectSelection,
     ObjectSelectionDirectiveSet, ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectionType,
-    SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, ServerScalarId,
-    ServerScalarSelectableId, VariableDefinition,
+    SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, ServerObjectSelectableId,
+    ServerScalarId, ServerScalarSelectableId, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
 use crate::{
     ClientField, ClientFieldOrPointerId, ClientPointer, NetworkProtocol, NormalizationKey,
-    SchemaObject, SchemaScalar, SchemaType, ServerScalarSelectable, UseRefetchFieldRefetchStrategy,
+    SchemaObject, SchemaScalar, SchemaType, ServerObjectSelectable,
+    ServerScalarOrObjectSelectableId, ServerScalarSelectable, ServerSelectable,
+    UseRefetchFieldRefetchStrategy,
 };
 
 lazy_static! {
@@ -44,6 +46,7 @@ pub struct RootOperationName(pub String);
 #[derive(Debug)]
 pub struct Schema<TNetworkProtocol: NetworkProtocol> {
     pub server_scalar_selectables: Vec<ServerScalarSelectable<TNetworkProtocol>>,
+    pub server_object_selectables: Vec<ServerObjectSelectable<TNetworkProtocol>>,
     pub client_types: SelectionTypes<TNetworkProtocol>,
     pub entrypoints: HashMap<ClientFieldId, IsoLiteralText>,
     pub server_field_data: ServerFieldData<TNetworkProtocol>,
@@ -64,9 +67,6 @@ impl<TNetworkProtocol: NetworkProtocol> Default for Schema<TNetworkProtocol> {
 impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn new() -> Self {
         // TODO add __typename
-        let fields = vec![];
-        let client_fields = vec![];
-        let objects = vec![];
         let mut scalars = vec![];
         let mut defined_types = HashMap::default();
 
@@ -111,11 +111,12 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         );
 
         Self {
-            server_scalar_selectables: fields,
-            client_types: client_fields,
+            server_scalar_selectables: vec![],
+            server_object_selectables: vec![],
+            client_types: vec![],
             entrypoints: Default::default(),
             server_field_data: ServerFieldData {
-                server_objects: objects,
+                server_objects: vec![],
                 server_scalars: scalars,
                 defined_types,
 
@@ -155,7 +156,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 }
 
 pub type ObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
-    &'a ServerScalarSelectable<TNetworkProtocol>,
+    &'a ServerObjectSelectable<TNetworkProtocol>,
     &'a ClientPointer<TNetworkProtocol>,
 >;
 
@@ -177,12 +178,32 @@ pub struct ServerFieldData<TNetworkProtocol: NetworkProtocol> {
 }
 
 impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
-    /// Get a reference to a given server field by its id.
     pub fn server_scalar_selectable(
         &self,
-        server_field_id: ServerScalarSelectableId,
+        server_scalar_selectable_id: ServerScalarSelectableId,
     ) -> &ServerScalarSelectable<TNetworkProtocol> {
-        &self.server_scalar_selectables[server_field_id.as_usize()]
+        &self.server_scalar_selectables[server_scalar_selectable_id.as_usize()]
+    }
+
+    pub fn server_object_selectable(
+        &self,
+        server_object_selectable_id: ServerObjectSelectableId,
+    ) -> &ServerObjectSelectable<TNetworkProtocol> {
+        &self.server_object_selectables[server_object_selectable_id.as_usize()]
+    }
+
+    pub fn server_selectable(
+        &self,
+        server_selectable_id: ServerScalarOrObjectSelectableId,
+    ) -> ServerSelectable<TNetworkProtocol> {
+        match server_selectable_id {
+            SelectionType::Scalar(server_scalar_selectable_id) => {
+                SelectionType::Scalar(self.server_scalar_selectable(server_scalar_selectable_id))
+            }
+            SelectionType::Object(server_object_selectable_id) => {
+                SelectionType::Object(self.server_object_selectable(server_object_selectable_id))
+            }
+        }
     }
 
     /// Get a reference to a given client field by its id.
@@ -211,11 +232,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     pub fn object_selectable(
         &self,
-        field_id: DefinitionLocation<ServerScalarSelectableId, ClientPointerId>,
+        field_id: DefinitionLocation<ServerObjectSelectableId, ClientPointerId>,
     ) -> ObjectSelectable<TNetworkProtocol> {
         match field_id {
             DefinitionLocation::Server(server_field_id) => {
-                DefinitionLocation::Server(self.server_scalar_selectable(server_field_id))
+                DefinitionLocation::Server(self.server_object_selectable(server_field_id))
             }
             DefinitionLocation::Client(client_pointer_id) => {
                 DefinitionLocation::Client(self.client_pointer(client_pointer_id))
@@ -343,7 +364,7 @@ pub enum SchemaServerObjectSelectableVariant {
 
 #[derive(Debug, Clone)]
 pub struct ServerFieldTypeAssociatedDataInlineFragment {
-    pub server_field_id: ServerScalarSelectableId,
+    pub server_object_selectable_id: ServerObjectSelectableId,
     pub concrete_type: IsographObjectTypeName,
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 }
@@ -372,7 +393,7 @@ pub type ValidatedFieldDefinitionLocation =
 #[derive(Debug, Clone)]
 pub struct ValidatedObjectSelectionAssociatedData {
     pub parent_object_id: ServerObjectId,
-    pub field_id: DefinitionLocation<ServerScalarSelectableId, ClientPointerId>,
+    pub field_id: DefinitionLocation<ServerObjectSelectableId, ClientPointerId>,
     pub selection_variant: ObjectSelectionDirectiveSet,
     /// Some if the (destination?) object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,

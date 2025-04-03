@@ -143,7 +143,8 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
         })?;
 
     let location = match *location {
-        DefinitionLocation::Server(server_scalar_selectable_id) => {
+        DefinitionLocation::Server(server_selectable_id) => {
+            // TODO encode this in types
             if matches!(
                 scalar_selection.associated_data,
                 ScalarSelectionDirectiveSet::Loadable(_)
@@ -156,27 +157,33 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
                 ));
             }
 
-            let selection = schema.server_scalar_selectable(server_scalar_selectable_id);
-            if let Some((_, object_id)) = selection.target_server_entity.as_object() {
-                let object = schema.server_field_data.object(*object_id.inner());
+            let server_scalar_selectable =
+                schema.server_scalar_selectable(*server_selectable_id.as_scalar_result().map_err(
+                    |object_selectable_id| {
+                        let object_selectable =
+                            schema.server_object_selectable(*object_selectable_id);
+                        let object = schema
+                            .server_field_data
+                            .object(*object_selectable.target_object_entity.inner());
 
-                return Err(WithLocation::new(
-                    AddSelectionSetsError::SelectionTypeSelectionFieldIsNotScalar {
-                        client_field_parent_type_name: top_level_field_or_pointer
-                            .type_and_field()
-                            .type_name,
-                        client_field_name: top_level_field_or_pointer.name().into(),
-                        field_parent_type_name: selection_parent_object.name,
-                        field_name: scalar_selection.name.item.into(),
-                        target_type_name: object.name.into(),
-                        client_type: top_level_field_or_pointer.client_type().to_string(),
-                        field_type: top_level_field_or_pointer.client_type(),
+                        WithLocation::new(
+                            AddSelectionSetsError::SelectionTypeSelectionFieldIsNotScalar {
+                                client_field_parent_type_name: top_level_field_or_pointer
+                                    .type_and_field()
+                                    .type_name,
+                                client_field_name: top_level_field_or_pointer.name().into(),
+                                field_parent_type_name: selection_parent_object.name,
+                                field_name: scalar_selection.name.item.into(),
+                                target_type_name: object.name.into(),
+                                client_type: top_level_field_or_pointer.client_type().to_string(),
+                                field_type: top_level_field_or_pointer.client_type(),
+                            },
+                            scalar_selection.name.location,
+                        )
                     },
-                    scalar_selection.name.location,
-                ));
-            }
+                )?);
 
-            DefinitionLocation::Server(server_scalar_selectable_id)
+            DefinitionLocation::Server(server_scalar_selectable.id)
         }
         DefinitionLocation::Client(client_type) => {
             let client_field_id = *client_type.as_scalar().ok_or_else(|| {
@@ -233,33 +240,37 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
         })?;
 
     let (location, new_parent_object_id) = match *location {
-        DefinitionLocation::Server(server_scalar_selectable_id) => {
-            let selection = schema.server_scalar_selectable(server_scalar_selectable_id);
-            let new_parent_object_id = match &selection.target_server_entity {
-                SelectionType::Scalar(scalar) => {
-                    let scalar_object_name =
-                        schema.server_field_data.scalar(*scalar.inner()).name.item;
+        DefinitionLocation::Server(server_selectable_id) => {
+            let server_object_selectable =
+                schema.server_object_selectable(*server_selectable_id.as_object_result().map_err(
+                    |server_scalar_selectable_id| {
+                        let server_scalar_selectable =
+                            schema.server_scalar_selectable(*server_scalar_selectable_id);
+                        let server_scalar = schema
+                            .server_field_data
+                            .scalar(*server_scalar_selectable.target_scalar_entity.inner());
 
-                    return Err(vec![WithLocation::new(
-                        AddSelectionSetsError::SelectionTypeSelectionFieldIsScalar {
-                            client_field_parent_type_name: top_level_field_or_pointer
-                                .type_and_field()
-                                .type_name,
-                            client_field_name: top_level_field_or_pointer.name().into(),
-                            field_parent_type_name: selection_parent_object.name,
-                            field_name: object_selection.name.item.into(),
-                            target_type_name: scalar_object_name.into(),
-                            client_type: top_level_field_or_pointer.client_type().to_string(),
-                        },
-                        Location::generated(),
-                    )]);
-                }
-                SelectionType::Object((_, object)) => object.inner(),
-            };
+                        vec![WithLocation::new(
+                            AddSelectionSetsError::SelectionTypeSelectionFieldIsScalar {
+                                client_field_parent_type_name: top_level_field_or_pointer
+                                    .type_and_field()
+                                    .type_name,
+                                client_field_name: top_level_field_or_pointer.name().into(),
+                                field_parent_type_name: selection_parent_object.name,
+                                field_name: object_selection.name.item.into(),
+                                target_type_name: server_scalar.name.item.into(),
+                                client_type: top_level_field_or_pointer.client_type().to_string(),
+                            },
+                            Location::generated(),
+                        )]
+                    },
+                )?);
+
+            let new_parent_object_id = *server_object_selectable.target_object_entity.inner();
 
             (
-                DefinitionLocation::Server(server_scalar_selectable_id),
-                *new_parent_object_id,
+                DefinitionLocation::Server(server_object_selectable.id),
+                new_parent_object_id,
             )
         }
         DefinitionLocation::Client(client_type) => {
