@@ -303,20 +303,22 @@ fn user_written_fields<TNetworkProtocol: NetworkProtocol>(
     ),
 > + '_ {
     schema
-        .client_types
+        .client_scalar_selectables
         .iter()
-        .filter_map(|client_type| match client_type {
-            SelectionType::Object(client_pointer) => Some((
-                SelectionType::Object(client_pointer),
-                UserWrittenComponentVariant::Eager,
-            )),
-            SelectionType::Scalar(client_field) => match client_field.variant {
+        .filter_map(
+            |client_scalar_selectable| match client_scalar_selectable.variant {
                 ClientFieldVariant::Link => None,
                 ClientFieldVariant::UserWritten(info) => Some((
-                    SelectionType::Scalar(client_field),
+                    SelectionType::Scalar(client_scalar_selectable),
                     info.user_written_component_variant,
                 )),
                 ClientFieldVariant::ImperativelyLoadedField(_) => None,
             },
-        })
+        )
+        .chain(
+            schema
+                .client_object_selectables
+                .iter()
+                .map(|x| (SelectionType::Object(x), UserWrittenComponentVariant::Eager)),
+        )
 }

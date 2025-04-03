@@ -8,9 +8,9 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     generate_refetch_field_strategy, id_arguments, id_selection, id_top_level_arguments,
-    ClientField, ClientFieldVariant, ClientPointer, ImperativelyLoadedFieldVariant,
-    NetworkProtocol, RefetchStrategy, RequiresRefinement, Schema, SchemaObject,
-    UnprocessedClientFieldItem, UnprocessedItem, NODE_FIELD_NAME, REFETCH_FIELD_NAME,
+    ClientField, ClientFieldVariant, ImperativelyLoadedFieldVariant, NetworkProtocol,
+    RefetchStrategy, RequiresRefinement, Schema, SchemaObject, UnprocessedClientFieldItem,
+    UnprocessedItem, NODE_FIELD_NAME, REFETCH_FIELD_NAME,
 };
 
 use crate::batch_compile::BatchCompileError;
@@ -31,7 +31,7 @@ pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
             if let Some(id_field) = object.id_field {
                 let (client_field_id, refetch_strategy) = add_refetch_field_to_object(
                     object,
-                    &mut schema.client_types,
+                    &mut schema.client_scalar_selectables,
                     query_id,
                     id_field,
                     schema.server_field_data.id_type_id,
@@ -68,9 +68,7 @@ pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
 
 fn add_refetch_field_to_object<TNetworkProtocol: NetworkProtocol>(
     object: &mut SchemaObject<TNetworkProtocol>,
-    client_fields: &mut Vec<
-        SelectionType<ClientField<TNetworkProtocol>, ClientPointer<TNetworkProtocol>>,
-    >,
+    client_fields: &mut Vec<ClientField<TNetworkProtocol>>,
     query_id: ServerObjectId,
     _id_field: ServerStrongIdFieldId,
     id_type_id: ServerScalarId,
@@ -93,7 +91,7 @@ fn add_refetch_field_to_object<TNetworkProtocol: NetworkProtocol>(
                 next_client_field_id,
             )));
 
-            client_fields.push(SelectionType::Scalar(ClientField {
+            client_fields.push(ClientField {
                 description: Some(
                     format!("A refetch field for the {} type.", object.name)
                         .intern()
@@ -121,7 +119,7 @@ fn add_refetch_field_to_object<TNetworkProtocol: NetworkProtocol>(
                 parent_object_id: object.id,
                 refetch_strategy: None,
                 output_format: std::marker::PhantomData,
-            }));
+            });
 
             let refetch_strategy =
                 RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(

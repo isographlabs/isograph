@@ -213,7 +213,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             })
             .collect::<Vec<_>>();
 
-        let mutation_field_client_field_id = self.client_types.len().into();
+        let mutation_field_client_field_id = self.client_scalar_selectables.len().into();
         let top_level_arguments = mutation_field_arguments
             .iter()
             .map(|input_value_def| ArgumentKeyAndValue {
@@ -262,8 +262,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             refetch_strategy: None,
             output_format: std::marker::PhantomData,
         };
-        self.client_types
-            .push(SelectionType::Scalar(mutation_client_field));
+        self.client_scalar_selectables.push(mutation_client_field);
 
         self.insert_client_field_on_object(
             client_field_scalar_selection_name,

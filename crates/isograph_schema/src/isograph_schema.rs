@@ -49,16 +49,14 @@ pub struct RootOperationName(pub String);
 pub struct Schema<TNetworkProtocol: NetworkProtocol> {
     pub server_scalar_selectables: Vec<ServerScalarSelectable<TNetworkProtocol>>,
     pub server_object_selectables: Vec<ServerObjectSelectable<TNetworkProtocol>>,
-    pub client_types: SelectionTypes<TNetworkProtocol>,
+    pub client_scalar_selectables: Vec<ClientField<TNetworkProtocol>>,
+    pub client_object_selectables: Vec<ClientPointer<TNetworkProtocol>>,
     pub entrypoints: HashMap<ClientFieldId, IsoLiteralText>,
     pub server_field_data: ServerFieldData<TNetworkProtocol>,
 
     /// These are root types like Query, Mutation, Subscription
     pub fetchable_types: BTreeMap<ServerObjectId, RootOperationName>,
 }
-
-type SelectionTypes<TNetworkProtocol> =
-    Vec<SelectionType<ClientField<TNetworkProtocol>, ClientPointer<TNetworkProtocol>>>;
 
 impl<TNetworkProtocol: NetworkProtocol> Default for Schema<TNetworkProtocol> {
     fn default() -> Self {
@@ -115,7 +113,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         Self {
             server_scalar_selectables: vec![],
             server_object_selectables: vec![],
-            client_types: vec![],
+            client_scalar_selectables: vec![],
+            client_object_selectables: vec![],
+
             entrypoints: Default::default(),
             server_field_data: ServerFieldData {
                 server_objects: vec![],
@@ -283,26 +283,14 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     /// Get a reference to a given client field by its id.
     pub fn client_field(&self, client_field_id: ClientFieldId) -> &ClientField<TNetworkProtocol> {
-        match &self.client_types[client_field_id.as_usize()] {
-            SelectionType::Scalar(client_field) => client_field,
-            SelectionType::Object(_) => panic!(
-                "encountered ClientPointer under ClientFieldId. \
-                This is indicative of a bug in Isograph."
-            ),
-        }
+        &self.client_scalar_selectables[client_field_id.as_usize()]
     }
 
     pub fn client_field_mut(
         &mut self,
         client_field_id: ClientFieldId,
     ) -> &mut ClientField<TNetworkProtocol> {
-        match &mut self.client_types[client_field_id.as_usize()] {
-            SelectionType::Scalar(client_field) => client_field,
-            SelectionType::Object(_) => panic!(
-                "encountered ClientPointer under ClientFieldId. \
-                This is indicative of a bug in Isograph."
-            ),
-        }
+        &mut self.client_scalar_selectables[client_field_id.as_usize()]
     }
 
     pub fn object_selectable(
@@ -323,26 +311,14 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &self,
         client_pointer_id: ClientPointerId,
     ) -> &ClientPointer<TNetworkProtocol> {
-        match &self.client_types[client_pointer_id.as_usize()] {
-            SelectionType::Object(client_pointer) => client_pointer,
-            SelectionType::Scalar(_) => panic!(
-                "encountered ClientField under ClientPointerId. \
-                This is indicative of a bug in Isograph."
-            ),
-        }
+        &self.client_object_selectables[client_pointer_id.as_usize()]
     }
 
     pub fn client_pointer_mut(
         &mut self,
         client_pointer_id: ClientPointerId,
     ) -> &mut ClientPointer<TNetworkProtocol> {
-        match &mut self.client_types[client_pointer_id.as_usize()] {
-            SelectionType::Object(client_pointer) => client_pointer,
-            SelectionType::Scalar(_) => panic!(
-                "encountered ClientField under ClientPointerId. \
-                This is indicative of a bug in Isograph."
-            ),
-        }
+        &mut self.client_object_selectables[client_pointer_id.as_usize()]
     }
 
     #[allow(clippy::type_complexity)]

@@ -167,7 +167,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let client_field_name = client_field_field_name_ws.item;
         let client_field_name_span = client_field_field_name_ws.span;
 
-        let next_client_field_id = self.client_types.len().into();
+        let next_client_field_id = self.client_scalar_selectables.len().into();
 
         if object
             .encountered_fields
@@ -190,7 +190,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let name = client_field_declaration.item.client_field_name.item;
         let variant = get_client_variant(&client_field_declaration.item);
 
-        self.client_types.push(SelectionType::Scalar(ClientField {
+        self.client_scalar_selectables.push(ClientField {
             description: client_field_declaration.item.description.map(|x| x.item),
             name,
             id: next_client_field_id,
@@ -217,7 +217,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             parent_object_id,
             refetch_strategy: None,
             output_format: std::marker::PhantomData,
-        }));
+        });
 
         let selections = client_field_declaration.item.selection_set;
         let refetch_strategy = object.id_field.map(|_| {
@@ -255,7 +255,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let client_pointer_name = client_pointer_pointer_name_ws.item;
         let client_pointer_name_span = client_pointer_pointer_name_ws.span;
 
-        let next_client_pointer_id: ClientPointerId = self.client_types.len().into();
+        let next_client_pointer_id: ClientPointerId = self.client_object_selectables.len().into();
 
         let name = client_pointer_declaration.item.client_pointer_name.item;
 
@@ -299,7 +299,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             }
         }?;
 
-        self.client_types.push(SelectionType::Object(ClientPointer {
+        self.client_object_selectables.push(ClientPointer {
             description: client_pointer_declaration.item.description.map(|x| x.item),
             name,
             id: next_client_pointer_id,
@@ -332,7 +332,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 const_export_name: client_pointer_declaration.item.const_export_name,
                 file_path: client_pointer_declaration.item.definition_path,
             },
-        }));
+        });
 
         let parent_object = self.server_field_data.object_mut(parent_object_id);
         if parent_object

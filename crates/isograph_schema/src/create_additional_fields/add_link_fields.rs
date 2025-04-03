@@ -11,8 +11,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn add_link_fields(&mut self) -> ProcessTypeDefinitionResult<()> {
         for object in &mut self.server_field_data.server_objects {
             let field_name = *LINK_FIELD_NAME;
-            let next_client_field_id = self.client_types.len().into();
-            self.client_types.push(SelectionType::Scalar(ClientField {
+            let next_client_field_id = self.client_scalar_selectables.len().into();
+            self.client_scalar_selectables.push(ClientField {
                 description: Some(
                     format!("A store Link for the {} type.", object.name)
                         .intern()
@@ -30,7 +30,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 },
                 refetch_strategy: None,
                 output_format: std::marker::PhantomData,
-            }));
+            });
 
             if object
                 .encountered_fields

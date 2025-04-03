@@ -39,23 +39,19 @@ pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
     validated_schema: &Schema<TNetworkProtocol>,
 ) -> Result<(), Vec<WithLocation<ValidateUseOfArgumentsError>>> {
     let mut errors = vec![];
-    for client_type in &validated_schema.client_types {
-        match client_type {
-            SelectionType::Scalar(client_field) => {
-                validate_use_of_arguments_for_client_type(
-                    validated_schema,
-                    client_field,
-                    &mut errors,
-                );
-            }
-            SelectionType::Object(client_pointer) => {
-                validate_use_of_arguments_for_client_type(
-                    validated_schema,
-                    client_pointer,
-                    &mut errors,
-                );
-            }
-        }
+    for client_scalar_selectable in &validated_schema.client_scalar_selectables {
+        validate_use_of_arguments_for_client_type(
+            validated_schema,
+            client_scalar_selectable,
+            &mut errors,
+        );
+    }
+    for client_object_selectable in &validated_schema.client_object_selectables {
+        validate_use_of_arguments_for_client_type(
+            validated_schema,
+            client_object_selectable,
+            &mut errors,
+        );
     }
 
     if errors.is_empty() {
