@@ -15,7 +15,6 @@ use crate::{NetworkProtocol, SchemaServerObjectSelectableVariant};
 pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: WithLocation<ServerScalarSelectableName>,
-    pub id: ServerScalarSelectableId,
 
     pub target_scalar_entity: TypeAnnotation<ServerScalarId>,
 
@@ -28,7 +27,6 @@ pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
 pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: WithLocation<ServerObjectSelectableName>,
-    pub id: ServerObjectSelectableId,
 
     pub target_object_entity: TypeAnnotation<ServerObjectId>,
 
@@ -49,7 +47,6 @@ pub type ServerSelectable<'a, TNetworkProtocol> = SelectionType<
 pub trait ServerScalarOrObjectSelectable {
     fn description(&self) -> Option<DescriptionValue>;
     fn name(&self) -> WithLocation<ServerSelectableName>;
-    fn id(&self) -> ServerSelectableId;
     fn target_entity_id(&self) -> TypeAnnotation<ServerEntityId>;
     fn parent_type_id(&self) -> ServerObjectId;
     fn arguments(&self) -> &[WithLocation<VariableDefinition<ServerEntityId>>];
@@ -64,10 +61,6 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
 
     fn name(&self) -> WithLocation<ServerSelectableName> {
         self.name.map(|x| x.into())
-    }
-
-    fn id(&self) -> ServerSelectableId {
-        SelectionType::Object(self.id)
     }
 
     fn target_entity_id(&self) -> TypeAnnotation<ServerEntityId> {
@@ -94,10 +87,6 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
 
     fn name(&self) -> WithLocation<ServerSelectableName> {
         self.name.map(|x| x.into())
-    }
-
-    fn id(&self) -> ServerSelectableId {
-        SelectionType::Scalar(self.id)
     }
 
     fn target_entity_id(&self) -> TypeAnnotation<ServerEntityId> {
@@ -129,13 +118,6 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
         match self {
             SelectionType::Scalar(s) => s.name(),
             SelectionType::Object(o) => o.name(),
-        }
-    }
-
-    fn id(&self) -> ServerSelectableId {
-        match self {
-            SelectionType::Scalar(s) => s.id(),
-            SelectionType::Object(o) => o.id(),
         }
     }
 

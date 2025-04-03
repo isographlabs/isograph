@@ -101,7 +101,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                             .intern()
                             .into(),
                     ),
-                    id: next_server_object_field_id,
                     name: WithLocation::new(field_name, Location::generated()),
                     parent_type_id: subtype.id,
                     arguments: vec![],

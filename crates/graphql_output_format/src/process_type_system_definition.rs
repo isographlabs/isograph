@@ -660,7 +660,6 @@ fn process_fields(
                                 .push(ServerScalarSelectable {
                                     description,
                                     name: field.item.name.map(|x| x.unchecked_conversion()),
-                                    id: next_server_field_id,
                                     target_scalar_entity:
                                         TypeAnnotation::from_graphql_type_annotation(
                                             field.item.type_,
@@ -683,7 +682,6 @@ fn process_fields(
                                 .push(ServerObjectSelectable {
                                     description,
                                     name: field.item.name.map(|x| x.unchecked_conversion()),
-                                    id: next_server_object_selectable_id,
                                     target_object_entity:
                                         TypeAnnotation::from_graphql_type_annotation(
                                             field.item.type_,
