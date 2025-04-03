@@ -7,7 +7,7 @@ use common_lang_types::{
     ClientScalarSelectableName, GraphQLScalarTypeName, IsoLiteralText, IsographObjectTypeName,
     JavascriptName, Location, SelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
-use graphql_lang_types::{GraphQLFieldDefinition, GraphQLNamedTypeAnnotation};
+use graphql_lang_types::GraphQLNamedTypeAnnotation;
 use intern::string_key::Intern;
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
@@ -211,9 +211,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn insert_server_scalar_selectable(
         &mut self,
         server_scalar_selectable: ServerScalarSelectable<TNetworkProtocol>,
-        // TODO do not accept these two params
+        // TODO do not accept this
         options: &CompilerConfigOptions,
-        field_definition: &WithLocation<GraphQLFieldDefinition>,
+        inner_non_null_named_type: Option<&GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
     ) -> InsertFieldsResult<()> {
         let next_server_scalar_selectable_id = self.server_scalar_selectables.len().into();
         let parent_object_id = server_scalar_selectable.parent_type_id;
@@ -229,23 +229,20 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             )
             .is_some()
         {
-            return Err(WithLocation::new(
-                InsertFieldsError::DuplicateField {
-                    field_name: field_definition.item.name.item.into(),
-                    parent_type: parent_object.name,
-                },
-                field_definition.item.name.location,
-            ));
+            return Err(InsertFieldsError::DuplicateField {
+                field_name: server_scalar_selectable.name.item.into(),
+                parent_type: parent_object.name,
+            });
         }
 
+        // TODO do not do this here, this is a GraphQL-ism
         if server_scalar_selectable.name.item == "id" {
             set_and_validate_id_field(
                 &mut parent_object.id_field,
                 next_server_scalar_selectable_id,
                 parent_object.name,
                 options,
-                field_definition.item.type_.inner_non_null_named_type(),
-                field_definition.location,
+                inner_non_null_named_type,
             )?;
         }
 
@@ -258,8 +255,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn insert_server_object_selectable(
         &mut self,
         server_object_selectable: ServerObjectSelectable<TNetworkProtocol>,
-        // TODO do not accept this
-        field_definition: &WithLocation<GraphQLFieldDefinition>,
     ) -> InsertFieldsResult<()> {
         let next_server_object_selectable_id = self.server_object_selectables.len().into();
         let parent_object_id = server_object_selectable.parent_type_id;
@@ -274,13 +269,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             )
             .is_some()
         {
-            return Err(WithLocation::new(
-                InsertFieldsError::DuplicateField {
-                    field_name: field_definition.item.name.item.into(),
-                    parent_type: parent_object.name,
-                },
-                field_definition.item.name.location,
-            ));
+            return Err(InsertFieldsError::DuplicateField {
+                field_name: next_object_name.item.into(),
+                parent_type: parent_object.name,
+            });
         }
 
         self.server_object_selectables
@@ -502,7 +494,6 @@ fn set_and_validate_id_field(
     parent_type_name: IsographObjectTypeName,
     options: &CompilerConfigOptions,
     inner_non_null_named_type: Option<&GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
-    location: Location,
 ) -> InsertFieldsResult<()> {
     // N.B. id_field is guaranteed to be None; otherwise field_names_to_type_name would
     // have contained this field name already.
@@ -516,28 +507,20 @@ fn set_and_validate_id_field(
         Some(type_) => {
             if type_.0.item != *ID_GRAPHQL_TYPE {
                 options.on_invalid_id_type.on_failure(|| {
-                    WithLocation::new(
-                        InsertFieldsError::IdFieldMustBeNonNullIdType {
-                            strong_field_name: "id",
-                            parent_type: parent_type_name,
-                        },
-                        // TODO this shows the wrong span?
-                        location,
-                    )
+                    InsertFieldsError::IdFieldMustBeNonNullIdType {
+                        strong_field_name: "id",
+                        parent_type: parent_type_name,
+                    }
                 })?;
             }
             Ok(())
         }
         None => {
             options.on_invalid_id_type.on_failure(|| {
-                WithLocation::new(
-                    InsertFieldsError::IdFieldMustBeNonNullIdType {
-                        strong_field_name: "id",
-                        parent_type: parent_type_name,
-                    },
-                    // TODO this shows the wrong span?
-                    location,
-                )
+                InsertFieldsError::IdFieldMustBeNonNullIdType {
+                    strong_field_name: "id",
+                    parent_type: parent_type_name,
+                }
             })?;
             Ok(())
         }
@@ -563,4 +546,4 @@ pub enum InsertFieldsError {
     },
 }
 
-type InsertFieldsResult<T> = Result<T, WithLocation<InsertFieldsError>>;
+type InsertFieldsResult<T> = Result<T, InsertFieldsError>;

@@ -631,29 +631,26 @@ fn process_fields(
                                 phantom_data: std::marker::PhantomData,
                             },
                             options,
-                            &field_definition,
+                            field_definition.item.type_.inner_non_null_named_type(),
                         )
-                        .map_err(|with_location| with_location.map(|e| e.into()))?;
+                        .map_err(|e| WithLocation::new(e.into(), field_definition.location))?;
                 }
                 SelectionType::Object(object_id) => {
                     schema
-                        .insert_server_object_selectable(
-                            ServerObjectSelectable {
-                                description,
-                                name: field_definition.item.name.map(|x| x.unchecked_conversion()),
-                                target_object_entity: TypeAnnotation::from_graphql_type_annotation(
-                                    field_definition.item.type_.clone(),
-                                )
-                                .map(&mut |_| *object_id),
-                                parent_type_id: parent_object.id,
-                                arguments,
-                                phantom_data: std::marker::PhantomData,
-                                object_selectable_variant:
-                                    SchemaServerObjectSelectableVariant::LinkedField,
-                            },
-                            &field_definition,
-                        )
-                        .map_err(|with_location| with_location.map(|e| e.into()))?;
+                        .insert_server_object_selectable(ServerObjectSelectable {
+                            description,
+                            name: field_definition.item.name.map(|x| x.unchecked_conversion()),
+                            target_object_entity: TypeAnnotation::from_graphql_type_annotation(
+                                field_definition.item.type_.clone(),
+                            )
+                            .map(&mut |_| *object_id),
+                            parent_type_id: parent_object.id,
+                            arguments,
+                            phantom_data: std::marker::PhantomData,
+                            object_selectable_variant:
+                                SchemaServerObjectSelectableVariant::LinkedField,
+                        })
+                        .map_err(|e| WithLocation::new(e.into(), field_definition.location))?;
                 }
             }
         }
