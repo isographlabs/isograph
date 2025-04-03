@@ -4,6 +4,7 @@ use common_lang_types::{
     DescriptionValue, ServerObjectSelectableName, ServerScalarSelectableName, ServerSelectableName,
     WithLocation,
 };
+use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
     SelectionType, ServerEntityId, ServerObjectId, ServerObjectSelectableId, ServerScalarId,
     ServerScalarSelectableId, TypeAnnotation, VariableDefinition,
@@ -44,6 +45,7 @@ pub type ServerSelectable<'a, TNetworkProtocol> = SelectionType<
     &'a ServerObjectSelectable<TNetworkProtocol>,
 >;
 
+#[impl_for_selection_type]
 pub trait ServerScalarOrObjectSelectable {
     fn description(&self) -> Option<DescriptionValue>;
     fn name(&self) -> WithLocation<ServerSelectableName>;
@@ -101,44 +103,5 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
 
     fn arguments(&self) -> &[WithLocation<VariableDefinition<ServerEntityId>>] {
         &self.arguments
-    }
-}
-
-impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
-    for ServerSelectable<'_, TNetworkProtocol>
-{
-    fn description(&self) -> Option<DescriptionValue> {
-        match self {
-            SelectionType::Scalar(s) => s.description(),
-            SelectionType::Object(o) => o.description(),
-        }
-    }
-
-    fn name(&self) -> WithLocation<ServerSelectableName> {
-        match self {
-            SelectionType::Scalar(s) => s.name(),
-            SelectionType::Object(o) => o.name(),
-        }
-    }
-
-    fn target_entity_id(&self) -> TypeAnnotation<ServerEntityId> {
-        match self {
-            SelectionType::Scalar(s) => s.target_entity_id(),
-            SelectionType::Object(o) => o.target_entity_id(),
-        }
-    }
-
-    fn parent_type_id(&self) -> ServerObjectId {
-        match self {
-            SelectionType::Scalar(s) => s.parent_type_id(),
-            SelectionType::Object(o) => o.parent_type_id(),
-        }
-    }
-
-    fn arguments(&self) -> &[WithLocation<VariableDefinition<ServerEntityId>>] {
-        match self {
-            SelectionType::Scalar(s) => s.arguments(),
-            SelectionType::Object(o) => o.arguments(),
-        }
     }
 }

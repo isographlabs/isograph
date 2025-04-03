@@ -49,16 +49,25 @@ pub type SchemaType<'a, TNetworkProtocol> =
 #[impl_for_selection_type]
 pub trait SchemaScalarOrObject {
     fn name(&self) -> SelectionType<GraphQLScalarTypeName, IsographObjectTypeName>;
+    fn description(&self) -> Option<DescriptionValue>;
 }
 
 impl<TNetworkProtocol: NetworkProtocol> SchemaScalarOrObject for &SchemaScalar<TNetworkProtocol> {
     fn name(&self) -> SelectionType<GraphQLScalarTypeName, IsographObjectTypeName> {
         SelectionType::Scalar(self.name.item)
     }
+
+    fn description(&self) -> Option<DescriptionValue> {
+        self.description.map(|x| x.item)
+    }
 }
 
 impl<TNetworkProtocol: NetworkProtocol> SchemaScalarOrObject for &SchemaObject<TNetworkProtocol> {
     fn name(&self) -> SelectionType<GraphQLScalarTypeName, IsographObjectTypeName> {
         SelectionType::Object(self.name)
+    }
+
+    fn description(&self) -> Option<DescriptionValue> {
+        self.description
     }
 }
