@@ -51,6 +51,10 @@ pnpm watch-rs
 
 This will watch and rebuild the compiler for use locally.
 
+:::info
+This starts bacon! There are several commands you can press: `b` to build, `c` for running clippy, `a` for checking. It defaults to building.
+:::
+
 ### Running the compiler binary directly
 
 The compiler can be run with `./target/debug/isograph_cli`. For example, `pnpm build-pet-demo` runs: `./target/debug/isograph_cli --config ./demos/pet-demo/isograph.config.json`.
