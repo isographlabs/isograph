@@ -343,6 +343,15 @@ impl<TNetworkProtocol: NetworkProtocol> ServerFieldData<TNetworkProtocol> {
         &self.server_scalars[scalar_id.as_usize()]
     }
 
+    pub fn server_scalars_and_ids<'a>(
+        &'a self,
+    ) -> impl Iterator<Item = (ServerScalarId, &'a SchemaScalar<TNetworkProtocol>)> + 'a {
+        self.server_scalars
+            .iter()
+            .enumerate()
+            .map(|(id, scalar)| (id.into(), scalar))
+    }
+
     // TODO this function is horribly named
     pub fn lookup_unvalidated_type(&self, type_id: ServerEntityId) -> SchemaType<TNetworkProtocol> {
         match type_id {
@@ -359,6 +368,15 @@ impl<TNetworkProtocol: NetworkProtocol> ServerFieldData<TNetworkProtocol> {
     /// Get a mutable reference to a given object type by its id.
     pub fn object_mut(&mut self, object_id: ServerObjectId) -> &mut SchemaObject<TNetworkProtocol> {
         &mut self.server_objects[object_id.as_usize()]
+    }
+
+    pub fn server_objects_and_ids<'a>(
+        &'a self,
+    ) -> impl Iterator<Item = (ServerObjectId, &'a SchemaObject<TNetworkProtocol>)> + 'a {
+        self.server_objects
+            .iter()
+            .enumerate()
+            .map(|(id, object)| (id.into(), object))
     }
 }
 
