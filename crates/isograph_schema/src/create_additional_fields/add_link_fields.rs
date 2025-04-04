@@ -9,7 +9,7 @@ use super::create_additional_fields_error::{
 
 impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn add_link_fields(&mut self) -> ProcessTypeDefinitionResult<()> {
-        for object in &mut self.server_field_data.server_objects {
+        for (object_id, object) in &mut self.server_field_data.server_objects_and_ids_mut() {
             let field_name = *LINK_FIELD_NAME;
             let next_client_field_id = self.client_scalar_selectables.len().into();
             self.client_scalar_selectables.push(ClientField {
@@ -19,7 +19,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         .into(),
                 ),
                 name: field_name,
-                parent_object_id: object.id,
+                parent_object_id: object_id,
                 variable_definitions: vec![],
                 reader_selection_set: vec![],
                 variant: ClientFieldVariant::Link,

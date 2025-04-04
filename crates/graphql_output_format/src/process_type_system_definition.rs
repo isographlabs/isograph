@@ -361,7 +361,6 @@ fn process_object_type_definition(
             server_objects.push(SchemaObject {
                 description: object_type_definition.description.map(|d| d.item),
                 name: object_type_definition.name.item,
-                id: next_object_id,
                 encountered_fields: BTreeMap::new(),
                 id_field: None,
                 directives: object_type_definition.directives,
@@ -626,7 +625,7 @@ fn process_fields(
                                     field_definition.item.type_.clone(),
                                 )
                                 .map(&mut |_| *scalar_id),
-                                parent_type_id: parent_object.id,
+                                parent_type_id: parent_object_id,
                                 arguments,
                                 phantom_data: std::marker::PhantomData,
                             },
@@ -644,7 +643,7 @@ fn process_fields(
                                 field_definition.item.type_.clone(),
                             )
                             .map(&mut |_| *object_id),
-                            parent_type_id: parent_object.id,
+                            parent_type_id: parent_object_id,
                             arguments,
                             phantom_data: std::marker::PhantomData,
                             object_selectable_variant:

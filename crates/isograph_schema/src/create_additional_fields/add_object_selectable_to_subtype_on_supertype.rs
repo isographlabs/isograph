@@ -83,7 +83,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         .into(),
                 ),
                 name: WithLocation::new(field_name, Location::generated()),
-                parent_type_id: subtype_entity.id,
+                parent_type_id: *subtype_id,
                 arguments: vec![],
                 target_object_entity: TypeAnnotation::from_graphql_type_annotation(
                     GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(WithSpan::new(

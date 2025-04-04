@@ -23,18 +23,20 @@ pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
     let mut errors = vec![];
     let mut results = vec![];
 
+    let id_type_id = schema.server_field_data.id_type_id;
+
     for item in schema
         .server_field_data
-        .server_objects
-        .iter_mut()
-        .map(|object| {
+        .server_objects_and_ids_mut()
+        .map(|(object_id, object)| {
             if let Some(id_field) = object.id_field {
                 let (client_field_id, refetch_strategy) = add_refetch_field_to_object(
+                    object_id,
                     object,
                     &mut schema.client_scalar_selectables,
                     query_id,
                     id_field,
-                    schema.server_field_data.id_type_id,
+                    id_type_id,
                 )?;
                 Ok::<Option<UnprocessedClientFieldItem>, BatchCompileError>(Some(
                     UnprocessedClientFieldItem {
@@ -67,6 +69,7 @@ pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
 }
 
 fn add_refetch_field_to_object<TNetworkProtocol: NetworkProtocol>(
+    object_id: ServerObjectId,
     object: &mut SchemaObject<TNetworkProtocol>,
     client_fields: &mut Vec<ClientField<TNetworkProtocol>>,
     query_id: ServerObjectId,
@@ -115,7 +118,7 @@ fn add_refetch_field_to_object<TNetworkProtocol: NetworkProtocol>(
                     type_name: object.name,
                     field_name: "__refetch".intern().into(),
                 },
-                parent_object_id: object.id,
+                parent_object_id: object_id,
                 refetch_strategy: None,
                 output_format: std::marker::PhantomData,
             });

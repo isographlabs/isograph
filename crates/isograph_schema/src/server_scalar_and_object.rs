@@ -7,7 +7,7 @@ use common_lang_types::{
 use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective};
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
-    DefinitionLocation, SelectionType, ServerObjectId, ServerScalarId, ServerStrongIdFieldId,
+    DefinitionLocation, SelectionType, ServerScalarId, ServerStrongIdFieldId,
 };
 
 use crate::{ClientFieldOrPointerId, NetworkProtocol, ServerSelectableId};
@@ -30,7 +30,6 @@ pub type ObjectEncounteredFields =
 pub struct SchemaObject<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: IsographObjectTypeName,
-    pub id: ServerObjectId,
     // We probably don't want this
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
