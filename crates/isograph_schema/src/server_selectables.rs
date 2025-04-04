@@ -6,8 +6,8 @@ use common_lang_types::{
 };
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
-    SelectionType, ServerEntityId, ServerObjectId, ServerObjectSelectableId, ServerScalarId,
-    ServerScalarSelectableId, TypeAnnotation, VariableDefinition,
+    impl_with_id, SelectionType, ServerEntityId, ServerObjectId, ServerObjectSelectableId,
+    ServerScalarId, ServerScalarSelectableId, TypeAnnotation, VariableDefinition,
 };
 
 use crate::{NetworkProtocol, SchemaServerObjectSelectableVariant};
@@ -24,6 +24,8 @@ pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub phantom_data: PhantomData<TNetworkProtocol>,
 }
 
+impl_with_id!(ServerScalarSelectable<TNetworkProtocol: NetworkProtocol>, ServerScalarSelectableId);
+
 #[derive(Debug, Clone)]
 pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
@@ -37,6 +39,8 @@ pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub arguments: Vec<WithLocation<VariableDefinition<ServerEntityId>>>,
     pub phantom_data: PhantomData<TNetworkProtocol>,
 }
+
+impl_with_id!(ServerObjectSelectable<TNetworkProtocol: NetworkProtocol>, ServerObjectSelectableId);
 
 pub type ServerSelectableId = SelectionType<ServerScalarSelectableId, ServerObjectSelectableId>;
 
