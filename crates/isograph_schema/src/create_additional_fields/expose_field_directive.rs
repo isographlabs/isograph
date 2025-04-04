@@ -86,10 +86,12 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     /// There is lots of cloning going on here! Not ideal.
     pub fn add_exposed_fields_to_parent_object_types(
         &mut self,
-        parent_object_id: ServerObjectId,
+        parent_object_entity_id: ServerObjectId,
     ) -> ProcessTypeDefinitionResult<Vec<UnprocessedClientFieldItem>> {
         // TODO don't clone if possible
-        let parent_object = self.server_field_data.object(parent_object_id);
+        let parent_object = self
+            .server_field_data
+            .object_entity(parent_object_entity_id);
         let parent_object_name = parent_object.name;
 
         // TODO this is a bit ridiculous
@@ -108,7 +110,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             unprocessed_client_field_items.push(self.create_new_exposed_field(
                 expose_field_directive,
                 parent_object_name,
-                parent_object_id,
+                parent_object_entity_id,
             )?);
         }
 
@@ -119,7 +121,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &mut self,
         expose_field_directive: &ExposeFieldDirective,
         parent_object_name: IsographObjectTypeName,
-        parent_object_id: ServerObjectId,
+        parent_object_entity_id: ServerObjectId,
     ) -> Result<UnprocessedClientFieldItem, WithLocation<CreateAdditionalFieldsError>> {
         let ExposeFieldDirective {
             expose_as,
@@ -128,16 +130,19 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             field,
         } = expose_field_directive;
 
-        let mutation_subfield_id = self.parse_mutation_subfield_id(*field, parent_object_id)?;
+        let mutation_subfield_id =
+            self.parse_mutation_subfield_id(*field, parent_object_entity_id)?;
 
         // TODO do not use mutation naming here
         let mutation_field = self.server_object_selectable(mutation_subfield_id);
         let payload_object_type_annotation = &mutation_field.target_object_entity;
-        let payload_object_id = *payload_object_type_annotation.inner();
+        let payload_object_entity_id = *payload_object_type_annotation.inner();
 
         // TODO it's a bit annoying that we call .object twice!
-        let mutation_field_payload_type_name =
-            self.server_field_data.object(payload_object_id).name;
+        let mutation_field_payload_type_name = self
+            .server_field_data
+            .object_entity(payload_object_entity_id)
+            .name;
 
         let client_field_scalar_selection_name =
             expose_as.unwrap_or(mutation_field.name.item.into());
@@ -156,7 +161,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             field_map.clone(),
         )?;
 
-        let payload_object = self.server_field_data.object(payload_object_id);
+        let payload_object = self
+            .server_field_data
+            .object_entity(payload_object_entity_id);
 
         // TODO split path on .
         let primary_field_name: ServerObjectSelectableName = path.unchecked_conversion();
@@ -165,30 +172,31 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .encountered_fields
             .get(&primary_field_name.into());
 
-        let (maybe_abstract_parent_object_id, maybe_abstract_parent_type_name) = match primary_field
-        {
-            Some(DefinitionLocation::Server(SelectionType::Object(object_selectable_id))) => {
-                let server_object_selectable = self.server_object_selectable(*object_selectable_id);
+        let (maybe_abstract_parent_object_entity_id, maybe_abstract_parent_type_name) =
+            match primary_field {
+                Some(DefinitionLocation::Server(SelectionType::Object(object_selectable_id))) => {
+                    let server_object_selectable =
+                        self.server_object_selectable(*object_selectable_id);
 
-                // TODO validate that the payload object has no plural fields in between
+                    // TODO validate that the payload object has no plural fields in between
 
-                let client_field_parent_object_id =
-                    server_object_selectable.target_object_entity.inner();
-                let client_field_parent_object = self
-                    .server_field_data
-                    .object(*client_field_parent_object_id);
+                    let client_field_parent_object_entity_id =
+                        server_object_selectable.target_object_entity.inner();
+                    let client_field_parent_object = self
+                        .server_field_data
+                        .object_entity(*client_field_parent_object_entity_id);
 
-                Ok((
-                    *client_field_parent_object_id,
-                    // This is the parent type name (Pet)
-                    client_field_parent_object.name,
-                ))
-            }
-            _ => Err(WithLocation::new(
-                CreateAdditionalFieldsError::InvalidMutationField,
-                Location::generated(),
-            )),
-        }?;
+                    Ok((
+                        *client_field_parent_object_entity_id,
+                        // This is the parent type name (Pet)
+                        client_field_parent_object.name,
+                    ))
+                }
+                _ => Err(WithLocation::new(
+                    CreateAdditionalFieldsError::InvalidMutationField,
+                    Location::generated(),
+                )),
+            }?;
 
         let fields = processed_field_map_items
             .iter()
@@ -225,7 +233,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let top_level_schema_field_concrete_type = payload_object.concrete_type;
         let primary_field_concrete_type = self
             .server_field_data
-            .object(maybe_abstract_parent_object_id)
+            .object_entity(maybe_abstract_parent_object_entity_id)
             .concrete_type;
 
         let mutation_client_field = ClientField {
@@ -244,12 +252,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 top_level_schema_field_concrete_type,
                 primary_field_info: Some(PrimaryFieldInfo {
                     primary_field_name,
-                    primary_field_return_type_object_id: maybe_abstract_parent_object_id,
+                    primary_field_return_type_object_entity_id:
+                        maybe_abstract_parent_object_entity_id,
                     primary_field_field_map: field_map.to_vec(),
                     primary_field_concrete_type,
                 }),
 
-                root_object_id: parent_object_id,
+                root_object_entity_id: parent_object_entity_id,
             }),
             variable_definitions: vec![],
             type_and_field: ObjectTypeAndFieldName {
@@ -257,7 +266,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 type_name: maybe_abstract_parent_type_name.unchecked_conversion(), // e.g. Pet
                 field_name: client_field_scalar_selection_name, // set_pet_best_friend
             },
-            parent_object_id: maybe_abstract_parent_object_id,
+            parent_object_entity_id: maybe_abstract_parent_object_entity_id,
             refetch_strategy: None,
             output_format: std::marker::PhantomData,
         };
@@ -265,7 +274,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         self.insert_client_field_on_object(
             client_field_scalar_selection_name,
-            maybe_abstract_parent_object_id,
+            maybe_abstract_parent_object_entity_id,
             mutation_field_client_field_id,
             mutation_field_payload_type_name,
         )?;
@@ -277,7 +286,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     fields.to_vec(),
                     // NOTE: this will probably panic if we're not exposing fields which are
                     // originally on Mutation
-                    parent_object_id,
+                    parent_object_entity_id,
                     format!("Mutation__{}", primary_field_name).intern().into(),
                     top_level_schema_field_name,
                     top_level_arguments,
@@ -298,13 +307,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn insert_client_field_on_object(
         &mut self,
         mutation_field_name: SelectableName,
-        client_field_parent_object_id: ServerObjectId,
+        client_field_parent_object_entity_id: ServerObjectId,
         client_field_id: ClientFieldId,
         payload_object_name: IsographObjectTypeName,
     ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
         let client_field_parent = self
             .server_field_data
-            .object_mut(client_field_parent_object_id);
+            .object_entity_mut(client_field_parent_object_entity_id);
         if client_field_parent
             .encountered_fields
             .insert(
@@ -349,9 +358,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     fn parse_mutation_subfield_id(
         &self,
         field_arg: StringLiteralValue,
-        mutation_object_id: ServerObjectId,
+        mutation_object_entity_id: ServerObjectId,
     ) -> ProcessTypeDefinitionResult<ServerObjectSelectableId> {
-        let mutation = self.server_field_data.object(mutation_object_id);
+        let mutation = self
+            .server_field_data
+            .object_entity(mutation_object_entity_id);
 
         let field_id = mutation
             .encountered_fields

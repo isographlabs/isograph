@@ -42,7 +42,7 @@ pub struct ClientField<TNetworkProtocol: NetworkProtocol> {
     // Why is this not calculated when needed?
     pub type_and_field: ObjectTypeAndFieldName,
 
-    pub parent_object_id: ServerObjectId,
+    pub parent_object_entity_id: ServerObjectId,
     pub output_format: PhantomData<TNetworkProtocol>,
 }
 
@@ -66,7 +66,7 @@ pub struct ClientPointer<TNetworkProtocol: NetworkProtocol> {
     // Why is this not calculated when needed?
     pub type_and_field: ObjectTypeAndFieldName,
 
-    pub parent_object_id: ServerObjectId,
+    pub parent_object_entity_id: ServerObjectId,
 
     pub output_format: PhantomData<TNetworkProtocol>,
     pub info: UserWrittenClientPointerInfo,
@@ -79,7 +79,7 @@ pub trait ClientFieldOrPointer {
     fn description(&self) -> Option<DescriptionValue>;
     fn name(&self) -> ClientSelectableName;
     fn type_and_field(&self) -> ObjectTypeAndFieldName;
-    fn parent_object_id(&self) -> ServerObjectId;
+    fn parent_object_entity_id(&self) -> ServerObjectId;
     // the following are unsupported, for now, because the return values include a generic
     fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>];
     fn refetch_strategy(
@@ -110,8 +110,8 @@ impl<TNetworkProtocol: NetworkProtocol> ClientFieldOrPointer for &ClientField<TN
         self.type_and_field
     }
 
-    fn parent_object_id(&self) -> ServerObjectId {
-        self.parent_object_id
+    fn parent_object_entity_id(&self) -> ServerObjectId {
+        self.parent_object_entity_id
     }
 
     fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>] {
@@ -165,8 +165,8 @@ impl<TNetworkProtocol: NetworkProtocol> ClientFieldOrPointer for &ClientPointer<
         self.type_and_field
     }
 
-    fn parent_object_id(&self) -> ServerObjectId {
-        self.parent_object_id
+    fn parent_object_entity_id(&self) -> ServerObjectId {
+        self.parent_object_entity_id
     }
 
     fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>] {

@@ -209,11 +209,11 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
 
                             let type_to_refine_to = schema
                                 .server_field_data
-                                .object(encountered_client_field.parent_object_id);
+                                .object_entity(encountered_client_field.parent_object_entity_id);
 
                             if schema
                                 .fetchable_types
-                                .contains_key(&encountered_client_field.parent_object_id)
+                                .contains_key(&encountered_client_field.parent_object_entity_id)
                             {
                                 panic!("Loadable fields on root objects are not yet supported");
                             }
@@ -590,9 +590,16 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 
                     let name_or_alias = scalar_field_selection.name_or_alias().item;
 
-                    let output_type = field.target_scalar_entity.clone().map(&mut |scalar_id| {
-                        schema.server_field_data.scalar(scalar_id).javascript_name
-                    });
+                    let output_type =
+                        field
+                            .target_scalar_entity
+                            .clone()
+                            .map(&mut |scalar_entity_id| {
+                                schema
+                                    .server_field_data
+                                    .scalar_entity(scalar_entity_id)
+                                    .javascript_name
+                            });
 
                     query_type_declaration.push_str(&format!(
                         "{}readonly {}: {},\n",
@@ -757,9 +764,16 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 
                     let name_or_alias = scalar_field_selection.name_or_alias().item;
 
-                    let output_type = field.target_scalar_entity.clone().map(&mut |scalar_id| {
-                        schema.server_field_data.scalar(scalar_id).javascript_name
-                    });
+                    let output_type =
+                        field
+                            .target_scalar_entity
+                            .clone()
+                            .map(&mut |scalar_entity_id| {
+                                schema
+                                    .server_field_data
+                                    .scalar_entity(scalar_entity_id)
+                                    .javascript_name
+                            });
 
                     match scalar_field_selection.associated_data.selection_variant {
                         ScalarSelectionDirectiveSet::Updatable(_) => {
@@ -903,8 +917,11 @@ fn format_type_for_js<TNetworkProtocol: NetworkProtocol>(
                     This is indicative of an unimplemented feature in Isograph."
                 )
             }
-            ServerEntityId::Scalar(scalar_id) => {
-                schema.server_field_data.scalar(scalar_id).javascript_name
+            ServerEntityId::Scalar(scalar_entity_id) => {
+                schema
+                    .server_field_data
+                    .scalar_entity(scalar_entity_id)
+                    .javascript_name
             }
         },
     );

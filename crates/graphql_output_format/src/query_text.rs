@@ -2,7 +2,7 @@ use common_lang_types::{QueryOperationName, QueryText, UnvalidatedTypeName};
 use graphql_lang_types::GraphQLTypeAnnotation;
 use isograph_lang_types::{ArgumentKeyAndValue, NonConstantValue};
 use isograph_schema::{
-    MergedSelectionMap, MergedServerSelection, RootOperationName, SchemaScalarOrObject,
+    MergedSelectionMap, MergedServerSelection, RootOperationName, ServerScalarOrObjectEntity,
     ValidatedVariableDefinition,
 };
 

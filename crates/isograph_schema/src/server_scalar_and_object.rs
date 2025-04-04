@@ -15,21 +15,21 @@ use crate::{ClientFieldOrPointerId, NetworkProtocol, ServerSelectableId};
 
 /// A scalar type in the schema.
 #[derive(Debug)]
-pub struct SchemaScalar<TNetworkProtocol: NetworkProtocol> {
+pub struct ServerScalarEntity<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<GraphQLScalarTypeName>,
     pub javascript_name: JavascriptName,
     pub output_format: PhantomData<TNetworkProtocol>,
 }
 
-impl_with_id!(SchemaScalar<TNetworkProtocol: NetworkProtocol>, ServerScalarId);
+impl_with_id!(ServerScalarEntity<TNetworkProtocol: NetworkProtocol>, ServerScalarId);
 
 pub type ObjectEncounteredFields =
     BTreeMap<SelectableName, DefinitionLocation<ServerSelectableId, ClientFieldOrPointerId>>;
 
 /// An object type in the schema.
 #[derive(Debug)]
-pub struct SchemaObject<TNetworkProtocol: NetworkProtocol> {
+pub struct ServerObjectEntity<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: IsographObjectTypeName,
     // We probably don't want this
@@ -44,18 +44,22 @@ pub struct SchemaObject<TNetworkProtocol: NetworkProtocol> {
     pub output_associated_data: TNetworkProtocol::SchemaObjectAssociatedData,
 }
 
-impl_with_id!(SchemaObject<TNetworkProtocol: NetworkProtocol>, ServerObjectId);
+impl_with_id!(ServerObjectEntity<TNetworkProtocol: NetworkProtocol>, ServerObjectId);
 
-pub type SchemaType<'a, TNetworkProtocol> =
-    SelectionType<&'a SchemaScalar<TNetworkProtocol>, &'a SchemaObject<TNetworkProtocol>>;
+pub type ServerEntity<'a, TNetworkProtocol> = SelectionType<
+    &'a ServerScalarEntity<TNetworkProtocol>,
+    &'a ServerObjectEntity<TNetworkProtocol>,
+>;
 
 #[impl_for_selection_type]
-pub trait SchemaScalarOrObject {
+pub trait ServerScalarOrObjectEntity {
     fn name(&self) -> SelectionType<GraphQLScalarTypeName, IsographObjectTypeName>;
     fn description(&self) -> Option<DescriptionValue>;
 }
 
-impl<TNetworkProtocol: NetworkProtocol> SchemaScalarOrObject for &SchemaScalar<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
+    for &ServerScalarEntity<TNetworkProtocol>
+{
     fn name(&self) -> SelectionType<GraphQLScalarTypeName, IsographObjectTypeName> {
         SelectionType::Scalar(self.name.item)
     }
@@ -65,7 +69,9 @@ impl<TNetworkProtocol: NetworkProtocol> SchemaScalarOrObject for &SchemaScalar<T
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol> SchemaScalarOrObject for &SchemaObject<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
+    for &ServerObjectEntity<TNetworkProtocol>
+{
     fn name(&self) -> SelectionType<GraphQLScalarTypeName, IsographObjectTypeName> {
         SelectionType::Object(self.name)
     }

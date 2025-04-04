@@ -33,7 +33,7 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
     };
     let parent_type = schema
         .server_field_data
-        .object(client_field.parent_object_id);
+        .object_entity(client_field.parent_object_entity_id);
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         schema,
@@ -89,7 +89,7 @@ pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkPro
 ) -> ArtifactPathAndContent {
     let parent_type = schema
         .server_field_data
-        .object(client_field.parent_object_id);
+        .object_entity(client_field.parent_object_entity_id);
 
     let client_field_output_type = generate_output_type(client_field);
 

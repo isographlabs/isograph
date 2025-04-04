@@ -48,19 +48,22 @@ fn validate_entrypoint_type_and_field<TNetworkProtocol: NetworkProtocol>(
     text_source: TextSource,
     entrypoint_declaration: WithSpan<EntrypointDeclaration>,
 ) -> Result<ClientFieldId, WithLocation<ValidateEntrypointDeclarationError>> {
-    let parent_object_id =
-        validate_parent_object_id(schema, entrypoint_declaration.item.parent_type, text_source)?;
+    let parent_object_entity_id = validate_parent_object_entity_id(
+        schema,
+        entrypoint_declaration.item.parent_type,
+        text_source,
+    )?;
     let client_field_id = validate_client_field(
         schema,
         entrypoint_declaration.item.client_field_name,
         text_source,
-        parent_object_id,
+        parent_object_entity_id,
     )?;
 
     Ok(client_field_id)
 }
 
-fn validate_parent_object_id<TNetworkProtocol: NetworkProtocol>(
+fn validate_parent_object_entity_id<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     parent_type: WithSpan<UnvalidatedTypeName>,
     text_source: TextSource,
@@ -77,16 +80,20 @@ fn validate_parent_object_id<TNetworkProtocol: NetworkProtocol>(
         ))?;
 
     match parent_type_id {
-        ServerEntityId::Object(object_id) => {
-            if !schema.fetchable_types.contains_key(object_id) {
+        ServerEntityId::Object(object_entity_id) => {
+            if !schema.fetchable_types.contains_key(object_entity_id) {
                 Err(WithLocation::new(
                     ValidateEntrypointDeclarationError::NonFetchableParentType {
                         parent_type_name: parent_type.item,
                         fetchable_types: schema
                             .fetchable_types
                             .keys()
-                            .map(|object_id| {
-                                schema.server_field_data.object(*object_id).name.to_string()
+                            .map(|object_entity_id| {
+                                schema
+                                    .server_field_data
+                                    .object_entity(*object_entity_id)
+                                    .name
+                                    .to_string()
                             })
                             .collect::<Vec<_>>()
                             .join(", "),
@@ -94,11 +101,14 @@ fn validate_parent_object_id<TNetworkProtocol: NetworkProtocol>(
                     Location::new(text_source, parent_type.span),
                 ))
             } else {
-                Ok(*object_id)
+                Ok(*object_entity_id)
             }
         }
-        ServerEntityId::Scalar(scalar_id) => {
-            let scalar_name = schema.server_field_data.scalar(*scalar_id).name;
+        ServerEntityId::Scalar(scalar_entity_id) => {
+            let scalar_name = schema
+                .server_field_data
+                .scalar_entity(*scalar_entity_id)
+                .name;
             Err(WithLocation::new(
                 ValidateEntrypointDeclarationError::InvalidParentType {
                     parent_type: "scalar",
@@ -114,9 +124,11 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     field_name: WithSpan<ServerScalarSelectableName>,
     text_source: TextSource,
-    parent_object_id: ServerObjectId,
+    parent_object_entity_id: ServerObjectId,
 ) -> Result<ClientFieldId, WithLocation<ValidateEntrypointDeclarationError>> {
-    let parent_object = schema.server_field_data.object(parent_object_id);
+    let parent_object = schema
+        .server_field_data
+        .object_entity(parent_object_entity_id);
 
     match parent_object
         .encountered_fields

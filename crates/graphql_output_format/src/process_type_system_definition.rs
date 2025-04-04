@@ -19,8 +19,9 @@ use isograph_lang_types::{
 use isograph_schema::{
     EncounteredRootTypes, InsertFieldsError, IsographObjectTypeDefinition,
     ProcessTypeSystemDocumentOutcome, ProcessedRootTypes, RootOperationName, RootTypes, Schema,
-    SchemaObject, SchemaScalar, SchemaServerObjectSelectableVariant, ServerObjectSelectable,
-    ServerScalarSelectable, TypeRefinementMaps, STRING_JAVASCRIPT_TYPE, TYPENAME_FIELD_NAME,
+    SchemaServerObjectSelectableVariant, ServerObjectEntity, ServerObjectSelectable,
+    ServerScalarEntity, ServerScalarSelectable, TypeRefinementMaps, STRING_JAVASCRIPT_TYPE,
+    TYPENAME_FIELD_NAME,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
@@ -95,7 +96,8 @@ pub fn process_graphql_type_system_document(
                 )?;
 
                 if let Some(encountered_root_kind) = outcome.encountered_root_kind {
-                    encountered_root_types.set_root_type(encountered_root_kind, outcome.object_id);
+                    encountered_root_types
+                        .set_root_type(encountered_root_kind, outcome.object_entity_id);
                 }
             }
             GraphQLTypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
@@ -343,7 +345,7 @@ fn process_object_type_definition(
         ref mut server_field_data,
         ..
     } = schema;
-    let next_object_id = server_field_data.server_objects.len().into();
+    let next_object_entity_id = server_field_data.server_objects.len().into();
     let defined_types = &mut server_field_data.defined_types;
     let server_objects = &mut server_field_data.server_objects;
     let encountered_root_kind = match defined_types.entry(object_type_definition.name.item.into()) {
@@ -358,7 +360,7 @@ fn process_object_type_definition(
             ));
         }
         HashMapEntry::Vacant(vacant) => {
-            server_objects.push(SchemaObject {
+            server_objects.push(ServerObjectEntity {
                 description: object_type_definition.description.map(|d| d.item),
                 name: object_type_definition.name.item,
                 encountered_fields: BTreeMap::new(),
@@ -368,7 +370,7 @@ fn process_object_type_definition(
                 output_associated_data: associated_data,
             });
 
-            vacant.insert(ServerEntityId::Object(next_object_id));
+            vacant.insert(ServerEntityId::Object(next_object_entity_id));
 
             let mut fields_to_insert = object_type_definition.fields;
 
@@ -392,7 +394,7 @@ fn process_object_type_definition(
                     Location::generated(),
                 ));
             }
-            field_queue.insert(next_object_id, fields_to_insert);
+            field_queue.insert(next_object_entity_id, fields_to_insert);
 
             if object_type_definition.name.item == *QUERY_TYPE {
                 Some(RootOperationKind::Query)
@@ -406,7 +408,7 @@ fn process_object_type_definition(
     };
 
     Ok(ProcessObjectTypeDefinitionOutcome {
-        object_id: next_object_id,
+        object_entity_id: next_object_entity_id,
         encountered_root_kind,
     })
 }
@@ -439,7 +441,7 @@ fn process_scalar_definition(
         ref mut server_field_data,
         ..
     } = schema;
-    let next_scalar_id = server_field_data.server_scalars.len().into();
+    let next_scalar_entity_id = server_field_data.server_scalars.len().into();
     let type_names = &mut server_field_data.defined_types;
     let scalars = &mut server_field_data.server_scalars;
     match type_names.entry(scalar_type_definition.name.item.into()) {
@@ -453,14 +455,14 @@ fn process_scalar_definition(
             ));
         }
         HashMapEntry::Vacant(vacant) => {
-            scalars.push(SchemaScalar {
+            scalars.push(ServerScalarEntity {
                 description: scalar_type_definition.description,
                 name: scalar_type_definition.name,
                 javascript_name: *STRING_JAVASCRIPT_TYPE,
                 output_format: std::marker::PhantomData,
             });
 
-            vacant.insert(ServerEntityId::Scalar(next_scalar_id));
+            vacant.insert(ServerEntityId::Scalar(next_scalar_entity_id));
         }
     }
     Ok(())
@@ -508,7 +510,7 @@ fn look_up_root_type(
         .defined_types
         .get(&type_name.item.into())
     {
-        Some(ServerEntityId::Object(object_id)) => Ok(*object_id),
+        Some(ServerEntityId::Object(object_entity_id)) => Ok(*object_entity_id),
         Some(ServerEntityId::Scalar(_)) => Err(WithLocation::new(
             ProcessGraphqlTypeSystemDefinitionError::RootTypeMustBeObject,
             type_name.location,
@@ -539,8 +541,9 @@ fn process_graphql_type_system_extension(
                 );
 
             match *id {
-                ServerEntityId::Object(object_id) => {
-                    let schema_object = schema.server_field_data.object_mut(object_id);
+                ServerEntityId::Object(object_entity_id) => {
+                    let schema_object =
+                        schema.server_field_data.object_entity_mut(object_entity_id);
 
                     if !object_extension.fields.is_empty() {
                         panic!("Adding fields in schema extensions is not allowed, yet.");
@@ -579,9 +582,11 @@ fn process_fields(
     field_queue: HashMap<ServerObjectId, Vec<WithLocation<GraphQLFieldDefinition>>>,
     options: &CompilerConfigOptions,
 ) -> ProcessGraphqlTypeDefinitionResult<()> {
-    for (parent_object_id, field_definitions_to_insert) in field_queue {
+    for (parent_object_entity_id, field_definitions_to_insert) in field_queue {
         for field_definition in field_definitions_to_insert.into_iter() {
-            let parent_object = schema.server_field_data.object(parent_object_id);
+            let parent_object = schema
+                .server_field_data
+                .object_entity(parent_object_entity_id);
 
             let inner_type = field_definition.item.type_.inner();
 
@@ -614,7 +619,7 @@ fn process_fields(
                 .collect::<Result<Vec<_>, _>>()?;
             let description = field_definition.item.description.map(|d| d.item);
             match selection_type {
-                SelectionType::Scalar(scalar_id) => {
+                SelectionType::Scalar(scalar_entity_id) => {
                     schema
                         .insert_server_scalar_selectable(
                             ServerScalarSelectable {
@@ -623,8 +628,8 @@ fn process_fields(
                                 target_scalar_entity: TypeAnnotation::from_graphql_type_annotation(
                                     field_definition.item.type_.clone(),
                                 )
-                                .map(&mut |_| *scalar_id),
-                                parent_type_id: parent_object_id,
+                                .map(&mut |_| *scalar_entity_id),
+                                parent_type_id: parent_object_entity_id,
                                 arguments,
                                 phantom_data: std::marker::PhantomData,
                             },
@@ -633,7 +638,7 @@ fn process_fields(
                         )
                         .map_err(|e| WithLocation::new(e.into(), field_definition.location))?;
                 }
-                SelectionType::Object(object_id) => {
+                SelectionType::Object(object_entity_id) => {
                     schema
                         .insert_server_object_selectable(ServerObjectSelectable {
                             description,
@@ -641,8 +646,8 @@ fn process_fields(
                             target_object_entity: TypeAnnotation::from_graphql_type_annotation(
                                 field_definition.item.type_.clone(),
                             )
-                            .map(&mut |_| *object_id),
-                            parent_type_id: parent_object_id,
+                            .map(&mut |_| *object_entity_id),
+                            parent_type_id: parent_object_entity_id,
                             arguments,
                             phantom_data: std::marker::PhantomData,
                             object_selectable_variant:
@@ -810,7 +815,7 @@ fn convert_graphql_constant_value_to_isograph_constant_value(
 }
 
 pub struct ProcessObjectTypeDefinitionOutcome {
-    pub object_id: ServerObjectId,
+    pub object_entity_id: ServerObjectId,
     pub encountered_root_kind: Option<RootOperationKind>,
 }
 

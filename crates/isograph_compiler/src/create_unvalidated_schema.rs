@@ -159,9 +159,9 @@ fn process_exposed_fields<TNetworkProtocol: NetworkProtocol>(
 ) -> Result<Vec<UnprocessedItem>, BatchCompileError> {
     let fetchable_types: Vec<_> = schema.fetchable_types.keys().copied().collect();
     let mut unprocessed_items = vec![];
-    for fetchable_object_id in fetchable_types.into_iter() {
+    for fetchable_object_entity_id in fetchable_types.into_iter() {
         let unprocessed_client_field_item =
-            schema.add_exposed_fields_to_parent_object_types(fetchable_object_id)?;
+            schema.add_exposed_fields_to_parent_object_types(fetchable_object_entity_id)?;
         unprocessed_items.extend(
             unprocessed_client_field_item
                 .into_iter()

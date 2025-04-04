@@ -59,11 +59,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             ))?;
 
         let unprocess_client_field_items = match parent_type_id {
-            ServerEntityId::Object(object_id) => self
-                .add_client_field_to_object(*object_id, client_field_declaration)
+            ServerEntityId::Object(object_entity_id) => self
+                .add_client_field_to_object(*object_entity_id, client_field_declaration)
                 .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?,
-            ServerEntityId::Scalar(scalar_id) => {
-                let scalar_name = self.server_field_data.scalar(*scalar_id).name;
+            ServerEntityId::Scalar(scalar_entity_id) => {
+                let scalar_name = self.server_field_data.scalar_entity(*scalar_entity_id).name;
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
                         literal_type: "field".to_string(),
@@ -112,22 +112,22 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             ))?;
 
         let unprocessed_client_pointer_items = match parent_type_id {
-            ServerEntityId::Object(object_id) => match target_type_id {
-                ServerEntityId::Object(to_object_id) => self
+            ServerEntityId::Object(object_entity_id) => match target_type_id {
+                ServerEntityId::Object(to_object_entity_id) => self
                     .add_client_pointer_to_object(
-                        *object_id,
+                        *object_entity_id,
                         TypeAnnotation::from_graphql_type_annotation(
                             client_pointer_declaration
                                 .item
                                 .target_type
                                 .clone()
-                                .map(|_| *to_object_id),
+                                .map(|_| *to_object_entity_id),
                         ),
                         client_pointer_declaration,
                     )
                     .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?,
-                ServerEntityId::Scalar(scalar_id) => {
-                    let scalar_name = self.server_field_data.scalar(*scalar_id).name;
+                ServerEntityId::Scalar(scalar_entity_id) => {
+                    let scalar_name = self.server_field_data.scalar_entity(*scalar_entity_id).name;
                     return Err(WithLocation::new(
                         ProcessClientFieldDeclarationError::ClientPointerInvalidTargetType {
                             target_type_name: scalar_name.item.into(),
@@ -139,8 +139,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     ));
                 }
             },
-            ServerEntityId::Scalar(scalar_id) => {
-                let scalar_name = self.server_field_data.scalar(*scalar_id).name;
+            ServerEntityId::Scalar(scalar_entity_id) => {
+                let scalar_name = self.server_field_data.scalar_entity(*scalar_entity_id).name;
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
                         literal_type: "pointer".to_string(),
@@ -158,11 +158,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     fn add_client_field_to_object(
         &mut self,
-        parent_object_id: ServerObjectId,
+        parent_object_entity_id: ServerObjectId,
         client_field_declaration: WithSpan<ClientFieldDeclaration>,
     ) -> ProcessClientFieldDeclarationResult<UnprocessedClientFieldItem> {
         let query_id = self.query_id();
-        let object = &mut self.server_field_data.server_objects[parent_object_id.as_usize()];
+        let object = &mut self.server_field_data.server_objects[parent_object_entity_id.as_usize()];
         let client_field_field_name_ws = client_field_declaration.item.client_field_name;
         let client_field_name = client_field_field_name_ws.item;
         let client_field_name_span = client_field_field_name_ws.span;
@@ -213,7 +213,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 field_name: name.into(),
             },
 
-            parent_object_id,
+            parent_object_entity_id,
             refetch_strategy: None,
             output_format: std::marker::PhantomData,
         });
@@ -243,13 +243,17 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     fn add_client_pointer_to_object(
         &mut self,
-        parent_object_id: ServerObjectId,
-        to_object_id: TypeAnnotation<ServerObjectId>,
+        parent_object_entity_id: ServerObjectId,
+        to_object_entity_id: TypeAnnotation<ServerObjectId>,
         client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
     ) -> ProcessClientFieldDeclarationResult<UnprocessedClientPointerItem> {
         let query_id = self.query_id();
-        let to_object = self.server_field_data.object(*to_object_id.inner());
-        let parent_object = self.server_field_data.object(parent_object_id);
+        let to_object = self
+            .server_field_data
+            .object_entity(*to_object_entity_id.inner());
+        let parent_object = self
+            .server_field_data
+            .object_entity(parent_object_entity_id);
         let client_pointer_pointer_name_ws = client_pointer_declaration.item.client_pointer_name;
         let client_pointer_name = client_pointer_pointer_name_ws.item;
         let client_pointer_name_span = client_pointer_pointer_name_ws.span;
@@ -321,9 +325,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 field_name: name.into(),
             },
 
-            parent_object_id,
+            parent_object_entity_id,
             refetch_strategy,
-            to: to_object_id,
+            to: to_object_entity_id,
             output_format: std::marker::PhantomData,
 
             info: UserWrittenClientPointerInfo {
@@ -332,7 +336,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             },
         });
 
-        let parent_object = self.server_field_data.object_mut(parent_object_id);
+        let parent_object = self
+            .server_field_data
+            .object_entity_mut(parent_object_entity_id);
         if parent_object
             .encountered_fields
             .insert(
@@ -421,7 +427,7 @@ pub struct PrimaryFieldInfo {
     /// Some if the object is concrete; None otherwise.
     pub primary_field_concrete_type: Option<IsographObjectTypeName>,
     /// If this is abstract, we add a fragment spread
-    pub primary_field_return_type_object_id: ServerObjectId,
+    pub primary_field_return_type_object_entity_id: ServerObjectId,
     pub primary_field_field_map: Vec<FieldMapItem>,
 }
 
@@ -441,7 +447,7 @@ pub struct ImperativelyLoadedFieldVariant {
     /// this differently, this is very awkward!
     pub primary_field_info: Option<PrimaryFieldInfo>,
 
-    pub root_object_id: ServerObjectId,
+    pub root_object_entity_id: ServerObjectId,
 }
 
 // TODO Component is a GraphQL-ism

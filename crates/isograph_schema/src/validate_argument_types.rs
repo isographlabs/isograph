@@ -14,7 +14,7 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    NetworkProtocol, ObjectEncounteredFields, SchemaObject, ServerFieldData,
+    NetworkProtocol, ObjectEncounteredFields, ServerFieldData, ServerObjectEntity,
     ServerObjectSelectable, ServerScalarSelectable, ValidatedVariableDefinition,
 };
 
@@ -45,7 +45,7 @@ fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 ) -> Result<(), WithLocation<ValidateArgumentTypesError>> {
     match graphql_type_to_non_null_type(type_.clone()) {
         GraphQLNonNullTypeAnnotation::List(_) => {
-            let actual = schema_data.scalar(*scalar_literal).name.item;
+            let actual = schema_data.scalar_entity(*scalar_literal).name.item;
 
             Err(WithLocation::new(
                 ValidateArgumentTypesError::ExpectedTypeFoundScalar {
@@ -56,11 +56,11 @@ fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             ))
         }
         GraphQLNonNullTypeAnnotation::Named(named_type) => match named_type.item {
-            SelectionType::Scalar(expected_scalar_id) => {
-                if expected_scalar_id == *scalar_literal {
+            SelectionType::Scalar(expected_scalar_entity_id) => {
+                if expected_scalar_entity_id == *scalar_literal {
                     return Ok(());
                 }
-                let actual = schema_data.scalar(*scalar_literal).name.item;
+                let actual = schema_data.scalar_entity(*scalar_literal).name.item;
 
                 let expected = id_annotation_to_typename_annotation(type_, schema_data);
 
@@ -70,7 +70,7 @@ fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                 ))
             }
             SelectionType::Object(_) => {
-                let actual = schema_data.scalar(*scalar_literal).name.item;
+                let actual = schema_data.scalar_entity(*scalar_literal).name.item;
 
                 let expected = id_annotation_to_typename_annotation(type_, schema_data);
 
@@ -285,14 +285,14 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                         },
                         selection_supplied_argument_value.location,
                     )),
-                    SelectionType::Object(object_id) => object_satisfies_type(
+                    SelectionType::Object(object_entity_id) => object_satisfies_type(
                         selection_supplied_argument_value,
                         variable_definitions,
                         schema_data,
                         server_scalar_selectables,
                         server_object_selectables,
                         object_literal,
-                        object_id,
+                        object_entity_id,
                     ),
                 },
             }
@@ -307,9 +307,9 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
     server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
-    object_id: ServerObjectId,
+    object_entity_id: ServerObjectId,
 ) -> Result<(), WithLocation<ValidateArgumentTypesError>> {
-    let object = schema_data.object(object_id);
+    let object = schema_data.object_entity(object_entity_id);
     validate_no_extraneous_fields(
         &object.encountered_fields,
         object_literal,
@@ -366,7 +366,7 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
     server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
     server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
-    object: &SchemaObject<TNetworkProtocol>,
+    object: &ServerObjectEntity<TNetworkProtocol>,
 ) -> Vec<ObjectLiteralFieldType> {
     object
         .encountered_fields
@@ -445,8 +445,12 @@ fn id_annotation_to_typename_annotation<TNetworkProtocol: NetworkProtocol>(
     schema_data: &ServerFieldData<TNetworkProtocol>,
 ) -> GraphQLTypeAnnotation<UnvalidatedTypeName> {
     type_.clone().map(|type_id| match type_id {
-        SelectionType::Scalar(scalar_id) => schema_data.scalar(scalar_id).name.item.into(),
-        SelectionType::Object(object_id) => schema_data.object(object_id).name.into(),
+        SelectionType::Scalar(scalar_entity_id) => {
+            schema_data.scalar_entity(scalar_entity_id).name.item.into()
+        }
+        SelectionType::Object(object_entity_id) => {
+            schema_data.object_entity(object_entity_id).name.into()
+        }
     })
 }
 
@@ -457,11 +461,11 @@ fn enum_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     location: Location,
 ) -> ValidateArgumentTypesResult<()> {
     match enum_type.item {
-        SelectionType::Object(object_id) => {
+        SelectionType::Object(object_entity_id) => {
             let expected = GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
                 enum_type
                     .clone()
-                    .map(|_| schema_data.object(object_id).name.into()),
+                    .map(|_| schema_data.object_entity(object_entity_id).name.into()),
             ));
 
             Err(WithLocation::new(
@@ -472,7 +476,7 @@ fn enum_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                 location,
             ))
         }
-        SelectionType::Scalar(_scalar_id) => {
+        SelectionType::Scalar(_scalar_entity_id) => {
             todo!("Validate enum literal. Parser doesn't support enum literals yet")
         }
     }

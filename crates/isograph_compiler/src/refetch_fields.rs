@@ -9,7 +9,7 @@ use isograph_lang_types::{
 use isograph_schema::{
     generate_refetch_field_strategy, id_arguments, id_selection, id_top_level_arguments,
     ClientField, ClientFieldVariant, ImperativelyLoadedFieldVariant, NetworkProtocol,
-    RefetchStrategy, RequiresRefinement, Schema, SchemaObject, UnprocessedClientFieldItem,
+    RefetchStrategy, RequiresRefinement, Schema, ServerObjectEntity, UnprocessedClientFieldItem,
     UnprocessedItem, NODE_FIELD_NAME, REFETCH_FIELD_NAME,
 };
 
@@ -25,32 +25,36 @@ pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
 
     let id_type_id = schema.server_field_data.id_type_id;
 
-    for item in schema.server_field_data.server_objects_and_ids_mut().map(
-        |WithId {
-             id: object_id,
-             item: object,
-         }| {
-            if let Some(id_field) = object.id_field {
-                let (client_field_id, refetch_strategy) = add_refetch_field_to_object(
-                    object_id,
-                    object,
-                    &mut schema.client_scalar_selectables,
-                    query_id,
-                    id_field,
-                    id_type_id,
-                )?;
-                Ok::<Option<UnprocessedClientFieldItem>, BatchCompileError>(Some(
-                    UnprocessedClientFieldItem {
-                        client_field_id,
-                        reader_selection_set: vec![],
-                        refetch_strategy: Some(refetch_strategy),
-                    },
-                ))
-            } else {
-                Ok(None)
-            }
-        },
-    ) {
+    for item in schema
+        .server_field_data
+        .server_object_entities_and_ids_mut()
+        .map(
+            |WithId {
+                 id: object_entity_id,
+                 item: object,
+             }| {
+                if let Some(id_field) = object.id_field {
+                    let (client_field_id, refetch_strategy) = add_refetch_field_to_object(
+                        object_entity_id,
+                        object,
+                        &mut schema.client_scalar_selectables,
+                        query_id,
+                        id_field,
+                        id_type_id,
+                    )?;
+                    Ok::<Option<UnprocessedClientFieldItem>, BatchCompileError>(Some(
+                        UnprocessedClientFieldItem {
+                            client_field_id,
+                            reader_selection_set: vec![],
+                            refetch_strategy: Some(refetch_strategy),
+                        },
+                    ))
+                } else {
+                    Ok(None)
+                }
+            },
+        )
+    {
         match item {
             Ok(Some(item)) => {
                 results.push(SelectionType::Scalar(item));
@@ -70,8 +74,8 @@ pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
 }
 
 fn add_refetch_field_to_object<TNetworkProtocol: NetworkProtocol>(
-    object_id: ServerObjectId,
-    object: &mut SchemaObject<TNetworkProtocol>,
+    object_entity_id: ServerObjectId,
+    object: &mut ServerObjectEntity<TNetworkProtocol>,
     client_fields: &mut Vec<ClientField<TNetworkProtocol>>,
     query_id: ServerObjectId,
     _id_field: ServerStrongIdFieldId,
@@ -111,7 +115,7 @@ fn add_refetch_field_to_object<TNetworkProtocol: NetworkProtocol>(
                         top_level_schema_field_concrete_type: None,
                         primary_field_info: None,
 
-                        root_object_id: query_id,
+                        root_object_entity_id: query_id,
                     },
                 ),
                 variable_definitions: vec![],
@@ -119,7 +123,7 @@ fn add_refetch_field_to_object<TNetworkProtocol: NetworkProtocol>(
                     type_name: object.name,
                     field_name: "__refetch".intern().into(),
                 },
-                parent_object_id: object_id,
+                parent_object_entity_id: object_entity_id,
                 refetch_strategy: None,
                 output_format: std::marker::PhantomData,
             });

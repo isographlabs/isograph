@@ -24,7 +24,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         subtype_to_supertype_map: &ValidatedTypeRefinementMap,
     ) -> ProcessTypeDefinitionResult<()> {
         for (subtype_id, supertype_ids) in subtype_to_supertype_map {
-            let subtype_entity = self.server_field_data.object(*subtype_id);
+            let subtype_entity = self.server_field_data.object_entity(*subtype_id);
 
             let field_name = format!("as{}", subtype_entity.name).intern().into();
 
@@ -106,7 +106,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 .push(server_object_selectable);
 
             for supertype_id in supertype_ids {
-                let supertype = self.server_field_data.object_mut(*supertype_id);
+                let supertype = self.server_field_data.object_entity_mut(*supertype_id);
 
                 if supertype
                     .encountered_fields

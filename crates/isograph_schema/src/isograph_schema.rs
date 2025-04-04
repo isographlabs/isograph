@@ -21,7 +21,7 @@ use thiserror::Error;
 
 use crate::{
     ClientField, ClientFieldOrPointerId, ClientFieldVariant, ClientPointer, NetworkProtocol,
-    NormalizationKey, SchemaObject, SchemaScalar, SchemaType, ServerObjectSelectable,
+    NormalizationKey, ServerEntity, ServerObjectEntity, ServerObjectSelectable, ServerScalarEntity,
     ServerScalarSelectable, ServerSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
     UserWrittenComponentVariant,
 };
@@ -165,8 +165,8 @@ pub type ObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
 
 #[derive(Debug)]
 pub struct ServerFieldData<TNetworkProtocol: NetworkProtocol> {
-    pub server_objects: Vec<SchemaObject<TNetworkProtocol>>,
-    pub server_scalars: Vec<SchemaScalar<TNetworkProtocol>>,
+    pub server_objects: Vec<ServerObjectEntity<TNetworkProtocol>>,
+    pub server_scalars: Vec<ServerScalarEntity<TNetworkProtocol>>,
     pub defined_types: HashMap<UnvalidatedTypeName, ServerEntityId>,
 
     // Well known types
@@ -235,10 +235,12 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         inner_non_null_named_type: Option<&GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
     ) -> InsertFieldsResult<()> {
         let next_server_scalar_selectable_id = self.server_scalar_selectables.len().into();
-        let parent_object_id = server_scalar_selectable.parent_type_id;
+        let parent_object_entity_id = server_scalar_selectable.parent_type_id;
         let next_scalar_name = server_scalar_selectable.name;
 
-        let parent_object = self.server_field_data.object_mut(parent_object_id);
+        let parent_object = self
+            .server_field_data
+            .object_entity_mut(parent_object_entity_id);
 
         if parent_object
             .encountered_fields
@@ -276,10 +278,12 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         server_object_selectable: ServerObjectSelectable<TNetworkProtocol>,
     ) -> InsertFieldsResult<()> {
         let next_server_object_selectable_id = self.server_object_selectables.len().into();
-        let parent_object_id = server_object_selectable.parent_type_id;
+        let parent_object_entity_id = server_object_selectable.parent_type_id;
         let next_object_name = server_object_selectable.name;
 
-        let parent_object = self.server_field_data.object_mut(parent_object_id);
+        let parent_object = self
+            .server_field_data
+            .object_entity_mut(parent_object_entity_id);
         if parent_object
             .encountered_fields
             .insert(
@@ -411,13 +415,16 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
 impl<TNetworkProtocol: NetworkProtocol> ServerFieldData<TNetworkProtocol> {
     /// Get a reference to a given scalar type by its id.
-    pub fn scalar(&self, scalar_id: ServerScalarId) -> &SchemaScalar<TNetworkProtocol> {
-        &self.server_scalars[scalar_id.as_usize()]
+    pub fn scalar_entity(
+        &self,
+        scalar_entity_id: ServerScalarId,
+    ) -> &ServerScalarEntity<TNetworkProtocol> {
+        &self.server_scalars[scalar_entity_id.as_usize()]
     }
 
-    pub fn server_scalars_and_ids(
+    pub fn server_scalar_entities_and_ids(
         &self,
-    ) -> impl Iterator<Item = WithId<&SchemaScalar<TNetworkProtocol>>> + '_ {
+    ) -> impl Iterator<Item = WithId<&ServerScalarEntity<TNetworkProtocol>>> + '_ {
         self.server_scalars
             .iter()
             .enumerate()
@@ -425,35 +432,48 @@ impl<TNetworkProtocol: NetworkProtocol> ServerFieldData<TNetworkProtocol> {
     }
 
     // TODO this function is horribly named
-    pub fn lookup_unvalidated_type(&self, type_id: ServerEntityId) -> SchemaType<TNetworkProtocol> {
+    pub fn lookup_unvalidated_type(
+        &self,
+        type_id: ServerEntityId,
+    ) -> ServerEntity<TNetworkProtocol> {
         match type_id {
-            ServerEntityId::Object(object_id) => SchemaType::Object(self.object(object_id)),
-            ServerEntityId::Scalar(scalar_id) => SchemaType::Scalar(self.scalar(scalar_id)),
+            ServerEntityId::Object(object_entity_id) => {
+                ServerEntity::Object(self.object_entity(object_entity_id))
+            }
+            ServerEntityId::Scalar(scalar_entity_id) => {
+                ServerEntity::Scalar(self.scalar_entity(scalar_entity_id))
+            }
         }
     }
 
     /// Get a reference to a given object type by its id.
-    pub fn object(&self, object_id: ServerObjectId) -> &SchemaObject<TNetworkProtocol> {
-        &self.server_objects[object_id.as_usize()]
+    pub fn object_entity(
+        &self,
+        object_entity_id: ServerObjectId,
+    ) -> &ServerObjectEntity<TNetworkProtocol> {
+        &self.server_objects[object_entity_id.as_usize()]
     }
 
     /// Get a mutable reference to a given object type by its id.
-    pub fn object_mut(&mut self, object_id: ServerObjectId) -> &mut SchemaObject<TNetworkProtocol> {
-        &mut self.server_objects[object_id.as_usize()]
+    pub fn object_entity_mut(
+        &mut self,
+        object_entity_id: ServerObjectId,
+    ) -> &mut ServerObjectEntity<TNetworkProtocol> {
+        &mut self.server_objects[object_entity_id.as_usize()]
     }
 
-    pub fn server_objects_and_ids(
+    pub fn server_object_entities_and_ids(
         &self,
-    ) -> impl Iterator<Item = WithId<&SchemaObject<TNetworkProtocol>>> + '_ {
+    ) -> impl Iterator<Item = WithId<&ServerObjectEntity<TNetworkProtocol>>> + '_ {
         self.server_objects
             .iter()
             .enumerate()
             .map(|(id, object)| WithId::new(id.into(), object))
     }
 
-    pub fn server_objects_and_ids_mut(
+    pub fn server_object_entities_and_ids_mut(
         &mut self,
-    ) -> impl Iterator<Item = WithId<&mut SchemaObject<TNetworkProtocol>>> + '_ {
+    ) -> impl Iterator<Item = WithId<&mut ServerObjectEntity<TNetworkProtocol>>> + '_ {
         self.server_objects
             .iter_mut()
             .enumerate()
@@ -484,25 +504,28 @@ impl NameAndArguments {
 }
 
 fn add_schema_defined_scalar_type<TNetworkProtocol: NetworkProtocol>(
-    scalars: &mut Vec<SchemaScalar<TNetworkProtocol>>,
+    scalars: &mut Vec<ServerScalarEntity<TNetworkProtocol>>,
     defined_types: &mut HashMap<UnvalidatedTypeName, ServerEntityId>,
     field_name: &'static str,
     javascript_name: JavascriptName,
 ) -> ServerScalarId {
-    let scalar_id = scalars.len().into();
+    let scalar_entity_id = scalars.len().into();
 
     // TODO this is problematic, we have no span (or really, no location) associated with this
     // schema-defined scalar, so we will not be able to properly show error messages if users
     // e.g. have Foo implements String
     let typename = WithLocation::new(field_name.intern().into(), Location::generated());
-    scalars.push(SchemaScalar {
+    scalars.push(ServerScalarEntity {
         description: None,
         name: typename,
         javascript_name,
         output_format: std::marker::PhantomData,
     });
-    defined_types.insert(typename.item.into(), ServerEntityId::Scalar(scalar_id));
-    scalar_id
+    defined_types.insert(
+        typename.item.into(),
+        ServerEntityId::Scalar(scalar_entity_id),
+    );
+    scalar_entity_id
 }
 
 #[derive(Debug, Clone)]
@@ -541,7 +564,7 @@ pub type ValidatedFieldDefinitionLocation =
 
 #[derive(Debug, Clone)]
 pub struct ValidatedObjectSelectionAssociatedData {
-    pub parent_object_id: ServerObjectId,
+    pub parent_object_entity_id: ServerObjectId,
     pub field_id: DefinitionLocation<ServerObjectSelectableId, ClientPointerId>,
     pub selection_variant: ObjectSelectionDirectiveSet,
     /// Some if the (destination?) object is concrete; None otherwise.

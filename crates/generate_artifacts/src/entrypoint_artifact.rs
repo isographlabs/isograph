@@ -14,7 +14,7 @@ use isograph_schema::{
     get_reachable_variables, initial_variable_context, ClientField, ClientFieldOrPointer,
     FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, MergedSelectionMap,
     NetworkProtocol, RootOperationName, RootRefetchedPath, ScalarClientFieldTraversalState, Schema,
-    SchemaObject, ValidatedVariableDefinition,
+    ServerObjectEntity, ValidatedVariableDefinition,
 };
 
 use crate::{
@@ -30,7 +30,7 @@ use crate::{
 #[derive(Debug)]
 struct EntrypointArtifactInfo<'schema, TNetworkProtocol: NetworkProtocol> {
     query_name: QueryOperationName,
-    parent_type: &'schema SchemaObject<TNetworkProtocol>,
+    parent_type: &'schema ServerObjectEntity<TNetworkProtocol>,
     query_text: QueryText,
     normalization_ast_text: NormalizationAstText,
     refetch_query_artifact_import: RefetchQueryArtifactImport,
@@ -51,8 +51,10 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
         ..
     } = create_merged_selection_map_for_field_and_insert_into_global_map(
         schema,
-        entrypoint.parent_object_id,
-        schema.server_field_data.object(entrypoint.parent_object_id),
+        entrypoint.parent_object_entity_id,
+        schema
+            .server_field_data
+            .object_entity(entrypoint.parent_object_entity_id),
         entrypoint.selection_set_for_parent_query(),
         encountered_client_type_map,
         DefinitionLocation::Client(SelectionType::Scalar(entrypoint_id)),
@@ -95,7 +97,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     // parameter
     let root_operation_name = schema
         .fetchable_types
-        .get(&entrypoint.parent_object_id)
+        .get(&entrypoint.parent_object_entity_id)
         .unwrap_or_else(|| {
             default_root_operation
                 .map(|(_, operation_name)| operation_name)
@@ -109,7 +111,9 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
                 })
         });
 
-    let parent_object = schema.server_field_data.object(entrypoint.parent_object_id);
+    let parent_object = schema
+        .server_field_data
+        .object_entity(entrypoint.parent_object_entity_id);
     let query_text = TNetworkProtocol::generate_query_text(
         query_name,
         schema,
@@ -156,12 +160,12 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     let normalization_ast_text =
         generate_normalization_ast_text(schema, merged_selection_map.values(), 1);
 
-    let concrete_type = schema.server_field_data.object(
+    let concrete_type = schema.server_field_data.object_entity(
         if schema
             .fetchable_types
-            .contains_key(&entrypoint.parent_object_id)
+            .contains_key(&entrypoint.parent_object_entity_id)
         {
-            entrypoint.parent_object_id
+            entrypoint.parent_object_entity_id
         } else {
             *default_root_operation
                 .map(|(operation_id, _)| operation_id)

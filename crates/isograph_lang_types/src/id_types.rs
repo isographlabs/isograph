@@ -26,7 +26,7 @@ impl TryFrom<ServerEntityId> for ServerScalarId {
     fn try_from(value: ServerEntityId) -> Result<Self, Self::Error> {
         match value {
             ServerEntityId::Object(_) => Err(()),
-            ServerEntityId::Scalar(scalar_id) => Ok(scalar_id),
+            ServerEntityId::Scalar(scalar_entity_id) => Ok(scalar_entity_id),
         }
     }
 }
@@ -36,7 +36,7 @@ impl TryFrom<ServerEntityId> for ServerObjectId {
 
     fn try_from(value: ServerEntityId) -> Result<Self, Self::Error> {
         match value {
-            ServerEntityId::Object(object_id) => Ok(object_id),
+            ServerEntityId::Object(object_entity_id) => Ok(object_entity_id),
             ServerEntityId::Scalar(_) => Err(()),
         }
     }

@@ -189,8 +189,8 @@ impl ModifiedArgument {
         // But we should double check that, and return an error if necessary
         let object = unmodified.type_.clone().map(|input_type_name| {
             match input_type_name {
-                ServerEntityId::Object(object_id) => {
-                    let object = schema.server_field_data.object(object_id);
+                ServerEntityId::Object(object_entity_id) => {
+                    let object = schema.server_field_data.object_entity(object_entity_id);
 
                     ModifiedObject {
                         field_map: object
@@ -205,7 +205,7 @@ impl ModifiedArgument {
                             .collect(),
                     }
                 }
-                ServerEntityId::Scalar(_scalar_id) => {
+                ServerEntityId::Scalar(_scalar_entity_id) => {
                     // TODO don't be lazy, return an error
                     panic!("Cannot modify a scalar")
                 }
