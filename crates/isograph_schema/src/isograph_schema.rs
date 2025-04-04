@@ -378,6 +378,15 @@ impl<TNetworkProtocol: NetworkProtocol> ServerFieldData<TNetworkProtocol> {
             .enumerate()
             .map(|(id, object)| (id.into(), object))
     }
+
+    pub fn server_objects_and_ids_mut<'a>(
+        &'a mut self,
+    ) -> impl Iterator<Item = (ServerObjectId, &'a mut SchemaObject<TNetworkProtocol>)> + 'a {
+        self.server_objects
+            .iter_mut()
+            .enumerate()
+            .map(|(id, object)| (id.into(), object))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
