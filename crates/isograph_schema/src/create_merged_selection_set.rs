@@ -23,17 +23,17 @@ use crate::{
     field_loadability::{categorize_field_loadability, Loadability},
     initial_variable_context, transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context, ClientFieldVariant,
-    ClientScalarOrObjectSelectable, ClientScalarOrObjectSelectableId, ClientScalarSelectable,
-    ClientSelectable, ImperativelyLoadedFieldVariant, NameAndArguments, NetworkProtocol,
-    PathToRefetchField, RootOperationName, Schema, SchemaServerObjectSelectableVariant,
-    ServerObjectEntity, ValidatedScalarSelection, ValidatedSelection, VariableContext,
+    ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, ClientSelectableId,
+    ImperativelyLoadedFieldVariant, NameAndArguments, NetworkProtocol, PathToRefetchField,
+    RootOperationName, Schema, SchemaServerObjectSelectableVariant, ServerObjectEntity,
+    ValidatedScalarSelection, ValidatedSelection, VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
 
 // Maybe this should be FNVHashMap? We don't really need stable iteration order
 pub type FieldToCompletedMergeTraversalStateMap = BTreeMap<
-    DefinitionLocation<ServerObjectSelectableId, ClientScalarOrObjectSelectableId>,
+    DefinitionLocation<ServerObjectSelectableId, ClientSelectableId>,
     FieldTraversalResult,
 >;
 
@@ -410,7 +410,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
-    root_field_id: DefinitionLocation<ServerObjectSelectableId, ClientScalarOrObjectSelectableId>,
+    root_field_id: DefinitionLocation<ServerObjectSelectableId, ClientSelectableId>,
     variable_context: &VariableContext,
     // TODO return Cow?
 ) -> FieldTraversalResult {
@@ -1026,7 +1026,7 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
     parent_merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    newly_encountered_client_type_id: ClientScalarOrObjectSelectableId,
+    newly_encountered_client_type_id: ClientSelectableId,
     newly_encountered_client_type: ClientSelectable<TNetworkProtocol>,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     parent_variable_context: &VariableContext,

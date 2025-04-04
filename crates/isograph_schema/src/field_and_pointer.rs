@@ -16,8 +16,7 @@ use crate::{
     ValidatedSelection,
 };
 
-pub type ClientScalarOrObjectSelectableId =
-    SelectionType<ClientScalarSelectableId, ClientObjectSelectableId>;
+pub type ClientSelectableId = SelectionType<ClientScalarSelectableId, ClientObjectSelectableId>;
 
 /// The struct formally known as a client field, and declared with the field keyword
 /// in iso literals.

@@ -21,10 +21,10 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    ClientFieldVariant, ClientObjectSelectable, ClientScalarOrObjectSelectableId,
-    ClientScalarSelectable, NetworkProtocol, NormalizationKey, ServerEntity, ServerObjectEntity,
-    ServerObjectSelectable, ServerScalarEntity, ServerScalarSelectable, ServerSelectable,
-    ServerSelectableId, UseRefetchFieldRefetchStrategy, UserWrittenComponentVariant,
+    ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectableId,
+    NetworkProtocol, NormalizationKey, ServerEntity, ServerObjectEntity, ServerObjectSelectable,
+    ServerScalarEntity, ServerScalarSelectable, ServerSelectable, ServerSelectableId,
+    UseRefetchFieldRefetchStrategy, UserWrittenComponentVariant,
 };
 
 lazy_static! {
@@ -368,7 +368,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     pub fn client_type(
         &self,
-        client_type_id: ClientScalarOrObjectSelectableId,
+        client_type_id: ClientSelectableId,
     ) -> SelectionType<
         &ClientScalarSelectable<TNetworkProtocol>,
         &ClientObjectSelectable<TNetworkProtocol>,

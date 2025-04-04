@@ -11,7 +11,7 @@ use isograph_lang_types::{
     ServerStrongIdFieldId,
 };
 
-use crate::{ClientScalarOrObjectSelectableId, NetworkProtocol, ServerSelectableId};
+use crate::{ClientSelectableId, NetworkProtocol, ServerSelectableId};
 
 /// A scalar type in the schema.
 #[derive(Debug)]
@@ -24,10 +24,9 @@ pub struct ServerScalarEntity<TNetworkProtocol: NetworkProtocol> {
 
 impl_with_id!(ServerScalarEntity<TNetworkProtocol: NetworkProtocol>, ServerScalarEntityId);
 
-pub type ServerObjectEntityAvailableSelectables = BTreeMap<
-    SelectableName,
-    DefinitionLocation<ServerSelectableId, ClientScalarOrObjectSelectableId>,
->;
+type SelectableId = DefinitionLocation<ServerSelectableId, ClientSelectableId>;
+
+pub type ServerObjectEntityAvailableSelectables = BTreeMap<SelectableName, SelectableId>;
 
 /// An object type in the schema.
 #[derive(Debug)]
