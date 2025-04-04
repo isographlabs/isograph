@@ -343,9 +343,9 @@ impl<TNetworkProtocol: NetworkProtocol> ServerFieldData<TNetworkProtocol> {
         &self.server_scalars[scalar_id.as_usize()]
     }
 
-    pub fn server_scalars_and_ids<'a>(
-        &'a self,
-    ) -> impl Iterator<Item = (ServerScalarId, &'a SchemaScalar<TNetworkProtocol>)> + 'a {
+    pub fn server_scalars_and_ids(
+        &self,
+    ) -> impl Iterator<Item = (ServerScalarId, &SchemaScalar<TNetworkProtocol>)> + '_ {
         self.server_scalars
             .iter()
             .enumerate()
@@ -370,18 +370,18 @@ impl<TNetworkProtocol: NetworkProtocol> ServerFieldData<TNetworkProtocol> {
         &mut self.server_objects[object_id.as_usize()]
     }
 
-    pub fn server_objects_and_ids<'a>(
-        &'a self,
-    ) -> impl Iterator<Item = (ServerObjectId, &'a SchemaObject<TNetworkProtocol>)> + 'a {
+    pub fn server_objects_and_ids(
+        &self,
+    ) -> impl Iterator<Item = (ServerObjectId, &SchemaObject<TNetworkProtocol>)> + '_ {
         self.server_objects
             .iter()
             .enumerate()
             .map(|(id, object)| (id.into(), object))
     }
 
-    pub fn server_objects_and_ids_mut<'a>(
-        &'a mut self,
-    ) -> impl Iterator<Item = (ServerObjectId, &'a mut SchemaObject<TNetworkProtocol>)> + 'a {
+    pub fn server_objects_and_ids_mut(
+        &mut self,
+    ) -> impl Iterator<Item = (ServerObjectId, &mut SchemaObject<TNetworkProtocol>)> + '_ {
         self.server_objects
             .iter_mut()
             .enumerate()

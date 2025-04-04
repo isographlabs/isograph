@@ -656,6 +656,7 @@ fn create_selection_map_with_merge_traversal_state<TNetworkProtocol: NetworkProt
     merged_selection_map
 }
 
+#[allow(clippy::too_many_arguments)]
 fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
@@ -940,6 +941,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
     select_typename_and_id_fields_in_merged_selection(schema, parent_map, parent_object);
 }
 
+#[allow(clippy::too_many_arguments)]
 fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
