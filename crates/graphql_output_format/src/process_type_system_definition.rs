@@ -456,7 +456,6 @@ fn process_scalar_definition(
             scalars.push(SchemaScalar {
                 description: scalar_type_definition.description,
                 name: scalar_type_definition.name,
-                id: next_scalar_id,
                 javascript_name: *STRING_JAVASCRIPT_TYPE,
                 output_format: std::marker::PhantomData,
             });

@@ -6,9 +6,7 @@ use common_lang_types::{
 };
 use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective};
 use impl_base_types_macro::impl_for_selection_type;
-use isograph_lang_types::{
-    DefinitionLocation, SelectionType, ServerScalarId, ServerStrongIdFieldId,
-};
+use isograph_lang_types::{DefinitionLocation, SelectionType, ServerStrongIdFieldId};
 
 use crate::{ClientFieldOrPointerId, NetworkProtocol, ServerSelectableId};
 
@@ -17,7 +15,6 @@ use crate::{ClientFieldOrPointerId, NetworkProtocol, ServerSelectableId};
 pub struct SchemaScalar<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<GraphQLScalarTypeName>,
-    pub id: ServerScalarId,
     pub javascript_name: JavascriptName,
     pub output_format: PhantomData<TNetworkProtocol>,
 }
