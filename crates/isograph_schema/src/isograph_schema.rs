@@ -20,9 +20,9 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    ClientField, ClientFieldOrPointerId, ClientPointer, NetworkProtocol, NormalizationKey,
-    SchemaObject, SchemaScalar, SchemaType, ServerObjectSelectable, ServerScalarSelectable,
-    ServerSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
+    ClientField, ClientFieldOrPointerId, ClientFieldVariant, ClientPointer, NetworkProtocol,
+    NormalizationKey, SchemaObject, SchemaScalar, SchemaType, ServerObjectSelectable,
+    ServerScalarSelectable, ServerSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
 };
 
 lazy_static! {
@@ -369,6 +369,38 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 SelectionType::Object(self.client_pointer(client_pointer_id))
             }
         }
+    }
+
+    pub fn user_written_client_types(
+        &self,
+    ) -> impl Iterator<
+        Item = (
+            SelectionType<ClientFieldId, ClientPointerId>,
+            SelectionType<&ClientField<TNetworkProtocol>, &ClientPointer<TNetworkProtocol>>,
+        ),
+    > {
+        self.client_scalar_selectables
+            .iter()
+            .enumerate()
+            .flat_map(|(id, field)| match field.variant {
+                ClientFieldVariant::Link => None,
+                ClientFieldVariant::UserWritten(_) => Some((
+                    SelectionType::Scalar(id.into()),
+                    SelectionType::Scalar(field),
+                )),
+                ClientFieldVariant::ImperativelyLoadedField(_) => None,
+            })
+            .chain(
+                self.client_object_selectables
+                    .iter()
+                    .enumerate()
+                    .map(|(id, pointer)| {
+                        (
+                            SelectionType::Object(id.into()),
+                            SelectionType::Object(pointer),
+                        )
+                    }),
+            )
     }
 }
 

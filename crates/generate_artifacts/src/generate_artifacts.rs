@@ -295,31 +295,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
         }
     }
 
-    for (client_type_id, user_written_client_type) in schema
-        .client_scalar_selectables
-        .iter()
-        .enumerate()
-        .flat_map(|(id, field)| match field.variant {
-            ClientFieldVariant::Link => None,
-            ClientFieldVariant::UserWritten(_) => Some((
-                SelectionType::Scalar(id.into()),
-                SelectionType::Scalar(field),
-            )),
-            ClientFieldVariant::ImperativelyLoadedField(_) => None,
-        })
-        .chain(
-            schema
-                .client_object_selectables
-                .iter()
-                .enumerate()
-                .map(|(id, pointer)| {
-                    (
-                        SelectionType::Object(id.into()),
-                        SelectionType::Object(pointer),
-                    )
-                }),
-        )
-    {
+    for (client_type_id, user_written_client_type) in schema.user_written_client_types() {
         // For each user-written client types, generate a param type artifact
         path_and_contents.push(generate_eager_reader_param_type_artifact(
             schema,
