@@ -372,6 +372,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn user_written_client_types(
         &self,
     ) -> impl Iterator<
