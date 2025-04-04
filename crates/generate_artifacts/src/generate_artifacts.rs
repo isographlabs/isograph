@@ -208,7 +208,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                             };
 
                             let type_to_refine_to = schema
-                                .server_field_data
+                                .server_entity_data
                                 .object_entity(encountered_client_field.parent_object_entity_id);
 
                             if schema
@@ -233,7 +233,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                     GraphQLNonNullTypeAnnotation::Named(
                                         GraphQLNamedTypeAnnotation(WithSpan::new(
                                             ServerEntityId::Scalar(
-                                                schema.server_field_data.id_type_id,
+                                                schema.server_entity_data.id_type_id,
                                             ),
                                             Span::todo_generated(),
                                         )),
@@ -596,7 +596,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                             .clone()
                             .map(&mut |scalar_entity_id| {
                                 schema
-                                    .server_field_data
+                                    .server_entity_data
                                     .scalar_entity(scalar_entity_id)
                                     .javascript_name
                             });
@@ -770,7 +770,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                             .clone()
                             .map(&mut |scalar_entity_id| {
                                 schema
-                                    .server_field_data
+                                    .server_entity_data
                                     .scalar_entity(scalar_entity_id)
                                     .javascript_name
                             });
@@ -919,7 +919,7 @@ fn format_type_for_js<TNetworkProtocol: NetworkProtocol>(
             }
             ServerEntityId::Scalar(scalar_entity_id) => {
                 schema
-                    .server_field_data
+                    .server_entity_data
                     .scalar_entity(scalar_entity_id)
                     .javascript_name
             }

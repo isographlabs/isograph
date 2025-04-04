@@ -54,7 +54,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
         schema,
         entrypoint.parent_object_entity_id,
         schema
-            .server_field_data
+            .server_entity_data
             .object_entity(entrypoint.parent_object_entity_id),
         entrypoint.selection_set_for_parent_query(),
         encountered_client_type_map,
@@ -113,7 +113,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         });
 
     let parent_object = schema
-        .server_field_data
+        .server_entity_data
         .object_entity(entrypoint.parent_object_entity_id);
     let query_text = TNetworkProtocol::generate_query_text(
         query_name,
@@ -161,7 +161,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     let normalization_ast_text =
         generate_normalization_ast_text(schema, merged_selection_map.values(), 1);
 
-    let concrete_type = schema.server_field_data.object_entity(
+    let concrete_type = schema.server_entity_data.object_entity(
         if schema
             .fetchable_types
             .contains_key(&entrypoint.parent_object_entity_id)

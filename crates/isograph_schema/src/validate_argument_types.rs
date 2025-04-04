@@ -14,7 +14,7 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    NetworkProtocol, ObjectEncounteredFields, ServerFieldData, ServerObjectEntity,
+    NetworkProtocol, ObjectEncounteredFields, ServerEntityData, ServerObjectEntity,
     ServerObjectSelectable, ServerScalarSelectable, ValidatedVariableDefinition,
 };
 
@@ -40,7 +40,7 @@ fn graphql_type_to_nullable_type<TValue>(
 fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     scalar_literal: &ServerScalarEntityId,
     type_: &GraphQLTypeAnnotation<ServerEntityId>,
-    schema_data: &ServerFieldData<TNetworkProtocol>,
+    schema_data: &ServerEntityData<TNetworkProtocol>,
     location: Location,
 ) -> Result<(), WithLocation<ValidateArgumentTypesError>> {
     match graphql_type_to_non_null_type(type_.clone()) {
@@ -126,7 +126,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
     field_argument_definition_type: &GraphQLTypeAnnotation<ServerEntityId>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-    schema_data: &ServerFieldData<TNetworkProtocol>,
+    schema_data: &ServerEntityData<TNetworkProtocol>,
     server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
     server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
 ) -> ValidateArgumentTypesResult<()> {
@@ -303,7 +303,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
     variable_definitions: &[WithSpan<VariableDefinition<ServerEntityId>>],
-    schema_data: &ServerFieldData<TNetworkProtocol>,
+    schema_data: &ServerEntityData<TNetworkProtocol>,
     server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
     server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
@@ -442,7 +442,7 @@ fn validate_no_extraneous_fields(
 
 fn id_annotation_to_typename_annotation<TNetworkProtocol: NetworkProtocol>(
     type_: &GraphQLTypeAnnotation<ServerEntityId>,
-    schema_data: &ServerFieldData<TNetworkProtocol>,
+    schema_data: &ServerEntityData<TNetworkProtocol>,
 ) -> GraphQLTypeAnnotation<UnvalidatedTypeName> {
     type_.clone().map(|type_id| match type_id {
         SelectionType::Scalar(scalar_entity_id) => {
@@ -457,7 +457,7 @@ fn id_annotation_to_typename_annotation<TNetworkProtocol: NetworkProtocol>(
 fn enum_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     enum_literal_value: &EnumLiteralValue,
     enum_type: &GraphQLNamedTypeAnnotation<ServerEntityId>,
-    schema_data: &ServerFieldData<TNetworkProtocol>,
+    schema_data: &ServerEntityData<TNetworkProtocol>,
     location: Location,
 ) -> ValidateArgumentTypesResult<()> {
     match enum_type.item {
@@ -486,7 +486,7 @@ fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     list: &[WithLocation<NonConstantValue>],
     list_type: GraphQLListTypeAnnotation<ServerEntityId>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-    schema_data: &ServerFieldData<TNetworkProtocol>,
+    schema_data: &ServerEntityData<TNetworkProtocol>,
     server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
     server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
 ) -> ValidateArgumentTypesResult<()> {

@@ -52,7 +52,7 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
             // consider how to do this is a not obviously broken manner.
             let mut s = "{\n".to_string();
             for (name, server_selectable_id) in schema
-                .server_field_data
+                .server_entity_data
                 .object_entity(object_entity_id)
                 .encountered_fields
                 .iter()
@@ -75,7 +75,7 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
             s
         }
         ServerEntityId::Scalar(scalar_entity_id) => schema
-            .server_field_data
+            .server_entity_data
             .scalar_entity(scalar_entity_id)
             .javascript_name
             .to_string(),

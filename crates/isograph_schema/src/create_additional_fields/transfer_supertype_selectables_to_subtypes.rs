@@ -21,7 +21,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         supertype_to_subtype_map: &ValidatedTypeRefinementMap,
     ) -> ProcessTypeDefinitionResult<()> {
         for (supertype_id, subtype_ids) in supertype_to_subtype_map {
-            let supertype = self.server_field_data.object_entity(*supertype_id);
+            let supertype = self.server_entity_data.object_entity(*supertype_id);
 
             // TODO is there a way to do this without cloning? I would think so, in theory,
             // if you could prove (or check at runtime?) that the supertype and subtype are not
@@ -36,7 +36,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                             // GraphQL, but ... does it make sense otherwise? Who knows.
                         }
                         DefinitionLocation::Client(_) => {
-                            let subtype = self.server_field_data.object_entity_mut(*subtype_id);
+                            let subtype = self.server_entity_data.object_entity_mut(*subtype_id);
 
                             if subtype
                                 .encountered_fields

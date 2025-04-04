@@ -173,7 +173,7 @@ fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
                         &selection_supplied_argument.item.value,
                         &field_argument_definition.type_,
                         client_type_variable_definitions,
-                        &schema.server_field_data,
+                        &schema.server_entity_data,
                         &schema.server_scalar_selectables,
                         &schema.server_object_selectables,
                     )

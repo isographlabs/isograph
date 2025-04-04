@@ -49,7 +49,7 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
     let client_field = schema.client_field(unprocessed_item.client_field_id);
     let parent_object = schema
-        .server_field_data
+        .server_entity_data
         .object_entity(client_field.parent_object_entity_id);
 
     let new_selection_set = get_validated_selection_set(
@@ -164,7 +164,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
                         let object_selectable =
                             schema.server_object_selectable(*object_selectable_id);
                         let object = schema
-                            .server_field_data
+                            .server_entity_data
                             .object_entity(*object_selectable.target_object_entity.inner());
 
                         WithLocation::new(
@@ -246,7 +246,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                     let server_scalar_selectable =
                         schema.server_scalar_selectable(*server_scalar_selectable_id);
                     let server_scalar = schema
-                        .server_field_data
+                        .server_entity_data
                         .scalar_entity(*server_scalar_selectable.target_scalar_entity.inner());
 
                     vec![WithLocation::new(
@@ -300,7 +300,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     };
 
     let new_parent_object = schema
-        .server_field_data
+        .server_entity_data
         .object_entity(new_parent_object_entity_id);
 
     Ok(ObjectSelection {

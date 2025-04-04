@@ -342,7 +342,7 @@ fn process_object_type_definition(
     field_queue: &mut HashMap<ServerObjectEntityId, Vec<WithLocation<GraphQLFieldDefinition>>>,
 ) -> ProcessGraphqlTypeDefinitionResult<ProcessObjectTypeDefinitionOutcome> {
     let &mut Schema {
-        ref mut server_field_data,
+        server_entity_data: ref mut server_field_data,
         ..
     } = schema;
     let next_object_entity_id = server_field_data.server_objects.len().into();
@@ -438,7 +438,7 @@ fn process_scalar_definition(
     scalar_type_definition: GraphQLScalarTypeDefinition,
 ) -> ProcessGraphqlTypeDefinitionResult<()> {
     let &mut Schema {
-        ref mut server_field_data,
+        server_entity_data: ref mut server_field_data,
         ..
     } = schema;
     let next_scalar_entity_id = server_field_data.server_scalars.len().into();
@@ -506,7 +506,7 @@ fn look_up_root_type(
     type_name: WithLocation<GraphQLObjectTypeName>,
 ) -> ProcessGraphqlTypeDefinitionResult<ServerObjectEntityId> {
     match schema
-        .server_field_data
+        .server_entity_data
         .defined_types
         .get(&type_name.item.into())
     {
@@ -533,7 +533,7 @@ fn process_graphql_type_system_extension(
             let name = object_extension.name.item;
 
             let id = schema
-                .server_field_data
+                .server_entity_data
                 .defined_types
                 .get(&name.into())
                 .expect(
@@ -542,8 +542,9 @@ fn process_graphql_type_system_extension(
 
             match *id {
                 ServerEntityId::Object(object_entity_id) => {
-                    let schema_object =
-                        schema.server_field_data.object_entity_mut(object_entity_id);
+                    let schema_object = schema
+                        .server_entity_data
+                        .object_entity_mut(object_entity_id);
 
                     if !object_extension.fields.is_empty() {
                         panic!("Adding fields in schema extensions is not allowed, yet.");
@@ -585,13 +586,13 @@ fn process_fields(
     for (parent_object_entity_id, field_definitions_to_insert) in field_queue {
         for field_definition in field_definitions_to_insert.into_iter() {
             let parent_object = schema
-                .server_field_data
+                .server_entity_data
                 .object_entity(parent_object_entity_id);
 
             let inner_type = field_definition.item.type_.inner();
 
             let selection_type = schema
-                .server_field_data
+                .server_entity_data
                 .defined_types
                 .get(inner_type)
                 .ok_or_else(|| {
@@ -610,7 +611,7 @@ fn process_fields(
                 .into_iter()
                 .map(|input_value_definition| {
                     graphql_input_value_definition_to_variable_definition(
-                        &schema.server_field_data.defined_types,
+                        &schema.server_entity_data.defined_types,
                         input_value_definition,
                         parent_object.name,
                         field_definition.item.name.item.into(),
@@ -688,7 +689,7 @@ fn lookup_object_in_schema(
     unvalidated_type_name: UnvalidatedTypeName,
 ) -> ProcessGraphqlTypeDefinitionResult<ServerObjectEntityId> {
     let result = (*schema
-        .server_field_data
+        .server_entity_data
         .defined_types
         .get(&unvalidated_type_name)
         .ok_or_else(|| {

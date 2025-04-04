@@ -90,7 +90,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     ) -> ProcessTypeDefinitionResult<Vec<UnprocessedClientFieldItem>> {
         // TODO don't clone if possible
         let parent_object = self
-            .server_field_data
+            .server_entity_data
             .object_entity(parent_object_entity_id);
         let parent_object_name = parent_object.name;
 
@@ -140,7 +140,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         // TODO it's a bit annoying that we call .object twice!
         let mutation_field_payload_type_name = self
-            .server_field_data
+            .server_entity_data
             .object_entity(payload_object_entity_id)
             .name;
 
@@ -162,7 +162,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         )?;
 
         let payload_object = self
-            .server_field_data
+            .server_entity_data
             .object_entity(payload_object_entity_id);
 
         // TODO split path on .
@@ -183,7 +183,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     let client_field_parent_object_entity_id =
                         server_object_selectable.target_object_entity.inner();
                     let client_field_parent_object = self
-                        .server_field_data
+                        .server_entity_data
                         .object_entity(*client_field_parent_object_entity_id);
 
                     Ok((
@@ -232,7 +232,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         let top_level_schema_field_concrete_type = payload_object.concrete_type;
         let primary_field_concrete_type = self
-            .server_field_data
+            .server_entity_data
             .object_entity(maybe_abstract_parent_object_entity_id)
             .concrete_type;
 
@@ -312,7 +312,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         payload_object_name: IsographObjectTypeName,
     ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
         let client_field_parent = self
-            .server_field_data
+            .server_entity_data
             .object_entity_mut(client_field_parent_object_entity_id);
         if client_field_parent
             .encountered_fields
@@ -361,7 +361,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         mutation_object_entity_id: ServerObjectEntityId,
     ) -> ProcessTypeDefinitionResult<ServerObjectSelectableId> {
         let mutation = self
-            .server_field_data
+            .server_entity_data
             .object_entity(mutation_object_entity_id);
 
         let field_id = mutation

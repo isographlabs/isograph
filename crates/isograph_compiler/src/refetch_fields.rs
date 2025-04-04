@@ -24,10 +24,10 @@ pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
     let mut errors = vec![];
     let mut results = vec![];
 
-    let id_type_id = schema.server_field_data.id_type_id;
+    let id_type_id = schema.server_entity_data.id_type_id;
 
     for item in schema
-        .server_field_data
+        .server_entity_data
         .server_object_entities_and_ids_mut()
         .map(
             |WithId {

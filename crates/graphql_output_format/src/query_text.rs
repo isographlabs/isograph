@@ -47,7 +47,7 @@ fn write_variables_to_string<'a>(
         let x: GraphQLTypeAnnotation<UnvalidatedTypeName> =
             variable.type_.clone().map(|input_type_id| {
                 let schema_input_type = schema
-                    .server_field_data
+                    .server_entity_data
                     .lookup_unvalidated_type(input_type_id);
                 schema_input_type.name().into()
             });

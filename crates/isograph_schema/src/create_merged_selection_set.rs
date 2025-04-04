@@ -512,7 +512,7 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
     } = variant;
     // This could be Pet
     let refetch_field_parent_type = schema
-        .server_field_data
+        .server_entity_data
         .object_entity(refetch_field_parent_id);
 
     let mut definitions_of_used_variables =
@@ -565,7 +565,7 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
     );
 
     let root_parent_object = schema
-        .server_field_data
+        .server_entity_data
         .object_entity(entrypoint.parent_object_entity_id)
         .name;
 
@@ -599,7 +599,7 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
         root_operation_name,
         query_name,
         concrete_type: schema
-            .server_field_data
+            .server_entity_data
             .object_entity(root_object_entity_id)
             .name,
     }
@@ -773,7 +773,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                 let parent_object_entity_id =
                     object_selection.associated_data.parent_object_entity_id;
                 let object_selection_parent_object = schema
-                    .server_field_data
+                    .server_entity_data
                     .object_entity(parent_object_entity_id);
 
                 match object_selection.associated_data.field_id {
@@ -832,7 +832,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                         existing_inline_fragment,
                                     ) => {
                                         let object_selection_parent_object = schema
-                                            .server_field_data
+                                            .server_entity_data
                                             .object_entity(parent_object_entity_id);
 
                                         merge_validated_selections_into_selection_map(

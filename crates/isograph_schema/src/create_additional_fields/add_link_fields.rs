@@ -12,7 +12,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         for WithId {
             id: object_entity_id,
             item: object,
-        } in &mut self.server_field_data.server_object_entities_and_ids_mut()
+        } in &mut self.server_entity_data.server_object_entities_and_ids_mut()
         {
             let field_name = *LINK_FIELD_NAME;
             let next_client_field_id = self.client_scalar_selectables.len().into();

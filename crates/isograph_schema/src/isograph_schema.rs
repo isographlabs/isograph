@@ -54,7 +54,7 @@ pub struct Schema<TNetworkProtocol: NetworkProtocol> {
     pub client_scalar_selectables: Vec<ClientScalarSelectable<TNetworkProtocol>>,
     pub client_object_selectables: Vec<ClientObjectSelectable<TNetworkProtocol>>,
     pub entrypoints: HashMap<ClientScalarSelectableId, IsoLiteralText>,
-    pub server_field_data: ServerFieldData<TNetworkProtocol>,
+    pub server_entity_data: ServerEntityData<TNetworkProtocol>,
 
     /// These are root types like Query, Mutation, Subscription
     pub fetchable_types: BTreeMap<ServerObjectEntityId, RootOperationName>,
@@ -119,7 +119,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             client_object_selectables: vec![],
 
             entrypoints: Default::default(),
-            server_field_data: ServerFieldData {
+            server_entity_data: ServerEntityData {
                 server_objects: vec![],
                 server_scalars: scalars,
                 defined_types,
@@ -165,7 +165,7 @@ pub type ObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
 >;
 
 #[derive(Debug)]
-pub struct ServerFieldData<TNetworkProtocol: NetworkProtocol> {
+pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
     pub server_objects: Vec<ServerObjectEntity<TNetworkProtocol>>,
     pub server_scalars: Vec<ServerScalarEntity<TNetworkProtocol>>,
     pub defined_types: HashMap<UnvalidatedTypeName, ServerEntityId>,
@@ -240,7 +240,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let next_scalar_name = server_scalar_selectable.name;
 
         let parent_object = self
-            .server_field_data
+            .server_entity_data
             .object_entity_mut(parent_object_entity_id);
 
         if parent_object
@@ -283,7 +283,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let next_object_name = server_object_selectable.name;
 
         let parent_object = self
-            .server_field_data
+            .server_entity_data
             .object_entity_mut(parent_object_entity_id);
         if parent_object
             .encountered_fields
@@ -423,7 +423,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol> ServerFieldData<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
     /// Get a reference to a given scalar type by its id.
     pub fn scalar_entity(
         &self,

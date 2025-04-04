@@ -69,7 +69,7 @@ fn validate_parent_object_entity_id<TNetworkProtocol: NetworkProtocol>(
     text_source: TextSource,
 ) -> Result<ServerObjectEntityId, WithLocation<ValidateEntrypointDeclarationError>> {
     let parent_type_id = schema
-        .server_field_data
+        .server_entity_data
         .defined_types
         .get(&parent_type.item)
         .ok_or(WithLocation::new(
@@ -90,7 +90,7 @@ fn validate_parent_object_entity_id<TNetworkProtocol: NetworkProtocol>(
                             .keys()
                             .map(|object_entity_id| {
                                 schema
-                                    .server_field_data
+                                    .server_entity_data
                                     .object_entity(*object_entity_id)
                                     .name
                                     .to_string()
@@ -106,7 +106,7 @@ fn validate_parent_object_entity_id<TNetworkProtocol: NetworkProtocol>(
         }
         ServerEntityId::Scalar(scalar_entity_id) => {
             let scalar_name = schema
-                .server_field_data
+                .server_entity_data
                 .scalar_entity(*scalar_entity_id)
                 .name;
             Err(WithLocation::new(
@@ -127,7 +127,7 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
     parent_object_entity_id: ServerObjectEntityId,
 ) -> Result<ClientScalarSelectableId, WithLocation<ValidateEntrypointDeclarationError>> {
     let parent_object = schema
-        .server_field_data
+        .server_entity_data
         .object_entity(parent_object_entity_id);
 
     match parent_object
