@@ -301,7 +301,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         self.client_object_selectables.push(ClientPointer {
             description: client_pointer_declaration.item.description.map(|x| x.item),
             name,
-            id: next_client_pointer_id,
             reader_selection_set: vec![],
 
             variable_definitions: client_pointer_declaration

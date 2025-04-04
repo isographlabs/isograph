@@ -50,7 +50,6 @@ pub struct ClientField<TNetworkProtocol: NetworkProtocol> {
 pub struct ClientPointer<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: ClientObjectSelectableName,
-    pub id: ClientPointerId,
     pub to: TypeAnnotation<ServerObjectId>,
 
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
