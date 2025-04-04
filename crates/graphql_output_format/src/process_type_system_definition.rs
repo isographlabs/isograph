@@ -320,9 +320,9 @@ pub enum ProcessGraphqlTypeSystemDefinitionError {
     #[error("Root types must be objects. This type is a scalar.")]
     RootTypeMustBeObject,
 
-    #[error("This field has type {unvalidated_type_name}, which does not exist")]
+    #[error("This field has type {target_entity_type_name}, which does not exist")]
     FieldTypenameDoesNotExist {
-        unvalidated_type_name: UnvalidatedTypeName,
+        target_entity_type_name: UnvalidatedTypeName,
     },
 
     #[error("{0}")]
@@ -585,24 +585,25 @@ fn process_fields(
 ) -> ProcessGraphqlTypeDefinitionResult<()> {
     for (parent_object_entity_id, field_definitions_to_insert) in field_queue {
         for field_definition in field_definitions_to_insert.into_iter() {
-            let parent_object = schema
+            let parent_object_entity = schema
                 .server_entity_data
                 .object_entity(parent_object_entity_id);
 
-            let inner_type = field_definition.item.type_.inner();
+            let target_entity_type_name = field_definition.item.type_.inner();
 
             let selection_type = schema
                 .server_entity_data
                 .defined_types
-                .get(inner_type)
+                .get(target_entity_type_name)
                 .ok_or_else(|| {
                     WithLocation::new(
                         ProcessGraphqlTypeSystemDefinitionError::FieldTypenameDoesNotExist {
-                            unvalidated_type_name: *inner_type,
+                            target_entity_type_name: *target_entity_type_name,
                         },
                         field_definition.item.name.location,
                     )
                 })?;
+
             let arguments = field_definition
                 .item
                 .arguments
@@ -613,12 +614,13 @@ fn process_fields(
                     graphql_input_value_definition_to_variable_definition(
                         &schema.server_entity_data.defined_types,
                         input_value_definition,
-                        parent_object.name,
+                        parent_object_entity.name,
                         field_definition.item.name.item.into(),
                     )
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             let description = field_definition.item.description.map(|d| d.item);
+
             match selection_type {
                 SelectionType::Scalar(scalar_entity_id) => {
                     schema
