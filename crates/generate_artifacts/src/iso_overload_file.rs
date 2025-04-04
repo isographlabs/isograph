@@ -5,8 +5,8 @@ use std::cmp::Ordering;
 
 use common_lang_types::{ArtifactPathAndContent, IsoLiteralText, SelectableName};
 use isograph_schema::{
-    ClientField, ClientFieldOrPointer, ClientFieldVariant, NetworkProtocol, Schema,
-    UserWrittenComponentVariant, ValidatedSelectionType,
+    ClientField, ClientFieldOrPointer, NetworkProtocol, Schema, UserWrittenComponentVariant,
+    ValidatedSelectionType,
 };
 
 use crate::generate_artifacts::ISO_TS_FILE_NAME;
@@ -225,7 +225,10 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
     ValidatedSelectionType<TNetworkProtocol>,
     UserWrittenComponentVariant,
 )> {
-    let mut client_types = user_written_fields(schema).collect::<Vec<_>>();
+    let mut client_types = schema
+        .user_written_client_types()
+        .map(|x| (x.1, x.2))
+        .collect::<Vec<_>>();
     client_types.sort_by(|client_type_1, client_type_2| {
         match client_type_1
             .0
@@ -292,33 +295,4 @@ fn sort_field_name(field_1: SelectableName, field_2: SelectableName) -> Ordering
     } else {
         field_1.cmp(field_2)
     }
-}
-
-fn user_written_fields<TNetworkProtocol: NetworkProtocol>(
-    schema: &Schema<TNetworkProtocol>,
-) -> impl Iterator<
-    Item = (
-        ValidatedSelectionType<TNetworkProtocol>,
-        UserWrittenComponentVariant,
-    ),
-> + '_ {
-    schema
-        .client_scalar_selectables
-        .iter()
-        .filter_map(
-            |client_scalar_selectable| match client_scalar_selectable.variant {
-                ClientFieldVariant::Link => None,
-                ClientFieldVariant::UserWritten(info) => Some((
-                    SelectionType::Scalar(client_scalar_selectable),
-                    info.user_written_component_variant,
-                )),
-                ClientFieldVariant::ImperativelyLoadedField(_) => None,
-            },
-        )
-        .chain(
-            schema
-                .client_object_selectables
-                .iter()
-                .map(|x| (SelectionType::Object(x), UserWrittenComponentVariant::Eager)),
-        )
 }

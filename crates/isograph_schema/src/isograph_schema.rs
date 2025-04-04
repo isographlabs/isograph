@@ -23,6 +23,7 @@ use crate::{
     ClientField, ClientFieldOrPointerId, ClientFieldVariant, ClientPointer, NetworkProtocol,
     NormalizationKey, SchemaObject, SchemaScalar, SchemaType, ServerObjectSelectable,
     ServerScalarSelectable, ServerSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
+    UserWrittenComponentVariant,
 };
 
 lazy_static! {
@@ -377,6 +378,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         Item = (
             SelectionType<ClientFieldId, ClientPointerId>,
             SelectionType<&ClientField<TNetworkProtocol>, &ClientPointer<TNetworkProtocol>>,
+            UserWrittenComponentVariant,
         ),
     > {
         self.client_scalar_selectables
@@ -384,9 +386,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .enumerate()
             .flat_map(|(id, field)| match field.variant {
                 ClientFieldVariant::Link => None,
-                ClientFieldVariant::UserWritten(_) => Some((
+                ClientFieldVariant::UserWritten(info) => Some((
                     SelectionType::Scalar(id.into()),
                     SelectionType::Scalar(field),
+                    info.user_written_component_variant,
                 )),
                 ClientFieldVariant::ImperativelyLoadedField(_) => None,
             })
@@ -398,6 +401,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         (
                             SelectionType::Object(id.into()),
                             SelectionType::Object(pointer),
+                            UserWrittenComponentVariant::Eager,
                         )
                     }),
             )

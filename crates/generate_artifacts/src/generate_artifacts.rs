@@ -295,7 +295,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
         }
     }
 
-    for (client_type_id, user_written_client_type) in schema.user_written_client_types() {
+    for (client_type_id, user_written_client_type, _) in schema.user_written_client_types() {
         // For each user-written client types, generate a param type artifact
         path_and_contents.push(generate_eager_reader_param_type_artifact(
             schema,
