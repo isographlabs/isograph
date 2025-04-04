@@ -10,7 +10,7 @@ use thiserror::Error;
 
 use isograph_lang_types::{
     graphql_type_annotation_from_type_annotation, NonConstantValue, SelectionType, ServerEntityId,
-    ServerObjectId, ServerScalarId, VariableDefinition,
+    ServerObjectEntityId, ServerScalarEntityId, VariableDefinition,
 };
 
 use crate::{
@@ -38,7 +38,7 @@ fn graphql_type_to_nullable_type<TValue>(
 }
 
 fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
-    scalar_literal: &ServerScalarId,
+    scalar_literal: &ServerScalarEntityId,
     type_: &GraphQLTypeAnnotation<ServerEntityId>,
     schema_data: &ServerFieldData<TNetworkProtocol>,
     location: Location,
@@ -307,7 +307,7 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
     server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
-    object_entity_id: ServerObjectId,
+    object_entity_id: ServerObjectEntityId,
 ) -> Result<(), WithLocation<ValidateArgumentTypesError>> {
     let object = schema_data.object_entity(object_entity_id);
     validate_no_extraneous_fields(

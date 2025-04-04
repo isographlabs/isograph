@@ -9,9 +9,9 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientScalarSelectableId, DefinitionLocation, EmptyDirectiveSet,
-    NonConstantValue, ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectionType,
-    SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, ServerObjectSelectableId,
-    VariableDefinition,
+    NonConstantValue, ScalarSelection, ScalarSelectionDirectiveSet, SelectionType,
+    SelectionTypeContainingSelections, ServerEntityId, ServerObjectEntityId,
+    ServerObjectSelectableId, VariableDefinition,
 };
 
 use serde::Deserialize;
@@ -86,7 +86,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     /// There is lots of cloning going on here! Not ideal.
     pub fn add_exposed_fields_to_parent_object_types(
         &mut self,
-        parent_object_entity_id: ServerObjectId,
+        parent_object_entity_id: ServerObjectEntityId,
     ) -> ProcessTypeDefinitionResult<Vec<UnprocessedClientFieldItem>> {
         // TODO don't clone if possible
         let parent_object = self
@@ -121,7 +121,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &mut self,
         expose_field_directive: &ExposeFieldDirective,
         parent_object_name: IsographObjectTypeName,
-        parent_object_entity_id: ServerObjectId,
+        parent_object_entity_id: ServerObjectEntityId,
     ) -> Result<UnprocessedClientFieldItem, WithLocation<CreateAdditionalFieldsError>> {
         let ExposeFieldDirective {
             expose_as,
@@ -201,7 +201,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let fields = processed_field_map_items
             .iter()
             .map(|field_map_item| {
-                let scalar_field_selection = ScalarFieldSelection {
+                let scalar_field_selection = ScalarSelection {
                     name: WithLocation::new(
                         // TODO make this no-op
                         // TODO split on . here; we should be able to have from: "best_friend.id" or whatnot.
@@ -307,7 +307,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn insert_client_field_on_object(
         &mut self,
         mutation_field_name: SelectableName,
-        client_field_parent_object_entity_id: ServerObjectId,
+        client_field_parent_object_entity_id: ServerObjectEntityId,
         client_field_id: ClientScalarSelectableId,
         payload_object_name: IsographObjectTypeName,
     ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
@@ -358,7 +358,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     fn parse_mutation_subfield_id(
         &self,
         field_arg: StringLiteralValue,
-        mutation_object_entity_id: ServerObjectId,
+        mutation_object_entity_id: ServerObjectEntityId,
     ) -> ProcessTypeDefinitionResult<ServerObjectSelectableId> {
         let mutation = self
             .server_field_data

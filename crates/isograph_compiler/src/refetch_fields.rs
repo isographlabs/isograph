@@ -4,7 +4,7 @@ use common_lang_types::ObjectTypeAndFieldName;
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ClientScalarSelectableId, DefinitionLocation, ObjectSelectionDirectiveSet,
-    ScalarSelectionDirectiveSet, SelectionType, ServerObjectId, ServerScalarId,
+    ScalarSelectionDirectiveSet, SelectionType, ServerObjectEntityId, ServerScalarEntityId,
     ServerStrongIdFieldId, WithId,
 };
 use isograph_schema::{
@@ -75,12 +75,12 @@ pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
 }
 
 fn add_refetch_field_to_object<TNetworkProtocol: NetworkProtocol>(
-    object_entity_id: ServerObjectId,
+    object_entity_id: ServerObjectEntityId,
     object: &mut ServerObjectEntity<TNetworkProtocol>,
     client_fields: &mut Vec<ClientScalarSelectable<TNetworkProtocol>>,
-    query_id: ServerObjectId,
+    query_id: ServerObjectEntityId,
     _id_field: ServerStrongIdFieldId,
-    id_type_id: ServerScalarId,
+    id_type_id: ServerScalarEntityId,
 ) -> Result<
     (
         ClientScalarSelectableId,

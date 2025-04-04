@@ -2,7 +2,7 @@ use common_lang_types::{
     IsographObjectTypeName, Location, SelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use isograph_lang_types::{
-    DefinitionLocation, ObjectSelection, ObjectSelectionDirectiveSet, ScalarFieldSelection,
+    DefinitionLocation, ObjectSelection, ObjectSelectionDirectiveSet, ScalarSelection,
     ScalarSelectionDirectiveSet, SelectionType, UnvalidatedScalarFieldSelection,
     UnvalidatedSelection,
 };
@@ -204,7 +204,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
         }
     };
 
-    Ok(ScalarFieldSelection {
+    Ok(ScalarSelection {
         name: scalar_selection.name,
         reader_alias: scalar_selection.reader_alias,
         associated_data: ValidatedScalarSelectionAssociatedData {

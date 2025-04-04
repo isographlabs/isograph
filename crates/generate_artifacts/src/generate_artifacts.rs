@@ -11,9 +11,9 @@ use core::panic;
 use isograph_config::CompilerConfig;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientScalarSelectableId, DefinitionLocation, NonConstantValue,
-    ObjectSelectionDirectiveSet, ScalarFieldSelection, ScalarSelectionDirectiveSet,
+    ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
     SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, ServerEntityId,
-    ServerObjectId, TypeAnnotation, UnionVariant, VariableDefinition,
+    ServerObjectEntityId, TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
     accessible_client_fields, description, output_type_annotation, selection_map_wrapped,
@@ -668,7 +668,7 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
     loadable_fields: &mut BTreeSet<ObjectTypeAndFieldName>,
     indentation_level: u8,
     link_fields: &mut bool,
-    scalar_field_selection: &ScalarFieldSelection<ValidatedScalarSelectionAssociatedData>,
+    scalar_field_selection: &ScalarSelection<ValidatedScalarSelectionAssociatedData>,
     client_field_id: ClientScalarSelectableId,
 ) {
     let client_field = schema.client_field(client_field_id);
@@ -863,7 +863,7 @@ fn write_getter_and_setter(
     query_type_declaration: &mut String,
     indentation_level: u8,
     name_or_alias: SelectableNameOrAlias,
-    output_type_annotation: &TypeAnnotation<ServerObjectId>,
+    output_type_annotation: &TypeAnnotation<ServerObjectEntityId>,
     type_annotation: &TypeAnnotation<ClientFieldUpdatableDataType>,
 ) {
     query_type_declaration.push_str(&format!(

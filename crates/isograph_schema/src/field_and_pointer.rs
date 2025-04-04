@@ -7,7 +7,7 @@ use common_lang_types::{
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
     impl_with_id, ClientObjectSelectableId, ClientScalarSelectableId, SelectionType,
-    ServerEntityId, ServerObjectId, TypeAnnotation, VariableDefinition,
+    ServerEntityId, ServerObjectEntityId, TypeAnnotation, VariableDefinition,
 };
 
 use crate::{
@@ -45,7 +45,7 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     // Why is this not calculated when needed?
     pub type_and_field: ObjectTypeAndFieldName,
 
-    pub parent_object_entity_id: ServerObjectId,
+    pub parent_object_entity_id: ServerObjectEntityId,
     pub output_format: PhantomData<TNetworkProtocol>,
 }
 
@@ -57,7 +57,7 @@ impl_with_id!(ClientScalarSelectable<TNetworkProtocol: NetworkProtocol>, ClientS
 pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: ClientObjectSelectableName,
-    pub to: TypeAnnotation<ServerObjectId>,
+    pub to: TypeAnnotation<ServerObjectEntityId>,
 
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 
@@ -71,7 +71,7 @@ pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     // Why is this not calculated when needed?
     pub type_and_field: ObjectTypeAndFieldName,
 
-    pub parent_object_entity_id: ServerObjectId,
+    pub parent_object_entity_id: ServerObjectEntityId,
 
     pub output_format: PhantomData<TNetworkProtocol>,
     pub info: UserWrittenClientPointerInfo,
@@ -84,8 +84,7 @@ pub trait ClientScalarOrObjectSelectable {
     fn description(&self) -> Option<DescriptionValue>;
     fn name(&self) -> ClientSelectableName;
     fn type_and_field(&self) -> ObjectTypeAndFieldName;
-    fn parent_object_entity_id(&self) -> ServerObjectId;
-    // the following are unsupported, for now, because the return values include a generic
+    fn parent_object_entity_id(&self) -> ServerObjectEntityId;
     fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>];
     fn refetch_strategy(
         &self,
@@ -117,7 +116,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         self.type_and_field
     }
 
-    fn parent_object_entity_id(&self) -> ServerObjectId {
+    fn parent_object_entity_id(&self) -> ServerObjectEntityId {
         self.parent_object_entity_id
     }
 
@@ -174,7 +173,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         self.type_and_field
     }
 
-    fn parent_object_entity_id(&self) -> ServerObjectId {
+    fn parent_object_entity_id(&self) -> ServerObjectEntityId {
         self.parent_object_entity_id
     }
 

@@ -11,7 +11,7 @@ use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientObjectSelectableId,
     ClientPointerDeclaration, ClientScalarSelectableId, DefinitionLocation, DeserializationError,
     NonConstantValue, ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionType,
-    SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, TypeAnnotation,
+    SelectionTypeContainingSelections, ServerEntityId, ServerObjectEntityId, TypeAnnotation,
     VariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -159,7 +159,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     fn add_client_field_to_object(
         &mut self,
-        parent_object_entity_id: ServerObjectId,
+        parent_object_entity_id: ServerObjectEntityId,
         client_field_declaration: WithSpan<ClientFieldDeclaration>,
     ) -> ProcessClientFieldDeclarationResult<UnprocessedClientFieldItem> {
         let query_id = self.query_id();
@@ -244,8 +244,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     fn add_client_pointer_to_object(
         &mut self,
-        parent_object_entity_id: ServerObjectId,
-        to_object_entity_id: TypeAnnotation<ServerObjectId>,
+        parent_object_entity_id: ServerObjectEntityId,
+        to_object_entity_id: TypeAnnotation<ServerObjectEntityId>,
         client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
     ) -> ProcessClientFieldDeclarationResult<UnprocessedClientPointerItem> {
         let query_id = self.query_id();
@@ -429,7 +429,7 @@ pub struct PrimaryFieldInfo {
     /// Some if the object is concrete; None otherwise.
     pub primary_field_concrete_type: Option<IsographObjectTypeName>,
     /// If this is abstract, we add a fragment spread
-    pub primary_field_return_type_object_entity_id: ServerObjectId,
+    pub primary_field_return_type_object_entity_id: ServerObjectEntityId,
     pub primary_field_field_map: Vec<FieldMapItem>,
 }
 
@@ -449,7 +449,7 @@ pub struct ImperativelyLoadedFieldVariant {
     /// this differently, this is very awkward!
     pub primary_field_info: Option<PrimaryFieldInfo>,
 
-    pub root_object_entity_id: ServerObjectId,
+    pub root_object_entity_id: ServerObjectEntityId,
 }
 
 // TODO Component is a GraphQL-ism

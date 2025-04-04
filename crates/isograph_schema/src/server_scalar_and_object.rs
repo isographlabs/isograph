@@ -7,7 +7,7 @@ use common_lang_types::{
 use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective};
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
-    impl_with_id, DefinitionLocation, SelectionType, ServerObjectId, ServerScalarId,
+    impl_with_id, DefinitionLocation, SelectionType, ServerObjectEntityId, ServerScalarEntityId,
     ServerStrongIdFieldId,
 };
 
@@ -22,7 +22,7 @@ pub struct ServerScalarEntity<TNetworkProtocol: NetworkProtocol> {
     pub output_format: PhantomData<TNetworkProtocol>,
 }
 
-impl_with_id!(ServerScalarEntity<TNetworkProtocol: NetworkProtocol>, ServerScalarId);
+impl_with_id!(ServerScalarEntity<TNetworkProtocol: NetworkProtocol>, ServerScalarEntityId);
 
 pub type ObjectEncounteredFields = BTreeMap<
     SelectableName,
@@ -46,7 +46,7 @@ pub struct ServerObjectEntity<TNetworkProtocol: NetworkProtocol> {
     pub output_associated_data: TNetworkProtocol::SchemaObjectAssociatedData,
 }
 
-impl_with_id!(ServerObjectEntity<TNetworkProtocol: NetworkProtocol>, ServerObjectId);
+impl_with_id!(ServerObjectEntity<TNetworkProtocol: NetworkProtocol>, ServerObjectEntityId);
 
 pub type ServerEntity<'a, TNetworkProtocol> = SelectionType<
     &'a ServerScalarEntity<TNetworkProtocol>,

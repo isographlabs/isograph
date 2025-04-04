@@ -1,5 +1,5 @@
 use common_lang_types::DescriptionValue;
-use isograph_lang_types::{DefinitionLocation, ServerObjectId, TypeAnnotation};
+use isograph_lang_types::{DefinitionLocation, ServerObjectEntityId, TypeAnnotation};
 
 use crate::{ClientObjectSelectable, NetworkProtocol, ServerObjectSelectable};
 
@@ -21,7 +21,7 @@ pub fn output_type_annotation<'a, TNetworkProtocol: NetworkProtocol>(
         &ServerObjectSelectable<TNetworkProtocol>,
         &ClientObjectSelectable<TNetworkProtocol>,
     >,
-) -> &'a TypeAnnotation<ServerObjectId> {
+) -> &'a TypeAnnotation<ServerObjectEntityId> {
     match definition_location {
         DefinitionLocation::Client(client_pointer) => &client_pointer.to,
         DefinitionLocation::Server(server_field) => &server_field.target_object_entity,

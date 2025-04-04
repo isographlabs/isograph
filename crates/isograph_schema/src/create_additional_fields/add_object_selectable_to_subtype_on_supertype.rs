@@ -2,7 +2,7 @@ use common_lang_types::{Span, WithLocation, WithSpan};
 use graphql_lang_types::{GraphQLNamedTypeAnnotation, GraphQLTypeAnnotation};
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    DefinitionLocation, EmptyDirectiveSet, ScalarFieldSelection, ScalarSelectionDirectiveSet,
+    DefinitionLocation, EmptyDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
     SelectionType, SelectionTypeContainingSelections, TypeAnnotation,
 };
 
@@ -31,7 +31,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             let next_server_object_selectable_id = self.server_object_selectables.len().into();
 
             let typename_selection = WithSpan::new(
-                SelectionTypeContainingSelections::Scalar(ScalarFieldSelection {
+                SelectionTypeContainingSelections::Scalar(ScalarSelection {
                     arguments: vec![],
                     associated_data: ValidatedScalarSelectionAssociatedData {
                         location: DefinitionLocation::Server(
@@ -53,7 +53,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             );
 
             let link_selection = WithSpan::new(
-                SelectionTypeContainingSelections::Scalar(ScalarFieldSelection {
+                SelectionTypeContainingSelections::Scalar(ScalarSelection {
                     arguments: vec![],
                     associated_data: ValidatedScalarSelectionAssociatedData {
                         location: DefinitionLocation::Client(

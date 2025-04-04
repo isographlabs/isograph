@@ -12,8 +12,8 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientScalarSelectableId, DefinitionLocation, EmptyDirectiveSet,
     NonConstantValue, RefetchQueryIndex, ScalarSelectionDirectiveSet, SelectionFieldArgument,
-    SelectionType, SelectionTypeContainingSelections, ServerEntityId, ServerObjectId,
-    ServerObjectSelectableId, ServerScalarId, VariableDefinition,
+    SelectionType, SelectionTypeContainingSelections, ServerEntityId, ServerObjectEntityId,
+    ServerObjectSelectableId, ServerScalarEntityId, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -189,7 +189,7 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PathToRefetchFieldInfo {
-    refetch_field_parent_id: ServerObjectId,
+    refetch_field_parent_id: ServerObjectEntityId,
     pub imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant,
     extra_selections: MergedSelectionMap,
     pub client_field_id: ClientScalarSelectableId,
@@ -406,7 +406,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     TNetworkProtocol: NetworkProtocol,
 >(
     schema: &Schema<TNetworkProtocol>,
-    parent_object_entity_id: ServerObjectId,
+    parent_object_entity_id: ServerObjectEntityId,
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
@@ -495,7 +495,7 @@ pub fn get_reachable_variables(selection_map: &MergedSelectionMap) -> BTreeSet<V
 fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     variant: ImperativelyLoadedFieldVariant,
-    refetch_field_parent_id: ServerObjectId,
+    refetch_field_parent_id: ServerObjectEntityId,
     selection_map: &MergedSelectionMap,
     entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
     index: usize,
@@ -639,7 +639,7 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
 
 fn create_selection_map_with_merge_traversal_state<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    parent_object_entity_id: ServerObjectId,
+    parent_object_entity_id: ServerObjectEntityId,
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
@@ -665,7 +665,7 @@ fn create_selection_map_with_merge_traversal_state<TNetworkProtocol: NetworkProt
 fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
-    parent_object_entity_id: ServerObjectId,
+    parent_object_entity_id: ServerObjectEntityId,
     parent_object: &ServerObjectEntity<TNetworkProtocol>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
@@ -956,7 +956,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     newly_encountered_scalar_client_selectable_id: ClientScalarSelectableId,
     newly_encountered_scalar_client_selectable: &ClientScalarSelectable<TNetworkProtocol>,
-    parent_object_entity_id: ServerObjectId,
+    parent_object_entity_id: ServerObjectEntityId,
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
     variant: &ImperativelyLoadedFieldVariant,
 ) {
@@ -1021,7 +1021,7 @@ fn filter_id_fields(field: &&WithSpan<ValidatedSelection>) -> bool {
 
 #[allow(clippy::too_many_arguments)]
 fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
-    parent_object_entity_id: ServerObjectId,
+    parent_object_entity_id: ServerObjectEntityId,
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
@@ -1244,7 +1244,7 @@ fn get_aliased_mutation_field_name(
     s
 }
 
-pub fn id_arguments(id_type_id: ServerScalarId) -> Vec<VariableDefinition<ServerEntityId>> {
+pub fn id_arguments(id_type_id: ServerScalarEntityId) -> Vec<VariableDefinition<ServerEntityId>> {
     vec![VariableDefinition {
         name: WithLocation::new("id".intern().into(), Location::generated()),
         type_: GraphQLTypeAnnotation::NonNull(Box::new(GraphQLNonNullTypeAnnotation::Named(

@@ -11,8 +11,8 @@ use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
     from_isograph_field_directives, ClientFieldDeclaration, ClientPointerDeclaration,
     ConstantValue, EntrypointDeclaration, IsographFieldDirective, NonConstantValue,
-    ObjectSelection, ScalarFieldSelection, SelectionFieldArgument,
-    SelectionTypeContainingSelections, UnvalidatedSelection, VariableDefinition,
+    ObjectSelection, ScalarSelection, SelectionFieldArgument, SelectionTypeContainingSelections,
+    UnvalidatedSelection, VariableDefinition,
 };
 use std::{collections::HashSet, ops::ControlFlow};
 
@@ -453,7 +453,7 @@ fn parse_selection(
                                 .unwrap_or_else(Span::todo_generated),
                         )
                     })?;
-                SelectionTypeContainingSelections::Scalar(ScalarFieldSelection {
+                SelectionTypeContainingSelections::Scalar(ScalarSelection {
                     name: field_name.map(|string_key| string_key.into()),
                     reader_alias: alias
                         .map(|with_span| with_span.map(|string_key| string_key.into())),

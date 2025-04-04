@@ -6,7 +6,7 @@ use common_lang_types::{
 };
 use isograph_lang_types::{
     ClientScalarSelectableId, DefinitionLocation, EntrypointDeclaration, SelectionType,
-    ServerEntityId, ServerObjectId,
+    ServerEntityId, ServerObjectEntityId,
 };
 
 use thiserror::Error;
@@ -67,7 +67,7 @@ fn validate_parent_object_entity_id<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     parent_type: WithSpan<UnvalidatedTypeName>,
     text_source: TextSource,
-) -> Result<ServerObjectId, WithLocation<ValidateEntrypointDeclarationError>> {
+) -> Result<ServerObjectEntityId, WithLocation<ValidateEntrypointDeclarationError>> {
     let parent_type_id = schema
         .server_field_data
         .defined_types
@@ -124,7 +124,7 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     field_name: WithSpan<ServerScalarSelectableName>,
     text_source: TextSource,
-    parent_object_entity_id: ServerObjectId,
+    parent_object_entity_id: ServerObjectEntityId,
 ) -> Result<ClientScalarSelectableId, WithLocation<ValidateEntrypointDeclarationError>> {
     let parent_object = schema
         .server_field_data

@@ -6,8 +6,8 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, EmptyDirectiveSet, ObjectSelectionDirectiveSet, ScalarFieldSelection,
-    ScalarSelectionDirectiveSet, SelectionTypeContainingSelections, ServerObjectId,
+    ArgumentKeyAndValue, EmptyDirectiveSet, ObjectSelectionDirectiveSet, ScalarSelection,
+    ScalarSelectionDirectiveSet, SelectionTypeContainingSelections, ServerObjectEntityId,
 };
 
 use crate::{
@@ -68,7 +68,7 @@ pub fn generate_refetch_field_strategy<
             >,
         >,
     >,
-    root_fetchable_type: ServerObjectId,
+    root_fetchable_type: ServerObjectEntityId,
     refetch_query_name: QueryOperationName,
     top_level_field_name: ServerObjectSelectableName,
     top_level_arguments: Vec<ArgumentKeyAndValue>,
@@ -111,7 +111,7 @@ pub struct UseRefetchFieldRefetchStrategy<
         >,
     >,
     /// Query, Mutation, etc.
-    pub root_fetchable_type: ServerObjectId,
+    pub root_fetchable_type: ServerObjectEntityId,
 
     /// Given the content one needs to refetch (which can be empty?), generate
     /// the merged selection map and variables representing the entire query.
@@ -168,7 +168,7 @@ pub fn id_selection() -> WithSpan<
     SelectionTypeContainingSelections<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
 > {
     WithSpan::new(
-        SelectionTypeContainingSelections::Scalar(ScalarFieldSelection {
+        SelectionTypeContainingSelections::Scalar(ScalarSelection {
             name: WithLocation::new("id".intern().into(), Location::generated()),
             reader_alias: None,
             associated_data: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),

@@ -12,9 +12,9 @@ use intern::string_key::Intern;
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientObjectSelectableId, ClientScalarSelectableId, DefinitionLocation,
-    ObjectSelection, ObjectSelectionDirectiveSet, ScalarFieldSelection,
-    ScalarSelectionDirectiveSet, SelectionType, SelectionTypeContainingSelections, ServerEntityId,
-    ServerObjectId, ServerObjectSelectableId, ServerScalarId, ServerScalarSelectableId,
+    ObjectSelection, ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
+    SelectionType, SelectionTypeContainingSelections, ServerEntityId, ServerObjectEntityId,
+    ServerObjectSelectableId, ServerScalarEntityId, ServerScalarSelectableId,
     ServerStrongIdFieldId, VariableDefinition, WithId,
 };
 use lazy_static::lazy_static;
@@ -57,7 +57,7 @@ pub struct Schema<TNetworkProtocol: NetworkProtocol> {
     pub server_field_data: ServerFieldData<TNetworkProtocol>,
 
     /// These are root types like Query, Mutation, Subscription
-    pub fetchable_types: BTreeMap<ServerObjectId, RootOperationName>,
+    pub fetchable_types: BTreeMap<ServerObjectEntityId, RootOperationName>,
 }
 
 impl<TNetworkProtocol: NetworkProtocol> Default for Schema<TNetworkProtocol> {
@@ -137,7 +137,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     /// This is a smell, and we should refactor away from it, or all schema's
     /// should have a root type.
-    pub fn query_id(&self) -> ServerObjectId {
+    pub fn query_id(&self) -> ServerObjectEntityId {
         *self
             .fetchable_types
             .iter()
@@ -146,13 +146,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .0
     }
 
-    pub fn find_mutation(&self) -> Option<(&ServerObjectId, &RootOperationName)> {
+    pub fn find_mutation(&self) -> Option<(&ServerObjectEntityId, &RootOperationName)> {
         self.fetchable_types
             .iter()
             .find(|(_, root_operation_name)| root_operation_name.0 == "mutation")
     }
 
-    pub fn find_query(&self) -> Option<(&ServerObjectId, &RootOperationName)> {
+    pub fn find_query(&self) -> Option<(&ServerObjectEntityId, &RootOperationName)> {
         self.fetchable_types
             .iter()
             .find(|(_, root_operation_name)| root_operation_name.0 == "query")
@@ -171,14 +171,14 @@ pub struct ServerFieldData<TNetworkProtocol: NetworkProtocol> {
     pub defined_types: HashMap<UnvalidatedTypeName, ServerEntityId>,
 
     // Well known types
-    pub id_type_id: ServerScalarId,
-    pub string_type_id: ServerScalarId,
-    pub float_type_id: ServerScalarId,
-    pub boolean_type_id: ServerScalarId,
-    pub int_type_id: ServerScalarId,
+    pub id_type_id: ServerScalarEntityId,
+    pub string_type_id: ServerScalarEntityId,
+    pub float_type_id: ServerScalarEntityId,
+    pub boolean_type_id: ServerScalarEntityId,
+    pub int_type_id: ServerScalarEntityId,
     // TODO restructure UnionTypeAnnotation to not have a nullable field, but to instead
     // include null in its variants.
-    pub null_type_id: ServerScalarId,
+    pub null_type_id: ServerScalarEntityId,
 }
 
 impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
@@ -427,7 +427,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerFieldData<TNetworkProtocol> {
     /// Get a reference to a given scalar type by its id.
     pub fn scalar_entity(
         &self,
-        scalar_entity_id: ServerScalarId,
+        scalar_entity_id: ServerScalarEntityId,
     ) -> &ServerScalarEntity<TNetworkProtocol> {
         &self.server_scalars[scalar_entity_id.as_usize()]
     }
@@ -459,7 +459,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerFieldData<TNetworkProtocol> {
     /// Get a reference to a given object type by its id.
     pub fn object_entity(
         &self,
-        object_entity_id: ServerObjectId,
+        object_entity_id: ServerObjectEntityId,
     ) -> &ServerObjectEntity<TNetworkProtocol> {
         &self.server_objects[object_entity_id.as_usize()]
     }
@@ -467,7 +467,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerFieldData<TNetworkProtocol> {
     /// Get a mutable reference to a given object type by its id.
     pub fn object_entity_mut(
         &mut self,
-        object_entity_id: ServerObjectId,
+        object_entity_id: ServerObjectEntityId,
     ) -> &mut ServerObjectEntity<TNetworkProtocol> {
         &mut self.server_objects[object_entity_id.as_usize()]
     }
@@ -518,7 +518,7 @@ fn add_schema_defined_scalar_type<TNetworkProtocol: NetworkProtocol>(
     defined_types: &mut HashMap<UnvalidatedTypeName, ServerEntityId>,
     field_name: &'static str,
     javascript_name: JavascriptName,
-) -> ServerScalarId {
+) -> ServerScalarEntityId {
     let scalar_entity_id = scalars.len().into();
 
     // TODO this is problematic, we have no span (or really, no location) associated with this
@@ -559,7 +559,7 @@ pub type ValidatedSelection = SelectionTypeContainingSelections<
 pub type ValidatedObjectSelection =
     ObjectSelection<ValidatedScalarSelectionAssociatedData, ValidatedObjectSelectionAssociatedData>;
 
-pub type ValidatedScalarSelection = ScalarFieldSelection<ValidatedScalarSelectionAssociatedData>;
+pub type ValidatedScalarSelection = ScalarSelection<ValidatedScalarSelectionAssociatedData>;
 
 pub type ValidatedVariableDefinition = VariableDefinition<ServerEntityId>;
 
@@ -574,7 +574,7 @@ pub type ValidatedFieldDefinitionLocation =
 
 #[derive(Debug, Clone)]
 pub struct ValidatedObjectSelectionAssociatedData {
-    pub parent_object_entity_id: ServerObjectId,
+    pub parent_object_entity_id: ServerObjectEntityId,
     pub field_id: DefinitionLocation<ServerObjectSelectableId, ClientObjectSelectableId>,
     pub selection_variant: ObjectSelectionDirectiveSet,
     /// Some if the (destination?) object is concrete; None otherwise.

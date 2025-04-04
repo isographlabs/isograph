@@ -14,7 +14,7 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
-    SelectionType, ServerEntityId, ServerObjectId, TypeAnnotation, VariableDefinition,
+    SelectionType, ServerEntityId, ServerObjectEntityId, TypeAnnotation, VariableDefinition,
 };
 use isograph_schema::{
     EncounteredRootTypes, InsertFieldsError, IsographObjectTypeDefinition,
@@ -331,7 +331,7 @@ pub enum ProcessGraphqlTypeSystemDefinitionError {
 
 type UnvalidatedTypeRefinementMap = HashMap<UnvalidatedTypeName, Vec<UnvalidatedTypeName>>;
 // When constructing the final map, we can replace object type names with ids.
-pub type ValidatedTypeRefinementMap = HashMap<ServerObjectId, Vec<ServerObjectId>>;
+pub type ValidatedTypeRefinementMap = HashMap<ServerObjectEntityId, Vec<ServerObjectEntityId>>;
 
 fn process_object_type_definition(
     schema: &mut UnvalidatedGraphqlSchema,
@@ -339,7 +339,7 @@ fn process_object_type_definition(
     concrete_type: Option<IsographObjectTypeName>,
     associated_data: GraphQLSchemaObjectAssociatedData,
     type_definition_type: GraphQLObjectDefinitionType,
-    field_queue: &mut HashMap<ServerObjectId, Vec<WithLocation<GraphQLFieldDefinition>>>,
+    field_queue: &mut HashMap<ServerObjectEntityId, Vec<WithLocation<GraphQLFieldDefinition>>>,
 ) -> ProcessGraphqlTypeDefinitionResult<ProcessObjectTypeDefinitionOutcome> {
     let &mut Schema {
         ref mut server_field_data,
@@ -504,7 +504,7 @@ fn process_root_types(
 fn look_up_root_type(
     schema: &UnvalidatedGraphqlSchema,
     type_name: WithLocation<GraphQLObjectTypeName>,
-) -> ProcessGraphqlTypeDefinitionResult<ServerObjectId> {
+) -> ProcessGraphqlTypeDefinitionResult<ServerObjectEntityId> {
     match schema
         .server_field_data
         .defined_types
@@ -579,7 +579,7 @@ fn process_graphql_type_system_extension(
 /// - if it is an id field, modify the parent object
 fn process_fields(
     schema: &mut UnvalidatedGraphqlSchema,
-    field_queue: HashMap<ServerObjectId, Vec<WithLocation<GraphQLFieldDefinition>>>,
+    field_queue: HashMap<ServerObjectEntityId, Vec<WithLocation<GraphQLFieldDefinition>>>,
     options: &CompilerConfigOptions,
 ) -> ProcessGraphqlTypeDefinitionResult<()> {
     for (parent_object_entity_id, field_definitions_to_insert) in field_queue {
@@ -686,7 +686,7 @@ fn validate_type_refinement_map(
 fn lookup_object_in_schema(
     schema: &mut UnvalidatedGraphqlSchema,
     unvalidated_type_name: UnvalidatedTypeName,
-) -> ProcessGraphqlTypeDefinitionResult<ServerObjectId> {
+) -> ProcessGraphqlTypeDefinitionResult<ServerObjectEntityId> {
     let result = (*schema
         .server_field_data
         .defined_types
@@ -815,7 +815,7 @@ fn convert_graphql_constant_value_to_isograph_constant_value(
 }
 
 pub struct ProcessObjectTypeDefinitionOutcome {
-    pub object_entity_id: ServerObjectId,
+    pub object_entity_id: ServerObjectEntityId,
     pub encountered_root_kind: Option<RootOperationKind>,
 }
 
