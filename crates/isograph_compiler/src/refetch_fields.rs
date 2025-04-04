@@ -4,7 +4,7 @@ use common_lang_types::ObjectTypeAndFieldName;
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ClientFieldId, DefinitionLocation, ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet,
-    SelectionType, ServerObjectId, ServerScalarId, ServerStrongIdFieldId,
+    SelectionType, ServerObjectId, ServerScalarId, ServerStrongIdFieldId, WithId,
 };
 use isograph_schema::{
     generate_refetch_field_strategy, id_arguments, id_selection, id_top_level_arguments,
@@ -25,10 +25,11 @@ pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
 
     let id_type_id = schema.server_field_data.id_type_id;
 
-    for item in schema
-        .server_field_data
-        .server_objects_and_ids_mut()
-        .map(|(object_id, object)| {
+    for item in schema.server_field_data.server_objects_and_ids_mut().map(
+        |WithId {
+             id: object_id,
+             item: object,
+         }| {
             if let Some(id_field) = object.id_field {
                 let (client_field_id, refetch_strategy) = add_refetch_field_to_object(
                     object_id,
@@ -48,8 +49,8 @@ pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
             } else {
                 Ok(None)
             }
-        })
-    {
+        },
+    ) {
         match item {
             Ok(Some(item)) => {
                 results.push(SelectionType::Scalar(item));

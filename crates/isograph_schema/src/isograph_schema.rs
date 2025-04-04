@@ -14,7 +14,7 @@ use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldId, ClientPointerId, DefinitionLocation, ObjectSelection,
     ObjectSelectionDirectiveSet, ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectionType,
     SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, ServerObjectSelectableId,
-    ServerScalarId, ServerScalarSelectableId, ServerStrongIdFieldId, VariableDefinition,
+    ServerScalarId, ServerScalarSelectableId, ServerStrongIdFieldId, VariableDefinition, WithId,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
@@ -345,11 +345,11 @@ impl<TNetworkProtocol: NetworkProtocol> ServerFieldData<TNetworkProtocol> {
 
     pub fn server_scalars_and_ids(
         &self,
-    ) -> impl Iterator<Item = (ServerScalarId, &SchemaScalar<TNetworkProtocol>)> + '_ {
+    ) -> impl Iterator<Item = WithId<&SchemaScalar<TNetworkProtocol>>> + '_ {
         self.server_scalars
             .iter()
             .enumerate()
-            .map(|(id, scalar)| (id.into(), scalar))
+            .map(|(id, scalar)| WithId::new(id.into(), scalar))
     }
 
     // TODO this function is horribly named
@@ -372,20 +372,20 @@ impl<TNetworkProtocol: NetworkProtocol> ServerFieldData<TNetworkProtocol> {
 
     pub fn server_objects_and_ids(
         &self,
-    ) -> impl Iterator<Item = (ServerObjectId, &SchemaObject<TNetworkProtocol>)> + '_ {
+    ) -> impl Iterator<Item = WithId<&SchemaObject<TNetworkProtocol>>> + '_ {
         self.server_objects
             .iter()
             .enumerate()
-            .map(|(id, object)| (id.into(), object))
+            .map(|(id, object)| WithId::new(id.into(), object))
     }
 
     pub fn server_objects_and_ids_mut(
         &mut self,
-    ) -> impl Iterator<Item = (ServerObjectId, &mut SchemaObject<TNetworkProtocol>)> + '_ {
+    ) -> impl Iterator<Item = WithId<&mut SchemaObject<TNetworkProtocol>>> + '_ {
         self.server_objects
             .iter_mut()
             .enumerate()
-            .map(|(id, object)| (id.into(), object))
+            .map(|(id, object)| WithId::new(id.into(), object))
     }
 }
 
