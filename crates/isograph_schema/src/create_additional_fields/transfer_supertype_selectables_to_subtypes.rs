@@ -26,7 +26,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             // TODO is there a way to do this without cloning? I would think so, in theory,
             // if you could prove (or check at runtime?) that the supertype and subtype are not
             // the same item.
-            let supertype_encountered_fields = supertype.encountered_fields.clone();
+            let supertype_encountered_fields = supertype.available_selectables.clone();
 
             for subtype_id in subtype_ids {
                 for (supertype_field_name, defined_field) in &supertype_encountered_fields {
@@ -39,7 +39,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                             let subtype = self.server_entity_data.object_entity_mut(*subtype_id);
 
                             if subtype
-                                .encountered_fields
+                                .available_selectables
                                 .insert(*supertype_field_name, *defined_field)
                                 .is_some()
                             {

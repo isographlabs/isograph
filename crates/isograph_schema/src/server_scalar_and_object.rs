@@ -24,7 +24,7 @@ pub struct ServerScalarEntity<TNetworkProtocol: NetworkProtocol> {
 
 impl_with_id!(ServerScalarEntity<TNetworkProtocol: NetworkProtocol>, ServerScalarEntityId);
 
-pub type ObjectEncounteredFields = BTreeMap<
+pub type ServerObjectEntityAvailableSelectables = BTreeMap<
     SelectableName,
     DefinitionLocation<ServerSelectableId, ClientScalarOrObjectSelectableId>,
 >;
@@ -39,7 +39,7 @@ pub struct ServerObjectEntity<TNetworkProtocol: NetworkProtocol> {
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
     /// to something else.
     pub id_field: Option<ServerStrongIdFieldId>,
-    pub encountered_fields: ObjectEncounteredFields,
+    pub available_selectables: ServerObjectEntityAvailableSelectables,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 

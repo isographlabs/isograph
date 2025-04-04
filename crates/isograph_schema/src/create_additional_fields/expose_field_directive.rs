@@ -169,7 +169,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let primary_field_name: ServerObjectSelectableName = path.unchecked_conversion();
 
         let primary_field = payload_object
-            .encountered_fields
+            .available_selectables
             .get(&primary_field_name.into());
 
         let (maybe_abstract_parent_object_entity_id, maybe_abstract_parent_type_name) =
@@ -315,7 +315,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_entity_data
             .object_entity_mut(client_field_parent_object_entity_id);
         if client_field_parent
-            .encountered_fields
+            .available_selectables
             .insert(
                 mutation_field_name,
                 DefinitionLocation::Client(SelectionType::Scalar(client_field_id)),
@@ -365,7 +365,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .object_entity(mutation_object_entity_id);
 
         let field_id = mutation
-            .encountered_fields
+            .available_selectables
             .iter()
             .find_map(|(name, field_id)| {
                 if let DefinitionLocation::Server(SelectionType::Object(server_field_id)) = field_id

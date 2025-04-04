@@ -36,7 +36,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             });
 
             if object
-                .encountered_fields
+                .available_selectables
                 .insert(
                     field_name.into(),
                     DefinitionLocation::Client(SelectionType::Scalar(next_client_field_id)),

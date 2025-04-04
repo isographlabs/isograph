@@ -36,7 +36,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     associated_data: ValidatedScalarSelectionAssociatedData {
                         location: DefinitionLocation::Server(
                             *subtype_entity
-                                .encountered_fields
+                                .available_selectables
                                 .get(&"__typename".intern().into())
                                 .expect("Expected __typename to exist")
                                 .as_server()
@@ -58,7 +58,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     associated_data: ValidatedScalarSelectionAssociatedData {
                         location: DefinitionLocation::Client(
                             *subtype_entity
-                                .encountered_fields
+                                .available_selectables
                                 .get(&(*LINK_FIELD_NAME).into())
                                 .expect("Expected link to exist")
                                 .as_client()
@@ -109,7 +109,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 let supertype = self.server_entity_data.object_entity_mut(*supertype_id);
 
                 if supertype
-                    .encountered_fields
+                    .available_selectables
                     .insert(
                         field_name.into(),
                         DefinitionLocation::Server(SelectionType::Object(

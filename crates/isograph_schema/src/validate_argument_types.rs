@@ -14,7 +14,7 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    NetworkProtocol, ObjectEncounteredFields, ServerEntityData, ServerObjectEntity,
+    NetworkProtocol, ServerEntityData, ServerObjectEntity, ServerObjectEntityAvailableSelectables,
     ServerObjectSelectable, ServerScalarSelectable, ValidatedVariableDefinition,
 };
 
@@ -311,7 +311,7 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 ) -> Result<(), WithLocation<ValidateArgumentTypesError>> {
     let object = schema_data.object_entity(object_entity_id);
     validate_no_extraneous_fields(
-        &object.encountered_fields,
+        &object.available_selectables,
         object_literal,
         selection_supplied_argument_value.location,
     )?;
@@ -369,7 +369,7 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
     object: &ServerObjectEntity<TNetworkProtocol>,
 ) -> Vec<ObjectLiteralFieldType> {
     object
-        .encountered_fields
+        .available_selectables
         .iter()
         .filter_map(|(field_name, field_type)| {
             let iso_type_annotation = match field_type.as_server()? {
@@ -413,7 +413,7 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
 }
 
 fn validate_no_extraneous_fields(
-    object_fields: &ObjectEncounteredFields,
+    object_fields: &ServerObjectEntityAvailableSelectables,
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     location: Location,
 ) -> ValidateArgumentTypesResult<()> {

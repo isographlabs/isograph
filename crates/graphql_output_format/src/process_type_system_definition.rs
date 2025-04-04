@@ -346,7 +346,7 @@ fn process_object_type_definition(
         ..
     } = schema;
     let next_object_entity_id = server_field_data.server_objects.len().into();
-    let defined_types = &mut server_field_data.defined_types;
+    let defined_types = &mut server_field_data.defined_entities;
     let server_objects = &mut server_field_data.server_objects;
     let encountered_root_kind = match defined_types.entry(object_type_definition.name.item.into()) {
         HashMapEntry::Occupied(_) => {
@@ -363,7 +363,7 @@ fn process_object_type_definition(
             server_objects.push(ServerObjectEntity {
                 description: object_type_definition.description.map(|d| d.item),
                 name: object_type_definition.name.item,
-                encountered_fields: BTreeMap::new(),
+                available_selectables: BTreeMap::new(),
                 id_field: None,
                 directives: object_type_definition.directives,
                 concrete_type,
@@ -442,7 +442,7 @@ fn process_scalar_definition(
         ..
     } = schema;
     let next_scalar_entity_id = server_field_data.server_scalars.len().into();
-    let type_names = &mut server_field_data.defined_types;
+    let type_names = &mut server_field_data.defined_entities;
     let scalars = &mut server_field_data.server_scalars;
     match type_names.entry(scalar_type_definition.name.item.into()) {
         HashMapEntry::Occupied(_) => {
@@ -507,7 +507,7 @@ fn look_up_root_type(
 ) -> ProcessGraphqlTypeDefinitionResult<ServerObjectEntityId> {
     match schema
         .server_entity_data
-        .defined_types
+        .defined_entities
         .get(&type_name.item.into())
     {
         Some(ServerEntityId::Object(object_entity_id)) => Ok(*object_entity_id),
@@ -534,7 +534,7 @@ fn process_graphql_type_system_extension(
 
             let id = schema
                 .server_entity_data
-                .defined_types
+                .defined_entities
                 .get(&name.into())
                 .expect(
                     "TODO why does this id not exist. This probably indicates a bug in Isograph.",
@@ -593,7 +593,7 @@ fn process_fields(
 
             let selection_type = schema
                 .server_entity_data
-                .defined_types
+                .defined_entities
                 .get(target_entity_type_name)
                 .ok_or_else(|| {
                     WithLocation::new(
@@ -612,7 +612,7 @@ fn process_fields(
                 .into_iter()
                 .map(|input_value_definition| {
                     graphql_input_value_definition_to_variable_definition(
-                        &schema.server_entity_data.defined_types,
+                        &schema.server_entity_data.defined_entities,
                         input_value_definition,
                         parent_object_entity.name,
                         field_definition.item.name.item.into(),
@@ -692,7 +692,7 @@ fn lookup_object_in_schema(
 ) -> ProcessGraphqlTypeDefinitionResult<ServerObjectEntityId> {
     let result = (*schema
         .server_entity_data
-        .defined_types
+        .defined_entities
         .get(&unvalidated_type_name)
         .ok_or_else(|| {
             WithLocation::new(

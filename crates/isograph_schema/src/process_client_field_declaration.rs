@@ -50,7 +50,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     ) -> Result<UnprocessedClientFieldItem, WithLocation<ProcessClientFieldDeclarationError>> {
         let parent_type_id = self
             .server_entity_data
-            .defined_types
+            .defined_entities
             .get(&client_field_declaration.item.parent_type.item)
             .ok_or(WithLocation::new(
                 ProcessClientFieldDeclarationError::ParentTypeNotDefined {
@@ -89,7 +89,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     {
         let parent_type_id = self
             .server_entity_data
-            .defined_types
+            .defined_entities
             .get(&client_pointer_declaration.item.parent_type.item)
             .ok_or(WithLocation::new(
                 ProcessClientFieldDeclarationError::ParentTypeNotDefined {
@@ -103,7 +103,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         let target_type_id = self
             .server_entity_data
-            .defined_types
+            .defined_entities
             .get(client_pointer_declaration.item.target_type.inner())
             .ok_or(WithLocation::new(
                 ProcessClientFieldDeclarationError::ParentTypeNotDefined {
@@ -181,7 +181,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let next_client_field_id = self.client_scalar_selectables.len().into();
 
         if object
-            .encountered_fields
+            .available_selectables
             .insert(
                 client_field_name.into(),
                 DefinitionLocation::Client(SelectionType::Scalar(next_client_field_id)),
@@ -212,7 +212,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 .into_iter()
                 .map(|variable_definition| {
                     validate_variable_definition(
-                        &self.server_entity_data.defined_types,
+                        &self.server_entity_data.defined_entities,
                         variable_definition,
                         object.name,
                         client_field_name.into(),
@@ -325,7 +325,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 .into_iter()
                 .map(|variable_definition| {
                     validate_variable_definition(
-                        &self.server_entity_data.defined_types,
+                        &self.server_entity_data.defined_entities,
                         variable_definition,
                         parent_object.name,
                         client_pointer_name.into(),
@@ -352,7 +352,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_entity_data
             .object_entity_mut(parent_object_entity_id);
         if parent_object
-            .encountered_fields
+            .available_selectables
             .insert(
                 client_pointer_name.into(),
                 DefinitionLocation::Client(SelectionType::Object(next_client_pointer_id)),

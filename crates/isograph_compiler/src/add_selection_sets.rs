@@ -125,7 +125,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
     scalar_selection: UnvalidatedScalarFieldSelection,
 ) -> AddSelectionSetsResult<ValidatedScalarSelection> {
     let location = selection_parent_object
-        .encountered_fields
+        .available_selectables
         .get(&scalar_selection.name.item.into())
         .ok_or_else(|| {
             WithLocation::new(
@@ -222,7 +222,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     object_selection: ObjectSelection<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<ValidatedObjectSelection> {
     let location = selection_parent_object
-        .encountered_fields
+        .available_selectables
         .get(&object_selection.name.item.into())
         .ok_or_else(|| {
             vec![WithLocation::new(

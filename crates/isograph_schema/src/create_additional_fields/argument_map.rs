@@ -194,7 +194,7 @@ impl ModifiedArgument {
 
                     ModifiedObject {
                         field_map: object
-                            .encountered_fields
+                            .available_selectables
                             .iter()
                             .flat_map(|(name, field_id)| match field_id {
                                 DefinitionLocation::Server(s) => {

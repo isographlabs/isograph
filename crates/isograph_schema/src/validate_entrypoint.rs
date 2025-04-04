@@ -70,7 +70,7 @@ fn validate_parent_object_entity_id<TNetworkProtocol: NetworkProtocol>(
 ) -> Result<ServerObjectEntityId, WithLocation<ValidateEntrypointDeclarationError>> {
     let parent_type_id = schema
         .server_entity_data
-        .defined_types
+        .defined_entities
         .get(&parent_type.item)
         .ok_or(WithLocation::new(
             ValidateEntrypointDeclarationError::ParentTypeNotDefined {
@@ -131,7 +131,7 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
         .object_entity(parent_object_entity_id);
 
     match parent_object
-        .encountered_fields
+        .available_selectables
         .get(&field_name.item.into())
     {
         Some(defined_field) => match defined_field {

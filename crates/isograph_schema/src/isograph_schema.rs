@@ -122,7 +122,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             server_entity_data: ServerEntityData {
                 server_objects: vec![],
                 server_scalars: scalars,
-                defined_types,
+                defined_entities: defined_types,
 
                 id_type_id,
                 string_type_id,
@@ -168,7 +168,7 @@ pub type ObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
 pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
     pub server_objects: Vec<ServerObjectEntity<TNetworkProtocol>>,
     pub server_scalars: Vec<ServerScalarEntity<TNetworkProtocol>>,
-    pub defined_types: HashMap<UnvalidatedTypeName, ServerEntityId>,
+    pub defined_entities: HashMap<UnvalidatedTypeName, ServerEntityId>,
 
     // Well known types
     pub id_type_id: ServerScalarEntityId,
@@ -244,7 +244,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .object_entity_mut(parent_object_entity_id);
 
         if parent_object
-            .encountered_fields
+            .available_selectables
             .insert(
                 next_scalar_name.item.into(),
                 DefinitionLocation::Server(SelectionType::Scalar(next_server_scalar_selectable_id)),
@@ -286,7 +286,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_entity_data
             .object_entity_mut(parent_object_entity_id);
         if parent_object
-            .encountered_fields
+            .available_selectables
             .insert(
                 next_object_name.item.into(),
                 DefinitionLocation::Server(SelectionType::Object(next_server_object_selectable_id)),

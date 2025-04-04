@@ -54,7 +54,7 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
             for (name, server_selectable_id) in schema
                 .server_entity_data
                 .object_entity(object_entity_id)
-                .encountered_fields
+                .available_selectables
                 .iter()
                 .filter_map(
                     |(name, field_definition_location)| match field_definition_location {

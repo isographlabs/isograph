@@ -89,7 +89,7 @@ fn add_refetch_field_to_object<TNetworkProtocol: NetworkProtocol>(
     BatchCompileError,
 > {
     match object
-        .encountered_fields
+        .available_selectables
         .entry((*REFETCH_FIELD_NAME).into())
     {
         Entry::Occupied(_) => Err(BatchCompileError::DuplicateRefetchField),
