@@ -63,12 +63,13 @@ pub fn create_unvalidated_schema<TNetworkProtocol: NetworkProtocol>(
 
     unprocessed_items.extend(process_exposed_fields(&mut unvalidated_isograph_schema)?);
 
-    // TODO investigate why we don't have unprocessed items here
-    unvalidated_isograph_schema
-        .add_fields_to_subtypes(&outcome.type_refinement_maps.supertype_to_subtype_map)?;
+    unvalidated_isograph_schema.transfer_supertype_client_selectables_to_subtypes(
+        &outcome.type_refinement_maps.supertype_to_subtype_map,
+    )?;
     unvalidated_isograph_schema.add_link_fields()?;
-    unvalidated_isograph_schema
-        .add_pointers_to_supertypes(&outcome.type_refinement_maps.subtype_to_supertype_map)?;
+    unvalidated_isograph_schema.add_object_selectable_to_subtype_on_supertypes(
+        &outcome.type_refinement_maps.subtype_to_supertype_map,
+    )?;
 
     unprocessed_items.extend(add_refetch_fields_to_objects(
         &mut unvalidated_isograph_schema,

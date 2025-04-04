@@ -8,15 +8,15 @@ use super::create_additional_fields_error::{
 };
 
 impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
-    /// For each supertype (e.g. Node), add the fields defined on it (e.g. Node.MyComponent)
+    /// For each supertype (e.g. Node), add the client selectables defined on it (e.g. Node.MyComponent)
     /// to subtypes (e.g. creating User.MyComponent).
     ///
-    /// We do not transfer server fields (because that makes no sense in GraphQL, but does
+    /// We do not transfer server selectables (because that makes no sense in GraphQL, but does
     /// it make sense otherwise??) and refetch fields (which are already defined on all valid
     /// types.)
     ///
     /// TODO confirm we don't do this for unions...
-    pub fn add_fields_to_subtypes(
+    pub fn transfer_supertype_client_selectables_to_subtypes(
         &mut self,
         supertype_to_subtype_map: &ValidatedTypeRefinementMap,
     ) -> ProcessTypeDefinitionResult<()> {
