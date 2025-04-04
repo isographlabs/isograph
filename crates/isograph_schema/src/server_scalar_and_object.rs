@@ -7,7 +7,8 @@ use common_lang_types::{
 use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective};
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
-    DefinitionLocation, HasId, SelectionType, ServerObjectId, ServerScalarId, ServerStrongIdFieldId,
+    impl_with_id, DefinitionLocation, HasId, SelectionType, ServerObjectId, ServerScalarId,
+    ServerStrongIdFieldId,
 };
 
 use crate::{ClientFieldOrPointerId, NetworkProtocol, ServerSelectableId};
@@ -21,17 +22,7 @@ pub struct SchemaScalar<TNetworkProtocol: NetworkProtocol> {
     pub output_format: PhantomData<TNetworkProtocol>,
 }
 
-impl<TNetworkProtocol: NetworkProtocol> HasId for SchemaScalar<TNetworkProtocol> {
-    type Id = ServerScalarId;
-}
-
-impl<TNetworkProtocol: NetworkProtocol> HasId for &SchemaScalar<TNetworkProtocol> {
-    type Id = ServerScalarId;
-}
-
-impl<TNetworkProtocol: NetworkProtocol> HasId for &mut SchemaScalar<TNetworkProtocol> {
-    type Id = ServerScalarId;
-}
+impl_with_id!(SchemaScalar<TNetworkProtocol: NetworkProtocol>, ServerScalarId);
 
 pub type ObjectEncounteredFields =
     BTreeMap<SelectableName, DefinitionLocation<ServerSelectableId, ClientFieldOrPointerId>>;
@@ -53,17 +44,7 @@ pub struct SchemaObject<TNetworkProtocol: NetworkProtocol> {
     pub output_associated_data: TNetworkProtocol::SchemaObjectAssociatedData,
 }
 
-impl<TNetworkProtocol: NetworkProtocol> HasId for SchemaObject<TNetworkProtocol> {
-    type Id = ServerObjectId;
-}
-
-impl<TNetworkProtocol: NetworkProtocol> HasId for &SchemaObject<TNetworkProtocol> {
-    type Id = ServerObjectId;
-}
-
-impl<TNetworkProtocol: NetworkProtocol> HasId for &mut SchemaObject<TNetworkProtocol> {
-    type Id = ServerObjectId;
-}
+impl_with_id!(SchemaObject<TNetworkProtocol: NetworkProtocol>, ServerObjectId);
 
 pub type SchemaType<'a, TNetworkProtocol> =
     SelectionType<&'a SchemaScalar<TNetworkProtocol>, &'a SchemaObject<TNetworkProtocol>>;

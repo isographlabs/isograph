@@ -12,3 +12,18 @@ impl<T: HasId> WithId<T> {
         WithId { item, id }
     }
 }
+
+#[macro_export]
+macro_rules! impl_with_id {
+    ($type:ident<$($param:ident: $bound:ident),*>, $id:ident) => {
+        impl<$($param: $bound),*> HasId for $type<$($param),*> {
+            type Id = $id;
+        }
+        impl<$($param: $bound),*> HasId for &$type<$($param),*> {
+            type Id = $id;
+        }
+        impl<$($param: $bound),*> HasId for &mut $type<$($param),*> {
+            type Id = $id;
+        }
+    };
+}
