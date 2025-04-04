@@ -15,14 +15,14 @@ impl<T: HasId> WithId<T> {
 
 #[macro_export]
 macro_rules! impl_with_id {
-    ($type:ident<$($param:ident: $bound:ident),*>, $id:ident) => {
-        impl<$($param: $bound),*> HasId for $type<$($param),*> {
+    ( $type:ident<$($param:ident: $bound:ident),*>, $id:ident) => {
+        impl<$($param: $bound),*> ::isograph_lang_types::HasId for $type<$($param),*> {
             type Id = $id;
         }
-        impl<$($param: $bound),*> HasId for &$type<$($param),*> {
+        impl<$($param: $bound),*> ::isograph_lang_types::HasId for &$type<$($param),*> {
             type Id = $id;
         }
-        impl<$($param: $bound),*> HasId for &mut $type<$($param),*> {
+        impl<$($param: $bound),*> ::isograph_lang_types::HasId for &mut $type<$($param),*> {
             type Id = $id;
         }
     };

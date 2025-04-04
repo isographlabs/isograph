@@ -7,7 +7,7 @@ use common_lang_types::{
 use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective};
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
-    impl_with_id, DefinitionLocation, HasId, SelectionType, ServerObjectId, ServerScalarId,
+    impl_with_id, DefinitionLocation, SelectionType, ServerObjectId, ServerScalarId,
     ServerStrongIdFieldId,
 };
 

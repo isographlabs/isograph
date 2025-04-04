@@ -6,8 +6,8 @@ use common_lang_types::{
 };
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
-    ClientFieldId, ClientPointerId, SelectionType, ServerEntityId, ServerObjectId, TypeAnnotation,
-    VariableDefinition,
+    impl_with_id, ClientFieldId, ClientPointerId, SelectionType, ServerEntityId, ServerObjectId,
+    TypeAnnotation, VariableDefinition,
 };
 
 use crate::{
@@ -46,6 +46,8 @@ pub struct ClientField<TNetworkProtocol: NetworkProtocol> {
     pub output_format: PhantomData<TNetworkProtocol>,
 }
 
+impl_with_id!(ClientField<TNetworkProtocol: NetworkProtocol>, ClientFieldId);
+
 #[derive(Debug)]
 pub struct ClientPointer<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
@@ -69,6 +71,8 @@ pub struct ClientPointer<TNetworkProtocol: NetworkProtocol> {
     pub output_format: PhantomData<TNetworkProtocol>,
     pub info: UserWrittenClientPointerInfo,
 }
+
+impl_with_id!(ClientPointer<TNetworkProtocol: NetworkProtocol>, ClientPointerId);
 
 #[impl_for_selection_type]
 pub trait ClientFieldOrPointer {
