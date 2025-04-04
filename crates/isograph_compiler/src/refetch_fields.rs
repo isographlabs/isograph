@@ -3,12 +3,13 @@ use std::collections::btree_map::Entry;
 use common_lang_types::ObjectTypeAndFieldName;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ClientFieldId, DefinitionLocation, ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet,
-    SelectionType, ServerObjectId, ServerScalarId, ServerStrongIdFieldId, WithId,
+    ClientScalarSelectableId, DefinitionLocation, ObjectSelectionDirectiveSet,
+    ScalarSelectionDirectiveSet, SelectionType, ServerObjectId, ServerScalarId,
+    ServerStrongIdFieldId, WithId,
 };
 use isograph_schema::{
     generate_refetch_field_strategy, id_arguments, id_selection, id_top_level_arguments,
-    ClientField, ClientFieldVariant, ImperativelyLoadedFieldVariant, NetworkProtocol,
+    ClientFieldVariant, ClientScalarSelectable, ImperativelyLoadedFieldVariant, NetworkProtocol,
     RefetchStrategy, RequiresRefinement, Schema, ServerObjectEntity, UnprocessedClientFieldItem,
     UnprocessedItem, NODE_FIELD_NAME, REFETCH_FIELD_NAME,
 };
@@ -76,13 +77,13 @@ pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
 fn add_refetch_field_to_object<TNetworkProtocol: NetworkProtocol>(
     object_entity_id: ServerObjectId,
     object: &mut ServerObjectEntity<TNetworkProtocol>,
-    client_fields: &mut Vec<ClientField<TNetworkProtocol>>,
+    client_fields: &mut Vec<ClientScalarSelectable<TNetworkProtocol>>,
     query_id: ServerObjectId,
     _id_field: ServerStrongIdFieldId,
     id_type_id: ServerScalarId,
 ) -> Result<
     (
-        ClientFieldId,
+        ClientScalarSelectableId,
         RefetchStrategy<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
     ),
     BatchCompileError,
@@ -99,7 +100,7 @@ fn add_refetch_field_to_object<TNetworkProtocol: NetworkProtocol>(
                 next_client_field_id,
             )));
 
-            client_fields.push(ClientField {
+            client_fields.push(ClientScalarSelectable {
                 description: Some(
                     format!("A refetch field for the {} type.", object.name)
                         .intern()

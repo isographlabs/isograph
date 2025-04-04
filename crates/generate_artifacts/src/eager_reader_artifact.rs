@@ -4,8 +4,8 @@ use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
 use isograph_schema::{
-    initial_variable_context, ClientField, ClientFieldOrPointer, NetworkProtocol, Schema,
-    ServerObjectSelectable, ValidatedSelectionType,
+    initial_variable_context, ClientScalarOrObjectSelectable, ClientScalarSelectable,
+    ClientSelectable, NetworkProtocol, Schema, ServerObjectSelectable,
 };
 use isograph_schema::{
     RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment, UserWrittenClientTypeInfo,
@@ -30,7 +30,7 @@ use crate::{
 
 pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    selection_type: &ValidatedSelectionType<TNetworkProtocol>,
+    selection_type: &ClientSelectable<TNetworkProtocol>,
     config: &CompilerConfig,
     info: UserWrittenClientTypeInfo,
     refetched_paths: &RefetchedPathsMap,
@@ -209,7 +209,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
 
 pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    client_field: &ValidatedSelectionType<TNetworkProtocol>,
+    client_field: &ClientSelectable<TNetworkProtocol>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
     let ts_file_extension = file_extensions.ts();
@@ -311,7 +311,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
 
 pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    client_field: &ClientField<TNetworkProtocol>,
+    client_field: &ClientScalarSelectable<TNetworkProtocol>,
     config: &CompilerConfig,
     info: UserWrittenClientTypeInfo,
     file_extensions: GenerateFileExtensionsOption,

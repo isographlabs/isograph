@@ -6,15 +6,16 @@ use common_lang_types::{
 };
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
-    ClientFieldId, DefinitionLocation, ScalarSelectionDirectiveSet, SelectionType, ServerObjectId,
+    ClientScalarSelectableId, DefinitionLocation, ScalarSelectionDirectiveSet, SelectionType,
+    ServerObjectId,
 };
 use isograph_schema::{
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
-    get_reachable_variables, initial_variable_context, ClientField, ClientFieldOrPointer,
-    FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, MergedSelectionMap,
-    NetworkProtocol, RootOperationName, RootRefetchedPath, ScalarClientFieldTraversalState, Schema,
-    ServerObjectEntity, ValidatedVariableDefinition,
+    get_reachable_variables, initial_variable_context, ClientScalarOrObjectSelectable,
+    ClientScalarSelectable, FieldToCompletedMergeTraversalStateMap, FieldTraversalResult,
+    MergedSelectionMap, NetworkProtocol, RootOperationName, RootRefetchedPath,
+    ScalarClientFieldTraversalState, Schema, ServerObjectEntity, ValidatedVariableDefinition,
 };
 
 use crate::{
@@ -39,7 +40,7 @@ struct EntrypointArtifactInfo<'schema, TNetworkProtocol: NetworkProtocol> {
 
 pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    entrypoint_id: ClientFieldId,
+    entrypoint_id: ClientScalarSelectableId,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     file_extensions: GenerateFileExtensionsOption,
 ) -> Vec<ArtifactPathAndContent> {
@@ -82,7 +83,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     TNetworkProtocol: NetworkProtocol,
 >(
     schema: &Schema<TNetworkProtocol>,
-    entrypoint: &ClientField<TNetworkProtocol>,
+    entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
     merged_selection_map: &MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,
     encountered_client_type_map: &FieldToCompletedMergeTraversalStateMap,

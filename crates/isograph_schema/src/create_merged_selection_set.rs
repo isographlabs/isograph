@@ -10,10 +10,10 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
-    RefetchQueryIndex, ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionType,
-    SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, ServerObjectSelectableId,
-    ServerScalarId, VariableDefinition,
+    ArgumentKeyAndValue, ClientScalarSelectableId, DefinitionLocation, EmptyDirectiveSet,
+    NonConstantValue, RefetchQueryIndex, ScalarSelectionDirectiveSet, SelectionFieldArgument,
+    SelectionType, SelectionTypeContainingSelections, ServerEntityId, ServerObjectId,
+    ServerObjectSelectableId, ServerScalarId, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -22,18 +22,18 @@ use crate::{
     expose_field_directive::RequiresRefinement,
     field_loadability::{categorize_field_loadability, Loadability},
     initial_variable_context, transform_arguments_with_child_context,
-    transform_name_and_arguments_with_child_variable_context, ClientField, ClientFieldOrPointer,
-    ClientFieldOrPointerId, ClientFieldVariant, ImperativelyLoadedFieldVariant, NameAndArguments,
-    NetworkProtocol, PathToRefetchField, RootOperationName, Schema,
-    SchemaServerObjectSelectableVariant, ServerObjectEntity, ValidatedScalarSelection,
-    ValidatedSelection, ValidatedSelectionType, VariableContext,
+    transform_name_and_arguments_with_child_variable_context, ClientFieldVariant,
+    ClientScalarOrObjectSelectable, ClientScalarOrObjectSelectableId, ClientScalarSelectable,
+    ClientSelectable, ImperativelyLoadedFieldVariant, NameAndArguments, NetworkProtocol,
+    PathToRefetchField, RootOperationName, Schema, SchemaServerObjectSelectableVariant,
+    ServerObjectEntity, ValidatedScalarSelection, ValidatedSelection, VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
 
 // Maybe this should be FNVHashMap? We don't really need stable iteration order
 pub type FieldToCompletedMergeTraversalStateMap = BTreeMap<
-    DefinitionLocation<ServerObjectSelectableId, ClientFieldOrPointerId>,
+    DefinitionLocation<ServerObjectSelectableId, ClientScalarOrObjectSelectableId>,
     FieldTraversalResult,
 >;
 
@@ -192,7 +192,7 @@ pub struct PathToRefetchFieldInfo {
     refetch_field_parent_id: ServerObjectId,
     pub imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant,
     extra_selections: MergedSelectionMap,
-    pub client_field_id: ClientFieldId,
+    pub client_field_id: ClientScalarSelectableId,
 }
 
 pub type RefetchedPathsMap =
@@ -220,7 +220,7 @@ pub struct ScalarClientFieldTraversalState {
     traversal_path: Vec<NormalizationKey>,
 
     /// Client fields that are directly accessed by this client field
-    pub accessible_client_fields: HashSet<ClientFieldId>,
+    pub accessible_client_fields: HashSet<ClientScalarSelectableId>,
     pub has_updatable: bool,
 }
 
@@ -410,7 +410,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
-    root_field_id: DefinitionLocation<ServerObjectSelectableId, ClientFieldOrPointerId>,
+    root_field_id: DefinitionLocation<ServerObjectSelectableId, ClientScalarOrObjectSelectableId>,
     variable_context: &VariableContext,
     // TODO return Cow?
 ) -> FieldTraversalResult {
@@ -453,7 +453,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
 
 pub fn get_imperatively_loaded_artifact_info<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    entrypoint: &ClientField<TNetworkProtocol>,
+    entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
     root_refetch_path: RootRefetchedPath,
     nested_selection_map: &MergedSelectionMap,
     reachable_variables: &BTreeSet<VariableName>,
@@ -497,10 +497,10 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
     variant: ImperativelyLoadedFieldVariant,
     refetch_field_parent_id: ServerObjectId,
     selection_map: &MergedSelectionMap,
-    entrypoint: &ClientField<TNetworkProtocol>,
+    entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
     index: usize,
     reachable_variables: &BTreeSet<VariableName>,
-    client_field: &ClientField<TNetworkProtocol>,
+    client_field: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ImperativelyLoadedFieldArtifactInfo {
     let ImperativelyLoadedFieldVariant {
         client_field_scalar_selection_name,
@@ -607,7 +607,7 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
 
 fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
     reachable_variables: &BTreeSet<VariableName>,
-    entrypoint: &ClientField<TNetworkProtocol>,
+    entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> Vec<WithSpan<VariableDefinition<ServerEntityId>>> {
     reachable_variables
         .iter()
@@ -954,8 +954,8 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
     schema: &Schema<TNetworkProtocol>,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    newly_encountered_scalar_client_selectable_id: ClientFieldId,
-    newly_encountered_scalar_client_selectable: &ClientField<TNetworkProtocol>,
+    newly_encountered_scalar_client_selectable_id: ClientScalarSelectableId,
+    newly_encountered_scalar_client_selectable: &ClientScalarSelectable<TNetworkProtocol>,
     parent_object_entity_id: ServerObjectId,
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
     variant: &ImperativelyLoadedFieldVariant,
@@ -1026,8 +1026,8 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
     parent_merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    newly_encountered_client_type_id: ClientFieldOrPointerId,
-    newly_encountered_client_type: ValidatedSelectionType<TNetworkProtocol>,
+    newly_encountered_client_type_id: ClientScalarOrObjectSelectableId,
+    newly_encountered_client_type: ClientSelectable<TNetworkProtocol>,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     parent_variable_context: &VariableContext,
     selection_arguments: &[WithLocation<SelectionFieldArgument>],

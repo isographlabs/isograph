@@ -10,9 +10,9 @@ u32_newtype!(ServerStrongIdFieldId);
 
 u32_conversion!(from: ServerStrongIdFieldId, to: ServerScalarSelectableId);
 
-u32_newtype!(ClientFieldId);
+u32_newtype!(ClientScalarSelectableId);
 
-u32_newtype!(ClientPointerId);
+u32_newtype!(ClientObjectSelectableId);
 
 u32_newtype!(ServerObjectId);
 

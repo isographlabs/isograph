@@ -1,15 +1,17 @@
 use common_lang_types::WithSpan;
-use isograph_lang_types::{ClientFieldId, DefinitionLocation, SelectionTypeContainingSelections};
+use isograph_lang_types::{
+    ClientScalarSelectableId, DefinitionLocation, SelectionTypeContainingSelections,
+};
 
 use crate::{
-    ClientFieldOrPointer, NetworkProtocol, Schema, ValidatedSelection, ValidatedSelectionType,
+    ClientScalarOrObjectSelectable, ClientSelectable, NetworkProtocol, Schema, ValidatedSelection,
 };
 
 // This should really be replaced with a proper visitor, or something
 pub fn accessible_client_fields<'a, TNetworkProtocol: NetworkProtocol>(
-    selection_type: &'a ValidatedSelectionType<'a, TNetworkProtocol>,
+    selection_type: &'a ClientSelectable<'a, TNetworkProtocol>,
     schema: &'a Schema<TNetworkProtocol>,
-) -> impl Iterator<Item = ClientFieldId> + 'a {
+) -> impl Iterator<Item = ClientScalarSelectableId> + 'a {
     AccessibleClientFieldIterator {
         selection_set: selection_type.selection_set_for_parent_query(),
         index: 0,
@@ -28,7 +30,7 @@ struct AccessibleClientFieldIterator<'a, TNetworkProtocol: NetworkProtocol> {
 impl<TNetworkProtocol: NetworkProtocol> Iterator
     for AccessibleClientFieldIterator<'_, TNetworkProtocol>
 {
-    type Item = ClientFieldId;
+    type Item = ClientScalarSelectableId;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(iterator) = &mut self.sub_iterator {

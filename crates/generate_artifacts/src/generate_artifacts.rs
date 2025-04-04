@@ -10,17 +10,17 @@ use intern::{string_key::Intern, Lookup};
 use core::panic;
 use isograph_config::CompilerConfig;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, NonConstantValue,
+    ArgumentKeyAndValue, ClientScalarSelectableId, DefinitionLocation, NonConstantValue,
     ObjectSelectionDirectiveSet, ScalarFieldSelection, ScalarSelectionDirectiveSet,
     SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, ServerEntityId,
     ServerObjectId, TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
     accessible_client_fields, description, output_type_annotation, selection_map_wrapped,
-    ClientField, ClientFieldVariant, FieldTraversalResult, NameAndArguments, NetworkProtocol,
-    NormalizationKey, RequiresRefinement, Schema, SchemaServerObjectSelectableVariant,
-    UserWrittenClientTypeInfo, UserWrittenComponentVariant, ValidatedScalarSelectionAssociatedData,
-    ValidatedSelection, ValidatedVariableDefinition,
+    ClientFieldVariant, ClientScalarSelectable, FieldTraversalResult, NameAndArguments,
+    NetworkProtocol, NormalizationKey, RequiresRefinement, Schema,
+    SchemaServerObjectSelectableVariant, UserWrittenClientTypeInfo, UserWrittenComponentVariant,
+    ValidatedScalarSelectionAssociatedData, ValidatedSelection, ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -114,7 +114,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
 ) -> Vec<ArtifactPathAndContent> {
     let mut encountered_client_type_map = BTreeMap::new();
     let mut path_and_contents = vec![];
-    let mut encountered_output_types = HashSet::<ClientFieldId>::new();
+    let mut encountered_output_types = HashSet::<ClientScalarSelectableId>::new();
 
     // For each entrypoint, generate an entrypoint artifact and refetch artifacts
     for entrypoint_id in schema.entrypoints.keys() {
@@ -479,7 +479,7 @@ fn get_serialized_field_argument(
 }
 
 pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
-    client_field: &ClientField<TNetworkProtocol>,
+    client_field: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ClientFieldOutputType {
     let variant = &client_field.variant;
     match variant {
@@ -669,7 +669,7 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
     indentation_level: u8,
     link_fields: &mut bool,
     scalar_field_selection: &ScalarFieldSelection<ValidatedScalarSelectionAssociatedData>,
-    client_field_id: ClientFieldId,
+    client_field_id: ClientScalarSelectableId,
 ) {
     let client_field = schema.client_field(client_field_id);
     write_optional_description(

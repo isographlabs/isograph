@@ -5,8 +5,8 @@ use common_lang_types::{
     UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use isograph_lang_types::{
-    ClientFieldId, DefinitionLocation, EntrypointDeclaration, SelectionType, ServerEntityId,
-    ServerObjectId,
+    ClientScalarSelectableId, DefinitionLocation, EntrypointDeclaration, SelectionType,
+    ServerEntityId, ServerObjectId,
 };
 
 use thiserror::Error;
@@ -17,7 +17,7 @@ pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     entrypoint_declarations: Vec<(TextSource, WithSpan<EntrypointDeclaration>)>,
 ) -> Result<
-    HashMap<ClientFieldId, IsoLiteralText>,
+    HashMap<ClientScalarSelectableId, IsoLiteralText>,
     Vec<WithLocation<ValidateEntrypointDeclarationError>>,
 > {
     let mut errors = vec![];
@@ -47,7 +47,7 @@ fn validate_entrypoint_type_and_field<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     text_source: TextSource,
     entrypoint_declaration: WithSpan<EntrypointDeclaration>,
-) -> Result<ClientFieldId, WithLocation<ValidateEntrypointDeclarationError>> {
+) -> Result<ClientScalarSelectableId, WithLocation<ValidateEntrypointDeclarationError>> {
     let parent_object_entity_id = validate_parent_object_entity_id(
         schema,
         entrypoint_declaration.item.parent_type,
@@ -125,7 +125,7 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
     field_name: WithSpan<ServerScalarSelectableName>,
     text_source: TextSource,
     parent_object_entity_id: ServerObjectId,
-) -> Result<ClientFieldId, WithLocation<ValidateEntrypointDeclarationError>> {
+) -> Result<ClientScalarSelectableId, WithLocation<ValidateEntrypointDeclarationError>> {
     let parent_object = schema
         .server_field_data
         .object_entity(parent_object_entity_id);

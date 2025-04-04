@@ -7,9 +7,9 @@ use isograph_lang_types::{
     SelectionTypeContainingSelections,
 };
 use isograph_schema::{
-    categorize_field_loadability, transform_arguments_with_child_context, ClientField,
-    ClientFieldOrPointer, ClientFieldVariant, Loadability, NameAndArguments, NetworkProtocol,
-    NormalizationKey, PathToRefetchField, RefetchedPathsMap, Schema,
+    categorize_field_loadability, transform_arguments_with_child_context, ClientFieldVariant,
+    ClientScalarOrObjectSelectable, ClientScalarSelectable, Loadability, NameAndArguments,
+    NetworkProtocol, NormalizationKey, PathToRefetchField, RefetchedPathsMap, Schema,
     SchemaServerObjectSelectableVariant, ValidatedObjectSelection, ValidatedScalarSelection,
     ValidatedSelection, VariableContext,
 };
@@ -178,7 +178,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
 fn scalar_client_defined_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     scalar_field_selection: &ValidatedScalarSelection,
     schema: &Schema<TNetworkProtocol>,
-    client_field: &ClientField<TNetworkProtocol>,
+    client_field: &ClientScalarSelectable<TNetworkProtocol>,
     indentation_level: u8,
     path: &mut Vec<NormalizationKey>,
     root_refetched_paths: &RefetchedPathsMap,
@@ -255,7 +255,7 @@ fn link_variant_ast_node(
 fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
     scalar_field_selection: &ValidatedScalarSelection,
     indentation_level: u8,
-    nested_client_field: &ClientField<TNetworkProtocol>,
+    nested_client_field: &ClientScalarSelectable<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     path: &mut Vec<NormalizationKey>,
     root_refetched_paths: &RefetchedPathsMap,
@@ -318,7 +318,7 @@ fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
 
 #[allow(clippy::too_many_arguments)]
 fn imperatively_loaded_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
-    nested_client_field: &ClientField<TNetworkProtocol>,
+    nested_client_field: &ClientScalarSelectable<TNetworkProtocol>,
     reader_imports: &mut ReaderImports,
     root_refetched_paths: &RefetchedPathsMap,
     path: &[NormalizationKey],
@@ -364,7 +364,7 @@ fn imperatively_loaded_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
 
 fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    client_field: &ClientField<TNetworkProtocol>,
+    client_field: &ClientScalarSelectable<TNetworkProtocol>,
     reader_imports: &mut ReaderImports,
     indentation_level: u8,
     scalar_field_selection: &ValidatedScalarSelection,
@@ -582,7 +582,7 @@ pub(crate) fn generate_reader_ast<'schema, TNetworkProtocol: NetworkProtocol>(
 }
 
 fn refetched_paths_for_client_field<TNetworkProtocol: NetworkProtocol>(
-    nested_client_field: &ClientField<TNetworkProtocol>,
+    nested_client_field: &ClientScalarSelectable<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     path: &mut Vec<NormalizationKey>,
     client_field_variable_context: &VariableContext,

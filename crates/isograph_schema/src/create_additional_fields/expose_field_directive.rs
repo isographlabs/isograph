@@ -8,8 +8,8 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
-    ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectionType,
+    ArgumentKeyAndValue, ClientScalarSelectableId, DefinitionLocation, EmptyDirectiveSet,
+    NonConstantValue, ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectionType,
     SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, ServerObjectSelectableId,
     VariableDefinition,
 };
@@ -17,7 +17,7 @@ use isograph_lang_types::{
 use serde::Deserialize;
 
 use crate::{
-    generate_refetch_field_strategy, ClientField, ClientFieldVariant,
+    generate_refetch_field_strategy, ClientFieldVariant, ClientScalarSelectable,
     ImperativelyLoadedFieldVariant, NetworkProtocol, PrimaryFieldInfo, RefetchStrategy, Schema,
     UnprocessedClientFieldItem,
 };
@@ -236,7 +236,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .object_entity(maybe_abstract_parent_object_entity_id)
             .concrete_type;
 
-        let mutation_client_field = ClientField {
+        let mutation_client_field = ClientScalarSelectable {
             description,
             name: client_field_scalar_selection_name.unchecked_conversion(),
             reader_selection_set: vec![],
@@ -308,7 +308,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &mut self,
         mutation_field_name: SelectableName,
         client_field_parent_object_entity_id: ServerObjectId,
-        client_field_id: ClientFieldId,
+        client_field_id: ClientScalarSelectableId,
         payload_object_name: IsographObjectTypeName,
     ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
         let client_field_parent = self

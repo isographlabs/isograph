@@ -11,19 +11,20 @@ use graphql_lang_types::GraphQLNamedTypeAnnotation;
 use intern::string_key::Intern;
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldId, ClientPointerId, DefinitionLocation, ObjectSelection,
-    ObjectSelectionDirectiveSet, ScalarFieldSelection, ScalarSelectionDirectiveSet, SelectionType,
-    SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, ServerObjectSelectableId,
-    ServerScalarId, ServerScalarSelectableId, ServerStrongIdFieldId, VariableDefinition, WithId,
+    ArgumentKeyAndValue, ClientObjectSelectableId, ClientScalarSelectableId, DefinitionLocation,
+    ObjectSelection, ObjectSelectionDirectiveSet, ScalarFieldSelection,
+    ScalarSelectionDirectiveSet, SelectionType, SelectionTypeContainingSelections, ServerEntityId,
+    ServerObjectId, ServerObjectSelectableId, ServerScalarId, ServerScalarSelectableId,
+    ServerStrongIdFieldId, VariableDefinition, WithId,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    ClientField, ClientFieldOrPointerId, ClientFieldVariant, ClientPointer, NetworkProtocol,
-    NormalizationKey, ServerEntity, ServerObjectEntity, ServerObjectSelectable, ServerScalarEntity,
-    ServerScalarSelectable, ServerSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
-    UserWrittenComponentVariant,
+    ClientFieldVariant, ClientObjectSelectable, ClientScalarOrObjectSelectableId,
+    ClientScalarSelectable, NetworkProtocol, NormalizationKey, ServerEntity, ServerObjectEntity,
+    ServerObjectSelectable, ServerScalarEntity, ServerScalarSelectable, ServerSelectable,
+    ServerSelectableId, UseRefetchFieldRefetchStrategy, UserWrittenComponentVariant,
 };
 
 lazy_static! {
@@ -50,9 +51,9 @@ pub struct RootOperationName(pub String);
 pub struct Schema<TNetworkProtocol: NetworkProtocol> {
     pub server_scalar_selectables: Vec<ServerScalarSelectable<TNetworkProtocol>>,
     pub server_object_selectables: Vec<ServerObjectSelectable<TNetworkProtocol>>,
-    pub client_scalar_selectables: Vec<ClientField<TNetworkProtocol>>,
-    pub client_object_selectables: Vec<ClientPointer<TNetworkProtocol>>,
-    pub entrypoints: HashMap<ClientFieldId, IsoLiteralText>,
+    pub client_scalar_selectables: Vec<ClientScalarSelectable<TNetworkProtocol>>,
+    pub client_object_selectables: Vec<ClientObjectSelectable<TNetworkProtocol>>,
+    pub entrypoints: HashMap<ClientScalarSelectableId, IsoLiteralText>,
     pub server_field_data: ServerFieldData<TNetworkProtocol>,
 
     /// These are root types like Query, Mutation, Subscription
@@ -160,7 +161,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
 pub type ObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
     &'a ServerObjectSelectable<TNetworkProtocol>,
-    &'a ClientPointer<TNetworkProtocol>,
+    &'a ClientObjectSelectable<TNetworkProtocol>,
 >;
 
 #[derive(Debug)]
@@ -305,20 +306,23 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     }
 
     /// Get a reference to a given client field by its id.
-    pub fn client_field(&self, client_field_id: ClientFieldId) -> &ClientField<TNetworkProtocol> {
+    pub fn client_field(
+        &self,
+        client_field_id: ClientScalarSelectableId,
+    ) -> &ClientScalarSelectable<TNetworkProtocol> {
         &self.client_scalar_selectables[client_field_id.as_usize()]
     }
 
     pub fn client_field_mut(
         &mut self,
-        client_field_id: ClientFieldId,
-    ) -> &mut ClientField<TNetworkProtocol> {
+        client_field_id: ClientScalarSelectableId,
+    ) -> &mut ClientScalarSelectable<TNetworkProtocol> {
         &mut self.client_scalar_selectables[client_field_id.as_usize()]
     }
 
     pub fn client_scalar_selectables_and_ids(
         &self,
-    ) -> impl Iterator<Item = WithId<&ClientField<TNetworkProtocol>>> {
+    ) -> impl Iterator<Item = WithId<&ClientScalarSelectable<TNetworkProtocol>>> {
         self.client_scalar_selectables
             .iter()
             .enumerate()
@@ -327,7 +331,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     pub fn object_selectable(
         &self,
-        field_id: DefinitionLocation<ServerObjectSelectableId, ClientPointerId>,
+        field_id: DefinitionLocation<ServerObjectSelectableId, ClientObjectSelectableId>,
     ) -> ObjectSelectable<TNetworkProtocol> {
         match field_id {
             DefinitionLocation::Server(server_field_id) => {
@@ -341,21 +345,21 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     pub fn client_pointer(
         &self,
-        client_pointer_id: ClientPointerId,
-    ) -> &ClientPointer<TNetworkProtocol> {
+        client_pointer_id: ClientObjectSelectableId,
+    ) -> &ClientObjectSelectable<TNetworkProtocol> {
         &self.client_object_selectables[client_pointer_id.as_usize()]
     }
 
     pub fn client_pointer_mut(
         &mut self,
-        client_pointer_id: ClientPointerId,
-    ) -> &mut ClientPointer<TNetworkProtocol> {
+        client_pointer_id: ClientObjectSelectableId,
+    ) -> &mut ClientObjectSelectable<TNetworkProtocol> {
         &mut self.client_object_selectables[client_pointer_id.as_usize()]
     }
 
     pub fn client_object_selectables_and_ids(
         &self,
-    ) -> impl Iterator<Item = WithId<&ClientPointer<TNetworkProtocol>>> {
+    ) -> impl Iterator<Item = WithId<&ClientObjectSelectable<TNetworkProtocol>>> {
         self.client_object_selectables
             .iter()
             .enumerate()
@@ -364,8 +368,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     pub fn client_type(
         &self,
-        client_type_id: ClientFieldOrPointerId,
-    ) -> SelectionType<&ClientField<TNetworkProtocol>, &ClientPointer<TNetworkProtocol>> {
+        client_type_id: ClientScalarOrObjectSelectableId,
+    ) -> SelectionType<
+        &ClientScalarSelectable<TNetworkProtocol>,
+        &ClientObjectSelectable<TNetworkProtocol>,
+    > {
         match client_type_id {
             SelectionType::Scalar(client_field_id) => {
                 SelectionType::Scalar(self.client_field(client_field_id))
@@ -381,8 +388,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &self,
     ) -> impl Iterator<
         Item = (
-            SelectionType<ClientFieldId, ClientPointerId>,
-            SelectionType<&ClientField<TNetworkProtocol>, &ClientPointer<TNetworkProtocol>>,
+            SelectionType<ClientScalarSelectableId, ClientObjectSelectableId>,
+            SelectionType<
+                &ClientScalarSelectable<TNetworkProtocol>,
+                &ClientObjectSelectable<TNetworkProtocol>,
+            >,
             UserWrittenComponentVariant,
         ),
     > {
@@ -560,12 +570,12 @@ pub type ValidatedUseRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
 
 /// The validated defined field that shows up in the TScalarField generic.
 pub type ValidatedFieldDefinitionLocation =
-    DefinitionLocation<ServerScalarSelectableId, ClientFieldId>;
+    DefinitionLocation<ServerScalarSelectableId, ClientScalarSelectableId>;
 
 #[derive(Debug, Clone)]
 pub struct ValidatedObjectSelectionAssociatedData {
     pub parent_object_entity_id: ServerObjectId,
-    pub field_id: DefinitionLocation<ServerObjectSelectableId, ClientPointerId>,
+    pub field_id: DefinitionLocation<ServerObjectSelectableId, ClientObjectSelectableId>,
     pub selection_variant: ObjectSelectionDirectiveSet,
     /// Some if the (destination?) object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
@@ -579,8 +589,10 @@ pub struct ValidatedScalarSelectionAssociatedData {
     pub selection_variant: ScalarSelectionDirectiveSet,
 }
 
-pub type ValidatedSelectionType<'a, TNetworkProtocol> =
-    SelectionType<&'a ClientField<TNetworkProtocol>, &'a ClientPointer<TNetworkProtocol>>;
+pub type ClientSelectable<'a, TNetworkProtocol> = SelectionType<
+    &'a ClientScalarSelectable<TNetworkProtocol>,
+    &'a ClientObjectSelectable<TNetworkProtocol>,
+>;
 
 /// If we have encountered an id field, we can:
 /// - validate that the id field is properly defined, i.e. has type ID!

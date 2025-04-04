@@ -8,9 +8,9 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldDeclaration, ClientFieldId, ClientPointerDeclaration,
-    ClientPointerId, DefinitionLocation, DeserializationError, NonConstantValue,
-    ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionType,
+    ArgumentKeyAndValue, ClientFieldDeclaration, ClientObjectSelectableId,
+    ClientPointerDeclaration, ClientScalarSelectableId, DefinitionLocation, DeserializationError,
+    NonConstantValue, ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionType,
     SelectionTypeContainingSelections, ServerEntityId, ServerObjectId, TypeAnnotation,
     VariableDefinition,
 };
@@ -21,7 +21,8 @@ use thiserror::Error;
 use crate::{
     expose_field_directive::RequiresRefinement,
     refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
-    ClientField, ClientPointer, FieldMapItem, NetworkProtocol, Schema, NODE_FIELD_NAME,
+    ClientObjectSelectable, ClientScalarSelectable, FieldMapItem, NetworkProtocol, Schema,
+    NODE_FIELD_NAME,
 };
 
 pub type UnprocessedSelection = WithSpan<
@@ -29,13 +30,13 @@ pub type UnprocessedSelection = WithSpan<
 >;
 
 pub struct UnprocessedClientFieldItem {
-    pub client_field_id: ClientFieldId,
+    pub client_field_id: ClientScalarSelectableId,
     pub reader_selection_set: Vec<UnprocessedSelection>,
     pub refetch_strategy:
         Option<RefetchStrategy<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>>,
 }
 pub struct UnprocessedClientPointerItem {
-    pub client_pointer_id: ClientPointerId,
+    pub client_pointer_id: ClientObjectSelectableId,
     pub reader_selection_set: Vec<UnprocessedSelection>,
     pub refetch_selection_set: Vec<UnprocessedSelection>,
 }
@@ -190,7 +191,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let name = client_field_declaration.item.client_field_name.item;
         let variant = get_client_variant(&client_field_declaration.item);
 
-        self.client_scalar_selectables.push(ClientField {
+        self.client_scalar_selectables.push(ClientScalarSelectable {
             description: client_field_declaration.item.description.map(|x| x.item),
             name,
             reader_selection_set: vec![],
@@ -258,7 +259,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let client_pointer_name = client_pointer_pointer_name_ws.item;
         let client_pointer_name_span = client_pointer_pointer_name_ws.span;
 
-        let next_client_pointer_id: ClientPointerId = self.client_object_selectables.len().into();
+        let next_client_pointer_id: ClientObjectSelectableId =
+            self.client_object_selectables.len().into();
 
         let name = client_pointer_declaration.item.client_pointer_name.item;
 
@@ -302,7 +304,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             }
         }?;
 
-        self.client_object_selectables.push(ClientPointer {
+        self.client_object_selectables.push(ClientObjectSelectable {
             description: client_pointer_declaration.item.description.map(|x| x.item),
             name,
             reader_selection_set: vec![],

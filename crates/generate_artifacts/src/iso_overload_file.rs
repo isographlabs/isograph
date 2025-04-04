@@ -5,14 +5,14 @@ use std::cmp::Ordering;
 
 use common_lang_types::{ArtifactPathAndContent, IsoLiteralText, SelectableName};
 use isograph_schema::{
-    ClientField, ClientFieldOrPointer, NetworkProtocol, Schema, UserWrittenComponentVariant,
-    ValidatedSelectionType,
+    ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, NetworkProtocol,
+    Schema, UserWrittenComponentVariant,
 };
 
 use crate::generate_artifacts::ISO_TS_FILE_NAME;
 
 fn build_iso_overload_for_entrypoint<TNetworkProtocol: NetworkProtocol>(
-    validated_client_field: &ClientField<TNetworkProtocol>,
+    validated_client_field: &ClientScalarSelectable<TNetworkProtocol>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> (String, String) {
     let formatted_field = format!(
@@ -42,7 +42,7 @@ export function iso<T>(
 
 fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol>(
     client_type_and_variant: (
-        ValidatedSelectionType<TNetworkProtocol>,
+        ClientSelectable<TNetworkProtocol>,
         UserWrittenComponentVariant,
     ),
     file_extensions: GenerateFileExtensionsOption,
@@ -222,7 +222,7 @@ export function iso(isographLiteralText: string):
 fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
 ) -> Vec<(
-    ValidatedSelectionType<TNetworkProtocol>,
+    ClientSelectable<TNetworkProtocol>,
     UserWrittenComponentVariant,
 )> {
     let mut client_types = schema
@@ -249,7 +249,7 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
 
 fn sorted_entrypoints<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-) -> Vec<(&ClientField<TNetworkProtocol>, &IsoLiteralText)> {
+) -> Vec<(&ClientScalarSelectable<TNetworkProtocol>, &IsoLiteralText)> {
     let mut entrypoints = schema
         .entrypoints
         .iter()

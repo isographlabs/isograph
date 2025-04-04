@@ -7,8 +7,9 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ClientField, ClientFieldOrPointer, ClientPointer, NameAndArguments, NetworkProtocol,
-    ServerObjectSelectable, ServerScalarSelectable, ValidatedVariableDefinition,
+    ClientObjectSelectable, ClientScalarOrObjectSelectable, ClientScalarSelectable,
+    NameAndArguments, NetworkProtocol, ServerObjectSelectable, ServerScalarSelectable,
+    ValidatedVariableDefinition,
 };
 
 #[derive(Debug)]
@@ -86,8 +87,8 @@ impl VariableContext {
 
 pub fn initial_variable_context<TNetworkProtocol: NetworkProtocol>(
     selection_type: &SelectionType<
-        &ClientField<TNetworkProtocol>,
-        &ClientPointer<TNetworkProtocol>,
+        &ClientScalarSelectable<TNetworkProtocol>,
+        &ClientObjectSelectable<TNetworkProtocol>,
     >,
 ) -> VariableContext {
     // This is used in two places: before we generate a merged selection set for an

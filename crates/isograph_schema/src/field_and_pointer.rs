@@ -6,8 +6,8 @@ use common_lang_types::{
 };
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
-    impl_with_id, ClientFieldId, ClientPointerId, SelectionType, ServerEntityId, ServerObjectId,
-    TypeAnnotation, VariableDefinition,
+    impl_with_id, ClientObjectSelectableId, ClientScalarSelectableId, SelectionType,
+    ServerEntityId, ServerObjectId, TypeAnnotation, VariableDefinition,
 };
 
 use crate::{
@@ -16,10 +16,13 @@ use crate::{
     ValidatedSelection,
 };
 
-pub type ClientFieldOrPointerId = SelectionType<ClientFieldId, ClientPointerId>;
+pub type ClientScalarOrObjectSelectableId =
+    SelectionType<ClientScalarSelectableId, ClientObjectSelectableId>;
 
+/// The struct formally known as a client field, and declared with the field keyword
+/// in iso literals.
 #[derive(Debug)]
-pub struct ClientField<TNetworkProtocol: NetworkProtocol> {
+pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: ClientScalarSelectableName,
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
@@ -46,10 +49,12 @@ pub struct ClientField<TNetworkProtocol: NetworkProtocol> {
     pub output_format: PhantomData<TNetworkProtocol>,
 }
 
-impl_with_id!(ClientField<TNetworkProtocol: NetworkProtocol>, ClientFieldId);
+impl_with_id!(ClientScalarSelectable<TNetworkProtocol: NetworkProtocol>, ClientScalarSelectableId);
 
+/// The struct formally known as a client pointer, and declared with the pointer keyword
+/// in iso literals.
 #[derive(Debug)]
-pub struct ClientPointer<TNetworkProtocol: NetworkProtocol> {
+pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: ClientObjectSelectableName,
     pub to: TypeAnnotation<ServerObjectId>,
@@ -72,10 +77,10 @@ pub struct ClientPointer<TNetworkProtocol: NetworkProtocol> {
     pub info: UserWrittenClientPointerInfo,
 }
 
-impl_with_id!(ClientPointer<TNetworkProtocol: NetworkProtocol>, ClientPointerId);
+impl_with_id!(ClientObjectSelectable<TNetworkProtocol: NetworkProtocol>, ClientObjectSelectableId);
 
 #[impl_for_selection_type]
-pub trait ClientFieldOrPointer {
+pub trait ClientScalarOrObjectSelectable {
     fn description(&self) -> Option<DescriptionValue>;
     fn name(&self) -> ClientSelectableName;
     fn type_and_field(&self) -> ObjectTypeAndFieldName;
@@ -97,7 +102,9 @@ pub trait ClientFieldOrPointer {
     fn client_type(&self) -> &'static str;
 }
 
-impl<TNetworkProtocol: NetworkProtocol> ClientFieldOrPointer for &ClientField<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
+    for &ClientScalarSelectable<TNetworkProtocol>
+{
     fn description(&self) -> Option<DescriptionValue> {
         self.description
     }
@@ -152,7 +159,9 @@ impl<TNetworkProtocol: NetworkProtocol> ClientFieldOrPointer for &ClientField<TN
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol> ClientFieldOrPointer for &ClientPointer<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
+    for &ClientObjectSelectable<TNetworkProtocol>
+{
     fn description(&self) -> Option<DescriptionValue> {
         self.description
     }

@@ -16,7 +16,7 @@ use thiserror::Error;
 use crate::{
     validate_argument_types::{value_satisfies_type, ValidateArgumentTypesError},
     visit_selection_set::visit_selection_set,
-    ClientFieldOrPointer, NetworkProtocol, Schema, ValidatedVariableDefinition,
+    ClientScalarOrObjectSelectable, NetworkProtocol, Schema, ValidatedVariableDefinition,
 };
 
 type UsedVariables = BTreeSet<VariableName>;
@@ -63,7 +63,7 @@ pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
 
 fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    client_type: impl ClientFieldOrPointer,
+    client_type: impl ClientScalarOrObjectSelectable,
     errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError>>,
 ) {
     let mut reachable_variables = BTreeSet::new();

@@ -1,4 +1,4 @@
-use crate::{ClientField, ClientFieldVariant, NetworkProtocol, Schema, LINK_FIELD_NAME};
+use crate::{ClientFieldVariant, ClientScalarSelectable, NetworkProtocol, Schema, LINK_FIELD_NAME};
 use common_lang_types::{Location, ObjectTypeAndFieldName, WithLocation};
 use intern::string_key::Intern;
 use isograph_lang_types::{DefinitionLocation, SelectionType, WithId};
@@ -16,7 +16,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         {
             let field_name = *LINK_FIELD_NAME;
             let next_client_field_id = self.client_scalar_selectables.len().into();
-            self.client_scalar_selectables.push(ClientField {
+            self.client_scalar_selectables.push(ClientScalarSelectable {
                 description: Some(
                     format!("A store Link for the {} type.", object.name)
                         .intern()

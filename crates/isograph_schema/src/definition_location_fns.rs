@@ -1,13 +1,13 @@
 use common_lang_types::DescriptionValue;
 use isograph_lang_types::{DefinitionLocation, ServerObjectId, TypeAnnotation};
 
-use crate::{ClientPointer, NetworkProtocol, ServerObjectSelectable};
+use crate::{ClientObjectSelectable, NetworkProtocol, ServerObjectSelectable};
 
 #[allow(clippy::type_complexity)]
 pub fn description<TNetworkProtocol: NetworkProtocol>(
     definition_location: &DefinitionLocation<
         &ServerObjectSelectable<TNetworkProtocol>,
-        &ClientPointer<TNetworkProtocol>,
+        &ClientObjectSelectable<TNetworkProtocol>,
     >,
 ) -> Option<DescriptionValue> {
     match definition_location {
@@ -19,7 +19,7 @@ pub fn description<TNetworkProtocol: NetworkProtocol>(
 pub fn output_type_annotation<'a, TNetworkProtocol: NetworkProtocol>(
     definition_location: &'a DefinitionLocation<
         &ServerObjectSelectable<TNetworkProtocol>,
-        &ClientPointer<TNetworkProtocol>,
+        &ClientObjectSelectable<TNetworkProtocol>,
     >,
 ) -> &'a TypeAnnotation<ServerObjectId> {
     match definition_location {
