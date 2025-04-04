@@ -187,11 +187,29 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &self.server_scalar_selectables[server_scalar_selectable_id.as_usize()]
     }
 
+    pub fn server_scalar_selectables_and_ids(
+        &self,
+    ) -> impl Iterator<Item = WithId<&ServerScalarSelectable<TNetworkProtocol>>> {
+        self.server_scalar_selectables
+            .iter()
+            .enumerate()
+            .map(|(id, scalar)| WithId::new(id.into(), scalar))
+    }
+
     pub fn server_object_selectable(
         &self,
         server_object_selectable_id: ServerObjectSelectableId,
     ) -> &ServerObjectSelectable<TNetworkProtocol> {
         &self.server_object_selectables[server_object_selectable_id.as_usize()]
+    }
+
+    pub fn server_object_selectables_and_ids(
+        &self,
+    ) -> impl Iterator<Item = WithId<&ServerObjectSelectable<TNetworkProtocol>>> {
+        self.server_object_selectables
+            .iter()
+            .enumerate()
+            .map(|(id, object)| WithId::new(id.into(), object))
     }
 
     pub fn server_selectable(
@@ -293,6 +311,15 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &mut self.client_scalar_selectables[client_field_id.as_usize()]
     }
 
+    pub fn client_scalar_selectables_and_ids(
+        &self,
+    ) -> impl Iterator<Item = WithId<&ClientField<TNetworkProtocol>>> {
+        self.client_scalar_selectables
+            .iter()
+            .enumerate()
+            .map(|(id, client_scalar_selectable)| WithId::new(id.into(), client_scalar_selectable))
+    }
+
     pub fn object_selectable(
         &self,
         field_id: DefinitionLocation<ServerObjectSelectableId, ClientPointerId>,
@@ -321,7 +348,15 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &mut self.client_object_selectables[client_pointer_id.as_usize()]
     }
 
-    #[allow(clippy::type_complexity)]
+    pub fn client_object_selectables_and_ids(
+        &self,
+    ) -> impl Iterator<Item = WithId<&ClientPointer<TNetworkProtocol>>> {
+        self.client_object_selectables
+            .iter()
+            .enumerate()
+            .map(|(id, client_object_selectable)| WithId::new(id.into(), client_object_selectable))
+    }
+
     pub fn client_type(
         &self,
         client_type_id: ClientFieldOrPointerId,
