@@ -98,7 +98,6 @@ fn add_refetch_field_to_object<TNetworkProtocol: NetworkProtocol>(
                         .into(),
                 ),
                 name: *REFETCH_FIELD_NAME,
-                id: next_client_field_id,
                 reader_selection_set: vec![],
                 variant: ClientFieldVariant::ImperativelyLoadedField(
                     ImperativelyLoadedFieldVariant {

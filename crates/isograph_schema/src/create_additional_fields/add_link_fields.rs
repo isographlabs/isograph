@@ -18,7 +18,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         .intern()
                         .into(),
                 ),
-                id: next_client_field_id,
                 name: field_name,
                 parent_object_id: object.id,
                 variable_definitions: vec![],

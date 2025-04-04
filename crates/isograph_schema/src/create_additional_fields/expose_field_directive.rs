@@ -231,7 +231,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let mutation_client_field = ClientField {
             description,
             name: client_field_scalar_selection_name.unchecked_conversion(),
-            id: mutation_field_client_field_id,
             reader_selection_set: vec![],
 
             variant: ClientFieldVariant::ImperativelyLoadedField(ImperativelyLoadedFieldVariant {

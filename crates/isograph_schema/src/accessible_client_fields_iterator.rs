@@ -1,16 +1,15 @@
 use common_lang_types::WithSpan;
-use isograph_lang_types::{DefinitionLocation, SelectionTypeContainingSelections};
+use isograph_lang_types::{ClientFieldId, DefinitionLocation, SelectionTypeContainingSelections};
 
 use crate::{
-    ClientField, ClientFieldOrPointer, NetworkProtocol, Schema, ValidatedSelection,
-    ValidatedSelectionType,
+    ClientFieldOrPointer, NetworkProtocol, Schema, ValidatedSelection, ValidatedSelectionType,
 };
 
 // This should really be replaced with a proper visitor, or something
 pub fn accessible_client_fields<'a, TNetworkProtocol: NetworkProtocol>(
     selection_type: &'a ValidatedSelectionType<'a, TNetworkProtocol>,
     schema: &'a Schema<TNetworkProtocol>,
-) -> impl Iterator<Item = &'a ClientField<TNetworkProtocol>> + 'a {
+) -> impl Iterator<Item = ClientFieldId> + 'a {
     AccessibleClientFieldIterator {
         selection_set: selection_type.selection_set_for_parent_query(),
         index: 0,
@@ -26,10 +25,10 @@ struct AccessibleClientFieldIterator<'a, TNetworkProtocol: NetworkProtocol> {
     sub_iterator: Option<Box<AccessibleClientFieldIterator<'a, TNetworkProtocol>>>,
 }
 
-impl<'a, TNetworkProtocol: NetworkProtocol> Iterator
-    for AccessibleClientFieldIterator<'a, TNetworkProtocol>
+impl<TNetworkProtocol: NetworkProtocol> Iterator
+    for AccessibleClientFieldIterator<'_, TNetworkProtocol>
 {
-    type Item = &'a ClientField<TNetworkProtocol>;
+    type Item = ClientFieldId;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(iterator) = &mut self.sub_iterator {
@@ -53,9 +52,8 @@ impl<'a, TNetworkProtocol: NetworkProtocol> Iterator
                                 continue 'main_loop;
                             }
                             DefinitionLocation::Client(client_field_id) => {
-                                let nested_client_field = self.schema.client_field(client_field_id);
                                 self.index += 1;
-                                return Some(nested_client_field);
+                                return Some(client_field_id);
                             }
                         }
                     }

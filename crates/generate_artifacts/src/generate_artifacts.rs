@@ -17,10 +17,10 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     accessible_client_fields, description, output_type_annotation, selection_map_wrapped,
-    ClientField, ClientFieldOrPointer, ClientFieldVariant, FieldTraversalResult, NameAndArguments,
-    NetworkProtocol, NormalizationKey, RequiresRefinement, Schema,
-    SchemaServerObjectSelectableVariant, UserWrittenClientTypeInfo, UserWrittenComponentVariant,
-    ValidatedScalarSelectionAssociatedData, ValidatedSelection, ValidatedVariableDefinition,
+    ClientField, ClientFieldVariant, FieldTraversalResult, NameAndArguments, NetworkProtocol,
+    NormalizationKey, RequiresRefinement, Schema, SchemaServerObjectSelectableVariant,
+    UserWrittenClientTypeInfo, UserWrittenComponentVariant, ValidatedScalarSelectionAssociatedData,
+    ValidatedSelection, ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -295,19 +295,29 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
         }
     }
 
-    for user_written_client_type in schema
+    for (client_type_id, user_written_client_type) in schema
         .client_scalar_selectables
         .iter()
-        .flat_map(|field| match field.variant {
+        .enumerate()
+        .flat_map(|(id, field)| match field.variant {
             ClientFieldVariant::Link => None,
-            ClientFieldVariant::UserWritten(_) => Some(SelectionType::Scalar(field)),
+            ClientFieldVariant::UserWritten(_) => Some((
+                SelectionType::Scalar(id.into()),
+                SelectionType::Scalar(field),
+            )),
             ClientFieldVariant::ImperativelyLoadedField(_) => None,
         })
         .chain(
             schema
                 .client_object_selectables
                 .iter()
-                .map(SelectionType::Object),
+                .enumerate()
+                .map(|(id, pointer)| {
+                    (
+                        SelectionType::Object(id.into()),
+                        SelectionType::Object(pointer),
+                    )
+                }),
         )
     {
         // For each user-written client types, generate a param type artifact
@@ -317,9 +327,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
             config.options.include_file_extensions_in_import_statements,
         ));
 
-        match encountered_client_type_map
-            .get(&DefinitionLocation::Client(user_written_client_type.id()))
-        {
+        match encountered_client_type_map.get(&DefinitionLocation::Client(client_type_id)) {
             Some(FieldTraversalResult {
                 traversal_state, ..
             }) => {
@@ -330,10 +338,10 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
             None => {
                 // If this field is not reachable from an entrypoint, we need to
                 // encounter all the client fields
-                for nested_client_field in
+                for nested_client_field_id in
                     accessible_client_fields(&user_written_client_type, schema)
                 {
-                    encountered_output_types.insert(nested_client_field.id);
+                    encountered_output_types.insert(nested_client_field_id);
                 }
             }
         }

@@ -54,7 +54,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
         schema.server_field_data.object(entrypoint.parent_object_id),
         entrypoint.selection_set_for_parent_query(),
         encountered_client_type_map,
-        DefinitionLocation::Client(SelectionType::Scalar(entrypoint.id)),
+        DefinitionLocation::Client(SelectionType::Scalar(entrypoint_id)),
         &initial_variable_context(&SelectionType::Scalar(entrypoint)),
     );
 

@@ -22,7 +22,6 @@ pub type ClientFieldOrPointerId = SelectionType<ClientFieldId, ClientPointerId>;
 pub struct ClientField<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: ClientScalarSelectableName,
-    pub id: ClientFieldId,
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 
     // None -> not refetchable
@@ -76,7 +75,6 @@ pub struct ClientPointer<TNetworkProtocol: NetworkProtocol> {
 pub trait ClientFieldOrPointer {
     fn description(&self) -> Option<DescriptionValue>;
     fn name(&self) -> ClientSelectableName;
-    fn id(&self) -> ClientFieldOrPointerId;
     fn type_and_field(&self) -> ObjectTypeAndFieldName;
     fn parent_object_id(&self) -> ServerObjectId;
     // the following are unsupported, for now, because the return values include a generic
@@ -103,10 +101,6 @@ impl<TNetworkProtocol: NetworkProtocol> ClientFieldOrPointer for &ClientField<TN
 
     fn name(&self) -> ClientSelectableName {
         self.name.into()
-    }
-
-    fn id(&self) -> ClientFieldOrPointerId {
-        SelectionType::Scalar(self.id)
     }
 
     fn type_and_field(&self) -> ObjectTypeAndFieldName {
@@ -162,10 +156,6 @@ impl<TNetworkProtocol: NetworkProtocol> ClientFieldOrPointer for &ClientPointer<
 
     fn name(&self) -> ClientSelectableName {
         self.name.into()
-    }
-
-    fn id(&self) -> ClientFieldOrPointerId {
-        SelectionType::Object(self.id)
     }
 
     fn type_and_field(&self) -> ObjectTypeAndFieldName {

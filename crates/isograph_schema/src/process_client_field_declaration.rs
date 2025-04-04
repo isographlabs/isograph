@@ -193,7 +193,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         self.client_scalar_selectables.push(ClientField {
             description: client_field_declaration.item.description.map(|x| x.item),
             name,
-            id: next_client_field_id,
             reader_selection_set: vec![],
             variant,
             variable_definitions: client_field_declaration
