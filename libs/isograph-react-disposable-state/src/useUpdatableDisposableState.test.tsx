@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { StrictMode } from 'react';
 import { create } from 'react-test-renderer';
 import { describe, expect, test, vi } from 'vitest';
 import {
@@ -45,7 +45,8 @@ function promiseAndResolver() {
 // not is a bit worrisome.
 async function awaitableCreate(Component, isConcurrent) {
   const element = create(
-    Component,
+    <StrictMode>{Component}</StrictMode>,
+
     isConcurrent ? { unstable_isConcurrent: true } : undefined,
   );
   await shortPromise();
