@@ -197,6 +197,7 @@ function readData<TReadFromStore>(
           root,
           variables,
           networkRequest,
+          networkRequestOptions,
           (ast, root) =>
             readData(
               environment,
@@ -591,6 +592,7 @@ export function readResolverFieldData(
               environment,
               fragment,
               readerWithRefetchQueries.readerArtifact.fieldName,
+              networkRequestOptions,
             )
           : undefined,
       };
@@ -645,7 +647,7 @@ export function readLinkedFieldData(
   root: Link,
   variables: Variables,
   networkRequest: PromiseWrapper<void, any>,
-
+  networkRequestOptions: NetworkRequestReaderOptions,
   readData: <TReadFromStore>(
     ast: ReaderAst<TReadFromStore>,
     root: Link,
@@ -742,6 +744,7 @@ export function readLinkedFieldData(
               environment,
               fragment,
               readerWithRefetchQueries.readerArtifact.fieldName,
+              networkRequestOptions,
             ),
           }
         : undefined),
