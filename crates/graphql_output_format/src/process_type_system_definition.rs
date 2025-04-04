@@ -700,7 +700,7 @@ fn lookup_object_in_schema(
                 Location::Generated,
             )
         })?)
-    .try_into()
+    .as_object_result()
     .map_err(|_| {
         WithLocation::new(
             ProcessGraphqlTypeSystemDefinitionError::GenericObjectIsScalar {
@@ -711,7 +711,7 @@ fn lookup_object_in_schema(
         )
     })?;
 
-    Ok(result)
+    Ok(*result)
 }
 
 pub fn graphql_input_value_definition_to_variable_definition(

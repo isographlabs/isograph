@@ -20,26 +20,4 @@ u32_newtype!(ServerScalarEntityId);
 
 pub type ServerEntityId = SelectionType<ServerScalarEntityId, ServerObjectEntityId>;
 
-impl TryFrom<ServerEntityId> for ServerScalarEntityId {
-    type Error = ();
-
-    fn try_from(value: ServerEntityId) -> Result<Self, Self::Error> {
-        match value {
-            ServerEntityId::Object(_) => Err(()),
-            ServerEntityId::Scalar(scalar_entity_id) => Ok(scalar_entity_id),
-        }
-    }
-}
-
-impl TryFrom<ServerEntityId> for ServerObjectEntityId {
-    type Error = ();
-
-    fn try_from(value: ServerEntityId) -> Result<Self, Self::Error> {
-        match value {
-            ServerEntityId::Object(object_entity_id) => Ok(object_entity_id),
-            ServerEntityId::Scalar(_) => Err(()),
-        }
-    }
-}
-
 u32_newtype!(RefetchQueryIndex);

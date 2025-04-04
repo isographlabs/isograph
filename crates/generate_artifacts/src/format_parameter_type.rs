@@ -47,6 +47,9 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
 ) -> String {
     match field {
         ServerEntityId::Object(object_entity_id) => {
+            // TODO this is bad; we should never create a type containing all of the fields
+            // on a given object. This is currently used for input objects, and we should
+            // consider how to do this is a not obviously broken manner.
             let mut s = "{\n".to_string();
             for (name, server_selectable_id) in schema
                 .server_field_data
