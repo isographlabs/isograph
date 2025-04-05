@@ -35,8 +35,14 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     arguments: vec![],
                     associated_data: ValidatedScalarSelectionAssociatedData {
                         location: DefinitionLocation::Server(
-                            *self.server_entity_data.server_object_entity_available_selectables.get(subtype_id)
-                                .expect("Expected subtype to exist in server_object_entity_available_selectables")
+                            *self
+                                .server_entity_data
+                                .server_object_entity_available_selectables
+                                .get(subtype_id)
+                                .expect(
+                                    "Expected subtype to exist \
+                                    in server_object_entity_available_selectables",
+                                )
                                 .0
                                 .get(&"__typename".intern().into())
                                 .expect("Expected __typename to exist")
@@ -58,9 +64,14 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     arguments: vec![],
                     associated_data: ValidatedScalarSelectionAssociatedData {
                         location: DefinitionLocation::Client(
-                            *self.server_entity_data.server_object_entity_available_selectables
+                            *self
+                                .server_entity_data
+                                .server_object_entity_available_selectables
                                 .get(subtype_id)
-                                .expect("Expected subtype to exist in server_object_entity_available_selectables")
+                                .expect(
+                                    "Expected subtype to exist \
+                                    in server_object_entity_available_selectables",
+                                )
                                 .0
                                 .get(&(*LINK_FIELD_NAME).into())
                                 .expect("Expected link to exist")

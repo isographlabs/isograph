@@ -363,7 +363,6 @@ fn process_object_type_definition(
             server_objects.push(ServerObjectEntity {
                 description: object_type_definition.description.map(|d| d.item),
                 name: object_type_definition.name.item,
-                id_field: None,
                 directives: object_type_definition.directives,
                 concrete_type,
                 output_associated_data: associated_data,

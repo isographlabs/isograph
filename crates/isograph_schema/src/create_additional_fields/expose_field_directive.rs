@@ -172,7 +172,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_entity_data
             .server_object_entity_available_selectables
             .get(&payload_object_entity_id)
-            .expect("Expected payload_object_entity_id to exist in server_object_entity_available_selectables")
+            .expect(
+                "Expected payload_object_entity_id to exist \
+                in server_object_entity_available_selectables",
+            )
             .0
             .get(&primary_field_name.into());
 
@@ -369,7 +372,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_entity_data
             .server_object_entity_available_selectables
             .get(&mutation_object_entity_id)
-            .expect("Expected mutation_object_entity_id to exist in server_object_entity_available_selectables")
+            .expect(
+                "Expected mutation_object_entity_id to exist \
+                in server_object_entity_available_selectables",
+            )
             .0
             .iter()
             .find_map(|(name, field_id)| {

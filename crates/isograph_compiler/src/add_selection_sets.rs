@@ -137,10 +137,14 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
     scalar_selection: UnvalidatedScalarFieldSelection,
 ) -> AddSelectionSetsResult<ValidatedScalarSelection> {
-    let location = schema.server_entity_data
+    let location = schema
+        .server_entity_data
         .server_object_entity_available_selectables
         .get(&selection_parent_object_id)
-        .expect("Expected selection_parent_object_id to exist in server_object_entity_available_selectables")
+        .expect(
+            "Expected selection_parent_object_id to exist \
+            in server_object_entity_available_selectables",
+        )
         .0
         .get(&scalar_selection.name.item.into())
         .ok_or_else(|| {
@@ -238,9 +242,14 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
     object_selection: ObjectSelection<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<ValidatedObjectSelection> {
-    let location = schema.server_entity_data.server_object_entity_available_selectables
-    .get(&selection_parent_object_id)
-    .expect("Expected selection_parent_object_id to exist in server_object_entity_available_selectables")
+    let location = schema
+        .server_entity_data
+        .server_object_entity_available_selectables
+        .get(&selection_parent_object_id)
+        .expect(
+            "Expected selection_parent_object_id to exist \
+            in server_object_entity_available_selectables",
+        )
         .0
         .get(&object_selection.name.item.into())
         .ok_or_else(|| {

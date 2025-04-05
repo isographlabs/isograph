@@ -194,7 +194,10 @@ impl ModifiedArgument {
                         .server_entity_data
                         .server_object_entity_available_selectables
                         .get(&object_entity_id)
-                        .expect("Expected object_entity_id to exist in server_object_entity_available_selectables")
+                        .expect(
+                            "Expected object_entity_id to exist \
+                            in server_object_entity_available_selectables",
+                        )
                         .0
                         .iter()
                         .flat_map(|(name, field_id)| match field_id {

@@ -46,14 +46,16 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                                 .server_entity_data
                                 .server_object_entity_available_selectables
                                 .get_mut(subtype_id)
-                                .expect("Expected subtype_id to exist in server_object_entity_available_selectables")
+                                .expect(
+                                    "Expected subtype_id to exist \
+                                    in server_object_entity_available_selectables",
+                                )
                                 .0
                                 .insert(*supertype_field_name, *defined_field)
                                 .is_some()
                             {
-                            let subtype = self
-                                .server_entity_data
-                                .server_object_entity(*subtype_id);
+                                let subtype =
+                                    self.server_entity_data.server_object_entity(*subtype_id);
                                 return Err(WithLocation::new(
                                     CreateAdditionalFieldsError::FieldExistsOnType {
                                         field_name: *supertype_field_name,

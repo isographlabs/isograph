@@ -946,7 +946,12 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
         }
     }
 
-    select_typename_and_id_fields_in_merged_selection(schema, parent_map, parent_object);
+    select_typename_and_id_fields_in_merged_selection(
+        schema,
+        parent_map,
+        parent_object,
+        parent_object_entity_id,
+    );
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1110,13 +1115,19 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
     schema: &Schema<TNetworkProtocol>,
     merged_selection_map: &mut MergedSelectionMap,
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
+    parent_object_entity_id: ServerObjectEntityId,
 ) {
     if parent_type.concrete_type.is_none() {
         maybe_add_typename_selection(merged_selection_map)
     };
 
     // If the type has an id field, we must select it.
-    if let Some(id_field) = parent_type.id_field {
+    if let Some(id_field) = schema
+        .server_entity_data
+        .server_object_entity_available_selectables
+        .get(&parent_object_entity_id)
+        .and_then(|(_, id_field)| *id_field)
+    {
         match merged_selection_map.entry(NormalizationKey::Id) {
             Entry::Occupied(occupied) => {
                 match occupied.get() {

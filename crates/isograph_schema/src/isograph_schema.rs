@@ -174,8 +174,13 @@ pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
 
     // We keep track of available selectables and id fields outside of server_objects so that
     // we don't need a server_object_entity_mut method, which is incompatible with pico.
-    pub server_object_entity_available_selectables:
-        HashMap<ServerObjectEntityId, (ServerObjectEntityAvailableSelectables,)>,
+    pub server_object_entity_available_selectables: HashMap<
+        ServerObjectEntityId,
+        (
+            ServerObjectEntityAvailableSelectables,
+            Option<ServerStrongIdFieldId>,
+        ),
+    >,
 
     // Well known types
     pub id_type_id: ServerScalarEntityId,
@@ -246,12 +251,18 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let parent_object_entity_id = server_scalar_selectable.parent_type_id;
         let next_scalar_name = server_scalar_selectable.name;
 
-        if self
+        let parent_type_name = self
+            .server_entity_data
+            .server_object_entity(parent_object_entity_id)
+            .name;
+
+        let (available_selections, id_field) = self
             .server_entity_data
             .server_object_entity_available_selectables
             .entry(parent_object_entity_id)
-            .or_default()
-            .0
+            .or_default();
+
+        if available_selections
             .insert(
                 next_scalar_name.item.into(),
                 DefinitionLocation::Server(SelectionType::Scalar(next_server_scalar_selectable_id)),
@@ -267,16 +278,12 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             });
         }
 
-        let parent_object = self
-            .server_entity_data
-            .server_object_entity_mut(parent_object_entity_id);
-
         // TODO do not do this here, this is a GraphQL-ism
         if server_scalar_selectable.name.item == "id" {
             set_and_validate_id_field(
-                &mut parent_object.id_field,
+                id_field,
                 next_server_scalar_selectable_id,
-                parent_object.name,
+                parent_type_name,
                 options,
                 inner_non_null_named_type,
             )?;

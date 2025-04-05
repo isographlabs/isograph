@@ -30,7 +30,16 @@ pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
                  id: object_entity_id,
                  item: object,
              }| {
-                if object.id_field.is_some() {
+                let id_field = schema
+                    .server_entity_data
+                    .server_object_entity_available_selectables
+                    .get(&object_entity_id)
+                    .expect(
+                        "Expected object_entity_id to exist \
+                        in server_object_entity_available_selectables",
+                    )
+                    .1;
+                if id_field.is_some() {
                     Some((object_entity_id, object.name))
                 } else {
                     None
