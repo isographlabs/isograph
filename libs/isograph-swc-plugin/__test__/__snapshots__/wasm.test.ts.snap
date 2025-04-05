@@ -2,7 +2,7 @@
 
 exports[`Should load swc-plugin-isograph wasm plugin correctly > Should transform should_preserve_function_calls_when_iso_applied correctly 1`] = `
 "export const HomeRoute = function HomeRouteComponent({ data }) {
-    const { fragmentReference, loadFragmentReference } = useImperativeReference(iso(\`entrypoint Query.PetFavoritePhrase\`));
+    const { fragmentReference, loadFragmentReference } = useImperativeReference(require("../../__isograph/Query/PetFavoritePhrase/entrypoint.ts").default);
     return "Render";
 };
 "

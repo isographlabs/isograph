@@ -1,0 +1,12 @@
+
+  x Invalid iso tag usage. The iso function should be passed at most one argument.
+   ,-[input.js:1:1]
+ 1 | ,-> export const HomeRoute = iso(`
+ 2 | |     field Query.HomeRoute @component {
+ 3 | |       pets {
+ 4 | |         id
+ 5 | |         PetSummaryCard
+ 6 | |       }
+ 7 | |     }
+ 8 | `-> `)();
+   `----

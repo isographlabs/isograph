@@ -1,16 +1,65 @@
-#![allow(clippy::not_unsafe_ptr_arg_deref)]
-
+use anyhow::{bail, Result};
 use isograph_config::{ConfigFileJavascriptModule, IsographProjectConfig, ISOGRAPH_FOLDER};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::path::{Path, PathBuf};
 use swc_atoms::JsWord;
-use swc_common::{errors::HANDLER, Mark, DUMMY_SP};
+use swc_common::{errors::HANDLER, Mark, Span, DUMMY_SP};
 use swc_ecma_ast::*;
 use swc_ecma_utils::{prepend_stmts, quote_ident, ExprFactory};
 use swc_ecma_visit::{noop_fold_type, Fold, FoldWith};
 use swc_trace_macro::swc_trace;
+use thiserror::Error;
 use tracing::debug;
+
+static OPERATION_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\s*(entrypoint|field)\s*([^\.\s]+)\.([^\s\(]+)").unwrap());
+
+pub fn isograph<'a>(
+    config: &'a IsographProjectConfig,
+    filepath: &'a Path,
+    root_dir: &'a Path,
+    unresolved_mark: Option<Mark>,
+) -> impl Fold + 'a {
+    Isograph {
+        config,
+        filepath,
+        unresolved_mark,
+        imports: vec![],
+        root_dir,
+    }
+}
+
+#[derive(Error, Clone, Debug, Eq, PartialEq)]
+enum IsograthTransformError {
+    #[error("Invalid iso tag usage. Expected 'entrypoint' or 'field'.")]
+    InvalidIsoKeyword,
+
+    #[error("Invalid iso tag usage. The iso function should be passed at most one argument.")]
+    IsoFnCallRequiresOneArg,
+
+    #[error("Iso invocation require one parameter.")]
+    IsoRequiresOneArg,
+
+    #[error("Malformed iso literal. I hope the iso compiler failed to accept this literal!")]
+    MalformedIsoLiteral,
+
+    #[error("Only template literals are allowed in iso fragments.")]
+    OnlyAllowedTemplateLiteral,
+
+    #[error("Substitutions are not allowed in iso fragments.")]
+    SubstitutionsNotAllowedInIsoFragments,
+}
+
+fn show_error(span: &Span, err: &IsograthTransformError) -> Result<(), anyhow::Error> {
+    let msg = IsograthTransformError::to_string(err);
+
+    HANDLER.with(|handler| {
+        handler.struct_span_err(*span, &msg).emit();
+        return;
+    });
+    bail!(msg)
+}
 
 #[derive(Debug, Clone)]
 struct IsographImport {
@@ -40,17 +89,6 @@ impl IsographImport {
             phase: Default::default(),
         }))
     }
-}
-
-#[derive(Debug, Clone)]
-struct Isograph<'a> {
-    // root_dir: PathBuf,
-    // pages_dir: Option<PathBuf>,
-    root_dir: &'a Path,
-    config: &'a IsographProjectConfig,
-    filepath: &'a Path,
-    imports: Vec<IsographImport>,
-    unresolved_mark: Option<Mark>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -101,16 +139,27 @@ impl IsographEntrypoint {
         })
     }
 
+    fn build_arrow_identity_expr(&self) -> Expr {
+        Expr::Arrow(ArrowExpr {
+            params: vec![Pat::Ident(Ident::new("x".into(), DUMMY_SP).into())],
+            body: Box::new(Ident::new("x".into(), DUMMY_SP).into()),
+            span: DUMMY_SP,
+            is_async: Default::default(),
+            is_generator: Default::default(),
+            return_type: Default::default(),
+            type_params: Default::default(),
+        })
+    }
+
     fn path_for_artifact(
         &self,
         real_filepath: &Path,
         config: &IsographProjectConfig,
         root_dir: &Path,
-    ) -> Result<PathBuf, BuildRequirePathError> {
-        debug!("real_filepath: {:?}", real_filepath);
+    ) -> Result<PathBuf, IsograthTransformError> {
         let folder = PathBuf::from(real_filepath.parent().unwrap());
         let cwd = PathBuf::from(root_dir);
-        debug!("cwd: {:?}", cwd);
+
         let artifact_directory = cwd
             .join(
                 config
@@ -120,11 +169,11 @@ impl IsographEntrypoint {
             )
             .join(ISOGRAPH_FOLDER);
         let artifact_directory = artifact_directory.as_path();
+
         debug!("artifact_directory: {:#?}", artifact_directory);
 
         let file_to_artifact_dir = &pathdiff::diff_paths(artifact_directory, folder)
             .expect("Expected path to be diffable");
-        debug!("file_to_artifact: {:#?}", file_to_artifact_dir);
 
         let mut file_to_artifact = PathBuf::from(format!(
             "{}/{}/{}/{}.ts",
@@ -145,46 +194,51 @@ impl IsographEntrypoint {
     }
 }
 
-static OPERATION_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\s*(entrypoint|field)\s*([^\.\s]+)\.([^\s\(]+)").unwrap());
-
-fn parse_iso_call_arg_into_type(
-    expr_or_spread: Option<&ExprOrSpread>,
-) -> Option<IsographEntrypoint> {
-    if let Some(ExprOrSpread { expr, .. }) = expr_or_spread {
-        match &**expr {
-            Expr::Tpl(Tpl { quasis, .. }) => OPERATION_REGEX
-                .captures_iter(&*quasis[0].raw.trim())
-                .next()
-                .map(|capture_group| IsographEntrypoint {
-                    artifact_type: capture_group[1].to_string(),
-                    field_type: capture_group[2].to_string(),
-                    field_name: capture_group[3].to_string(),
-                }),
-            _ => panic!("iso function can only be called with a literal argument"),
-        }
-    } else {
-        panic!("iso function can only be called with an expression argument")
-    }
-}
-
-#[derive(Debug)]
-enum BuildRequirePathError {
-    FileNameNotReal,
-    ArtifactDirectoryExpected { filepath: String },
-    InvalidArgs,
+#[derive(Debug, Clone)]
+struct Isograph<'a> {
+    root_dir: &'a Path,
+    config: &'a IsographProjectConfig,
+    filepath: &'a Path,
+    imports: Vec<IsographImport>,
+    unresolved_mark: Option<Mark>,
 }
 
 #[swc_trace]
 impl<'a> Isograph<'a> {
+    fn parse_iso_call_arg_into_type(
+        &self,
+        expr_or_spread: Option<&ExprOrSpread>,
+    ) -> Result<IsographEntrypoint, IsograthTransformError> {
+        if let Some(ExprOrSpread { expr, .. }) = expr_or_spread {
+            if let Expr::Tpl(Tpl { quasis, .. }) = &**expr {
+                if quasis.iter().len() != 1 {
+                    return Err(IsograthTransformError::SubstitutionsNotAllowedInIsoFragments);
+                }
+
+                let entrypoint = OPERATION_REGEX
+                    .captures_iter(&*quasis[0].raw.trim())
+                    .next()
+                    .map(|capture_group| {
+                        debug!("capture_group {:?}", capture_group);
+                        return IsographEntrypoint {
+                            artifact_type: capture_group[1].to_string(),
+                            field_type: capture_group[2].to_string(),
+                            field_name: capture_group[3].to_string(),
+                        };
+                    });
+                match entrypoint {
+                    Some(entrypoint) => return Ok(entrypoint),
+                    None => return Err(IsograthTransformError::InvalidIsoKeyword),
+                }
+            }
+        }
+        return Err(IsograthTransformError::OnlyAllowedTemplateLiteral);
+    }
+
     pub fn compile_import_statement(&mut self, entrypoint: &IsographEntrypoint) -> Expr {
         let file_to_artifact = entrypoint
             .path_for_artifact(self.filepath, self.config, self.root_dir)
             .expect("Failed to get path for artifact.");
-
-        debug!("gen expr for artifact: {}", file_to_artifact.display());
-
-        debug!("options module: {:?}", self.config.options.module);
 
         match self.config.options.module {
             ConfigFileJavascriptModule::CommonJs => entrypoint.build_require_expr_from_path(
@@ -210,45 +264,36 @@ impl<'a> Isograph<'a> {
         // iso(iso_args)(fn_args);
         iso_args: &Vec<ExprOrSpread>,
         fn_args: Option<&Vec<ExprOrSpread>>,
-    ) -> Option<Expr> {
-        let entrypoint = parse_iso_call_arg_into_type(iso_args.first())
-            .expect("C: iso call argument must be a literal expression");
+    ) -> Result<Expr, IsograthTransformError> {
+        if iso_args.iter().len() != 1 {
+            return Err(IsograthTransformError::IsoRequiresOneArg);
+        }
 
-        if entrypoint.artifact_type == "entrypoint" {
-            debug!("Entrypoint artifact type {:?}", entrypoint);
-            Some(self.compile_import_statement(&entrypoint))
-        } else if entrypoint.artifact_type == "field" {
-            match fn_args {
-                Some(iso_args) => {
-                    if fn_args.iter().len() >= 1 {
-                        if let Some(ExprOrSpread { expr: e, .. }) = iso_args.first() {
-                            Some(e.as_ref().clone())
-                        } else {
-                            // show error
-                            return None;
+        let entrypoint = self.parse_iso_call_arg_into_type(iso_args.first());
+
+        match entrypoint {
+            Err(e) => return Err(e),
+            Ok(entrypoint) => {
+                if entrypoint.artifact_type == "entrypoint" {
+                    Ok(self.compile_import_statement(&entrypoint))
+                } else if entrypoint.artifact_type == "field" {
+                    match fn_args {
+                        Some(fn_args) => {
+                            if fn_args.iter().len() == 1 {
+                                if let Some(ExprOrSpread { expr: e, .. }) = fn_args.first() {
+                                    return Ok(e.as_ref().clone());
+                                }
+                            }
+                            // iso(...)(>args empty<) or iso(...)(first_arg, second_arg)
+                            return Err(IsograthTransformError::IsoFnCallRequiresOneArg);
                         }
-                    } else {
-                        // show error
-                        return None;
+                        // iso(...)>empty<
+                        None => Ok(entrypoint.build_arrow_identity_expr()),
                     }
-                }
-                None => {
-                    let e = Expr::Arrow(ArrowExpr {
-                        params: vec![Pat::Ident(Ident::new("x".into(), DUMMY_SP).into())],
-                        body: Box::new(Ident::new("x".into(), DUMMY_SP).into()),
-                        span: DUMMY_SP,
-                        is_async: Default::default(),
-                        is_generator: Default::default(),
-                        return_type: Default::default(),
-                        type_params: Default::default(),
-                    });
-
-                    return Some(e);
+                } else {
+                    return Err(IsograthTransformError::MalformedIsoLiteral);
                 }
             }
-        } else {
-            // show error
-            return None;
         }
     }
 }
@@ -265,39 +310,41 @@ impl<'a> Fold for Isograph<'a> {
                 ..
             }) => match &**callee {
                 Expr::Ident(ident) => {
-                    debug!("Ident executed");
                     if ident.sym == "iso" {
-                        debug!("found iso function ---.");
-                        if let Some(build_expr) = self.compile_iso_call_statement(args, None) {
-                            // might have `iso` functions inside the build expr
-                            let build_expr = build_expr.fold_children_with(self);
-                            return build_expr;
+                        match self.compile_iso_call_statement(args, None) {
+                            Ok(build_expr) => {
+                                // might have `iso` functions inside the build expr
+                                let build_expr = build_expr.fold_children_with(self);
+                                return build_expr;
+                            }
+                            Err(err) => {
+                                let _ = show_error(span, &err);
+                                // On error, we keep the same expression and fail showing the error
+                                return expr;
+                            }
                         }
                     }
                 }
                 Expr::Call(CallExpr {
                     callee: Callee::Expr(child_callee),
                     args: child_args,
+                    span: child_span,
                     ..
                 }) => {
-                    debug!("Call executed");
                     match &**child_callee {
                         Expr::Ident(ident) => {
                             if ident.sym == "iso" {
-                                debug!("found iso function");
-                                if let Some(build_expr) =
-                                    self.compile_iso_call_statement(child_args, Some(args))
-                                {
-                                    // might have `iso` functions inside the build expr
-                                    let build_expr = build_expr.fold_children_with(self);
-                                    return build_expr;
-                                } else {
-                                    HANDLER.with(|handler| {
-                                        handler
-                                            .struct_span_err(*span, "Invalid iso tag usage. The iso function should be passed at most one argument.")
-                                            .emit();
-                                        return;
-                                    });
+                                match self.compile_iso_call_statement(child_args, Some(args)) {
+                                    Ok(build_expr) => {
+                                        // might have `iso` functions inside the build expr
+                                        let build_expr = build_expr.fold_children_with(self);
+                                        return build_expr;
+                                    }
+                                    Err(err) => {
+                                        let _ = show_error(child_span, &err);
+                                        // On error, we keep the same expression and fail showing the error
+                                        return expr;
+                                    }
                                 }
                             }
                         }
@@ -324,20 +371,5 @@ impl<'a> Fold for Isograph<'a> {
         );
 
         items
-    }
-}
-
-pub fn isograph<'a>(
-    config: &'a IsographProjectConfig,
-    filepath: &'a Path,
-    root_dir: &'a Path,
-    unresolved_mark: Option<Mark>,
-) -> impl Fold + 'a {
-    Isograph {
-        config,
-        filepath,
-        unresolved_mark,
-        imports: vec![],
-        root_dir,
     }
 }

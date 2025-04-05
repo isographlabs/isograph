@@ -2905,6 +2905,7 @@ dependencies = [
 name = "swc_isograph"
 version = "0.7.4"
 dependencies = [
+ "anyhow",
  "common_lang_types",
  "intern",
  "isograph_config",
@@ -2923,6 +2924,7 @@ dependencies = [
  "swc_ecma_visit",
  "swc_trace_macro 2.0.0",
  "testing",
+ "thiserror",
  "tracing",
 ]
 
