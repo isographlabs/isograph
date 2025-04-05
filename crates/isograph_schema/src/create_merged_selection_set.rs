@@ -220,7 +220,7 @@ pub struct ScalarClientFieldTraversalState {
     traversal_path: Vec<NormalizationKey>,
 
     /// Client fields that are directly accessed by this client field
-    pub accessible_client_fields: HashSet<ClientScalarSelectableId>,
+    pub accessible_client_fields: HashSet<ClientSelectableId>,
     pub has_updatable: bool,
 }
 
@@ -763,9 +763,9 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             },
                         }
 
-                        merge_traversal_state
-                            .accessible_client_fields
-                            .insert(*newly_encountered_scalar_client_selectable_id);
+                        merge_traversal_state.accessible_client_fields.insert(
+                            SelectionType::Scalar(*newly_encountered_scalar_client_selectable_id),
+                        );
                     }
                 };
             }
@@ -792,7 +792,11 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             encountered_client_field_map,
                             variable_context,
                             &object_selection.arguments,
-                        )
+                        );
+
+                        merge_traversal_state.accessible_client_fields.insert(
+                            SelectionType::Object(newly_encountered_client_object_selectable_id),
+                        );
                     }
                     DefinitionLocation::Server(server_field_id) => {
                         let server_field = schema.server_object_selectable(server_field_id);
