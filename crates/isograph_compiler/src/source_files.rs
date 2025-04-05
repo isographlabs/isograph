@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     error::Error,
     path::{Path, PathBuf},
 };
@@ -22,7 +22,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct SourceFiles {
     pub schema: SourceId<SchemaSource>,
-    pub schema_extensions: HashMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
+    pub schema_extensions: BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
     pub iso_literals: HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>,
 }
 
@@ -279,8 +279,8 @@ pub fn read_schema_file(path: &PathBuf) -> Result<String, BatchCompileError> {
 pub fn read_schema_extensions(
     db: &mut Database,
     config: &CompilerConfig,
-) -> Result<HashMap<RelativePathToSourceFile, SourceId<SchemaSource>>, Box<dyn Error>> {
-    let mut schema_extensions = HashMap::new();
+) -> Result<BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>, Box<dyn Error>> {
+    let mut schema_extensions = BTreeMap::new();
     for schema_extension_path in config.schema_extensions.iter() {
         let schema_extension =
             read_schema(db, schema_extension_path, config.current_working_directory)?;

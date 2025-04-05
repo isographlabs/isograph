@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     error::Error,
     ops::{Deref, DerefMut},
 };
@@ -106,7 +106,7 @@ pub fn create_unvalidated_schema<TNetworkProtocol: NetworkProtocol>(
 
 fn parse_schema_extensions<TNetworkProtocol: NetworkProtocol>(
     db: &Database,
-    schema_extensions_sources: &HashMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
+    schema_extensions_sources: &BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
 ) -> Result<
     HashMap<RelativePathToSourceFile, TNetworkProtocol::TypeSystemExtensionDocument>,
     Box<dyn Error>,
