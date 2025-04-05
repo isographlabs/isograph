@@ -38,7 +38,6 @@ pub struct ServerObjectEntity<TNetworkProtocol: NetworkProtocol> {
     /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
     /// to something else.
     pub id_field: Option<ServerStrongIdFieldId>,
-    pub available_selectables: ServerObjectEntityAvailableSelectables,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 

@@ -35,8 +35,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     arguments: vec![],
                     associated_data: ValidatedScalarSelectionAssociatedData {
                         location: DefinitionLocation::Server(
-                            *subtype_entity
-                                .available_selectables
+                            *self.server_entity_data.server_object_entity_available_selectables.get(subtype_id)
+                                .expect("Expected subtype to exist in server_object_entity_available_selectables")
                                 .get(&"__typename".intern().into())
                                 .expect("Expected __typename to exist")
                                 .as_server()
@@ -57,8 +57,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     arguments: vec![],
                     associated_data: ValidatedScalarSelectionAssociatedData {
                         location: DefinitionLocation::Client(
-                            *subtype_entity
-                                .available_selectables
+                            *self.server_entity_data.server_object_entity_available_selectables
+                                .get(subtype_id)
+                                .expect("Expected subtype to exist in server_object_entity_available_selectables")
                                 .get(&(*LINK_FIELD_NAME).into())
                                 .expect("Expected link to exist")
                                 .as_client()
@@ -106,12 +107,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 .push(server_object_selectable);
 
             for supertype_id in supertype_ids {
-                let supertype = self
+                if self
                     .server_entity_data
-                    .server_object_entity_mut(*supertype_id);
-
-                if supertype
-                    .available_selectables
+                    .server_object_entity_available_selectables
+                    .entry(*supertype_id)
+                    .or_default()
                     .insert(
                         field_name.into(),
                         DefinitionLocation::Server(SelectionType::Object(
@@ -120,6 +120,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     )
                     .is_some()
                 {
+                    let supertype = self.server_entity_data.server_object_entity(*supertype_id);
                     return Err(WithLocation::new(
                         CreateAdditionalFieldsError::FieldExistsOnType {
                             field_name: field_name.into(),

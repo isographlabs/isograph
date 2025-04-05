@@ -1,4 +1,4 @@
-use std::collections::{hash_map::Entry as HashMapEntry, BTreeMap, HashMap};
+use std::collections::{hash_map::Entry as HashMapEntry, HashMap};
 
 use common_lang_types::{
     GraphQLObjectTypeName, IsographObjectTypeName, Location, SelectableName,
@@ -363,7 +363,6 @@ fn process_object_type_definition(
             server_objects.push(ServerObjectEntity {
                 description: object_type_definition.description.map(|d| d.item),
                 name: object_type_definition.name.item,
-                available_selectables: BTreeMap::new(),
                 id_field: None,
                 directives: object_type_definition.directives,
                 concrete_type,

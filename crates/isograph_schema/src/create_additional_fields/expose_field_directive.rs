@@ -168,8 +168,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         // TODO split path on .
         let primary_field_name: ServerObjectSelectableName = path.unchecked_conversion();
 
-        let primary_field = payload_object
-            .available_selectables
+        let primary_field = self
+            .server_entity_data
+            .server_object_entity_available_selectables
+            .get(&payload_object_entity_id)
+            .expect("Expected payload_object_entity_id to exist in server_object_entity_available_selectables")
             .get(&primary_field_name.into());
 
         let (maybe_abstract_parent_object_entity_id, maybe_abstract_parent_type_name) =
@@ -311,11 +314,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         client_field_id: ClientScalarSelectableId,
         payload_object_name: IsographObjectTypeName,
     ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
-        let client_field_parent = self
+        if self
             .server_entity_data
-            .server_object_entity_mut(client_field_parent_object_entity_id);
-        if client_field_parent
-            .available_selectables
+            .server_object_entity_available_selectables
+            .entry(client_field_parent_object_entity_id)
+            .or_default()
             .insert(
                 mutation_field_name,
                 DefinitionLocation::Client(SelectionType::Scalar(client_field_id)),
@@ -360,12 +363,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         field_arg: StringLiteralValue,
         mutation_object_entity_id: ServerObjectEntityId,
     ) -> ProcessTypeDefinitionResult<ServerObjectSelectableId> {
-        let mutation = self
+        let field_id = self
             .server_entity_data
-            .server_object_entity(mutation_object_entity_id);
-
-        let field_id = mutation
-            .available_selectables
+            .server_object_entity_available_selectables
+            .get(&mutation_object_entity_id)
+            .expect("Expected mutation_object_entity_id to exist in server_object_entity_available_selectables")
             .iter()
             .find_map(|(name, field_id)| {
                 if let DefinitionLocation::Server(SelectionType::Object(server_field_id)) = field_id

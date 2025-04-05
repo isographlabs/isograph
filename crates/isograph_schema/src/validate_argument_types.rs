@@ -14,7 +14,7 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    NetworkProtocol, ServerEntityData, ServerObjectEntity, ServerObjectEntityAvailableSelectables,
+    NetworkProtocol, ServerEntityData, ServerObjectEntityAvailableSelectables,
     ServerObjectSelectable, ServerScalarSelectable, ValidatedVariableDefinition,
 };
 
@@ -303,24 +303,29 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
     variable_definitions: &[WithSpan<VariableDefinition<ServerEntityId>>],
-    schema_data: &ServerEntityData<TNetworkProtocol>,
+    server_entity_data: &ServerEntityData<TNetworkProtocol>,
     server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
     server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     object_entity_id: ServerObjectEntityId,
 ) -> Result<(), WithLocation<ValidateArgumentTypesError>> {
-    let object = schema_data.server_object_entity(object_entity_id);
     validate_no_extraneous_fields(
-        &object.available_selectables,
+        &server_entity_data
+            .server_object_entity_available_selectables
+            .get(&object_entity_id)
+            .expect(
+                "Expected object_entity_id to exist in server_object_entity_available_selectables",
+            ),
         object_literal,
         selection_supplied_argument_value.location,
     )?;
 
     let missing_fields = get_non_nullable_missing_and_provided_fields(
+        server_entity_data,
         server_scalar_selectables,
         server_object_selectables,
         object_literal,
-        object,
+        object_entity_id,
     )
     .iter()
     .filter_map(|field| match field {
@@ -331,7 +336,7 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             &selection_supplied_argument_value.value,
             field_type_annotation,
             variable_definitions,
-            schema_data,
+            server_entity_data,
             server_scalar_selectables,
             server_object_selectables,
         ) {
@@ -363,13 +368,16 @@ enum ObjectLiteralFieldType {
 }
 
 fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtocol>(
+    server_entity_data: &ServerEntityData<TNetworkProtocol>,
     server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
     server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
-    object: &ServerObjectEntity<TNetworkProtocol>,
+    object_entity_id: ServerObjectEntityId,
 ) -> Vec<ObjectLiteralFieldType> {
-    object
-        .available_selectables
+    server_entity_data
+        .server_object_entity_available_selectables
+        .get(&object_entity_id)
+        .expect("Expected object_entity_id to exist in server_object_entity_available_selectables")
         .iter()
         .filter_map(|(field_name, field_type)| {
             let iso_type_annotation = match field_type.as_server()? {

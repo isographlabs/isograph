@@ -180,8 +180,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         let next_client_field_id = self.client_scalar_selectables.len().into();
 
-        if object
-            .available_selectables
+        if self
+            .server_entity_data
+            .server_object_entity_available_selectables
+            .entry(parent_object_entity_id)
+            .or_default()
             .insert(
                 client_field_name.into(),
                 DefinitionLocation::Client(SelectionType::Scalar(next_client_field_id)),
@@ -348,17 +351,20 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             },
         });
 
-        let parent_object = self
+        if self
             .server_entity_data
-            .server_object_entity_mut(parent_object_entity_id);
-        if parent_object
-            .available_selectables
+            .server_object_entity_available_selectables
+            .entry(parent_object_entity_id)
+            .or_default()
             .insert(
                 client_pointer_name.into(),
                 DefinitionLocation::Client(SelectionType::Object(next_client_pointer_id)),
             )
             .is_some()
         {
+            let parent_object = self
+                .server_entity_data
+                .server_object_entity(parent_object_entity_id);
             // Did not insert, so this object already has a field with the same name :(
             return Err(WithSpan::new(
                 ProcessClientFieldDeclarationError::ParentAlreadyHasField {

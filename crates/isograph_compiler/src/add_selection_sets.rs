@@ -3,8 +3,8 @@ use common_lang_types::{
 };
 use isograph_lang_types::{
     DefinitionLocation, ObjectSelection, ObjectSelectionDirectiveSet, ScalarSelection,
-    ScalarSelectionDirectiveSet, SelectionType, UnvalidatedScalarFieldSelection,
-    UnvalidatedSelection,
+    ScalarSelectionDirectiveSet, SelectionType, ServerObjectEntityId,
+    UnvalidatedScalarFieldSelection, UnvalidatedSelection,
 };
 use isograph_schema::{
     ClientScalarOrObjectSelectable, NetworkProtocol, RefetchStrategy, Schema, ServerObjectEntity,
@@ -56,6 +56,7 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
         schema,
         unprocessed_item.reader_selection_set,
         parent_object,
+        client_field.parent_object_entity_id,
         &client_field,
     )?;
 
@@ -63,6 +64,7 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
         schema,
         unprocessed_item.refetch_strategy,
         parent_object,
+        client_field.parent_object_entity_id,
         &client_field,
     )?;
 
@@ -84,10 +86,17 @@ fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     parent_object: &ServerObjectEntity<TNetworkProtocol>,
+    selection_parent_object_id: ServerObjectEntityId,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<Vec<WithSpan<ValidatedSelection>>> {
     get_all_errors_or_all_ok(selection_set.into_iter().map(|selection| {
-        get_validated_selection(schema, selection, parent_object, top_level_field_or_pointer)
+        get_validated_selection(
+            schema,
+            selection,
+            parent_object,
+            selection_parent_object_id,
+            top_level_field_or_pointer,
+        )
     }))
 }
 
@@ -95,6 +104,7 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     with_span: WithSpan<UnvalidatedSelection>,
     selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
+    selection_parent_object_id: ServerObjectEntityId,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<WithSpan<ValidatedSelection>> {
     with_span.and_then(|selection| match selection {
@@ -102,6 +112,7 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
             get_validated_scalar_selection(
                 schema,
                 selection_parent_object,
+                selection_parent_object_id,
                 top_level_field_or_pointer,
                 scalar_selection,
             )
@@ -111,6 +122,7 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
             Ok(SelectionType::Object(get_validated_object_selection(
                 schema,
                 selection_parent_object,
+                selection_parent_object_id,
                 top_level_field_or_pointer,
                 object_selection,
             )?))
@@ -121,11 +133,14 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
 fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
+    selection_parent_object_id: ServerObjectEntityId,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
     scalar_selection: UnvalidatedScalarFieldSelection,
 ) -> AddSelectionSetsResult<ValidatedScalarSelection> {
-    let location = selection_parent_object
-        .available_selectables
+    let location = schema.server_entity_data
+        .server_object_entity_available_selectables
+        .get(&selection_parent_object_id)
+        .expect("Expected selection_parent_object_id to exist in server_object_entity_available_selectables")
         .get(&scalar_selection.name.item.into())
         .ok_or_else(|| {
             WithLocation::new(
@@ -218,11 +233,13 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
 fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
+    selection_parent_object_id: ServerObjectEntityId,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
     object_selection: ObjectSelection<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<ValidatedObjectSelection> {
-    let location = selection_parent_object
-        .available_selectables
+    let location = schema.server_entity_data.server_object_entity_available_selectables
+    .get(&selection_parent_object_id)
+    .expect("Expected selection_parent_object_id to exist in server_object_entity_available_selectables")
         .get(&object_selection.name.item.into())
         .ok_or_else(|| {
             vec![WithLocation::new(
@@ -245,9 +262,9 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                 |server_scalar_selectable_id| {
                     let server_scalar_selectable =
                         schema.server_scalar_selectable(*server_scalar_selectable_id);
-                    let server_scalar = schema
-                        .server_entity_data
-                        .server_scalar_entity(*server_scalar_selectable.target_scalar_entity.inner());
+                    let server_scalar = schema.server_entity_data.server_scalar_entity(
+                        *server_scalar_selectable.target_scalar_entity.inner(),
+                    );
 
                     vec![WithLocation::new(
                         AddSelectionSetsError::SelectionTypeSelectionFieldIsScalar {
@@ -317,6 +334,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
             schema,
             object_selection.selection_set,
             new_parent_object,
+            new_parent_object_entity_id,
             top_level_field_or_pointer,
         )?,
     })
@@ -328,6 +346,7 @@ fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol>(
         RefetchStrategy<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
     >,
     parent_object: &ServerObjectEntity<TNetworkProtocol>,
+    selection_parent_object_id: ServerObjectEntityId,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<
     Option<
@@ -344,6 +363,7 @@ fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol>(
                     schema,
                     use_refetch_field_strategy.refetch_selection_set,
                     parent_object,
+                    selection_parent_object_id,
                     top_level_field_or_pointer,
                 )?,
                 root_fetchable_type: use_refetch_field_strategy.root_fetchable_type,

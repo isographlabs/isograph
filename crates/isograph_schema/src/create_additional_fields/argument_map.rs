@@ -189,22 +189,21 @@ impl ModifiedArgument {
         // But we should double check that, and return an error if necessary
         let object = unmodified.type_.clone().map(|input_type_name| {
             match input_type_name {
-                ServerEntityId::Object(object_entity_id) => {
-                    let object = schema.server_entity_data.server_object_entity(object_entity_id);
-
-                    ModifiedObject {
-                        field_map: object
-                            .available_selectables
-                            .iter()
-                            .flat_map(|(name, field_id)| match field_id {
-                                DefinitionLocation::Server(s) => {
-                                    Some((*name, PotentiallyModifiedField::Unmodified(*s)))
-                                }
-                                DefinitionLocation::Client(_) => None,
-                            })
-                            .collect(),
-                    }
-                }
+                ServerEntityId::Object(object_entity_id) => ModifiedObject {
+                    field_map: schema
+                        .server_entity_data
+                        .server_object_entity_available_selectables
+                        .get(&object_entity_id)
+                        .expect("Expected object_entity_id to exist in server_object_entity_available_selectables")
+                        .iter()
+                        .flat_map(|(name, field_id)| match field_id {
+                            DefinitionLocation::Server(s) => {
+                                Some((*name, PotentiallyModifiedField::Unmodified(*s)))
+                            }
+                            DefinitionLocation::Client(_) => None,
+                        })
+                        .collect(),
+                },
                 ServerEntityId::Scalar(_scalar_entity_id) => {
                     // TODO don't be lazy, return an error
                     panic!("Cannot modify a scalar")

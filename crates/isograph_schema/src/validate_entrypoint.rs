@@ -130,8 +130,9 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
         .server_entity_data
         .server_object_entity(parent_object_entity_id);
 
-    match parent_object
-        .available_selectables
+    match schema.server_entity_data.server_object_entity_available_selectables
+        .get(&parent_object_entity_id)
+        .expect("Expected parent_object_entity_id to exist in server_object_entity_available_selectables")
         .get(&field_name.item.into())
     {
         Some(defined_field) => match defined_field {

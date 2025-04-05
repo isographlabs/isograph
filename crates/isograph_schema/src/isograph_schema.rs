@@ -22,9 +22,10 @@ use thiserror::Error;
 
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectableId,
-    NetworkProtocol, NormalizationKey, ServerEntity, ServerObjectEntity, ServerObjectSelectable,
-    ServerScalarEntity, ServerScalarSelectable, ServerSelectable, ServerSelectableId,
-    UseRefetchFieldRefetchStrategy, UserWrittenComponentVariant,
+    NetworkProtocol, NormalizationKey, ServerEntity, ServerObjectEntity,
+    ServerObjectEntityAvailableSelectables, ServerObjectSelectable, ServerScalarEntity,
+    ServerScalarSelectable, ServerSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
+    UserWrittenComponentVariant,
 };
 
 lazy_static! {
@@ -123,6 +124,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 server_objects: vec![],
                 server_scalars: scalars,
                 defined_entities: defined_types,
+                server_object_entity_available_selectables: HashMap::new(),
 
                 id_type_id,
                 string_type_id,
@@ -169,6 +171,11 @@ pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
     pub server_objects: Vec<ServerObjectEntity<TNetworkProtocol>>,
     pub server_scalars: Vec<ServerScalarEntity<TNetworkProtocol>>,
     pub defined_entities: HashMap<UnvalidatedTypeName, ServerEntityId>,
+
+    // We keep track of available selectables and id fields outside of server_objects so that
+    // we don't need a server_object_entity_mut method, which is incompatible with pico.
+    pub server_object_entity_available_selectables:
+        HashMap<ServerObjectEntityId, ServerObjectEntityAvailableSelectables>,
 
     // Well known types
     pub id_type_id: ServerScalarEntityId,
@@ -239,23 +246,29 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let parent_object_entity_id = server_scalar_selectable.parent_type_id;
         let next_scalar_name = server_scalar_selectable.name;
 
-        let parent_object = self
+        if self
             .server_entity_data
-            .server_object_entity_mut(parent_object_entity_id);
-
-        if parent_object
-            .available_selectables
+            .server_object_entity_available_selectables
+            .entry(parent_object_entity_id)
+            .or_default()
             .insert(
                 next_scalar_name.item.into(),
                 DefinitionLocation::Server(SelectionType::Scalar(next_server_scalar_selectable_id)),
             )
             .is_some()
         {
+            let parent_object = self
+                .server_entity_data
+                .server_object_entity(parent_object_entity_id);
             return Err(InsertFieldsError::DuplicateField {
                 field_name: server_scalar_selectable.name.item.into(),
                 parent_type: parent_object.name,
             });
         }
+
+        let parent_object = self
+            .server_entity_data
+            .server_object_entity_mut(parent_object_entity_id);
 
         // TODO do not do this here, this is a GraphQL-ism
         if server_scalar_selectable.name.item == "id" {
@@ -282,17 +295,20 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let parent_object_entity_id = server_object_selectable.parent_type_id;
         let next_object_name = server_object_selectable.name;
 
-        let parent_object = self
+        if self
             .server_entity_data
-            .server_object_entity_mut(parent_object_entity_id);
-        if parent_object
-            .available_selectables
+            .server_object_entity_available_selectables
+            .entry(parent_object_entity_id)
+            .or_default()
             .insert(
                 next_object_name.item.into(),
                 DefinitionLocation::Server(SelectionType::Object(next_server_object_selectable_id)),
             )
             .is_some()
         {
+            let parent_object = self
+                .server_entity_data
+                .server_object_entity(parent_object_entity_id);
             return Err(InsertFieldsError::DuplicateField {
                 field_name: next_object_name.item.into(),
                 parent_type: parent_object.name,

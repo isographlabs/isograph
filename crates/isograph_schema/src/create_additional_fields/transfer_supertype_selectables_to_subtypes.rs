@@ -21,12 +21,18 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         supertype_to_subtype_map: &ValidatedTypeRefinementMap,
     ) -> ProcessTypeDefinitionResult<()> {
         for (supertype_id, subtype_ids) in supertype_to_subtype_map {
-            let supertype = self.server_entity_data.server_object_entity(*supertype_id);
-
+            // let supertype = self.server_entity_data.server_object_entity(*supertype_id);
             // TODO is there a way to do this without cloning? I would think so, in theory,
             // if you could prove (or check at runtime?) that the supertype and subtype are not
             // the same item.
-            let supertype_encountered_fields = supertype.available_selectables.clone();
+            let supertype_encountered_fields = match self
+                .server_entity_data
+                .server_object_entity_available_selectables
+                .get(supertype_id)
+            {
+                Some(selectables) => selectables.clone(),
+                None => Default::default(),
+            };
 
             for subtype_id in subtype_ids {
                 for (supertype_field_name, defined_field) in &supertype_encountered_fields {
@@ -36,13 +42,17 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                             // GraphQL, but ... does it make sense otherwise? Who knows.
                         }
                         DefinitionLocation::Client(_) => {
-                            let subtype = self.server_entity_data.server_object_entity_mut(*subtype_id);
-
-                            if subtype
-                                .available_selectables
+                            if self
+                                .server_entity_data
+                                .server_object_entity_available_selectables
+                                .get_mut(subtype_id)
+                                .expect("Expected subtype_id to exist in server_object_entity_available_selectables")
                                 .insert(*supertype_field_name, *defined_field)
                                 .is_some()
                             {
+                            let subtype = self
+                                .server_entity_data
+                                .server_object_entity(*subtype_id);
                                 return Err(WithLocation::new(
                                     CreateAdditionalFieldsError::FieldExistsOnType {
                                         field_name: *supertype_field_name,
