@@ -633,7 +633,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "graphql_output_format"
+name = "graphql_network_protocol"
 version = "0.3.1"
 dependencies = [
  "common_lang_types",
@@ -974,7 +974,7 @@ dependencies = [
  "clap 4.5.31",
  "colored",
  "common_lang_types",
- "graphql_output_format",
+ "graphql_network_protocol",
  "intern",
  "isograph_compiler",
  "isograph_config",

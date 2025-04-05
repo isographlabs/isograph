@@ -3,7 +3,7 @@ mod opt;
 use clap::Parser;
 use colored::Colorize;
 use common_lang_types::CurrentWorkingDirectory;
-use graphql_output_format::GraphQLNetworkProtocol;
+use graphql_network_protocol::GraphQLNetworkProtocol;
 use intern::string_key::Intern;
 use isograph_compiler::{compile_and_print, handle_watch_command};
 use isograph_config::create_config;
