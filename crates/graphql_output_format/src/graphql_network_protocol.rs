@@ -19,9 +19,9 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, std::hash::Hash, Default)]
-pub struct GraphQLOutputFormat {}
+pub struct GraphQLNetworkProtocol {}
 
-impl NetworkProtocol for GraphQLOutputFormat {
+impl NetworkProtocol for GraphQLNetworkProtocol {
     type TypeSystemDocument = GraphQLTypeSystemDocument;
     type TypeSystemExtensionDocument = GraphQLTypeSystemExtensionDocument;
 
