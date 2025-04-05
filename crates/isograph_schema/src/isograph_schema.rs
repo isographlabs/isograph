@@ -486,13 +486,6 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
         &self.server_objects[object_entity_id.as_usize()]
     }
 
-    pub fn server_object_entity_mut(
-        &mut self,
-        object_entity_id: ServerObjectEntityId,
-    ) -> &mut ServerObjectEntity<TNetworkProtocol> {
-        &mut self.server_objects[object_entity_id.as_usize()]
-    }
-
     pub fn server_object_entities_and_ids(
         &self,
     ) -> impl Iterator<Item = WithId<&ServerObjectEntity<TNetworkProtocol>>> + '_ {
