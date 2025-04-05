@@ -173,6 +173,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_object_entity_available_selectables
             .get(&payload_object_entity_id)
             .expect("Expected payload_object_entity_id to exist in server_object_entity_available_selectables")
+            .0
             .get(&primary_field_name.into());
 
         let (maybe_abstract_parent_object_entity_id, maybe_abstract_parent_type_name) =
@@ -319,6 +320,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_object_entity_available_selectables
             .entry(client_field_parent_object_entity_id)
             .or_default()
+            .0
             .insert(
                 mutation_field_name,
                 DefinitionLocation::Client(SelectionType::Scalar(client_field_id)),
@@ -368,6 +370,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_object_entity_available_selectables
             .get(&mutation_object_entity_id)
             .expect("Expected mutation_object_entity_id to exist in server_object_entity_available_selectables")
+            .0
             .iter()
             .find_map(|(name, field_id)| {
                 if let DefinitionLocation::Server(SelectionType::Object(server_field_id)) = field_id

@@ -46,6 +46,7 @@ pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
             .server_object_entity_available_selectables
             .entry(object_entity_id)
             .or_default()
+            .0
             .entry((*REFETCH_FIELD_NAME).into())
         {
             Entry::Occupied(_) => Err(BatchCompileError::DuplicateRefetchField),

@@ -56,6 +56,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 .server_object_entity_available_selectables
                 .entry(object_entity_id)
                 .or_default()
+                .0
                 .insert(
                     field_name.into(),
                     DefinitionLocation::Client(SelectionType::Scalar(next_client_field_id)),

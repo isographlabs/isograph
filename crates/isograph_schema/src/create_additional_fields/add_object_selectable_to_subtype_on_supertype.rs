@@ -37,6 +37,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         location: DefinitionLocation::Server(
                             *self.server_entity_data.server_object_entity_available_selectables.get(subtype_id)
                                 .expect("Expected subtype to exist in server_object_entity_available_selectables")
+                                .0
                                 .get(&"__typename".intern().into())
                                 .expect("Expected __typename to exist")
                                 .as_server()
@@ -60,6 +61,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                             *self.server_entity_data.server_object_entity_available_selectables
                                 .get(subtype_id)
                                 .expect("Expected subtype to exist in server_object_entity_available_selectables")
+                                .0
                                 .get(&(*LINK_FIELD_NAME).into())
                                 .expect("Expected link to exist")
                                 .as_client()
@@ -112,6 +114,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     .server_object_entity_available_selectables
                     .entry(*supertype_id)
                     .or_default()
+                    .0
                     .insert(
                         field_name.into(),
                         DefinitionLocation::Server(SelectionType::Object(

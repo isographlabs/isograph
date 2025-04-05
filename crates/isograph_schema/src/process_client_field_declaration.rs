@@ -185,6 +185,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_object_entity_available_selectables
             .entry(parent_object_entity_id)
             .or_default()
+            .0
             .insert(
                 client_field_name.into(),
                 DefinitionLocation::Client(SelectionType::Scalar(next_client_field_id)),
@@ -356,6 +357,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_object_entity_available_selectables
             .entry(parent_object_entity_id)
             .or_default()
+            .0
             .insert(
                 client_pointer_name.into(),
                 DefinitionLocation::Client(SelectionType::Object(next_client_pointer_id)),

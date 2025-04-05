@@ -175,7 +175,7 @@ pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
     // We keep track of available selectables and id fields outside of server_objects so that
     // we don't need a server_object_entity_mut method, which is incompatible with pico.
     pub server_object_entity_available_selectables:
-        HashMap<ServerObjectEntityId, ServerObjectEntityAvailableSelectables>,
+        HashMap<ServerObjectEntityId, (ServerObjectEntityAvailableSelectables,)>,
 
     // Well known types
     pub id_type_id: ServerScalarEntityId,
@@ -251,6 +251,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_object_entity_available_selectables
             .entry(parent_object_entity_id)
             .or_default()
+            .0
             .insert(
                 next_scalar_name.item.into(),
                 DefinitionLocation::Server(SelectionType::Scalar(next_server_scalar_selectable_id)),
@@ -300,6 +301,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_object_entity_available_selectables
             .entry(parent_object_entity_id)
             .or_default()
+            .0
             .insert(
                 next_object_name.item.into(),
                 DefinitionLocation::Server(SelectionType::Object(next_server_object_selectable_id)),

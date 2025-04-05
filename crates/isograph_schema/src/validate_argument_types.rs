@@ -315,7 +315,8 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             .get(&object_entity_id)
             .expect(
                 "Expected object_entity_id to exist in server_object_entity_available_selectables",
-            ),
+            )
+            .0,
         object_literal,
         selection_supplied_argument_value.location,
     )?;
@@ -378,6 +379,7 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
         .server_object_entity_available_selectables
         .get(&object_entity_id)
         .expect("Expected object_entity_id to exist in server_object_entity_available_selectables")
+        .0
         .iter()
         .filter_map(|(field_name, field_type)| {
             let iso_type_annotation = match field_type.as_server()? {

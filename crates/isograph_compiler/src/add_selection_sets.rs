@@ -141,6 +141,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
         .server_object_entity_available_selectables
         .get(&selection_parent_object_id)
         .expect("Expected selection_parent_object_id to exist in server_object_entity_available_selectables")
+        .0
         .get(&scalar_selection.name.item.into())
         .ok_or_else(|| {
             WithLocation::new(
@@ -240,6 +241,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     let location = schema.server_entity_data.server_object_entity_available_selectables
     .get(&selection_parent_object_id)
     .expect("Expected selection_parent_object_id to exist in server_object_entity_available_selectables")
+        .0
         .get(&object_selection.name.item.into())
         .ok_or_else(|| {
             vec![WithLocation::new(

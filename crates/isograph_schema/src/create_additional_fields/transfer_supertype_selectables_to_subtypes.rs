@@ -30,7 +30,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 .server_object_entity_available_selectables
                 .get(supertype_id)
             {
-                Some(selectables) => selectables.clone(),
+                Some(selectables) => selectables.0.clone(),
                 None => Default::default(),
             };
 
@@ -47,6 +47,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                                 .server_object_entity_available_selectables
                                 .get_mut(subtype_id)
                                 .expect("Expected subtype_id to exist in server_object_entity_available_selectables")
+                                .0
                                 .insert(*supertype_field_name, *defined_field)
                                 .is_some()
                             {

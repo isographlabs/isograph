@@ -56,6 +56,7 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
                 .server_object_entity_available_selectables
                 .get(&object_entity_id)
                 .expect("Expected object_entity_id to exist in server_object_entity_available_selectables")
+                .0
                 .iter()
                 .filter_map(
                     |(name, field_definition_location)| match field_definition_location {
