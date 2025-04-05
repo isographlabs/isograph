@@ -241,7 +241,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         let parent_object = self
             .server_entity_data
-            .object_entity_mut(parent_object_entity_id);
+            .server_object_entity_mut(parent_object_entity_id);
 
         if parent_object
             .available_selectables
@@ -284,7 +284,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         let parent_object = self
             .server_entity_data
-            .object_entity_mut(parent_object_entity_id);
+            .server_object_entity_mut(parent_object_entity_id);
         if parent_object
             .available_selectables
             .insert(
@@ -424,8 +424,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 }
 
 impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
-    /// Get a reference to a given scalar type by its id.
-    pub fn scalar_entity(
+    pub fn server_scalar_entity(
         &self,
         scalar_entity_id: ServerScalarEntityId,
     ) -> &ServerScalarEntity<TNetworkProtocol> {
@@ -441,31 +440,25 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
             .map(|(id, scalar)| WithId::new(id.into(), scalar))
     }
 
-    // TODO this function is horribly named
-    pub fn lookup_unvalidated_type(
-        &self,
-        type_id: ServerEntityId,
-    ) -> ServerEntity<TNetworkProtocol> {
+    pub fn server_entity(&self, type_id: ServerEntityId) -> ServerEntity<TNetworkProtocol> {
         match type_id {
             ServerEntityId::Object(object_entity_id) => {
-                ServerEntity::Object(self.object_entity(object_entity_id))
+                ServerEntity::Object(self.server_object_entity(object_entity_id))
             }
             ServerEntityId::Scalar(scalar_entity_id) => {
-                ServerEntity::Scalar(self.scalar_entity(scalar_entity_id))
+                ServerEntity::Scalar(self.server_scalar_entity(scalar_entity_id))
             }
         }
     }
 
-    /// Get a reference to a given object type by its id.
-    pub fn object_entity(
+    pub fn server_object_entity(
         &self,
         object_entity_id: ServerObjectEntityId,
     ) -> &ServerObjectEntity<TNetworkProtocol> {
         &self.server_objects[object_entity_id.as_usize()]
     }
 
-    /// Get a mutable reference to a given object type by its id.
-    pub fn object_entity_mut(
+    pub fn server_object_entity_mut(
         &mut self,
         object_entity_id: ServerObjectEntityId,
     ) -> &mut ServerObjectEntity<TNetworkProtocol> {

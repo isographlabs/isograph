@@ -66,7 +66,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             ServerEntityId::Scalar(scalar_entity_id) => {
                 let scalar_name = self
                     .server_entity_data
-                    .scalar_entity(*scalar_entity_id)
+                    .server_scalar_entity(*scalar_entity_id)
                     .name;
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
@@ -133,7 +133,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 ServerEntityId::Scalar(scalar_entity_id) => {
                     let scalar_name = self
                         .server_entity_data
-                        .scalar_entity(*scalar_entity_id)
+                        .server_scalar_entity(*scalar_entity_id)
                         .name;
                     return Err(WithLocation::new(
                         ProcessClientFieldDeclarationError::ClientPointerInvalidTargetType {
@@ -149,7 +149,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             ServerEntityId::Scalar(scalar_entity_id) => {
                 let scalar_name = self
                     .server_entity_data
-                    .scalar_entity(*scalar_entity_id)
+                    .server_scalar_entity(*scalar_entity_id)
                     .name;
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
@@ -261,10 +261,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let query_id = self.query_id();
         let to_object = self
             .server_entity_data
-            .object_entity(*to_object_entity_id.inner());
+            .server_object_entity(*to_object_entity_id.inner());
         let parent_object = self
             .server_entity_data
-            .object_entity(parent_object_entity_id);
+            .server_object_entity(parent_object_entity_id);
         let client_pointer_pointer_name_ws = client_pointer_declaration.item.client_pointer_name;
         let client_pointer_name = client_pointer_pointer_name_ws.item;
         let client_pointer_name_span = client_pointer_pointer_name_ws.span;
@@ -350,7 +350,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         let parent_object = self
             .server_entity_data
-            .object_entity_mut(parent_object_entity_id);
+            .server_object_entity_mut(parent_object_entity_id);
         if parent_object
             .available_selectables
             .insert(

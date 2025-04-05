@@ -91,7 +91,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         // TODO don't clone if possible
         let parent_object = self
             .server_entity_data
-            .object_entity(parent_object_entity_id);
+            .server_object_entity(parent_object_entity_id);
         let parent_object_name = parent_object.name;
 
         // TODO this is a bit ridiculous
@@ -141,7 +141,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         // TODO it's a bit annoying that we call .object twice!
         let mutation_field_payload_type_name = self
             .server_entity_data
-            .object_entity(payload_object_entity_id)
+            .server_object_entity(payload_object_entity_id)
             .name;
 
         let client_field_scalar_selection_name =
@@ -163,7 +163,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         let payload_object = self
             .server_entity_data
-            .object_entity(payload_object_entity_id);
+            .server_object_entity(payload_object_entity_id);
 
         // TODO split path on .
         let primary_field_name: ServerObjectSelectableName = path.unchecked_conversion();
@@ -184,7 +184,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         server_object_selectable.target_object_entity.inner();
                     let client_field_parent_object = self
                         .server_entity_data
-                        .object_entity(*client_field_parent_object_entity_id);
+                        .server_object_entity(*client_field_parent_object_entity_id);
 
                     Ok((
                         *client_field_parent_object_entity_id,
@@ -233,7 +233,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let top_level_schema_field_concrete_type = payload_object.concrete_type;
         let primary_field_concrete_type = self
             .server_entity_data
-            .object_entity(maybe_abstract_parent_object_entity_id)
+            .server_object_entity(maybe_abstract_parent_object_entity_id)
             .concrete_type;
 
         let mutation_client_field = ClientScalarSelectable {
@@ -313,7 +313,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
         let client_field_parent = self
             .server_entity_data
-            .object_entity_mut(client_field_parent_object_entity_id);
+            .server_object_entity_mut(client_field_parent_object_entity_id);
         if client_field_parent
             .available_selectables
             .insert(
@@ -362,7 +362,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     ) -> ProcessTypeDefinitionResult<ServerObjectSelectableId> {
         let mutation = self
             .server_entity_data
-            .object_entity(mutation_object_entity_id);
+            .server_object_entity(mutation_object_entity_id);
 
         let field_id = mutation
             .available_selectables

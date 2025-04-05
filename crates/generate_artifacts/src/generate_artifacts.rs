@@ -207,9 +207,9 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 value: NonConstantValue::Variable("id".intern().into()),
                             };
 
-                            let type_to_refine_to = schema
-                                .server_entity_data
-                                .object_entity(encountered_client_field.parent_object_entity_id);
+                            let type_to_refine_to = schema.server_entity_data.server_object_entity(
+                                encountered_client_field.parent_object_entity_id,
+                            );
 
                             if schema
                                 .fetchable_types
@@ -597,7 +597,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                             .map(&mut |scalar_entity_id| {
                                 schema
                                     .server_entity_data
-                                    .scalar_entity(scalar_entity_id)
+                                    .server_scalar_entity(scalar_entity_id)
                                     .javascript_name
                             });
 
@@ -771,7 +771,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                             .map(&mut |scalar_entity_id| {
                                 schema
                                     .server_entity_data
-                                    .scalar_entity(scalar_entity_id)
+                                    .server_scalar_entity(scalar_entity_id)
                                     .javascript_name
                             });
 
@@ -920,7 +920,7 @@ fn format_type_for_js<TNetworkProtocol: NetworkProtocol>(
             ServerEntityId::Scalar(scalar_entity_id) => {
                 schema
                     .server_entity_data
-                    .scalar_entity(scalar_entity_id)
+                    .server_scalar_entity(scalar_entity_id)
                     .javascript_name
             }
         },

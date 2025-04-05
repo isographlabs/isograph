@@ -544,7 +544,7 @@ fn process_graphql_type_system_extension(
                 ServerEntityId::Object(object_entity_id) => {
                     let schema_object = schema
                         .server_entity_data
-                        .object_entity_mut(object_entity_id);
+                        .server_object_entity_mut(object_entity_id);
 
                     if !object_extension.fields.is_empty() {
                         panic!("Adding fields in schema extensions is not allowed, yet.");
@@ -587,7 +587,7 @@ fn process_fields(
         for field_definition in field_definitions_to_insert.into_iter() {
             let parent_object_entity = schema
                 .server_entity_data
-                .object_entity(parent_object_entity_id);
+                .server_object_entity(parent_object_entity_id);
 
             let target_entity_type_name = field_definition.item.type_.inner();
 

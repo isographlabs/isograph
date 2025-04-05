@@ -50,7 +50,7 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
     let client_field = schema.client_field(unprocessed_item.client_field_id);
     let parent_object = schema
         .server_entity_data
-        .object_entity(client_field.parent_object_entity_id);
+        .server_object_entity(client_field.parent_object_entity_id);
 
     let new_selection_set = get_validated_selection_set(
         schema,
@@ -165,7 +165,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
                             schema.server_object_selectable(*object_selectable_id);
                         let object = schema
                             .server_entity_data
-                            .object_entity(*object_selectable.target_object_entity.inner());
+                            .server_object_entity(*object_selectable.target_object_entity.inner());
 
                         WithLocation::new(
                             AddSelectionSetsError::SelectionTypeSelectionFieldIsNotScalar {
@@ -247,7 +247,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                         schema.server_scalar_selectable(*server_scalar_selectable_id);
                     let server_scalar = schema
                         .server_entity_data
-                        .scalar_entity(*server_scalar_selectable.target_scalar_entity.inner());
+                        .server_scalar_entity(*server_scalar_selectable.target_scalar_entity.inner());
 
                     vec![WithLocation::new(
                         AddSelectionSetsError::SelectionTypeSelectionFieldIsScalar {
@@ -301,7 +301,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
 
     let new_parent_object = schema
         .server_entity_data
-        .object_entity(new_parent_object_entity_id);
+        .server_object_entity(new_parent_object_entity_id);
 
     Ok(ObjectSelection {
         name: object_selection.name,

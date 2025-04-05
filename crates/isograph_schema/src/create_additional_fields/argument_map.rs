@@ -190,7 +190,7 @@ impl ModifiedArgument {
         let object = unmodified.type_.clone().map(|input_type_name| {
             match input_type_name {
                 ServerEntityId::Object(object_entity_id) => {
-                    let object = schema.server_entity_data.object_entity(object_entity_id);
+                    let object = schema.server_entity_data.server_object_entity(object_entity_id);
 
                     ModifiedObject {
                         field_map: object

@@ -41,7 +41,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
     let user_written_component_variant = info.user_written_component_variant;
     let parent_type = schema
         .server_entity_data
-        .object_entity(selection_type.parent_object_entity_id());
+        .server_object_entity(selection_type.parent_object_entity_id());
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         schema,
@@ -160,7 +160,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
 
     let parent_type = schema
         .server_entity_data
-        .object_entity(encountered_server_field.parent_type_id);
+        .server_object_entity(encountered_server_field.parent_type_id);
     let concrete_type = inline_fragment.concrete_type;
 
     let (reader_ast, reader_imports) = generate_reader_ast(
@@ -215,7 +215,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     let ts_file_extension = file_extensions.ts();
     let parent_type = schema
         .server_entity_data
-        .object_entity(client_field.parent_object_entity_id());
+        .server_object_entity(client_field.parent_object_entity_id());
 
     let mut param_type_imports = BTreeSet::new();
     let mut loadable_fields = BTreeSet::new();
@@ -318,7 +318,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
 ) -> ArtifactPathAndContent {
     let parent_type = schema
         .server_entity_data
-        .object_entity(client_field.parent_object_entity_id);
+        .server_object_entity(client_field.parent_object_entity_id);
 
     let function_import_statement =
         generate_function_import_statement(config, info, file_extensions);
