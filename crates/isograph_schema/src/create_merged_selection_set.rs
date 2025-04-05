@@ -1126,7 +1126,7 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
         .server_entity_data
         .server_object_entity_available_selectables
         .get(&parent_object_entity_id)
-        .and_then(|(_, id_field)| *id_field)
+        .and_then(|(_, id_field, _)| *id_field)
     {
         match merged_selection_map.entry(NormalizationKey::Id) {
             Entry::Occupied(occupied) => {

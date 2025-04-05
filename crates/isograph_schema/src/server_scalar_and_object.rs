@@ -4,7 +4,6 @@ use common_lang_types::{
     DescriptionValue, GraphQLScalarTypeName, IsographObjectTypeName, JavascriptName,
     SelectableName, WithLocation, WithSpan,
 };
-use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective};
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
     impl_with_id, DefinitionLocation, SelectionType, ServerObjectEntityId, ServerScalarEntityId,
@@ -32,8 +31,6 @@ pub type ServerObjectEntityAvailableSelectables = BTreeMap<SelectableName, Selec
 pub struct ServerObjectEntity<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: IsographObjectTypeName,
-    // We probably don't want this
-    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 

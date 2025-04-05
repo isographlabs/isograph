@@ -95,8 +95,15 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let parent_object_name = parent_object.name;
 
         // TODO this is a bit ridiculous
-        let expose_field_directives = parent_object
-            .directives
+        let expose_field_directives = self
+            .server_entity_data
+            .server_object_entity_available_selectables
+            .get(&parent_object_entity_id)
+            .expect(
+                "Expected parent_object_entity_id to exist \
+                in server_object_entity_available_selectables",
+            )
+            .2
             .iter()
             .map(|d| self.parse_expose_field_directive(d))
             .collect::<Result<Vec<_>, _>>()?;

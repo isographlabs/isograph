@@ -342,12 +342,20 @@ fn process_object_type_definition(
     field_queue: &mut HashMap<ServerObjectEntityId, Vec<WithLocation<GraphQLFieldDefinition>>>,
 ) -> ProcessGraphqlTypeDefinitionResult<ProcessObjectTypeDefinitionOutcome> {
     let &mut Schema {
-        server_entity_data: ref mut server_field_data,
+        ref mut server_entity_data,
         ..
     } = schema;
-    let next_object_entity_id = server_field_data.server_objects.len().into();
-    let defined_types = &mut server_field_data.defined_entities;
-    let server_objects = &mut server_field_data.server_objects;
+    let next_object_entity_id = server_entity_data.server_objects.len().into();
+    let defined_types = &mut server_entity_data.defined_entities;
+    let server_objects = &mut server_entity_data.server_objects;
+
+    server_entity_data
+        .server_object_entity_available_selectables
+        .entry(next_object_entity_id)
+        .or_default()
+        .2
+        .extend(object_type_definition.directives);
+
     let encountered_root_kind = match defined_types.entry(object_type_definition.name.item.into()) {
         HashMapEntry::Occupied(_) => {
             return Err(WithLocation::new(
@@ -363,7 +371,6 @@ fn process_object_type_definition(
             server_objects.push(ServerObjectEntity {
                 description: object_type_definition.description.map(|d| d.item),
                 name: object_type_definition.name.item,
-                directives: object_type_definition.directives,
                 concrete_type,
                 output_associated_data: associated_data,
             });
@@ -540,10 +547,6 @@ fn process_graphql_type_system_extension(
 
             match *id {
                 ServerEntityId::Object(object_entity_id) => {
-                    let schema_object = schema
-                        .server_entity_data
-                        .server_object_entity_mut(object_entity_id);
-
                     if !object_extension.fields.is_empty() {
                         panic!("Adding fields in schema extensions is not allowed, yet.");
                     }
@@ -551,7 +554,13 @@ fn process_graphql_type_system_extension(
                         panic!("Adding interfaces in schema extensions is not allowed, yet.");
                     }
 
-                    schema_object.directives.extend(object_extension.directives);
+                    schema
+                        .server_entity_data
+                        .server_object_entity_available_selectables
+                        .entry(object_entity_id)
+                        .or_default()
+                        .2
+                        .extend(object_extension.directives);
 
                     Ok(())
                 }

@@ -7,7 +7,7 @@ use common_lang_types::{
     ClientScalarSelectableName, GraphQLScalarTypeName, IsoLiteralText, IsographObjectTypeName,
     JavascriptName, Location, SelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
-use graphql_lang_types::GraphQLNamedTypeAnnotation;
+use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective, GraphQLNamedTypeAnnotation};
 use intern::string_key::Intern;
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
@@ -174,11 +174,14 @@ pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
 
     // We keep track of available selectables and id fields outside of server_objects so that
     // we don't need a server_object_entity_mut method, which is incompatible with pico.
+    #[allow(clippy::type_complexity)]
     pub server_object_entity_available_selectables: HashMap<
         ServerObjectEntityId,
         (
             ServerObjectEntityAvailableSelectables,
             Option<ServerStrongIdFieldId>,
+            // We probably don't want this
+            Vec<GraphQLDirective<GraphQLConstantValue>>,
         ),
     >,
 
@@ -256,7 +259,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_object_entity(parent_object_entity_id)
             .name;
 
-        let (available_selections, id_field) = self
+        let (available_selections, id_field, _) = self
             .server_entity_data
             .server_object_entity_available_selectables
             .entry(parent_object_entity_id)
