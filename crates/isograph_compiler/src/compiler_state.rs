@@ -4,10 +4,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use common_lang_types::CurrentWorkingDirectory;
+use common_lang_types::{CurrentWorkingDirectory, WithLocation};
 use generate_artifacts::get_artifact_path_and_content;
 use isograph_config::{create_config, CompilerConfig};
-use isograph_schema::{OutputFormat, Schema};
+use isograph_schema::{validate_use_of_arguments, NetworkProtocol};
 use pico::Database;
 
 use crate::{
@@ -57,8 +57,8 @@ impl CompilerState {
 /// - Read and parse things:
 ///   - Read and parse the GraphQL schema
 ///   - Read and parse the Isograph literals
-/// - Combine everything into an UnvalidatedSchema.
-/// - Turn the UnvalidatedSchema into a ValidatedSchema
+/// - Combine everything into an Schema.
+/// - Turn the Schema into a Schema
 ///   - Note: at this point, we do most of the validations, like ensuring that
 ///     all selected fields exist and are of the correct types, parameters are
 ///     passed when needed, etc.
@@ -78,24 +78,31 @@ impl CompilerState {
 ///
 /// These are less "core" to the overall mission, and thus invite the question
 /// of whether they belong in this function, or at all.
-pub fn compile<TOutputFormat: OutputFormat>(
+pub fn compile<TNetworkProtocol: NetworkProtocol>(
     db: &Database,
     source_files: &SourceFiles,
     config: &CompilerConfig,
 ) -> Result<CompilationStats, Box<dyn Error>> {
     // Create schema
-    let (unvalidated_schema, stats) =
-        create_unvalidated_schema::<TOutputFormat>(db, source_files, config)?;
+    let (isograph_schema, stats) =
+        create_unvalidated_schema::<TNetworkProtocol>(db, source_files, config)?;
 
-    // Validate
-    let validated_schema = Schema::validate_and_construct(unvalidated_schema)
-        .map_err(|messages| BatchCompileError::UnableToValidateSchema { messages })?;
+    validate_use_of_arguments(&isograph_schema).map_err(|messages| {
+        Box::new(BatchCompileError::MultipleErrorsWithLocations {
+            messages: messages
+                .into_iter()
+                .map(|x| {
+                    WithLocation::new(Box::new(x.item) as Box<dyn std::error::Error>, x.location)
+                })
+                .collect(),
+        })
+    })?;
 
     // Note: we calculate all of the artifact paths and contents first, so that writing to
     // disk can be as fast as possible and we minimize the chance that changes to the file
     // system occur while we're writing and we get unpredictable results.
 
-    let artifacts = get_artifact_path_and_content(&validated_schema, config);
+    let artifacts = get_artifact_path_and_content(&isograph_schema, config);
 
     let total_artifacts_written =
         write_artifacts_to_disk(artifacts, &config.artifact_directory.absolute_path)?;

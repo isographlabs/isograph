@@ -3,15 +3,15 @@ use std::collections::{BTreeSet, HashSet};
 use common_lang_types::{ClientScalarSelectableName, ObjectTypeAndFieldName, WithSpan};
 use isograph_lang_types::{
     DefinitionLocation, EmptyDirectiveSet, LoadableDirectiveParameters,
-    ObjectSelectionDirectiveSet, RefetchQueryIndex, ScalarSelectionDirectiveSet, SelectionType,
+    ObjectSelectionDirectiveSet, RefetchQueryIndex, ScalarSelectionDirectiveSet,
     SelectionTypeContainingSelections,
 };
 use isograph_schema::{
-    categorize_field_loadability, transform_arguments_with_child_context, ClientFieldOrPointer,
-    ClientFieldVariant, Loadability, NameAndArguments, NormalizationKey, OutputFormat,
-    PathToRefetchField, RefetchedPathsMap, SchemaServerLinkedFieldFieldVariant,
-    ValidatedClientField, ValidatedLinkedFieldSelection, ValidatedScalarFieldSelection,
-    ValidatedSchema, ValidatedSelection, VariableContext,
+    categorize_field_loadability, transform_arguments_with_child_context, ClientFieldVariant,
+    ClientScalarOrObjectSelectable, ClientScalarSelectable, Loadability, NameAndArguments,
+    NetworkProtocol, NormalizationKey, PathToRefetchField, RefetchedPathsMap, Schema,
+    SchemaServerObjectSelectableVariant, ValidatedObjectSelection, ValidatedScalarSelection,
+    ValidatedSelection, VariableContext,
 };
 
 use crate::{
@@ -20,9 +20,9 @@ use crate::{
 };
 
 // Can we do this when visiting the client field in when generating entrypoints?
-fn generate_reader_ast_node<TOutputFormat: OutputFormat>(
+fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
     selection: &WithSpan<ValidatedSelection>,
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TNetworkProtocol>,
     indentation_level: u8,
     reader_imports: &mut ReaderImports,
     // TODO use this to generate usedRefetchQueries
@@ -96,9 +96,9 @@ fn generate_reader_ast_node<TOutputFormat: OutputFormat>(
     }
 }
 
-fn linked_field_ast_node<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
-    linked_field: &ValidatedLinkedFieldSelection,
+fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    linked_field: &ValidatedObjectSelection,
     indentation_level: u8,
     inner_reader_ast: ReaderAst,
     initial_variable_context: &VariableContext,
@@ -132,31 +132,26 @@ fn linked_field_ast_node<TOutputFormat: OutputFormat>(
             )
         }
         DefinitionLocation::Server(server_field_id) => {
-            let server_field = schema.server_field(server_field_id);
-            match &server_field.target_server_entity {
-                SelectionType::Scalar(_) => panic!("Expected object"),
-                SelectionType::Object((linked_field_variant, _)) => match &linked_field_variant {
-                    SchemaServerLinkedFieldFieldVariant::InlineFragment(inline_fragment) => {
-                        let parent_object_id = schema
-                            .server_field(inline_fragment.server_field_id)
-                            .parent_type_id;
-                        let object = schema.server_field_data.object(parent_object_id);
+            let server_field = schema.server_object_selectable(server_field_id);
+            match &server_field.object_selectable_variant {
+                SchemaServerObjectSelectableVariant::InlineFragment(_) => {
+                    let object = schema
+                        .server_entity_data
+                        .server_object_entity(server_field.parent_type_id);
 
-                        let type_and_field = ObjectTypeAndFieldName {
-                            field_name: linked_field.name.item.into(),
-                            type_name: object.name,
-                        };
+                    let type_and_field = ObjectTypeAndFieldName {
+                        field_name: linked_field.name.item.into(),
+                        type_name: object.name,
+                    };
 
-                        let reader_artifact_import_name =
-                            format!("{}__resolver_reader", type_and_field.underscore_separated());
+                    let reader_artifact_import_name =
+                        format!("{}__resolver_reader", type_and_field.underscore_separated());
 
-                        reader_imports
-                            .insert((type_and_field, ImportedFileCategory::ResolverReader));
+                    reader_imports.insert((type_and_field, ImportedFileCategory::ResolverReader));
 
-                        reader_artifact_import_name
-                    }
-                    SchemaServerLinkedFieldFieldVariant::LinkedField => "null".to_string(),
-                },
+                    reader_artifact_import_name
+                }
+                SchemaServerObjectSelectableVariant::LinkedField => "null".to_string(),
             }
         }
     };
@@ -180,10 +175,10 @@ fn linked_field_ast_node<TOutputFormat: OutputFormat>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn scalar_client_defined_field_ast_node<TOutputFormat: OutputFormat>(
-    scalar_field_selection: &ValidatedScalarFieldSelection,
-    schema: &ValidatedSchema<TOutputFormat>,
-    client_field: &ValidatedClientField<TOutputFormat>,
+fn scalar_client_defined_field_ast_node<TNetworkProtocol: NetworkProtocol>(
+    scalar_field_selection: &ValidatedScalarSelection,
+    schema: &Schema<TNetworkProtocol>,
+    client_field: &ClientScalarSelectable<TNetworkProtocol>,
     indentation_level: u8,
     path: &mut Vec<NormalizationKey>,
     root_refetched_paths: &RefetchedPathsMap,
@@ -241,7 +236,7 @@ fn scalar_client_defined_field_ast_node<TOutputFormat: OutputFormat>(
 }
 
 fn link_variant_ast_node(
-    scalar_field_selection: &ValidatedScalarFieldSelection,
+    scalar_field_selection: &ValidatedScalarSelection,
     indentation_level: u8,
 ) -> String {
     let alias = scalar_field_selection.name_or_alias().item;
@@ -257,11 +252,11 @@ fn link_variant_ast_node(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn user_written_variant_ast_node<TOutputFormat: OutputFormat>(
-    scalar_field_selection: &ValidatedScalarFieldSelection,
+fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
+    scalar_field_selection: &ValidatedScalarSelection,
     indentation_level: u8,
-    nested_client_field: &ValidatedClientField<TOutputFormat>,
-    schema: &ValidatedSchema<TOutputFormat>,
+    nested_client_field: &ClientScalarSelectable<TNetworkProtocol>,
+    schema: &Schema<TNetworkProtocol>,
     path: &mut Vec<NormalizationKey>,
     root_refetched_paths: &RefetchedPathsMap,
     reader_imports: &mut ReaderImports,
@@ -322,13 +317,13 @@ fn user_written_variant_ast_node<TOutputFormat: OutputFormat>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn imperatively_loaded_variant_ast_node<TOutputFormat: OutputFormat>(
-    nested_client_field: &ValidatedClientField<TOutputFormat>,
+fn imperatively_loaded_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
+    nested_client_field: &ClientScalarSelectable<TNetworkProtocol>,
     reader_imports: &mut ReaderImports,
     root_refetched_paths: &RefetchedPathsMap,
     path: &[NormalizationKey],
     indentation_level: u8,
-    scalar_field_selection: &ValidatedScalarFieldSelection,
+    scalar_field_selection: &ValidatedScalarSelection,
 ) -> String {
     let alias = scalar_field_selection.name_or_alias().item;
     let indent_1 = "  ".repeat(indentation_level as usize);
@@ -367,12 +362,12 @@ fn imperatively_loaded_variant_ast_node<TOutputFormat: OutputFormat>(
     )
 }
 
-fn loadably_selected_field_ast_node<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
-    client_field: &ValidatedClientField<TOutputFormat>,
+fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    client_field: &ClientScalarSelectable<TNetworkProtocol>,
     reader_imports: &mut ReaderImports,
     indentation_level: u8,
-    scalar_field_selection: &ValidatedScalarFieldSelection,
+    scalar_field_selection: &ValidatedScalarSelection,
     client_field_variable_context: &VariableContext,
     loadable_directive_parameters: &LoadableDirectiveParameters,
 ) -> String {
@@ -446,7 +441,7 @@ fn loadably_selected_field_ast_node<TOutputFormat: OutputFormat>(
 }
 
 fn server_defined_scalar_field_ast_node(
-    scalar_field_selection: &ValidatedScalarFieldSelection,
+    scalar_field_selection: &ValidatedScalarSelection,
     indentation_level: u8,
     initial_variable_context: &VariableContext,
 ) -> String {
@@ -483,8 +478,8 @@ fn server_defined_scalar_field_ast_node(
     )
 }
 
-fn generate_reader_ast_with_path<'schema, TOutputFormat: OutputFormat>(
-    schema: &'schema ValidatedSchema<TOutputFormat>,
+fn generate_reader_ast_with_path<'schema, TNetworkProtocol: NetworkProtocol>(
+    schema: &'schema Schema<TNetworkProtocol>,
     selection_set: &'schema [WithSpan<ValidatedSelection>],
     indentation_level: u8,
     nested_client_field_imports: &mut ReaderImports,
@@ -562,8 +557,8 @@ fn find_imperatively_fetchable_query_index(
         .expect("Expected refetch query to be found")
 }
 
-pub(crate) fn generate_reader_ast<'schema, TOutputFormat: OutputFormat>(
-    schema: &'schema ValidatedSchema<TOutputFormat>,
+pub(crate) fn generate_reader_ast<'schema, TNetworkProtocol: NetworkProtocol>(
+    schema: &'schema Schema<TNetworkProtocol>,
     selection_set: &'schema [WithSpan<ValidatedSelection>],
     indentation_level: u8,
     // N.B. this is not root_refetched_paths when we're generating an entrypoint :(
@@ -586,9 +581,9 @@ pub(crate) fn generate_reader_ast<'schema, TOutputFormat: OutputFormat>(
     (reader_ast, client_field_imports)
 }
 
-fn refetched_paths_for_client_field<TOutputFormat: OutputFormat>(
-    nested_client_field: &ValidatedClientField<TOutputFormat>,
-    schema: &ValidatedSchema<TOutputFormat>,
+fn refetched_paths_for_client_field<TNetworkProtocol: NetworkProtocol>(
+    nested_client_field: &ClientScalarSelectable<TNetworkProtocol>,
+    schema: &Schema<TNetworkProtocol>,
     path: &mut Vec<NormalizationKey>,
     client_field_variable_context: &VariableContext,
 ) -> Vec<PathToRefetchField> {
@@ -608,9 +603,9 @@ fn refetched_paths_for_client_field<TOutputFormat: OutputFormat>(
     paths
 }
 
-fn refetched_paths_with_path<TOutputFormat: OutputFormat>(
+fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
     selection_set: &[WithSpan<ValidatedSelection>],
-    schema: &ValidatedSchema<TOutputFormat>,
+    schema: &Schema<TNetworkProtocol>,
     path: &mut Vec<NormalizationKey>,
     initial_variable_context: &VariableContext,
 ) -> HashSet<PathToRefetchField> {

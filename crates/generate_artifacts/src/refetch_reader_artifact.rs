@@ -4,8 +4,8 @@ use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
-    initial_variable_context, ClientFieldOrPointer, FieldMapItem, OutputFormat, PrimaryFieldInfo,
-    RefetchedPathsMap, ValidatedClientField, ValidatedSchema,
+    initial_variable_context, ClientScalarOrObjectSelectable, ClientScalarSelectable, FieldMapItem,
+    NetworkProtocol, PrimaryFieldInfo, RefetchedPathsMap, Schema,
 };
 
 use crate::{
@@ -17,9 +17,9 @@ use crate::{
     reader_ast::generate_reader_ast,
 };
 
-pub(crate) fn generate_refetch_reader_artifact<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
-    client_field: &ValidatedClientField<TOutputFormat>,
+pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    client_field: &ClientScalarSelectable<TNetworkProtocol>,
     primary_field_info: Option<&PrimaryFieldInfo>,
     refetched_paths: &RefetchedPathsMap,
     was_selected_loadably: bool,
@@ -32,8 +32,8 @@ pub(crate) fn generate_refetch_reader_artifact<TOutputFormat: OutputFormat>(
         None => generate_function_import_statement_for_refetch_reader(),
     };
     let parent_type = schema
-        .server_field_data
-        .object(client_field.parent_object_id);
+        .server_entity_data
+        .server_object_entity(client_field.parent_object_entity_id);
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         schema,
@@ -83,13 +83,13 @@ pub(crate) fn generate_refetch_reader_artifact<TOutputFormat: OutputFormat>(
     }
 }
 
-pub(crate) fn generate_refetch_output_type_artifact<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
-    client_field: &ValidatedClientField<TOutputFormat>,
+pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    client_field: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ArtifactPathAndContent {
     let parent_type = schema
-        .server_field_data
-        .object(client_field.parent_object_id);
+        .server_entity_data
+        .server_object_entity(client_field.parent_object_entity_id);
 
     let client_field_output_type = generate_output_type(client_field);
 

@@ -1,16 +1,17 @@
 use common_lang_types::WithSpan;
-use isograph_lang_types::{DefinitionLocation, SelectionTypeContainingSelections};
+use isograph_lang_types::{
+    ClientScalarSelectableId, DefinitionLocation, SelectionTypeContainingSelections,
+};
 
 use crate::{
-    ClientFieldOrPointer, OutputFormat, ValidatedClientField, ValidatedSchema, ValidatedSelection,
-    ValidatedSelectionType,
+    ClientScalarOrObjectSelectable, ClientSelectable, NetworkProtocol, Schema, ValidatedSelection,
 };
 
 // This should really be replaced with a proper visitor, or something
-pub fn accessible_client_fields<'a, TOutputFormat: OutputFormat>(
-    selection_type: &'a ValidatedSelectionType<'a, TOutputFormat>,
-    schema: &'a ValidatedSchema<TOutputFormat>,
-) -> impl Iterator<Item = &'a ValidatedClientField<TOutputFormat>> + 'a {
+pub fn accessible_client_fields<'a, TNetworkProtocol: NetworkProtocol>(
+    selection_type: &'a ClientSelectable<'a, TNetworkProtocol>,
+    schema: &'a Schema<TNetworkProtocol>,
+) -> impl Iterator<Item = ClientScalarSelectableId> + 'a {
     AccessibleClientFieldIterator {
         selection_set: selection_type.selection_set_for_parent_query(),
         index: 0,
@@ -19,17 +20,17 @@ pub fn accessible_client_fields<'a, TOutputFormat: OutputFormat>(
     }
 }
 
-struct AccessibleClientFieldIterator<'a, TOutputFormat: OutputFormat> {
+struct AccessibleClientFieldIterator<'a, TNetworkProtocol: NetworkProtocol> {
     selection_set: &'a [WithSpan<ValidatedSelection>],
-    schema: &'a ValidatedSchema<TOutputFormat>,
+    schema: &'a Schema<TNetworkProtocol>,
     index: usize,
-    sub_iterator: Option<Box<AccessibleClientFieldIterator<'a, TOutputFormat>>>,
+    sub_iterator: Option<Box<AccessibleClientFieldIterator<'a, TNetworkProtocol>>>,
 }
 
-impl<'a, TOutputFormat: OutputFormat> Iterator
-    for AccessibleClientFieldIterator<'a, TOutputFormat>
+impl<TNetworkProtocol: NetworkProtocol> Iterator
+    for AccessibleClientFieldIterator<'_, TNetworkProtocol>
 {
-    type Item = &'a ValidatedClientField<TOutputFormat>;
+    type Item = ClientScalarSelectableId;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(iterator) = &mut self.sub_iterator {
@@ -53,9 +54,8 @@ impl<'a, TOutputFormat: OutputFormat> Iterator
                                 continue 'main_loop;
                             }
                             DefinitionLocation::Client(client_field_id) => {
-                                let nested_client_field = self.schema.client_field(client_field_id);
                                 self.index += 1;
-                                return Some(nested_client_field);
+                                return Some(client_field_id);
                             }
                         }
                     }

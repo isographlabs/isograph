@@ -6,7 +6,7 @@ use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::RefetchQueryIndex;
 use isograph_schema::{
-    ImperativelyLoadedFieldArtifactInfo, OutputFormat, ValidatedSchema, REFETCH_FIELD_NAME,
+    ImperativelyLoadedFieldArtifactInfo, NetworkProtocol, Schema, REFETCH_FIELD_NAME,
 };
 
 use crate::{
@@ -117,8 +117,8 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
     }
 }
 
-pub(crate) fn get_artifact_for_imperatively_loaded_field<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+pub(crate) fn get_artifact_for_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     imperatively_loaded_field_artifact_info: ImperativelyLoadedFieldArtifactInfo,
     file_extensions: GenerateFileExtensionsOption,
 ) -> Vec<ArtifactPathAndContent> {
@@ -133,7 +133,7 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field<TOutputFormat: OutputFo
         concrete_type,
     } = imperatively_loaded_field_artifact_info;
 
-    let query_text = TOutputFormat::generate_query_text(
+    let query_text = TNetworkProtocol::generate_query_text(
         query_name,
         schema,
         &merged_selection_set,

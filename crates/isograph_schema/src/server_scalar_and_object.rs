@@ -4,62 +4,72 @@ use common_lang_types::{
     DescriptionValue, GraphQLScalarTypeName, IsographObjectTypeName, JavascriptName,
     SelectableName, WithLocation, WithSpan,
 };
-use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective};
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
-    DefinitionLocation, SelectionType, ServerObjectId, ServerScalarId, ServerScalarSelectableId,
-    ServerStrongIdFieldId,
+    impl_with_id, DefinitionLocation, SelectionType, ServerObjectEntityId, ServerScalarEntityId,
 };
 
-use crate::{ClientFieldOrPointerId, OutputFormat};
+use crate::{ClientSelectableId, NetworkProtocol, ServerSelectableId};
 
 /// A scalar type in the schema.
 #[derive(Debug)]
-pub struct SchemaScalar<TOutputFormat: OutputFormat> {
+pub struct ServerScalarEntity<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<GraphQLScalarTypeName>,
-    pub id: ServerScalarId,
     pub javascript_name: JavascriptName,
-    pub output_format: PhantomData<TOutputFormat>,
+    pub output_format: PhantomData<TNetworkProtocol>,
 }
+
+impl_with_id!(ServerScalarEntity<TNetworkProtocol: NetworkProtocol>, ServerScalarEntityId);
+
+type SelectableId = DefinitionLocation<ServerSelectableId, ClientSelectableId>;
+
+pub type ServerObjectEntityAvailableSelectables = BTreeMap<SelectableName, SelectableId>;
 
 /// An object type in the schema.
 #[derive(Debug)]
-pub struct SchemaObject<TOutputFormat: OutputFormat> {
+pub struct ServerObjectEntity<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: IsographObjectTypeName,
-    pub id: ServerObjectId,
-    // We probably don't want this
-    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
-    /// TODO remove id_field from fields, and change the type of Option<ServerFieldId>
-    /// to something else.
-    pub id_field: Option<ServerStrongIdFieldId>,
-    pub encountered_fields: BTreeMap<
-        SelectableName,
-        DefinitionLocation<ServerScalarSelectableId, ClientFieldOrPointerId>,
-    >,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<IsographObjectTypeName>,
 
-    pub output_associated_data: TOutputFormat::SchemaObjectAssociatedData,
+    pub output_associated_data: TNetworkProtocol::SchemaObjectAssociatedData,
 }
 
-pub type SchemaType<'a, TOutputFormat> =
-    SelectionType<&'a SchemaScalar<TOutputFormat>, &'a SchemaObject<TOutputFormat>>;
+impl_with_id!(ServerObjectEntity<TNetworkProtocol: NetworkProtocol>, ServerObjectEntityId);
+
+pub type ServerEntity<'a, TNetworkProtocol> = SelectionType<
+    &'a ServerScalarEntity<TNetworkProtocol>,
+    &'a ServerObjectEntity<TNetworkProtocol>,
+>;
 
 #[impl_for_selection_type]
-pub trait SchemaScalarOrObject {
+pub trait ServerScalarOrObjectEntity {
     fn name(&self) -> SelectionType<GraphQLScalarTypeName, IsographObjectTypeName>;
+    fn description(&self) -> Option<DescriptionValue>;
 }
 
-impl<TOutputFormat: OutputFormat> SchemaScalarOrObject for &SchemaScalar<TOutputFormat> {
+impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
+    for &ServerScalarEntity<TNetworkProtocol>
+{
     fn name(&self) -> SelectionType<GraphQLScalarTypeName, IsographObjectTypeName> {
         SelectionType::Scalar(self.name.item)
     }
+
+    fn description(&self) -> Option<DescriptionValue> {
+        self.description.map(|x| x.item)
+    }
 }
 
-impl<TOutputFormat: OutputFormat> SchemaScalarOrObject for &SchemaObject<TOutputFormat> {
+impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
+    for &ServerObjectEntity<TNetworkProtocol>
+{
     fn name(&self) -> SelectionType<GraphQLScalarTypeName, IsographObjectTypeName> {
         SelectionType::Object(self.name)
+    }
+
+    fn description(&self) -> Option<DescriptionValue> {
+        self.description
     }
 }

@@ -17,6 +17,36 @@ pub enum DefinitionLocation<TServer, TClient> {
     Client(TClient),
 }
 
+impl<TServer, TClient> DefinitionLocation<TServer, TClient> {
+    pub fn as_server(&self) -> Option<&TServer> {
+        match self {
+            DefinitionLocation::Server(s) => Some(s),
+            DefinitionLocation::Client(_) => None,
+        }
+    }
+
+    pub fn as_server_result(&self) -> Result<&TServer, &TClient> {
+        match self {
+            DefinitionLocation::Server(s) => Ok(s),
+            DefinitionLocation::Client(c) => Err(c),
+        }
+    }
+
+    pub fn as_client(&self) -> Option<&TClient> {
+        match self {
+            DefinitionLocation::Server(_) => None,
+            DefinitionLocation::Client(c) => Some(c),
+        }
+    }
+
+    pub fn as_client_result(&self) -> Result<&TClient, &TServer> {
+        match self {
+            DefinitionLocation::Server(s) => Err(s),
+            DefinitionLocation::Client(c) => Ok(c),
+        }
+    }
+}
+
 /// Distinguishes between items are are "scalar-like" and objects that
 /// are "object-like". Examples include:
 ///
@@ -80,10 +110,24 @@ impl<TScalar, TObject> SelectionType<TScalar, TObject> {
         }
     }
 
+    pub fn as_scalar_result(&self) -> Result<&TScalar, &TObject> {
+        match self {
+            SelectionType::Scalar(s) => Ok(s),
+            SelectionType::Object(o) => Err(o),
+        }
+    }
+
     pub fn as_object(&self) -> Option<&TObject> {
         match self {
             SelectionType::Scalar(_) => None,
             SelectionType::Object(o) => Some(o),
+        }
+    }
+
+    pub fn as_object_result(&self) -> Result<&TObject, &TScalar> {
+        match self {
+            SelectionType::Scalar(s) => Err(s),
+            SelectionType::Object(o) => Ok(o),
         }
     }
 }

@@ -1,26 +1,13 @@
 use common_lang_types::DescriptionValue;
-use isograph_lang_types::{DefinitionLocation, SelectionType, ServerObjectId, TypeAnnotation};
+use isograph_lang_types::{DefinitionLocation, ServerObjectEntityId, TypeAnnotation};
 
-use crate::{
-    ClientPointer, OutputFormat, ServerScalarSelectable, ValidatedClientPointer,
-    ValidatedSchemaServerField,
-};
+use crate::{ClientObjectSelectable, NetworkProtocol, ServerObjectSelectable};
 
 #[allow(clippy::type_complexity)]
-pub fn description<
-    TSelectionTypeSelectionScalarFieldAssociatedData,
-    TSelectionTypeSelectionLinkedFieldAssociatedData,
-    TSelectionTypeVariableDefinitionAssociatedData: Ord + std::fmt::Debug,
-    TOutputFormat: OutputFormat,
->(
+pub fn description<TNetworkProtocol: NetworkProtocol>(
     definition_location: &DefinitionLocation<
-        &ServerScalarSelectable<TOutputFormat>,
-        &ClientPointer<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-            TSelectionTypeVariableDefinitionAssociatedData,
-            TOutputFormat,
-        >,
+        &ServerObjectSelectable<TNetworkProtocol>,
+        &ClientObjectSelectable<TNetworkProtocol>,
     >,
 ) -> Option<DescriptionValue> {
     match definition_location {
@@ -29,40 +16,14 @@ pub fn description<
     }
 }
 
-pub fn output_type_annotation<'a, TOutputFormat: OutputFormat>(
+pub fn output_type_annotation<'a, TNetworkProtocol: NetworkProtocol>(
     definition_location: &'a DefinitionLocation<
-        &ValidatedSchemaServerField<TOutputFormat>,
-        &ValidatedClientPointer<TOutputFormat>,
+        &ServerObjectSelectable<TNetworkProtocol>,
+        &ClientObjectSelectable<TNetworkProtocol>,
     >,
-) -> &'a TypeAnnotation<ServerObjectId> {
+) -> &'a TypeAnnotation<ServerObjectEntityId> {
     match definition_location {
         DefinitionLocation::Client(client_pointer) => &client_pointer.to,
-        DefinitionLocation::Server(server_field) => match &server_field.target_server_entity {
-            SelectionType::Scalar(_) => {
-                panic!(
-                    "output_type_id should be an object. \
-                    This is indicative of a bug in Isograph.",
-                )
-            }
-            SelectionType::Object((_, type_annotation)) => type_annotation,
-        },
-    }
-}
-
-pub fn as_server_field<TFieldAssociatedData, TClientFieldType>(
-    definition_location: &DefinitionLocation<TFieldAssociatedData, TClientFieldType>,
-) -> Option<&TFieldAssociatedData> {
-    match definition_location {
-        DefinitionLocation::Server(server_field) => Some(server_field),
-        DefinitionLocation::Client(_) => None,
-    }
-}
-
-pub fn as_client_type<TFieldAssociatedData, TClientFieldType>(
-    definition_location: &DefinitionLocation<TFieldAssociatedData, TClientFieldType>,
-) -> Option<&TClientFieldType> {
-    match definition_location {
-        DefinitionLocation::Server(_) => None,
-        DefinitionLocation::Client(client_field) => Some(client_field),
+        DefinitionLocation::Server(server_field) => &server_field.target_object_entity,
     }
 }

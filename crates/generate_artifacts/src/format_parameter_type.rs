@@ -4,13 +4,12 @@ use common_lang_types::SelectableName;
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 
 use isograph_lang_types::{
-    DefinitionLocation, SelectionType, ServerEntityId, ServerScalarSelectableId, TypeAnnotation,
-    UnionVariant,
+    DefinitionLocation, SelectionType, ServerEntityId, TypeAnnotation, UnionVariant,
 };
-use isograph_schema::{OutputFormat, ValidatedSchema};
+use isograph_schema::{NetworkProtocol, Schema, ServerSelectableId};
 
-pub(crate) fn format_parameter_type<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     type_: GraphQLTypeAnnotation<ServerEntityId>,
     indentation_level: u8,
 ) -> String {
@@ -41,18 +40,23 @@ pub(crate) fn format_parameter_type<TOutputFormat: OutputFormat>(
     }
 }
 
-fn format_server_field_type<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     field: ServerEntityId,
     indentation_level: u8,
 ) -> String {
     match field {
-        ServerEntityId::Object(object_id) => {
+        ServerEntityId::Object(object_entity_id) => {
+            // TODO this is bad; we should never create a type containing all of the fields
+            // on a given object. This is currently used for input objects, and we should
+            // consider how to do this is a not obviously broken manner.
             let mut s = "{\n".to_string();
-            for (name, server_field_id) in schema
-                .server_field_data
-                .object(object_id)
-                .encountered_fields
+            for (name, server_selectable_id) in schema
+                .server_entity_data
+                .server_object_entity_available_selectables
+                .get(&object_entity_id)
+                .expect("Expected object_entity_id to exist in server_object_entity_available_selectables")
+                .0
                 .iter()
                 .filter_map(
                     |(name, field_definition_location)| match field_definition_location {
@@ -61,36 +65,45 @@ fn format_server_field_type<TOutputFormat: OutputFormat>(
                     },
                 )
             {
-                let field_type =
-                    format_field_definition(schema, name, server_field_id, indentation_level + 1);
+                let field_type = format_field_definition(
+                    schema,
+                    name,
+                    server_selectable_id,
+                    indentation_level + 1,
+                );
                 s.push_str(&field_type)
             }
             s.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
             s
         }
-        ServerEntityId::Scalar(scalar_id) => schema
-            .server_field_data
-            .scalar(scalar_id)
+        ServerEntityId::Scalar(scalar_entity_id) => schema
+            .server_entity_data
+            .server_scalar_entity(scalar_entity_id)
             .javascript_name
             .to_string(),
     }
 }
 
-fn format_field_definition<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     name: &SelectableName,
-    server_field_id: ServerScalarSelectableId,
+    server_selectable_id: ServerSelectableId,
     indentation_level: u8,
 ) -> String {
-    let selection_type = &schema.server_field(server_field_id).target_server_entity;
-    let (is_optional, selection_type) = match selection_type {
-        SelectionType::Scalar(type_annotation) => (
-            is_nullable(type_annotation),
-            type_annotation.clone().map(&mut SelectionType::Scalar),
+    let (is_optional, selection_type) = match schema.server_selectable(server_selectable_id) {
+        SelectionType::Scalar(scalar_selectable) => (
+            is_nullable(&scalar_selectable.target_scalar_entity),
+            scalar_selectable
+                .target_scalar_entity
+                .clone()
+                .map(&mut SelectionType::Scalar),
         ),
-        SelectionType::Object((_, type_annotation)) => (
-            is_nullable(type_annotation),
-            type_annotation.clone().map(&mut SelectionType::Object),
+        SelectionType::Object(object_selectable) => (
+            is_nullable(&object_selectable.target_object_entity),
+            object_selectable
+                .target_object_entity
+                .clone()
+                .map(&mut SelectionType::Object),
         ),
     };
 
@@ -111,8 +124,8 @@ fn is_nullable<T: Ord + Debug>(type_annotation: &TypeAnnotation<T>) -> bool {
     }
 }
 
-fn format_type_annotation<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+fn format_type_annotation<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     type_annotation: &TypeAnnotation<ServerEntityId>,
     indentation_level: u8,
 ) -> String {

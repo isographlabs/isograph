@@ -4,8 +4,8 @@ use common_lang_types::{QueryOperationName, QueryText};
 use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDocument};
 use isograph_lang_types::SchemaSource;
 use isograph_schema::{
-    MergedSelectionMap, OutputFormat, ProcessTypeSystemDocumentOutcome, RootOperationName,
-    ValidatedSchema, ValidatedVariableDefinition,
+    MergedSelectionMap, NetworkProtocol, ProcessTypeSystemDocumentOutcome, RootOperationName,
+    Schema, ValidatedVariableDefinition,
 };
 use pico::{Database, MemoRef, SourceId};
 
@@ -19,9 +19,9 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, std::hash::Hash, Default)]
-pub struct GraphQLOutputFormat {}
+pub struct GraphQLNetworkProtocol {}
 
-impl OutputFormat for GraphQLOutputFormat {
+impl NetworkProtocol for GraphQLNetworkProtocol {
     type TypeSystemDocument = GraphQLTypeSystemDocument;
     type TypeSystemExtensionDocument = GraphQLTypeSystemExtensionDocument;
 
@@ -66,7 +66,7 @@ impl OutputFormat for GraphQLOutputFormat {
 
     fn generate_query_text<'a>(
         query_name: QueryOperationName,
-        schema: &ValidatedSchema<Self>,
+        schema: &Schema<Self>,
         selection_map: &MergedSelectionMap,
         query_variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
         root_operation_name: &RootOperationName,

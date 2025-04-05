@@ -1,32 +1,38 @@
 use common_lang_types::{Location, WithLocation};
 use isograph_lang_types::DefinitionLocation;
 
-use crate::{OutputFormat, UnvalidatedSchema};
+use crate::{NetworkProtocol, Schema};
 
 use super::create_additional_fields_error::{
     CreateAdditionalFieldsError, ProcessTypeDefinitionResult, ValidatedTypeRefinementMap,
 };
 
-impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
-    /// For each supertype (e.g. Node), add the fields defined on it (e.g. Node.MyComponent)
+impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
+    /// For each supertype (e.g. Node), add the client selectables defined on it (e.g. Node.MyComponent)
     /// to subtypes (e.g. creating User.MyComponent).
     ///
-    /// We do not transfer server fields (because that makes no sense in GraphQL, but does
+    /// We do not transfer server selectables (because that makes no sense in GraphQL, but does
     /// it make sense otherwise??) and refetch fields (which are already defined on all valid
     /// types.)
     ///
     /// TODO confirm we don't do this for unions...
-    pub fn add_fields_to_subtypes(
+    pub fn transfer_supertype_client_selectables_to_subtypes(
         &mut self,
         supertype_to_subtype_map: &ValidatedTypeRefinementMap,
     ) -> ProcessTypeDefinitionResult<()> {
         for (supertype_id, subtype_ids) in supertype_to_subtype_map {
-            let supertype = self.server_field_data.object(*supertype_id);
-
+            // let supertype = self.server_entity_data.server_object_entity(*supertype_id);
             // TODO is there a way to do this without cloning? I would think so, in theory,
             // if you could prove (or check at runtime?) that the supertype and subtype are not
             // the same item.
-            let supertype_encountered_fields = supertype.encountered_fields.clone();
+            let supertype_encountered_fields = match self
+                .server_entity_data
+                .server_object_entity_available_selectables
+                .get(supertype_id)
+            {
+                Some(selectables) => selectables.0.clone(),
+                None => Default::default(),
+            };
 
             for subtype_id in subtype_ids {
                 for (supertype_field_name, defined_field) in &supertype_encountered_fields {
@@ -36,13 +42,20 @@ impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {
                             // GraphQL, but ... does it make sense otherwise? Who knows.
                         }
                         DefinitionLocation::Client(_) => {
-                            let subtype = self.server_field_data.object_mut(*subtype_id);
-
-                            if subtype
-                                .encountered_fields
+                            if self
+                                .server_entity_data
+                                .server_object_entity_available_selectables
+                                .get_mut(subtype_id)
+                                .expect(
+                                    "Expected subtype_id to exist \
+                                    in server_object_entity_available_selectables",
+                                )
+                                .0
                                 .insert(*supertype_field_name, *defined_field)
                                 .is_some()
                             {
+                                let subtype =
+                                    self.server_entity_data.server_object_entity(*subtype_id);
                                 return Err(WithLocation::new(
                                     CreateAdditionalFieldsError::FieldExistsOnType {
                                         field_name: *supertype_field_name,

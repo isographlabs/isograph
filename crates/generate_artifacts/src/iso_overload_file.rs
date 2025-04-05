@@ -5,14 +5,14 @@ use std::cmp::Ordering;
 
 use common_lang_types::{ArtifactPathAndContent, IsoLiteralText, SelectableName};
 use isograph_schema::{
-    ClientFieldOrPointer, ClientFieldVariant, OutputFormat, UserWrittenComponentVariant,
-    ValidatedClientField, ValidatedSchema, ValidatedSelectionType,
+    ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, NetworkProtocol,
+    Schema, UserWrittenComponentVariant,
 };
 
 use crate::generate_artifacts::ISO_TS_FILE_NAME;
 
-fn build_iso_overload_for_entrypoint<TOutputFormat: OutputFormat>(
-    validated_client_field: &ValidatedClientField<TOutputFormat>,
+fn build_iso_overload_for_entrypoint<TNetworkProtocol: NetworkProtocol>(
+    validated_client_field: &ClientScalarSelectable<TNetworkProtocol>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> (String, String) {
     let formatted_field = format!(
@@ -40,9 +40,9 @@ export function iso<T>(
     (import, s)
 }
 
-fn build_iso_overload_for_client_defined_type<TOutputFormat: OutputFormat>(
+fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol>(
     client_type_and_variant: (
-        ValidatedSelectionType<TOutputFormat>,
+        ClientSelectable<TNetworkProtocol>,
         UserWrittenComponentVariant,
     ),
     file_extensions: GenerateFileExtensionsOption,
@@ -87,8 +87,8 @@ export function iso<T>(
     (import, s)
 }
 
-pub(crate) fn build_iso_overload_artifact<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+pub(crate) fn build_iso_overload_artifact<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     file_extensions: GenerateFileExtensionsOption,
     no_babel_transform: bool,
 ) -> ArtifactPathAndContent {
@@ -219,13 +219,16 @@ export function iso(isographLiteralText: string):
     }
 }
 
-fn sorted_user_written_types<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
+fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
 ) -> Vec<(
-    ValidatedSelectionType<TOutputFormat>,
+    ClientSelectable<TNetworkProtocol>,
     UserWrittenComponentVariant,
 )> {
-    let mut client_types = user_written_fields(schema).collect::<Vec<_>>();
+    let mut client_types = schema
+        .user_written_client_types()
+        .map(|x| (x.1, x.2))
+        .collect::<Vec<_>>();
     client_types.sort_by(|client_type_1, client_type_2| {
         match client_type_1
             .0
@@ -244,9 +247,9 @@ fn sorted_user_written_types<TOutputFormat: OutputFormat>(
     client_types
 }
 
-fn sorted_entrypoints<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
-) -> Vec<(&ValidatedClientField<TOutputFormat>, &IsoLiteralText)> {
+fn sorted_entrypoints<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+) -> Vec<(&ClientScalarSelectable<TNetworkProtocol>, &IsoLiteralText)> {
     let mut entrypoints = schema
         .entrypoints
         .iter()
@@ -292,31 +295,4 @@ fn sort_field_name(field_1: SelectableName, field_2: SelectableName) -> Ordering
     } else {
         field_1.cmp(field_2)
     }
-}
-
-fn user_written_fields<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
-) -> impl Iterator<
-    Item = (
-        ValidatedSelectionType<TOutputFormat>,
-        UserWrittenComponentVariant,
-    ),
-> + '_ {
-    schema
-        .client_types
-        .iter()
-        .filter_map(|client_type| match client_type {
-            SelectionType::Object(client_pointer) => Some((
-                SelectionType::Object(client_pointer),
-                UserWrittenComponentVariant::Eager,
-            )),
-            SelectionType::Scalar(client_field) => match client_field.variant {
-                ClientFieldVariant::Link => None,
-                ClientFieldVariant::UserWritten(info) => Some((
-                    SelectionType::Scalar(client_field),
-                    info.user_written_component_variant,
-                )),
-                ClientFieldVariant::ImperativelyLoadedField(_) => None,
-            },
-        })
 }

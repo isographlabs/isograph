@@ -1,24 +1,21 @@
 use common_lang_types::{
-    EnumLiteralValue, Location, SelectableName, UnvalidatedTypeName, ValueKeyName, VariableName,
-    WithLocation, WithSpan,
+    EnumLiteralValue, GraphQLScalarTypeName, Location, SelectableName, UnvalidatedTypeName,
+    ValueKeyName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
     GraphQLTypeAnnotation, NameValuePair,
 };
-use intern::Lookup;
-use std::collections::BTreeMap;
+use thiserror::Error;
 
 use isograph_lang_types::{
-    graphql_type_annotation_from_type_annotation, DefinitionLocation, NonConstantValue,
-    SelectionType, ServerEntityId, ServerObjectId, ServerScalarId, ServerScalarSelectableId,
-    VariableDefinition,
+    graphql_type_annotation_from_type_annotation, NonConstantValue, SelectionType, ServerEntityId,
+    ServerObjectEntityId, ServerScalarEntityId, VariableDefinition,
 };
 
 use crate::{
-    as_server_field, ClientFieldOrPointerId, OutputFormat, SchemaObject, ServerFieldData,
-    ValidateSchemaError, ValidateSchemaResult, ValidatedSchemaServerField,
-    ValidatedVariableDefinition,
+    NetworkProtocol, ServerEntityData, ServerObjectEntityAvailableSelectables,
+    ServerObjectSelectable, ServerScalarSelectable, ValidatedVariableDefinition,
 };
 
 fn graphql_type_to_non_null_type<TValue>(
@@ -40,18 +37,18 @@ fn graphql_type_to_nullable_type<TValue>(
     }
 }
 
-fn scalar_literal_satisfies_type<TOutputFormat: OutputFormat>(
-    scalar_literal: &ServerScalarId,
+fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
+    scalar_literal: &ServerScalarEntityId,
     type_: &GraphQLTypeAnnotation<ServerEntityId>,
-    schema_data: &ServerFieldData<TOutputFormat>,
+    schema_data: &ServerEntityData<TNetworkProtocol>,
     location: Location,
-) -> Result<(), WithLocation<ValidateSchemaError>> {
+) -> Result<(), WithLocation<ValidateArgumentTypesError>> {
     match graphql_type_to_non_null_type(type_.clone()) {
         GraphQLNonNullTypeAnnotation::List(_) => {
-            let actual = schema_data.scalar(*scalar_literal).name.item;
+            let actual = schema_data.server_scalar_entity(*scalar_literal).name.item;
 
             Err(WithLocation::new(
-                ValidateSchemaError::ExpectedTypeFoundScalar {
+                ValidateArgumentTypesError::ExpectedTypeFoundScalar {
                     expected: id_annotation_to_typename_annotation(type_, schema_data),
                     actual,
                 },
@@ -59,26 +56,26 @@ fn scalar_literal_satisfies_type<TOutputFormat: OutputFormat>(
             ))
         }
         GraphQLNonNullTypeAnnotation::Named(named_type) => match named_type.item {
-            SelectionType::Scalar(expected_scalar_id) => {
-                if expected_scalar_id == *scalar_literal {
+            SelectionType::Scalar(expected_scalar_entity_id) => {
+                if expected_scalar_entity_id == *scalar_literal {
                     return Ok(());
                 }
-                let actual = schema_data.scalar(*scalar_literal).name.item;
+                let actual = schema_data.server_scalar_entity(*scalar_literal).name.item;
 
                 let expected = id_annotation_to_typename_annotation(type_, schema_data);
 
                 Err(WithLocation::new(
-                    ValidateSchemaError::ExpectedTypeFoundScalar { expected, actual },
+                    ValidateArgumentTypesError::ExpectedTypeFoundScalar { expected, actual },
                     location,
                 ))
             }
             SelectionType::Object(_) => {
-                let actual = schema_data.scalar(*scalar_literal).name.item;
+                let actual = schema_data.server_scalar_entity(*scalar_literal).name.item;
 
                 let expected = id_annotation_to_typename_annotation(type_, schema_data);
 
                 Err(WithLocation::new(
-                    ValidateSchemaError::ExpectedTypeFoundScalar { expected, actual },
+                    ValidateArgumentTypesError::ExpectedTypeFoundScalar { expected, actual },
                     location,
                 ))
             }
@@ -125,13 +122,14 @@ fn variable_type_satisfies_argument_type(
     }
 }
 
-pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
+pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
     field_argument_definition_type: &GraphQLTypeAnnotation<ServerEntityId>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-    schema_data: &ServerFieldData<TOutputFormat>,
-    server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
-) -> ValidateSchemaResult<()> {
+    schema_data: &ServerEntityData<TNetworkProtocol>,
+    server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
+    server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
+) -> ValidateArgumentTypesResult<()> {
     match &selection_supplied_argument_value.item {
         NonConstantValue::Variable(variable_name) => {
             let variable_type = get_variable_type(
@@ -150,7 +148,7 @@ pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
                 let actual = id_annotation_to_typename_annotation(variable_type, schema_data);
 
                 Err(WithLocation::new(
-                    ValidateSchemaError::ExpectedTypeFoundVariable {
+                    ValidateArgumentTypesError::ExpectedTypeFoundVariable {
                         expected_type: expected,
                         variable_type: actual,
                         variable_name: *variable_name,
@@ -213,7 +211,7 @@ pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
         NonConstantValue::Enum(enum_literal_value) => {
             match graphql_type_to_non_null_type(field_argument_definition_type.clone()) {
                 GraphQLNonNullTypeAnnotation::List(_) => Err(WithLocation::new(
-                    ValidateSchemaError::ExpectedTypeFoundEnum {
+                    ValidateArgumentTypesError::ExpectedTypeFoundEnum {
                         expected: id_annotation_to_typename_annotation(
                             field_argument_definition_type,
                             schema_data,
@@ -235,7 +233,7 @@ pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
                 Ok(())
             } else {
                 Err(WithLocation::new(
-                    ValidateSchemaError::ExpectedNonNullTypeFoundNull {
+                    ValidateArgumentTypesError::ExpectedNonNullTypeFoundNull {
                         expected: id_annotation_to_typename_annotation(
                             field_argument_definition_type,
                             schema_data,
@@ -252,10 +250,11 @@ pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
                     list_type,
                     variable_definitions,
                     schema_data,
-                    server_fields,
+                    server_scalar_selectables,
+                    server_object_selectables,
                 ),
                 GraphQLNonNullTypeAnnotation::Named(_) => Err(WithLocation::new(
-                    ValidateSchemaError::ExpectedTypeFoundList {
+                    ValidateArgumentTypesError::ExpectedTypeFoundList {
                         expected: id_annotation_to_typename_annotation(
                             field_argument_definition_type,
                             schema_data,
@@ -268,7 +267,7 @@ pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
         NonConstantValue::Object(object_literal) => {
             match graphql_type_to_non_null_type(field_argument_definition_type.clone()) {
                 GraphQLNonNullTypeAnnotation::List(_) => Err(WithLocation::new(
-                    ValidateSchemaError::ExpectedTypeFoundObject {
+                    ValidateArgumentTypesError::ExpectedTypeFoundObject {
                         expected: id_annotation_to_typename_annotation(
                             field_argument_definition_type,
                             schema_data,
@@ -278,7 +277,7 @@ pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
                 )),
                 GraphQLNonNullTypeAnnotation::Named(named_type) => match named_type.0.item {
                     SelectionType::Scalar(_) => Err(WithLocation::new(
-                        ValidateSchemaError::ExpectedTypeFoundObject {
+                        ValidateArgumentTypesError::ExpectedTypeFoundObject {
                             expected: id_annotation_to_typename_annotation(
                                 field_argument_definition_type,
                                 schema_data,
@@ -286,13 +285,14 @@ pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
                         },
                         selection_supplied_argument_value.location,
                     )),
-                    SelectionType::Object(object_id) => object_satisfies_type(
+                    SelectionType::Object(object_entity_id) => object_satisfies_type(
                         selection_supplied_argument_value,
                         variable_definitions,
                         schema_data,
-                        server_fields,
+                        server_scalar_selectables,
+                        server_object_selectables,
                         object_literal,
-                        object_id,
+                        object_entity_id,
                     ),
                 },
             }
@@ -300,47 +300,60 @@ pub fn value_satisfies_type<TOutputFormat: OutputFormat>(
     }
 }
 
-fn object_satisfies_type<TOutputFormat: OutputFormat>(
+fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
     variable_definitions: &[WithSpan<VariableDefinition<ServerEntityId>>],
-    schema_data: &ServerFieldData<TOutputFormat>,
-    server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
+    server_entity_data: &ServerEntityData<TNetworkProtocol>,
+    server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
+    server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
-    object_id: ServerObjectId,
-) -> Result<(), WithLocation<ValidateSchemaError>> {
-    let object = schema_data.object(object_id);
+    object_entity_id: ServerObjectEntityId,
+) -> Result<(), WithLocation<ValidateArgumentTypesError>> {
     validate_no_extraneous_fields(
-        &object.encountered_fields,
+        &server_entity_data
+            .server_object_entity_available_selectables
+            .get(&object_entity_id)
+            .expect(
+                "Expected object_entity_id to exist \
+                in server_object_entity_available_selectables",
+            )
+            .0,
         object_literal,
         selection_supplied_argument_value.location,
     )?;
 
-    let missing_fields =
-        get_non_nullable_missing_and_provided_fields(server_fields, object_literal, object)
-            .iter()
-            .filter_map(|field| match field {
-                ObjectLiteralFieldType::Provided(
-                    field_type_annotation,
-                    selection_supplied_argument_value,
-                ) => match value_satisfies_type(
-                    &selection_supplied_argument_value.value,
-                    field_type_annotation,
-                    variable_definitions,
-                    schema_data,
-                    server_fields,
-                ) {
-                    Ok(_) => None,
-                    Err(e) => Some(Err(e)),
-                },
-                ObjectLiteralFieldType::Missing(field_name) => Some(Ok(*field_name)),
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+    let missing_fields = get_non_nullable_missing_and_provided_fields(
+        server_entity_data,
+        server_scalar_selectables,
+        server_object_selectables,
+        object_literal,
+        object_entity_id,
+    )
+    .iter()
+    .filter_map(|field| match field {
+        ObjectLiteralFieldType::Provided(
+            field_type_annotation,
+            selection_supplied_argument_value,
+        ) => match value_satisfies_type(
+            &selection_supplied_argument_value.value,
+            field_type_annotation,
+            variable_definitions,
+            server_entity_data,
+            server_scalar_selectables,
+            server_object_selectables,
+        ) {
+            Ok(_) => None,
+            Err(e) => Some(Err(e)),
+        },
+        ObjectLiteralFieldType::Missing(field_name) => Some(Ok(*field_name)),
+    })
+    .collect::<Result<Vec<_>, _>>()?;
 
     if missing_fields.is_empty() {
         Ok(())
     } else {
         Err(WithLocation::new(
-            ValidateSchemaError::MissingFields {
+            ValidateArgumentTypesError::MissingFields {
                 missing_fields_names: missing_fields,
             },
             selection_supplied_argument_value.location,
@@ -356,25 +369,37 @@ enum ObjectLiteralFieldType {
     Missing(SelectableName),
 }
 
-fn get_non_nullable_missing_and_provided_fields<TOutputFormat: OutputFormat>(
-    server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
+fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtocol>(
+    server_entity_data: &ServerEntityData<TNetworkProtocol>,
+    server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
+    server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
-    object: &SchemaObject<TOutputFormat>,
+    object_entity_id: ServerObjectEntityId,
 ) -> Vec<ObjectLiteralFieldType> {
-    object
-        .encountered_fields
+    server_entity_data
+        .server_object_entity_available_selectables
+        .get(&object_entity_id)
+        .expect(
+            "Expected object_entity_id to exist \
+            in server_object_entity_available_selectables",
+        )
+        .0
         .iter()
         .filter_map(|(field_name, field_type)| {
-            let field = &server_fields[as_server_field(field_type)?.as_usize()];
-
-            let field_type_annotation = &field.target_server_entity;
-
-            let iso_type_annotation = match field_type_annotation {
-                SelectionType::Scalar(type_annotation) => {
-                    type_annotation.clone().map(&mut SelectionType::Scalar)
+            let iso_type_annotation = match field_type.as_server()? {
+                SelectionType::Scalar(scalar_selectable_id) => {
+                    let field = &server_scalar_selectables[scalar_selectable_id.as_usize()];
+                    let field_type_annotation = &field.target_scalar_entity;
+                    field_type_annotation
+                        .clone()
+                        .map(&mut SelectionType::Scalar)
                 }
-                SelectionType::Object((_variant, type_annotation)) => {
-                    type_annotation.clone().map(&mut SelectionType::Object)
+                SelectionType::Object(object_selectable_id) => {
+                    let field = &server_object_selectables[object_selectable_id.as_usize()];
+                    let field_type_annotation = &field.target_object_entity;
+                    field_type_annotation
+                        .clone()
+                        .map(&mut SelectionType::Object)
                 }
             };
 
@@ -383,7 +408,7 @@ fn get_non_nullable_missing_and_provided_fields<TOutputFormat: OutputFormat>(
 
             let object_literal_supplied_field = object_literal
                 .iter()
-                .find(|field| field.name.item.lookup() == field_name.lookup());
+                .find(|field| field.name.item == *field_name);
 
             match object_literal_supplied_field {
                 Some(selection_supplied_argument_value) => Some(ObjectLiteralFieldType::Provided(
@@ -402,19 +427,16 @@ fn get_non_nullable_missing_and_provided_fields<TOutputFormat: OutputFormat>(
 }
 
 fn validate_no_extraneous_fields(
-    object_fields: &BTreeMap<
-        SelectableName,
-        DefinitionLocation<ServerScalarSelectableId, ClientFieldOrPointerId>,
-    >,
+    object_fields: &ServerObjectEntityAvailableSelectables,
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     location: Location,
-) -> ValidateSchemaResult<()> {
+) -> ValidateArgumentTypesResult<()> {
     let extra_fields: Vec<_> = object_literal
         .iter()
         .filter_map(|field| {
             let is_defined = object_fields
                 .iter()
-                .any(|(field_name, _)| field_name.lookup() == field.name.item.lookup());
+                .any(|(field_name, _)| *field_name == field.name.item);
 
             if !is_defined {
                 return Some(field.clone());
@@ -425,65 +447,77 @@ fn validate_no_extraneous_fields(
 
     if !extra_fields.is_empty() {
         return Err(WithLocation::new(
-            ValidateSchemaError::ExtraneousFields { extra_fields },
+            ValidateArgumentTypesError::ExtraneousFields { extra_fields },
             location,
         ));
     }
     Ok(())
 }
 
-fn id_annotation_to_typename_annotation<TOutputFormat: OutputFormat>(
+fn id_annotation_to_typename_annotation<TNetworkProtocol: NetworkProtocol>(
     type_: &GraphQLTypeAnnotation<ServerEntityId>,
-    schema_data: &ServerFieldData<TOutputFormat>,
+    schema_data: &ServerEntityData<TNetworkProtocol>,
 ) -> GraphQLTypeAnnotation<UnvalidatedTypeName> {
     type_.clone().map(|type_id| match type_id {
-        SelectionType::Scalar(scalar_id) => schema_data.scalar(scalar_id).name.item.into(),
-        SelectionType::Object(object_id) => schema_data.object(object_id).name.into(),
+        SelectionType::Scalar(scalar_entity_id) => schema_data
+            .server_scalar_entity(scalar_entity_id)
+            .name
+            .item
+            .into(),
+        SelectionType::Object(object_entity_id) => schema_data
+            .server_object_entity(object_entity_id)
+            .name
+            .into(),
     })
 }
 
-fn enum_satisfies_type<TOutputFormat: OutputFormat>(
+fn enum_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     enum_literal_value: &EnumLiteralValue,
     enum_type: &GraphQLNamedTypeAnnotation<ServerEntityId>,
-    schema_data: &ServerFieldData<TOutputFormat>,
+    schema_data: &ServerEntityData<TNetworkProtocol>,
     location: Location,
-) -> ValidateSchemaResult<()> {
+) -> ValidateArgumentTypesResult<()> {
     match enum_type.item {
-        SelectionType::Object(object_id) => {
+        SelectionType::Object(object_entity_id) => {
             let expected = GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                enum_type
-                    .clone()
-                    .map(|_| schema_data.object(object_id).name.into()),
+                enum_type.clone().map(|_| {
+                    schema_data
+                        .server_object_entity(object_entity_id)
+                        .name
+                        .into()
+                }),
             ));
 
             Err(WithLocation::new(
-                ValidateSchemaError::ExpectedTypeFoundEnum {
+                ValidateArgumentTypesError::ExpectedTypeFoundEnum {
                     expected,
                     actual: *enum_literal_value,
                 },
                 location,
             ))
         }
-        SelectionType::Scalar(_scalar_id) => {
+        SelectionType::Scalar(_scalar_entity_id) => {
             todo!("Validate enum literal. Parser doesn't support enum literals yet")
         }
     }
 }
 
-fn list_satisfies_type<TOutputFormat: OutputFormat>(
+fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     list: &[WithLocation<NonConstantValue>],
     list_type: GraphQLListTypeAnnotation<ServerEntityId>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-    schema_data: &ServerFieldData<TOutputFormat>,
-    server_fields: &[ValidatedSchemaServerField<TOutputFormat>],
-) -> ValidateSchemaResult<()> {
+    schema_data: &ServerEntityData<TNetworkProtocol>,
+    server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
+    server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
+) -> ValidateArgumentTypesResult<()> {
     list.iter().try_for_each(|element| {
         value_satisfies_type(
             element,
             &list_type.0,
             variable_definitions,
             schema_data,
-            server_fields,
+            server_scalar_selectables,
+            server_object_selectables,
         )
     })
 }
@@ -492,17 +526,75 @@ fn get_variable_type<'a>(
     variable_name: &'a VariableName,
     variable_definitions: &'a [WithSpan<ValidatedVariableDefinition>],
     location: Location,
-) -> ValidateSchemaResult<&'a GraphQLTypeAnnotation<ServerEntityId>> {
+) -> ValidateArgumentTypesResult<&'a GraphQLTypeAnnotation<ServerEntityId>> {
     match variable_definitions
         .iter()
         .find(|definition| definition.item.name.item == *variable_name)
     {
         Some(variable) => Ok(&variable.item.type_),
         None => Err(WithLocation::new(
-            ValidateSchemaError::UsedUndefinedVariable {
+            ValidateArgumentTypesError::UsedUndefinedVariable {
                 undefined_variable: *variable_name,
             },
             location,
         )),
     }
+}
+
+type ValidateArgumentTypesResult<T> = Result<T, WithLocation<ValidateArgumentTypesError>>;
+
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+pub enum ValidateArgumentTypesError {
+    #[error("Expected input of type {expected_type}, found variable {variable_name} of type {variable_type}")]
+    ExpectedTypeFoundVariable {
+        expected_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+        variable_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+        variable_name: VariableName,
+    },
+
+    #[error("Expected input of type {expected}, found {actual} scalar literal")]
+    ExpectedTypeFoundScalar {
+        expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+        actual: GraphQLScalarTypeName,
+    },
+
+    #[error("Expected input of type {expected}, found object literal")]
+    ExpectedTypeFoundObject {
+        expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+    },
+
+    #[error("Expected input of type {expected}, found list literal")]
+    ExpectedTypeFoundList {
+        expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+    },
+
+    #[error("Expected non null input of type {expected}, found null")]
+    ExpectedNonNullTypeFoundNull {
+        expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+    },
+
+    #[error("Expected input of type {expected}, found {actual} enum literal")]
+    ExpectedTypeFoundEnum {
+        expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+        actual: EnumLiteralValue,
+    },
+
+    #[error("This variable is not defined: ${undefined_variable}")]
+    UsedUndefinedVariable { undefined_variable: VariableName },
+
+    #[error(
+        "This object has missing fields: {0}",
+        missing_fields_names.iter().map(|field_name| format!("${}", field_name)).collect::<Vec<_>>().join(", ")
+    )]
+    MissingFields {
+        missing_fields_names: Vec<SelectableName>,
+    },
+
+    #[error(
+        "This object has extra fields: {0}",
+        extra_fields.iter().map(|field| format!("{}", field.name.item)).collect::<Vec<_>>().join(", ")
+    )]
+    ExtraneousFields {
+        extra_fields: Vec<NameValuePair<ValueKeyName, NonConstantValue>>,
+    },
 }

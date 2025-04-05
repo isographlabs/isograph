@@ -5,12 +5,10 @@ use common_lang_types::{
     WithLocation,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
-use intern::{string_key::Intern, Lookup};
-use isograph_lang_types::{
-    DefinitionLocation, SelectionType, ServerEntityId, ServerScalarSelectableId, VariableDefinition,
-};
+use intern::Lookup;
+use isograph_lang_types::{DefinitionLocation, ServerEntityId, VariableDefinition};
 
-use crate::{OutputFormat, UnvalidatedSchema};
+use crate::{NetworkProtocol, Schema, ServerSelectableId, ValidatedVariableDefinition};
 
 use super::create_additional_fields_error::{
     CreateAdditionalFieldsError, FieldMapItem, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
@@ -30,13 +28,13 @@ impl ArgumentMap {
         }
     }
 
-    pub(crate) fn remove_field_map_item<TOutputFormat: OutputFormat>(
+    pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol>(
         &mut self,
         field_map_item: FieldMapItem,
         primary_type_name: IsographObjectTypeName,
         mutation_object_name: IsographObjectTypeName,
         mutation_field_name: SelectableName,
-        schema: &mut UnvalidatedSchema<TOutputFormat>,
+        schema: &mut Schema<TNetworkProtocol>,
     ) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem> {
         let split_to_arg = field_map_item.split_to_arg();
         let (index_of_argument, argument) = self
@@ -50,7 +48,7 @@ impl ArgumentMap {
                         modified_argument.name.item
                     }
                 };
-                name.lookup() == split_to_arg.to_argument_name.lookup()
+                name == split_to_arg.to_argument_name
             })
             .ok_or_else(|| {
                 WithLocation::new(
@@ -58,7 +56,7 @@ impl ArgumentMap {
                         primary_type_name,
                         mutation_object_name,
                         mutation_field_name,
-                        field_name: split_to_arg.to_argument_name.lookup().to_string(),
+                        field_name: split_to_arg.to_argument_name,
                     },
                     Location::generated(),
                 )
@@ -89,7 +87,7 @@ impl ArgumentMap {
                         let mut arg =
                             ModifiedArgument::from_unmodified(unmodified_argument, schema);
 
-                        arg.remove_to_field(schema, *first, rest, primary_type_name)?;
+                        arg.remove_to_field(*first, rest, primary_type_name)?;
 
                         *argument =
                             WithLocation::new(PotentiallyModifiedArgument::Modified(arg), location);
@@ -109,13 +107,13 @@ impl ArgumentMap {
                         return Err(WithLocation::new(
                             CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
                                 primary_type_name,
-                                field_name: split_to_arg.to_argument_name.to_string(),
+                                field_name: split_to_arg.to_argument_name.lookup().to_string(),
                             },
                             Location::generated(),
                         ));
                     }
                     Some((first, rest)) => {
-                        modified.remove_to_field(schema, *first, rest, primary_type_name)?;
+                        modified.remove_to_field(*first, rest, primary_type_name)?;
                         // TODO WAT
                         ProcessedFieldMapItem(field_map_item.clone())
                     }
@@ -128,7 +126,7 @@ impl ArgumentMap {
 }
 
 enum PotentiallyModifiedArgument {
-    Unmodified(VariableDefinition<ServerEntityId>),
+    Unmodified(ValidatedVariableDefinition),
     Modified(ModifiedArgument),
 }
 
@@ -143,7 +141,7 @@ pub(crate) struct ModifiedObject {
 
 #[derive(Debug)]
 pub(crate) enum PotentiallyModifiedField {
-    Unmodified(ServerScalarSelectableId),
+    Unmodified(ServerSelectableId),
     // This is exercised in the case of 3+ segments, e.g. input.foo.id.
     // For now, we support only up to two segments.
     #[allow(dead_code)]
@@ -183,31 +181,34 @@ impl ModifiedArgument {
     /// an existing object.
     ///
     /// This panics if unmodified's type is a scalar.
-    pub fn from_unmodified<TOutputFormat: OutputFormat>(
+    pub fn from_unmodified<TNetworkProtocol: NetworkProtocol>(
         unmodified: &VariableDefinition<ServerEntityId>,
-        schema: &UnvalidatedSchema<TOutputFormat>,
+        schema: &Schema<TNetworkProtocol>,
     ) -> Self {
         // TODO I think we have validated that the item exists already.
         // But we should double check that, and return an error if necessary
         let object = unmodified.type_.clone().map(|input_type_name| {
             match input_type_name {
-                ServerEntityId::Object(object_id) => {
-                    let object = schema.server_field_data.object(object_id);
-
-                    ModifiedObject {
-                        field_map: object
-                            .encountered_fields
-                            .iter()
-                            .flat_map(|(name, field_id)| match field_id {
-                                DefinitionLocation::Server(s) => {
-                                    Some((*name, PotentiallyModifiedField::Unmodified(*s)))
-                                }
-                                DefinitionLocation::Client(_) => None,
-                            })
-                            .collect(),
-                    }
-                }
-                ServerEntityId::Scalar(_scalar_id) => {
+                ServerEntityId::Object(object_entity_id) => ModifiedObject {
+                    field_map: schema
+                        .server_entity_data
+                        .server_object_entity_available_selectables
+                        .get(&object_entity_id)
+                        .expect(
+                            "Expected object_entity_id to exist \
+                            in server_object_entity_available_selectables",
+                        )
+                        .0
+                        .iter()
+                        .flat_map(|(name, field_id)| match field_id {
+                            DefinitionLocation::Server(s) => {
+                                Some((*name, PotentiallyModifiedField::Unmodified(*s)))
+                            }
+                            DefinitionLocation::Client(_) => None,
+                        })
+                        .collect(),
+                },
+                ServerEntityId::Scalar(_scalar_entity_id) => {
                     // TODO don't be lazy, return an error
                     panic!("Cannot modify a scalar")
                 }
@@ -221,16 +222,15 @@ impl ModifiedArgument {
         }
     }
 
-    pub fn remove_to_field<TOutputFormat: OutputFormat>(
+    pub fn remove_to_field(
         &mut self,
-        schema: &UnvalidatedSchema<TOutputFormat>,
         first: StringLiteralValue,
         rest: &[StringLiteralValue],
         primary_type_name: IsographObjectTypeName,
     ) -> ProcessTypeDefinitionResult<()> {
         let argument_object = self.object.inner_mut();
 
-        let key = first.lookup().intern().into();
+        let key = first.unchecked_conversion();
         match argument_object
             .field_map
             // TODO make this a no-op
@@ -257,17 +257,15 @@ impl ModifiedArgument {
 
                         match field {
                             PotentiallyModifiedField::Unmodified(field_id) => {
-                                let field_object = schema.server_field(*field_id);
-                                if let SelectionType::Object(_) = field_object.target_server_entity
-                                {
+                                if field_id.as_object().is_some() {
                                     return Err(WithLocation::new(
                                         CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
                                             primary_type_name,
-                                            field_name: key.to_string(),
+                                            field_name: key.lookup().to_string(),
                                         },
                                         Location::generated(),
                                     ));
-                                };
+                                }
 
                                 // Cool! We found a scalar, we can remove it.
                                 argument_object.field_map.remove(&key).expect(

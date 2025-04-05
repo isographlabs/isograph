@@ -4,12 +4,12 @@ use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
 use isograph_schema::{
-    initial_variable_context, ClientFieldOrPointer, OutputFormat, ValidatedClientField,
-    ValidatedSchema, ValidatedSelectionType,
+    initial_variable_context, ClientScalarOrObjectSelectable, ClientScalarSelectable,
+    ClientSelectable, NetworkProtocol, Schema, ServerObjectSelectable,
 };
 use isograph_schema::{
     RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment, UserWrittenClientTypeInfo,
-    UserWrittenComponentVariant, ValidatedSchemaServerField,
+    UserWrittenComponentVariant,
 };
 
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
@@ -28,9 +28,9 @@ use crate::{
     reader_ast::generate_reader_ast,
 };
 
-pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
-    selection_type: &ValidatedSelectionType<TOutputFormat>,
+pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    selection_type: &ClientSelectable<TNetworkProtocol>,
     config: &CompilerConfig,
     info: UserWrittenClientTypeInfo,
     refetched_paths: &RefetchedPathsMap,
@@ -40,8 +40,8 @@ pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
     let ts_file_extension = file_extensions.ts();
     let user_written_component_variant = info.user_written_component_variant;
     let parent_type = schema
-        .server_field_data
-        .object(selection_type.parent_object_id());
+        .server_entity_data
+        .server_object_entity(selection_type.parent_object_entity_id());
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         schema,
@@ -149,9 +149,9 @@ pub(crate) fn generate_eager_reader_artifacts<TOutputFormat: OutputFormat>(
     path_and_contents
 }
 
-pub(crate) fn generate_eager_reader_condition_artifact<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
-    encountered_server_field: &ValidatedSchemaServerField<TOutputFormat>,
+pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    encountered_server_field: &ServerObjectSelectable<TNetworkProtocol>,
     inline_fragment: &ServerFieldTypeAssociatedDataInlineFragment,
     refetch_paths: &RefetchedPathsMap,
     file_extensions: GenerateFileExtensionsOption,
@@ -159,8 +159,8 @@ pub(crate) fn generate_eager_reader_condition_artifact<TOutputFormat: OutputForm
     let field_name = encountered_server_field.name.item;
 
     let parent_type = schema
-        .server_field_data
-        .object(encountered_server_field.parent_type_id);
+        .server_entity_data
+        .server_object_entity(encountered_server_field.parent_type_id);
     let concrete_type = inline_fragment.concrete_type;
 
     let (reader_ast, reader_imports) = generate_reader_ast(
@@ -207,15 +207,15 @@ pub(crate) fn generate_eager_reader_condition_artifact<TOutputFormat: OutputForm
     }
 }
 
-pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
-    client_field: &ValidatedSelectionType<TOutputFormat>,
+pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    client_field: &ClientSelectable<TNetworkProtocol>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
     let ts_file_extension = file_extensions.ts();
     let parent_type = schema
-        .server_field_data
-        .object(client_field.parent_object_id());
+        .server_entity_data
+        .server_object_entity(client_field.parent_object_entity_id());
 
     let mut param_type_imports = BTreeSet::new();
     let mut loadable_fields = BTreeSet::new();
@@ -224,7 +224,6 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
     let client_field_parameter_type = generate_client_field_parameter_type(
         schema,
         client_field.selection_set_for_parent_query(),
-        parent_type,
         &mut param_type_imports,
         &mut loadable_fields,
         1,
@@ -233,7 +232,6 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
     let updatable_data_type = generate_client_field_updatable_data_type(
         schema,
         client_field.selection_set_for_parent_query(),
-        parent_type,
         &mut param_type_imports,
         &mut loadable_fields,
         1,
@@ -311,16 +309,16 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TOutputFormat: OutputFor
     }
 }
 
-pub(crate) fn generate_eager_reader_output_type_artifact<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
-    client_field: &ValidatedClientField<TOutputFormat>,
+pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    client_field: &ClientScalarSelectable<TNetworkProtocol>,
     config: &CompilerConfig,
     info: UserWrittenClientTypeInfo,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
     let parent_type = schema
-        .server_field_data
-        .object(client_field.parent_object_id);
+        .server_entity_data
+        .server_object_entity(client_field.parent_object_entity_id);
 
     let function_import_statement =
         generate_function_import_statement(config, info, file_extensions);

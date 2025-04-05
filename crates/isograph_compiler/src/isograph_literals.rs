@@ -1,12 +1,12 @@
 use common_lang_types::{
     relative_path_from_absolute_and_working_directory, CurrentWorkingDirectory, Location,
-    RelativePathToSourceFile, Span, TextSource, WithLocation,
+    RelativePathToSourceFile, Span, TextSource, WithLocation, WithSpan,
 };
 use isograph_lang_parser::{
     parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
 };
-use isograph_lang_types::IsoLiteralsSource;
-use isograph_schema::{OutputFormat, UnvalidatedSchema};
+use isograph_lang_types::{EntrypointDeclaration, IsoLiteralsSource, SelectionType};
+use isograph_schema::{NetworkProtocol, Schema, UnprocessedItem};
 use lazy_static::lazy_static;
 use pico::{Database, SourceId};
 use pico_macros::memo;
@@ -140,39 +140,56 @@ pub fn parse_iso_literal_in_source(
     parse_iso_literals_in_file_content(*relative_path, content, current_working_directory)
 }
 
-pub(crate) fn process_iso_literals<TOutputFormat: OutputFormat>(
-    schema: &mut UnvalidatedSchema<TOutputFormat>,
+#[allow(clippy::type_complexity)]
+pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
+    schema: &mut Schema<TNetworkProtocol>,
     contains_iso: ContainsIso,
-) -> Result<(), BatchCompileError> {
+) -> Result<
+    (
+        Vec<UnprocessedItem>,
+        Vec<(TextSource, WithSpan<EntrypointDeclaration>)>,
+    ),
+    BatchCompileError,
+> {
     let mut errors = vec![];
+    let mut unprocess_client_field_items = vec![];
+    let mut unprocessed_entrypoints = vec![];
     for iso_literals in contains_iso.files.into_values() {
         for (extraction_result, text_source) in iso_literals {
             match extraction_result {
                 IsoLiteralExtractionResult::ClientFieldDeclaration(client_field_declaration) => {
-                    if let Err(e) = schema
+                    match schema
                         .process_client_field_declaration(client_field_declaration, text_source)
                     {
-                        errors.push(e);
+                        Ok(unprocessed_client_field_items) => unprocess_client_field_items
+                            .push(SelectionType::Scalar(unprocessed_client_field_items)),
+                        Err(e) => {
+                            errors.push(e);
+                        }
                     }
                 }
                 IsoLiteralExtractionResult::ClientPointerDeclaration(
                     client_pointer_declaration,
                 ) => {
-                    if let Err(e) = schema
+                    match schema
                         .process_client_pointer_declaration(client_pointer_declaration, text_source)
                     {
-                        errors.push(e);
+                        Ok(unprocessed_client_pointer_item) => unprocess_client_field_items
+                            .push(SelectionType::Object(unprocessed_client_pointer_item)),
+                        Err(e) => {
+                            errors.push(e);
+                        }
                     }
                 }
 
-                IsoLiteralExtractionResult::EntrypointDeclaration(entrypoint_declaration) => schema
-                    .entrypoints
-                    .push((text_source, entrypoint_declaration)),
+                IsoLiteralExtractionResult::EntrypointDeclaration(entrypoint_declaration) => {
+                    unprocessed_entrypoints.push((text_source, entrypoint_declaration))
+                }
             }
         }
     }
     if errors.is_empty() {
-        Ok(())
+        Ok((unprocess_client_field_items, unprocessed_entrypoints))
     } else {
         Err(errors.into())
     }

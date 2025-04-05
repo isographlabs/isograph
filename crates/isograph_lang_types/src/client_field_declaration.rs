@@ -13,20 +13,10 @@ use crate::{
     IsographFieldDirective, ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionType,
 };
 
-// This name makes no sense anymore... directives are validated!
-pub type UnvalidatedSelectionWithUnvalidatedDirectives =
+pub type UnvalidatedSelection =
     SelectionTypeContainingSelections<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>;
 
-pub type UnvalidatedSelection = SelectionTypeContainingSelections<
-    // <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
-    ScalarSelectionDirectiveSet,
-    // <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionLinkedFieldAssociatedData,
-    ObjectSelectionDirectiveSet,
->;
-pub type UnvalidatedScalarFieldSelection = ScalarFieldSelection<
-    // <UnvalidatedSchemaState as SchemaValidationState>::SelectionTypeSelectionScalarFieldAssociatedData,
-    ScalarSelectionDirectiveSet,
->;
+pub type UnvalidatedScalarFieldSelection = ScalarSelection<ScalarSelectionDirectiveSet>;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct ClientFieldDeclaration {
@@ -34,14 +24,7 @@ pub struct ClientFieldDeclaration {
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub client_field_name: WithSpan<ClientScalarSelectableName>,
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub selection_set: Vec<
-        WithSpan<
-            SelectionTypeContainingSelections<
-                ScalarSelectionDirectiveSet,
-                ObjectSelectionDirectiveSet,
-            >,
-        >,
-    >,
+    pub selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     // TODO remove, or put on a generic
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
@@ -61,14 +44,7 @@ pub struct ClientPointerDeclaration {
     pub target_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     pub client_pointer_name: WithSpan<ClientObjectSelectableName>,
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub selection_set: Vec<
-        WithSpan<
-            SelectionTypeContainingSelections<
-                ScalarSelectionDirectiveSet,
-                ObjectSelectionDirectiveSet,
-            >,
-        >,
-    >,
+    pub selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: RelativePathToSourceFile,
 
@@ -87,51 +63,49 @@ pub struct LoadableDirectiveParameters {
     pub lazy_load_artifact: bool,
 }
 
-pub type SelectionTypeContainingSelections<TScalarField, TLinkedField> = SelectionType<
-    ScalarFieldSelection<TScalarField>,
-    LinkedFieldSelection<TScalarField, TLinkedField>,
->;
+pub type SelectionTypeContainingSelections<TScalarField, TLinkedField> =
+    SelectionType<ScalarSelection<TScalarField>, ObjectSelection<TScalarField, TLinkedField>>;
 
 impl<TScalarField, TLinkedField> SelectionTypeContainingSelections<TScalarField, TLinkedField> {
     pub fn map<TNewScalarField, TNewLinkedField>(
         self,
-        map_scalar_field: &mut impl FnMut(
-            ScalarFieldSelection<TScalarField>,
-        ) -> ScalarFieldSelection<TNewScalarField>,
-        map_linked_field: &mut impl FnMut(
-            LinkedFieldSelection<TScalarField, TLinkedField>,
+        map_scalar_selection: &mut impl FnMut(
+            ScalarSelection<TScalarField>,
+        ) -> ScalarSelection<TNewScalarField>,
+        map_linked_selection: &mut impl FnMut(
+            ObjectSelection<TScalarField, TLinkedField>,
         )
-            -> LinkedFieldSelection<TNewScalarField, TNewLinkedField>,
+            -> ObjectSelection<TNewScalarField, TNewLinkedField>,
     ) -> SelectionTypeContainingSelections<TNewScalarField, TNewLinkedField> {
         match self {
             SelectionTypeContainingSelections::Scalar(s) => {
-                SelectionTypeContainingSelections::Scalar(map_scalar_field(s))
+                SelectionTypeContainingSelections::Scalar(map_scalar_selection(s))
             }
             SelectionTypeContainingSelections::Object(l) => {
-                SelectionTypeContainingSelections::Object(map_linked_field(l))
+                SelectionTypeContainingSelections::Object(map_linked_selection(l))
             }
         }
     }
 
     pub fn and_then<TNewScalarField, TNewLinkedField, E>(
         self,
-        and_then_scalar_field: &mut impl FnMut(
-            ScalarFieldSelection<TScalarField>,
+        and_then_scalar_selection: &mut impl FnMut(
+            ScalarSelection<TScalarField>,
         )
-            -> Result<ScalarFieldSelection<TNewScalarField>, E>,
-        and_then_linked_field: &mut impl FnMut(
-            LinkedFieldSelection<TScalarField, TLinkedField>,
+            -> Result<ScalarSelection<TNewScalarField>, E>,
+        and_then_linked_selection: &mut impl FnMut(
+            ObjectSelection<TScalarField, TLinkedField>,
         ) -> Result<
-            LinkedFieldSelection<TNewScalarField, TNewLinkedField>,
+            ObjectSelection<TNewScalarField, TNewLinkedField>,
             E,
         >,
     ) -> Result<SelectionTypeContainingSelections<TNewScalarField, TNewLinkedField>, E> {
         match self {
             SelectionTypeContainingSelections::Scalar(s) => Ok(
-                SelectionTypeContainingSelections::Scalar(and_then_scalar_field(s)?),
+                SelectionTypeContainingSelections::Scalar(and_then_scalar_selection(s)?),
             ),
             SelectionTypeContainingSelections::Object(l) => Ok(
-                SelectionTypeContainingSelections::Object(and_then_linked_field(l)?),
+                SelectionTypeContainingSelections::Object(and_then_linked_selection(l)?),
             ),
         }
     }
@@ -160,16 +134,16 @@ impl<TScalarField, TLinkedField> SelectionTypeContainingSelections<TScalarField,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub struct ScalarFieldSelection<TScalarField> {
+pub struct ScalarSelection<TScalarField> {
     pub name: WithLocation<ScalarSelectableName>,
     pub reader_alias: Option<WithLocation<SelectableAlias>>,
     pub associated_data: TScalarField,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
 }
 
-impl<TScalarField> ScalarFieldSelection<TScalarField> {
-    pub fn map<U>(self, map: &impl Fn(TScalarField) -> U) -> ScalarFieldSelection<U> {
-        ScalarFieldSelection {
+impl<TScalarField> ScalarSelection<TScalarField> {
+    pub fn map<U>(self, map: &impl Fn(TScalarField) -> U) -> ScalarSelection<U> {
+        ScalarSelection {
             name: self.name,
             reader_alias: self.reader_alias,
             associated_data: map(self.associated_data),
@@ -180,8 +154,8 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
     pub fn and_then<U, E>(
         self,
         map: &impl Fn(TScalarField) -> Result<U, E>,
-    ) -> Result<ScalarFieldSelection<U>, E> {
-        Ok(ScalarFieldSelection {
+    ) -> Result<ScalarSelection<U>, E> {
+        Ok(ScalarSelection {
             name: self.name,
             reader_alias: self.reader_alias,
             associated_data: map(self.associated_data)?,
@@ -197,21 +171,21 @@ impl<TScalarField> ScalarFieldSelection<TScalarField> {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub struct LinkedFieldSelection<TScalarField, TLinkedField> {
+pub struct ObjectSelection<TScalar, TLinked> {
     pub name: WithLocation<ServerObjectSelectableName>,
     pub reader_alias: Option<WithLocation<SelectableAlias>>,
-    pub associated_data: TLinkedField,
-    pub selection_set: Vec<WithSpan<SelectionTypeContainingSelections<TScalarField, TLinkedField>>>,
+    pub associated_data: TLinked,
+    pub selection_set: Vec<WithSpan<SelectionTypeContainingSelections<TScalar, TLinked>>>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
 }
 
-impl<TScalarField, TLinkedField> LinkedFieldSelection<TScalarField, TLinkedField> {
+impl<TScalarField, TLinkedField> ObjectSelection<TScalarField, TLinkedField> {
     pub fn map<U, V>(
         self,
         map_scalar: &impl Fn(TScalarField) -> U,
         map_linked: &impl Fn(TLinkedField) -> V,
-    ) -> LinkedFieldSelection<U, V> {
-        LinkedFieldSelection {
+    ) -> ObjectSelection<U, V> {
+        ObjectSelection {
             name: self.name,
             reader_alias: self.reader_alias,
             associated_data: map_linked(self.associated_data),
@@ -289,22 +263,6 @@ pub enum NonConstantValue {
     // This is weird! We can be more consistent vis-a-vis where the WithSpan appears.
     List(Vec<WithLocation<NonConstantValue>>),
     Object(Vec<NameValuePair<ValueKeyName, NonConstantValue>>),
-}
-
-pub fn reachable_variables(
-    non_constant_value: &WithLocation<NonConstantValue>,
-) -> Vec<WithLocation<VariableName>> {
-    match &non_constant_value.item {
-        NonConstantValue::Variable(name) => {
-            vec![WithLocation::new(*name, non_constant_value.location)]
-        }
-        NonConstantValue::Object(object) => object
-            .iter()
-            .flat_map(|pair| reachable_variables(&pair.value))
-            .collect(),
-        NonConstantValue::List(list) => list.iter().flat_map(reachable_variables).collect(),
-        _ => vec![],
-    }
 }
 
 impl NonConstantValue {

@@ -5,6 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
@@ -70,6 +71,18 @@ impl fmt::Display for StringKey {
 impl fmt::Debug for StringKey {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.lookup())
+    }
+}
+
+impl PartialEq<&'static str> for StringKey {
+    fn eq(&self, other: &&'static str) -> bool {
+        self.lookup() == *other
+    }
+}
+
+impl PartialEq<StringKey> for &'static str {
+    fn eq(&self, other: &StringKey) -> bool {
+        *self == other.lookup()
     }
 }
 

@@ -1,17 +1,17 @@
 use std::collections::HashMap;
 
-use crate::{OutputFormat, UnvalidatedSchema};
+use crate::{NetworkProtocol, Schema};
 use common_lang_types::{IsographObjectTypeName, SelectableName, StringLiteralValue, WithLocation};
 use intern::{string_key::Intern, Lookup};
-use isograph_lang_types::ServerObjectId;
+use isograph_lang_types::ServerObjectEntityId;
 
 use serde::Deserialize;
 use thiserror::Error;
 
 // When constructing the final map, we can replace object type names with ids.
-pub type ValidatedTypeRefinementMap = HashMap<ServerObjectId, Vec<ServerObjectId>>;
+pub type ValidatedTypeRefinementMap = HashMap<ServerObjectEntityId, Vec<ServerObjectEntityId>>;
 
-impl<TOutputFormat: OutputFormat> UnvalidatedSchema<TOutputFormat> {}
+impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {}
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, PartialOrd, Ord, Hash)]
 #[serde(deny_unknown_fields)]
@@ -74,7 +74,7 @@ pub enum CreateAdditionalFieldsError {
         primary_type_name: IsographObjectTypeName,
         mutation_object_name: IsographObjectTypeName,
         mutation_field_name: SelectableName,
-        field_name: String,
+        field_name: StringLiteralValue,
     },
 
     #[error(

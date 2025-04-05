@@ -9,6 +9,11 @@ type Query {
 
 input TopLevelFieldInput {
   name: String
+  nestedInput: NestedInput
+}
+
+input NestedInput {
+  nestedField: String
 }
 
 type TopLevelField {

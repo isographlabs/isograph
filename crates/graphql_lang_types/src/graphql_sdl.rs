@@ -8,7 +8,6 @@ use common_lang_types::{
     GraphQLObjectTypeName, GraphQLScalarTypeName, GraphQLUnionTypeName, InputTypeName,
     InputValueName, ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
-use intern::{string_key::Intern, Lookup};
 use strum::EnumString;
 
 // also Schema
@@ -223,8 +222,8 @@ impl From<GraphQLInputValueDefinition> for GraphQLFieldDefinition {
         Self {
             description: value.description,
             // TODO make this zero cost?
-            name: value.name.map(|x| x.lookup().intern().into()),
-            type_: value.type_.map(|x| x.lookup().intern().into()),
+            name: value.name.map(|x| x.unchecked_conversion()),
+            type_: value.type_.map(|x| x.unchecked_conversion()),
             // Input object fields do not take arguments
             arguments: vec![],
             directives: value.directives,

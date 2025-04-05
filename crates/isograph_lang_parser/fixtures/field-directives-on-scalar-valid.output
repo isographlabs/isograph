@@ -29,7 +29,7 @@ Ok(
                         selection_set: [
                             WithSpan {
                                 item: Scalar(
-                                    ScalarFieldSelection {
+                                    ScalarSelection {
                                         name: WithLocation {
                                             location: Embedded(
                                                 EmbeddedLocation {
@@ -141,7 +141,7 @@ Ok(
                         selection_set: [
                             WithSpan {
                                 item: Scalar(
-                                    ScalarFieldSelection {
+                                    ScalarSelection {
                                         name: WithLocation {
                                             location: Embedded(
                                                 EmbeddedLocation {
@@ -253,7 +253,7 @@ Ok(
                         selection_set: [
                             WithSpan {
                                 item: Scalar(
-                                    ScalarFieldSelection {
+                                    ScalarSelection {
                                         name: WithLocation {
                                             location: Embedded(
                                                 EmbeddedLocation {
@@ -365,7 +365,7 @@ Ok(
                         selection_set: [
                             WithSpan {
                                 item: Scalar(
-                                    ScalarFieldSelection {
+                                    ScalarSelection {
                                         name: WithLocation {
                                             location: Embedded(
                                                 EmbeddedLocation {

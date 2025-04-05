@@ -1,4 +1,3 @@
-use intern::Lookup;
 use std::{collections::HashMap, fmt::Debug};
 
 use common_lang_types::{SelectableName, VariableName, WithLocation, WithSpan};
@@ -8,8 +7,9 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ClientField, ClientFieldOrPointer, ClientPointer, NameAndArguments, OutputFormat,
-    ServerScalarSelectable, ValidatedVariableDefinition,
+    ClientObjectSelectable, ClientScalarOrObjectSelectable, ClientScalarSelectable,
+    NameAndArguments, NetworkProtocol, ServerObjectSelectable, ServerScalarSelectable,
+    ValidatedVariableDefinition,
 };
 
 #[derive(Debug)]
@@ -38,10 +38,10 @@ impl VariableContext {
             .map(|variable_definition| {
                 let variable_name = variable_definition.item.name.item;
 
-                let matching_arg = match selection_arguments.iter().find(|s| {
-                    // TODO don't require a lookup
-                    s.item.name.item.lookup() == variable_name.lookup()
-                }) {
+                let matching_arg = match selection_arguments
+                    .iter()
+                    .find(|s| s.item.name.item == variable_name)
+                {
                     Some(arg) => arg,
                     None => {
                         if matches!(selection_variant, ScalarSelectionDirectiveSet::Loadable(_)) {
@@ -85,26 +85,10 @@ impl VariableContext {
     }
 }
 
-#[allow(clippy::type_complexity)]
-pub fn initial_variable_context<
-    TSelectionTypeSelectionScalarFieldAssociatedData,
-    TSelectionTypeSelectionLinkedFieldAssociatedData,
-    TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
-    TOutputFormat: OutputFormat,
->(
+pub fn initial_variable_context<TNetworkProtocol: NetworkProtocol>(
     selection_type: &SelectionType<
-        &ClientField<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-            TClientFieldVariableDefinitionAssociatedData,
-            TOutputFormat,
-        >,
-        &ClientPointer<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-            TClientFieldVariableDefinitionAssociatedData,
-            TOutputFormat,
-        >,
+        &ClientScalarSelectable<TNetworkProtocol>,
+        &ClientObjectSelectable<TNetworkProtocol>,
     >,
 ) -> VariableContext {
     // This is used in two places: before we generate a merged selection set for an
@@ -137,7 +121,24 @@ pub fn initial_variable_context<
     VariableContext(variable_context)
 }
 
-impl<TOutputFormat: OutputFormat> ServerScalarSelectable<TOutputFormat> {
+impl<TNetworkProtocol: NetworkProtocol> ServerScalarSelectable<TNetworkProtocol> {
+    pub fn initial_variable_context(&self) -> VariableContext {
+        let variable_context = self
+            .arguments
+            .iter()
+            .map(|variable_definition| {
+                (
+                    variable_definition.item.name.item,
+                    NonConstantValue::Variable(variable_definition.item.name.item),
+                )
+            })
+            .collect();
+
+        VariableContext(variable_context)
+    }
+}
+
+impl<TNetworkProtocol: NetworkProtocol> ServerObjectSelectable<TNetworkProtocol> {
     pub fn initial_variable_context(&self) -> VariableContext {
         let variable_context = self
             .arguments

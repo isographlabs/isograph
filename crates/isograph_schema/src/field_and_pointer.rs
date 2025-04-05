@@ -6,154 +6,102 @@ use common_lang_types::{
 };
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
-    ClientFieldId, ClientPointerId, SelectionType, SelectionTypeContainingSelections,
-    ServerObjectId, TypeAnnotation, VariableDefinition,
+    impl_with_id, ClientObjectSelectableId, ClientScalarSelectableId, SelectionType,
+    ServerEntityId, ServerObjectEntityId, TypeAnnotation, VariableDefinition,
 };
 
-use crate::{ClientFieldVariant, OutputFormat, RefetchStrategy, UserWrittenClientPointerInfo};
+use crate::{
+    ClientFieldVariant, NetworkProtocol, RefetchStrategy, UserWrittenClientPointerInfo,
+    ValidatedObjectSelectionAssociatedData, ValidatedScalarSelectionAssociatedData,
+    ValidatedSelection,
+};
 
-pub type ClientFieldOrPointerId = SelectionType<ClientFieldId, ClientPointerId>;
+pub type ClientSelectableId = SelectionType<ClientScalarSelectableId, ClientObjectSelectableId>;
 
+/// The struct formally known as a client field, and declared with the field keyword
+/// in iso literals.
 #[derive(Debug)]
-pub struct ClientField<
-    TSelectionTypeSelectionScalarFieldAssociatedData,
-    TSelectionTypeSelectionLinkedFieldAssociatedData,
-    TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
-    TOutputFormat: OutputFormat,
-> {
+pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: ClientScalarSelectableName,
-    pub id: ClientFieldId,
-    pub reader_selection_set: Vec<
-        WithSpan<
-            SelectionTypeContainingSelections<
-                TSelectionTypeSelectionScalarFieldAssociatedData,
-                TSelectionTypeSelectionLinkedFieldAssociatedData,
-            >,
-        >,
-    >,
+    pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 
     // None -> not refetchable
     // TODO - this is only used if variant === imperatively loaded field
     // consider moving it into that struct.
     pub refetch_strategy: Option<
         RefetchStrategy<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
+            ValidatedScalarSelectionAssociatedData,
+            ValidatedObjectSelectionAssociatedData,
         >,
     >,
 
     // TODO we should probably model this differently
     pub variant: ClientFieldVariant,
 
-    pub variable_definitions:
-        Vec<WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<ServerEntityId>>>,
 
     // Why is this not calculated when needed?
     pub type_and_field: ObjectTypeAndFieldName,
 
-    pub parent_object_id: ServerObjectId,
-    pub output_format: PhantomData<TOutputFormat>,
+    pub parent_object_entity_id: ServerObjectEntityId,
+    pub output_format: PhantomData<TNetworkProtocol>,
 }
 
+impl_with_id!(ClientScalarSelectable<TNetworkProtocol: NetworkProtocol>, ClientScalarSelectableId);
+
+/// The struct formally known as a client pointer, and declared with the pointer keyword
+/// in iso literals.
 #[derive(Debug)]
-pub struct ClientPointer<
-    TSelectionTypeSelectionScalarFieldAssociatedData,
-    TSelectionTypeSelectionLinkedFieldAssociatedData,
-    TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
-    TOutputFormat: OutputFormat,
-> {
+pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: ClientObjectSelectableName,
-    pub id: ClientPointerId,
-    pub to: TypeAnnotation<ServerObjectId>,
+    pub to: TypeAnnotation<ServerObjectEntityId>,
 
-    pub reader_selection_set: Vec<
-        WithSpan<
-            SelectionTypeContainingSelections<
-                TSelectionTypeSelectionScalarFieldAssociatedData,
-                TSelectionTypeSelectionLinkedFieldAssociatedData,
-            >,
-        >,
-    >,
+    pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 
     pub refetch_strategy: RefetchStrategy<
-        TSelectionTypeSelectionScalarFieldAssociatedData,
-        TSelectionTypeSelectionLinkedFieldAssociatedData,
+        ValidatedScalarSelectionAssociatedData,
+        ValidatedObjectSelectionAssociatedData,
     >,
 
-    pub variable_definitions:
-        Vec<WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>>,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<ServerEntityId>>>,
 
     // Why is this not calculated when needed?
     pub type_and_field: ObjectTypeAndFieldName,
 
-    pub parent_object_id: ServerObjectId,
+    pub parent_object_entity_id: ServerObjectEntityId,
 
-    pub output_format: PhantomData<TOutputFormat>,
+    pub output_format: PhantomData<TNetworkProtocol>,
     pub info: UserWrittenClientPointerInfo,
 }
 
+impl_with_id!(ClientObjectSelectable<TNetworkProtocol: NetworkProtocol>, ClientObjectSelectableId);
+
 #[impl_for_selection_type]
-pub trait ClientFieldOrPointer<
-    TSelectionTypeSelectionScalarFieldAssociatedData,
-    TSelectionTypeSelectionLinkedFieldAssociatedData,
-    TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
->
-{
+pub trait ClientScalarOrObjectSelectable {
     fn description(&self) -> Option<DescriptionValue>;
     fn name(&self) -> ClientSelectableName;
-    fn id(&self) -> ClientFieldOrPointerId;
     fn type_and_field(&self) -> ObjectTypeAndFieldName;
-    fn parent_object_id(&self) -> ServerObjectId;
-    // the following are unsupported, for now, because the return values include a generic
-    fn reader_selection_set(
-        &self,
-    ) -> &[WithSpan<
-        SelectionTypeContainingSelections<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-        >,
-    >];
+    fn parent_object_entity_id(&self) -> ServerObjectEntityId;
+    fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>];
     fn refetch_strategy(
         &self,
     ) -> Option<
         &RefetchStrategy<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
+            ValidatedScalarSelectionAssociatedData,
+            ValidatedObjectSelectionAssociatedData,
         >,
     >;
-    fn selection_set_for_parent_query(
-        &self,
-    ) -> &[WithSpan<
-        SelectionTypeContainingSelections<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-        >,
-    >];
+    fn selection_set_for_parent_query(&self) -> &[WithSpan<ValidatedSelection>];
 
-    fn variable_definitions(
-        &self,
-    ) -> &[WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>];
+    fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityId>>];
+
+    fn client_type(&self) -> &'static str;
 }
 
-impl<
-        TSelectionTypeSelectionScalarFieldAssociatedData,
-        TSelectionTypeSelectionLinkedFieldAssociatedData,
-        TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
-        TOutputFormat: OutputFormat,
-    >
-    ClientFieldOrPointer<
-        TSelectionTypeSelectionScalarFieldAssociatedData,
-        TSelectionTypeSelectionLinkedFieldAssociatedData,
-        TClientFieldVariableDefinitionAssociatedData,
-    >
-    for &ClientField<
-        TSelectionTypeSelectionScalarFieldAssociatedData,
-        TSelectionTypeSelectionLinkedFieldAssociatedData,
-        TClientFieldVariableDefinitionAssociatedData,
-        TOutputFormat,
-    >
+impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
+    for &ClientScalarSelectable<TNetworkProtocol>
 {
     fn description(&self) -> Option<DescriptionValue> {
         self.description
@@ -163,26 +111,15 @@ impl<
         self.name.into()
     }
 
-    fn id(&self) -> ClientFieldOrPointerId {
-        SelectionType::Scalar(self.id)
-    }
-
     fn type_and_field(&self) -> ObjectTypeAndFieldName {
         self.type_and_field
     }
 
-    fn parent_object_id(&self) -> ServerObjectId {
-        self.parent_object_id
+    fn parent_object_entity_id(&self) -> ServerObjectEntityId {
+        self.parent_object_entity_id
     }
 
-    fn reader_selection_set(
-        &self,
-    ) -> &[WithSpan<
-        SelectionTypeContainingSelections<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-        >,
-    >] {
+    fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>] {
         &self.reader_selection_set
     }
 
@@ -190,21 +127,14 @@ impl<
         &self,
     ) -> Option<
         &RefetchStrategy<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
+            ValidatedScalarSelectionAssociatedData,
+            ValidatedObjectSelectionAssociatedData,
         >,
     > {
         self.refetch_strategy.as_ref()
     }
 
-    fn selection_set_for_parent_query(
-        &self,
-    ) -> &[WithSpan<
-        SelectionTypeContainingSelections<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-        >,
-    >] {
+    fn selection_set_for_parent_query(&self) -> &[WithSpan<ValidatedSelection>] {
         match self.variant {
             ClientFieldVariant::ImperativelyLoadedField(_) => self
                 .refetch_strategy
@@ -218,30 +148,17 @@ impl<
         }
     }
 
-    fn variable_definitions(
-        &self,
-    ) -> &[WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>] {
+    fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityId>>] {
         &self.variable_definitions
+    }
+
+    fn client_type(&self) -> &'static str {
+        "field"
     }
 }
 
-impl<
-        TSelectionTypeSelectionScalarFieldAssociatedData,
-        TSelectionTypeSelectionLinkedFieldAssociatedData,
-        TClientFieldVariableDefinitionAssociatedData: Ord + Debug,
-        TOutputFormat: OutputFormat,
-    >
-    ClientFieldOrPointer<
-        TSelectionTypeSelectionScalarFieldAssociatedData,
-        TSelectionTypeSelectionLinkedFieldAssociatedData,
-        TClientFieldVariableDefinitionAssociatedData,
-    >
-    for &ClientPointer<
-        TSelectionTypeSelectionScalarFieldAssociatedData,
-        TSelectionTypeSelectionLinkedFieldAssociatedData,
-        TClientFieldVariableDefinitionAssociatedData,
-        TOutputFormat,
-    >
+impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
+    for &ClientObjectSelectable<TNetworkProtocol>
 {
     fn description(&self) -> Option<DescriptionValue> {
         self.description
@@ -251,26 +168,15 @@ impl<
         self.name.into()
     }
 
-    fn id(&self) -> ClientFieldOrPointerId {
-        SelectionType::Object(self.id)
-    }
-
     fn type_and_field(&self) -> ObjectTypeAndFieldName {
         self.type_and_field
     }
 
-    fn parent_object_id(&self) -> ServerObjectId {
-        self.parent_object_id
+    fn parent_object_entity_id(&self) -> ServerObjectEntityId {
+        self.parent_object_entity_id
     }
 
-    fn reader_selection_set(
-        &self,
-    ) -> &[WithSpan<
-        SelectionTypeContainingSelections<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-        >,
-    >] {
+    fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>] {
         &self.reader_selection_set
     }
 
@@ -278,27 +184,22 @@ impl<
         &self,
     ) -> Option<
         &RefetchStrategy<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
+            ValidatedScalarSelectionAssociatedData,
+            ValidatedObjectSelectionAssociatedData,
         >,
     > {
         Some(&self.refetch_strategy)
     }
 
-    fn selection_set_for_parent_query(
-        &self,
-    ) -> &[WithSpan<
-        SelectionTypeContainingSelections<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-        >,
-    >] {
+    fn selection_set_for_parent_query(&self) -> &[WithSpan<ValidatedSelection>] {
         &self.reader_selection_set
     }
 
-    fn variable_definitions(
-        &self,
-    ) -> &[WithSpan<VariableDefinition<TClientFieldVariableDefinitionAssociatedData>>] {
+    fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityId>>] {
         &self.variable_definitions
+    }
+
+    fn client_type(&self) -> &'static str {
+        "pointer"
     }
 }

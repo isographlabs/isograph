@@ -10,10 +10,9 @@ use graphql_lang_types::{
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
     from_isograph_field_directives, ClientFieldDeclaration, ClientPointerDeclaration,
-    ConstantValue, EntrypointDeclaration, IsographFieldDirective, LinkedFieldSelection,
-    NonConstantValue, ScalarFieldSelection, SelectionFieldArgument,
-    SelectionTypeContainingSelections, UnvalidatedSelectionWithUnvalidatedDirectives,
-    VariableDefinition,
+    ConstantValue, EntrypointDeclaration, IsographFieldDirective, NonConstantValue,
+    ObjectSelection, ScalarSelection, SelectionFieldArgument, SelectionTypeContainingSelections,
+    UnvalidatedSelection, VariableDefinition,
 };
 use std::{collections::HashSet, ops::ControlFlow};
 
@@ -299,11 +298,10 @@ fn parse_client_pointer_declaration_inner(
 // Note: for now, top-level selection sets are required
 //
 // TODO: perform some refactor to make type easier to read.
-#[allow(clippy::type_complexity)]
 fn parse_selection_set(
     tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
-) -> ParseResultWithSpan<Vec<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>>> {
+) -> ParseResultWithSpan<Vec<WithSpan<UnvalidatedSelection>>> {
     let selection_set = parse_optional_selection_set(tokens, text_source)?;
     match selection_set {
         Some(selection_set) => Ok(selection_set),
@@ -318,7 +316,7 @@ fn parse_selection_set(
 fn parse_optional_selection_set(
     tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
-) -> ParseResultWithSpan<Option<Vec<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>>>> {
+) -> ParseResultWithSpan<Option<Vec<WithSpan<UnvalidatedSelection>>>> {
     let open_brace: Result<WithSpan<IsographLangTokenKind>, WithSpan<crate::LowLevelParseError>> =
         tokens.parse_token_of_kind(IsographLangTokenKind::OpenBrace);
     if open_brace.is_err() {
@@ -408,7 +406,7 @@ fn parse_comma_line_break_or_curly(tokens: &mut PeekableLexer<'_>) -> ParseResul
 fn parse_selection(
     tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
-) -> ParseResultWithSpan<WithSpan<UnvalidatedSelectionWithUnvalidatedDirectives>> {
+) -> ParseResultWithSpan<WithSpan<UnvalidatedSelection>> {
     tokens.with_span(|tokens| {
         let (field_name, alias) = parse_optional_alias_and_field_name(tokens)?;
         let field_name = field_name.to_with_location(text_source);
@@ -435,7 +433,7 @@ fn parse_selection(
                                 .unwrap_or_else(Span::todo_generated),
                         )
                     })?;
-                SelectionTypeContainingSelections::Object(LinkedFieldSelection {
+                SelectionTypeContainingSelections::Object(ObjectSelection {
                     name: field_name.map(|string_key| string_key.into()),
                     reader_alias: alias
                         .map(|with_span| with_span.map(|string_key| string_key.into())),
@@ -455,7 +453,7 @@ fn parse_selection(
                                 .unwrap_or_else(Span::todo_generated),
                         )
                     })?;
-                SelectionTypeContainingSelections::Scalar(ScalarFieldSelection {
+                SelectionTypeContainingSelections::Scalar(ScalarSelection {
                     name: field_name.map(|string_key| string_key.into()),
                     reader_alias: alias
                         .map(|with_span| with_span.map(|string_key| string_key.into())),

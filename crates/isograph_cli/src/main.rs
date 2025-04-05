@@ -3,7 +3,7 @@ mod opt;
 use clap::Parser;
 use colored::Colorize;
 use common_lang_types::CurrentWorkingDirectory;
-use graphql_output_format::GraphQLOutputFormat;
+use graphql_network_protocol::GraphQLNetworkProtocol;
 use intern::string_key::Intern;
 use isograph_compiler::{compile_and_print, handle_watch_command};
 use isograph_config::create_config;
@@ -37,7 +37,7 @@ async fn start_compiler(
         .unwrap_or("./isograph.config.json".into());
 
     if compile_command.watch {
-        match handle_watch_command::<GraphQLOutputFormat>(
+        match handle_watch_command::<GraphQLNetworkProtocol>(
             config_location,
             current_working_directory,
         )
@@ -51,8 +51,11 @@ async fn start_compiler(
                 std::process::exit(1);
             }
         };
-    } else if compile_and_print::<GraphQLOutputFormat>(config_location, current_working_directory)
-        .is_err()
+    } else if compile_and_print::<GraphQLNetworkProtocol>(
+        config_location,
+        current_working_directory,
+    )
+    .is_err()
     {
         std::process::exit(1);
     }

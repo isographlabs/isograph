@@ -4,18 +4,18 @@ use common_lang_types::{
     ArtifactPathAndContent, IsographObjectTypeName, ObjectTypeAndFieldName, QueryOperationName,
     QueryText, VariableName,
 };
-use intern::{string_key::Intern, Lookup};
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
-    ClientFieldId, DefinitionLocation, ScalarSelectionDirectiveSet, SelectionType, ServerObjectId,
+    ClientScalarSelectableId, DefinitionLocation, ScalarSelectionDirectiveSet, SelectionType,
+    ServerObjectEntityId,
 };
 use isograph_schema::{
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
-    get_reachable_variables, initial_variable_context, ClientFieldOrPointer,
-    FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, MergedSelectionMap, OutputFormat,
-    RootOperationName, RootRefetchedPath, ScalarClientFieldTraversalState, SchemaObject,
-    ValidatedClientField, ValidatedSchema, ValidatedVariableDefinition,
+    get_reachable_variables, initial_variable_context, ClientScalarOrObjectSelectable,
+    ClientScalarSelectable, FieldToCompletedMergeTraversalStateMap, FieldTraversalResult,
+    MergedSelectionMap, NetworkProtocol, RootOperationName, RootRefetchedPath,
+    ScalarClientFieldTraversalState, Schema, ServerObjectEntity, ValidatedVariableDefinition,
 };
 
 use crate::{
@@ -29,18 +29,18 @@ use crate::{
 };
 
 #[derive(Debug)]
-struct EntrypointArtifactInfo<'schema, TOutputFormat: OutputFormat> {
+struct EntrypointArtifactInfo<'schema, TNetworkProtocol: NetworkProtocol> {
     query_name: QueryOperationName,
-    parent_type: &'schema SchemaObject<TOutputFormat>,
+    parent_type: &'schema ServerObjectEntity<TNetworkProtocol>,
     query_text: QueryText,
     normalization_ast_text: NormalizationAstText,
     refetch_query_artifact_import: RefetchQueryArtifactImport,
     concrete_type: IsographObjectTypeName,
 }
 
-pub(crate) fn generate_entrypoint_artifacts<TOutputFormat: OutputFormat>(
-    schema: &ValidatedSchema<TOutputFormat>,
-    entrypoint_id: ClientFieldId,
+pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    entrypoint_id: ClientScalarSelectableId,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     file_extensions: GenerateFileExtensionsOption,
 ) -> Vec<ArtifactPathAndContent> {
@@ -52,10 +52,13 @@ pub(crate) fn generate_entrypoint_artifacts<TOutputFormat: OutputFormat>(
         ..
     } = create_merged_selection_map_for_field_and_insert_into_global_map(
         schema,
-        schema.server_field_data.object(entrypoint.parent_object_id),
+        entrypoint.parent_object_entity_id,
+        schema
+            .server_entity_data
+            .server_object_entity(entrypoint.parent_object_entity_id),
         entrypoint.selection_set_for_parent_query(),
         encountered_client_type_map,
-        DefinitionLocation::Client(SelectionType::Scalar(entrypoint.id)),
+        DefinitionLocation::Client(SelectionType::Scalar(entrypoint_id)),
         &initial_variable_context(&SelectionType::Scalar(entrypoint)),
     );
 
@@ -77,15 +80,15 @@ pub(crate) fn generate_entrypoint_artifacts<TOutputFormat: OutputFormat>(
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     'a,
-    TOutputFormat: OutputFormat,
+    TNetworkProtocol: NetworkProtocol,
 >(
-    schema: &ValidatedSchema<TOutputFormat>,
-    entrypoint: &ValidatedClientField<TOutputFormat>,
+    schema: &Schema<TNetworkProtocol>,
+    entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
     merged_selection_map: &MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,
     encountered_client_type_map: &FieldToCompletedMergeTraversalStateMap,
     variable_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
-    default_root_operation: &Option<(&ServerObjectId, &RootOperationName)>,
+    default_root_operation: &Option<(&ServerObjectEntityId, &RootOperationName)>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> Vec<ArtifactPathAndContent> {
     let query_name = entrypoint.name.into();
@@ -95,7 +98,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     // parameter
     let root_operation_name = schema
         .fetchable_types
-        .get(&entrypoint.parent_object_id)
+        .get(&entrypoint.parent_object_entity_id)
         .unwrap_or_else(|| {
             default_root_operation
                 .map(|(_, operation_name)| operation_name)
@@ -109,8 +112,10 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
                 })
         });
 
-    let parent_object = schema.server_field_data.object(entrypoint.parent_object_id);
-    let query_text = TOutputFormat::generate_query_text(
+    let parent_object = schema
+        .server_entity_data
+        .server_object_entity(entrypoint.parent_object_entity_id);
+    let query_text = TNetworkProtocol::generate_query_text(
         query_name,
         schema,
         merged_selection_map,
@@ -156,12 +161,12 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     let normalization_ast_text =
         generate_normalization_ast_text(schema, merged_selection_map.values(), 1);
 
-    let concrete_type = schema.server_field_data.object(
+    let concrete_type = schema.server_entity_data.server_object_entity(
         if schema
             .fetchable_types
-            .contains_key(&entrypoint.parent_object_id)
+            .contains_key(&entrypoint.parent_object_entity_id)
         {
-            entrypoint.parent_object_id
+            entrypoint.parent_object_entity_id
         } else {
             *default_root_operation
                 .map(|(operation_id, _)| operation_id)
@@ -238,7 +243,7 @@ fn generate_refetch_query_artifact_import(
                 .imperatively_loaded_field_variant
                 .top_level_schema_field_arguments
                 .iter()
-                .map(|x| x.name.item.lookup().intern().into()),
+                .map(|x| x.name.item.unchecked_conversion()),
         );
         array_syntax.push_str(&format!(
             "  {{ artifact: refetchQuery{}, allowedVariables: {} }},\n",
@@ -257,7 +262,7 @@ fn generate_refetch_query_artifact_import(
     RefetchQueryArtifactImport(output)
 }
 
-impl<TOutputFormat: OutputFormat> EntrypointArtifactInfo<'_, TOutputFormat> {
+impl<TNetworkProtocol: NetworkProtocol> EntrypointArtifactInfo<'_, TNetworkProtocol> {
     fn path_and_content(
         self,
         file_extensions: GenerateFileExtensionsOption,
