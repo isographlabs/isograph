@@ -442,13 +442,9 @@ fn process_scalar_definition(
     schema: &mut UnvalidatedGraphqlSchema,
     scalar_type_definition: GraphQLScalarTypeDefinition,
 ) -> ProcessGraphqlTypeDefinitionResult<()> {
-    let &mut Schema {
-        server_entity_data: ref mut server_field_data,
-        ..
-    } = schema;
-    let next_scalar_entity_id = server_field_data.server_scalars.len().into();
-    let type_names = &mut server_field_data.defined_entities;
-    let scalars = &mut server_field_data.server_scalars;
+    let next_scalar_entity_id = schema.server_entity_data.server_scalars.len().into();
+    let type_names = &mut schema.server_entity_data.defined_entities;
+    let scalars = &mut schema.server_entity_data.server_scalars;
     match type_names.entry(scalar_type_definition.name.item.into()) {
         HashMapEntry::Occupied(_) => {
             return Err(WithLocation::new(
