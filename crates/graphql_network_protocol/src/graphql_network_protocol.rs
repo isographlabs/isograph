@@ -1,6 +1,6 @@
-use std::error::Error;
+use std::{collections::BTreeMap, error::Error};
 
-use common_lang_types::{QueryOperationName, QueryText};
+use common_lang_types::{QueryOperationName, QueryText, RelativePathToSourceFile};
 use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDocument};
 use isograph_lang_types::SchemaSource;
 use isograph_schema::{
@@ -10,7 +10,7 @@ use isograph_schema::{
 use pico::{Database, MemoRef, SourceId};
 
 use crate::{
-    parse_graphql_schema, parse_schema_extensions_file,
+    parse_graphql_schema,
     process_type_system_definition::{
         process_graphql_type_extension_document, process_graphql_type_system_document,
     },
@@ -27,18 +27,18 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 
     type SchemaObjectAssociatedData = GraphQLSchemaObjectAssociatedData;
 
-    fn parse_type_system_document(
+    fn parse_type_system_documents(
         db: &Database,
         schema_source_id: SourceId<SchemaSource>,
-    ) -> Result<MemoRef<Self::TypeSystemDocument>, Box<dyn Error>> {
-        Ok(parse_graphql_schema(db, schema_source_id).to_owned()?)
-    }
-
-    fn parse_type_system_extension_document(
-        db: &Database,
-        schema_extension_source_id: SourceId<SchemaSource>,
-    ) -> Result<MemoRef<Self::TypeSystemExtensionDocument>, Box<dyn Error>> {
-        Ok(parse_schema_extensions_file(db, schema_extension_source_id).to_owned()?)
+        schema_extension_sources: &BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
+    ) -> Result<
+        (
+            MemoRef<Self::TypeSystemDocument>,
+            BTreeMap<RelativePathToSourceFile, MemoRef<Self::TypeSystemExtensionDocument>>,
+        ),
+        Box<dyn Error>,
+    > {
+        Ok(parse_graphql_schema(db, schema_source_id, schema_extension_sources).to_owned()?)
     }
 
     fn process_type_system_document(

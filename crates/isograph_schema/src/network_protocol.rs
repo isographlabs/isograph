@@ -1,6 +1,6 @@
-use std::{error::Error, fmt::Debug, hash::Hash};
+use std::{collections::BTreeMap, error::Error, fmt::Debug, hash::Hash};
 
-use common_lang_types::{QueryOperationName, QueryText};
+use common_lang_types::{QueryOperationName, QueryText, RelativePathToSourceFile};
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::SchemaSource;
 use pico::{Database, MemoRef, SourceId};
@@ -22,15 +22,18 @@ where
 
     type SchemaObjectAssociatedData: Debug;
 
-    fn parse_type_system_document(
+    #[allow(clippy::type_complexity)]
+    fn parse_type_system_documents(
         db: &Database,
         schema_source_id: SourceId<SchemaSource>,
-    ) -> Result<MemoRef<Self::TypeSystemDocument>, Box<dyn Error>>;
-
-    fn parse_type_system_extension_document(
-        db: &Database,
-        schema_extension_source_id: SourceId<SchemaSource>,
-    ) -> Result<MemoRef<Self::TypeSystemExtensionDocument>, Box<dyn Error>>;
+        schema_extension_sources: &BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
+    ) -> Result<
+        (
+            MemoRef<Self::TypeSystemDocument>,
+            BTreeMap<RelativePathToSourceFile, MemoRef<Self::TypeSystemExtensionDocument>>,
+        ),
+        Box<dyn Error>,
+    >;
 
     // TODO refactor this to return a Vec or Iterator of IsographObjectDefinition or the like,
     // instead of mutating the Schema
