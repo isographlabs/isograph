@@ -10,7 +10,7 @@ use thiserror::Error;
 
 #[allow(clippy::type_complexity)]
 #[memo]
-pub fn parse_graphql_schema(
+pub fn parse_graphql_schema_and_extensions(
     db: &Database,
     schema_source_id: SourceId<SchemaSource>,
     schema_extension_sources: &BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,

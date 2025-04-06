@@ -10,7 +10,7 @@ use isograph_schema::{
 use pico::{Database, MemoRef, SourceId};
 
 use crate::{
-    parse_graphql_schema,
+    parse_graphql_schema_and_extensions,
     process_type_system_definition::{
         process_graphql_type_extension_document, process_graphql_type_system_document,
     },
@@ -38,7 +38,10 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         ),
         Box<dyn Error>,
     > {
-        Ok(parse_graphql_schema(db, schema_source_id, schema_extension_sources).to_owned()?)
+        Ok(
+            parse_graphql_schema_and_extensions(db, schema_source_id, schema_extension_sources)
+                .to_owned()?,
+        )
     }
 
     fn process_type_system_document(
