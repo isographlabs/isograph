@@ -1,8 +1,8 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
-    "compile-typescript": {
-      "dependsOn": ["^compile-typescript"],
+    "compile-libs": {
+      "dependsOn": ["^compile-libs"],
       "outputs": ["dist/**"]
     },
     "//#build": {
