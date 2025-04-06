@@ -8,7 +8,7 @@
   "author": "Isograph Labs",
   "license": "MIT",
   "scripts": {
-    "compile-typescript": "rm -rf dist/* && tsc -p tsconfig.pkg.json",
+    "compile-libs": "rm -rf dist/* && tsc -p tsconfig.pkg.json",
     "compile-watch": "tsc -p tsconfig.pkg.json --watch",
     "test": "vitest run",
     "test-watch": "vitest watch",
