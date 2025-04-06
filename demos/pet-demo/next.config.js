@@ -12,6 +12,7 @@ const nextConfig = {
         {
           // must be an absolute path
           root_dir: path.resolve(__dirname, '.'),
+          // prettier-ignore
           ...(require('./isograph.config.json')),
         },
       ],
