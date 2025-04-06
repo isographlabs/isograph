@@ -3,9 +3,10 @@ use intern::Lookup;
 
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
+use isograph_lang_types::SelectionType;
 use isograph_schema::{
-    initial_variable_context, ClientScalarOrObjectSelectable, ClientScalarSelectable,
-    ClientSelectable, NetworkProtocol, Schema, ServerObjectSelectable,
+    initial_variable_context, ClientScalarOrObjectSelectable, ClientSelectable, NetworkProtocol,
+    Schema, ServerObjectSelectable,
 };
 use isograph_schema::{
     RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment, UserWrittenClientTypeInfo,
@@ -14,6 +15,7 @@ use isograph_schema::{
 
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
+use crate::generate_artifacts::ClientFieldOutputType;
 use crate::{
     generate_artifacts::{
         generate_client_field_parameter_type, generate_client_field_updatable_data_type,
@@ -311,44 +313,54 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
 
 pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    client_field: &ClientScalarSelectable<TNetworkProtocol>,
+    client_field: &ClientSelectable<TNetworkProtocol>,
     config: &CompilerConfig,
     info: UserWrittenClientTypeInfo,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
     let parent_type = schema
         .server_entity_data
-        .server_object_entity(client_field.parent_object_entity_id);
+        .server_object_entity(client_field.parent_object_entity_id());
 
     let function_import_statement =
         generate_function_import_statement(config, info, file_extensions);
 
-    let client_field_output_type = generate_output_type(client_field);
+    let client_field_output_type = match client_field {
+        SelectionType::Object(_) => ClientFieldOutputType("Link".to_string()),
+        SelectionType::Scalar(client_field) => generate_output_type(client_field),
+    };
 
     let output_type_text = format!(
         "import type React from 'react';\n\
         {function_import_statement}\n\
         export type {}__{}__output_type = {};",
-        parent_type.name, client_field.name, client_field_output_type
+        parent_type.name,
+        client_field.name(),
+        client_field_output_type
     );
 
-    let final_output_type_text =
-        if let UserWrittenComponentVariant::Eager = info.user_written_component_variant {
-            output_type_text
-        } else {
-            format!(
-                "import type {{ ExtractSecondParam, CombineWithIntrinsicAttributes }} \
+    let final_output_type_text = if let SelectionType::Object(_) = client_field {
+        format!(
+            "import type {{ Link }} \
                 from '@isograph/react';\n\
                 {output_type_text}\n",
-            )
-        };
+        )
+    } else if let UserWrittenComponentVariant::Eager = info.user_written_component_variant {
+        output_type_text
+    } else {
+        format!(
+            "import type {{ ExtractSecondParam, CombineWithIntrinsicAttributes }} \
+                from '@isograph/react';\n\
+                {output_type_text}\n",
+        )
+    };
 
     ArtifactPathAndContent {
         file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
         file_content: final_output_type_text,
         type_and_field: Some(ObjectTypeAndFieldName {
             type_name: parent_type.name,
-            field_name: client_field.name.into(),
+            field_name: client_field.name().into(),
         }),
     }
 }

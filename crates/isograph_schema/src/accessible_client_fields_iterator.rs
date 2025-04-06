@@ -1,17 +1,18 @@
 use common_lang_types::WithSpan;
-use isograph_lang_types::{
-    ClientScalarSelectableId, DefinitionLocation, SelectionTypeContainingSelections,
-};
+use isograph_lang_types::{DefinitionLocation, SelectionTypeContainingSelections};
 
 use crate::{
-    ClientScalarOrObjectSelectable, ClientSelectable, NetworkProtocol, Schema, ValidatedSelection,
+    ClientScalarOrObjectSelectable, ClientSelectable, ClientSelectableId, NetworkProtocol, Schema,
+    ValidatedSelection,
 };
+
+use isograph_lang_types::SelectionType;
 
 // This should really be replaced with a proper visitor, or something
 pub fn accessible_client_fields<'a, TNetworkProtocol: NetworkProtocol>(
     selection_type: &'a ClientSelectable<'a, TNetworkProtocol>,
     schema: &'a Schema<TNetworkProtocol>,
-) -> impl Iterator<Item = ClientScalarSelectableId> + 'a {
+) -> impl Iterator<Item = ClientSelectableId> + 'a {
     AccessibleClientFieldIterator {
         selection_set: selection_type.selection_set_for_parent_query(),
         index: 0,
@@ -30,7 +31,7 @@ struct AccessibleClientFieldIterator<'a, TNetworkProtocol: NetworkProtocol> {
 impl<TNetworkProtocol: NetworkProtocol> Iterator
     for AccessibleClientFieldIterator<'_, TNetworkProtocol>
 {
-    type Item = ClientScalarSelectableId;
+    type Item = ClientSelectableId;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(iterator) = &mut self.sub_iterator {
@@ -55,7 +56,7 @@ impl<TNetworkProtocol: NetworkProtocol> Iterator
                             }
                             DefinitionLocation::Client(client_field_id) => {
                                 self.index += 1;
-                                return Some(client_field_id);
+                                return Some(SelectionType::Scalar(client_field_id));
                             }
                         }
                     }
@@ -65,6 +66,15 @@ impl<TNetworkProtocol: NetworkProtocol> Iterator
                             schema: self.schema,
                             index: 0,
                             sub_iterator: None,
+                        };
+
+                        match linked_field.associated_data.field_id {
+                            DefinitionLocation::Client(client_pointer_id) => {
+                                self.sub_iterator = Some(Box::new(iterator));
+                                self.index += 1;
+                                return Some(SelectionType::Object(client_pointer_id));
+                            }
+                            DefinitionLocation::Server(_) => {}
                         };
                         let next = iterator.next();
                         if next.is_some() {
