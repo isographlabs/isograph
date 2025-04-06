@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     error::Error,
     ops::{Deref, DerefMut},
 };
@@ -9,7 +9,7 @@ use common_lang_types::{
 };
 use isograph_config::CompilerConfig;
 use isograph_lang_parser::IsoLiteralExtractionResult;
-use isograph_lang_types::{IsoLiteralsSource, SchemaSource};
+use isograph_lang_types::IsoLiteralsSource;
 use isograph_schema::{validate_entrypoints, NetworkProtocol, Schema, UnprocessedItem};
 use pico::{Database, SourceId};
 
@@ -27,19 +27,22 @@ pub fn create_unvalidated_schema<TNetworkProtocol: NetworkProtocol>(
     config: &CompilerConfig,
 ) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), Box<dyn Error>> {
     let mut unvalidated_isograph_schema = Schema::<TNetworkProtocol>::new();
-    let type_system_document =
-        TNetworkProtocol::parse_type_system_document(db, source_files.schema)?.to_owned();
+    let (type_system_document, schema_extensions) = TNetworkProtocol::parse_type_system_documents(
+        db,
+        source_files.schema,
+        &source_files.schema_extensions,
+    )?
+    .to_owned();
+
     let outcome = TNetworkProtocol::process_type_system_document(
         &mut unvalidated_isograph_schema,
-        type_system_document,
+        type_system_document.to_owned(),
         &config.options,
     )?;
-    let schema_extensions =
-        parse_schema_extensions::<TNetworkProtocol>(db, &source_files.schema_extensions)?;
     for extension_document in schema_extensions.into_values() {
         TNetworkProtocol::process_type_system_extension_document(
             &mut unvalidated_isograph_schema,
-            extension_document,
+            extension_document.to_owned(),
             &config.options,
         )?;
     }
@@ -102,25 +105,6 @@ pub fn create_unvalidated_schema<TNetworkProtocol: NetworkProtocol>(
     })?;
 
     Ok((unvalidated_isograph_schema, contains_iso_stats))
-}
-
-fn parse_schema_extensions<TNetworkProtocol: NetworkProtocol>(
-    db: &Database,
-    schema_extensions_sources: &BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
-) -> Result<
-    HashMap<RelativePathToSourceFile, TNetworkProtocol::TypeSystemExtensionDocument>,
-    Box<dyn Error>,
-> {
-    let mut schema_extensions = HashMap::new();
-    for (relative_path, schema_extension_source_id) in schema_extensions_sources.iter() {
-        let extensions_document = TNetworkProtocol::parse_type_system_extension_document(
-            db,
-            *schema_extension_source_id,
-        )?
-        .to_owned();
-        schema_extensions.insert(*relative_path, extensions_document);
-    }
-    Ok(schema_extensions)
 }
 
 fn parse_iso_literals(
