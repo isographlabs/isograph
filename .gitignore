@@ -19,3 +19,4 @@ artifacts
 **/out/**
 
 .turbo
+swc_isograph_plugin.wasm

@@ -2,11 +2,10 @@
 [package]
 authors = ["Robert Balicki <robert.balicki@gmail.com>", "Edmondo Porcu <edmondo.porcu@gmail.com>", "Pablo Crovetto <jpcc077@gmail.com>"]
 description = "SWC plugin for Isograph"
-edition = "2021"
-license = "Apache-2.0"
 name = "swc_isograph_plugin"
-publish = false
-version = "0.7.4"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -30,7 +29,6 @@ tracing = { workspace = true, features = ["release_max_level_off"] }
 
 [profile.release]
 codegen-units = 1
-# debug = true
 lto = true
 
 # Optimize for size

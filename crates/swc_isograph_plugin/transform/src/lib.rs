@@ -35,7 +35,7 @@ enum IsograthTransformError {
     #[error("Invalid iso tag usage. Expected 'entrypoint' or 'field'.")]
     InvalidIsoKeyword,
 
-    #[error("Invalid iso tag usage. The iso function should be passed at most one argument.")]
+    #[error("Invalid iso tag usage. The iso function should be passed exactly one argument.")]
     IsoFnCallRequiresOneArg,
 
     #[error("Iso invocation require one parameter.")]

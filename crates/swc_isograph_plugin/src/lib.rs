@@ -13,11 +13,11 @@ use tracing::debug;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct WasmConfig {
-    // Unlike native env,  in WASM we can't use env::current_dir
-    // as well as `/cwd` alias. current_dir cannot resolve to actual path,
-    // `/cwd` alias won't expand to `real` path but only gives ACCESS to the cwd as
-    // mounted path, which we can't use in this case.
-    // Must be an absolute path
+    /// Unlike native env,  in WASM we can't use env::current_dir
+    /// as well as `/cwd` alias. current_dir cannot resolve to actual path,
+    /// `/cwd` alias won't expand to `real` path but only gives ACCESS to the cwd as
+    /// mounted path, which we can't use in this case.
+    /// Must be an absolute path
     pub root_dir: PathBuf,
     /// From here is the same as isograph_config::IsographProjectConfig
     /// The user may hard-code the JSON Schema for their version of the config.

@@ -2930,7 +2930,7 @@ dependencies = [
 
 [[package]]
 name = "swc_isograph_plugin"
-version = "0.7.4"
+version = "0.3.1"
 dependencies = [
  "common_lang_types",
  "intern",
