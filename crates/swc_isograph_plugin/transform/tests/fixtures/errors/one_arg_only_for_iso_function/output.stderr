@@ -1,5 +1,5 @@
 
-  x Invalid iso tag usage. The iso function should be passed at most one argument.
+  x Invalid iso tag usage. The iso function should be passed exactly one argument.
    ,-[input.js:1:1]
  1 | ,-> export const HomeRoute = iso(`
  2 | |     field Query.HomeRoute @component {

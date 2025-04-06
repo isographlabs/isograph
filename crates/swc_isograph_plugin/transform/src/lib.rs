@@ -56,7 +56,6 @@ fn show_error(span: &Span, err: &IsograthTransformError) -> Result<(), anyhow::E
 
     HANDLER.with(|handler| {
         handler.struct_span_err(*span, &msg).emit();
-        return;
     });
     bail!(msg)
 }
@@ -78,7 +77,7 @@ impl IsographImport {
                     span: self
                         .unresolved_mark
                         .map(|m| DUMMY_SP.apply_mark(m))
-                        .unwrap_or(Default::default()),
+                        .unwrap_or_default(),
                     sym: self.item.clone(),
                     optional: false,
                 },
@@ -204,7 +203,7 @@ struct Isograph<'a> {
 }
 
 #[swc_trace]
-impl<'a> Isograph<'a> {
+impl Isograph<'_> {
     fn parse_iso_call_arg_into_type(
         &self,
         expr_or_spread: Option<&ExprOrSpread>,
@@ -216,15 +215,15 @@ impl<'a> Isograph<'a> {
                 }
 
                 let entrypoint = OPERATION_REGEX
-                    .captures_iter(&*quasis[0].raw.trim())
+                    .captures_iter(quasis[0].raw.trim())
                     .next()
                     .map(|capture_group| {
                         debug!("capture_group {:?}", capture_group);
-                        return IsographEntrypoint {
+                        IsographEntrypoint {
                             artifact_type: capture_group[1].to_string(),
                             field_type: capture_group[2].to_string(),
                             field_name: capture_group[3].to_string(),
-                        };
+                        }
                     });
                 match entrypoint {
                     Some(entrypoint) => return Ok(entrypoint),
@@ -262,8 +261,8 @@ impl<'a> Isograph<'a> {
     fn compile_iso_call_statement(
         &mut self,
         // iso(iso_args)(fn_args);
-        iso_args: &Vec<ExprOrSpread>,
-        fn_args: Option<&Vec<ExprOrSpread>>,
+        iso_args: &[ExprOrSpread],
+        fn_args: Option<&[ExprOrSpread]>,
     ) -> Result<Expr, IsograthTransformError> {
         if iso_args.iter().len() != 1 {
             return Err(IsograthTransformError::IsoRequiresOneArg);
@@ -298,17 +297,18 @@ impl<'a> Isograph<'a> {
     }
 }
 
-impl<'a> Fold for Isograph<'a> {
+impl Fold for Isograph<'_> {
     noop_fold_type!();
 
     fn fold_expr(&mut self, expr: Expr) -> Expr {
-        match &expr {
-            Expr::Call(CallExpr {
-                callee: Callee::Expr(callee),
-                args,
-                span,
-                ..
-            }) => match &**callee {
+        if let Expr::Call(CallExpr {
+            callee: Callee::Expr(callee),
+            args,
+            span,
+            ..
+        }) = &expr
+        {
+            match &**callee {
                 Expr::Ident(ident) => {
                     if ident.sym == "iso" {
                         match self.compile_iso_call_statement(args, None) {
@@ -331,29 +331,25 @@ impl<'a> Fold for Isograph<'a> {
                     span: child_span,
                     ..
                 }) => {
-                    match &**child_callee {
-                        Expr::Ident(ident) => {
-                            if ident.sym == "iso" {
-                                match self.compile_iso_call_statement(child_args, Some(args)) {
-                                    Ok(build_expr) => {
-                                        // might have `iso` functions inside the build expr
-                                        let build_expr = build_expr.fold_children_with(self);
-                                        return build_expr;
-                                    }
-                                    Err(err) => {
-                                        let _ = show_error(child_span, &err);
-                                        // On error, we keep the same expression and fail showing the error
-                                        return expr;
-                                    }
+                    if let Expr::Ident(ident) = &**child_callee {
+                        if ident.sym == "iso" {
+                            match self.compile_iso_call_statement(child_args, Some(args)) {
+                                Ok(build_expr) => {
+                                    // might have `iso` functions inside the build expr
+                                    let build_expr = build_expr.fold_children_with(self);
+                                    return build_expr;
+                                }
+                                Err(err) => {
+                                    let _ = show_error(child_span, &err);
+                                    // On error, we keep the same expression and fail showing the error
+                                    return expr;
                                 }
                             }
                         }
-                        _ => {}
                     }
                 }
                 _ => {}
-            },
-            _ => {}
+            }
         }
 
         expr.fold_children_with(self)

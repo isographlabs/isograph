@@ -7,7 +7,6 @@ use swc_core::{
     ecma::{ast::Program, visit::FoldWith},
     plugin::{plugin_transform, proxies::TransformPluginProgramMetadata},
 };
-use swc_isograph;
 use tracing::debug;
 
 #[derive(Deserialize)]
