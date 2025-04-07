@@ -27,20 +27,14 @@ pub fn create_unvalidated_schema<TNetworkProtocol: NetworkProtocol>(
     config: &CompilerConfig,
 ) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), Box<dyn Error>> {
     let mut unvalidated_isograph_schema = Schema::<TNetworkProtocol>::new();
-    let (type_system_document, type_system_extension_documents) =
-        TNetworkProtocol::parse_type_system_documents(
-            db,
-            source_files.schema,
-            &source_files.schema_extensions,
-        )?
-        .to_owned();
-
-    let outcome = TNetworkProtocol::process_type_system_documents(
+    let outcome = TNetworkProtocol::parse_and_process_type_system_documents(
+        db,
         &mut unvalidated_isograph_schema,
-        type_system_document.to_owned(),
-        type_system_extension_documents,
+        source_files.schema,
+        &source_files.schema_extensions,
         &config.options,
     )?;
+
     let contains_iso = parse_iso_literals(
         db,
         &source_files.iso_literals,

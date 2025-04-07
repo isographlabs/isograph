@@ -8,7 +8,7 @@ use isograph_schema::{
     MergedSelectionMap, NetworkProtocol, ProcessTypeSystemDocumentOutcome, RootOperationName,
     Schema, ValidatedVariableDefinition,
 };
-use pico::{Database, MemoRef, SourceId};
+use pico::{Database, SourceId};
 
 use crate::{
     parse_graphql_schema,
@@ -28,30 +28,18 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 
     type SchemaObjectAssociatedData = GraphQLSchemaObjectAssociatedData;
 
-    fn parse_type_system_documents(
+    fn parse_and_process_type_system_documents(
         db: &Database,
+        schema: &mut UnvalidatedGraphqlSchema,
         schema_source_id: SourceId<SchemaSource>,
         schema_extension_sources: &BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
-    ) -> Result<
-        (
-            MemoRef<Self::TypeSystemDocument>,
-            BTreeMap<RelativePathToSourceFile, MemoRef<Self::TypeSystemExtensionDocument>>,
-        ),
-        Box<dyn Error>,
-    > {
-        Ok(parse_graphql_schema(db, schema_source_id, schema_extension_sources).to_owned()?)
-    }
-
-    fn process_type_system_documents(
-        schema: &mut UnvalidatedGraphqlSchema,
-        type_system_document: Self::TypeSystemDocument,
-        type_system_extension_documents: BTreeMap<
-            RelativePathToSourceFile,
-            MemoRef<Self::TypeSystemExtensionDocument>,
-        >,
         options: &CompilerConfigOptions,
     ) -> Result<ProcessTypeSystemDocumentOutcome, Box<dyn Error>> {
-        let result = process_graphql_type_system_document(schema, type_system_document, options)?;
+        let (type_system_document, type_system_extension_documents) =
+            parse_graphql_schema(db, schema_source_id, schema_extension_sources).to_owned()?;
+
+        let result =
+            process_graphql_type_system_document(schema, type_system_document.to_owned(), options)?;
 
         for (_, type_system_extension_document) in type_system_extension_documents {
             process_graphql_type_extension_document(
