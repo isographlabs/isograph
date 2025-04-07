@@ -37,14 +37,13 @@ where
 
     // TODO refactor this to return a Vec or Iterator of IsographObjectDefinition or the like,
     // instead of mutating the Schema
-    fn process_type_system_document(
+    fn process_type_system_documents(
         schema: &mut Schema<Self>,
         type_system_document: Self::TypeSystemDocument,
-        options: &CompilerConfigOptions,
-    ) -> Result<ProcessTypeSystemDocumentOutcome, Box<dyn Error>>;
-    fn process_type_system_extension_document(
-        schema: &mut Schema<Self>,
-        type_system_extension_document: Self::TypeSystemExtensionDocument,
+        type_system_extension_document: BTreeMap<
+            RelativePathToSourceFile,
+            MemoRef<Self::TypeSystemExtensionDocument>,
+        >,
         options: &CompilerConfigOptions,
     ) -> Result<ProcessTypeSystemDocumentOutcome, Box<dyn Error>>;
 

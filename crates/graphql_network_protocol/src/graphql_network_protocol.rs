@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, error::Error};
 
 use common_lang_types::{QueryOperationName, QueryText, RelativePathToSourceFile};
 use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDocument};
+use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::SchemaSource;
 use isograph_schema::{
     MergedSelectionMap, NetworkProtocol, ProcessTypeSystemDocumentOutcome, RootOperationName,
@@ -41,27 +42,26 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         Ok(parse_graphql_schema(db, schema_source_id, schema_extension_sources).to_owned()?)
     }
 
-    fn process_type_system_document(
+    fn process_type_system_documents(
         schema: &mut UnvalidatedGraphqlSchema,
         type_system_document: Self::TypeSystemDocument,
-        options: &isograph_config::CompilerConfigOptions,
+        type_system_extension_documents: BTreeMap<
+            RelativePathToSourceFile,
+            MemoRef<Self::TypeSystemExtensionDocument>,
+        >,
+        options: &CompilerConfigOptions,
     ) -> Result<ProcessTypeSystemDocumentOutcome, Box<dyn Error>> {
-        Ok(process_graphql_type_system_document(
-            schema,
-            type_system_document,
-            options,
-        )?)
-    }
-    fn process_type_system_extension_document(
-        schema: &mut UnvalidatedGraphqlSchema,
-        type_system_extension_document: Self::TypeSystemExtensionDocument,
-        options: &isograph_config::CompilerConfigOptions,
-    ) -> Result<ProcessTypeSystemDocumentOutcome, Box<dyn Error>> {
-        Ok(process_graphql_type_extension_document(
-            schema,
-            type_system_extension_document,
-            options,
-        )?)
+        let result = process_graphql_type_system_document(schema, type_system_document, options)?;
+
+        for (_, type_system_extension_document) in type_system_extension_documents {
+            process_graphql_type_extension_document(
+                schema,
+                type_system_extension_document.to_owned(),
+                options,
+            )?;
+        }
+
+        Ok(result)
     }
 
     fn generate_query_text<'a>(
