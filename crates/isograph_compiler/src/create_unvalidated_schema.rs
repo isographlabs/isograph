@@ -5,12 +5,21 @@ use std::{
 };
 
 use common_lang_types::{
-    CurrentWorkingDirectory, RelativePathToSourceFile, TextSource, WithLocation,
+    CurrentWorkingDirectory, IsographObjectTypeName, RelativePathToSourceFile, SelectableName,
+    TextSource, UnvalidatedTypeName, VariableName, WithLocation,
 };
-use isograph_config::CompilerConfig;
+use graphql_lang_types::{GraphQLFieldDefinition, GraphQLInputValueDefinition, NameValuePair};
+use isograph_config::{CompilerConfig, CompilerConfigOptions};
 use isograph_lang_parser::IsoLiteralExtractionResult;
-use isograph_lang_types::IsoLiteralsSource;
-use isograph_schema::{validate_entrypoints, NetworkProtocol, Schema, UnprocessedItem};
+use isograph_lang_types::{
+    IsoLiteralsSource, SelectionType, ServerEntityId, ServerObjectEntityId, TypeAnnotation,
+    VariableDefinition,
+};
+use isograph_schema::{
+    validate_entrypoints, InsertFieldsError, NetworkProtocol, ProcessTypeSystemDocumentOutcome,
+    Schema, SchemaServerObjectSelectableVariant, ServerObjectSelectable, ServerScalarSelectable,
+    UnprocessedItem,
+};
 use pico::{Database, SourceId};
 
 use crate::{
@@ -27,11 +36,26 @@ pub fn create_unvalidated_schema<TNetworkProtocol: NetworkProtocol>(
     config: &CompilerConfig,
 ) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), Box<dyn Error>> {
     let mut unvalidated_isograph_schema = Schema::<TNetworkProtocol>::new();
-    let outcome = TNetworkProtocol::parse_and_process_type_system_documents(
+    let ProcessTypeSystemDocumentOutcome {
+        type_refinement_maps,
+        scalars,
+        field_queue,
+    } = TNetworkProtocol::parse_and_process_type_system_documents(
         db,
         &mut unvalidated_isograph_schema,
         source_files.schema,
         &source_files.schema_extensions,
+    )?;
+
+    for (server_scalar_entity, name_location) in scalars {
+        unvalidated_isograph_schema
+            .server_entity_data
+            .insert_server_scalar_entity(server_scalar_entity, name_location)?;
+    }
+
+    process_field_queue(
+        &mut unvalidated_isograph_schema,
+        field_queue,
         &config.options,
     )?;
 
@@ -56,11 +80,11 @@ pub fn create_unvalidated_schema<TNetworkProtocol: NetworkProtocol>(
     unprocessed_items.extend(process_exposed_fields(&mut unvalidated_isograph_schema)?);
 
     unvalidated_isograph_schema.transfer_supertype_client_selectables_to_subtypes(
-        &outcome.type_refinement_maps.supertype_to_subtype_map,
+        &type_refinement_maps.supertype_to_subtype_map,
     )?;
     unvalidated_isograph_schema.add_link_fields()?;
     unvalidated_isograph_schema.add_object_selectable_to_subtype_on_supertypes(
-        &outcome.type_refinement_maps.subtype_to_supertype_map,
+        &type_refinement_maps.subtype_to_supertype_map,
     )?;
 
     unprocessed_items.extend(add_refetch_fields_to_objects(
@@ -194,4 +218,199 @@ pub struct ContainsIsoStats {
     pub entrypoint_count: usize,
     #[allow(unused)]
     pub client_pointer_count: usize,
+}
+
+/// Now that we have processed all objects and scalars, we can process fields (i.e.
+/// selectables), as we have the knowledge of whether the field points to a scalar
+/// or object.
+///
+/// For each field:
+/// - insert it into to the parent object's encountered_fields
+/// - append it to schema.server_fields
+/// - if it is an id field, modify the parent object
+fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
+    schema: &mut Schema<TNetworkProtocol>,
+    field_queue: HashMap<ServerObjectEntityId, Vec<WithLocation<GraphQLFieldDefinition>>>,
+    options: &CompilerConfigOptions,
+) -> Result<(), WithLocation<InsertFieldsError>> {
+    for (parent_object_entity_id, field_definitions_to_insert) in field_queue {
+        for field_definition in field_definitions_to_insert.into_iter() {
+            let parent_object_entity = schema
+                .server_entity_data
+                .server_object_entity(parent_object_entity_id);
+
+            let target_entity_type_name = field_definition.item.type_.inner();
+
+            let selection_type = schema
+                .server_entity_data
+                .defined_entities
+                .get(target_entity_type_name)
+                .ok_or_else(|| {
+                    WithLocation::new(
+                        InsertFieldsError::FieldTypenameDoesNotExist {
+                            target_entity_type_name: *target_entity_type_name,
+                        },
+                        field_definition.item.name.location,
+                    )
+                })?;
+
+            let arguments = field_definition
+                .item
+                .arguments
+                // TODO don't clone
+                .clone()
+                .into_iter()
+                .map(|input_value_definition| {
+                    graphql_input_value_definition_to_variable_definition(
+                        &schema.server_entity_data.defined_entities,
+                        input_value_definition,
+                        parent_object_entity.name,
+                        field_definition.item.name.item.into(),
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let description = field_definition.item.description.map(|d| d.item);
+
+            match selection_type {
+                SelectionType::Scalar(scalar_entity_id) => {
+                    schema
+                        .insert_server_scalar_selectable(
+                            ServerScalarSelectable {
+                                description,
+                                name: field_definition.item.name.map(|x| x.unchecked_conversion()),
+                                target_scalar_entity: TypeAnnotation::from_graphql_type_annotation(
+                                    field_definition.item.type_.clone(),
+                                )
+                                .map(&mut |_| *scalar_entity_id),
+                                parent_type_id: parent_object_entity_id,
+                                arguments,
+                                phantom_data: std::marker::PhantomData,
+                            },
+                            options,
+                            field_definition.item.type_.inner_non_null_named_type(),
+                        )
+                        .map_err(|e| WithLocation::new(e, field_definition.location))?;
+                }
+                SelectionType::Object(object_entity_id) => {
+                    schema
+                        .insert_server_object_selectable(ServerObjectSelectable {
+                            description,
+                            name: field_definition.item.name.map(|x| x.unchecked_conversion()),
+                            target_object_entity: TypeAnnotation::from_graphql_type_annotation(
+                                field_definition.item.type_.clone(),
+                            )
+                            .map(&mut |_| *object_entity_id),
+                            parent_type_id: parent_object_entity_id,
+                            arguments,
+                            phantom_data: std::marker::PhantomData,
+                            object_selectable_variant:
+                                SchemaServerObjectSelectableVariant::LinkedField,
+                        })
+                        .map_err(|e| WithLocation::new(e, field_definition.location))?;
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+pub fn graphql_input_value_definition_to_variable_definition(
+    defined_types: &HashMap<UnvalidatedTypeName, ServerEntityId>,
+    input_value_definition: WithLocation<GraphQLInputValueDefinition>,
+    parent_type_name: IsographObjectTypeName,
+    field_name: SelectableName,
+) -> Result<WithLocation<VariableDefinition<ServerEntityId>>, WithLocation<InsertFieldsError>> {
+    let default_value = input_value_definition
+        .item
+        .default_value
+        .map(|graphql_constant_value| {
+            Ok::<_, WithLocation<InsertFieldsError>>(WithLocation::new(
+                convert_graphql_constant_value_to_isograph_constant_value(
+                    graphql_constant_value.item,
+                ),
+                graphql_constant_value.location,
+            ))
+        })
+        .transpose()?;
+
+    let type_ = input_value_definition
+        .item
+        .type_
+        .clone()
+        .and_then(|input_type_name| {
+            defined_types
+                .get(&(*input_value_definition.item.type_.inner()).into())
+                .ok_or_else(|| {
+                    WithLocation::new(
+                        InsertFieldsError::FieldArgumentTypeDoesNotExist {
+                            argument_type: input_type_name.into(),
+                            argument_name: input_value_definition.item.name.item.into(),
+                            parent_type_name,
+                            field_name,
+                        },
+                        input_value_definition.location,
+                    )
+                })
+                .copied()
+        })?;
+
+    Ok(WithLocation::new(
+        VariableDefinition {
+            name: input_value_definition.item.name.map(VariableName::from),
+            type_,
+            default_value,
+        },
+        input_value_definition.location,
+    ))
+}
+
+fn convert_graphql_constant_value_to_isograph_constant_value(
+    graphql_constant_value: graphql_lang_types::GraphQLConstantValue,
+) -> isograph_lang_types::ConstantValue {
+    match graphql_constant_value {
+        graphql_lang_types::GraphQLConstantValue::Int(i) => {
+            isograph_lang_types::ConstantValue::Integer(i)
+        }
+        graphql_lang_types::GraphQLConstantValue::Boolean(b) => {
+            isograph_lang_types::ConstantValue::Boolean(b)
+        }
+        graphql_lang_types::GraphQLConstantValue::String(s) => {
+            isograph_lang_types::ConstantValue::String(s)
+        }
+        graphql_lang_types::GraphQLConstantValue::Float(f) => {
+            isograph_lang_types::ConstantValue::Float(f)
+        }
+        graphql_lang_types::GraphQLConstantValue::Null => isograph_lang_types::ConstantValue::Null,
+        graphql_lang_types::GraphQLConstantValue::Enum(e) => {
+            isograph_lang_types::ConstantValue::Enum(e)
+        }
+        graphql_lang_types::GraphQLConstantValue::List(l) => {
+            let converted_list = l
+                .into_iter()
+                .map(|x| {
+                    WithLocation::new(
+                        convert_graphql_constant_value_to_isograph_constant_value(x.item),
+                        x.location,
+                    )
+                })
+                .collect::<Vec<_>>();
+            isograph_lang_types::ConstantValue::List(converted_list)
+        }
+        graphql_lang_types::GraphQLConstantValue::Object(o) => {
+            let converted_object = o
+                .into_iter()
+                .map(|name_value_pair| NameValuePair {
+                    name: name_value_pair.name,
+                    value: WithLocation::new(
+                        convert_graphql_constant_value_to_isograph_constant_value(
+                            name_value_pair.value.item,
+                        ),
+                        name_value_pair.value.location,
+                    ),
+                })
+                .collect::<Vec<_>>();
+            isograph_lang_types::ConstantValue::Object(converted_object)
+        }
+    }
 }

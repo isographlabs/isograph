@@ -5,7 +5,8 @@ use std::{
 
 use common_lang_types::{
     ClientScalarSelectableName, GraphQLScalarTypeName, IsoLiteralText, IsographObjectTypeName,
-    JavascriptName, Location, SelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
+    JavascriptName, Location, SelectableName, UnvalidatedTypeName, VariableName, WithLocation,
+    WithSpan,
 };
 use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective, GraphQLNamedTypeAnnotation};
 use intern::string_key::Intern;
@@ -503,6 +504,32 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
             .enumerate()
             .map(|(id, object)| WithId::new(id.into(), object))
     }
+
+    pub fn insert_server_scalar_entity(
+        &mut self,
+        server_scalar_entity: ServerScalarEntity<TNetworkProtocol>,
+        name_location: Location,
+    ) -> Result<(), WithLocation<InsertFieldsError>> {
+        let next_scalar_entity_id = self.server_scalars.len().into();
+        if self
+            .defined_entities
+            .insert(
+                server_scalar_entity.name.item.into(),
+                SelectionType::Scalar(next_scalar_entity_id),
+            )
+            .is_some()
+        {
+            return Err(WithLocation::new(
+                InsertFieldsError::DuplicateTypeDefinition {
+                    type_definition_type: "scalar",
+                    type_name: server_scalar_entity.name.item.into(),
+                },
+                name_location,
+            ));
+        }
+        self.server_scalars.push(server_scalar_entity);
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -666,6 +693,27 @@ pub enum InsertFieldsError {
     DuplicateField {
         field_name: SelectableName,
         parent_type: IsographObjectTypeName,
+    },
+
+    #[error(
+        "The argument `{argument_name}` on field `{parent_type_name}.{field_name}` has inner type `{argument_type}`, which does not exist."
+    )]
+    FieldArgumentTypeDoesNotExist {
+        argument_name: VariableName,
+        parent_type_name: IsographObjectTypeName,
+        field_name: SelectableName,
+        argument_type: UnvalidatedTypeName,
+    },
+
+    #[error("This field has type {target_entity_type_name}, which does not exist")]
+    FieldTypenameDoesNotExist {
+        target_entity_type_name: UnvalidatedTypeName,
+    },
+
+    #[error("Duplicate type definition ({type_definition_type}) named \"{type_name}\"")]
+    DuplicateTypeDefinition {
+        type_definition_type: &'static str,
+        type_name: UnvalidatedTypeName,
     },
 }
 

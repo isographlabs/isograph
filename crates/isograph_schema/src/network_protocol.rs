@@ -1,12 +1,19 @@
-use std::{collections::BTreeMap, error::Error, fmt::Debug, hash::Hash};
+use std::{
+    collections::{BTreeMap, HashMap},
+    error::Error,
+    fmt::Debug,
+    hash::Hash,
+};
 
-use common_lang_types::{QueryOperationName, QueryText, RelativePathToSourceFile};
-use isograph_config::CompilerConfigOptions;
-use isograph_lang_types::SchemaSource;
+use common_lang_types::{
+    Location, QueryOperationName, QueryText, RelativePathToSourceFile, WithLocation,
+};
+use graphql_lang_types::GraphQLFieldDefinition;
+use isograph_lang_types::{SchemaSource, ServerObjectEntityId};
 use pico::{Database, SourceId};
 
 use crate::{
-    EncounteredRootTypes, MergedSelectionMap, RootOperationName, Schema, TypeRefinementMaps,
+    MergedSelectionMap, RootOperationName, Schema, ServerScalarEntity, TypeRefinementMaps,
     ValidatedVariableDefinition,
 };
 
@@ -28,8 +35,7 @@ where
         schema: &mut Schema<Self>,
         schema_source_id: SourceId<SchemaSource>,
         schema_extension_sources: &BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
-        options: &CompilerConfigOptions,
-    ) -> Result<ProcessTypeSystemDocumentOutcome, Box<dyn Error>>;
+    ) -> Result<ProcessTypeSystemDocumentOutcome<Self>, Box<dyn Error>>;
 
     fn generate_query_text<'a>(
         query_name: QueryOperationName,
@@ -40,7 +46,8 @@ where
     ) -> QueryText;
 }
 
-pub struct ProcessTypeSystemDocumentOutcome {
+pub struct ProcessTypeSystemDocumentOutcome<TNetworkProtocol: NetworkProtocol> {
     pub type_refinement_maps: TypeRefinementMaps,
-    pub root_types: EncounteredRootTypes,
+    pub scalars: Vec<(ServerScalarEntity<TNetworkProtocol>, Location)>,
+    pub field_queue: HashMap<ServerObjectEntityId, Vec<WithLocation<GraphQLFieldDefinition>>>,
 }

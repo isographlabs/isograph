@@ -2,7 +2,6 @@ use std::{collections::BTreeMap, error::Error};
 
 use common_lang_types::{QueryOperationName, QueryText, RelativePathToSourceFile};
 use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDocument};
-use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::SchemaSource;
 use isograph_schema::{
     MergedSelectionMap, NetworkProtocol, ProcessTypeSystemDocumentOutcome, RootOperationName,
@@ -33,19 +32,16 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         schema: &mut UnvalidatedGraphqlSchema,
         schema_source_id: SourceId<SchemaSource>,
         schema_extension_sources: &BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
-        options: &CompilerConfigOptions,
-    ) -> Result<ProcessTypeSystemDocumentOutcome, Box<dyn Error>> {
+    ) -> Result<ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>, Box<dyn Error>> {
         let (type_system_document, type_system_extension_documents) =
             parse_graphql_schema(db, schema_source_id, schema_extension_sources).to_owned()?;
 
-        let result =
-            process_graphql_type_system_document(schema, type_system_document.to_owned(), options)?;
+        let result = process_graphql_type_system_document(schema, type_system_document.to_owned())?;
 
         for (_, type_system_extension_document) in type_system_extension_documents {
             process_graphql_type_extension_document(
                 schema,
                 type_system_extension_document.to_owned(),
-                options,
             )?;
         }
 

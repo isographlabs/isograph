@@ -1,33 +1,28 @@
 use std::collections::{hash_map::Entry as HashMapEntry, HashMap};
 
 use common_lang_types::{
-    GraphQLObjectTypeName, IsographObjectTypeName, Location, SelectableName,
-    ServerScalarSelectableName, Span, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
+    GraphQLObjectTypeName, IsographObjectTypeName, Location, ServerScalarSelectableName, Span,
+    UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    GraphQLFieldDefinition, GraphQLInputValueDefinition, GraphQLNamedTypeAnnotation,
-    GraphQLNonNullTypeAnnotation, GraphQLScalarTypeDefinition, GraphQLTypeAnnotation,
-    GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument, GraphQLTypeSystemExtension,
-    GraphQLTypeSystemExtensionDocument, GraphQLTypeSystemExtensionOrDefinition, NameValuePair,
-    RootOperationKind,
+    GraphQLFieldDefinition, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
+    GraphQLScalarTypeDefinition, GraphQLTypeAnnotation, GraphQLTypeSystemDefinition,
+    GraphQLTypeSystemDocument, GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionDocument,
+    GraphQLTypeSystemExtensionOrDefinition, RootOperationKind,
 };
 use intern::string_key::Intern;
-use isograph_config::CompilerConfigOptions;
-use isograph_lang_types::{
-    SelectionType, ServerEntityId, ServerObjectEntityId, TypeAnnotation, VariableDefinition,
-};
+use isograph_lang_types::{ServerEntityId, ServerObjectEntityId};
 use isograph_schema::{
     EncounteredRootTypes, InsertFieldsError, IsographObjectTypeDefinition,
     ProcessTypeSystemDocumentOutcome, ProcessedRootTypes, RootOperationName, RootTypes, Schema,
-    SchemaServerObjectSelectableVariant, ServerObjectEntity, ServerObjectSelectable,
-    ServerScalarEntity, ServerScalarSelectable, TypeRefinementMaps, STRING_JAVASCRIPT_TYPE,
+    ServerObjectEntity, ServerScalarEntity, TypeRefinementMaps, STRING_JAVASCRIPT_TYPE,
     TYPENAME_FIELD_NAME,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    GraphQLSchemaObjectAssociatedData, GraphQLSchemaOriginalDefinitionType,
+    GraphQLNetworkProtocol, GraphQLSchemaObjectAssociatedData, GraphQLSchemaOriginalDefinitionType,
     UnvalidatedGraphqlSchema,
 };
 
@@ -42,8 +37,7 @@ lazy_static! {
 pub fn process_graphql_type_system_document(
     schema: &mut UnvalidatedGraphqlSchema,
     type_system_document: GraphQLTypeSystemDocument,
-    options: &CompilerConfigOptions,
-) -> ProcessGraphqlTypeDefinitionResult<ProcessTypeSystemDocumentOutcome> {
+) -> ProcessGraphqlTypeDefinitionResult<ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>> {
     // In the schema, interfaces, unions and objects are the same type of object (SchemaType),
     // with e.g. interfaces "simply" being objects that can be refined to other
     // concrete objects.
@@ -63,6 +57,8 @@ pub fn process_graphql_type_system_document(
     let mut processed_root_types = None;
 
     let mut field_queue = HashMap::new();
+
+    let mut scalars = vec![];
 
     for with_location in type_system_document.0 {
         let WithLocation {
@@ -101,7 +97,7 @@ pub fn process_graphql_type_system_document(
                 }
             }
             GraphQLTypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
-                process_scalar_definition(schema, scalar_type_definition)?;
+                scalars.push((process_scalar_definition(scalar_type_definition), location));
                 // N.B. we assume that Mutation will be an object, not a scalar
             }
             GraphQLTypeSystemDefinition::InterfaceTypeDefinition(interface_type_definition) => {
@@ -139,14 +135,14 @@ pub fn process_graphql_type_system_document(
             }
             GraphQLTypeSystemDefinition::EnumDefinition(enum_definition) => {
                 // TODO Do not do this
-                process_scalar_definition(
-                    schema,
-                    GraphQLScalarTypeDefinition {
+                scalars.push((
+                    process_scalar_definition(GraphQLScalarTypeDefinition {
                         description: enum_definition.description,
                         name: enum_definition.name.map(|x| x.unchecked_conversion()),
                         directives: enum_definition.directives,
-                    },
-                )?;
+                    }),
+                    location,
+                ));
             }
             GraphQLTypeSystemDefinition::UnionTypeDefinition(union_definition) => {
                 // TODO do something reasonable here, once we add support for type refinements.
@@ -192,8 +188,6 @@ pub fn process_graphql_type_system_document(
         }
     }
 
-    process_fields(schema, field_queue, options)?;
-
     let type_refinement_map =
         get_type_refinement_map(schema, supertype_to_subtype_map, subtype_to_supertype_map)?;
 
@@ -212,16 +206,16 @@ pub fn process_graphql_type_system_document(
     // TODO add support for subscriptions
 
     Ok(ProcessTypeSystemDocumentOutcome {
-        root_types,
         type_refinement_maps: type_refinement_map,
+        scalars,
+        field_queue,
     })
 }
 
 pub fn process_graphql_type_extension_document(
     schema: &mut UnvalidatedGraphqlSchema,
     extension_document: GraphQLTypeSystemExtensionDocument,
-    options: &CompilerConfigOptions,
-) -> ProcessGraphqlTypeDefinitionResult<ProcessTypeSystemDocumentOutcome> {
+) -> ProcessGraphqlTypeDefinitionResult<ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>> {
     let mut definitions = Vec::with_capacity(extension_document.0.len());
     let mut extensions = Vec::with_capacity(extension_document.0.len());
 
@@ -239,11 +233,8 @@ pub fn process_graphql_type_extension_document(
 
     // N.B. we should probably restructure this...?
     // Like, we could discover the mutation type right now!
-    let outcome = process_graphql_type_system_document(
-        schema,
-        GraphQLTypeSystemDocument(definitions),
-        options,
-    )?;
+    let outcome =
+        process_graphql_type_system_document(schema, GraphQLTypeSystemDocument(definitions))?;
 
     for extension in extensions.into_iter() {
         // TODO collect errors into vec
@@ -284,16 +275,6 @@ pub enum ProcessGraphqlTypeSystemDefinitionError {
         type_name: UnvalidatedTypeName,
     },
 
-    #[error(
-        "The argument `{argument_name}` on field `{parent_type_name}.{field_name}` has inner type `{argument_type}`, which does not exist."
-    )]
-    FieldArgumentTypeDoesNotExist {
-        argument_name: VariableName,
-        parent_type_name: IsographObjectTypeName,
-        field_name: SelectableName,
-        argument_type: UnvalidatedTypeName,
-    },
-
     // TODO
     // This is held in a span pointing to one place the non-existent type was referenced.
     // We should perhaps include info about all the places it was referenced.
@@ -319,11 +300,6 @@ pub enum ProcessGraphqlTypeSystemDefinitionError {
 
     #[error("Root types must be objects. This type is a scalar.")]
     RootTypeMustBeObject,
-
-    #[error("This field has type {target_entity_type_name}, which does not exist")]
-    FieldTypenameDoesNotExist {
-        target_entity_type_name: UnvalidatedTypeName,
-    },
 
     #[error("{0}")]
     InsertFieldsError(#[from] InsertFieldsError),
@@ -439,34 +415,14 @@ fn get_type_refinement_map(
 
 // TODO this should accept an IsographScalarTypeDefinition
 fn process_scalar_definition(
-    schema: &mut UnvalidatedGraphqlSchema,
     scalar_type_definition: GraphQLScalarTypeDefinition,
-) -> ProcessGraphqlTypeDefinitionResult<()> {
-    let next_scalar_entity_id = schema.server_entity_data.server_scalars.len().into();
-    let type_names = &mut schema.server_entity_data.defined_entities;
-    let scalars = &mut schema.server_entity_data.server_scalars;
-    match type_names.entry(scalar_type_definition.name.item.into()) {
-        HashMapEntry::Occupied(_) => {
-            return Err(WithLocation::new(
-                ProcessGraphqlTypeSystemDefinitionError::DuplicateTypeDefinition {
-                    type_definition_type: "scalar",
-                    type_name: scalar_type_definition.name.item.into(),
-                },
-                scalar_type_definition.name.location,
-            ));
-        }
-        HashMapEntry::Vacant(vacant) => {
-            scalars.push(ServerScalarEntity {
-                description: scalar_type_definition.description,
-                name: scalar_type_definition.name,
-                javascript_name: *STRING_JAVASCRIPT_TYPE,
-                output_format: std::marker::PhantomData,
-            });
-
-            vacant.insert(ServerEntityId::Scalar(next_scalar_entity_id));
-        }
+) -> ServerScalarEntity<GraphQLNetworkProtocol> {
+    ServerScalarEntity {
+        description: scalar_type_definition.description,
+        name: scalar_type_definition.name,
+        javascript_name: *STRING_JAVASCRIPT_TYPE,
+        output_format: std::marker::PhantomData,
     }
-    Ok(())
 }
 
 fn process_root_types(
@@ -573,101 +529,6 @@ fn process_graphql_type_system_extension(
     }
 }
 
-/// Now that we have processed all objects and scalars, we can process fields (i.e.
-/// selectables), as we have the knowledge of whether the field points to a scalar
-/// or object.
-///
-/// For each field:
-/// - insert it into to the parent object's encountered_fields
-/// - append it to schema.server_fields
-/// - if it is an id field, modify the parent object
-fn process_fields(
-    schema: &mut UnvalidatedGraphqlSchema,
-    field_queue: HashMap<ServerObjectEntityId, Vec<WithLocation<GraphQLFieldDefinition>>>,
-    options: &CompilerConfigOptions,
-) -> ProcessGraphqlTypeDefinitionResult<()> {
-    for (parent_object_entity_id, field_definitions_to_insert) in field_queue {
-        for field_definition in field_definitions_to_insert.into_iter() {
-            let parent_object_entity = schema
-                .server_entity_data
-                .server_object_entity(parent_object_entity_id);
-
-            let target_entity_type_name = field_definition.item.type_.inner();
-
-            let selection_type = schema
-                .server_entity_data
-                .defined_entities
-                .get(target_entity_type_name)
-                .ok_or_else(|| {
-                    WithLocation::new(
-                        ProcessGraphqlTypeSystemDefinitionError::FieldTypenameDoesNotExist {
-                            target_entity_type_name: *target_entity_type_name,
-                        },
-                        field_definition.item.name.location,
-                    )
-                })?;
-
-            let arguments = field_definition
-                .item
-                .arguments
-                // TODO don't clone
-                .clone()
-                .into_iter()
-                .map(|input_value_definition| {
-                    graphql_input_value_definition_to_variable_definition(
-                        &schema.server_entity_data.defined_entities,
-                        input_value_definition,
-                        parent_object_entity.name,
-                        field_definition.item.name.item.into(),
-                    )
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            let description = field_definition.item.description.map(|d| d.item);
-
-            match selection_type {
-                SelectionType::Scalar(scalar_entity_id) => {
-                    schema
-                        .insert_server_scalar_selectable(
-                            ServerScalarSelectable {
-                                description,
-                                name: field_definition.item.name.map(|x| x.unchecked_conversion()),
-                                target_scalar_entity: TypeAnnotation::from_graphql_type_annotation(
-                                    field_definition.item.type_.clone(),
-                                )
-                                .map(&mut |_| *scalar_entity_id),
-                                parent_type_id: parent_object_entity_id,
-                                arguments,
-                                phantom_data: std::marker::PhantomData,
-                            },
-                            options,
-                            field_definition.item.type_.inner_non_null_named_type(),
-                        )
-                        .map_err(|e| WithLocation::new(e.into(), field_definition.location))?;
-                }
-                SelectionType::Object(object_entity_id) => {
-                    schema
-                        .insert_server_object_selectable(ServerObjectSelectable {
-                            description,
-                            name: field_definition.item.name.map(|x| x.unchecked_conversion()),
-                            target_object_entity: TypeAnnotation::from_graphql_type_annotation(
-                                field_definition.item.type_.clone(),
-                            )
-                            .map(&mut |_| *object_entity_id),
-                            parent_type_id: parent_object_entity_id,
-                            arguments,
-                            phantom_data: std::marker::PhantomData,
-                            object_selectable_variant:
-                                SchemaServerObjectSelectableVariant::LinkedField,
-                        })
-                        .map_err(|e| WithLocation::new(e.into(), field_definition.location))?;
-                }
-            }
-        }
-    }
-
-    Ok(())
-}
-
 fn validate_type_refinement_map(
     schema: &mut UnvalidatedGraphqlSchema,
     unvalidated_type_refinement_map: UnvalidatedTypeRefinementMap,
@@ -718,106 +579,6 @@ fn lookup_object_in_schema(
     })?;
 
     Ok(*result)
-}
-
-pub fn graphql_input_value_definition_to_variable_definition(
-    defined_types: &HashMap<UnvalidatedTypeName, ServerEntityId>,
-    input_value_definition: WithLocation<GraphQLInputValueDefinition>,
-    parent_type_name: IsographObjectTypeName,
-    field_name: SelectableName,
-) -> ProcessGraphqlTypeDefinitionResult<WithLocation<VariableDefinition<ServerEntityId>>> {
-    let default_value = input_value_definition
-        .item
-        .default_value
-        .map(|graphql_constant_value| {
-            Ok::<_, WithLocation<ProcessGraphqlTypeSystemDefinitionError>>(WithLocation::new(
-                convert_graphql_constant_value_to_isograph_constant_value(
-                    graphql_constant_value.item,
-                ),
-                graphql_constant_value.location,
-            ))
-        })
-        .transpose()?;
-
-    let type_ = input_value_definition
-        .item
-        .type_
-        .clone()
-        .and_then(|input_type_name| {
-            defined_types
-                .get(&(*input_value_definition.item.type_.inner()).into())
-                .ok_or_else(|| {
-                    WithLocation::new(
-                        ProcessGraphqlTypeSystemDefinitionError::FieldArgumentTypeDoesNotExist {
-                            argument_type: input_type_name.into(),
-                            argument_name: input_value_definition.item.name.item.into(),
-                            parent_type_name,
-                            field_name,
-                        },
-                        input_value_definition.location,
-                    )
-                })
-                .copied()
-        })?;
-
-    Ok(WithLocation::new(
-        VariableDefinition {
-            name: input_value_definition.item.name.map(VariableName::from),
-            type_,
-            default_value,
-        },
-        input_value_definition.location,
-    ))
-}
-
-fn convert_graphql_constant_value_to_isograph_constant_value(
-    graphql_constant_value: graphql_lang_types::GraphQLConstantValue,
-) -> isograph_lang_types::ConstantValue {
-    match graphql_constant_value {
-        graphql_lang_types::GraphQLConstantValue::Int(i) => {
-            isograph_lang_types::ConstantValue::Integer(i)
-        }
-        graphql_lang_types::GraphQLConstantValue::Boolean(b) => {
-            isograph_lang_types::ConstantValue::Boolean(b)
-        }
-        graphql_lang_types::GraphQLConstantValue::String(s) => {
-            isograph_lang_types::ConstantValue::String(s)
-        }
-        graphql_lang_types::GraphQLConstantValue::Float(f) => {
-            isograph_lang_types::ConstantValue::Float(f)
-        }
-        graphql_lang_types::GraphQLConstantValue::Null => isograph_lang_types::ConstantValue::Null,
-        graphql_lang_types::GraphQLConstantValue::Enum(e) => {
-            isograph_lang_types::ConstantValue::Enum(e)
-        }
-        graphql_lang_types::GraphQLConstantValue::List(l) => {
-            let converted_list = l
-                .into_iter()
-                .map(|x| {
-                    WithLocation::new(
-                        convert_graphql_constant_value_to_isograph_constant_value(x.item),
-                        x.location,
-                    )
-                })
-                .collect::<Vec<_>>();
-            isograph_lang_types::ConstantValue::List(converted_list)
-        }
-        graphql_lang_types::GraphQLConstantValue::Object(o) => {
-            let converted_object = o
-                .into_iter()
-                .map(|name_value_pair| NameValuePair {
-                    name: name_value_pair.name,
-                    value: WithLocation::new(
-                        convert_graphql_constant_value_to_isograph_constant_value(
-                            name_value_pair.value.item,
-                        ),
-                        name_value_pair.value.location,
-                    ),
-                })
-                .collect::<Vec<_>>();
-            isograph_lang_types::ConstantValue::Object(converted_object)
-        }
-    }
 }
 
 pub struct ProcessObjectTypeDefinitionOutcome {
