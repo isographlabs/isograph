@@ -6,14 +6,17 @@ use std::{
 };
 
 use common_lang_types::{
-    Location, QueryOperationName, QueryText, RelativePathToSourceFile, WithLocation,
+    Location, QueryOperationName, QueryText, RelativePathToSourceFile, UnvalidatedTypeName,
+    WithLocation,
 };
-use graphql_lang_types::GraphQLFieldDefinition;
-use isograph_lang_types::{SchemaSource, ServerObjectEntityId};
+use graphql_lang_types::{
+    GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition, RootOperationKind,
+};
+use isograph_lang_types::SchemaSource;
 use pico::{Database, SourceId};
 
 use crate::{
-    MergedSelectionMap, RootOperationName, Schema, ServerScalarEntity, TypeRefinementMaps,
+    MergedSelectionMap, RootOperationName, Schema, ServerObjectEntity, ServerScalarEntity,
     ValidatedVariableDefinition,
 };
 
@@ -32,7 +35,6 @@ where
     #[allow(clippy::type_complexity)]
     fn parse_and_process_type_system_documents(
         db: &Database,
-        schema: &mut Schema<Self>,
         schema_source_id: SourceId<SchemaSource>,
         schema_extension_sources: &BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
     ) -> Result<ProcessTypeSystemDocumentOutcome<Self>, Box<dyn Error>>;
@@ -47,7 +49,25 @@ where
 }
 
 pub struct ProcessTypeSystemDocumentOutcome<TNetworkProtocol: NetworkProtocol> {
-    pub type_refinement_maps: TypeRefinementMaps,
+    // TODO these fields are a mistake. The concepts of subtypes and supertypes
+    // mapping to asConcreteType fields is a GraphQL-ism! Sure, you may also want
+    // that it in SQL-land, but it should nonetheless be the responsibility of the
+    // network protocol to specify that.
+    pub unvalidated_subtype_to_supertype_map:
+        HashMap<UnvalidatedTypeName, Vec<UnvalidatedTypeName>>,
+    pub unvalidated_supertype_to_subtype_map:
+        HashMap<UnvalidatedTypeName, Vec<UnvalidatedTypeName>>,
+
     pub scalars: Vec<(ServerScalarEntity<TNetworkProtocol>, Location)>,
-    pub field_queue: HashMap<ServerObjectEntityId, Vec<WithLocation<GraphQLFieldDefinition>>>,
+    pub objects: Vec<(
+        ProcessObjectTypeDefinitionOutcome<TNetworkProtocol>,
+        Location,
+    )>,
+}
+
+pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol> {
+    pub encountered_root_kind: Option<RootOperationKind>,
+    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
+    pub server_object_entity: ServerObjectEntity<TNetworkProtocol>,
+    pub fields_to_insert: Vec<WithLocation<GraphQLFieldDefinition>>,
 }

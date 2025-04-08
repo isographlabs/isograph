@@ -530,6 +530,33 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
         self.server_scalars.push(server_scalar_entity);
         Ok(())
     }
+
+    pub fn insert_server_object_entity(
+        &mut self,
+        server_object_entity: ServerObjectEntity<TNetworkProtocol>,
+        name_location: Location,
+    ) -> Result<ServerObjectEntityId, WithLocation<InsertFieldsError>> {
+        let next_object_entity_id = self.server_objects.len().into();
+        if self
+            .defined_entities
+            .insert(
+                server_object_entity.name.into(),
+                SelectionType::Object(next_object_entity_id),
+            )
+            .is_some()
+        {
+            return Err(WithLocation::new(
+                InsertFieldsError::DuplicateTypeDefinition {
+                    type_definition_type: "object",
+                    type_name: server_object_entity.name.into(),
+                },
+                name_location,
+            ));
+        }
+
+        self.server_objects.push(server_object_entity);
+        Ok(next_object_entity_id)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -715,6 +742,9 @@ pub enum InsertFieldsError {
         type_definition_type: &'static str,
         type_name: UnvalidatedTypeName,
     },
+
+    #[error("Expected {type_name} to be an object, but it was a scalar.")]
+    GenericObjectIsScalar { type_name: UnvalidatedTypeName },
 }
 
 type InsertFieldsResult<T> = Result<T, InsertFieldsError>;

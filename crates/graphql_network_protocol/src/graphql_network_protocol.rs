@@ -1,6 +1,8 @@
 use std::{collections::BTreeMap, error::Error};
 
-use common_lang_types::{QueryOperationName, QueryText, RelativePathToSourceFile};
+use common_lang_types::{
+    Location, QueryOperationName, QueryText, RelativePathToSourceFile, WithLocation,
+};
 use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDocument};
 use isograph_lang_types::SchemaSource;
 use isograph_schema::{
@@ -13,9 +15,9 @@ use crate::{
     parse_graphql_schema,
     process_type_system_definition::{
         process_graphql_type_extension_document, process_graphql_type_system_document,
+        ProcessGraphqlTypeSystemDefinitionError,
     },
     query_text::generate_query_text,
-    UnvalidatedGraphqlSchema,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, std::hash::Hash, Default)]
@@ -29,20 +31,57 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 
     fn parse_and_process_type_system_documents(
         db: &Database,
-        schema: &mut UnvalidatedGraphqlSchema,
         schema_source_id: SourceId<SchemaSource>,
         schema_extension_sources: &BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
     ) -> Result<ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>, Box<dyn Error>> {
         let (type_system_document, type_system_extension_documents) =
             parse_graphql_schema(db, schema_source_id, schema_extension_sources).to_owned()?;
 
-        let result = process_graphql_type_system_document(schema, type_system_document.to_owned())?;
+        let mut result = process_graphql_type_system_document(type_system_document.to_owned())?;
 
         for (_, type_system_extension_document) in type_system_extension_documents {
-            process_graphql_type_extension_document(
-                schema,
-                type_system_extension_document.to_owned(),
-            )?;
+            let (outcome, objects_and_directives) =
+                process_graphql_type_extension_document(type_system_extension_document.to_owned())?;
+
+            let ProcessTypeSystemDocumentOutcome {
+                unvalidated_subtype_to_supertype_map,
+                unvalidated_supertype_to_subtype_map,
+                scalars,
+                objects,
+            } = outcome;
+
+            // Note: we process all newly-defined types in schema extensions.
+            // However, we ignore a bunch of things, like newly-defined fields on existing types, etc.
+            // We should probably fix that!
+            result.objects.extend(objects);
+            result.scalars.extend(scalars);
+            result
+                .unvalidated_subtype_to_supertype_map
+                .extend(unvalidated_subtype_to_supertype_map);
+            result
+                .unvalidated_supertype_to_subtype_map
+                .extend(unvalidated_supertype_to_subtype_map);
+
+            // - in the extension document, you may have added directives to objects, e.g. @exposeAs
+            // - we need to transfer those to the original objects.
+            //
+            // The way we are doing this is in dire need of cleanup.
+            for (name, directives) in objects_and_directives {
+                let object = result
+                    .objects
+                    .iter_mut()
+                    .find(|(result, _)| result.server_object_entity.name == name)
+                    .ok_or_else(|| {
+                        WithLocation::new(
+                        ProcessGraphqlTypeSystemDefinitionError::AttemptedToExtendUndefinedType {
+                            type_name: name
+                        },
+                        Location::generated()
+                    )
+                    })?;
+
+                object.0.directives.extend(directives);
+            }
         }
 
         Ok(result)
