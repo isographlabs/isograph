@@ -47,6 +47,39 @@ impl<TServer, TClient> DefinitionLocation<TServer, TClient> {
     }
 }
 
+impl<TServerObject, TServerScalar, TClientObject, TClientScalar>
+    DefinitionLocation<
+        SelectionType<TServerScalar, TServerObject>,
+        SelectionType<TClientScalar, TClientObject>,
+    >
+{
+    pub fn extract_scalar(&self) -> Option<DefinitionLocation<&TServerScalar, &TClientScalar>> {
+        match self {
+            DefinitionLocation::Server(server) => match server {
+                SelectionType::Scalar(scalar) => Some(DefinitionLocation::Server(scalar)),
+                SelectionType::Object(_) => None,
+            },
+            DefinitionLocation::Client(client) => match client {
+                SelectionType::Scalar(scalar) => Some(DefinitionLocation::Client(scalar)),
+                SelectionType::Object(_) => None,
+            },
+        }
+    }
+
+    pub fn extract_object(&self) -> Option<DefinitionLocation<&TServerObject, &TClientObject>> {
+        match self {
+            DefinitionLocation::Server(server) => match server {
+                SelectionType::Scalar(_) => None,
+                SelectionType::Object(object) => Some(DefinitionLocation::Server(object)),
+            },
+            DefinitionLocation::Client(client) => match client {
+                SelectionType::Scalar(_) => None,
+                SelectionType::Object(object) => Some(DefinitionLocation::Client(object)),
+            },
+        }
+    }
+}
+
 /// Distinguishes between items are are "scalar-like" and objects that
 /// are "object-like". Examples include:
 ///
