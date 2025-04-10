@@ -53,29 +53,25 @@ impl<TServerObject, TServerScalar, TClientObject, TClientScalar>
         SelectionType<TClientScalar, TClientObject>,
     >
 {
-    pub fn extract_scalar(&self) -> Option<DefinitionLocation<&TServerScalar, &TClientScalar>> {
+    pub fn transpose(
+        &self,
+    ) -> SelectionType<
+        DefinitionLocation<&TServerScalar, &TClientScalar>,
+        DefinitionLocation<&TServerObject, &TClientObject>,
+    > {
         match self {
-            DefinitionLocation::Server(server) => match server {
-                SelectionType::Scalar(scalar) => Some(DefinitionLocation::Server(scalar)),
-                SelectionType::Object(_) => None,
-            },
-            DefinitionLocation::Client(client) => match client {
-                SelectionType::Scalar(scalar) => Some(DefinitionLocation::Client(scalar)),
-                SelectionType::Object(_) => None,
-            },
-        }
-    }
-
-    pub fn extract_object(&self) -> Option<DefinitionLocation<&TServerObject, &TClientObject>> {
-        match self {
-            DefinitionLocation::Server(server) => match server {
-                SelectionType::Scalar(_) => None,
-                SelectionType::Object(object) => Some(DefinitionLocation::Server(object)),
-            },
-            DefinitionLocation::Client(client) => match client {
-                SelectionType::Scalar(_) => None,
-                SelectionType::Object(object) => Some(DefinitionLocation::Client(object)),
-            },
+            DefinitionLocation::Server(SelectionType::Object(object)) => {
+                SelectionType::Object(DefinitionLocation::Server(object))
+            }
+            DefinitionLocation::Server(SelectionType::Scalar(scalar)) => {
+                SelectionType::Scalar(DefinitionLocation::Server(scalar))
+            }
+            DefinitionLocation::Client(SelectionType::Object(object)) => {
+                SelectionType::Object(DefinitionLocation::Client(object))
+            }
+            DefinitionLocation::Client(SelectionType::Scalar(scalar)) => {
+                SelectionType::Scalar(DefinitionLocation::Client(scalar))
+            }
         }
     }
 }
