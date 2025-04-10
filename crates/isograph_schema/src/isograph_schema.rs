@@ -216,7 +216,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 },
                 None => {
                     return Err(CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
-                        primary_type_name: current_entity.name.into(),
+                        primary_type_name: current_entity.name,
                         field_name: selection_name.unchecked_conversion(),
                     })
                 }

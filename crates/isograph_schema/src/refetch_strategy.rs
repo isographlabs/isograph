@@ -1,18 +1,15 @@
 use std::{collections::BTreeSet, fmt::Debug};
 
-use common_lang_types::{
-    IsographObjectTypeName, Location, QueryOperationName, ServerObjectSelectableName, Span,
-    VariableName, WithLocation, WithSpan,
-};
+use common_lang_types::{Location, Span, VariableName, WithLocation, WithSpan};
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, EmptyDirectiveSet, ObjectSelectionDirectiveSet, ScalarSelection,
-    ScalarSelectionDirectiveSet, SelectionTypeContainingSelections, ServerObjectEntityId,
+    EmptyDirectiveSet, ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
+    SelectionTypeContainingSelections, ServerObjectEntityId,
 };
 
 use crate::{
-    expose_field_directive::RequiresRefinement, get_reachable_variables, selection_map_wrapped,
-    MergedSelectionMap,
+    get_reachable_variables, selection_map_wrapped, MergedSelectionMap,
+    WrappedSelectionMapSelection,
 };
 
 #[derive(Debug)]
@@ -69,13 +66,7 @@ pub fn generate_refetch_field_strategy<
         >,
     >,
     root_fetchable_type: ServerObjectEntityId,
-    refetch_query_name: QueryOperationName,
-    top_level_field_name: ServerObjectSelectableName,
-    top_level_arguments: Vec<ArgumentKeyAndValue>,
-    top_level_field_concrete_type: Option<IsographObjectTypeName>,
-    refine_to_type: RequiresRefinement,
-    subfields: Vec<ServerObjectSelectableName>,
-    subfield_concrete_type: Option<IsographObjectTypeName>,
+    subfields: Vec<WrappedSelectionMapSelection>,
 ) -> UseRefetchFieldRefetchStrategy<
     TSelectionTypeSelectionScalarFieldAssociatedData,
     TSelectionTypeSelectionLinkedFieldAssociatedData,
@@ -83,15 +74,7 @@ pub fn generate_refetch_field_strategy<
     UseRefetchFieldRefetchStrategy {
         refetch_selection_set,
         root_fetchable_type,
-        generate_refetch_query: Box::new(GenerateRefetchQueryImpl {
-            top_level_field_name,
-            top_level_arguments,
-            top_level_field_concrete_type,
-            refine_to_type,
-            subfields,
-            subfield_concrete_type,
-        }),
-        refetch_query_name,
+        generate_refetch_query: Box::new(GenerateRefetchQueryImpl { subfields }),
     }
 }
 
@@ -119,7 +102,6 @@ pub struct UseRefetchFieldRefetchStrategy<
     /// A root_fetchable_type + a query name + variables + a MergedSelectionMap
     /// is enough to generate the query text, for example.
     pub generate_refetch_query: Box<dyn GenerateRefetchQueryFn>,
-    pub refetch_query_name: QueryOperationName,
 }
 
 pub trait GenerateRefetchQueryFn: Debug {
@@ -131,14 +113,7 @@ pub trait GenerateRefetchQueryFn: Debug {
 
 #[derive(Debug)]
 struct GenerateRefetchQueryImpl {
-    top_level_field_name: ServerObjectSelectableName,
-    top_level_arguments: Vec<ArgumentKeyAndValue>,
-    /// Some if the object is concrete; None otherwise.
-    top_level_field_concrete_type: Option<IsographObjectTypeName>,
-    refine_to_type: RequiresRefinement,
-    subfields: Vec<ServerObjectSelectableName>,
-    /// Some if the object is concrete; None otherwise.
-    subfield_concrete_type: Option<IsographObjectTypeName>,
+    subfields: Vec<WrappedSelectionMapSelection>,
 }
 
 impl GenerateRefetchQueryFn for GenerateRefetchQueryImpl {
@@ -146,16 +121,7 @@ impl GenerateRefetchQueryFn for GenerateRefetchQueryImpl {
         &self,
         inner_selection_map: MergedSelectionMap,
     ) -> (MergedSelectionMap, BTreeSet<VariableName>) {
-        let new_selection_map = selection_map_wrapped(
-            inner_selection_map,
-            self.top_level_field_name,
-            // TODO consume and don't clone?
-            self.top_level_arguments.clone(),
-            self.top_level_field_concrete_type,
-            &self.subfields,
-            self.subfield_concrete_type,
-            self.refine_to_type,
-        );
+        let new_selection_map = selection_map_wrapped(inner_selection_map, self.subfields.clone());
 
         // TODO this seems like a bunch of extra work, and we shouldn't need to do it
         let variables = get_reachable_variables(&new_selection_map);

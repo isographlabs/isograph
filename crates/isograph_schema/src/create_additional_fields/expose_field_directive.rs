@@ -19,7 +19,7 @@ use serde::Deserialize;
 use crate::{
     generate_refetch_field_strategy, ClientFieldVariant, ClientScalarSelectable,
     ImperativelyLoadedFieldVariant, NetworkProtocol, PrimaryFieldInfo, RefetchStrategy, Schema,
-    UnprocessedClientFieldItem,
+    UnprocessedClientFieldItem, WrappedSelectionMapSelection,
 };
 use lazy_static::lazy_static;
 
@@ -65,12 +65,6 @@ impl ExposeFieldDirective {
             field,
         }
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum RequiresRefinement {
-    Yes(IsographObjectTypeName),
-    No,
 }
 
 impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
@@ -301,17 +295,23 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     // NOTE: this will probably panic if we're not exposing fields which are
                     // originally on Mutation
                     parent_object_entity_id,
-                    format!("Mutation__{}", primary_field_name).intern().into(),
-                    top_level_schema_field_name,
-                    top_level_arguments,
-                    top_level_schema_field_concrete_type,
-                    // This is blatantly incorrect - at this point, we don't know whether
-                    // we require refinement, since the same field is copied from the abstract
-                    // type to the concrete type. So, when we do that, we need to account
-                    // for this.
-                    RequiresRefinement::No,
-                    vec![primary_field_name],
-                    primary_field_concrete_type,
+                    vec![
+                        WrappedSelectionMapSelection::LinkedField {
+                            server_object_selectable_name: primary_field_name,
+                            arguments: vec![],
+                            concrete_type: primary_field_concrete_type,
+                        },
+                        // We might need an inline fragment here. What we have is blatantly incorrect
+                        // - at this point, we don't know whether
+                        // we require refinement, since the same field is copied from the abstract
+                        // type to the concrete type. So, when we do that, we need to account
+                        // for this.
+                        WrappedSelectionMapSelection::LinkedField {
+                            server_object_selectable_name: top_level_schema_field_name,
+                            arguments: top_level_arguments,
+                            concrete_type: top_level_schema_field_concrete_type,
+                        },
+                    ],
                 ),
             )),
         })
