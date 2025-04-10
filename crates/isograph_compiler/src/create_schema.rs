@@ -18,9 +18,9 @@ use isograph_lang_types::{
     VariableDefinition,
 };
 use isograph_schema::{
-    validate_entrypoints, InsertFieldsError, NetworkProtocol, ProcessObjectTypeDefinitionOutcome,
-    ProcessTypeSystemDocumentOutcome, RootOperationName, Schema,
-    SchemaServerObjectSelectableVariant, ServerObjectSelectable, ServerScalarSelectable,
+    insert_fields_error::InsertFieldsError, validate_entrypoints, NetworkProtocol,
+    ProcessObjectTypeDefinitionOutcome, ProcessTypeSystemDocumentOutcome, RootOperationName,
+    Schema, SchemaServerObjectSelectableVariant, ServerObjectSelectable, ServerScalarSelectable,
     TypeRefinementMaps, UnprocessedItem,
 };
 use pico::{Database, SourceId};

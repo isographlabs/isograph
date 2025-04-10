@@ -12,9 +12,9 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_schema::{
-    InsertFieldsError, IsographObjectTypeDefinition, ProcessObjectTypeDefinitionOutcome,
-    ProcessTypeSystemDocumentOutcome, RootTypes, ServerObjectEntity, ServerScalarEntity,
-    STRING_JAVASCRIPT_TYPE, TYPENAME_FIELD_NAME,
+    insert_fields_error::InsertFieldsError, IsographObjectTypeDefinition,
+    ProcessObjectTypeDefinitionOutcome, ProcessTypeSystemDocumentOutcome, RootTypes,
+    ServerObjectEntity, ServerScalarEntity, STRING_JAVASCRIPT_TYPE, TYPENAME_FIELD_NAME,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;

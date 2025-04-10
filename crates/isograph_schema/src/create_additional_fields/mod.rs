@@ -3,6 +3,7 @@ pub(crate) mod add_object_selectable_to_subtype_on_supertype;
 mod argument_map;
 mod create_additional_fields_error;
 pub(crate) mod expose_field_directive;
+pub mod insert_fields_error;
 mod transfer_supertype_selectables_to_subtypes;
 
 pub use create_additional_fields_error::*;
