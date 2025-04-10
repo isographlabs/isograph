@@ -555,9 +555,11 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
             })
             .collect(),
         top_level_schema_field_concrete_type,
-        primary_field_info
+        &primary_field_info
             .as_ref()
-            .map(|x| x.primary_field_name.unchecked_conversion()),
+            .map(|x| x.primary_field_name.unchecked_conversion())
+            .into_iter()
+            .collect::<Vec<_>>(),
         primary_field_info
             .as_ref()
             .and_then(|x| x.primary_field_concrete_type),
@@ -1170,8 +1172,7 @@ pub fn selection_map_wrapped(
     top_level_field: ServerObjectSelectableName,
     top_level_field_arguments: Vec<ArgumentKeyAndValue>,
     top_level_field_concrete_type: Option<IsographObjectTypeName>,
-    // TODO support arguments and vectors of subfields
-    subfield: Option<ServerObjectSelectableName>,
+    subfields: &[ServerObjectSelectableName],
     subfield_concrete_type: Option<IsographObjectTypeName>,
     type_to_refine_to: RequiresRefinement,
 ) -> MergedSelectionMap {
@@ -1196,25 +1197,26 @@ pub fn selection_map_wrapped(
         RequiresRefinement::No => inner_selection_map,
     };
 
-    let selection_set_with_subfield = match subfield {
-        Some(subfield) => {
-            let mut map = BTreeMap::new();
-            map.insert(
-                NormalizationKey::ServerField(NameAndArguments {
-                    name: subfield.into(),
-                    arguments: vec![],
-                }),
-                MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
-                    name: subfield,
-                    selection_map: selection_set_with_inline_fragment,
-                    arguments: vec![],
-                    concrete_type: subfield_concrete_type,
-                }),
-            );
-            map
-        }
-        None => selection_set_with_inline_fragment,
-    };
+    let mut selection_set_with_subfield = selection_set_with_inline_fragment;
+    // TODO we may need to reverse subfields here
+    // TODO so far we only support regular linked fields, but the goal is to support
+    // inline fragments, too.
+    for subfield in subfields {
+        let mut map = BTreeMap::new();
+        map.insert(
+            NormalizationKey::ServerField(NameAndArguments {
+                name: (*subfield).into(),
+                arguments: vec![],
+            }),
+            MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
+                name: *subfield,
+                selection_map: selection_set_with_subfield,
+                arguments: vec![],
+                concrete_type: subfield_concrete_type,
+            }),
+        );
+        selection_set_with_subfield = map;
+    }
 
     let mut top_level_selection_set = BTreeMap::new();
     top_level_selection_set.insert(

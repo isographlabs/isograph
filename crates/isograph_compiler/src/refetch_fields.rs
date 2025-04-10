@@ -106,7 +106,7 @@ pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
                         id_top_level_arguments(),
                         None,
                         RequiresRefinement::Yes(object_name),
-                        None,
+                        vec![],
                         None,
                     ));
 

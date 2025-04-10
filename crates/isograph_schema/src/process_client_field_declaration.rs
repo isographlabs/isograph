@@ -253,7 +253,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 id_top_level_arguments(),
                 None,
                 RequiresRefinement::Yes(object.name),
-                None,
+                vec![],
                 None,
             ))
         });
@@ -329,7 +329,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         id_top_level_arguments(),
                         None,
                         RequiresRefinement::Yes(to_object.name),
-                        None,
+                        vec![],
                         None,
                     ),
                 ))

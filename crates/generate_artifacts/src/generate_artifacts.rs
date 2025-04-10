@@ -223,7 +223,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 "node".intern().into(),
                                 vec![id_arg.clone()],
                                 None,
-                                None,
+                                &[],
                                 None,
                                 RequiresRefinement::Yes(type_to_refine_to.name),
                             );

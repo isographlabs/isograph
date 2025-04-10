@@ -74,7 +74,7 @@ pub fn generate_refetch_field_strategy<
     top_level_arguments: Vec<ArgumentKeyAndValue>,
     top_level_field_concrete_type: Option<IsographObjectTypeName>,
     refine_to_type: RequiresRefinement,
-    subfield: Option<ServerObjectSelectableName>,
+    subfields: Vec<ServerObjectSelectableName>,
     subfield_concrete_type: Option<IsographObjectTypeName>,
 ) -> UseRefetchFieldRefetchStrategy<
     TSelectionTypeSelectionScalarFieldAssociatedData,
@@ -88,7 +88,7 @@ pub fn generate_refetch_field_strategy<
             top_level_arguments,
             top_level_field_concrete_type,
             refine_to_type,
-            subfield,
+            subfields,
             subfield_concrete_type,
         }),
         refetch_query_name,
@@ -136,7 +136,7 @@ struct GenerateRefetchQueryImpl {
     /// Some if the object is concrete; None otherwise.
     top_level_field_concrete_type: Option<IsographObjectTypeName>,
     refine_to_type: RequiresRefinement,
-    subfield: Option<ServerObjectSelectableName>,
+    subfields: Vec<ServerObjectSelectableName>,
     /// Some if the object is concrete; None otherwise.
     subfield_concrete_type: Option<IsographObjectTypeName>,
 }
@@ -152,7 +152,7 @@ impl GenerateRefetchQueryFn for GenerateRefetchQueryImpl {
             // TODO consume and don't clone?
             self.top_level_arguments.clone(),
             self.top_level_field_concrete_type,
-            self.subfield,
+            &self.subfields,
             self.subfield_concrete_type,
             self.refine_to_type,
         );

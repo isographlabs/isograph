@@ -310,7 +310,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     // type to the concrete type. So, when we do that, we need to account
                     // for this.
                     RequiresRefinement::No,
-                    Some(primary_field_name),
+                    vec![primary_field_name],
                     primary_field_concrete_type,
                 ),
             )),
