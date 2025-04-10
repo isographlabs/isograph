@@ -339,7 +339,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         {
             return Err(WithLocation::new(
                 // TODO use a more generic error message when making this
-                CreateAdditionalFieldsError::FieldExistsOnType {
+                CreateAdditionalFieldsError::CompilerCreatedFieldExistsOnType {
                     field_name: mutation_field_name,
                     parent_type: payload_object_name,
                 },

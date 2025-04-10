@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use crate::{NetworkProtocol, Schema};
-use common_lang_types::{IsographObjectTypeName, SelectableName, StringLiteralValue, WithLocation};
+use common_lang_types::{
+    IsographObjectTypeName, SelectableName, StringLiteralValue, UnvalidatedTypeName, VariableName,
+    WithLocation,
+};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::ServerObjectEntityId;
 
@@ -52,9 +55,16 @@ pub(crate) type ProcessTypeDefinitionResult<T> =
 pub enum CreateAdditionalFieldsError {
     #[error(
         "The Isograph compiler attempted to create a field named \
-    \"{field_name}\" on type \"{parent_type}\", but a field with that name already exists."
+        \"{field_name}\" on type \"{parent_type}\", but a field with that name already exists."
     )]
-    FieldExistsOnType {
+    CompilerCreatedFieldExistsOnType {
+        field_name: SelectableName,
+        parent_type: IsographObjectTypeName,
+    },
+
+    // TODO include info about where the field was previously defined
+    #[error("Duplicate field named \"{field_name}\" on type \"{parent_type}\"")]
+    DuplicateField {
         field_name: SelectableName,
         parent_type: IsographObjectTypeName,
     },
@@ -97,6 +107,39 @@ pub enum CreateAdditionalFieldsError {
 
     #[error("Failed to deserialize {0}")]
     FailedToDeserialize(String),
+
+    #[error(
+        "The {strong_field_name} field on \"{parent_type}\" must have type \"ID!\".\n\
+        This error can be suppressed using the \"on_invalid_id_type\" config parameter."
+    )]
+    IdFieldMustBeNonNullIdType {
+        parent_type: IsographObjectTypeName,
+        strong_field_name: &'static str,
+    },
+
+    #[error(
+        "The argument `{argument_name}` on field `{parent_type_name}.{field_name}` has inner type `{argument_type}`, which does not exist."
+    )]
+    FieldArgumentTypeDoesNotExist {
+        argument_name: VariableName,
+        parent_type_name: IsographObjectTypeName,
+        field_name: SelectableName,
+        argument_type: UnvalidatedTypeName,
+    },
+
+    #[error("This field has type {target_entity_type_name}, which does not exist")]
+    FieldTypenameDoesNotExist {
+        target_entity_type_name: UnvalidatedTypeName,
+    },
+
+    #[error("Duplicate type definition ({type_definition_type}) named \"{type_name}\"")]
+    DuplicateTypeDefinition {
+        type_definition_type: &'static str,
+        type_name: UnvalidatedTypeName,
+    },
+
+    #[error("Expected {type_name} to be an object, but it was a scalar.")]
+    GenericObjectIsScalar { type_name: UnvalidatedTypeName },
 }
 
 #[derive(Debug)]
@@ -104,3 +147,5 @@ pub struct TypeRefinementMaps {
     pub subtype_to_supertype_map: ValidatedTypeRefinementMap,
     pub supertype_to_subtype_map: ValidatedTypeRefinementMap,
 }
+
+pub type CreateAdditionalFieldsResult<T> = Result<T, CreateAdditionalFieldsError>;

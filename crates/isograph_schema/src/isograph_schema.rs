@@ -20,7 +20,7 @@ use isograph_lang_types::{
 use lazy_static::lazy_static;
 
 use crate::{
-    insert_fields_error::{InsertFieldsError, InsertFieldsResult},
+    create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectableId,
     NetworkProtocol, NormalizationKey, ServerEntity, ServerObjectEntity,
     ServerObjectEntityAvailableSelectables, ServerObjectSelectable, ServerScalarEntity,
@@ -249,7 +249,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         // TODO do not accept this
         options: &CompilerConfigOptions,
         inner_non_null_named_type: Option<&GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
-    ) -> InsertFieldsResult<()> {
+    ) -> CreateAdditionalFieldsResult<()> {
         let next_server_scalar_selectable_id = self.server_scalar_selectables.len().into();
         let parent_object_entity_id = server_scalar_selectable.parent_type_id;
         let next_scalar_name = server_scalar_selectable.name;
@@ -275,7 +275,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             let parent_object = self
                 .server_entity_data
                 .server_object_entity(parent_object_entity_id);
-            return Err(InsertFieldsError::DuplicateField {
+            return Err(CreateAdditionalFieldsError::DuplicateField {
                 field_name: server_scalar_selectable.name.item.into(),
                 parent_type: parent_object.name,
             });
@@ -301,7 +301,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn insert_server_object_selectable(
         &mut self,
         server_object_selectable: ServerObjectSelectable<TNetworkProtocol>,
-    ) -> InsertFieldsResult<()> {
+    ) -> CreateAdditionalFieldsResult<()> {
         let next_server_object_selectable_id = self.server_object_selectables.len().into();
         let parent_object_entity_id = server_object_selectable.parent_type_id;
         let next_object_name = server_object_selectable.name;
@@ -321,7 +321,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             let parent_object = self
                 .server_entity_data
                 .server_object_entity(parent_object_entity_id);
-            return Err(InsertFieldsError::DuplicateField {
+            return Err(CreateAdditionalFieldsError::DuplicateField {
                 field_name: next_object_name.item.into(),
                 parent_type: parent_object.name,
             });
@@ -508,7 +508,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
         &mut self,
         server_scalar_entity: ServerScalarEntity<TNetworkProtocol>,
         name_location: Location,
-    ) -> Result<(), WithLocation<InsertFieldsError>> {
+    ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
         let next_scalar_entity_id = self.server_scalars.len().into();
         if self
             .defined_entities
@@ -519,7 +519,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
             .is_some()
         {
             return Err(WithLocation::new(
-                InsertFieldsError::DuplicateTypeDefinition {
+                CreateAdditionalFieldsError::DuplicateTypeDefinition {
                     type_definition_type: "scalar",
                     type_name: server_scalar_entity.name.item.into(),
                 },
@@ -534,7 +534,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
         &mut self,
         server_object_entity: ServerObjectEntity<TNetworkProtocol>,
         name_location: Location,
-    ) -> Result<ServerObjectEntityId, WithLocation<InsertFieldsError>> {
+    ) -> Result<ServerObjectEntityId, WithLocation<CreateAdditionalFieldsError>> {
         let next_object_entity_id = self.server_objects.len().into();
         if self
             .defined_entities
@@ -545,7 +545,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
             .is_some()
         {
             return Err(WithLocation::new(
-                InsertFieldsError::DuplicateTypeDefinition {
+                CreateAdditionalFieldsError::DuplicateTypeDefinition {
                     type_definition_type: "object",
                     type_name: server_object_entity.name.into(),
                 },
@@ -670,7 +670,7 @@ fn set_and_validate_id_field(
     parent_type_name: IsographObjectTypeName,
     options: &CompilerConfigOptions,
     inner_non_null_named_type: Option<&GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
-) -> InsertFieldsResult<()> {
+) -> CreateAdditionalFieldsResult<()> {
     // N.B. id_field is guaranteed to be None; otherwise field_names_to_type_name would
     // have contained this field name already.
     debug_assert!(id_field.is_none(), "id field should not be defined twice");
@@ -683,7 +683,7 @@ fn set_and_validate_id_field(
         Some(type_) => {
             if type_.0.item != *ID_GRAPHQL_TYPE {
                 options.on_invalid_id_type.on_failure(|| {
-                    InsertFieldsError::IdFieldMustBeNonNullIdType {
+                    CreateAdditionalFieldsError::IdFieldMustBeNonNullIdType {
                         strong_field_name: "id",
                         parent_type: parent_type_name,
                     }
@@ -693,7 +693,7 @@ fn set_and_validate_id_field(
         }
         None => {
             options.on_invalid_id_type.on_failure(|| {
-                InsertFieldsError::IdFieldMustBeNonNullIdType {
+                CreateAdditionalFieldsError::IdFieldMustBeNonNullIdType {
                     strong_field_name: "id",
                     parent_type: parent_type_name,
                 }

@@ -12,9 +12,9 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_schema::{
-    insert_fields_error::InsertFieldsError, IsographObjectTypeDefinition,
-    ProcessObjectTypeDefinitionOutcome, ProcessTypeSystemDocumentOutcome, RootTypes,
-    ServerObjectEntity, ServerScalarEntity, STRING_JAVASCRIPT_TYPE, TYPENAME_FIELD_NAME,
+    CreateAdditionalFieldsError, IsographObjectTypeDefinition, ProcessObjectTypeDefinitionOutcome,
+    ProcessTypeSystemDocumentOutcome, RootTypes, ServerObjectEntity, ServerScalarEntity,
+    STRING_JAVASCRIPT_TYPE, TYPENAME_FIELD_NAME,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
@@ -228,7 +228,7 @@ pub enum ProcessGraphqlTypeSystemDefinitionError {
     DuplicateSchemaDefinition,
 
     #[error("{0}")]
-    InsertFieldsError(#[from] InsertFieldsError),
+    CreateAdditionalFieldsError(#[from] CreateAdditionalFieldsError),
 
     #[error("Attempted to extend {type_name}, but that type is not defined")]
     AttemptedToExtendUndefinedType { type_name: IsographObjectTypeName },

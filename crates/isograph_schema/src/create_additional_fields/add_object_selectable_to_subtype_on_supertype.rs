@@ -136,7 +136,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 {
                     let supertype = self.server_entity_data.server_object_entity(*supertype_id);
                     return Err(WithLocation::new(
-                        CreateAdditionalFieldsError::FieldExistsOnType {
+                        CreateAdditionalFieldsError::CompilerCreatedFieldExistsOnType {
                             field_name: field_name.into(),
                             parent_type: supertype.name,
                         },

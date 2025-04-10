@@ -18,7 +18,7 @@ use isograph_lang_types::{
     VariableDefinition,
 };
 use isograph_schema::{
-    insert_fields_error::InsertFieldsError, validate_entrypoints, NetworkProtocol,
+    validate_entrypoints, CreateAdditionalFieldsError, NetworkProtocol,
     ProcessObjectTypeDefinitionOutcome, ProcessTypeSystemDocumentOutcome, RootOperationName,
     Schema, SchemaServerObjectSelectableVariant, ServerObjectSelectable, ServerScalarSelectable,
     TypeRefinementMaps, UnprocessedItem,
@@ -286,7 +286,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
     schema: &mut Schema<TNetworkProtocol>,
     field_queue: HashMap<ServerObjectEntityId, Vec<WithLocation<GraphQLFieldDefinition>>>,
     options: &CompilerConfigOptions,
-) -> Result<(), WithLocation<InsertFieldsError>> {
+) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
     for (parent_object_entity_id, field_definitions_to_insert) in field_queue {
         for field_definition in field_definitions_to_insert.into_iter() {
             let parent_object_entity = schema
@@ -301,7 +301,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
                 .get(target_entity_type_name)
                 .ok_or_else(|| {
                     WithLocation::new(
-                        InsertFieldsError::FieldTypenameDoesNotExist {
+                        CreateAdditionalFieldsError::FieldTypenameDoesNotExist {
                             target_entity_type_name: *target_entity_type_name,
                         },
                         field_definition.item.name.location,
@@ -374,12 +374,15 @@ pub fn graphql_input_value_definition_to_variable_definition(
     input_value_definition: WithLocation<GraphQLInputValueDefinition>,
     parent_type_name: IsographObjectTypeName,
     field_name: SelectableName,
-) -> Result<WithLocation<VariableDefinition<ServerEntityId>>, WithLocation<InsertFieldsError>> {
+) -> Result<
+    WithLocation<VariableDefinition<ServerEntityId>>,
+    WithLocation<CreateAdditionalFieldsError>,
+> {
     let default_value = input_value_definition
         .item
         .default_value
         .map(|graphql_constant_value| {
-            Ok::<_, WithLocation<InsertFieldsError>>(WithLocation::new(
+            Ok::<_, WithLocation<CreateAdditionalFieldsError>>(WithLocation::new(
                 convert_graphql_constant_value_to_isograph_constant_value(
                     graphql_constant_value.item,
                 ),
@@ -397,7 +400,7 @@ pub fn graphql_input_value_definition_to_variable_definition(
                 .get(&(*input_value_definition.item.type_.inner()).into())
                 .ok_or_else(|| {
                     WithLocation::new(
-                        InsertFieldsError::FieldArgumentTypeDoesNotExist {
+                        CreateAdditionalFieldsError::FieldArgumentTypeDoesNotExist {
                             argument_type: input_type_name.into(),
                             argument_name: input_value_definition.item.name.item.into(),
                             parent_type_name,
@@ -476,7 +479,7 @@ fn get_type_refinement_map<TNetworkProtocol: NetworkProtocol>(
     schema: &mut Schema<TNetworkProtocol>,
     unvalidated_supertype_to_subtype_map: UnvalidatedTypeRefinementMap,
     unvalidated_subtype_to_supertype_map: UnvalidatedTypeRefinementMap,
-) -> Result<TypeRefinementMaps, WithLocation<InsertFieldsError>> {
+) -> Result<TypeRefinementMaps, WithLocation<CreateAdditionalFieldsError>> {
     let supertype_to_subtype_map =
         validate_type_refinement_map(schema, unvalidated_supertype_to_subtype_map)?;
     let subtype_to_supertype_map =
@@ -491,7 +494,7 @@ fn get_type_refinement_map<TNetworkProtocol: NetworkProtocol>(
 fn validate_type_refinement_map<TNetworkProtocol: NetworkProtocol>(
     schema: &mut Schema<TNetworkProtocol>,
     unvalidated_type_refinement_map: UnvalidatedTypeRefinementMap,
-) -> Result<ValidatedTypeRefinementMap, WithLocation<InsertFieldsError>> {
+) -> Result<ValidatedTypeRefinementMap, WithLocation<CreateAdditionalFieldsError>> {
     let supertype_to_subtype_map = unvalidated_type_refinement_map
         .into_iter()
         .map(|(key_type_name, values_type_names)| {
@@ -504,21 +507,21 @@ fn validate_type_refinement_map<TNetworkProtocol: NetworkProtocol>(
 
             Ok((key_id, value_type_ids))
         })
-        .collect::<Result<HashMap<_, _>, WithLocation<InsertFieldsError>>>()?;
+        .collect::<Result<HashMap<_, _>, WithLocation<CreateAdditionalFieldsError>>>()?;
     Ok(supertype_to_subtype_map)
 }
 
 fn lookup_object_in_schema<TNetworkProtocol: NetworkProtocol>(
     schema: &mut Schema<TNetworkProtocol>,
     unvalidated_type_name: UnvalidatedTypeName,
-) -> Result<ServerObjectEntityId, WithLocation<InsertFieldsError>> {
+) -> Result<ServerObjectEntityId, WithLocation<CreateAdditionalFieldsError>> {
     let result = (*schema
         .server_entity_data
         .defined_entities
         .get(&unvalidated_type_name)
         .ok_or_else(|| {
             WithLocation::new(
-                InsertFieldsError::FieldTypenameDoesNotExist {
+                CreateAdditionalFieldsError::FieldTypenameDoesNotExist {
                     target_entity_type_name: unvalidated_type_name,
                 },
                 // TODO don't do this
@@ -528,7 +531,7 @@ fn lookup_object_in_schema<TNetworkProtocol: NetworkProtocol>(
     .as_object_result()
     .map_err(|_| {
         WithLocation::new(
-            InsertFieldsError::GenericObjectIsScalar {
+            CreateAdditionalFieldsError::GenericObjectIsScalar {
                 type_name: unvalidated_type_name,
             },
             // TODO don't do this
