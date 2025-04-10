@@ -5,7 +5,8 @@ use std::{
 
 use common_lang_types::{
     ClientScalarSelectableName, GraphQLScalarTypeName, IsoLiteralText, IsographObjectTypeName,
-    JavascriptName, Location, SelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
+    JavascriptName, Location, ObjectSelectableName, SelectableName, UnvalidatedTypeName,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective, GraphQLNamedTypeAnnotation};
 use intern::string_key::Intern;
@@ -158,6 +159,71 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         self.fetchable_types
             .iter()
             .find(|(_, root_operation_name)| root_operation_name.0 == "query")
+    }
+
+    pub fn traverse_object_selections(
+        &self,
+        root_object_entity_id: ServerObjectEntityId,
+        selections: impl Iterator<Item = ObjectSelectableName>,
+    ) -> Result<WithId<&ServerObjectEntity<TNetworkProtocol>>, CreateAdditionalFieldsError> {
+        let mut current_entity = self
+            .server_entity_data
+            .server_object_entity(root_object_entity_id);
+        let mut current_selectables = &self
+            .server_entity_data
+            .server_object_entity_available_selectables
+            .get(&root_object_entity_id)
+            .expect(
+                "Expected root_object_entity_id to exist \
+                in server_object_entity_avaiable_selectables",
+            )
+            .0;
+        let mut current_object_id = root_object_entity_id;
+
+        for selection_name in selections {
+            match current_selectables.get(&selection_name.into()) {
+                Some(entity) => match entity.transpose() {
+                    SelectionType::Scalar(_) => {
+                        // TODO show a better error message
+                        return Err(CreateAdditionalFieldsError::InvalidField);
+                    }
+                    SelectionType::Object(object) => {
+                        let target_object_entity_id = match object {
+                            DefinitionLocation::Server(s) => {
+                                let selectable = self.server_object_selectable(*s);
+                                selectable.target_object_entity.inner()
+                            }
+                            DefinitionLocation::Client(c) => {
+                                let pointer = self.client_pointer(*c);
+                                pointer.to.inner()
+                            }
+                        };
+
+                        current_entity = self
+                            .server_entity_data
+                            .server_object_entity(*target_object_entity_id);
+                        current_selectables = &self
+                            .server_entity_data
+                            .server_object_entity_available_selectables
+                            .get(target_object_entity_id)
+                            .expect(
+                                "Expected target_object_entity_id to exist \
+                                in server_object_entity_available_selectables",
+                            )
+                            .0;
+                        current_object_id = *target_object_entity_id;
+                    }
+                },
+                None => {
+                    return Err(CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
+                        primary_type_name: current_entity.name.into(),
+                        field_name: selection_name.unchecked_conversion(),
+                    })
+                }
+            };
+        }
+
+        Ok(WithId::new(current_object_id, current_entity))
     }
 }
 
