@@ -33,7 +33,7 @@ use crate::{
     source_files::SourceFiles,
 };
 
-pub fn create_unvalidated_schema<TNetworkProtocol: NetworkProtocol>(
+pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
     db: &Database,
     source_files: &SourceFiles,
     config: &CompilerConfig,

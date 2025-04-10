@@ -17,7 +17,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{batch_compile::BatchCompileError, create_unvalidated_schema::ContainsIso};
+use crate::{batch_compile::BatchCompileError, create_schema::ContainsIso};
 
 pub fn read_files_in_folder(
     folder: &Path,
