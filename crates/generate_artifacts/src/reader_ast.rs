@@ -54,44 +54,70 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
             }
         }
         SelectionTypeContainingSelections::Object(linked_field_selection) => {
-            path.push(
-                NameAndArguments {
-                    // TODO use alias
-                    name: linked_field_selection.name.item.into(),
-                    // TODO this clearly does something, but why are we able to pass
-                    // the initial variable context here??
-                    arguments: transform_arguments_with_child_context(
-                        linked_field_selection
-                            .arguments
-                            .iter()
-                            .map(|x| x.item.into_key_and_value()),
-                        // TODO why is this not the transformed context?
+            match linked_field_selection.associated_data.field_id {
+                DefinitionLocation::Client(client_pointer_id) => {
+                    let client_pointer = schema.client_pointer(client_pointer_id);
+
+                    let inner_reader_ast = generate_reader_ast_with_path(
+                        schema,
+                        client_pointer.refetch_strategy.refetch_selection_set(),
+                        indentation_level + 1,
+                        reader_imports,
+                        root_refetched_paths,
+                        path,
                         initial_variable_context,
-                    ),
+                    );
+
+                    linked_field_ast_node(
+                        schema,
+                        linked_field_selection,
+                        indentation_level,
+                        inner_reader_ast,
+                        initial_variable_context,
+                        reader_imports,
+                    )
                 }
-                .normalization_key(),
-            );
+                DefinitionLocation::Server(_) => {
+                    path.push(
+                        NameAndArguments {
+                            // TODO use alias
+                            name: linked_field_selection.name.item.into(),
+                            // TODO this clearly does something, but why are we able to pass
+                            // the initial variable context here??
+                            arguments: transform_arguments_with_child_context(
+                                linked_field_selection
+                                    .arguments
+                                    .iter()
+                                    .map(|x| x.item.into_key_and_value()),
+                                // TODO why is this not the transformed context?
+                                initial_variable_context,
+                            ),
+                        }
+                        .normalization_key(),
+                    );
 
-            let inner_reader_ast = generate_reader_ast_with_path(
-                schema,
-                &linked_field_selection.selection_set,
-                indentation_level + 1,
-                reader_imports,
-                root_refetched_paths,
-                path,
-                initial_variable_context,
-            );
+                    let inner_reader_ast = generate_reader_ast_with_path(
+                        schema,
+                        &linked_field_selection.selection_set,
+                        indentation_level + 1,
+                        reader_imports,
+                        root_refetched_paths,
+                        path,
+                        initial_variable_context,
+                    );
 
-            path.pop();
+                    path.pop();
 
-            linked_field_ast_node(
-                schema,
-                linked_field_selection,
-                indentation_level,
-                inner_reader_ast,
-                initial_variable_context,
-                reader_imports,
-            )
+                    linked_field_ast_node(
+                        schema,
+                        linked_field_selection,
+                        indentation_level,
+                        inner_reader_ast,
+                        initial_variable_context,
+                        reader_imports,
+                    )
+                }
+            }
         }
     }
 }
@@ -126,10 +152,18 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     let condition = match linked_field.associated_data.field_id {
         DefinitionLocation::Client(client_pointer_id) => {
             let client_pointer = schema.client_pointer(client_pointer_id);
-            format!(
+
+            let reader_artifact_import_name = format!(
                 "{}__resolver_reader",
                 client_pointer.type_and_field.underscore_separated()
-            )
+            );
+
+            reader_imports.insert((
+                client_pointer.type_and_field,
+                ImportedFileCategory::ResolverReader,
+            ));
+
+            reader_artifact_import_name
         }
         DefinitionLocation::Server(server_field_id) => {
             let server_field = schema.server_object_selectable(server_field_id);
@@ -652,33 +686,39 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                 }
             }
             SelectionTypeContainingSelections::Object(linked_field_selection) => {
-                path.push(
-                    NameAndArguments {
-                        // TODO use alias
-                        name: linked_field_selection.name.item.into(),
-                        arguments: transform_arguments_with_child_context(
-                            linked_field_selection
-                                .arguments
-                                .iter()
-                                .map(|x| x.item.into_key_and_value()),
-                            // TODO this clearly does something, but why are we able to pass
-                            // the initial variable context here??
-                            initial_variable_context,
-                        ),
+                match linked_field_selection.associated_data.field_id {
+                    DefinitionLocation::Client(_) => {
+                        // Do not recurse into selections of client pointers
                     }
-                    .normalization_key(),
-                );
+                    DefinitionLocation::Server(_) => {
+                        path.push(
+                            NameAndArguments {
+                                // TODO use alias
+                                name: linked_field_selection.name.item.into(),
+                                arguments: transform_arguments_with_child_context(
+                                    linked_field_selection
+                                        .arguments
+                                        .iter()
+                                        .map(|x| x.item.into_key_and_value()),
+                                    // TODO this clearly does something, but why are we able to pass
+                                    // the initial variable context here??
+                                    initial_variable_context,
+                                ),
+                            }
+                            .normalization_key(),
+                        );
+                        let new_paths = refetched_paths_with_path(
+                            &linked_field_selection.selection_set,
+                            schema,
+                            path,
+                            initial_variable_context,
+                        );
 
-                let new_paths = refetched_paths_with_path(
-                    &linked_field_selection.selection_set,
-                    schema,
-                    path,
-                    initial_variable_context,
-                );
+                        paths.extend(new_paths.into_iter());
 
-                paths.extend(new_paths.into_iter());
-
-                path.pop();
+                        path.pop();
+                    }
+                };
             }
         };
     }
