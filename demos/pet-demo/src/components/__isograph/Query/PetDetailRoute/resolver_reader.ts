@@ -20,6 +20,7 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
     ],
     condition: null,
     isUpdatable: false,
+    isPlural: false,
     selections: [
       {
         kind: "Scalar",

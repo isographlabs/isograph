@@ -12,6 +12,7 @@ const readerAst: ReaderAst<Query__Newsfeed__param> = [
     arguments: null,
     condition: null,
     isUpdatable: false,
+    isPlural: false,
     selections: [
       {
         kind: "Resolver",

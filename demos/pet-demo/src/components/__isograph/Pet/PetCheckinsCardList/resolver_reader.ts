@@ -22,6 +22,7 @@ const readerAst: ReaderAst<Pet__PetCheckinsCardList__param> = [
     ],
     condition: null,
     isUpdatable: false,
+    isPlural: true,
     selections: [
       {
         kind: "Resolver",

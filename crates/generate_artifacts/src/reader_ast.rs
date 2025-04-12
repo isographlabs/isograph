@@ -130,6 +130,18 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     initial_variable_context: &VariableContext,
     reader_imports: &mut ReaderImports,
 ) -> String {
+    let object_selectable = schema.object_selectable(linked_field.associated_data.field_id);
+    let is_plural = match object_selectable {
+        DefinitionLocation::Server(server_object_field) => {
+            match &server_object_field.target_object_entity {
+                isograph_lang_types::TypeAnnotation::Scalar(_) => false,
+                isograph_lang_types::TypeAnnotation::Union(union_type_annotation) => false,
+                isograph_lang_types::TypeAnnotation::Plural(type_annotation) => true,
+            }
+        }
+        DefinitionLocation::Client(_) => false,
+    };
+
     let name = linked_field.name.item;
     let alias = linked_field
         .reader_alias
@@ -203,6 +215,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         {indent_2}arguments: {arguments},\n\
         {indent_2}condition: {condition},\n\
         {indent_2}isUpdatable: {is_updatable},\n\
+        {indent_2}isPlural: {is_plural},\n\
         {indent_2}selections: {inner_reader_ast},\n\
         {indent_1}}},\n",
     )

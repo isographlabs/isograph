@@ -16,6 +16,7 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
     ],
     condition: null,
     isUpdatable: false,
+    isPlural: false,
     selections: [
       {
         kind: "Resolver",
@@ -47,6 +48,7 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
     ],
     condition: null,
     isUpdatable: false,
+    isPlural: false,
     selections: [
       {
         kind: "Scalar",

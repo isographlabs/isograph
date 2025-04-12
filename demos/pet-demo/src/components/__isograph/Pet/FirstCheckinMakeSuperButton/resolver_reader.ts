@@ -21,6 +21,7 @@ const readerAst: ReaderAst<Pet__FirstCheckinMakeSuperButton__param> = [
     ],
     condition: null,
     isUpdatable: false,
+    isPlural: true,
     selections: [
       {
         kind: "ImperativelyLoadedField",

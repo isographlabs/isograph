@@ -25,6 +25,7 @@ const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
     arguments: null,
     condition: null,
     isUpdatable: false,
+    isPlural: false,
     selections: [
       {
         kind: "Scalar",
@@ -40,6 +41,7 @@ const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
         arguments: null,
         condition: null,
         isUpdatable: false,
+        isPlural: false,
         selections: [
           {
             kind: "Scalar",

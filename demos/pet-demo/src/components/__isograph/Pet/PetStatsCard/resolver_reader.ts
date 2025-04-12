@@ -32,6 +32,7 @@ const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
     arguments: null,
     condition: null,
     isUpdatable: false,
+    isPlural: false,
     selections: [
       {
         kind: "Scalar",

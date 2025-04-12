@@ -11,6 +11,7 @@ const readerAst: ReaderAst<Query__HomeRoute__param> = [
     arguments: null,
     condition: null,
     isUpdatable: false,
+    isPlural: true,
     selections: [
       {
         kind: "Scalar",

@@ -16,6 +16,7 @@ const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
     ],
     condition: null,
     isUpdatable: false,
+    isPlural: false,
     selections: [
       {
         kind: "Resolver",
