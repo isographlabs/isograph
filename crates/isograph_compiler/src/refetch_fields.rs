@@ -6,8 +6,8 @@ use isograph_lang_types::{DefinitionLocation, SelectionType, WithId};
 use isograph_schema::{
     generate_refetch_field_strategy, id_arguments, id_selection, id_top_level_arguments,
     ClientFieldVariant, ClientScalarSelectable, ImperativelyLoadedFieldVariant, NetworkProtocol,
-    RefetchStrategy, RequiresRefinement, Schema, UnprocessedClientFieldItem, UnprocessedItem,
-    NODE_FIELD_NAME, REFETCH_FIELD_NAME,
+    RefetchStrategy, Schema, UnprocessedClientFieldItem, UnprocessedItem,
+    WrappedSelectionMapSelection, NODE_FIELD_NAME, REFETCH_FIELD_NAME,
 };
 
 use crate::batch_compile::BatchCompileError;
@@ -101,13 +101,14 @@ pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
                     RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
                         vec![id_selection()],
                         query_id,
-                        format!("refetch__{}", object_name).intern().into(),
-                        *NODE_FIELD_NAME,
-                        id_top_level_arguments(),
-                        None,
-                        RequiresRefinement::Yes(object_name),
-                        None,
-                        None,
+                        vec![
+                            WrappedSelectionMapSelection::InlineFragment(object_name),
+                            WrappedSelectionMapSelection::LinkedField {
+                                server_object_selectable_name: *NODE_FIELD_NAME,
+                                arguments: id_top_level_arguments(),
+                                concrete_type: None,
+                            },
+                        ],
                     ));
 
                 Ok(UnprocessedClientFieldItem {

@@ -379,7 +379,6 @@ fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol>(
                 )?,
                 root_fetchable_type: use_refetch_field_strategy.root_fetchable_type,
                 generate_refetch_query: use_refetch_field_strategy.generate_refetch_query,
-                refetch_query_name: use_refetch_field_strategy.refetch_query_name,
             }),
         )),
         None => Ok(None),

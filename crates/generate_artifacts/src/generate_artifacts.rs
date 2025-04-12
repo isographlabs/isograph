@@ -18,9 +18,10 @@ use isograph_lang_types::{
 use isograph_schema::{
     accessible_client_fields, description, output_type_annotation, selection_map_wrapped,
     ClientFieldVariant, ClientScalarSelectable, ClientSelectableId, FieldTraversalResult,
-    NameAndArguments, NetworkProtocol, NormalizationKey, RequiresRefinement, Schema,
+    NameAndArguments, NetworkProtocol, NormalizationKey, Schema,
     SchemaServerObjectSelectableVariant, UserWrittenClientTypeInfo, UserWrittenComponentVariant,
     ValidatedScalarSelectionAssociatedData, ValidatedSelection, ValidatedVariableDefinition,
+    WrappedSelectionMapSelection,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -220,12 +221,16 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
 
                             let wrapped_map = selection_map_wrapped(
                                 merged_selection_map.clone(),
-                                "node".intern().into(),
-                                vec![id_arg.clone()],
-                                None,
-                                None,
-                                None,
-                                RequiresRefinement::Yes(type_to_refine_to.name),
+                                vec![
+                                    WrappedSelectionMapSelection::InlineFragment(
+                                        type_to_refine_to.name,
+                                    ),
+                                    WrappedSelectionMapSelection::LinkedField {
+                                        server_object_selectable_name: "node".intern().into(),
+                                        arguments: vec![id_arg.clone()],
+                                        concrete_type: None,
+                                    },
+                                ],
                             );
                             let id_var = ValidatedVariableDefinition {
                                 name: WithLocation::new("id".intern().into(), Location::Generated),

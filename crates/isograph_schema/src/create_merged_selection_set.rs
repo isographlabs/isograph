@@ -19,7 +19,6 @@ use lazy_static::lazy_static;
 
 use crate::{
     create_transformed_name_and_arguments,
-    expose_field_directive::RequiresRefinement,
     field_loadability::{categorize_field_loadability, Loadability},
     initial_variable_context, transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context, ClientFieldVariant,
@@ -518,50 +517,61 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
     let mut definitions_of_used_variables =
         get_used_variable_definitions(reachable_variables, client_field);
 
-    let requires_refinement = if primary_field_info
+    let maybe_inline_fragment = if primary_field_info
         .as_ref()
         .map(|x| x.primary_field_return_type_object_entity_id != refetch_field_parent_id)
         .unwrap_or(true)
     {
-        RequiresRefinement::Yes(refetch_field_parent_type.name)
+        Some(WrappedSelectionMapSelection::InlineFragment(
+            refetch_field_parent_type.name,
+        ))
     } else {
-        RequiresRefinement::No
+        None
     };
+
+    let top_level_schema_field_arguments = top_level_schema_field_arguments
+        .iter()
+        // TODO don't clone
+        .cloned()
+        .map(|variable_definition| {
+            let variable_name = variable_definition.name;
+            definitions_of_used_variables.push(WithSpan {
+                item: VariableDefinition {
+                    name: variable_name,
+                    type_: variable_definition.type_,
+                    default_value: variable_definition.default_value,
+                },
+                span: Span::todo_generated(),
+            });
+
+            ArgumentKeyAndValue {
+                key: variable_definition.name.item.unchecked_conversion(),
+                value: NonConstantValue::Variable(variable_definition.name.item),
+            }
+        })
+        .collect();
 
     // TODO consider wrapping this when we first create the RootRefetchedPath?
     let wrapped_selection_map = selection_map_wrapped(
         selection_map.clone(),
-        // TODO why are these types different
-        top_level_schema_field_name.unchecked_conversion(),
-        top_level_schema_field_arguments
-            .iter()
-            // TODO don't clone
-            .cloned()
-            .map(|variable_definition| {
-                let variable_name = variable_definition.name;
-                definitions_of_used_variables.push(WithSpan {
-                    item: VariableDefinition {
-                        name: variable_name,
-                        type_: variable_definition.type_,
-                        default_value: variable_definition.default_value,
-                    },
-                    span: Span::todo_generated(),
-                });
-
-                ArgumentKeyAndValue {
-                    key: variable_definition.name.item.unchecked_conversion(),
-                    value: NonConstantValue::Variable(variable_definition.name.item),
+        vec![
+            maybe_inline_fragment,
+            primary_field_info.as_ref().map(|primary_field| {
+                WrappedSelectionMapSelection::LinkedField {
+                    server_object_selectable_name: primary_field.primary_field_name,
+                    arguments: vec![],
+                    concrete_type: primary_field.primary_field_concrete_type,
                 }
-            })
-            .collect(),
-        top_level_schema_field_concrete_type,
-        primary_field_info
-            .as_ref()
-            .map(|x| x.primary_field_name.unchecked_conversion()),
-        primary_field_info
-            .as_ref()
-            .and_then(|x| x.primary_field_concrete_type),
-        requires_refinement,
+            }),
+            Some(WrappedSelectionMapSelection::LinkedField {
+                server_object_selectable_name: top_level_schema_field_name,
+                arguments: top_level_schema_field_arguments,
+                concrete_type: top_level_schema_field_concrete_type,
+            }),
+        ]
+        .into_iter()
+        .flatten()
+        .collect(),
     );
 
     let root_parent_object = schema
@@ -1165,72 +1175,61 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum WrappedSelectionMapSelection {
+    LinkedField {
+        server_object_selectable_name: ServerObjectSelectableName,
+        arguments: Vec<ArgumentKeyAndValue>,
+        concrete_type: Option<IsographObjectTypeName>,
+    },
+    InlineFragment(IsographObjectTypeName),
+}
+
 pub fn selection_map_wrapped(
     mut inner_selection_map: MergedSelectionMap,
-    top_level_field: ServerObjectSelectableName,
-    top_level_field_arguments: Vec<ArgumentKeyAndValue>,
-    top_level_field_concrete_type: Option<IsographObjectTypeName>,
-    // TODO support arguments and vectors of subfields
-    subfield: Option<ServerObjectSelectableName>,
-    subfield_concrete_type: Option<IsographObjectTypeName>,
-    type_to_refine_to: RequiresRefinement,
+    // NOTE: these must be in reverse order, e.g. node { ... on Foo { etc } } would be
+    // [foo_inline_fragment, node_field_selection]
+    subfields_or_inline_fragments: Vec<WrappedSelectionMapSelection>,
 ) -> MergedSelectionMap {
-    // We are proceeding inside out, i.e. creating
-    // `mutation_name { subfield { ...on Type { existing_selection_set }}}`
-    // first by creating the inline fragment, then subfield, etc.
-
-    // Should we wrap the selection set in a type to refine to?
-    let selection_set_with_inline_fragment = match type_to_refine_to {
-        RequiresRefinement::Yes(type_to_refine_to) => {
-            maybe_add_typename_selection(&mut inner_selection_map);
-            let mut map = BTreeMap::new();
-            map.insert(
-                NormalizationKey::InlineFragment(type_to_refine_to),
-                MergedServerSelection::InlineFragment(MergedInlineFragmentSelection {
-                    type_to_refine_to,
-                    selection_map: inner_selection_map,
-                }),
-            );
-            map
+    // TODO so far we only support regular linked fields, but the goal is to support
+    // inline fragments, too.
+    // TODO unify this with type_to_refine_to
+    for subfield_or_inline_fragment in subfields_or_inline_fragments {
+        let mut map = BTreeMap::new();
+        match subfield_or_inline_fragment {
+            WrappedSelectionMapSelection::LinkedField {
+                server_object_selectable_name,
+                arguments,
+                concrete_type,
+            } => {
+                map.insert(
+                    NormalizationKey::ServerField(NameAndArguments {
+                        name: server_object_selectable_name.into(),
+                        arguments: arguments.clone(),
+                    }),
+                    MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
+                        name: server_object_selectable_name,
+                        selection_map: inner_selection_map,
+                        arguments,
+                        concrete_type,
+                    }),
+                );
+            }
+            WrappedSelectionMapSelection::InlineFragment(isograph_object_type_name) => {
+                maybe_add_typename_selection(&mut inner_selection_map);
+                map.insert(
+                    NormalizationKey::InlineFragment(isograph_object_type_name),
+                    MergedServerSelection::InlineFragment(MergedInlineFragmentSelection {
+                        type_to_refine_to: isograph_object_type_name,
+                        selection_map: inner_selection_map,
+                    }),
+                );
+            }
         }
-        RequiresRefinement::No => inner_selection_map,
-    };
+        inner_selection_map = map;
+    }
 
-    let selection_set_with_subfield = match subfield {
-        Some(subfield) => {
-            let mut map = BTreeMap::new();
-            map.insert(
-                NormalizationKey::ServerField(NameAndArguments {
-                    name: subfield.into(),
-                    arguments: vec![],
-                }),
-                MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
-                    name: subfield,
-                    selection_map: selection_set_with_inline_fragment,
-                    arguments: vec![],
-                    concrete_type: subfield_concrete_type,
-                }),
-            );
-            map
-        }
-        None => selection_set_with_inline_fragment,
-    };
-
-    let mut top_level_selection_set = BTreeMap::new();
-    top_level_selection_set.insert(
-        NormalizationKey::ServerField(NameAndArguments {
-            name: top_level_field.into(),
-            arguments: top_level_field_arguments.clone(),
-        }),
-        MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
-            name: top_level_field,
-            selection_map: selection_set_with_subfield,
-            arguments: top_level_field_arguments,
-            concrete_type: top_level_field_concrete_type,
-        }),
-    );
-
-    top_level_selection_set
+    inner_selection_map
 }
 
 fn maybe_add_typename_selection(selections: &mut MergedSelectionMap) {

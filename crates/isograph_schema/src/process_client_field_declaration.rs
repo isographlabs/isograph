@@ -19,10 +19,9 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    expose_field_directive::RequiresRefinement,
     refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
     ClientObjectSelectable, ClientScalarSelectable, FieldMapItem, NetworkProtocol, Schema,
-    NODE_FIELD_NAME,
+    WrappedSelectionMapSelection, NODE_FIELD_NAME,
 };
 
 pub type UnprocessedSelection = WithSpan<
@@ -248,13 +247,14 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
                 vec![id_selection()],
                 query_id,
-                format!("refetch__{}", object.name).intern().into(),
-                *NODE_FIELD_NAME,
-                id_top_level_arguments(),
-                None,
-                RequiresRefinement::Yes(object.name),
-                None,
-                None,
+                vec![
+                    WrappedSelectionMapSelection::InlineFragment(object.name),
+                    WrappedSelectionMapSelection::LinkedField {
+                        server_object_selectable_name: *NODE_FIELD_NAME,
+                        arguments: id_top_level_arguments(),
+                        concrete_type: None,
+                    },
+                ],
             ))
         });
 
@@ -324,13 +324,14 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     generate_refetch_field_strategy(
                         vec![],
                         query_id,
-                        format!("refetch__{}", to_object.name).intern().into(),
-                        *NODE_FIELD_NAME,
-                        id_top_level_arguments(),
-                        None,
-                        RequiresRefinement::Yes(to_object.name),
-                        None,
-                        None,
+                        vec![
+                            WrappedSelectionMapSelection::InlineFragment(to_object.name),
+                            WrappedSelectionMapSelection::LinkedField {
+                                server_object_selectable_name: *NODE_FIELD_NAME,
+                                arguments: id_top_level_arguments(),
+                                concrete_type: None,
+                            },
+                        ],
                     ),
                 ))
             }

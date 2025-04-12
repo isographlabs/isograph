@@ -64,7 +64,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 .is_some()
             {
                 return Err(WithLocation::new(
-                    CreateAdditionalFieldsError::FieldExistsOnType {
+                    CreateAdditionalFieldsError::CompilerCreatedFieldExistsOnType {
                         field_name: field_name.into(),
                         parent_type: object_name,
                     },

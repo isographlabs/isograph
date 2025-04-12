@@ -12,7 +12,7 @@ use pico::Database;
 
 use crate::{
     batch_compile::{BatchCompileError, CompilationStats},
-    create_unvalidated_schema::create_unvalidated_schema,
+    create_schema::create_schema,
     source_files::SourceFiles,
     write_artifacts::write_artifacts_to_disk,
 };
@@ -84,8 +84,7 @@ pub fn compile<TNetworkProtocol: NetworkProtocol>(
     config: &CompilerConfig,
 ) -> Result<CompilationStats, Box<dyn Error>> {
     // Create schema
-    let (isograph_schema, stats) =
-        create_unvalidated_schema::<TNetworkProtocol>(db, source_files, config)?;
+    let (isograph_schema, stats) = create_schema::<TNetworkProtocol>(db, source_files, config)?;
 
     validate_use_of_arguments(&isograph_schema).map_err(|messages| {
         Box::new(BatchCompileError::MultipleErrorsWithLocations {

@@ -47,6 +47,35 @@ impl<TServer, TClient> DefinitionLocation<TServer, TClient> {
     }
 }
 
+impl<TServerObject, TServerScalar, TClientObject, TClientScalar>
+    DefinitionLocation<
+        SelectionType<TServerScalar, TServerObject>,
+        SelectionType<TClientScalar, TClientObject>,
+    >
+{
+    pub fn transpose(
+        &self,
+    ) -> SelectionType<
+        DefinitionLocation<&TServerScalar, &TClientScalar>,
+        DefinitionLocation<&TServerObject, &TClientObject>,
+    > {
+        match self {
+            DefinitionLocation::Server(SelectionType::Object(object)) => {
+                SelectionType::Object(DefinitionLocation::Server(object))
+            }
+            DefinitionLocation::Server(SelectionType::Scalar(scalar)) => {
+                SelectionType::Scalar(DefinitionLocation::Server(scalar))
+            }
+            DefinitionLocation::Client(SelectionType::Object(object)) => {
+                SelectionType::Object(DefinitionLocation::Client(object))
+            }
+            DefinitionLocation::Client(SelectionType::Scalar(scalar)) => {
+                SelectionType::Scalar(DefinitionLocation::Client(scalar))
+            }
+        }
+    }
+}
+
 /// Distinguishes between items are are "scalar-like" and objects that
 /// are "object-like". Examples include:
 ///

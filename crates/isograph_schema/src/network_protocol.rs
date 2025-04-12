@@ -1,12 +1,22 @@
-use std::{error::Error, fmt::Debug, hash::Hash};
+use std::{
+    collections::{BTreeMap, HashMap},
+    error::Error,
+    fmt::Debug,
+    hash::Hash,
+};
 
-use common_lang_types::{QueryOperationName, QueryText};
-use isograph_config::CompilerConfigOptions;
+use common_lang_types::{
+    Location, QueryOperationName, QueryText, RelativePathToSourceFile, UnvalidatedTypeName,
+    WithLocation,
+};
+use graphql_lang_types::{
+    GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition, RootOperationKind,
+};
 use isograph_lang_types::SchemaSource;
-use pico::{Database, MemoRef, SourceId};
+use pico::{Database, SourceId};
 
 use crate::{
-    EncounteredRootTypes, MergedSelectionMap, RootOperationName, Schema, TypeRefinementMaps,
+    MergedSelectionMap, RootOperationName, Schema, ServerObjectEntity, ServerScalarEntity,
     ValidatedVariableDefinition,
 };
 
@@ -22,28 +32,12 @@ where
 
     type SchemaObjectAssociatedData: Debug;
 
-    fn parse_type_system_document(
+    #[allow(clippy::type_complexity)]
+    fn parse_and_process_type_system_documents(
         db: &Database,
         schema_source_id: SourceId<SchemaSource>,
-    ) -> Result<MemoRef<Self::TypeSystemDocument>, Box<dyn Error>>;
-
-    fn parse_type_system_extension_document(
-        db: &Database,
-        schema_extension_source_id: SourceId<SchemaSource>,
-    ) -> Result<MemoRef<Self::TypeSystemExtensionDocument>, Box<dyn Error>>;
-
-    // TODO refactor this to return a Vec or Iterator of IsographObjectDefinition or the like,
-    // instead of mutating the Schema
-    fn process_type_system_document(
-        schema: &mut Schema<Self>,
-        type_system_document: Self::TypeSystemDocument,
-        options: &CompilerConfigOptions,
-    ) -> Result<ProcessTypeSystemDocumentOutcome, Box<dyn Error>>;
-    fn process_type_system_extension_document(
-        schema: &mut Schema<Self>,
-        type_system_extension_document: Self::TypeSystemExtensionDocument,
-        options: &CompilerConfigOptions,
-    ) -> Result<ProcessTypeSystemDocumentOutcome, Box<dyn Error>>;
+        schema_extension_sources: &BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
+    ) -> Result<ProcessTypeSystemDocumentOutcome<Self>, Box<dyn Error>>;
 
     fn generate_query_text<'a>(
         query_name: QueryOperationName,
@@ -54,7 +48,26 @@ where
     ) -> QueryText;
 }
 
-pub struct ProcessTypeSystemDocumentOutcome {
-    pub type_refinement_maps: TypeRefinementMaps,
-    pub root_types: EncounteredRootTypes,
+pub struct ProcessTypeSystemDocumentOutcome<TNetworkProtocol: NetworkProtocol> {
+    // TODO these fields are a mistake. The concepts of subtypes and supertypes
+    // mapping to asConcreteType fields is a GraphQL-ism! Sure, you may also want
+    // that it in SQL-land, but it should nonetheless be the responsibility of the
+    // network protocol to specify that.
+    pub unvalidated_subtype_to_supertype_map:
+        HashMap<UnvalidatedTypeName, Vec<UnvalidatedTypeName>>,
+    pub unvalidated_supertype_to_subtype_map:
+        HashMap<UnvalidatedTypeName, Vec<UnvalidatedTypeName>>,
+
+    pub scalars: Vec<(ServerScalarEntity<TNetworkProtocol>, Location)>,
+    pub objects: Vec<(
+        ProcessObjectTypeDefinitionOutcome<TNetworkProtocol>,
+        Location,
+    )>,
+}
+
+pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol> {
+    pub encountered_root_kind: Option<RootOperationKind>,
+    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
+    pub server_object_entity: ServerObjectEntity<TNetworkProtocol>,
+    pub fields_to_insert: Vec<WithLocation<GraphQLFieldDefinition>>,
 }

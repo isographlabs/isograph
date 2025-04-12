@@ -1,7 +1,7 @@
 mod add_selection_sets;
 pub mod batch_compile;
 mod compiler_state;
-mod create_unvalidated_schema;
+mod create_schema;
 mod isograph_literals;
 mod refetch_fields;
 mod source_files;

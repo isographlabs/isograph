@@ -57,7 +57,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                                 let subtype =
                                     self.server_entity_data.server_object_entity(*subtype_id);
                                 return Err(WithLocation::new(
-                                    CreateAdditionalFieldsError::FieldExistsOnType {
+                                    CreateAdditionalFieldsError::CompilerCreatedFieldExistsOnType {
                                         field_name: *supertype_field_name,
                                         parent_type: subtype.name,
                                     },
