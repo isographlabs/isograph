@@ -1,5 +1,7 @@
 use serde::Deserialize;
 
+use crate::EmptyDirectiveSet;
+
 #[derive(Deserialize, Debug, Clone, PartialEq, PartialOrd, Ord, Eq, Copy, Hash)]
 #[serde(rename_all = "camelCase", untagged)]
 pub enum ClientFieldDirectiveSet {
@@ -15,8 +17,3 @@ pub struct ComponentDirectiveSet {
 #[derive(Deserialize, Debug, Default, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ComponentDirectiveParameters {}
-
-// No directives -> an EmptyStruct is parsed!
-#[derive(Deserialize, Debug, Default, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct EmptyDirectiveSet {}

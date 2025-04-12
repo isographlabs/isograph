@@ -9,10 +9,10 @@ use graphql_lang_types::{
 };
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
-    from_isograph_field_directives, ClientFieldDeclaration, ClientPointerDeclaration,
-    ConstantValue, EntrypointDeclaration, IsographFieldDirective, NonConstantValue,
-    ObjectSelection, ScalarSelection, SelectionFieldArgument, SelectionTypeContainingSelections,
-    UnvalidatedSelection, VariableDefinition,
+    from_isograph_field_directives, ClientFieldDeclaration, ClientFieldDirectiveSet,
+    ClientPointerDeclaration, ConstantValue, EntrypointDeclaration, IsographFieldDirective,
+    NonConstantValue, ObjectSelection, ScalarSelection, SelectionFieldArgument,
+    SelectionTypeContainingSelections, UnvalidatedSelection, VariableDefinition,
 };
 use std::{collections::HashSet, ops::ControlFlow};
 
@@ -160,6 +160,17 @@ fn parse_client_field_declaration_inner(
         let variable_definitions = parse_variable_definitions(tokens, text_source)?;
 
         let directives = parse_directives(tokens, text_source)?;
+
+        let _client_field_directive_set: ClientFieldDirectiveSet =
+            from_isograph_field_directives(&directives).map_err(|message| {
+                WithSpan::new(
+                    IsographLiteralParseError::UnableToDeserializeDirectives { message },
+                    directives
+                        .first()
+                        .map(|x| x.span)
+                        .unwrap_or_else(Span::todo_generated),
+                )
+            })?;
 
         let description = parse_optional_description(tokens);
 
