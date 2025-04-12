@@ -1,5 +1,6 @@
 mod base_types;
 mod client_field_declaration;
+mod client_field_directive_set;
 mod entrypoint_declaration;
 mod id_types;
 mod isograph_directives;
