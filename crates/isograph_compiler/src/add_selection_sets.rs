@@ -8,8 +8,9 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientScalarOrObjectSelectable, NetworkProtocol, RefetchStrategy, Schema, ServerObjectEntity,
-    UnprocessedClientFieldItem, UnprocessedItem, UseRefetchFieldRefetchStrategy,
-    ValidatedObjectSelection, ValidatedObjectSelectionAssociatedData, ValidatedScalarSelection,
+    UnprocessedClientFieldItem, UnprocessedClientPointerItem, UnprocessedItem,
+    UseRefetchFieldRefetchStrategy, ValidatedObjectSelection,
+    ValidatedObjectSelectionAssociatedData, ValidatedScalarSelection,
     ValidatedScalarSelectionAssociatedData, ValidatedSelection,
 };
 use thiserror::Error;
@@ -31,7 +32,13 @@ pub(crate) fn add_selection_sets_to_client_selectables<TNetworkProtocol: Network
                     errors.extend(e)
                 }
             }
-            SelectionType::Object(_) => todo!("process unprocessed pointer item"),
+            SelectionType::Object(unprocessed_client_pointer_item) => {
+                if let Err(e) =
+                    process_unprocessed_client_pointer_item(schema, unprocessed_client_pointer_item)
+                {
+                    errors.extend(e)
+                }
+            }
         }
     }
     if !errors.is_empty() {
@@ -72,6 +79,41 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
 
     client_field.reader_selection_set = new_selection_set;
     client_field.refetch_strategy = refetch_strategy;
+
+    Ok(())
+}
+
+// TODO we should not be mutating items in the schema. Instead, we should be creating
+// new items (the refetch and reader selection sets).
+fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol>(
+    schema: &mut Schema<TNetworkProtocol>,
+    unprocessed_item: UnprocessedClientPointerItem,
+) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
+    let client_pointer = schema.client_pointer(unprocessed_item.client_pointer_id);
+    let parent_object = schema
+        .server_entity_data
+        .server_object_entity(client_pointer.parent_object_entity_id);
+
+    let new_selection_set = get_validated_selection_set(
+        schema,
+        unprocessed_item.reader_selection_set,
+        parent_object,
+        client_pointer.parent_object_entity_id,
+        &client_pointer,
+    )?;
+
+    // let refetch_strategy = get_validated_refetch_strategy(
+    //     schema,
+    //     unprocessed_item.refetch_strategy,
+    //     parent_object,
+    //     client_pointer.parent_object_entity_id,
+    //     &client_pointer,
+    // )?;
+
+    let client_pointer = schema.client_pointer_mut(unprocessed_item.client_pointer_id);
+
+    client_pointer.reader_selection_set = new_selection_set;
+    // client_pointer.refetch_strategy = refetch_strategy;
 
     Ok(())
 }
