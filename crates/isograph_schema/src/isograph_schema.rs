@@ -12,9 +12,10 @@ use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective, GraphQLNamedTyp
 use intern::string_key::Intern;
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientObjectSelectableId, ClientScalarSelectableId, DefinitionLocation,
-    ObjectSelection, ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionType, SelectionTypeContainingSelections, ServerEntityId, ServerObjectEntityId,
+    ArgumentKeyAndValue, ClientFieldDirectiveSet, ClientObjectSelectableId,
+    ClientScalarSelectableId, DefinitionLocation, EmptyDirectiveSet, ObjectSelection,
+    ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet, SelectionType,
+    SelectionTypeContainingSelections, ServerEntityId, ServerObjectEntityId,
     ServerObjectSelectableId, ServerScalarEntityId, ServerScalarSelectableId,
     ServerStrongIdFieldId, VariableDefinition, WithId,
 };
@@ -26,7 +27,6 @@ use crate::{
     NetworkProtocol, NormalizationKey, ServerEntity, ServerObjectEntity,
     ServerObjectEntityAvailableSelectables, ServerObjectSelectable, ServerScalarEntity,
     ServerScalarSelectable, ServerSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
-    UserWrittenComponentVariant,
 };
 
 lazy_static! {
@@ -487,7 +487,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 &ClientScalarSelectable<TNetworkProtocol>,
                 &ClientObjectSelectable<TNetworkProtocol>,
             >,
-            UserWrittenComponentVariant,
+            ClientFieldDirectiveSet,
         ),
     > {
         self.client_scalar_selectables
@@ -498,7 +498,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 ClientFieldVariant::UserWritten(info) => Some((
                     SelectionType::Scalar(id.into()),
                     SelectionType::Scalar(field),
-                    info.user_written_component_variant,
+                    info.client_field_directive_set,
                 )),
                 ClientFieldVariant::ImperativelyLoadedField(_) => None,
             })
@@ -510,7 +510,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         (
                             SelectionType::Object(id.into()),
                             SelectionType::Object(pointer),
-                            UserWrittenComponentVariant::Eager,
+                            ClientFieldDirectiveSet::None(EmptyDirectiveSet {}),
                         )
                     }),
             )

@@ -3,14 +3,13 @@ use intern::Lookup;
 
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
-use isograph_lang_types::SelectionType;
+use isograph_lang_types::{ClientFieldDirectiveSet, SelectionType};
 use isograph_schema::{
     initial_variable_context, ClientScalarOrObjectSelectable, ClientSelectable, NetworkProtocol,
     Schema, ServerObjectSelectable,
 };
 use isograph_schema::{
     RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment, UserWrittenClientTypeInfo,
-    UserWrittenComponentVariant,
 };
 
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
@@ -40,7 +39,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
     has_updatable: bool,
 ) -> Vec<ArtifactPathAndContent> {
     let ts_file_extension = file_extensions.ts();
-    let user_written_component_variant = info.user_written_component_variant;
+    let user_written_component_variant = info.client_field_directive_set;
     let parent_type = schema
         .server_entity_data
         .server_object_entity(selection_type.parent_object_entity_id());
@@ -61,8 +60,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
 
     let reader_param_type = format!("{}__{}__param", parent_type.name, selection_type.name());
 
-    let reader_content = if let UserWrittenComponentVariant::Eager = user_written_component_variant
-    {
+    let reader_content = if let ClientFieldDirectiveSet::None(_) = user_written_component_variant {
         let eager_reader_name = format!("{}.{}", parent_type.name, selection_type.name());
         let reader_output_type = format!(
             "{}__{}__output_type",
@@ -345,7 +343,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
                 from '@isograph/react';\n\
                 {output_type_text}\n",
         )
-    } else if let UserWrittenComponentVariant::Eager = info.user_written_component_variant {
+    } else if let ClientFieldDirectiveSet::None(_) = info.client_field_directive_set {
         output_type_text
     } else {
         format!(

@@ -488,19 +488,12 @@ pub struct ImperativelyLoadedFieldVariant {
     pub root_object_entity_id: ServerObjectEntityId,
 }
 
-// TODO Component is a GraphQL-ism
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum UserWrittenComponentVariant {
-    Eager,
-    Component,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UserWrittenClientTypeInfo {
     // TODO use a shared struct
     pub const_export_name: ConstExportName,
     pub file_path: RelativePathToSourceFile,
-    pub user_written_component_variant: UserWrittenComponentVariant,
+    pub client_field_directive_set: ClientFieldDirectiveSet,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -518,22 +511,11 @@ pub enum ClientFieldVariant {
 }
 
 fn get_client_variant(client_field_declaration: &ClientFieldDeclaration) -> ClientFieldVariant {
-    match client_field_declaration.client_field_directive_set {
-        ClientFieldDirectiveSet::Component(_) => {
-            ClientFieldVariant::UserWritten(UserWrittenClientTypeInfo {
-                const_export_name: client_field_declaration.const_export_name,
-                file_path: client_field_declaration.definition_path,
-                user_written_component_variant: UserWrittenComponentVariant::Component,
-            })
-        }
-        ClientFieldDirectiveSet::None(_) => {
-            ClientFieldVariant::UserWritten(UserWrittenClientTypeInfo {
-                const_export_name: client_field_declaration.const_export_name,
-                file_path: client_field_declaration.definition_path,
-                user_written_component_variant: UserWrittenComponentVariant::Eager,
-            })
-        }
-    }
+    ClientFieldVariant::UserWritten(UserWrittenClientTypeInfo {
+        const_export_name: client_field_declaration.const_export_name,
+        file_path: client_field_declaration.definition_path,
+        client_field_directive_set: client_field_declaration.client_field_directive_set,
+    })
 }
 
 pub fn id_top_level_arguments() -> Vec<ArgumentKeyAndValue> {

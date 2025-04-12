@@ -1,12 +1,12 @@
 use intern::Lookup;
 use isograph_config::GenerateFileExtensionsOption;
-use isograph_lang_types::SelectionType;
+use isograph_lang_types::{ClientFieldDirectiveSet, SelectionType};
 use std::cmp::Ordering;
 
 use common_lang_types::{ArtifactPathAndContent, IsoLiteralText, SelectableName};
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, NetworkProtocol,
-    Schema, UserWrittenComponentVariant,
+    Schema,
 };
 
 use crate::generate_artifacts::ISO_TS_FILE_NAME;
@@ -41,10 +41,7 @@ export function iso<T>(
 }
 
 fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol>(
-    client_type_and_variant: (
-        ClientSelectable<TNetworkProtocol>,
-        UserWrittenComponentVariant,
-    ),
+    client_type_and_variant: (ClientSelectable<TNetworkProtocol>, ClientFieldDirectiveSet),
     file_extensions: GenerateFileExtensionsOption,
 ) -> (String, String) {
     let (client_type, variant) = client_type_and_variant;
@@ -65,7 +62,7 @@ fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol>
         client_type.type_and_field().type_name,
         client_type.type_and_field().field_name
     );
-    if matches!(variant, UserWrittenComponentVariant::Component) {
+    if matches!(variant, ClientFieldDirectiveSet::Component(_)) {
         s.push_str(&format!(
             "
 export function iso<T>(
@@ -221,10 +218,7 @@ export function iso(isographLiteralText: string):
 
 fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-) -> Vec<(
-    ClientSelectable<TNetworkProtocol>,
-    UserWrittenComponentVariant,
-)> {
+) -> Vec<(ClientSelectable<TNetworkProtocol>, ClientFieldDirectiveSet)> {
     let mut client_types = schema
         .user_written_client_types()
         .map(|x| (x.1, x.2))
