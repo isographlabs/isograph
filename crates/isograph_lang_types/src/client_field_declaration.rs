@@ -68,49 +68,6 @@ pub type SelectionTypeContainingSelections<TScalarField, TLinkedField> =
     SelectionType<ScalarSelection<TScalarField>, ObjectSelection<TScalarField, TLinkedField>>;
 
 impl<TScalarField, TLinkedField> SelectionTypeContainingSelections<TScalarField, TLinkedField> {
-    pub fn map<TNewScalarField, TNewLinkedField>(
-        self,
-        map_scalar_selection: &mut impl FnMut(
-            ScalarSelection<TScalarField>,
-        ) -> ScalarSelection<TNewScalarField>,
-        map_linked_selection: &mut impl FnMut(
-            ObjectSelection<TScalarField, TLinkedField>,
-        )
-            -> ObjectSelection<TNewScalarField, TNewLinkedField>,
-    ) -> SelectionTypeContainingSelections<TNewScalarField, TNewLinkedField> {
-        match self {
-            SelectionTypeContainingSelections::Scalar(s) => {
-                SelectionTypeContainingSelections::Scalar(map_scalar_selection(s))
-            }
-            SelectionTypeContainingSelections::Object(l) => {
-                SelectionTypeContainingSelections::Object(map_linked_selection(l))
-            }
-        }
-    }
-
-    pub fn and_then<TNewScalarField, TNewLinkedField, E>(
-        self,
-        and_then_scalar_selection: &mut impl FnMut(
-            ScalarSelection<TScalarField>,
-        )
-            -> Result<ScalarSelection<TNewScalarField>, E>,
-        and_then_linked_selection: &mut impl FnMut(
-            ObjectSelection<TScalarField, TLinkedField>,
-        ) -> Result<
-            ObjectSelection<TNewScalarField, TNewLinkedField>,
-            E,
-        >,
-    ) -> Result<SelectionTypeContainingSelections<TNewScalarField, TNewLinkedField>, E> {
-        match self {
-            SelectionTypeContainingSelections::Scalar(s) => Ok(
-                SelectionTypeContainingSelections::Scalar(and_then_scalar_selection(s)?),
-            ),
-            SelectionTypeContainingSelections::Object(l) => Ok(
-                SelectionTypeContainingSelections::Object(and_then_linked_selection(l)?),
-            ),
-        }
-    }
-
     pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
         match self {
             SelectionTypeContainingSelections::Scalar(scalar_field) => scalar_field.name_or_alias(),
