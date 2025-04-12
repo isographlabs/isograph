@@ -1,0 +1,4 @@
+
+> @isograph/react@0.3.1 compile-typescript /home/pablocrov/code/isograph/libs/isograph-react
+> rm -rf dist/* && tsc -p tsconfig.pkg.json
+

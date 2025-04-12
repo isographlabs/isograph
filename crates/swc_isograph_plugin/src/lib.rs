@@ -1,5 +1,4 @@
 use isograph_config::IsographProjectConfig;
-use isograph_config::{self, ConfigFileOptions};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 use swc_common::plugin::metadata::TransformPluginMetadataContextKind;
@@ -18,25 +17,8 @@ struct WasmConfig {
     /// mounted path, which we can't use in this case.
     /// Must be an absolute path
     pub root_dir: PathBuf,
-    /// From here is the same as isograph_config::IsographProjectConfig
-    /// The user may hard-code the JSON Schema for their version of the config.
-    #[serde(rename = "$schema")]
-    #[allow(dead_code)]
-    pub json_schema: Option<String>,
-    /// The relative path to the folder where the compiler should look for Isograph literals
-    pub project_root: PathBuf,
-    /// The relative path to the folder where the compiler should create artifacts
-    /// Defaults to the project_root directory.
-    pub artifact_directory: Option<PathBuf>,
-    /// The relative path to the GraphQL schema
-    pub schema: PathBuf,
-    /// The relative path to schema extensions
-    #[serde(default)]
-    pub schema_extensions: Vec<PathBuf>,
-
-    /// Various options of less importance
-    #[serde(default)]
-    pub options: ConfigFileOptions,
+    #[serde(flatten)]
+    pub isograph_project_config: IsographProjectConfig,
 }
 
 #[plugin_transform]
@@ -53,14 +35,7 @@ fn isograph_plugin_transform(
 
     let root_dir = config.root_dir;
 
-    let isograph_config = IsographProjectConfig {
-        json_schema: config.json_schema,
-        project_root: config.project_root,
-        artifact_directory: config.artifact_directory,
-        schema: config.schema,
-        schema_extensions: config.schema_extensions,
-        options: config.options,
-    };
+    let isograph_config = config.isograph_project_config;
 
     debug!("Config: {:?}", isograph_config);
     let file_name = metadata
@@ -68,7 +43,7 @@ fn isograph_plugin_transform(
         .unwrap_or_default();
     let path = Path::new(&file_name);
 
-    let mut isograph = swc_isograph::isograph(
+    let mut isograph = swc_isograph::compile_iso_literal_visitor(
         &isograph_config,
         path,
         root_dir.as_path(),

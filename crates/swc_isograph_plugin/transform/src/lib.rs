@@ -2,6 +2,8 @@ use anyhow::{bail, Result};
 use isograph_config::{ConfigFileJavascriptModule, IsographProjectConfig, ISOGRAPH_FOLDER};
 use once_cell::sync::Lazy;
 use regex::Regex;
+use serde::Deserialize;
+use std::fmt;
 use std::path::{Path, PathBuf};
 use swc_atoms::JsWord;
 use swc_common::{errors::HANDLER, Mark, Span, DUMMY_SP};
@@ -15,13 +17,13 @@ use tracing::debug;
 static OPERATION_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\s*(entrypoint|field)\s*([^\.\s]+)\.([^\s\(]+)").unwrap());
 
-pub fn isograph<'a>(
+pub fn compile_iso_literal_visitor<'a>(
     config: &'a IsographProjectConfig,
     filepath: &'a Path,
     root_dir: &'a Path,
     unresolved_mark: Option<Mark>,
 ) -> impl Fold + 'a {
-    Isograph {
+    IsoLiteralCompilerVisitor {
         config,
         filepath,
         unresolved_mark,
@@ -90,14 +92,48 @@ impl IsographImport {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-struct IsographEntrypoint {
-    pub field_type: String,
-    pub field_name: String,
-    pub artifact_type: String,
+#[derive(Deserialize, Default, Debug, Clone, Copy, PartialEq)]
+pub enum ArtifactType {
+    #[default]
+    Entrypoint,
+    Field,
+    Unknown,
 }
 
-impl IsographEntrypoint {
+impl fmt::Display for ArtifactType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ArtifactType::Entrypoint => f.write_str("entrypoint"),
+            ArtifactType::Field => f.write_str("field"),
+            ArtifactType::Unknown => f.write_str("unknown"),
+        }
+    }
+}
+
+impl From<&str> for ArtifactType {
+    fn from(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "entrypoint" => Self::Entrypoint,
+            "field" => Self::Field,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+impl From<String> for ArtifactType {
+    fn from(s: String) -> Self {
+        s.as_str().into()
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+struct ValidIsographTemplateLiteral {
+    pub field_type: String,
+    pub field_name: String,
+    pub artifact_type: ArtifactType,
+}
+
+impl ValidIsographTemplateLiteral {
     fn build_ident_expr_for_hoisted_import(
         &self,
         ident_name: &str,
@@ -182,19 +218,21 @@ impl IsographEntrypoint {
             self.artifact_type
         ));
 
-        #[cfg(target_os = "windows")]
-        let file_to_artifact = file_to_artifact.replace("\\", "/");
-
+        if cfg!(target_os = "windows") {
+            file_to_artifact = PathBuf::from(format!("{}", file_to_artifact.display()).replace("\\", "/"));
+        }
+        
         if file_to_artifact.starts_with(ISOGRAPH_FOLDER) {
             file_to_artifact = PathBuf::from(format!("./{}", file_to_artifact.display()));
         }
+
 
         Ok(file_to_artifact)
     }
 }
 
 #[derive(Debug, Clone)]
-struct Isograph<'a> {
+struct IsoLiteralCompilerVisitor<'a> {
     root_dir: &'a Path,
     config: &'a IsographProjectConfig,
     filepath: &'a Path,
@@ -203,38 +241,35 @@ struct Isograph<'a> {
 }
 
 #[swc_trace]
-impl Isograph<'_> {
+impl IsoLiteralCompilerVisitor<'_> {
     fn parse_iso_call_arg_into_type(
         &self,
         expr_or_spread: Option<&ExprOrSpread>,
-    ) -> Result<IsographEntrypoint, IsograthTransformError> {
+    ) -> Result<ValidIsographTemplateLiteral, IsograthTransformError> {
         if let Some(ExprOrSpread { expr, .. }) = expr_or_spread {
             if let Expr::Tpl(Tpl { quasis, .. }) = &**expr {
                 if quasis.iter().len() != 1 {
                     return Err(IsograthTransformError::SubstitutionsNotAllowedInIsoFragments);
                 }
 
-                let entrypoint = OPERATION_REGEX
+                return OPERATION_REGEX
                     .captures_iter(quasis[0].raw.trim())
                     .next()
                     .map(|capture_group| {
                         debug!("capture_group {:?}", capture_group);
-                        IsographEntrypoint {
-                            artifact_type: capture_group[1].to_string(),
+                        ValidIsographTemplateLiteral {
+                            artifact_type: ArtifactType::from(capture_group[1].to_string()),
                             field_type: capture_group[2].to_string(),
                             field_name: capture_group[3].to_string(),
                         }
-                    });
-                match entrypoint {
-                    Some(entrypoint) => return Ok(entrypoint),
-                    None => return Err(IsograthTransformError::InvalidIsoKeyword),
-                }
+                    })
+                    .ok_or(IsograthTransformError::InvalidIsoKeyword);
             }
         }
-        return Err(IsograthTransformError::OnlyAllowedTemplateLiteral);
+        Err(IsograthTransformError::OnlyAllowedTemplateLiteral)
     }
 
-    pub fn compile_import_statement(&mut self, entrypoint: &IsographEntrypoint) -> Expr {
+    pub fn compile_import_statement(&mut self, entrypoint: &ValidIsographTemplateLiteral) -> Expr {
         let file_to_artifact = entrypoint
             .path_for_artifact(self.filepath, self.config, self.root_dir)
             .expect("Failed to get path for artifact.");
@@ -272,10 +307,9 @@ impl Isograph<'_> {
 
         match entrypoint {
             Err(e) => return Err(e),
-            Ok(entrypoint) => {
-                if entrypoint.artifact_type == "entrypoint" {
-                    Ok(self.compile_import_statement(&entrypoint))
-                } else if entrypoint.artifact_type == "field" {
+            Ok(entrypoint) => match entrypoint.artifact_type {
+                ArtifactType::Entrypoint => Ok(self.compile_import_statement(&entrypoint)),
+                ArtifactType::Field => {
                     match fn_args {
                         Some(fn_args) => {
                             if fn_args.iter().len() == 1 {
@@ -289,15 +323,16 @@ impl Isograph<'_> {
                         // iso(...)>empty<
                         None => Ok(entrypoint.build_arrow_identity_expr()),
                     }
-                } else {
+                }
+                ArtifactType::Unknown => {
                     return Err(IsograthTransformError::MalformedIsoLiteral);
                 }
-            }
+            },
         }
     }
 }
 
-impl Fold for Isograph<'_> {
+impl Fold for IsoLiteralCompilerVisitor<'_> {
     noop_fold_type!();
 
     fn fold_expr(&mut self, expr: Expr) -> Expr {

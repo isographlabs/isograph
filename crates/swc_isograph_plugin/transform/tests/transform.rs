@@ -5,7 +5,7 @@ use std::{
 };
 use swc_ecma_parser::{EsConfig, Syntax};
 use swc_ecma_transforms_testing::{test_fixture, FixtureTestConfig};
-use swc_isograph::isograph;
+use swc_isograph::compile_iso_literal_visitor;
 
 #[testing::fixture("tests/fixtures/base/**/*/input.js")]
 fn run(input: PathBuf) {
@@ -21,7 +21,7 @@ fn run(input: PathBuf) {
             jsx: true,
             ..Default::default()
         }),
-        &|_| isograph(&config, Path::new(&filename), Path::new(root_dir), None),
+        &|_| compile_iso_literal_visitor(&config, Path::new(&filename), Path::new(root_dir), None),
         &input,
         &output,
         Default::default(),
@@ -42,7 +42,7 @@ fn isograph_errors(input: PathBuf) {
             jsx: true,
             ..Default::default()
         }),
-        &|_| isograph(&config, Path::new(&filename), Path::new(root_dir), None),
+        &|_| compile_iso_literal_visitor(&config, Path::new(&filename), Path::new(root_dir), None),
         &input,
         &output,
         FixtureTestConfig {
