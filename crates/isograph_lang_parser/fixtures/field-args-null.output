@@ -125,7 +125,9 @@ Ok(
                                 },
                             },
                         ],
-                        directives: [],
+                        client_field_directive_set: None(
+                            EmptyDirectiveSet,
+                        ),
                         variable_definitions: [],
                         definition_path: RelativePathToSourceFile(
                             "crates/isograph_lang_parser/fixtures/field-args-null.input.js",

@@ -9,8 +9,8 @@ use crate::row_col_offset::RowColDiff;
 use super::{
     semantic_token_generator::SemanticTokenGenerator,
     semantic_token_legend::{
-        semantic_token_type_decorator, semantic_token_type_keyword, semantic_token_type_method,
-        semantic_token_type_operator, semantic_token_type_type, semantic_token_type_variable,
+        semantic_token_type_keyword, semantic_token_type_method, semantic_token_type_operator,
+        semantic_token_type_type, semantic_token_type_variable,
     },
 };
 
@@ -34,14 +34,10 @@ pub(crate) fn client_field_declaration_to_tokens(
     );
 
     let name_span = client_field_declaration.item.client_field_name.span;
-    let mut last_span_so_far = name_span;
+    let last_span_so_far = name_span;
     semantic_token_generator.generate_semantic_token(name_span, semantic_token_type_method());
 
-    for directive in client_field_declaration.item.directives {
-        last_span_so_far = directive.span;
-        semantic_token_generator
-            .generate_semantic_token(directive.span, semantic_token_type_decorator());
-    }
+    // TODO: Handle directives
 
     let first_selection_set_span = client_field_declaration
         .item

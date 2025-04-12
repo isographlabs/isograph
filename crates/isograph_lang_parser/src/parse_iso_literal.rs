@@ -161,7 +161,7 @@ fn parse_client_field_declaration_inner(
 
         let directives = parse_directives(tokens, text_source)?;
 
-        let _client_field_directive_set: ClientFieldDirectiveSet =
+        let client_field_directive_set: ClientFieldDirectiveSet =
             from_isograph_field_directives(&directives).map_err(|message| {
                 WithSpan::new(
                     IsographLiteralParseError::UnableToDeserializeDirectives { message },
@@ -198,7 +198,7 @@ fn parse_client_field_declaration_inner(
             description,
             selection_set,
             definition_path: definition_file_path,
-            directives,
+            client_field_directive_set,
             const_export_name: const_export_name.intern().into(),
             variable_definitions,
             field_keyword: WithSpan::new((), field_keyword_span),
