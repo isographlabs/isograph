@@ -91,12 +91,25 @@ fn parse_iso_entrypoint_declaration(
                 .parse_string_key_type(IsographLangTokenKind::Identifier)
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
+            let directives = parse_directives(tokens, text_source)?;
+
+            let entrypoint_directive_set =
+                from_isograph_field_directives(&directives).map_err(|message| {
+                    WithSpan::new(
+                        IsographLiteralParseError::UnableToDeserializeDirectives { message },
+                        directives
+                            .first()
+                            .map(|x| x.span)
+                            .unwrap_or_else(Span::todo_generated),
+                    )
+                })?;
             Ok(EntrypointDeclaration {
                 parent_type,
                 client_field_name,
                 iso_literal_text,
                 entrypoint_keyword: WithSpan::new((), entrypoint_keyword),
                 dot: dot.map(|_| ()),
+                entrypoint_directive_set,
             })
         })
         .map_err(|with_span: WithSpan<_>| with_span.to_with_location(text_source))?;
