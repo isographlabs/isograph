@@ -10,7 +10,8 @@ use serde::Deserialize;
 use std::fmt::Debug;
 
 use crate::{
-    IsographFieldDirective, ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionType,
+    ClientFieldDirectiveSet, IsographFieldDirective, ObjectSelectionDirectiveSet,
+    ScalarSelectionDirectiveSet, SelectionType,
 };
 
 pub type UnvalidatedSelection =
@@ -26,7 +27,7 @@ pub struct ClientFieldDeclaration {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     // TODO remove, or put on a generic
-    pub directives: Vec<WithSpan<IsographFieldDirective>>,
+    pub client_field_directive_set: ClientFieldDirectiveSet,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: RelativePathToSourceFile,
 

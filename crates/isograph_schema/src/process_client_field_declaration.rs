@@ -8,13 +8,12 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldDeclaration, ClientObjectSelectableId,
+    ArgumentKeyAndValue, ClientFieldDeclaration, ClientFieldDirectiveSet, ClientObjectSelectableId,
     ClientPointerDeclaration, ClientScalarSelectableId, DefinitionLocation, DeserializationError,
     NonConstantValue, ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionType,
     SelectionTypeContainingSelections, ServerEntityId, ServerObjectEntityId, TypeAnnotation,
     VariableDefinition,
 };
-use lazy_static::lazy_static;
 
 use thiserror::Error;
 
@@ -518,25 +517,23 @@ pub enum ClientFieldVariant {
     Link,
 }
 
-lazy_static! {
-    static ref COMPONENT: IsographDirectiveName = "component".intern().into();
-}
-
 fn get_client_variant(client_field_declaration: &ClientFieldDeclaration) -> ClientFieldVariant {
-    for directive in client_field_declaration.directives.iter() {
-        if directive.item.name.item == *COMPONENT {
-            return ClientFieldVariant::UserWritten(UserWrittenClientTypeInfo {
+    match client_field_declaration.client_field_directive_set {
+        ClientFieldDirectiveSet::Component(_) => {
+            ClientFieldVariant::UserWritten(UserWrittenClientTypeInfo {
                 const_export_name: client_field_declaration.const_export_name,
                 file_path: client_field_declaration.definition_path,
                 user_written_component_variant: UserWrittenComponentVariant::Component,
-            });
+            })
+        }
+        ClientFieldDirectiveSet::None(_) => {
+            ClientFieldVariant::UserWritten(UserWrittenClientTypeInfo {
+                const_export_name: client_field_declaration.const_export_name,
+                file_path: client_field_declaration.definition_path,
+                user_written_component_variant: UserWrittenComponentVariant::Eager,
+            })
         }
     }
-    ClientFieldVariant::UserWritten(UserWrittenClientTypeInfo {
-        const_export_name: client_field_declaration.const_export_name,
-        file_path: client_field_declaration.definition_path,
-        user_written_component_variant: UserWrittenComponentVariant::Eager,
-    })
 }
 
 pub fn id_top_level_arguments() -> Vec<ArgumentKeyAndValue> {

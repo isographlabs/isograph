@@ -27,26 +27,11 @@ Ok(
                         },
                         description: None,
                         selection_set: [],
-                        directives: [
-                            WithSpan {
-                                item: IsographFieldDirective {
-                                    name: WithSpan {
-                                        item: IsographDirectiveName(
-                                            "component",
-                                        ),
-                                        span: Span {
-                                            start: 20,
-                                            end: 29,
-                                        },
-                                    },
-                                    arguments: [],
-                                },
-                                span: Span {
-                                    start: 19,
-                                    end: 29,
-                                },
+                        client_field_directive_set: Component(
+                            ComponentDirectiveSet {
+                                component: ComponentDirectiveParameters,
                             },
-                        ],
+                        ),
                         variable_definitions: [],
                         definition_path: RelativePathToSourceFile(
                             "crates/isograph_lang_parser/fixtures/field-directives-on-definition-valid.input.js",
