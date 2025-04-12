@@ -10,16 +10,17 @@ use intern::{string_key::Intern, Lookup};
 use core::panic;
 use isograph_config::CompilerConfig;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientScalarSelectableId, DefinitionLocation, NonConstantValue,
-    ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, ServerEntityId,
-    ServerObjectEntityId, TypeAnnotation, UnionVariant, VariableDefinition,
+    ArgumentKeyAndValue, ClientFieldDirectiveSet, ClientScalarSelectableId, DefinitionLocation,
+    EmptyDirectiveSet, NonConstantValue, ObjectSelectionDirectiveSet, ScalarSelection,
+    ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionType,
+    SelectionTypeContainingSelections, ServerEntityId, ServerObjectEntityId, TypeAnnotation,
+    UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
     accessible_client_fields, description, output_type_annotation, selection_map_wrapped,
     ClientFieldVariant, ClientScalarSelectable, ClientSelectableId, FieldTraversalResult,
     NameAndArguments, NetworkProtocol, NormalizationKey, Schema,
-    SchemaServerObjectSelectableVariant, UserWrittenClientTypeInfo, UserWrittenComponentVariant,
+    SchemaServerObjectSelectableVariant, UserWrittenClientTypeInfo,
     ValidatedScalarSelectionAssociatedData, ValidatedSelection, ValidatedVariableDefinition,
     WrappedSelectionMapSelection,
 };
@@ -169,7 +170,9 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     UserWrittenClientTypeInfo {
                         const_export_name: encountered_client_pointer.info.const_export_name,
                         file_path: encountered_client_pointer.info.file_path,
-                        user_written_component_variant: UserWrittenComponentVariant::Eager,
+                        client_field_directive_set: ClientFieldDirectiveSet::None(
+                            EmptyDirectiveSet {},
+                        ),
                     },
                     &traversal_state.refetch_paths,
                     config.options.include_file_extensions_in_import_statements,
@@ -340,7 +343,9 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     UserWrittenClientTypeInfo {
                         const_export_name: client_pointer.info.const_export_name,
                         file_path: client_pointer.info.file_path,
-                        user_written_component_variant: UserWrittenComponentVariant::Eager,
+                        client_field_directive_set: ClientFieldDirectiveSet::None(
+                            EmptyDirectiveSet {},
+                        ),
                     },
                     config.options.include_file_extensions_in_import_statements,
                 ))
@@ -506,11 +511,11 @@ pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
     let variant = &client_field.variant;
     match variant {
         ClientFieldVariant::Link => ClientFieldOutputType("Link".to_string()),
-        ClientFieldVariant::UserWritten(info) => match info.user_written_component_variant {
-            UserWrittenComponentVariant::Eager => {
+        ClientFieldVariant::UserWritten(info) => match info.client_field_directive_set {
+            ClientFieldDirectiveSet::None(_) => {
                 ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
             }
-            UserWrittenComponentVariant::Component => ClientFieldOutputType(
+            ClientFieldDirectiveSet::Component(_) => ClientFieldOutputType(
                 "(React.FC<CombineWithIntrinsicAttributes<ExtractSecondParam<typeof resolver>>>)"
                     .to_string(),
             ),
