@@ -20,11 +20,17 @@ Err(
                 },
             },
         ),
-        item: LeftoverTokens,
+        item: UnableToDeserializeDirectives {
+            message: Custom(
+                "data did not match any variant of untagged enum EntrypointDirectiveSet",
+            ),
+        },
     },
 )
 
-Unparsed tokens remaining
+Unable to process directives. Message: Error when deserializing.
+
+data did not match any variant of untagged enum EntrypointDirectiveSet
 crates/isograph_lang_parser/fixtures/entrypoint-with-directives.input.js
 entrypoint Type.Name @foo
                      ^^^^

@@ -39,6 +39,9 @@ Ok(
                         iso_literal_text: IsoLiteralText(
                             "entrypoint Type.Name",
                         ),
+                        entrypoint_directive_set: None(
+                            EmptyDirectiveSet,
+                        ),
                     },
                     span: Span {
                         start: 11,
