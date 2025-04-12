@@ -186,12 +186,6 @@ fn parse_client_field_declaration_inner(
             )
         })?;
 
-        // --------------------
-        // TODO: use directives to:
-        // - ensure only component exists
-        // - it ends up in the reader AST
-        // --------------------
-
         Ok(ClientFieldDeclaration {
             parent_type,
             client_field_name,
