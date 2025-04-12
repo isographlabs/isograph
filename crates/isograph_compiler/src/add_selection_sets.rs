@@ -102,18 +102,9 @@ fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol>(
         &client_pointer,
     )?;
 
-    // let refetch_strategy = get_validated_refetch_strategy(
-    //     schema,
-    //     unprocessed_item.refetch_strategy,
-    //     parent_object,
-    //     client_pointer.parent_object_entity_id,
-    //     &client_pointer,
-    // )?;
-
     let client_pointer = schema.client_pointer_mut(unprocessed_item.client_pointer_id);
 
     client_pointer.reader_selection_set = new_selection_set;
-    // client_pointer.refetch_strategy = refetch_strategy;
 
     Ok(())
 }
