@@ -142,27 +142,6 @@ pub struct ScalarSelection<TScalarField> {
 }
 
 impl<TScalarField> ScalarSelection<TScalarField> {
-    pub fn map<U>(self, map: &impl Fn(TScalarField) -> U) -> ScalarSelection<U> {
-        ScalarSelection {
-            name: self.name,
-            reader_alias: self.reader_alias,
-            associated_data: map(self.associated_data),
-            arguments: self.arguments,
-        }
-    }
-
-    pub fn and_then<U, E>(
-        self,
-        map: &impl Fn(TScalarField) -> Result<U, E>,
-    ) -> Result<ScalarSelection<U>, E> {
-        Ok(ScalarSelection {
-            name: self.name,
-            reader_alias: self.reader_alias,
-            associated_data: map(self.associated_data)?,
-            arguments: self.arguments,
-        })
-    }
-
     pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
         self.reader_alias
             .map(|item| item.map(SelectableNameOrAlias::from))
@@ -180,33 +159,6 @@ pub struct ObjectSelection<TScalar, TLinked> {
 }
 
 impl<TScalarField, TLinkedField> ObjectSelection<TScalarField, TLinkedField> {
-    pub fn map<U, V>(
-        self,
-        map_scalar: &impl Fn(TScalarField) -> U,
-        map_linked: &impl Fn(TLinkedField) -> V,
-    ) -> ObjectSelection<U, V> {
-        ObjectSelection {
-            name: self.name,
-            reader_alias: self.reader_alias,
-            associated_data: map_linked(self.associated_data),
-            selection_set: self
-                .selection_set
-                .into_iter()
-                .map(|with_span| {
-                    with_span.map(|selection| {
-                        selection.map(
-                            &mut |scalar_field_selection| scalar_field_selection.map(map_scalar),
-                            &mut |linked_field_selection| {
-                                linked_field_selection.map(map_scalar, map_linked)
-                            },
-                        )
-                    })
-                })
-                .collect(),
-            arguments: self.arguments,
-        }
-    }
-
     pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
         self.reader_alias
             .map(|item| item.map(SelectableNameOrAlias::from))
