@@ -217,7 +217,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         Location::generated(),
                     ),
                     reader_alias: None,
-                    associated_data: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
+                    associated_data: (),
+                    scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(
+                        EmptyDirectiveSet {},
+                    ),
                     // TODO what about arguments? How would we handle them?
                     arguments: vec![],
                 };

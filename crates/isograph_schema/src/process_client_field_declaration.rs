@@ -10,8 +10,8 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientFieldDirectiveSet, ClientObjectSelectableId,
     ClientPointerDeclaration, ClientScalarSelectableId, DefinitionLocation, DeserializationError,
-    NonConstantValue, ScalarSelectionDirectiveSet, SelectionType, ServerEntityId,
-    ServerObjectEntityId, TypeAnnotation, UnvalidatedSelection, VariableDefinition,
+    NonConstantValue, SelectionType, ServerEntityId, ServerObjectEntityId, TypeAnnotation,
+    UnvalidatedSelection, VariableDefinition,
 };
 
 use thiserror::Error;
@@ -27,7 +27,7 @@ pub type UnprocessedSelection = WithSpan<UnvalidatedSelection>;
 pub struct UnprocessedClientFieldItem {
     pub client_field_id: ClientScalarSelectableId,
     pub reader_selection_set: Vec<UnprocessedSelection>,
-    pub refetch_strategy: Option<RefetchStrategy<ScalarSelectionDirectiveSet, ()>>,
+    pub refetch_strategy: Option<RefetchStrategy<(), ()>>,
 }
 pub struct UnprocessedClientPointerItem {
     pub client_pointer_id: ClientObjectSelectableId,

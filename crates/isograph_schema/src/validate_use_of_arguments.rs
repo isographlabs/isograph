@@ -89,7 +89,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
 
                 // Only loadably selected fields are allowed to have missing arguments
                 let can_have_missing_args = matches!(
-                    scalar_selection.associated_data.selection_variant,
+                    scalar_selection.scalar_selection_directive_set,
                     ScalarSelectionDirectiveSet::Loadable(_)
                 );
 

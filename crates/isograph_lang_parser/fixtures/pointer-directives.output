@@ -192,10 +192,11 @@ Ok(
                                                             ),
                                                         },
                                                         reader_alias: None,
-                                                        associated_data: None(
+                                                        associated_data: (),
+                                                        arguments: [],
+                                                        scalar_selection_directive_set: None(
                                                             EmptyDirectiveSet,
                                                         ),
-                                                        arguments: [],
                                                     },
                                                 ),
                                                 span: Span {
@@ -232,10 +233,11 @@ Ok(
                                                             ),
                                                         },
                                                         reader_alias: None,
-                                                        associated_data: None(
+                                                        associated_data: (),
+                                                        arguments: [],
+                                                        scalar_selection_directive_set: None(
                                                             EmptyDirectiveSet,
                                                         ),
-                                                        arguments: [],
                                                     },
                                                 ),
                                                 span: Span {

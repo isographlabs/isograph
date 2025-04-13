@@ -723,7 +723,7 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
                 "{}__output_type",
                 client_field.type_and_field.underscore_separated()
             );
-            let output_type = match scalar_field_selection.associated_data.selection_variant {
+            let output_type = match scalar_field_selection.scalar_selection_directive_set {
                 ScalarSelectionDirectiveSet::Updatable(_)
                 | ScalarSelectionDirectiveSet::None(_) => inner_output_type,
                 ScalarSelectionDirectiveSet::Loadable(_) => {
@@ -802,7 +802,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                                     .javascript_name
                             });
 
-                    match scalar_field_selection.associated_data.selection_variant {
+                    match scalar_field_selection.scalar_selection_directive_set {
                         ScalarSelectionDirectiveSet::Updatable(_) => {
                             *updatable_fields = true;
                             query_type_declaration

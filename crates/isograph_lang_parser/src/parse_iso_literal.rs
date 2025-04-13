@@ -462,8 +462,8 @@ fn parse_selection(
                 })
             }
             None => {
-                let associated_data =
-                    from_isograph_field_directives(&directives).map_err(|message| {
+                let scalar_selection_directive_set = from_isograph_field_directives(&directives)
+                    .map_err(|message| {
                         WithSpan::new(
                             IsographLiteralParseError::UnableToDeserializeDirectives { message },
                             directives
@@ -476,8 +476,9 @@ fn parse_selection(
                     name: field_name.map(|string_key| string_key.into()),
                     reader_alias: alias
                         .map(|with_span| with_span.map(|string_key| string_key.into())),
-                    associated_data,
+                    associated_data: (),
                     arguments,
+                    scalar_selection_directive_set,
                 })
             }
         };

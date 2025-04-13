@@ -135,7 +135,8 @@ pub fn id_selection() -> UnprocessedSelection {
         SelectionTypeContainingSelections::Scalar(ScalarSelection {
             name: WithLocation::new("id".intern().into(), Location::generated()),
             reader_alias: None,
-            associated_data: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
+            scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
+            associated_data: (),
             arguments: vec![],
         }),
         Span::todo_generated(),

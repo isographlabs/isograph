@@ -198,7 +198,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
         DefinitionLocation::Server(server_selectable_id) => {
             // TODO encode this in types
             if matches!(
-                scalar_selection.associated_data,
+                scalar_selection.scalar_selection_directive_set,
                 ScalarSelectionDirectiveSet::Loadable(_)
             ) {
                 return Err(WithLocation::new(
@@ -259,10 +259,8 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
     Ok(ScalarSelection {
         name: scalar_selection.name,
         reader_alias: scalar_selection.reader_alias,
-        associated_data: ValidatedScalarSelectionAssociatedData {
-            location,
-            selection_variant: scalar_selection.associated_data,
-        },
+        associated_data: ValidatedScalarSelectionAssociatedData { location },
+        scalar_selection_directive_set: scalar_selection.scalar_selection_directive_set,
         arguments: scalar_selection.arguments,
     })
 }
@@ -272,7 +270,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
     selection_parent_object_id: ServerObjectEntityId,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
-    object_selection: ObjectSelection<ScalarSelectionDirectiveSet, ()>,
+    object_selection: ObjectSelection<(), ()>,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<ValidatedObjectSelection> {
     let location = schema
         .server_entity_data
@@ -384,7 +382,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
 
 fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    refetch_strategy: Option<RefetchStrategy<ScalarSelectionDirectiveSet, ()>>,
+    refetch_strategy: Option<RefetchStrategy<(), ()>>,
     parent_object: &ServerObjectEntity<TNetworkProtocol>,
     selection_parent_object_id: ServerObjectEntityId,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,

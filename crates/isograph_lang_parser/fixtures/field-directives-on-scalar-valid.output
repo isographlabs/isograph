@@ -56,7 +56,9 @@ Ok(
                                             ),
                                         },
                                         reader_alias: None,
-                                        associated_data: Loadable(
+                                        associated_data: (),
+                                        arguments: [],
+                                        scalar_selection_directive_set: Loadable(
                                             LoadableDirectiveSet {
                                                 loadable: LoadableDirectiveParameters {
                                                     complete_selection_set: false,
@@ -64,7 +66,6 @@ Ok(
                                                 },
                                             },
                                         ),
-                                        arguments: [],
                                     },
                                 ),
                                 span: Span {
@@ -170,7 +171,9 @@ Ok(
                                             ),
                                         },
                                         reader_alias: None,
-                                        associated_data: Loadable(
+                                        associated_data: (),
+                                        arguments: [],
+                                        scalar_selection_directive_set: Loadable(
                                             LoadableDirectiveSet {
                                                 loadable: LoadableDirectiveParameters {
                                                     complete_selection_set: false,
@@ -178,7 +181,6 @@ Ok(
                                                 },
                                             },
                                         ),
-                                        arguments: [],
                                     },
                                 ),
                                 span: Span {
@@ -284,7 +286,9 @@ Ok(
                                             ),
                                         },
                                         reader_alias: None,
-                                        associated_data: Loadable(
+                                        associated_data: (),
+                                        arguments: [],
+                                        scalar_selection_directive_set: Loadable(
                                             LoadableDirectiveSet {
                                                 loadable: LoadableDirectiveParameters {
                                                     complete_selection_set: false,
@@ -292,7 +296,6 @@ Ok(
                                                 },
                                             },
                                         ),
-                                        arguments: [],
                                     },
                                 ),
                                 span: Span {
@@ -398,12 +401,13 @@ Ok(
                                             ),
                                         },
                                         reader_alias: None,
-                                        associated_data: Updatable(
+                                        associated_data: (),
+                                        arguments: [],
+                                        scalar_selection_directive_set: Updatable(
                                             UpdatableDirectiveSet {
                                                 updatable: UpdatableDirectiveParameters,
                                             },
                                         ),
-                                        arguments: [],
                                     },
                                 ),
                                 span: Span {

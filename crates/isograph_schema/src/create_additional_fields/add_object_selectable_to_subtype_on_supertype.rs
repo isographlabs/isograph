@@ -33,6 +33,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             let typename_selection = WithSpan::new(
                 SelectionTypeContainingSelections::Scalar(ScalarSelection {
                     arguments: vec![],
+                    scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(
+                        EmptyDirectiveSet {},
+                    ),
                     associated_data: ValidatedScalarSelectionAssociatedData {
                         location: DefinitionLocation::Server(
                             *self
@@ -51,7 +54,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                                 .as_scalar()
                                 .expect("Expected __typename to be scalar"),
                         ),
-                        selection_variant: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
                     },
                     name: WithLocation::new("__typename".intern().into(), Location::generated()),
                     reader_alias: None,
@@ -80,8 +82,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                                 .as_scalar()
                                 .expect("Expected lnk to be scalar field"),
                         ),
-                        selection_variant: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
                     },
+                    scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(
+                        EmptyDirectiveSet {},
+                    ),
                     name: WithLocation::new((*LINK_FIELD_NAME).into(), Location::generated()),
                     reader_alias: None,
                 }),

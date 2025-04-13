@@ -222,12 +222,12 @@ fn scalar_client_defined_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     let client_field_variable_context = parent_variable_context.child_variable_context(
         &scalar_field_selection.arguments,
         &client_field.variable_definitions,
-        &scalar_field_selection.associated_data.selection_variant,
+        &scalar_field_selection.scalar_selection_directive_set,
     );
 
     match categorize_field_loadability(
         client_field,
-        &scalar_field_selection.associated_data.selection_variant,
+        &scalar_field_selection.scalar_selection_directive_set,
     ) {
         Some(Loadability::LoadablySelectedField(loadable_directive_parameters)) => {
             loadably_selected_field_ast_node(
@@ -495,7 +495,7 @@ fn server_defined_scalar_field_ast_node(
         indentation_level + 1,
     );
     let is_updatable = matches!(
-        scalar_field_selection.associated_data.selection_variant,
+        scalar_field_selection.scalar_selection_directive_set,
         ScalarSelectionDirectiveSet::Updatable(_)
     );
     let indent_1 = "  ".repeat(indentation_level as usize);
@@ -656,7 +656,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                         let client_field = schema.client_field(client_field_id);
                         match categorize_field_loadability(
                             client_field,
-                            &scalar_field_selection.associated_data.selection_variant,
+                            &scalar_field_selection.scalar_selection_directive_set,
                         ) {
                             Some(Loadability::ImperativelyLoadedField(_)) => {
                                 paths.insert(PathToRefetchField {

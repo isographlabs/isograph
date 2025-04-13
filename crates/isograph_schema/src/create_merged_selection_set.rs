@@ -687,7 +687,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
             SelectionType::Scalar(scalar_field_selection) => {
                 match &scalar_field_selection.associated_data.location {
                     DefinitionLocation::Server(_) => {
-                        match scalar_field_selection.associated_data.selection_variant {
+                        match scalar_field_selection.scalar_selection_directive_set {
                             ScalarSelectionDirectiveSet::Updatable(_) => {
                                 merge_traversal_state.has_updatable = true;
                             }
@@ -709,7 +709,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                         // because this results in an artifact being generated.
                         match categorize_field_loadability(
                             newly_encountered_scalar_client_selectable,
-                            &scalar_field_selection.associated_data.selection_variant,
+                            &scalar_field_selection.scalar_selection_directive_set,
                         ) {
                             Some(Loadability::LoadablySelectedField(_loadable_variant)) => {
                                 create_merged_selection_map_for_field_and_insert_into_global_map(

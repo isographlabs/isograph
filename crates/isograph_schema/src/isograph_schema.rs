@@ -14,9 +14,9 @@ use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDirectiveSet, ClientObjectSelectableId,
     ClientScalarSelectableId, DefinitionLocation, EmptyDirectiveSet, ObjectSelection,
-    ScalarSelection, ScalarSelectionDirectiveSet, SelectionType, SelectionTypeContainingSelections,
-    ServerEntityId, ServerObjectEntityId, ServerObjectSelectableId, ServerScalarEntityId,
-    ServerScalarSelectableId, ServerStrongIdFieldId, VariableDefinition, WithId,
+    ScalarSelection, SelectionType, SelectionTypeContainingSelections, ServerEntityId,
+    ServerObjectEntityId, ServerObjectSelectableId, ServerScalarEntityId, ServerScalarSelectableId,
+    ServerStrongIdFieldId, VariableDefinition, WithId,
 };
 use lazy_static::lazy_static;
 
@@ -714,8 +714,8 @@ pub struct ValidatedObjectSelectionAssociatedData {
 // client field or to a server scalar
 #[derive(Debug, Clone)]
 pub struct ValidatedScalarSelectionAssociatedData {
+    // TODO no need for a wrapper struct here
     pub location: ValidatedFieldDefinitionLocation,
-    pub selection_variant: ScalarSelectionDirectiveSet,
 }
 
 pub type ClientSelectable<'a, TNetworkProtocol> = SelectionType<

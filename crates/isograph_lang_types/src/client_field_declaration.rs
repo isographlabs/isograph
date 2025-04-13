@@ -14,9 +14,9 @@ use crate::{
     ScalarSelectionDirectiveSet, SelectionType,
 };
 
-pub type UnvalidatedSelection = SelectionTypeContainingSelections<ScalarSelectionDirectiveSet, ()>;
+pub type UnvalidatedSelection = SelectionTypeContainingSelections<(), ()>;
 
-pub type UnvalidatedScalarFieldSelection = ScalarSelection<ScalarSelectionDirectiveSet>;
+pub type UnvalidatedScalarFieldSelection = ScalarSelection<()>;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct ClientFieldDeclaration {
@@ -96,6 +96,7 @@ pub struct ScalarSelection<TScalarField> {
     pub reader_alias: Option<WithLocation<SelectableAlias>>,
     pub associated_data: TScalarField,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
+    pub scalar_selection_directive_set: ScalarSelectionDirectiveSet,
 }
 
 impl<TScalarField> ScalarSelection<TScalarField> {
