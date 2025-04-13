@@ -710,8 +710,6 @@ pub struct ValidatedObjectSelectionAssociatedData {
     pub parent_object_entity_id: ServerObjectEntityId,
     pub field_id: DefinitionLocation<ServerObjectSelectableId, ClientObjectSelectableId>,
     pub selection_variant: ObjectSelectionDirectiveSet,
-    /// Some if the (destination?) object is concrete; None otherwise.
-    pub concrete_type: Option<IsographObjectTypeName>,
 }
 
 // TODO this should encode whether the scalar selection points to a

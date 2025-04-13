@@ -909,8 +909,13 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                     parent_map.entry(normalization_key).or_insert_with(|| {
                                         MergedServerSelection::LinkedField(
                                             MergedLinkedFieldSelection {
-                                                concrete_type: object_selection
-                                                    .associated_data
+                                                concrete_type: schema
+                                                    .server_entity_data
+                                                    .server_object_entity(
+                                                        object_selection
+                                                            .associated_data
+                                                            .parent_object_entity_id,
+                                                    )
                                                     .concrete_type,
                                                 name: object_selection.name.item,
                                                 selection_map: BTreeMap::new(),

@@ -371,7 +371,6 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
             parent_object_entity_id: new_parent_object_entity_id,
             field_id: location,
             selection_variant: object_selection.associated_data,
-            concrete_type: new_parent_object.concrete_type,
         },
         arguments: object_selection.arguments,
         selection_set: get_validated_selection_set(
