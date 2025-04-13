@@ -171,7 +171,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
                 SchemaServerObjectSelectableVariant::InlineFragment(_) => {
                     let object = schema
                         .server_entity_data
-                        .server_object_entity(server_field.parent_type_id);
+                        .server_object_entity(server_field.parent_object_entity_id);
 
                     let type_and_field = ObjectTypeAndFieldName {
                         field_name: linked_field.name.item.into(),

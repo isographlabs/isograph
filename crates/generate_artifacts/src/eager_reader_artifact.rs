@@ -31,7 +31,7 @@ use crate::{
 
 pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    selection_type: &ClientSelectable<TNetworkProtocol>,
+    client_selectable: &ClientSelectable<TNetworkProtocol>,
     config: &CompilerConfig,
     info: UserWrittenClientTypeInfo,
     refetched_paths: &RefetchedPathsMap,
@@ -40,16 +40,16 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
 ) -> Vec<ArtifactPathAndContent> {
     let ts_file_extension = file_extensions.ts();
     let user_written_component_variant = info.client_field_directive_set;
-    let parent_type = schema
+    let parent_object_entity = schema
         .server_entity_data
-        .server_object_entity(selection_type.parent_object_entity_id());
+        .server_object_entity(client_selectable.parent_object_entity_id());
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         schema,
-        selection_type.selection_set_for_parent_query(),
+        client_selectable.selection_set_for_parent_query(),
         0,
         refetched_paths,
-        &initial_variable_context(selection_type),
+        &initial_variable_context(client_selectable),
     );
 
     let function_import_statement =
@@ -58,14 +58,19 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
     let reader_import_statement =
         reader_imports_to_import_statement(&reader_imports, file_extensions);
 
-    let reader_param_type = format!("{}__{}__param", parent_type.name, selection_type.name());
+    let reader_param_type = format!(
+        "{}__{}__param",
+        parent_object_entity.name,
+        client_selectable.name()
+    );
 
     let reader_content = if let ClientFieldDirectiveSet::None(_) = user_written_component_variant {
-        let eager_reader_name = format!("{}.{}", parent_type.name, selection_type.name());
+        let eager_reader_name =
+            format!("{}.{}", parent_object_entity.name, client_selectable.name());
         let reader_output_type = format!(
             "{}__{}__output_type",
-            parent_type.name,
-            selection_type.name()
+            parent_object_entity.name,
+            client_selectable.name()
         );
         let param_type_file_name = *RESOLVER_PARAM_TYPE;
         let output_type_file_name = *RESOLVER_OUTPUT_TYPE;
@@ -90,7 +95,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
             "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         )
     } else {
-        let component_name = format!("{}.{}", parent_type.name, selection_type.name());
+        let component_name = format!("{}.{}", parent_object_entity.name, client_selectable.name());
         let param_type_file_name = *RESOLVER_PARAM_TYPE;
         format!(
             "import type {{ComponentReaderArtifact, ExtractSecondParam, \
@@ -118,18 +123,18 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
         file_name: *RESOLVER_READER_FILE_NAME,
         file_content: reader_content,
         type_and_field: Some(ObjectTypeAndFieldName {
-            type_name: parent_type.name,
-            field_name: selection_type.name().into(),
+            type_name: parent_object_entity.name,
+            field_name: client_selectable.name().into(),
         }),
     }];
 
-    if !selection_type.variable_definitions().is_empty() {
+    if !client_selectable.variable_definitions().is_empty() {
         let reader_parameters_type = format!(
             "{}__{}__parameters",
-            parent_type.name,
-            selection_type.name()
+            parent_object_entity.name,
+            client_selectable.name()
         );
-        let parameters = selection_type
+        let parameters = client_selectable
             .variable_definitions()
             .iter()
             .map(|x| &x.item);
@@ -140,8 +145,8 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
             file_name: *RESOLVER_PARAMETERS_TYPE_FILE_NAME,
             file_content: parameters_content,
             type_and_field: Some(ObjectTypeAndFieldName {
-                type_name: parent_type.name,
-                field_name: selection_type.name().into(),
+                type_name: parent_object_entity.name,
+                field_name: client_selectable.name().into(),
             }),
         });
     }
@@ -158,14 +163,11 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
 ) -> ArtifactPathAndContent {
     let server_object_selectable_name = server_object_selectable.name.item;
 
-    let parent_type = schema
+    let parent_object_entity = schema
         .server_entity_data
-        .server_object_entity(server_object_selectable.parent_type_id);
+        .server_object_entity(server_object_selectable.parent_object_entity_id);
 
-    let concrete_type = schema
-        .server_entity_data
-        .server_object_entity(*server_object_selectable.target_object_entity.inner())
-        .name;
+    let concrete_type = parent_object_entity.name;
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         schema,
@@ -181,7 +183,10 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
     let reader_param_type = "{ data: any, parameters: Record<PropertyKey, never> }";
     let reader_output_type = "Link | null";
 
-    let eager_reader_name = format!("{}.{}", parent_type.name, server_object_selectable_name);
+    let eager_reader_name = format!(
+        "{}.{}",
+        parent_object_entity.name, server_object_selectable_name
+    );
 
     let reader_content = format!(
         "import type {{ EagerReaderArtifact, ReaderAst, Link }} from '@isograph/react';\n\
@@ -205,7 +210,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
         file_name: *RESOLVER_READER_FILE_NAME,
         file_content: reader_content,
         type_and_field: Some(ObjectTypeAndFieldName {
-            type_name: parent_type.name,
+            type_name: parent_object_entity.name,
             field_name: server_object_selectable_name.into(),
         }),
     }

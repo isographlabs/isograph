@@ -353,7 +353,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         server_object_selectable: ServerObjectSelectable<TNetworkProtocol>,
     ) -> CreateAdditionalFieldsResult<()> {
         let next_server_object_selectable_id = self.server_object_selectables.len().into();
-        let parent_object_entity_id = server_object_selectable.parent_type_id;
+        let parent_object_entity_id = server_object_selectable.parent_object_entity_id;
         let next_object_name = server_object_selectable.name;
 
         if self

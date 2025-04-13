@@ -33,7 +33,7 @@ pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
 
     pub object_selectable_variant: SchemaServerObjectSelectableVariant,
 
-    pub parent_type_id: ServerObjectEntityId,
+    pub parent_object_entity_id: ServerObjectEntityId,
     pub arguments: Vec<WithLocation<VariableDefinition<ServerEntityId>>>,
     pub phantom_data: PhantomData<TNetworkProtocol>,
 }

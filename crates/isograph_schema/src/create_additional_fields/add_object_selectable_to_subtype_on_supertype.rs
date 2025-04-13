@@ -105,7 +105,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         as_concrete_type_selectable_name,
                         Location::generated(),
                     ),
-                    parent_type_id: *supertype_id,
+                    parent_object_entity_id: *supertype_id,
                     arguments: vec![],
                     target_object_entity: TypeAnnotation::from_graphql_type_annotation(
                         GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(WithSpan::new(
