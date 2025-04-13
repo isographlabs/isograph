@@ -22,10 +22,11 @@ use crate::{
     field_loadability::{categorize_field_loadability, Loadability},
     initial_variable_context, transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context, ClientFieldVariant,
-    ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, ClientSelectableId,
-    ImperativelyLoadedFieldVariant, NameAndArguments, NetworkProtocol, PathToRefetchField,
-    RootOperationName, Schema, SchemaServerObjectSelectableVariant, ServerObjectEntity,
-    ValidatedScalarSelection, ValidatedSelection, VariableContext,
+    ClientOrServerObjectSelectable, ClientScalarOrObjectSelectable, ClientScalarSelectable,
+    ClientSelectable, ClientSelectableId, ImperativelyLoadedFieldVariant, NameAndArguments,
+    NetworkProtocol, PathToRefetchField, RootOperationName, Schema,
+    SchemaServerObjectSelectableVariant, ServerObjectEntity, ValidatedScalarSelection,
+    ValidatedSelection, VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -780,8 +781,10 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                 };
             }
             SelectionType::Object(object_selection) => {
-                let parent_object_entity_id =
-                    object_selection.associated_data.parent_object_entity_id;
+                let parent_object_entity_id = *schema
+                    .object_selectable(object_selection.associated_data.field_id)
+                    .target_object_entity_id()
+                    .inner();
                 let object_selection_parent_object = schema
                     .server_entity_data
                     .server_object_entity(parent_object_entity_id);
@@ -912,9 +915,14 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                                 concrete_type: schema
                                                     .server_entity_data
                                                     .server_object_entity(
-                                                        object_selection
-                                                            .associated_data
-                                                            .parent_object_entity_id,
+                                                        *schema
+                                                            .object_selectable(
+                                                                object_selection
+                                                                    .associated_data
+                                                                    .field_id,
+                                                            )
+                                                            .target_object_entity_id()
+                                                            .inner(),
                                                     )
                                                     .concrete_type,
                                                 name: object_selection.name.item,

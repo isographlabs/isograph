@@ -704,7 +704,6 @@ pub type ObjectSelectableId =
 
 #[derive(Debug, Clone)]
 pub struct ValidatedObjectSelectionAssociatedData {
-    pub parent_object_entity_id: ServerObjectEntityId,
     pub field_id: ObjectSelectableId,
 }
 
