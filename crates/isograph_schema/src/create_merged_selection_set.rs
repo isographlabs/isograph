@@ -811,10 +811,11 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             SelectionType::Object(newly_encountered_client_object_selectable_id),
                         );
                     }
-                    DefinitionLocation::Server(server_field_id) => {
-                        let server_field = schema.server_object_selectable(server_field_id);
+                    DefinitionLocation::Server(server_object_selectable_id) => {
+                        let server_object_selectable =
+                            schema.server_object_selectable(server_object_selectable_id);
 
-                        match &server_field.object_selectable_variant {
+                        match &server_object_selectable.object_selectable_variant {
                             SchemaServerObjectSelectableVariant::InlineFragment(
                                 inline_fragment_variant,
                             ) => {
@@ -873,18 +874,13 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                             variable_context,
                                         );
 
-                                        let server_object_selectable = schema
-                                            .server_object_selectable(
-                                                inline_fragment_variant.server_object_selectable_id,
-                                            );
-
                                         create_merged_selection_map_for_field_and_insert_into_global_map(
                                             schema,
                                             parent_object_entity_id,
                                             parent_object,
                                             &object_selection.selection_set,
                                             encountered_client_field_map,
-                                            DefinitionLocation::Server(inline_fragment_variant.server_object_selectable_id),
+                                            DefinitionLocation::Server(server_object_selectable_id),
                                             &server_object_selectable.initial_variable_context()
                                         );
                                     }

@@ -663,7 +663,6 @@ pub enum SchemaServerObjectSelectableVariant {
 
 #[derive(Debug, Clone)]
 pub struct ServerFieldTypeAssociatedDataInlineFragment {
-    pub server_object_selectable_id: ServerObjectSelectableId,
     pub concrete_type: IsographObjectTypeName,
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 }
