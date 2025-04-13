@@ -424,7 +424,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     pub fn object_selectable(
         &self,
-        field_id: DefinitionLocation<ServerObjectSelectableId, ClientObjectSelectableId>,
+        field_id: ObjectSelectableId,
     ) -> ObjectSelectable<TNetworkProtocol> {
         match field_id {
             DefinitionLocation::Server(server_field_id) => {
@@ -699,10 +699,13 @@ pub type ValidatedUseRefetchFieldStrategy =
 pub type ScalarSelectableId =
     DefinitionLocation<ServerScalarSelectableId, ClientScalarSelectableId>;
 
+pub type ObjectSelectableId =
+    DefinitionLocation<ServerObjectSelectableId, ClientObjectSelectableId>;
+
 #[derive(Debug, Clone)]
 pub struct ValidatedObjectSelectionAssociatedData {
     pub parent_object_entity_id: ServerObjectEntityId,
-    pub field_id: DefinitionLocation<ServerObjectSelectableId, ClientObjectSelectableId>,
+    pub field_id: ObjectSelectableId,
 }
 
 pub type ClientSelectable<'a, TNetworkProtocol> = SelectionType<
