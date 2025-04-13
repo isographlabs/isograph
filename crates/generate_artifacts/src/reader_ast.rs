@@ -54,7 +54,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
             }
         }
         SelectionTypeContainingSelections::Object(linked_field_selection) => {
-            match linked_field_selection.associated_data.field_id {
+            match linked_field_selection.associated_data {
                 DefinitionLocation::Client(client_pointer_id) => {
                     let client_pointer = schema.client_pointer(client_pointer_id);
 
@@ -149,7 +149,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     let indent_1 = "  ".repeat(indentation_level as usize);
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
 
-    let condition = match linked_field.associated_data.field_id {
+    let condition = match linked_field.associated_data {
         DefinitionLocation::Client(client_pointer_id) => {
             let client_pointer = schema.client_pointer(client_pointer_id);
 
@@ -686,7 +686,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                 }
             }
             SelectionTypeContainingSelections::Object(linked_field_selection) => {
-                match linked_field_selection.associated_data.field_id {
+                match linked_field_selection.associated_data {
                     DefinitionLocation::Client(_) => {
                         // Do not recurse into selections of client pointers
                     }

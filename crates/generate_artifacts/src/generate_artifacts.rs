@@ -647,7 +647,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             }
         }
         SelectionTypeContainingSelections::Object(linked_field) => {
-            let field = match linked_field.associated_data.field_id {
+            let field = match linked_field.associated_data {
                 DefinitionLocation::Server(server_object_selectable_id) => {
                     DefinitionLocation::Server(
                         schema.server_object_selectable(server_object_selectable_id),
@@ -840,7 +840,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             }
         }
         SelectionTypeContainingSelections::Object(linked_field) => {
-            let field = schema.object_selectable(linked_field.associated_data.field_id);
+            let field = schema.object_selectable(linked_field.associated_data);
 
             write_optional_description(
                 description(&field),

@@ -684,28 +684,22 @@ pub struct ServerFieldTypeAssociatedDataInlineFragment {
 }
 
 pub type ValidatedSelection =
-    SelectionTypeContainingSelections<ScalarSelectableId, ValidatedObjectSelectionAssociatedData>;
+    SelectionTypeContainingSelections<ScalarSelectableId, ObjectSelectableId>;
 
-pub type ValidatedObjectSelection =
-    ObjectSelection<ScalarSelectableId, ValidatedObjectSelectionAssociatedData>;
+pub type ValidatedObjectSelection = ObjectSelection<ScalarSelectableId, ObjectSelectableId>;
 
 pub type ValidatedScalarSelection = ScalarSelection<ScalarSelectableId>;
 
 pub type ValidatedVariableDefinition = VariableDefinition<ServerEntityId>;
 
 pub type ValidatedUseRefetchFieldStrategy =
-    UseRefetchFieldRefetchStrategy<ScalarSelectableId, ValidatedObjectSelectionAssociatedData>;
+    UseRefetchFieldRefetchStrategy<ScalarSelectableId, ObjectSelectableId>;
 
 pub type ScalarSelectableId =
     DefinitionLocation<ServerScalarSelectableId, ClientScalarSelectableId>;
 
 pub type ObjectSelectableId =
     DefinitionLocation<ServerObjectSelectableId, ClientObjectSelectableId>;
-
-#[derive(Debug, Clone)]
-pub struct ValidatedObjectSelectionAssociatedData {
-    pub field_id: ObjectSelectableId,
-}
 
 pub type ClientSelectable<'a, TNetworkProtocol> = SelectionType<
     &'a ClientScalarSelectable<TNetworkProtocol>,

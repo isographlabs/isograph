@@ -105,7 +105,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                 );
             }
             SelectionType::Object(object_selection) => {
-                let field_argument_definitions = match object_selection.associated_data.field_id {
+                let field_argument_definitions = match object_selection.associated_data {
                     DefinitionLocation::Server(object_selectable_id) => schema
                         .server_object_selectable(object_selectable_id)
                         .arguments

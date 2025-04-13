@@ -68,7 +68,7 @@ impl<TNetworkProtocol: NetworkProtocol> Iterator
                             sub_iterator: None,
                         };
 
-                        match linked_field.associated_data.field_id {
+                        match linked_field.associated_data {
                             DefinitionLocation::Client(client_pointer_id) => {
                                 self.sub_iterator = Some(Box::new(iterator));
                                 self.index += 1;

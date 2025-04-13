@@ -10,8 +10,8 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ClientFieldVariant, NetworkProtocol, RefetchStrategy, ScalarSelectableId,
-    UserWrittenClientPointerInfo, ValidatedObjectSelectionAssociatedData, ValidatedSelection,
+    ClientFieldVariant, NetworkProtocol, ObjectSelectableId, RefetchStrategy, ScalarSelectableId,
+    UserWrittenClientPointerInfo, ValidatedSelection,
 };
 
 pub type ClientSelectableId = SelectionType<ClientScalarSelectableId, ClientObjectSelectableId>;
@@ -27,8 +27,7 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     // None -> not refetchable
     // TODO - this is only used if variant === imperatively loaded field
     // consider moving it into that struct.
-    pub refetch_strategy:
-        Option<RefetchStrategy<ScalarSelectableId, ValidatedObjectSelectionAssociatedData>>,
+    pub refetch_strategy: Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>,
 
     // TODO we should probably model this differently
     pub variant: ClientFieldVariant,
@@ -54,8 +53,7 @@ pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
 
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 
-    pub refetch_strategy:
-        RefetchStrategy<ScalarSelectableId, ValidatedObjectSelectionAssociatedData>,
+    pub refetch_strategy: RefetchStrategy<ScalarSelectableId, ObjectSelectableId>,
 
     pub variable_definitions: Vec<WithSpan<VariableDefinition<ServerEntityId>>>,
 

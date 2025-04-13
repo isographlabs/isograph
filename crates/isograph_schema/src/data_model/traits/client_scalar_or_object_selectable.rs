@@ -4,8 +4,7 @@ use isograph_lang_types::{ServerEntityId, ServerObjectEntityId, VariableDefiniti
 
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, NetworkProtocol,
-    RefetchStrategy, ScalarSelectableId, ValidatedObjectSelectionAssociatedData,
-    ValidatedSelection,
+    ObjectSelectableId, RefetchStrategy, ScalarSelectableId, ValidatedSelection,
 };
 
 #[impl_for_selection_type]
@@ -15,9 +14,7 @@ pub trait ClientScalarOrObjectSelectable {
     fn type_and_field(&self) -> ObjectTypeAndFieldName;
     fn parent_object_entity_id(&self) -> ServerObjectEntityId;
     fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>];
-    fn refetch_strategy(
-        &self,
-    ) -> Option<&RefetchStrategy<ScalarSelectableId, ValidatedObjectSelectionAssociatedData>>;
+    fn refetch_strategy(&self) -> Option<&RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>;
     fn selection_set_for_parent_query(&self) -> &[WithSpan<ValidatedSelection>];
 
     fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityId>>];
@@ -48,9 +45,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         &self.reader_selection_set
     }
 
-    fn refetch_strategy(
-        &self,
-    ) -> Option<&RefetchStrategy<ScalarSelectableId, ValidatedObjectSelectionAssociatedData>> {
+    fn refetch_strategy(&self) -> Option<&RefetchStrategy<ScalarSelectableId, ObjectSelectableId>> {
         self.refetch_strategy.as_ref()
     }
 
@@ -100,9 +95,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         &self.reader_selection_set
     }
 
-    fn refetch_strategy(
-        &self,
-    ) -> Option<&RefetchStrategy<ScalarSelectableId, ValidatedObjectSelectionAssociatedData>> {
+    fn refetch_strategy(&self) -> Option<&RefetchStrategy<ScalarSelectableId, ObjectSelectableId>> {
         Some(&self.refetch_strategy)
     }
 

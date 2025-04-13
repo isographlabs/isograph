@@ -782,14 +782,14 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
             }
             SelectionType::Object(object_selection) => {
                 let parent_object_entity_id = *schema
-                    .object_selectable(object_selection.associated_data.field_id)
+                    .object_selectable(object_selection.associated_data)
                     .target_object_entity_id()
                     .inner();
                 let object_selection_parent_object = schema
                     .server_entity_data
                     .server_object_entity(parent_object_entity_id);
 
-                match object_selection.associated_data.field_id {
+                match object_selection.associated_data {
                     DefinitionLocation::Client(newly_encountered_client_object_selectable_id) => {
                         let newly_encountered_client_object_selectable =
                             schema.client_pointer(newly_encountered_client_object_selectable_id);
@@ -917,9 +917,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                                     .server_object_entity(
                                                         *schema
                                                             .object_selectable(
-                                                                object_selection
-                                                                    .associated_data
-                                                                    .field_id,
+                                                                object_selection.associated_data,
                                                             )
                                                             .target_object_entity_id()
                                                             .inner(),
