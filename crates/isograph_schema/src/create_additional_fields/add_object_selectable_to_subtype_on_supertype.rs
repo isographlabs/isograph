@@ -24,101 +24,108 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     ) -> ProcessTypeDefinitionResult<()> {
         for (subtype_id, supertype_ids) in subtype_to_supertype_map {
             let subtype_entity = self.server_entity_data.server_object_entity(*subtype_id);
-
-            let as_concrete_type_selectable_name =
-                format!("as{}", subtype_entity.name).intern().into();
-
-            let next_server_object_selectable_id = self.server_object_selectables.len().into();
-
-            let typename_selection = WithSpan::new(
-                SelectionTypeContainingSelections::Scalar(ScalarSelection {
-                    arguments: vec![],
-                    scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(
-                        EmptyDirectiveSet {},
-                    ),
-                    associated_data: DefinitionLocation::Server(
-                        *self
-                            .server_entity_data
-                            .server_object_entity_available_selectables
-                            .get(subtype_id)
-                            .expect(
-                                "Expected subtype to exist \
-                                    in server_object_entity_available_selectables",
-                            )
-                            .0
-                            .get(&"__typename".intern().into())
-                            .expect("Expected __typename to exist")
-                            .as_server()
-                            .expect("Expected __typename to be server field")
-                            .as_scalar()
-                            .expect("Expected __typename to be scalar"),
-                    ),
-                    name: WithLocation::new("__typename".intern().into(), Location::generated()),
-                    reader_alias: None,
-                }),
-                Span::todo_generated(),
-            );
-
-            let link_selection = WithSpan::new(
-                SelectionTypeContainingSelections::Scalar(ScalarSelection {
-                    arguments: vec![],
-                    associated_data: DefinitionLocation::Client(
-                        *self
-                            .server_entity_data
-                            .server_object_entity_available_selectables
-                            .get(subtype_id)
-                            .expect(
-                                "Expected subtype to exist \
-                                    in server_object_entity_available_selectables",
-                            )
-                            .0
-                            .get(&(*LINK_FIELD_NAME).into())
-                            .expect("Expected link to exist")
-                            .as_client()
-                            .expect("Expected link to be client field")
-                            .as_scalar()
-                            .expect("Expected lnk to be scalar field"),
-                    ),
-                    scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(
-                        EmptyDirectiveSet {},
-                    ),
-                    name: WithLocation::new((*LINK_FIELD_NAME).into(), Location::generated()),
-                    reader_alias: None,
-                }),
-                Span::todo_generated(),
-            );
-
-            let reader_selection_set = vec![typename_selection, link_selection];
-
-            let server_object_selectable = ServerObjectSelectable {
-                description: Some(
-                    format!("A client pointer for the {} type.", subtype_entity.name)
-                        .intern()
-                        .into(),
-                ),
-                name: WithLocation::new(as_concrete_type_selectable_name, Location::generated()),
-                parent_type_id: *subtype_id,
-                arguments: vec![],
-                target_object_entity: TypeAnnotation::from_graphql_type_annotation(
-                    GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(WithSpan::new(
-                        *subtype_id,
-                        Span::todo_generated(),
-                    ))),
-                ),
-
-                phantom_data: std::marker::PhantomData,
-                object_selectable_variant: SchemaServerObjectSelectableVariant::InlineFragment(
-                    ServerFieldTypeAssociatedDataInlineFragment {
-                        concrete_type: subtype_entity.name,
-                        reader_selection_set,
-                    },
-                ),
-            };
-
-            self.server_object_selectables
-                .push(server_object_selectable);
+            let subtype_entity_name = subtype_entity.name;
 
             for supertype_id in supertype_ids {
+                let as_concrete_type_selectable_name =
+                    format!("as{}", subtype_entity_name).intern().into();
+
+                let next_server_object_selectable_id = self.server_object_selectables.len().into();
+
+                let typename_selection = WithSpan::new(
+                    SelectionTypeContainingSelections::Scalar(ScalarSelection {
+                        arguments: vec![],
+                        scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(
+                            EmptyDirectiveSet {},
+                        ),
+                        associated_data: DefinitionLocation::Server(
+                            *self
+                                .server_entity_data
+                                .server_object_entity_available_selectables
+                                .get(subtype_id)
+                                .expect(
+                                    "Expected subtype to exist \
+                                    in server_object_entity_available_selectables",
+                                )
+                                .0
+                                .get(&"__typename".intern().into())
+                                .expect("Expected __typename to exist")
+                                .as_server()
+                                .expect("Expected __typename to be server field")
+                                .as_scalar()
+                                .expect("Expected __typename to be scalar"),
+                        ),
+                        name: WithLocation::new(
+                            "__typename".intern().into(),
+                            Location::generated(),
+                        ),
+                        reader_alias: None,
+                    }),
+                    Span::todo_generated(),
+                );
+
+                let link_selection = WithSpan::new(
+                    SelectionTypeContainingSelections::Scalar(ScalarSelection {
+                        arguments: vec![],
+                        associated_data: DefinitionLocation::Client(
+                            *self
+                                .server_entity_data
+                                .server_object_entity_available_selectables
+                                .get(subtype_id)
+                                .expect(
+                                    "Expected subtype to exist \
+                                    in server_object_entity_available_selectables",
+                                )
+                                .0
+                                .get(&(*LINK_FIELD_NAME).into())
+                                .expect("Expected link to exist")
+                                .as_client()
+                                .expect("Expected link to be client field")
+                                .as_scalar()
+                                .expect("Expected lnk to be scalar field"),
+                        ),
+                        scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(
+                            EmptyDirectiveSet {},
+                        ),
+                        name: WithLocation::new((*LINK_FIELD_NAME).into(), Location::generated()),
+                        reader_alias: None,
+                    }),
+                    Span::todo_generated(),
+                );
+
+                let reader_selection_set = vec![typename_selection, link_selection];
+
+                let server_object_selectable = ServerObjectSelectable {
+                    description: Some(
+                        format!("A client pointer for the {} type.", subtype_entity_name)
+                            .intern()
+                            .into(),
+                    ),
+                    name: WithLocation::new(
+                        as_concrete_type_selectable_name,
+                        Location::generated(),
+                    ),
+                    parent_type_id: *subtype_id,
+                    arguments: vec![],
+                    target_object_entity: TypeAnnotation::from_graphql_type_annotation(
+                        GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(WithSpan::new(
+                            *subtype_id,
+                            Span::todo_generated(),
+                        ))),
+                    ),
+
+                    phantom_data: std::marker::PhantomData,
+                    object_selectable_variant: SchemaServerObjectSelectableVariant::InlineFragment(
+                        ServerFieldTypeAssociatedDataInlineFragment {
+                            concrete_type: subtype_entity_name,
+                            reader_selection_set,
+                        },
+                    ),
+                };
+
+                self.server_object_selectables
+                    .push(server_object_selectable);
+
                 if self
                     .server_entity_data
                     .server_object_entity_available_selectables
