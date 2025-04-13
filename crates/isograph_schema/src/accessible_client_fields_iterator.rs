@@ -49,7 +49,7 @@ impl<TNetworkProtocol: NetworkProtocol> Iterator
             if let Some(selection) = item {
                 match &selection.item {
                     SelectionTypeContainingSelections::Scalar(scalar) => {
-                        match scalar.associated_data.location {
+                        match scalar.associated_data {
                             DefinitionLocation::Server(_) => {
                                 self.index += 1;
                                 continue 'main_loop;

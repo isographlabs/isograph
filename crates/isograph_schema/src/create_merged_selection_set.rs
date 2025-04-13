@@ -685,7 +685,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
     for validated_selection in validated_selections.iter().filter(filter_id_fields) {
         match &validated_selection.item {
             SelectionType::Scalar(scalar_field_selection) => {
-                match &scalar_field_selection.associated_data.location {
+                match &scalar_field_selection.associated_data {
                     DefinitionLocation::Server(_) => {
                         match scalar_field_selection.scalar_selection_directive_set {
                             ScalarSelectionDirectiveSet::Updatable(_) => {

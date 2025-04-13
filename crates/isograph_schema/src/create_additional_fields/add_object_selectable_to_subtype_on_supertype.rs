@@ -8,8 +8,7 @@ use isograph_lang_types::{
 
 use crate::{
     NetworkProtocol, Schema, SchemaServerObjectSelectableVariant,
-    ServerFieldTypeAssociatedDataInlineFragment, ServerObjectSelectable,
-    ValidatedScalarSelectionAssociatedData, LINK_FIELD_NAME,
+    ServerFieldTypeAssociatedDataInlineFragment, ServerObjectSelectable, LINK_FIELD_NAME,
 };
 use common_lang_types::Location;
 
@@ -36,25 +35,23 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(
                         EmptyDirectiveSet {},
                     ),
-                    associated_data: ValidatedScalarSelectionAssociatedData {
-                        location: DefinitionLocation::Server(
-                            *self
-                                .server_entity_data
-                                .server_object_entity_available_selectables
-                                .get(subtype_id)
-                                .expect(
-                                    "Expected subtype to exist \
+                    associated_data: DefinitionLocation::Server(
+                        *self
+                            .server_entity_data
+                            .server_object_entity_available_selectables
+                            .get(subtype_id)
+                            .expect(
+                                "Expected subtype to exist \
                                     in server_object_entity_available_selectables",
-                                )
-                                .0
-                                .get(&"__typename".intern().into())
-                                .expect("Expected __typename to exist")
-                                .as_server()
-                                .expect("Expected __typename to be server field")
-                                .as_scalar()
-                                .expect("Expected __typename to be scalar"),
-                        ),
-                    },
+                            )
+                            .0
+                            .get(&"__typename".intern().into())
+                            .expect("Expected __typename to exist")
+                            .as_server()
+                            .expect("Expected __typename to be server field")
+                            .as_scalar()
+                            .expect("Expected __typename to be scalar"),
+                    ),
                     name: WithLocation::new("__typename".intern().into(), Location::generated()),
                     reader_alias: None,
                 }),
@@ -64,25 +61,23 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             let link_selection = WithSpan::new(
                 SelectionTypeContainingSelections::Scalar(ScalarSelection {
                     arguments: vec![],
-                    associated_data: ValidatedScalarSelectionAssociatedData {
-                        location: DefinitionLocation::Client(
-                            *self
-                                .server_entity_data
-                                .server_object_entity_available_selectables
-                                .get(subtype_id)
-                                .expect(
-                                    "Expected subtype to exist \
+                    associated_data: DefinitionLocation::Client(
+                        *self
+                            .server_entity_data
+                            .server_object_entity_available_selectables
+                            .get(subtype_id)
+                            .expect(
+                                "Expected subtype to exist \
                                     in server_object_entity_available_selectables",
-                                )
-                                .0
-                                .get(&(*LINK_FIELD_NAME).into())
-                                .expect("Expected link to exist")
-                                .as_client()
-                                .expect("Expected link to be client field")
-                                .as_scalar()
-                                .expect("Expected lnk to be scalar field"),
-                        ),
-                    },
+                            )
+                            .0
+                            .get(&(*LINK_FIELD_NAME).into())
+                            .expect("Expected link to exist")
+                            .as_client()
+                            .expect("Expected link to be client field")
+                            .as_scalar()
+                            .expect("Expected lnk to be scalar field"),
+                    ),
                     scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(
                         EmptyDirectiveSet {},
                     ),

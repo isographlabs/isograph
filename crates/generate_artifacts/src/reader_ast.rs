@@ -32,7 +32,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
 ) -> String {
     match &selection.item {
         SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
-            match scalar_field_selection.associated_data.location {
+            match scalar_field_selection.associated_data {
                 DefinitionLocation::Server(_) => server_defined_scalar_field_ast_node(
                     scalar_field_selection,
                     indentation_level,
@@ -648,7 +648,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
     for selection in selection_set {
         match &selection.item {
             SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
-                match scalar_field_selection.associated_data.location {
+                match scalar_field_selection.associated_data {
                     DefinitionLocation::Server(_) => {
                         // Do nothing, we encountered a server field
                     }

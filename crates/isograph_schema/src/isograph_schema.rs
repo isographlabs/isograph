@@ -683,39 +683,26 @@ pub struct ServerFieldTypeAssociatedDataInlineFragment {
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 }
 
-pub type ValidatedSelection = SelectionTypeContainingSelections<
-    ValidatedScalarSelectionAssociatedData,
-    ValidatedObjectSelectionAssociatedData,
->;
+pub type ValidatedSelection =
+    SelectionTypeContainingSelections<ScalarSelectableId, ValidatedObjectSelectionAssociatedData>;
 
 pub type ValidatedObjectSelection =
-    ObjectSelection<ValidatedScalarSelectionAssociatedData, ValidatedObjectSelectionAssociatedData>;
+    ObjectSelection<ScalarSelectableId, ValidatedObjectSelectionAssociatedData>;
 
-pub type ValidatedScalarSelection = ScalarSelection<ValidatedScalarSelectionAssociatedData>;
+pub type ValidatedScalarSelection = ScalarSelection<ScalarSelectableId>;
 
 pub type ValidatedVariableDefinition = VariableDefinition<ServerEntityId>;
 
-pub type ValidatedUseRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
-    ValidatedScalarSelectionAssociatedData,
-    ValidatedObjectSelectionAssociatedData,
->;
+pub type ValidatedUseRefetchFieldStrategy =
+    UseRefetchFieldRefetchStrategy<ScalarSelectableId, ValidatedObjectSelectionAssociatedData>;
 
-/// The validated defined field that shows up in the TScalarField generic.
-pub type ValidatedFieldDefinitionLocation =
+pub type ScalarSelectableId =
     DefinitionLocation<ServerScalarSelectableId, ClientScalarSelectableId>;
 
 #[derive(Debug, Clone)]
 pub struct ValidatedObjectSelectionAssociatedData {
     pub parent_object_entity_id: ServerObjectEntityId,
     pub field_id: DefinitionLocation<ServerObjectSelectableId, ClientObjectSelectableId>,
-}
-
-// TODO this should encode whether the scalar selection points to a
-// client field or to a server scalar
-#[derive(Debug, Clone)]
-pub struct ValidatedScalarSelectionAssociatedData {
-    // TODO no need for a wrapper struct here
-    pub location: ValidatedFieldDefinitionLocation,
 }
 
 pub type ClientSelectable<'a, TNetworkProtocol> = SelectionType<

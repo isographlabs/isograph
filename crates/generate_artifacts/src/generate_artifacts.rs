@@ -19,10 +19,9 @@ use isograph_lang_types::{
 use isograph_schema::{
     accessible_client_fields, description, output_type_annotation, selection_map_wrapped,
     ClientFieldVariant, ClientScalarSelectable, ClientSelectableId, FieldTraversalResult,
-    NameAndArguments, NetworkProtocol, NormalizationKey, Schema,
-    SchemaServerObjectSelectableVariant, UserWrittenClientTypeInfo,
-    ValidatedScalarSelectionAssociatedData, ValidatedSelection, ValidatedVariableDefinition,
-    WrappedSelectionMapSelection,
+    NameAndArguments, NetworkProtocol, NormalizationKey, ScalarSelectableId, Schema,
+    SchemaServerObjectSelectableVariant, UserWrittenClientTypeInfo, ValidatedSelection,
+    ValidatedVariableDefinition, WrappedSelectionMapSelection,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -605,7 +604,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 ) {
     match &selection.item {
         SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
-            match scalar_field_selection.associated_data.location {
+            match scalar_field_selection.associated_data {
                 DefinitionLocation::Server(server_scalar_selectable_id) => {
                     let field = schema.server_scalar_selectable(server_scalar_selectable_id);
 
@@ -695,7 +694,7 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
     loadable_fields: &mut BTreeSet<ObjectTypeAndFieldName>,
     indentation_level: u8,
     link_fields: &mut bool,
-    scalar_field_selection: &ScalarSelection<ValidatedScalarSelectionAssociatedData>,
+    scalar_field_selection: &ScalarSelection<ScalarSelectableId>,
     client_field_id: ClientScalarSelectableId,
 ) {
     let client_field = schema.client_field(client_field_id);
@@ -779,7 +778,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 ) {
     match &selection.item {
         SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
-            match scalar_field_selection.associated_data.location {
+            match scalar_field_selection.associated_data {
                 DefinitionLocation::Server(server_scalar_selectable_id) => {
                     let field = schema.server_scalar_selectable(server_scalar_selectable_id);
 

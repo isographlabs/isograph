@@ -72,7 +72,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
         client_type.reader_selection_set(),
         &mut |selection| match selection {
             SelectionType::Scalar(scalar_selection) => {
-                let field_argument_definitions = match scalar_selection.associated_data.location {
+                let field_argument_definitions = match scalar_selection.associated_data {
                     DefinitionLocation::Server(s) => schema
                         .server_scalar_selectable(s)
                         .arguments

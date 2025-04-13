@@ -6,11 +6,10 @@ use isograph_lang_types::{
     SelectionType, ServerObjectEntityId, UnvalidatedScalarFieldSelection, UnvalidatedSelection,
 };
 use isograph_schema::{
-    ClientScalarOrObjectSelectable, NetworkProtocol, RefetchStrategy, Schema, ServerObjectEntity,
-    UnprocessedClientFieldItem, UnprocessedClientPointerItem, UnprocessedItem,
+    ClientScalarOrObjectSelectable, NetworkProtocol, RefetchStrategy, ScalarSelectableId, Schema,
+    ServerObjectEntity, UnprocessedClientFieldItem, UnprocessedClientPointerItem, UnprocessedItem,
     UseRefetchFieldRefetchStrategy, ValidatedObjectSelection,
-    ValidatedObjectSelectionAssociatedData, ValidatedScalarSelection,
-    ValidatedScalarSelectionAssociatedData, ValidatedSelection,
+    ValidatedObjectSelectionAssociatedData, ValidatedScalarSelection, ValidatedSelection,
 };
 use thiserror::Error;
 
@@ -194,7 +193,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
             )
         })?;
 
-    let location = match *location {
+    let associated_data = match *location {
         DefinitionLocation::Server(server_selectable_id) => {
             // TODO encode this in types
             if matches!(
@@ -259,7 +258,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
     Ok(ScalarSelection {
         name: scalar_selection.name,
         reader_alias: scalar_selection.reader_alias,
-        associated_data: ValidatedScalarSelectionAssociatedData { location },
+        associated_data,
         scalar_selection_directive_set: scalar_selection.scalar_selection_directive_set,
         arguments: scalar_selection.arguments,
     })
@@ -387,12 +386,7 @@ fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol>(
     selection_parent_object_id: ServerObjectEntityId,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<
-    Option<
-        RefetchStrategy<
-            ValidatedScalarSelectionAssociatedData,
-            ValidatedObjectSelectionAssociatedData,
-        >,
-    >,
+    Option<RefetchStrategy<ScalarSelectableId, ValidatedObjectSelectionAssociatedData>>,
 > {
     match refetch_strategy {
         Some(RefetchStrategy::UseRefetchField(use_refetch_field_strategy)) => Ok(Some(

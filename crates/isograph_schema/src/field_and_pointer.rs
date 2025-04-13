@@ -11,9 +11,8 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ClientFieldVariant, NetworkProtocol, RefetchStrategy, UserWrittenClientPointerInfo,
-    ValidatedObjectSelectionAssociatedData, ValidatedScalarSelectionAssociatedData,
-    ValidatedSelection,
+    ClientFieldVariant, NetworkProtocol, RefetchStrategy, ScalarSelectableId,
+    UserWrittenClientPointerInfo, ValidatedObjectSelectionAssociatedData, ValidatedSelection,
 };
 
 pub type ClientSelectableId = SelectionType<ClientScalarSelectableId, ClientObjectSelectableId>;
@@ -29,12 +28,8 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     // None -> not refetchable
     // TODO - this is only used if variant === imperatively loaded field
     // consider moving it into that struct.
-    pub refetch_strategy: Option<
-        RefetchStrategy<
-            ValidatedScalarSelectionAssociatedData,
-            ValidatedObjectSelectionAssociatedData,
-        >,
-    >,
+    pub refetch_strategy:
+        Option<RefetchStrategy<ScalarSelectableId, ValidatedObjectSelectionAssociatedData>>,
 
     // TODO we should probably model this differently
     pub variant: ClientFieldVariant,
@@ -60,10 +55,8 @@ pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
 
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 
-    pub refetch_strategy: RefetchStrategy<
-        ValidatedScalarSelectionAssociatedData,
-        ValidatedObjectSelectionAssociatedData,
-    >,
+    pub refetch_strategy:
+        RefetchStrategy<ScalarSelectableId, ValidatedObjectSelectionAssociatedData>,
 
     pub variable_definitions: Vec<WithSpan<VariableDefinition<ServerEntityId>>>,
 
@@ -87,12 +80,7 @@ pub trait ClientScalarOrObjectSelectable {
     fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>];
     fn refetch_strategy(
         &self,
-    ) -> Option<
-        &RefetchStrategy<
-            ValidatedScalarSelectionAssociatedData,
-            ValidatedObjectSelectionAssociatedData,
-        >,
-    >;
+    ) -> Option<&RefetchStrategy<ScalarSelectableId, ValidatedObjectSelectionAssociatedData>>;
     fn selection_set_for_parent_query(&self) -> &[WithSpan<ValidatedSelection>];
 
     fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityId>>];
@@ -125,12 +113,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 
     fn refetch_strategy(
         &self,
-    ) -> Option<
-        &RefetchStrategy<
-            ValidatedScalarSelectionAssociatedData,
-            ValidatedObjectSelectionAssociatedData,
-        >,
-    > {
+    ) -> Option<&RefetchStrategy<ScalarSelectableId, ValidatedObjectSelectionAssociatedData>> {
         self.refetch_strategy.as_ref()
     }
 
@@ -182,12 +165,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 
     fn refetch_strategy(
         &self,
-    ) -> Option<
-        &RefetchStrategy<
-            ValidatedScalarSelectionAssociatedData,
-            ValidatedObjectSelectionAssociatedData,
-        >,
-    > {
+    ) -> Option<&RefetchStrategy<ScalarSelectableId, ValidatedObjectSelectionAssociatedData>> {
         Some(&self.refetch_strategy)
     }
 
