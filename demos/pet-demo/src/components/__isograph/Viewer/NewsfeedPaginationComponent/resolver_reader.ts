@@ -2,9 +2,9 @@ import type { EagerReaderArtifact, ReaderAst } from '@isograph/react';
 import { Viewer__NewsfeedPaginationComponent__param } from './param_type';
 import { Viewer__NewsfeedPaginationComponent__output_type } from './output_type';
 import { NewsfeedPaginationComponent as resolver } from '../../../Newsfeed/NewsfeedPagination';
-import AdItem__asAdItem__resolver_reader from '../../AdItem/asAdItem/resolver_reader';
-import BlogItem__asBlogItem__resolver_reader from '../../BlogItem/asBlogItem/resolver_reader';
 import NewsfeedItem__NewsfeedAdOrBlog__resolver_reader from '../../NewsfeedItem/NewsfeedAdOrBlog/resolver_reader';
+import NewsfeedItem__asAdItem__resolver_reader from '../../NewsfeedItem/asAdItem/resolver_reader';
+import NewsfeedItem__asBlogItem__resolver_reader from '../../NewsfeedItem/asBlogItem/resolver_reader';
 
 const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
   {
@@ -30,7 +30,7 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
         fieldName: "asAdItem",
         alias: null,
         arguments: null,
-        condition: AdItem__asAdItem__resolver_reader,
+        condition: NewsfeedItem__asAdItem__resolver_reader,
         isUpdatable: false,
         selections: [
           {
@@ -47,7 +47,7 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
         fieldName: "asBlogItem",
         alias: null,
         arguments: null,
-        condition: BlogItem__asBlogItem__resolver_reader,
+        condition: NewsfeedItem__asBlogItem__resolver_reader,
         isUpdatable: false,
         selections: [
           {
