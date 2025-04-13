@@ -658,12 +658,10 @@ fn add_schema_defined_scalar_type<TNetworkProtocol: NetworkProtocol>(
 #[derive(Debug, Clone)]
 pub enum SchemaServerObjectSelectableVariant {
     LinkedField,
-    InlineFragment(ServerFieldTypeAssociatedDataInlineFragment),
-}
-
-#[derive(Debug, Clone)]
-pub struct ServerFieldTypeAssociatedDataInlineFragment {
-    pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
+    // This is the reader selection set, i.e. the vec![typename, link]
+    // It's very weird to have this here! This is indicative of poor
+    // data modeling.
+    InlineFragment(Vec<WithSpan<ValidatedSelection>>),
 }
 
 pub type ValidatedSelection =

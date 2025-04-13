@@ -1,4 +1,4 @@
-use common_lang_types::{ArtifactPathAndContent, ObjectTypeAndFieldName};
+use common_lang_types::{ArtifactPathAndContent, ObjectTypeAndFieldName, WithSpan};
 use intern::Lookup;
 
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
@@ -6,11 +6,9 @@ use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 use isograph_lang_types::{ClientFieldDirectiveSet, SelectionType};
 use isograph_schema::{
     initial_variable_context, ClientScalarOrObjectSelectable, ClientSelectable, NetworkProtocol,
-    Schema, ServerObjectSelectable,
+    Schema, ServerObjectSelectable, ValidatedSelection,
 };
-use isograph_schema::{
-    RefetchedPathsMap, ServerFieldTypeAssociatedDataInlineFragment, UserWrittenClientTypeInfo,
-};
+use isograph_schema::{RefetchedPathsMap, UserWrittenClientTypeInfo};
 
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
@@ -157,7 +155,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
 pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     server_object_selectable: &ServerObjectSelectable<TNetworkProtocol>,
-    inline_fragment: &ServerFieldTypeAssociatedDataInlineFragment,
+    inline_fragment_reader_selections: &[WithSpan<ValidatedSelection>],
     refetch_paths: &RefetchedPathsMap,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
@@ -171,7 +169,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         schema,
-        &inline_fragment.reader_selection_set,
+        &inline_fragment_reader_selections,
         0,
         refetch_paths,
         &server_object_selectable.initial_variable_context(),

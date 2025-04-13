@@ -7,8 +7,8 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    NetworkProtocol, Schema, SchemaServerObjectSelectableVariant,
-    ServerFieldTypeAssociatedDataInlineFragment, ServerObjectSelectable, LINK_FIELD_NAME,
+    NetworkProtocol, Schema, SchemaServerObjectSelectableVariant, ServerObjectSelectable,
+    LINK_FIELD_NAME,
 };
 use common_lang_types::Location;
 
@@ -116,9 +116,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
                     phantom_data: std::marker::PhantomData,
                     object_selectable_variant: SchemaServerObjectSelectableVariant::InlineFragment(
-                        ServerFieldTypeAssociatedDataInlineFragment {
-                            reader_selection_set,
-                        },
+                        reader_selection_set,
                     ),
                 };
 

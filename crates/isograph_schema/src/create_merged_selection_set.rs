@@ -817,7 +817,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
 
                         match &server_object_selectable.object_selectable_variant {
                             SchemaServerObjectSelectableVariant::InlineFragment(
-                                inline_fragment_variant,
+                                inline_fragment_reader_selections,
                             ) => {
                                 let type_to_refine_to = object_selection_parent_object.name;
                                 let normalization_key =
@@ -858,7 +858,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                             &mut existing_inline_fragment.selection_map,
                                             parent_object_entity_id,
                                             object_selection_parent_object,
-                                            &inline_fragment_variant.reader_selection_set,
+                                            &inline_fragment_reader_selections,
                                             merge_traversal_state,
                                             encountered_client_field_map,
                                             variable_context,
