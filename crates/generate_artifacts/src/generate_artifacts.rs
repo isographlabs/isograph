@@ -679,7 +679,20 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             query_type_declaration.push_str(&format!(
                 "readonly {}: {},\n",
                 name_or_alias,
-                print_javascript_type_declaration(&type_annotation),
+                match field {
+                    DefinitionLocation::Client(client_pointer) => {
+                        loadable_fields.insert(client_pointer.type_and_field);
+
+                        let inner_output_type = print_javascript_type_declaration(&type_annotation);
+
+                        format!(
+                            "LoadableField<{}__param, {inner_output_type}>",
+                            client_pointer.type_and_field.underscore_separated(),
+                        )
+                    }
+                    DefinitionLocation::Server(_) =>
+                        print_javascript_type_declaration(&type_annotation),
+                }
             ));
         }
     }
