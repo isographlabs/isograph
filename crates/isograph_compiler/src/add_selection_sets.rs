@@ -324,12 +324,9 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
             let server_object_selectable =
                 schema.server_object_selectable(server_object_selectable_id);
 
-            let new_parent_object_entity_id =
-                *server_object_selectable.target_object_entity.inner();
-
             (
                 DefinitionLocation::Server(server_object_selectable_id),
-                new_parent_object_entity_id,
+                *server_object_selectable.target_object_entity.inner(),
             )
         }
         DefinitionLocation::Client(client_type) => {
@@ -351,7 +348,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
 
             (
                 DefinitionLocation::Client(client_pointer_id),
-                *client_pointer.to.inner(),
+                *client_pointer.target_object_entity.inner(),
             )
         }
     };

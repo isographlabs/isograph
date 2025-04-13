@@ -194,7 +194,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                             }
                             DefinitionLocation::Client(c) => {
                                 let pointer = self.client_pointer(*c);
-                                pointer.to.inner()
+                                pointer.target_object_entity.inner()
                             }
                         };
 

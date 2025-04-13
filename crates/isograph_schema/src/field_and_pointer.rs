@@ -51,7 +51,7 @@ impl_with_id!(ClientScalarSelectable<TNetworkProtocol: NetworkProtocol>, ClientS
 pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: ClientObjectSelectableName,
-    pub to: TypeAnnotation<ServerObjectEntityId>,
+    pub target_object_entity: TypeAnnotation<ServerObjectEntityId>,
 
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 

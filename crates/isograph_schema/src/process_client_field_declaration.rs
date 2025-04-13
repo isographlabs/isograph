@@ -357,7 +357,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
             parent_object_entity_id,
             refetch_strategy,
-            to: to_object_entity_id,
+            target_object_entity: to_object_entity_id,
             output_format: std::marker::PhantomData,
 
             info: UserWrittenClientPointerInfo {
