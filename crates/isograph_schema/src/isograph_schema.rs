@@ -37,17 +37,6 @@ lazy_static! {
 pub struct RootOperationName(pub String);
 
 /// The in-memory representation of a schema.
-///
-/// The TSchemaValidationState type param varies based on how far along in the
-/// validation pipeline the schema instance is, i.e. validating the schema means
-/// consuming an instance and creating a new instance with another
-/// TSchemaValidationState.
-///
-/// The TNetworkProtocol type param will stay constant as the schema is validated.
-///
-/// Invariant: a schema is append-only, because pointers into the Schema are in the
-/// form of newtype wrappers around u32 indexes (e.g. FieldId, etc.) As a result,
-/// the schema does not support removing items.
 #[derive(Debug)]
 pub struct Schema<TNetworkProtocol: NetworkProtocol> {
     pub server_scalar_selectables: Vec<ServerScalarSelectable<TNetworkProtocol>>,
