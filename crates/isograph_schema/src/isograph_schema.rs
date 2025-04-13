@@ -23,9 +23,10 @@ use lazy_static::lazy_static;
 use crate::{
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectableId,
-    NetworkProtocol, NormalizationKey, ObjectSelectable, ServerEntity, ServerObjectEntity,
-    ServerObjectEntityAvailableSelectables, ServerObjectSelectable, ServerScalarEntity,
-    ServerScalarSelectable, ServerSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
+    NetworkProtocol, NormalizationKey, ObjectSelectable, ObjectSelectableId, ServerEntity,
+    ServerObjectEntity, ServerObjectEntityAvailableSelectables, ServerObjectSelectable,
+    ServerScalarEntity, ServerScalarSelectable, ServerSelectable, ServerSelectableId,
+    UseRefetchFieldRefetchStrategy,
 };
 
 lazy_static! {
@@ -681,9 +682,6 @@ pub type ValidatedUseRefetchFieldStrategy =
 
 pub type ScalarSelectableId =
     DefinitionLocation<ServerScalarSelectableId, ClientScalarSelectableId>;
-
-pub type ObjectSelectableId =
-    DefinitionLocation<ServerObjectSelectableId, ClientObjectSelectableId>;
 
 /// If we have encountered an id field, we can:
 /// - validate that the id field is properly defined, i.e. has type ID!
