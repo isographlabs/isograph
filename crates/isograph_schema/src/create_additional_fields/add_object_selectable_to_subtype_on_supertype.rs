@@ -25,7 +25,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         for (subtype_id, supertype_ids) in subtype_to_supertype_map {
             let subtype_entity = self.server_entity_data.server_object_entity(*subtype_id);
 
-            let field_name = format!("as{}", subtype_entity.name).intern().into();
+            let as_concrete_type_selectable_name =
+                format!("as{}", subtype_entity.name).intern().into();
 
             let next_server_object_selectable_id = self.server_object_selectables.len().into();
 
@@ -95,7 +96,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         .intern()
                         .into(),
                 ),
-                name: WithLocation::new(field_name, Location::generated()),
+                name: WithLocation::new(as_concrete_type_selectable_name, Location::generated()),
                 parent_type_id: *subtype_id,
                 arguments: vec![],
                 target_object_entity: TypeAnnotation::from_graphql_type_annotation(
@@ -126,7 +127,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     .or_default()
                     .0
                     .insert(
-                        field_name.into(),
+                        as_concrete_type_selectable_name.into(),
                         DefinitionLocation::Server(SelectionType::Object(
                             next_server_object_selectable_id,
                         )),
@@ -136,7 +137,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     let supertype = self.server_entity_data.server_object_entity(*supertype_id);
                     return Err(WithLocation::new(
                         CreateAdditionalFieldsError::CompilerCreatedFieldExistsOnType {
-                            field_name: field_name.into(),
+                            field_name: as_concrete_type_selectable_name.into(),
                             parent_type: supertype.name,
                         },
                         Location::generated(),
