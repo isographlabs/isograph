@@ -237,6 +237,19 @@ jobs:
       binary: generate_isograph_fixtures
       params: --dir ./crates/isograph_lang_parser/fixtures/
 
+  build-swc:
+    name: Build swc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: Build swc
+        run: pnpm build-swc
+
   all-checks-passed:
     name: All checks passed
     runs-on: ubuntu-latest

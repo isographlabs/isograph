@@ -16,6 +16,7 @@
     "watch-swc": "bacon -j build-swc -p ./crates/",
     "check-rs": "bacon -j check -p ./crates/",
     "build": "cargo build",
+    "build-swc": "cargo build -p swc_isograph_plugin --release && cd ./libs/isograph-swc-plugin && pnpm cp-wasm",
     "compile-libs": "pnpm turbo compile-libs --log-order=grouped",
     "cross": "cross build",
     "build-json-schema": "./target/debug/build_json_schema",
