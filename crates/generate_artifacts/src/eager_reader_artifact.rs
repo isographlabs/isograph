@@ -151,20 +151,20 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
 
 pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    encountered_server_field: &ServerObjectSelectable<TNetworkProtocol>,
+    server_object_selectable: &ServerObjectSelectable<TNetworkProtocol>,
     inline_fragment: &ServerFieldTypeAssociatedDataInlineFragment,
     refetch_paths: &RefetchedPathsMap,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
-    let field_name = encountered_server_field.name.item;
+    let server_object_selectable_name = server_object_selectable.name.item;
 
     let parent_type = schema
         .server_entity_data
-        .server_object_entity(encountered_server_field.parent_type_id);
+        .server_object_entity(server_object_selectable.parent_type_id);
 
     let concrete_type = schema
         .server_entity_data
-        .server_object_entity(*encountered_server_field.target_object_entity.inner())
+        .server_object_entity(*server_object_selectable.target_object_entity.inner())
         .name;
 
     let (reader_ast, reader_imports) = generate_reader_ast(
@@ -172,7 +172,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
         &inline_fragment.reader_selection_set,
         0,
         refetch_paths,
-        &encountered_server_field.initial_variable_context(),
+        &server_object_selectable.initial_variable_context(),
     );
 
     let reader_import_statement =
@@ -181,7 +181,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
     let reader_param_type = "{ data: any, parameters: Record<PropertyKey, never> }";
     let reader_output_type = "Link | null";
 
-    let eager_reader_name = format!("{}.{}", parent_type.name, field_name);
+    let eager_reader_name = format!("{}.{}", parent_type.name, server_object_selectable_name);
 
     let reader_content = format!(
         "import type {{ EagerReaderArtifact, ReaderAst, Link }} from '@isograph/react';\n\
@@ -206,20 +206,20 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
         file_content: reader_content,
         type_and_field: Some(ObjectTypeAndFieldName {
             type_name: parent_type.name,
-            field_name: field_name.into(),
+            field_name: server_object_selectable_name.into(),
         }),
     }
 }
 
 pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    client_field: &ClientSelectable<TNetworkProtocol>,
+    client_scalar_selectable: &ClientSelectable<TNetworkProtocol>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
     let ts_file_extension = file_extensions.ts();
     let parent_type = schema
         .server_entity_data
-        .server_object_entity(client_field.parent_object_entity_id());
+        .server_object_entity(client_scalar_selectable.parent_object_entity_id());
 
     let mut param_type_imports = BTreeSet::new();
     let mut loadable_fields = BTreeSet::new();
@@ -227,7 +227,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     let mut updatable_fields = false;
     let client_field_parameter_type = generate_client_field_parameter_type(
         schema,
-        client_field.selection_set_for_parent_query(),
+        client_scalar_selectable.selection_set_for_parent_query(),
         &mut param_type_imports,
         &mut loadable_fields,
         1,
@@ -235,7 +235,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     );
     let updatable_data_type = generate_client_field_updatable_data_type(
         schema,
-        client_field.selection_set_for_parent_query(),
+        client_scalar_selectable.selection_set_for_parent_query(),
         &mut param_type_imports,
         &mut loadable_fields,
         1,
@@ -245,7 +245,11 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
 
     let param_type_import_statement =
         param_type_imports_to_import_statement(&param_type_imports, file_extensions);
-    let reader_param_type = format!("{}__{}__param", parent_type.name, client_field.name());
+    let reader_param_type = format!(
+        "{}__{}__param",
+        parent_type.name,
+        client_scalar_selectable.name()
+    );
 
     let link_field_imports = if link_fields {
         "import type { Link } from '@isograph/react';\n".to_string()
@@ -270,9 +274,15 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         "".to_string()
     };
 
-    let (parameters_import, parameters_type) = if !client_field.variable_definitions().is_empty() {
-        let reader_parameters_type =
-            format!("{}__{}__parameters", parent_type.name, client_field.name());
+    let (parameters_import, parameters_type) = if !client_scalar_selectable
+        .variable_definitions()
+        .is_empty()
+    {
+        let reader_parameters_type = format!(
+            "{}__{}__parameters",
+            parent_type.name,
+            client_scalar_selectable.name()
+        );
         (
             format!("import type {{ {reader_parameters_type} }} from './parameters_type{ts_file_extension}';\n"),
             reader_parameters_type,
@@ -308,7 +318,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         file_content: param_type_content,
         type_and_field: Some(ObjectTypeAndFieldName {
             type_name: parent_type.name,
-            field_name: client_field.name().into(),
+            field_name: client_scalar_selectable.name().into(),
         }),
     }
 }

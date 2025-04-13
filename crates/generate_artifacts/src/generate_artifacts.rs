@@ -142,15 +142,15 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
     ) in &encountered_client_type_map
     {
         match encountered_field_id {
-            DefinitionLocation::Server(encountered_server_field_id) => {
-                let encountered_server_field =
-                    schema.server_object_selectable(*encountered_server_field_id);
-                match &encountered_server_field.object_selectable_variant {
+            DefinitionLocation::Server(server_object_selectable_id) => {
+                let server_object_selectable =
+                    schema.server_object_selectable(*server_object_selectable_id);
+                match &server_object_selectable.object_selectable_variant {
                     SchemaServerObjectSelectableVariant::LinkedField => {}
                     SchemaServerObjectSelectableVariant::InlineFragment(inline_fragment) => {
                         path_and_contents.push(generate_eager_reader_condition_artifact(
                             schema,
-                            encountered_server_field,
+                            server_object_selectable,
                             inline_fragment,
                             &traversal_state.refetch_paths,
                             config.options.include_file_extensions_in_import_statements,
@@ -159,16 +159,15 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 }
             }
 
-            DefinitionLocation::Client(SelectionType::Object(encountered_client_pointer_id)) => {
-                let encountered_client_pointer =
-                    schema.client_pointer(*encountered_client_pointer_id);
+            DefinitionLocation::Client(SelectionType::Object(client_object_selectable_id)) => {
+                let client_object_selectable = schema.client_pointer(*client_object_selectable_id);
                 path_and_contents.extend(generate_eager_reader_artifacts(
                     schema,
-                    &SelectionType::Object(encountered_client_pointer),
+                    &SelectionType::Object(client_object_selectable),
                     config,
                     UserWrittenClientTypeInfo {
-                        const_export_name: encountered_client_pointer.info.const_export_name,
-                        file_path: encountered_client_pointer.info.file_path,
+                        const_export_name: client_object_selectable.info.const_export_name,
+                        file_path: client_object_selectable.info.file_path,
                         client_field_directive_set: ClientFieldDirectiveSet::None(
                             EmptyDirectiveSet {},
                         ),
@@ -178,15 +177,15 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     traversal_state.has_updatable,
                 ));
             }
-            DefinitionLocation::Client(SelectionType::Scalar(encountered_client_field_id)) => {
-                let encountered_client_field = schema.client_field(*encountered_client_field_id);
+            DefinitionLocation::Client(SelectionType::Scalar(client_scalar_selectable_id)) => {
+                let client_scalar_selectable = schema.client_field(*client_scalar_selectable_id);
 
-                match &encountered_client_field.variant {
+                match &client_scalar_selectable.variant {
                     ClientFieldVariant::Link => (),
                     ClientFieldVariant::UserWritten(info) => {
                         path_and_contents.extend(generate_eager_reader_artifacts(
                             schema,
-                            &SelectionType::Scalar(encountered_client_field),
+                            &SelectionType::Scalar(client_scalar_selectable),
                             config,
                             *info,
                             &traversal_state.refetch_paths,
@@ -197,7 +196,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                         if *was_ever_selected_loadably {
                             path_and_contents.push(generate_refetch_reader_artifact(
                                 schema,
-                                encountered_client_field,
+                                client_scalar_selectable,
                                 None,
                                 &traversal_state.refetch_paths,
                                 true,
@@ -211,12 +210,12 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                             };
 
                             let type_to_refine_to = schema.server_entity_data.server_object_entity(
-                                encountered_client_field.parent_object_entity_id,
+                                client_scalar_selectable.parent_object_entity_id,
                             );
 
                             if schema
                                 .fetchable_types
-                                .contains_key(&encountered_client_field.parent_object_entity_id)
+                                .contains_key(&client_scalar_selectable.parent_object_entity_id)
                             {
                                 panic!("Loadable fields on root objects are not yet supported");
                             }
@@ -248,7 +247,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 )),
                                 default_value: None,
                             };
-                            let variable_definitions_iter = encountered_client_field
+                            let variable_definitions_iter = client_scalar_selectable
                                 .variable_definitions
                                 .iter()
                                 .map(|variable_definition| &variable_definition.item)
@@ -276,7 +275,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                             path_and_contents.extend(
                                 generate_entrypoint_artifacts_with_client_field_traversal_result(
                                     schema,
-                                    encountered_client_field,
+                                    client_scalar_selectable,
                                     &wrapped_map,
                                     &traversal_state,
                                     &encountered_client_type_map,
@@ -290,7 +289,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     ClientFieldVariant::ImperativelyLoadedField(variant) => {
                         path_and_contents.push(generate_refetch_reader_artifact(
                             schema,
-                            encountered_client_field,
+                            client_scalar_selectable,
                             variant.primary_field_info.as_ref(),
                             &traversal_state.refetch_paths,
                             false,
