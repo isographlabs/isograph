@@ -16,6 +16,11 @@ use crate::{
 
 pub type ClientSelectableId = SelectionType<ClientScalarSelectableId, ClientObjectSelectableId>;
 
+pub type ClientSelectable<'a, TNetworkProtocol> = SelectionType<
+    &'a ClientScalarSelectable<TNetworkProtocol>,
+    &'a ClientObjectSelectable<TNetworkProtocol>,
+>;
+
 /// The struct formally known as a client field, and declared with the field keyword
 /// in iso literals.
 #[derive(Debug)]

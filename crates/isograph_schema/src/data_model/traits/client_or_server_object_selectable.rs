@@ -1,8 +1,13 @@
 use common_lang_types::{DescriptionValue, ObjectSelectableName};
 use impl_base_types_macro::impl_for_definition_location;
-use isograph_lang_types::{ServerObjectEntityId, TypeAnnotation};
+use isograph_lang_types::{DefinitionLocation, ServerObjectEntityId, TypeAnnotation};
 
 use crate::{ClientObjectSelectable, NetworkProtocol, ServerObjectSelectable};
+
+pub type ObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
+    &'a ServerObjectSelectable<TNetworkProtocol>,
+    &'a ClientObjectSelectable<TNetworkProtocol>,
+>;
 
 #[impl_for_definition_location]
 pub trait ClientOrServerObjectSelectable {

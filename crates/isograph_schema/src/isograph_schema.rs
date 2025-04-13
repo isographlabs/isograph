@@ -23,7 +23,7 @@ use lazy_static::lazy_static;
 use crate::{
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectableId,
-    NetworkProtocol, NormalizationKey, ServerEntity, ServerObjectEntity,
+    NetworkProtocol, NormalizationKey, ObjectSelectable, ServerEntity, ServerObjectEntity,
     ServerObjectEntityAvailableSelectables, ServerObjectSelectable, ServerScalarEntity,
     ServerScalarSelectable, ServerSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
 };
@@ -225,11 +225,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         Ok(WithId::new(current_object_id, current_entity))
     }
 }
-
-pub type ObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
-    &'a ServerObjectSelectable<TNetworkProtocol>,
-    &'a ClientObjectSelectable<TNetworkProtocol>,
->;
 
 #[derive(Debug)]
 pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
@@ -700,11 +695,6 @@ pub type ScalarSelectableId =
 
 pub type ObjectSelectableId =
     DefinitionLocation<ServerObjectSelectableId, ClientObjectSelectableId>;
-
-pub type ClientSelectable<'a, TNetworkProtocol> = SelectionType<
-    &'a ClientScalarSelectable<TNetworkProtocol>,
-    &'a ClientObjectSelectable<TNetworkProtocol>,
->;
 
 /// If we have encountered an id field, we can:
 /// - validate that the id field is properly defined, i.e. has type ID!
