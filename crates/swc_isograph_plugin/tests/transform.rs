@@ -5,7 +5,7 @@ use std::{
 };
 use swc_ecma_parser::{EsConfig, Syntax};
 use swc_ecma_transforms_testing::{test_fixture, FixtureTestConfig};
-use swc_isograph::compile_iso_literal_visitor;
+use swc_isograph_plugin::compile_iso_literal_visitor;
 
 #[testing::fixture("tests/fixtures/base/*/input.js")]
 fn run(input: PathBuf) {

@@ -11,21 +11,24 @@ license = { workspace = true }
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-common_lang_types = { path = "../common_lang_types" }
+anyhow = { workspace = true }
 isograph_config = { path = "../isograph_config" }
-intern = { path = "../../relay-crates/intern" }
-once_cell = "1.8.0"
+once_cell = { workspace = true }
+pathdiff = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-swc_common = { version = "0.33.17", features = ["concurrent"] }
-swc_core = { version = "0.90.6", features = ["ecma_plugin_transform"] }
-swc_ecma_ast = "0.112.2"
-swc_ecma_utils = "0.127.3"
-swc_ecma_visit = "0.98.2"
-swc_isograph = { path = "./transform" }
-swc_plugin_macro = "0.9.16"
+swc_atoms = { workspace = true }
+swc_core = { workspace = true, features = ["ecma_plugin_transform"] }
+swc_ecma_utils = { workspace = true }
+swc_trace_macro = { workspace = true }
+thiserror =  { workspace = true }
 tracing = { workspace = true, features = ["release_max_level_off"] }
+
+[dev-dependencies]
+swc_ecma_parser =  { workspace = true }
+swc_ecma_transforms_testing =  { workspace = true }
+testing =  { workspace = true }
 
 [profile.release]
 codegen-units = 1

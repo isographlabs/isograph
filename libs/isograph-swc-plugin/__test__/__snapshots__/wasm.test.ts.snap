@@ -1,13 +1,5 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`Should load swc-plugin-isograph wasm plugin correctly > Should transform should_preserve_function_calls_when_iso_applied correctly 1`] = `
-"export const HomeRoute = function HomeRouteComponent({ data }) {
-    const { fragmentReference, loadFragmentReference } = useImperativeReference(require("../../__isograph/Query/PetFavoritePhrase/entrypoint.ts").default);
-    return "Render";
-};
-"
-`;
-
 exports[`Should load swc-plugin-isograph wasm plugin correctly > Should transform should_return_an_identity_for_non_called_iso_function correctly 1`] = `
 "export const HomeRoute = (x)=>x;
 "
@@ -23,5 +15,13 @@ function test() {
 
 exports[`Should load swc-plugin-isograph wasm plugin correctly > Should transform should_transform_iso_fn_to_a_require_call correctly 1`] = `
 "const { fragmentReference } = useLazyReference(require("../../__isograph/Query/HomeRoute/entrypoint.ts").default, {});
+"
+`;
+
+exports[`Should load swc-plugin-isograph wasm plugin correctly > Should transform should_transform_nested_calls_to_iso correctly 1`] = `
+"export const HomeRoute = function HomeRouteComponent({ data }) {
+    const { fragmentReference, loadFragmentReference } = useImperativeReference(require("../../__isograph/Query/PetFavoritePhrase/entrypoint.ts").default);
+    return "Render";
+};
 "
 `;

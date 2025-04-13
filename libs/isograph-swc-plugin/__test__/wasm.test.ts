@@ -79,7 +79,7 @@ async function walkDir(
 describe('Should load swc-plugin-isograph wasm plugin correctly', async () => {
   await walkDir(
     new URL(
-      '../../../crates/swc_isograph_plugin/transform/tests/fixtures/base',
+      '../../../crates/swc_isograph_plugin/tests/fixtures/base',
       // @ts-ignore
       import.meta.url,
     ),

@@ -8,7 +8,8 @@
   "license": "MIT",
   "scripts": {
     "prepack": "cp ../../target/wasm32-wasip1/release/swc_isograph_plugin.wasm ../../libs/isograph-swc-plugin/",
-    "debug": "cd ../../crates/swc_isograph_plugin && cargo build -p swc_isograph_plugin  --target wasm32-wasip1 && cp ../../target/wasm32-wasip1/debug/swc_isograph_plugin.wasm ../../libs/isograph-swc-plugin/",
+    "build": "cd ../../crates/swc_isograph_plugin && cargo build --release -p swc_isograph_plugin  --target wasm32-wasip1 && cp ../../target/wasm32-wasip1/release/swc_isograph_plugin.wasm ../../libs/isograph-swc-plugin/",
+    "build:debug": "cd ../../crates/swc_isograph_plugin && cargo build -p swc_isograph_plugin  --target wasm32-wasip1 && cp ../../target/wasm32-wasip1/debug/swc_isograph_plugin.wasm ../../libs/isograph-swc-plugin/",
     "test": "vitest run"
   },
   "repository": {

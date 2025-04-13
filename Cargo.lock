@@ -2684,7 +2684,6 @@ dependencies = [
  "swc_atoms",
  "swc_common",
  "swc_ecma_ast",
- "swc_ecma_quote_macros",
  "swc_ecma_transforms_base",
  "swc_ecma_transforms_testing",
  "swc_ecma_visit",
@@ -2764,23 +2763,6 @@ dependencies = [
  "swc_ecma_ast",
  "tracing",
  "typed-arena",
-]
-
-[[package]]
-name = "swc_ecma_quote_macros"
-version = "0.54.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49a0e789f5cced50904847f0fefef0f416156c12f0e0cf8b054f6fba6233023a"
-dependencies = [
- "anyhow",
- "proc-macro2",
- "quote",
- "swc_atoms",
- "swc_common",
- "swc_ecma_ast",
- "swc_ecma_parser",
- "swc_macros_common",
- "syn 2.0.98",
 ]
 
 [[package]]
@@ -2902,12 +2884,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "swc_isograph"
+name = "swc_isograph_plugin"
 version = "0.3.1"
 dependencies = [
  "anyhow",
- "common_lang_types",
- "intern",
  "isograph_config",
  "once_cell",
  "pathdiff",
@@ -2915,37 +2895,13 @@ dependencies = [
  "serde",
  "serde_json",
  "swc_atoms",
- "swc_common",
  "swc_core",
- "swc_ecma_ast",
  "swc_ecma_parser",
  "swc_ecma_transforms_testing",
  "swc_ecma_utils",
- "swc_ecma_visit",
  "swc_trace_macro 2.0.0",
  "testing",
  "thiserror",
- "tracing",
-]
-
-[[package]]
-name = "swc_isograph_plugin"
-version = "0.3.1"
-dependencies = [
- "common_lang_types",
- "intern",
- "isograph_config",
- "once_cell",
- "regex",
- "serde",
- "serde_json",
- "swc_common",
- "swc_core",
- "swc_ecma_ast",
- "swc_ecma_utils",
- "swc_ecma_visit",
- "swc_isograph",
- "swc_plugin_macro",
  "tracing",
 ]
 

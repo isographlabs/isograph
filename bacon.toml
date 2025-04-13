@@ -122,7 +122,7 @@ b = "job:build"
 
 [jobs.build-swc]
 command = [
-	"cargo", "build", "-p", "swc_isograph_plugin", "--release", "--target", "wasm32-wasip1",
+	"cargo", "build", "-p", "swc_isograph_plugin", "--release",
 	"--color", "always",
 ]
 need_stdout = false
