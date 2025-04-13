@@ -161,7 +161,11 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
     let parent_type = schema
         .server_entity_data
         .server_object_entity(encountered_server_field.parent_type_id);
-    let concrete_type = inline_fragment.concrete_type;
+
+    let concrete_type = schema
+        .server_entity_data
+        .server_object_entity(*encountered_server_field.target_object_entity.inner())
+        .name;
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         schema,

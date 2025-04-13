@@ -117,7 +117,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     phantom_data: std::marker::PhantomData,
                     object_selectable_variant: SchemaServerObjectSelectableVariant::InlineFragment(
                         ServerFieldTypeAssociatedDataInlineFragment {
-                            concrete_type: subtype_entity_name,
                             reader_selection_set,
                         },
                     ),
