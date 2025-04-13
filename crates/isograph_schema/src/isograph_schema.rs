@@ -14,10 +14,9 @@ use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDirectiveSet, ClientObjectSelectableId,
     ClientScalarSelectableId, DefinitionLocation, EmptyDirectiveSet, ObjectSelection,
-    ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet, SelectionType,
-    SelectionTypeContainingSelections, ServerEntityId, ServerObjectEntityId,
-    ServerObjectSelectableId, ServerScalarEntityId, ServerScalarSelectableId,
-    ServerStrongIdFieldId, VariableDefinition, WithId,
+    ScalarSelection, ScalarSelectionDirectiveSet, SelectionType, SelectionTypeContainingSelections,
+    ServerEntityId, ServerObjectEntityId, ServerObjectSelectableId, ServerScalarEntityId,
+    ServerScalarSelectableId, ServerStrongIdFieldId, VariableDefinition, WithId,
 };
 use lazy_static::lazy_static;
 
@@ -709,7 +708,6 @@ pub type ValidatedFieldDefinitionLocation =
 pub struct ValidatedObjectSelectionAssociatedData {
     pub parent_object_entity_id: ServerObjectEntityId,
     pub field_id: DefinitionLocation<ServerObjectSelectableId, ClientObjectSelectableId>,
-    pub selection_variant: ObjectSelectionDirectiveSet,
 }
 
 // TODO this should encode whether the scalar selection points to a

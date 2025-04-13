@@ -96,9 +96,7 @@ Ok(
                                             ),
                                         },
                                         reader_alias: None,
-                                        associated_data: None(
-                                            EmptyDirectiveSet,
-                                        ),
+                                        associated_data: (),
                                         selection_set: [
                                             WithSpan {
                                                 item: Scalar(
@@ -142,6 +140,9 @@ Ok(
                                             },
                                         ],
                                         arguments: [],
+                                        object_selection_directive_set: None(
+                                            EmptyDirectiveSet,
+                                        ),
                                     },
                                 ),
                                 span: Span {
@@ -178,9 +179,7 @@ Ok(
                                             ),
                                         },
                                         reader_alias: None,
-                                        associated_data: None(
-                                            EmptyDirectiveSet,
-                                        ),
+                                        associated_data: (),
                                         selection_set: [
                                             WithSpan {
                                                 item: Scalar(
@@ -224,6 +223,9 @@ Ok(
                                             },
                                         ],
                                         arguments: [],
+                                        object_selection_directive_set: None(
+                                            EmptyDirectiveSet,
+                                        ),
                                     },
                                 ),
                                 span: Span {
@@ -500,9 +502,7 @@ Ok(
                                             ),
                                         },
                                         reader_alias: None,
-                                        associated_data: None(
-                                            EmptyDirectiveSet,
-                                        ),
+                                        associated_data: (),
                                         selection_set: [
                                             WithSpan {
                                                 item: Scalar(
@@ -546,6 +546,9 @@ Ok(
                                             },
                                         ],
                                         arguments: [],
+                                        object_selection_directive_set: None(
+                                            EmptyDirectiveSet,
+                                        ),
                                     },
                                 ),
                                 span: Span {

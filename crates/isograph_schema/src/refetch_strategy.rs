@@ -3,12 +3,12 @@ use std::{collections::BTreeSet, fmt::Debug};
 use common_lang_types::{Location, Span, VariableName, WithLocation, WithSpan};
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    EmptyDirectiveSet, ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
+    EmptyDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
     SelectionTypeContainingSelections, ServerObjectEntityId,
 };
 
 use crate::{
-    get_reachable_variables, selection_map_wrapped, MergedSelectionMap,
+    get_reachable_variables, selection_map_wrapped, MergedSelectionMap, UnprocessedSelection,
     WrappedSelectionMapSelection,
 };
 
@@ -130,9 +130,7 @@ impl GenerateRefetchQueryFn for GenerateRefetchQueryImpl {
     }
 }
 
-pub fn id_selection() -> WithSpan<
-    SelectionTypeContainingSelections<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
-> {
+pub fn id_selection() -> UnprocessedSelection {
     WithSpan::new(
         SelectionTypeContainingSelections::Scalar(ScalarSelection {
             name: WithLocation::new("id".intern().into(), Location::generated()),

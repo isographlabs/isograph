@@ -191,7 +191,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     };
 
     let is_updatable = matches!(
-        linked_field.associated_data.selection_variant,
+        linked_field.object_selection_directive_set,
         ObjectSelectionDirectiveSet::Updatable(_)
     );
 

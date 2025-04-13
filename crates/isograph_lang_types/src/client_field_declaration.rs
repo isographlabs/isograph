@@ -14,8 +14,7 @@ use crate::{
     ScalarSelectionDirectiveSet, SelectionType,
 };
 
-pub type UnvalidatedSelection =
-    SelectionTypeContainingSelections<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>;
+pub type UnvalidatedSelection = SelectionTypeContainingSelections<ScalarSelectionDirectiveSet, ()>;
 
 pub type UnvalidatedScalarFieldSelection = ScalarSelection<ScalarSelectionDirectiveSet>;
 
@@ -114,6 +113,7 @@ pub struct ObjectSelection<TScalar, TLinked> {
     pub associated_data: TLinked,
     pub selection_set: Vec<WithSpan<SelectionTypeContainingSelections<TScalar, TLinked>>>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
+    pub object_selection_directive_set: ObjectSelectionDirectiveSet,
 }
 
 impl<TScalarField, TLinkedField> ObjectSelection<TScalarField, TLinkedField> {

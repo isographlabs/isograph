@@ -2,9 +2,8 @@ use common_lang_types::{
     IsographObjectTypeName, Location, SelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use isograph_lang_types::{
-    DefinitionLocation, ObjectSelection, ObjectSelectionDirectiveSet, ScalarSelection,
-    ScalarSelectionDirectiveSet, SelectionType, ServerObjectEntityId,
-    UnvalidatedScalarFieldSelection, UnvalidatedSelection,
+    DefinitionLocation, ObjectSelection, ScalarSelection, ScalarSelectionDirectiveSet,
+    SelectionType, ServerObjectEntityId, UnvalidatedScalarFieldSelection, UnvalidatedSelection,
 };
 use isograph_schema::{
     ClientScalarOrObjectSelectable, NetworkProtocol, RefetchStrategy, Schema, ServerObjectEntity,
@@ -273,7 +272,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
     selection_parent_object_id: ServerObjectEntityId,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
-    object_selection: ObjectSelection<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
+    object_selection: ObjectSelection<ScalarSelectionDirectiveSet, ()>,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<ValidatedObjectSelection> {
     let location = schema
         .server_entity_data
@@ -367,10 +366,10 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     Ok(ObjectSelection {
         name: object_selection.name,
         reader_alias: object_selection.reader_alias,
+        object_selection_directive_set: object_selection.object_selection_directive_set,
         associated_data: ValidatedObjectSelectionAssociatedData {
             parent_object_entity_id: new_parent_object_entity_id,
             field_id: location,
-            selection_variant: object_selection.associated_data,
         },
         arguments: object_selection.arguments,
         selection_set: get_validated_selection_set(
@@ -385,9 +384,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
 
 fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    refetch_strategy: Option<
-        RefetchStrategy<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
-    >,
+    refetch_strategy: Option<RefetchStrategy<ScalarSelectionDirectiveSet, ()>>,
     parent_object: &ServerObjectEntity<TNetworkProtocol>,
     selection_parent_object_id: ServerObjectEntityId,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,

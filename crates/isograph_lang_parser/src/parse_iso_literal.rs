@@ -441,8 +441,8 @@ fn parse_selection(
 
         let selection = match selection_set {
             Some(selection_set) => {
-                let associated_data =
-                    from_isograph_field_directives(&directives).map_err(|message| {
+                let object_selection_directive_set = from_isograph_field_directives(&directives)
+                    .map_err(|message| {
                         WithSpan::new(
                             IsographLiteralParseError::UnableToDeserializeDirectives { message },
                             directives
@@ -455,9 +455,10 @@ fn parse_selection(
                     name: field_name.map(|string_key| string_key.into()),
                     reader_alias: alias
                         .map(|with_span| with_span.map(|string_key| string_key.into())),
-                    associated_data,
+                    object_selection_directive_set,
                     selection_set,
                     arguments,
+                    associated_data: (),
                 })
             }
             None => {

@@ -863,7 +863,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 )
             });
 
-            match linked_field.associated_data.selection_variant {
+            match linked_field.object_selection_directive_set {
                 ObjectSelectionDirectiveSet::Updatable(_) => {
                     *updatable_fields = true;
                     write_getter_and_setter(

@@ -10,9 +10,8 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientFieldDirectiveSet, ClientObjectSelectableId,
     ClientPointerDeclaration, ClientScalarSelectableId, DefinitionLocation, DeserializationError,
-    NonConstantValue, ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionType,
-    SelectionTypeContainingSelections, ServerEntityId, ServerObjectEntityId, TypeAnnotation,
-    VariableDefinition,
+    NonConstantValue, ScalarSelectionDirectiveSet, SelectionType, ServerEntityId,
+    ServerObjectEntityId, TypeAnnotation, UnvalidatedSelection, VariableDefinition,
 };
 
 use thiserror::Error;
@@ -23,15 +22,12 @@ use crate::{
     WrappedSelectionMapSelection, NODE_FIELD_NAME,
 };
 
-pub type UnprocessedSelection = WithSpan<
-    SelectionTypeContainingSelections<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
->;
+pub type UnprocessedSelection = WithSpan<UnvalidatedSelection>;
 
 pub struct UnprocessedClientFieldItem {
     pub client_field_id: ClientScalarSelectableId,
     pub reader_selection_set: Vec<UnprocessedSelection>,
-    pub refetch_strategy:
-        Option<RefetchStrategy<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>>,
+    pub refetch_strategy: Option<RefetchStrategy<ScalarSelectionDirectiveSet, ()>>,
 }
 pub struct UnprocessedClientPointerItem {
     pub client_pointer_id: ClientObjectSelectableId,
