@@ -469,13 +469,16 @@ pub struct PrimaryFieldInfo {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ImperativelyLoadedFieldVariant {
     /// The arguments we must pass to the top level schema field, e.g. id: ID!
-    /// for node(id: $id)
+    /// for node(id: $id). These are already encoded in the subfields_or_inline_fragments,
+    /// but we nonetheless need to put them into the query definition. (Or we could perhaps
+    /// calculate that by calculating reachable variables.)
     pub top_level_schema_field_arguments: Vec<VariableDefinition<ServerEntityId>>,
 
     /// If we need to select a sub-field, this is Some(...). We should model
     /// this differently, this is very awkward!
     pub primary_field_info: Option<PrimaryFieldInfo>,
 
+    // Mutation or Query or whatnot. Awkward! A GraphQL-ism!
     pub root_object_entity_id: ServerObjectEntityId,
 
     // Excluding an initial (inner) inline fragment, if the actual concrete type differs
