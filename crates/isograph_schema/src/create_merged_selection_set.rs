@@ -24,7 +24,7 @@ use crate::{
     transform_name_and_arguments_with_child_variable_context, ClientFieldVariant,
     ClientOrServerObjectSelectable, ClientScalarOrObjectSelectable, ClientScalarSelectable,
     ClientSelectable, ClientSelectableId, ImperativelyLoadedFieldVariant, NameAndArguments,
-    NetworkProtocol, PathToRefetchField, RootOperationName, Schema,
+    NetworkProtocol, PathToRefetchField, PrimaryFieldInfo, RootOperationName, Schema,
     SchemaServerObjectSelectableVariant, ServerObjectEntity, ServerObjectSelectable,
     ValidatedScalarSelection, ValidatedSelection, VariableContext,
 };
@@ -495,6 +495,7 @@ pub fn get_reachable_variables(selection_map: &MergedSelectionMap) -> BTreeSet<V
 fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     variant: ImperativelyLoadedFieldVariant,
+    // ID of e.g. Pet, Checkin, etc. i.e. the field on which e.g. __refetch or make_super is selected
     refetch_field_parent_id: ServerObjectEntityId,
     selection_map: &MergedSelectionMap,
     entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
@@ -518,62 +519,28 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
     let mut definitions_of_used_variables =
         get_used_variable_definitions(reachable_variables, client_field);
 
-    let maybe_inline_fragment = if primary_field_info
-        .as_ref()
-        .map(|x| x.primary_field_return_type_object_entity_id != refetch_field_parent_id)
-        .unwrap_or(true)
-    {
-        Some(WrappedSelectionMapSelection::InlineFragment(
-            refetch_field_parent_type.name,
-        ))
-    } else {
-        None
-    };
+    for variable_definition in top_level_schema_field_arguments.iter() {
+        definitions_of_used_variables.push(WithSpan {
+            item: VariableDefinition {
+                name: variable_definition.name,
+                type_: variable_definition.type_.clone(),
+                default_value: variable_definition.default_value.clone(),
+            },
+            span: Span::todo_generated(),
+        });
+    }
 
-    let top_level_schema_field_arguments = top_level_schema_field_arguments
-        .iter()
-        // TODO don't clone
-        .cloned()
-        .map(|variable_definition| {
-            let variable_name = variable_definition.name;
-            definitions_of_used_variables.push(WithSpan {
-                item: VariableDefinition {
-                    name: variable_name,
-                    type_: variable_definition.type_,
-                    default_value: variable_definition.default_value,
-                },
-                span: Span::todo_generated(),
-            });
-
-            ArgumentKeyAndValue {
-                key: variable_definition.name.item.unchecked_conversion(),
-                value: NonConstantValue::Variable(variable_definition.name.item),
-            }
-        })
-        .collect();
-
-    // TODO consider wrapping this when we first create the RootRefetchedPath?
-    let wrapped_selection_map = selection_map_wrapped(
-        selection_map.clone(),
-        vec![
-            maybe_inline_fragment,
-            primary_field_info.as_ref().map(|primary_field| {
-                WrappedSelectionMapSelection::LinkedField {
-                    server_object_selectable_name: primary_field.primary_field_name,
-                    arguments: vec![],
-                    concrete_type: primary_field.primary_field_concrete_type,
-                }
-            }),
-            Some(WrappedSelectionMapSelection::LinkedField {
-                server_object_selectable_name: top_level_schema_field_name,
-                arguments: top_level_schema_field_arguments,
-                concrete_type: top_level_schema_field_concrete_type,
-            }),
-        ]
-        .into_iter()
-        .flatten()
-        .collect(),
+    let subfields_or_inline_fragments = imperative_field_subfields_or_inline_fragments(
+        refetch_field_parent_id,
+        refetch_field_parent_type.name,
+        top_level_schema_field_name,
+        top_level_schema_field_arguments,
+        top_level_schema_field_concrete_type,
+        &primary_field_info,
     );
+
+    let wrapped_selection_map =
+        selection_map_wrapped(selection_map.clone(), subfields_or_inline_fragments);
 
     let root_parent_object = schema
         .server_entity_data
@@ -614,6 +581,58 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
             .server_object_entity(root_object_entity_id)
             .name,
     }
+}
+
+pub fn imperative_field_subfields_or_inline_fragments(
+    refetch_field_parent_id: ServerObjectEntityId,
+    refetch_field_parent_entity_name: IsographObjectTypeName,
+    top_level_schema_field_name: ServerObjectSelectableName,
+    top_level_schema_field_arguments: Vec<
+        VariableDefinition<SelectionType<ServerScalarEntityId, ServerObjectEntityId>>,
+    >,
+    top_level_schema_field_concrete_type: Option<IsographObjectTypeName>,
+    primary_field_info: &Option<PrimaryFieldInfo>,
+) -> Vec<WrappedSelectionMapSelection> {
+    let top_level_schema_field_arguments = top_level_schema_field_arguments
+        .iter()
+        // TODO don't clone
+        .cloned()
+        .map(|variable_definition| ArgumentKeyAndValue {
+            key: variable_definition.name.item.unchecked_conversion(),
+            value: NonConstantValue::Variable(variable_definition.name.item),
+        })
+        .collect();
+
+    // TODO consider wrapping this when we first create the RootRefetchedPath?
+
+    vec![
+        if primary_field_info
+            .as_ref()
+            .map(|x| x.primary_field_return_type_object_entity_id != refetch_field_parent_id)
+            .unwrap_or(true)
+        {
+            Some(WrappedSelectionMapSelection::InlineFragment(
+                refetch_field_parent_entity_name,
+            ))
+        } else {
+            None
+        },
+        primary_field_info.as_ref().map(|primary_field| {
+            WrappedSelectionMapSelection::LinkedField {
+                server_object_selectable_name: primary_field.primary_field_name,
+                arguments: vec![],
+                concrete_type: primary_field.primary_field_concrete_type,
+            }
+        }),
+        Some(WrappedSelectionMapSelection::LinkedField {
+            server_object_selectable_name: top_level_schema_field_name,
+            arguments: top_level_schema_field_arguments,
+            concrete_type: top_level_schema_field_concrete_type,
+        }),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
 }
 
 fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
