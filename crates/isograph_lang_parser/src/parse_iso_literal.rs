@@ -91,12 +91,25 @@ fn parse_iso_entrypoint_declaration(
                 .parse_string_key_type(IsographLangTokenKind::Identifier)
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
+            let directives = parse_directives(tokens, text_source)?;
+
+            let entrypoint_directive_set =
+                from_isograph_field_directives(&directives).map_err(|message| {
+                    WithSpan::new(
+                        IsographLiteralParseError::UnableToDeserializeDirectives { message },
+                        directives
+                            .first()
+                            .map(|x| x.span)
+                            .unwrap_or_else(Span::todo_generated),
+                    )
+                })?;
             Ok(EntrypointDeclaration {
                 parent_type,
                 client_field_name,
                 iso_literal_text,
                 entrypoint_keyword: WithSpan::new((), entrypoint_keyword),
                 dot: dot.map(|_| ()),
+                entrypoint_directive_set,
             })
         })
         .map_err(|with_span: WithSpan<_>| with_span.to_with_location(text_source))?;
@@ -161,6 +174,17 @@ fn parse_client_field_declaration_inner(
 
         let directives = parse_directives(tokens, text_source)?;
 
+        let client_field_directive_set =
+            from_isograph_field_directives(&directives).map_err(|message| {
+                WithSpan::new(
+                    IsographLiteralParseError::UnableToDeserializeDirectives { message },
+                    directives
+                        .first()
+                        .map(|x| x.span)
+                        .unwrap_or_else(Span::todo_generated),
+                )
+            })?;
+
         let description = parse_optional_description(tokens);
 
         let selection_set = parse_selection_set(tokens, text_source)?;
@@ -175,19 +199,13 @@ fn parse_client_field_declaration_inner(
             )
         })?;
 
-        // --------------------
-        // TODO: use directives to:
-        // - ensure only component exists
-        // - it ends up in the reader AST
-        // --------------------
-
         Ok(ClientFieldDeclaration {
             parent_type,
             client_field_name,
             description,
             selection_set,
             definition_path: definition_file_path,
-            directives,
+            client_field_directive_set,
             const_export_name: const_export_name.intern().into(),
             variable_definitions,
             field_keyword: WithSpan::new((), field_keyword_span),
@@ -423,8 +441,8 @@ fn parse_selection(
 
         let selection = match selection_set {
             Some(selection_set) => {
-                let associated_data =
-                    from_isograph_field_directives(&directives).map_err(|message| {
+                let object_selection_directive_set = from_isograph_field_directives(&directives)
+                    .map_err(|message| {
                         WithSpan::new(
                             IsographLiteralParseError::UnableToDeserializeDirectives { message },
                             directives
@@ -437,14 +455,15 @@ fn parse_selection(
                     name: field_name.map(|string_key| string_key.into()),
                     reader_alias: alias
                         .map(|with_span| with_span.map(|string_key| string_key.into())),
-                    associated_data,
+                    object_selection_directive_set,
                     selection_set,
                     arguments,
+                    associated_data: (),
                 })
             }
             None => {
-                let associated_data =
-                    from_isograph_field_directives(&directives).map_err(|message| {
+                let scalar_selection_directive_set = from_isograph_field_directives(&directives)
+                    .map_err(|message| {
                         WithSpan::new(
                             IsographLiteralParseError::UnableToDeserializeDirectives { message },
                             directives
@@ -457,8 +476,9 @@ fn parse_selection(
                     name: field_name.map(|string_key| string_key.into()),
                     reader_alias: alias
                         .map(|with_span| with_span.map(|string_key| string_key.into())),
-                    associated_data,
+                    associated_data: (),
                     arguments,
+                    scalar_selection_directive_set,
                 })
             }
         };

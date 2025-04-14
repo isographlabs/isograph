@@ -7,9 +7,8 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    NetworkProtocol, Schema, SchemaServerObjectSelectableVariant,
-    ServerFieldTypeAssociatedDataInlineFragment, ServerObjectSelectable,
-    ValidatedScalarSelectionAssociatedData, LINK_FIELD_NAME,
+    NetworkProtocol, Schema, SchemaServerObjectSelectableVariant, ServerObjectSelectable,
+    LINK_FIELD_NAME,
 };
 use common_lang_types::Location;
 
@@ -25,16 +24,21 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     ) -> ProcessTypeDefinitionResult<()> {
         for (subtype_id, supertype_ids) in subtype_to_supertype_map {
             let subtype_entity = self.server_entity_data.server_object_entity(*subtype_id);
+            let subtype_entity_name = subtype_entity.name;
 
-            let field_name = format!("as{}", subtype_entity.name).intern().into();
+            for supertype_id in supertype_ids {
+                let as_concrete_type_selectable_name =
+                    format!("as{}", subtype_entity_name).intern().into();
 
-            let next_server_object_selectable_id = self.server_object_selectables.len().into();
+                let next_server_object_selectable_id = self.server_object_selectables.len().into();
 
-            let typename_selection = WithSpan::new(
-                SelectionTypeContainingSelections::Scalar(ScalarSelection {
-                    arguments: vec![],
-                    associated_data: ValidatedScalarSelectionAssociatedData {
-                        location: DefinitionLocation::Server(
+                let typename_selection = WithSpan::new(
+                    SelectionTypeContainingSelections::Scalar(ScalarSelection {
+                        arguments: vec![],
+                        scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(
+                            EmptyDirectiveSet {},
+                        ),
+                        associated_data: DefinitionLocation::Server(
                             *self
                                 .server_entity_data
                                 .server_object_entity_available_selectables
@@ -51,19 +55,19 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                                 .as_scalar()
                                 .expect("Expected __typename to be scalar"),
                         ),
-                        selection_variant: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
-                    },
-                    name: WithLocation::new("__typename".intern().into(), Location::generated()),
-                    reader_alias: None,
-                }),
-                Span::todo_generated(),
-            );
+                        name: WithLocation::new(
+                            "__typename".intern().into(),
+                            Location::generated(),
+                        ),
+                        reader_alias: None,
+                    }),
+                    Span::todo_generated(),
+                );
 
-            let link_selection = WithSpan::new(
-                SelectionTypeContainingSelections::Scalar(ScalarSelection {
-                    arguments: vec![],
-                    associated_data: ValidatedScalarSelectionAssociatedData {
-                        location: DefinitionLocation::Client(
+                let link_selection = WithSpan::new(
+                    SelectionTypeContainingSelections::Scalar(ScalarSelection {
+                        arguments: vec![],
+                        associated_data: DefinitionLocation::Client(
                             *self
                                 .server_entity_data
                                 .server_object_entity_available_selectables
@@ -80,46 +84,45 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                                 .as_scalar()
                                 .expect("Expected lnk to be scalar field"),
                         ),
-                        selection_variant: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
-                    },
-                    name: WithLocation::new((*LINK_FIELD_NAME).into(), Location::generated()),
-                    reader_alias: None,
-                }),
-                Span::todo_generated(),
-            );
+                        scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(
+                            EmptyDirectiveSet {},
+                        ),
+                        name: WithLocation::new((*LINK_FIELD_NAME).into(), Location::generated()),
+                        reader_alias: None,
+                    }),
+                    Span::todo_generated(),
+                );
 
-            let reader_selection_set = vec![typename_selection, link_selection];
+                let reader_selection_set = vec![typename_selection, link_selection];
 
-            let server_object_selectable = ServerObjectSelectable {
-                description: Some(
-                    format!("A client pointer for the {} type.", subtype_entity.name)
-                        .intern()
-                        .into(),
-                ),
-                name: WithLocation::new(field_name, Location::generated()),
-                parent_type_id: *subtype_id,
-                arguments: vec![],
-                target_object_entity: TypeAnnotation::from_graphql_type_annotation(
-                    GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(WithSpan::new(
-                        *subtype_id,
-                        Span::todo_generated(),
-                    ))),
-                ),
+                let server_object_selectable = ServerObjectSelectable {
+                    description: Some(
+                        format!("A client pointer for the {} type.", subtype_entity_name)
+                            .intern()
+                            .into(),
+                    ),
+                    name: WithLocation::new(
+                        as_concrete_type_selectable_name,
+                        Location::generated(),
+                    ),
+                    parent_object_entity_id: *supertype_id,
+                    arguments: vec![],
+                    target_object_entity: TypeAnnotation::from_graphql_type_annotation(
+                        GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(WithSpan::new(
+                            *subtype_id,
+                            Span::todo_generated(),
+                        ))),
+                    ),
 
-                phantom_data: std::marker::PhantomData,
-                object_selectable_variant: SchemaServerObjectSelectableVariant::InlineFragment(
-                    ServerFieldTypeAssociatedDataInlineFragment {
-                        server_object_selectable_id: next_server_object_selectable_id,
-                        concrete_type: subtype_entity.name,
+                    phantom_data: std::marker::PhantomData,
+                    object_selectable_variant: SchemaServerObjectSelectableVariant::InlineFragment(
                         reader_selection_set,
-                    },
-                ),
-            };
+                    ),
+                };
 
-            self.server_object_selectables
-                .push(server_object_selectable);
+                self.server_object_selectables
+                    .push(server_object_selectable);
 
-            for supertype_id in supertype_ids {
                 if self
                     .server_entity_data
                     .server_object_entity_available_selectables
@@ -127,7 +130,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     .or_default()
                     .0
                     .insert(
-                        field_name.into(),
+                        as_concrete_type_selectable_name.into(),
                         DefinitionLocation::Server(SelectionType::Object(
                             next_server_object_selectable_id,
                         )),
@@ -137,7 +140,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     let supertype = self.server_entity_data.server_object_entity(*supertype_id);
                     return Err(WithLocation::new(
                         CreateAdditionalFieldsError::CompilerCreatedFieldExistsOnType {
-                            field_name: field_name.into(),
+                            field_name: as_concrete_type_selectable_name.into(),
                             parent_type: supertype.name,
                         },
                         Location::generated(),

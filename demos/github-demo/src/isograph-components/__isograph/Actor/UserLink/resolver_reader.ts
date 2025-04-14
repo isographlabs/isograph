@@ -1,7 +1,7 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Actor__UserLink__param } from './param_type';
 import { UserLink as resolver } from '../../../UserLink';
-import User__asUser__resolver_reader from '../../User/asUser/resolver_reader';
+import Actor__asUser__resolver_reader from '../../Actor/asUser/resolver_reader';
 
 const readerAst: ReaderAst<Actor__UserLink__param> = [
   {
@@ -16,7 +16,7 @@ const readerAst: ReaderAst<Actor__UserLink__param> = [
     fieldName: "asUser",
     alias: null,
     arguments: null,
-    condition: User__asUser__resolver_reader,
+    condition: Actor__asUser__resolver_reader,
     isUpdatable: false,
     selections: [
       {

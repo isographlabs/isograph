@@ -22,10 +22,11 @@ use crate::{
     field_loadability::{categorize_field_loadability, Loadability},
     initial_variable_context, transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context, ClientFieldVariant,
-    ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, ClientSelectableId,
-    ImperativelyLoadedFieldVariant, NameAndArguments, NetworkProtocol, PathToRefetchField,
-    RootOperationName, Schema, SchemaServerObjectSelectableVariant, ServerObjectEntity,
-    ValidatedScalarSelection, ValidatedSelection, VariableContext,
+    ClientOrServerObjectSelectable, ClientScalarOrObjectSelectable, ClientScalarSelectable,
+    ClientSelectable, ClientSelectableId, ImperativelyLoadedFieldVariant, NameAndArguments,
+    NetworkProtocol, PathToRefetchField, RootOperationName, Schema,
+    SchemaServerObjectSelectableVariant, ServerObjectEntity, ValidatedScalarSelection,
+    ValidatedSelection, VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -685,9 +686,9 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
     for validated_selection in validated_selections.iter().filter(filter_id_fields) {
         match &validated_selection.item {
             SelectionType::Scalar(scalar_field_selection) => {
-                match &scalar_field_selection.associated_data.location {
+                match &scalar_field_selection.associated_data {
                     DefinitionLocation::Server(_) => {
-                        match scalar_field_selection.associated_data.selection_variant {
+                        match scalar_field_selection.scalar_selection_directive_set {
                             ScalarSelectionDirectiveSet::Updatable(_) => {
                                 merge_traversal_state.has_updatable = true;
                             }
@@ -709,7 +710,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                         // because this results in an artifact being generated.
                         match categorize_field_loadability(
                             newly_encountered_scalar_client_selectable,
-                            &scalar_field_selection.associated_data.selection_variant,
+                            &scalar_field_selection.scalar_selection_directive_set,
                         ) {
                             Some(Loadability::LoadablySelectedField(_loadable_variant)) => {
                                 create_merged_selection_map_for_field_and_insert_into_global_map(
@@ -780,13 +781,15 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                 };
             }
             SelectionType::Object(object_selection) => {
-                let parent_object_entity_id =
-                    object_selection.associated_data.parent_object_entity_id;
+                let parent_object_entity_id = *schema
+                    .object_selectable(object_selection.associated_data)
+                    .target_object_entity_id()
+                    .inner();
                 let object_selection_parent_object = schema
                     .server_entity_data
                     .server_object_entity(parent_object_entity_id);
 
-                match object_selection.associated_data.field_id {
+                match object_selection.associated_data {
                     DefinitionLocation::Client(newly_encountered_client_object_selectable_id) => {
                         let newly_encountered_client_object_selectable =
                             schema.client_pointer(newly_encountered_client_object_selectable_id);
@@ -808,12 +811,13 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             SelectionType::Object(newly_encountered_client_object_selectable_id),
                         );
                     }
-                    DefinitionLocation::Server(server_field_id) => {
-                        let server_field = schema.server_object_selectable(server_field_id);
+                    DefinitionLocation::Server(server_object_selectable_id) => {
+                        let server_object_selectable =
+                            schema.server_object_selectable(server_object_selectable_id);
 
-                        match &server_field.object_selectable_variant {
+                        match &server_object_selectable.object_selectable_variant {
                             SchemaServerObjectSelectableVariant::InlineFragment(
-                                inline_fragment_variant,
+                                inline_fragment_reader_selections,
                             ) => {
                                 let type_to_refine_to = object_selection_parent_object.name;
                                 let normalization_key =
@@ -854,7 +858,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                             &mut existing_inline_fragment.selection_map,
                                             parent_object_entity_id,
                                             object_selection_parent_object,
-                                            &inline_fragment_variant.reader_selection_set,
+                                            &inline_fragment_reader_selections,
                                             merge_traversal_state,
                                             encountered_client_field_map,
                                             variable_context,
@@ -870,18 +874,13 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                             variable_context,
                                         );
 
-                                        let server_object_selectable = schema
-                                            .server_object_selectable(
-                                                inline_fragment_variant.server_object_selectable_id,
-                                            );
-
                                         create_merged_selection_map_for_field_and_insert_into_global_map(
                                             schema,
                                             parent_object_entity_id,
                                             parent_object,
                                             &object_selection.selection_set,
                                             encountered_client_field_map,
-                                            DefinitionLocation::Server(inline_fragment_variant.server_object_selectable_id),
+                                            DefinitionLocation::Server(server_object_selectable_id),
                                             &server_object_selectable.initial_variable_context()
                                         );
                                     }
@@ -909,8 +908,16 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                     parent_map.entry(normalization_key).or_insert_with(|| {
                                         MergedServerSelection::LinkedField(
                                             MergedLinkedFieldSelection {
-                                                concrete_type: object_selection
-                                                    .associated_data
+                                                concrete_type: schema
+                                                    .server_entity_data
+                                                    .server_object_entity(
+                                                        *schema
+                                                            .object_selectable(
+                                                                object_selection.associated_data,
+                                                            )
+                                                            .target_object_entity_id()
+                                                            .inner(),
+                                                    )
                                                     .concrete_type,
                                                 name: object_selection.name.item,
                                                 selection_map: BTreeMap::new(),

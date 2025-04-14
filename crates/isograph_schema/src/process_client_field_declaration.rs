@@ -8,13 +8,11 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldDeclaration, ClientObjectSelectableId,
+    ArgumentKeyAndValue, ClientFieldDeclaration, ClientFieldDirectiveSet, ClientObjectSelectableId,
     ClientPointerDeclaration, ClientScalarSelectableId, DefinitionLocation, DeserializationError,
-    NonConstantValue, ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionType,
-    SelectionTypeContainingSelections, ServerEntityId, ServerObjectEntityId, TypeAnnotation,
-    VariableDefinition,
+    NonConstantValue, SelectionType, ServerEntityId, ServerObjectEntityId, TypeAnnotation,
+    UnvalidatedSelection, VariableDefinition,
 };
-use lazy_static::lazy_static;
 
 use thiserror::Error;
 
@@ -24,15 +22,12 @@ use crate::{
     WrappedSelectionMapSelection, NODE_FIELD_NAME,
 };
 
-pub type UnprocessedSelection = WithSpan<
-    SelectionTypeContainingSelections<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
->;
+pub type UnprocessedSelection = WithSpan<UnvalidatedSelection>;
 
 pub struct UnprocessedClientFieldItem {
     pub client_field_id: ClientScalarSelectableId,
     pub reader_selection_set: Vec<UnprocessedSelection>,
-    pub refetch_strategy:
-        Option<RefetchStrategy<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>>,
+    pub refetch_strategy: Option<RefetchStrategy<(), ()>>,
 }
 pub struct UnprocessedClientPointerItem {
     pub client_pointer_id: ClientObjectSelectableId,
@@ -362,7 +357,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
             parent_object_entity_id,
             refetch_strategy,
-            to: to_object_entity_id,
+            target_object_entity: to_object_entity_id,
             output_format: std::marker::PhantomData,
 
             info: UserWrittenClientPointerInfo {
@@ -489,19 +484,12 @@ pub struct ImperativelyLoadedFieldVariant {
     pub root_object_entity_id: ServerObjectEntityId,
 }
 
-// TODO Component is a GraphQL-ism
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum UserWrittenComponentVariant {
-    Eager,
-    Component,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UserWrittenClientTypeInfo {
     // TODO use a shared struct
     pub const_export_name: ConstExportName,
     pub file_path: RelativePathToSourceFile,
-    pub user_written_component_variant: UserWrittenComponentVariant,
+    pub client_field_directive_set: ClientFieldDirectiveSet,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -518,24 +506,11 @@ pub enum ClientFieldVariant {
     Link,
 }
 
-lazy_static! {
-    static ref COMPONENT: IsographDirectiveName = "component".intern().into();
-}
-
 fn get_client_variant(client_field_declaration: &ClientFieldDeclaration) -> ClientFieldVariant {
-    for directive in client_field_declaration.directives.iter() {
-        if directive.item.name.item == *COMPONENT {
-            return ClientFieldVariant::UserWritten(UserWrittenClientTypeInfo {
-                const_export_name: client_field_declaration.const_export_name,
-                file_path: client_field_declaration.definition_path,
-                user_written_component_variant: UserWrittenComponentVariant::Component,
-            });
-        }
-    }
     ClientFieldVariant::UserWritten(UserWrittenClientTypeInfo {
         const_export_name: client_field_declaration.const_export_name,
         file_path: client_field_declaration.definition_path,
-        user_written_component_variant: UserWrittenComponentVariant::Eager,
+        client_field_directive_set: client_field_declaration.client_field_directive_set,
     })
 }
 

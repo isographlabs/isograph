@@ -1,107 +1,40 @@
-Ok(
-    [
-        (
-            ClientFieldDeclaration(
-                WithSpan {
-                    item: ClientFieldDeclaration {
-                        const_export_name: ConstExportName(
-                            "BasicField",
-                        ),
-                        parent_type: WithSpan {
-                            item: UnvalidatedTypeName(
-                                "Type",
-                            ),
-                            span: Span {
-                                start: 9,
-                                end: 13,
-                            },
+Err(
+    WithLocation {
+        location: Embedded(
+            EmbeddedLocation {
+                text_source: TextSource {
+                    current_working_directory: CurrentWorkingDirectory,
+                    relative_path_to_source_file: RelativePathToSourceFile(
+                        "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
+                    ),
+                    span: Some(
+                        Span {
+                            start: 31,
+                            end: 70,
                         },
-                        client_field_name: WithSpan {
-                            item: ClientScalarSelectableName(
-                                "Name",
-                            ),
-                            span: Span {
-                                start: 14,
-                                end: 18,
-                            },
-                        },
-                        description: None,
-                        selection_set: [],
-                        directives: [
-                            WithSpan {
-                                item: IsographFieldDirective {
-                                    name: WithSpan {
-                                        item: IsographDirectiveName(
-                                            "hello",
-                                        ),
-                                        span: Span {
-                                            start: 20,
-                                            end: 25,
-                                        },
-                                    },
-                                    arguments: [],
-                                },
-                                span: Span {
-                                    start: 19,
-                                    end: 25,
-                                },
-                            },
-                            WithSpan {
-                                item: IsographFieldDirective {
-                                    name: WithSpan {
-                                        item: IsographDirectiveName(
-                                            "there",
-                                        ),
-                                        span: Span {
-                                            start: 27,
-                                            end: 32,
-                                        },
-                                    },
-                                    arguments: [],
-                                },
-                                span: Span {
-                                    start: 26,
-                                    end: 32,
-                                },
-                            },
-                        ],
-                        variable_definitions: [],
-                        definition_path: RelativePathToSourceFile(
-                            "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
-                        ),
-                        field_keyword: WithSpan {
-                            item: (),
-                            span: Span {
-                                start: 3,
-                                end: 8,
-                            },
-                        },
-                        dot: WithSpan {
-                            item: (),
-                            span: Span {
-                                start: 13,
-                                end: 14,
-                            },
-                        },
-                    },
-                    span: Span {
-                        start: 9,
-                        end: 38,
-                    },
+                    ),
                 },
-            ),
-            TextSource {
-                current_working_directory: CurrentWorkingDirectory,
-                relative_path_to_source_file: RelativePathToSourceFile(
-                    "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
-                ),
-                span: Some(
-                    Span {
-                        start: 31,
-                        end: 70,
-                    },
-                ),
+                span: Span {
+                    start: 19,
+                    end: 25,
+                },
             },
         ),
-    ],
+        item: UnableToDeserializeDirectives {
+            message: Custom(
+                "data did not match any variant of untagged enum ClientFieldDirectiveSet",
+            ),
+        },
+    },
 )
+
+Unable to process directives. Message: Error when deserializing.
+
+data did not match any variant of untagged enum ClientFieldDirectiveSet
+crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js
+
+  field Type.Name @hello @there {
+                  ^^^^^^         
+  }
+
+---

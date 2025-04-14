@@ -56,9 +56,7 @@ Ok(
                                             ),
                                         },
                                         reader_alias: None,
-                                        associated_data: None(
-                                            EmptyDirectiveSet,
-                                        ),
+                                        associated_data: (),
                                         arguments: [
                                             WithLocation {
                                                 location: Embedded(
@@ -119,6 +117,9 @@ Ok(
                                                 },
                                             },
                                         ],
+                                        scalar_selection_directive_set: None(
+                                            EmptyDirectiveSet,
+                                        ),
                                     },
                                 ),
                                 span: Span {
@@ -127,7 +128,9 @@ Ok(
                                 },
                             },
                         ],
-                        directives: [],
+                        client_field_directive_set: None(
+                            EmptyDirectiveSet,
+                        ),
                         variable_definitions: [],
                         definition_path: RelativePathToSourceFile(
                             "crates/isograph_lang_parser/fixtures/field-args-boolean.input.js",

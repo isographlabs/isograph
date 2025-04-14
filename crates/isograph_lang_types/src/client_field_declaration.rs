@@ -10,13 +10,13 @@ use serde::Deserialize;
 use std::fmt::Debug;
 
 use crate::{
-    IsographFieldDirective, ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionType,
+    ClientFieldDirectiveSet, IsographFieldDirective, ObjectSelectionDirectiveSet,
+    ScalarSelectionDirectiveSet, SelectionType,
 };
 
-pub type UnvalidatedSelection =
-    SelectionTypeContainingSelections<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>;
+pub type UnvalidatedSelection = SelectionTypeContainingSelections<(), ()>;
 
-pub type UnvalidatedScalarFieldSelection = ScalarSelection<ScalarSelectionDirectiveSet>;
+pub type UnvalidatedScalarFieldSelection = ScalarSelection<()>;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct ClientFieldDeclaration {
@@ -26,7 +26,7 @@ pub struct ClientFieldDeclaration {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     // TODO remove, or put on a generic
-    pub directives: Vec<WithSpan<IsographFieldDirective>>,
+    pub client_field_directive_set: ClientFieldDirectiveSet,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: RelativePathToSourceFile,
 
@@ -67,49 +67,6 @@ pub type SelectionTypeContainingSelections<TScalarField, TLinkedField> =
     SelectionType<ScalarSelection<TScalarField>, ObjectSelection<TScalarField, TLinkedField>>;
 
 impl<TScalarField, TLinkedField> SelectionTypeContainingSelections<TScalarField, TLinkedField> {
-    pub fn map<TNewScalarField, TNewLinkedField>(
-        self,
-        map_scalar_selection: &mut impl FnMut(
-            ScalarSelection<TScalarField>,
-        ) -> ScalarSelection<TNewScalarField>,
-        map_linked_selection: &mut impl FnMut(
-            ObjectSelection<TScalarField, TLinkedField>,
-        )
-            -> ObjectSelection<TNewScalarField, TNewLinkedField>,
-    ) -> SelectionTypeContainingSelections<TNewScalarField, TNewLinkedField> {
-        match self {
-            SelectionTypeContainingSelections::Scalar(s) => {
-                SelectionTypeContainingSelections::Scalar(map_scalar_selection(s))
-            }
-            SelectionTypeContainingSelections::Object(l) => {
-                SelectionTypeContainingSelections::Object(map_linked_selection(l))
-            }
-        }
-    }
-
-    pub fn and_then<TNewScalarField, TNewLinkedField, E>(
-        self,
-        and_then_scalar_selection: &mut impl FnMut(
-            ScalarSelection<TScalarField>,
-        )
-            -> Result<ScalarSelection<TNewScalarField>, E>,
-        and_then_linked_selection: &mut impl FnMut(
-            ObjectSelection<TScalarField, TLinkedField>,
-        ) -> Result<
-            ObjectSelection<TNewScalarField, TNewLinkedField>,
-            E,
-        >,
-    ) -> Result<SelectionTypeContainingSelections<TNewScalarField, TNewLinkedField>, E> {
-        match self {
-            SelectionTypeContainingSelections::Scalar(s) => Ok(
-                SelectionTypeContainingSelections::Scalar(and_then_scalar_selection(s)?),
-            ),
-            SelectionTypeContainingSelections::Object(l) => Ok(
-                SelectionTypeContainingSelections::Object(and_then_linked_selection(l)?),
-            ),
-        }
-    }
-
     pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
         match self {
             SelectionTypeContainingSelections::Scalar(scalar_field) => scalar_field.name_or_alias(),
@@ -139,30 +96,11 @@ pub struct ScalarSelection<TScalarField> {
     pub reader_alias: Option<WithLocation<SelectableAlias>>,
     pub associated_data: TScalarField,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
+    pub scalar_selection_directive_set: ScalarSelectionDirectiveSet,
 }
+// TODO impl_with_target_id!(ScalarSelection)
 
 impl<TScalarField> ScalarSelection<TScalarField> {
-    pub fn map<U>(self, map: &impl Fn(TScalarField) -> U) -> ScalarSelection<U> {
-        ScalarSelection {
-            name: self.name,
-            reader_alias: self.reader_alias,
-            associated_data: map(self.associated_data),
-            arguments: self.arguments,
-        }
-    }
-
-    pub fn and_then<U, E>(
-        self,
-        map: &impl Fn(TScalarField) -> Result<U, E>,
-    ) -> Result<ScalarSelection<U>, E> {
-        Ok(ScalarSelection {
-            name: self.name,
-            reader_alias: self.reader_alias,
-            associated_data: map(self.associated_data)?,
-            arguments: self.arguments,
-        })
-    }
-
     pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
         self.reader_alias
             .map(|item| item.map(SelectableNameOrAlias::from))
@@ -177,36 +115,11 @@ pub struct ObjectSelection<TScalar, TLinked> {
     pub associated_data: TLinked,
     pub selection_set: Vec<WithSpan<SelectionTypeContainingSelections<TScalar, TLinked>>>,
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
+    pub object_selection_directive_set: ObjectSelectionDirectiveSet,
 }
+// TODO impl_with_target_id!(ObjectSelection)
 
 impl<TScalarField, TLinkedField> ObjectSelection<TScalarField, TLinkedField> {
-    pub fn map<U, V>(
-        self,
-        map_scalar: &impl Fn(TScalarField) -> U,
-        map_linked: &impl Fn(TLinkedField) -> V,
-    ) -> ObjectSelection<U, V> {
-        ObjectSelection {
-            name: self.name,
-            reader_alias: self.reader_alias,
-            associated_data: map_linked(self.associated_data),
-            selection_set: self
-                .selection_set
-                .into_iter()
-                .map(|with_span| {
-                    with_span.map(|selection| {
-                        selection.map(
-                            &mut |scalar_field_selection| scalar_field_selection.map(map_scalar),
-                            &mut |linked_field_selection| {
-                                linked_field_selection.map(map_scalar, map_linked)
-                            },
-                        )
-                    })
-                })
-                .collect(),
-            arguments: self.arguments,
-        }
-    }
-
     pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
         self.reader_alias
             .map(|item| item.map(SelectableNameOrAlias::from))

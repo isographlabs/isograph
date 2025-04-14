@@ -23,7 +23,7 @@ pub fn output_type_annotation<'a, TNetworkProtocol: NetworkProtocol>(
     >,
 ) -> &'a TypeAnnotation<ServerObjectEntityId> {
     match definition_location {
-        DefinitionLocation::Client(client_pointer) => &client_pointer.to,
+        DefinitionLocation::Client(client_pointer) => &client_pointer.target_object_entity,
         DefinitionLocation::Server(server_field) => &server_field.target_object_entity,
     }
 }

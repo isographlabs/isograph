@@ -161,9 +161,7 @@ Ok(
                                             ),
                                         },
                                         reader_alias: None,
-                                        associated_data: None(
-                                            EmptyDirectiveSet,
-                                        ),
+                                        associated_data: (),
                                         selection_set: [
                                             WithSpan {
                                                 item: Scalar(
@@ -194,10 +192,11 @@ Ok(
                                                             ),
                                                         },
                                                         reader_alias: None,
-                                                        associated_data: None(
+                                                        associated_data: (),
+                                                        arguments: [],
+                                                        scalar_selection_directive_set: None(
                                                             EmptyDirectiveSet,
                                                         ),
-                                                        arguments: [],
                                                     },
                                                 ),
                                                 span: Span {
@@ -234,10 +233,11 @@ Ok(
                                                             ),
                                                         },
                                                         reader_alias: None,
-                                                        associated_data: None(
+                                                        associated_data: (),
+                                                        arguments: [],
+                                                        scalar_selection_directive_set: None(
                                                             EmptyDirectiveSet,
                                                         ),
-                                                        arguments: [],
                                                     },
                                                 ),
                                                 span: Span {
@@ -247,6 +247,9 @@ Ok(
                                             },
                                         ],
                                         arguments: [],
+                                        object_selection_directive_set: None(
+                                            EmptyDirectiveSet,
+                                        ),
                                     },
                                 ),
                                 span: Span {

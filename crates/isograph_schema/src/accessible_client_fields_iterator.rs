@@ -49,7 +49,7 @@ impl<TNetworkProtocol: NetworkProtocol> Iterator
             if let Some(selection) = item {
                 match &selection.item {
                     SelectionTypeContainingSelections::Scalar(scalar) => {
-                        match scalar.associated_data.location {
+                        match scalar.associated_data {
                             DefinitionLocation::Server(_) => {
                                 self.index += 1;
                                 continue 'main_loop;
@@ -68,7 +68,7 @@ impl<TNetworkProtocol: NetworkProtocol> Iterator
                             sub_iterator: None,
                         };
 
-                        match linked_field.associated_data.field_id {
+                        match linked_field.associated_data {
                             DefinitionLocation::Client(client_pointer_id) => {
                                 self.sub_iterator = Some(Box::new(iterator));
                                 self.index += 1;

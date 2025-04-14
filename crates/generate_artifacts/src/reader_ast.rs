@@ -32,7 +32,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
 ) -> String {
     match &selection.item {
         SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
-            match scalar_field_selection.associated_data.location {
+            match scalar_field_selection.associated_data {
                 DefinitionLocation::Server(_) => server_defined_scalar_field_ast_node(
                     scalar_field_selection,
                     indentation_level,
@@ -54,44 +54,70 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
             }
         }
         SelectionTypeContainingSelections::Object(linked_field_selection) => {
-            path.push(
-                NameAndArguments {
-                    // TODO use alias
-                    name: linked_field_selection.name.item.into(),
-                    // TODO this clearly does something, but why are we able to pass
-                    // the initial variable context here??
-                    arguments: transform_arguments_with_child_context(
-                        linked_field_selection
-                            .arguments
-                            .iter()
-                            .map(|x| x.item.into_key_and_value()),
-                        // TODO why is this not the transformed context?
+            match linked_field_selection.associated_data {
+                DefinitionLocation::Client(client_pointer_id) => {
+                    let client_pointer = schema.client_pointer(client_pointer_id);
+
+                    let inner_reader_ast = generate_reader_ast_with_path(
+                        schema,
+                        client_pointer.refetch_strategy.refetch_selection_set(),
+                        indentation_level + 1,
+                        reader_imports,
+                        root_refetched_paths,
+                        path,
                         initial_variable_context,
-                    ),
+                    );
+
+                    linked_field_ast_node(
+                        schema,
+                        linked_field_selection,
+                        indentation_level,
+                        inner_reader_ast,
+                        initial_variable_context,
+                        reader_imports,
+                    )
                 }
-                .normalization_key(),
-            );
+                DefinitionLocation::Server(_) => {
+                    path.push(
+                        NameAndArguments {
+                            // TODO use alias
+                            name: linked_field_selection.name.item.into(),
+                            // TODO this clearly does something, but why are we able to pass
+                            // the initial variable context here??
+                            arguments: transform_arguments_with_child_context(
+                                linked_field_selection
+                                    .arguments
+                                    .iter()
+                                    .map(|x| x.item.into_key_and_value()),
+                                // TODO why is this not the transformed context?
+                                initial_variable_context,
+                            ),
+                        }
+                        .normalization_key(),
+                    );
 
-            let inner_reader_ast = generate_reader_ast_with_path(
-                schema,
-                &linked_field_selection.selection_set,
-                indentation_level + 1,
-                reader_imports,
-                root_refetched_paths,
-                path,
-                initial_variable_context,
-            );
+                    let inner_reader_ast = generate_reader_ast_with_path(
+                        schema,
+                        &linked_field_selection.selection_set,
+                        indentation_level + 1,
+                        reader_imports,
+                        root_refetched_paths,
+                        path,
+                        initial_variable_context,
+                    );
 
-            path.pop();
+                    path.pop();
 
-            linked_field_ast_node(
-                schema,
-                linked_field_selection,
-                indentation_level,
-                inner_reader_ast,
-                initial_variable_context,
-                reader_imports,
-            )
+                    linked_field_ast_node(
+                        schema,
+                        linked_field_selection,
+                        indentation_level,
+                        inner_reader_ast,
+                        initial_variable_context,
+                        reader_imports,
+                    )
+                }
+            }
         }
     }
 }
@@ -123,13 +149,21 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     let indent_1 = "  ".repeat(indentation_level as usize);
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
 
-    let condition = match linked_field.associated_data.field_id {
+    let condition = match linked_field.associated_data {
         DefinitionLocation::Client(client_pointer_id) => {
             let client_pointer = schema.client_pointer(client_pointer_id);
-            format!(
+
+            let reader_artifact_import_name = format!(
                 "{}__resolver_reader",
                 client_pointer.type_and_field.underscore_separated()
-            )
+            );
+
+            reader_imports.insert((
+                client_pointer.type_and_field,
+                ImportedFileCategory::ResolverReader,
+            ));
+
+            reader_artifact_import_name
         }
         DefinitionLocation::Server(server_field_id) => {
             let server_field = schema.server_object_selectable(server_field_id);
@@ -137,7 +171,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
                 SchemaServerObjectSelectableVariant::InlineFragment(_) => {
                     let object = schema
                         .server_entity_data
-                        .server_object_entity(server_field.parent_type_id);
+                        .server_object_entity(server_field.parent_object_entity_id);
 
                     let type_and_field = ObjectTypeAndFieldName {
                         field_name: linked_field.name.item.into(),
@@ -157,7 +191,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     };
 
     let is_updatable = matches!(
-        linked_field.associated_data.selection_variant,
+        linked_field.object_selection_directive_set,
         ObjectSelectionDirectiveSet::Updatable(_)
     );
 
@@ -188,12 +222,12 @@ fn scalar_client_defined_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     let client_field_variable_context = parent_variable_context.child_variable_context(
         &scalar_field_selection.arguments,
         &client_field.variable_definitions,
-        &scalar_field_selection.associated_data.selection_variant,
+        &scalar_field_selection.scalar_selection_directive_set,
     );
 
     match categorize_field_loadability(
         client_field,
-        &scalar_field_selection.associated_data.selection_variant,
+        &scalar_field_selection.scalar_selection_directive_set,
     ) {
         Some(Loadability::LoadablySelectedField(loadable_directive_parameters)) => {
             loadably_selected_field_ast_node(
@@ -461,7 +495,7 @@ fn server_defined_scalar_field_ast_node(
         indentation_level + 1,
     );
     let is_updatable = matches!(
-        scalar_field_selection.associated_data.selection_variant,
+        scalar_field_selection.scalar_selection_directive_set,
         ScalarSelectionDirectiveSet::Updatable(_)
     );
     let indent_1 = "  ".repeat(indentation_level as usize);
@@ -614,7 +648,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
     for selection in selection_set {
         match &selection.item {
             SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
-                match scalar_field_selection.associated_data.location {
+                match scalar_field_selection.associated_data {
                     DefinitionLocation::Server(_) => {
                         // Do nothing, we encountered a server field
                     }
@@ -622,7 +656,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                         let client_field = schema.client_field(client_field_id);
                         match categorize_field_loadability(
                             client_field,
-                            &scalar_field_selection.associated_data.selection_variant,
+                            &scalar_field_selection.scalar_selection_directive_set,
                         ) {
                             Some(Loadability::ImperativelyLoadedField(_)) => {
                                 paths.insert(PathToRefetchField {
@@ -652,33 +686,39 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                 }
             }
             SelectionTypeContainingSelections::Object(linked_field_selection) => {
-                path.push(
-                    NameAndArguments {
-                        // TODO use alias
-                        name: linked_field_selection.name.item.into(),
-                        arguments: transform_arguments_with_child_context(
-                            linked_field_selection
-                                .arguments
-                                .iter()
-                                .map(|x| x.item.into_key_and_value()),
-                            // TODO this clearly does something, but why are we able to pass
-                            // the initial variable context here??
-                            initial_variable_context,
-                        ),
+                match linked_field_selection.associated_data {
+                    DefinitionLocation::Client(_) => {
+                        // Do not recurse into selections of client pointers
                     }
-                    .normalization_key(),
-                );
+                    DefinitionLocation::Server(_) => {
+                        path.push(
+                            NameAndArguments {
+                                // TODO use alias
+                                name: linked_field_selection.name.item.into(),
+                                arguments: transform_arguments_with_child_context(
+                                    linked_field_selection
+                                        .arguments
+                                        .iter()
+                                        .map(|x| x.item.into_key_and_value()),
+                                    // TODO this clearly does something, but why are we able to pass
+                                    // the initial variable context here??
+                                    initial_variable_context,
+                                ),
+                            }
+                            .normalization_key(),
+                        );
+                        let new_paths = refetched_paths_with_path(
+                            &linked_field_selection.selection_set,
+                            schema,
+                            path,
+                            initial_variable_context,
+                        );
 
-                let new_paths = refetched_paths_with_path(
-                    &linked_field_selection.selection_set,
-                    schema,
-                    path,
-                    initial_variable_context,
-                );
+                        paths.extend(new_paths.into_iter());
 
-                paths.extend(new_paths.into_iter());
-
-                path.pop();
+                        path.pop();
+                    }
+                };
             }
         };
     }

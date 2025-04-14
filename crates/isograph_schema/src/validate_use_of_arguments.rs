@@ -72,7 +72,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
         client_type.reader_selection_set(),
         &mut |selection| match selection {
             SelectionType::Scalar(scalar_selection) => {
-                let field_argument_definitions = match scalar_selection.associated_data.location {
+                let field_argument_definitions = match scalar_selection.associated_data {
                     DefinitionLocation::Server(s) => schema
                         .server_scalar_selectable(s)
                         .arguments
@@ -89,7 +89,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
 
                 // Only loadably selected fields are allowed to have missing arguments
                 let can_have_missing_args = matches!(
-                    scalar_selection.associated_data.selection_variant,
+                    scalar_selection.scalar_selection_directive_set,
                     ScalarSelectionDirectiveSet::Loadable(_)
                 );
 
@@ -105,7 +105,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                 );
             }
             SelectionType::Object(object_selection) => {
-                let field_argument_definitions = match object_selection.associated_data.field_id {
+                let field_argument_definitions = match object_selection.associated_data {
                     DefinitionLocation::Server(object_selectable_id) => schema
                         .server_object_selectable(object_selectable_id)
                         .arguments

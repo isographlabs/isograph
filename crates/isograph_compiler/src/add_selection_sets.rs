@@ -2,15 +2,14 @@ use common_lang_types::{
     IsographObjectTypeName, Location, SelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use isograph_lang_types::{
-    DefinitionLocation, ObjectSelection, ObjectSelectionDirectiveSet, ScalarSelection,
-    ScalarSelectionDirectiveSet, SelectionType, ServerObjectEntityId,
-    UnvalidatedScalarFieldSelection, UnvalidatedSelection,
+    DefinitionLocation, ObjectSelection, ScalarSelection, ScalarSelectionDirectiveSet,
+    SelectionType, ServerObjectEntityId, UnvalidatedScalarFieldSelection, UnvalidatedSelection,
 };
 use isograph_schema::{
-    ClientScalarOrObjectSelectable, NetworkProtocol, RefetchStrategy, Schema, ServerObjectEntity,
-    UnprocessedClientFieldItem, UnprocessedItem, UseRefetchFieldRefetchStrategy,
-    ValidatedObjectSelection, ValidatedObjectSelectionAssociatedData, ValidatedScalarSelection,
-    ValidatedScalarSelectionAssociatedData, ValidatedSelection,
+    ClientScalarOrObjectSelectable, NetworkProtocol, ObjectSelectableId, RefetchStrategy,
+    ScalarSelectableId, Schema, ServerObjectEntity, UnprocessedClientFieldItem,
+    UnprocessedClientPointerItem, UnprocessedItem, UseRefetchFieldRefetchStrategy,
+    ValidatedObjectSelection, ValidatedScalarSelection, ValidatedSelection,
 };
 use thiserror::Error;
 
@@ -31,7 +30,13 @@ pub(crate) fn add_selection_sets_to_client_selectables<TNetworkProtocol: Network
                     errors.extend(e)
                 }
             }
-            SelectionType::Object(_) => todo!("process unprocessed pointer item"),
+            SelectionType::Object(unprocessed_client_pointer_item) => {
+                if let Err(e) =
+                    process_unprocessed_client_pointer_item(schema, unprocessed_client_pointer_item)
+                {
+                    errors.extend(e)
+                }
+            }
         }
     }
     if !errors.is_empty() {
@@ -72,6 +77,32 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
 
     client_field.reader_selection_set = new_selection_set;
     client_field.refetch_strategy = refetch_strategy;
+
+    Ok(())
+}
+
+// TODO we should not be mutating items in the schema. Instead, we should be creating
+// new items (the refetch and reader selection sets).
+fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol>(
+    schema: &mut Schema<TNetworkProtocol>,
+    unprocessed_item: UnprocessedClientPointerItem,
+) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
+    let client_pointer = schema.client_pointer(unprocessed_item.client_pointer_id);
+    let parent_object = schema
+        .server_entity_data
+        .server_object_entity(client_pointer.parent_object_entity_id);
+
+    let new_selection_set = get_validated_selection_set(
+        schema,
+        unprocessed_item.reader_selection_set,
+        parent_object,
+        client_pointer.parent_object_entity_id,
+        &client_pointer,
+    )?;
+
+    let client_pointer = schema.client_pointer_mut(unprocessed_item.client_pointer_id);
+
+    client_pointer.reader_selection_set = new_selection_set;
 
     Ok(())
 }
@@ -162,11 +193,11 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
             )
         })?;
 
-    let location = match *location {
+    let associated_data = match *location {
         DefinitionLocation::Server(server_selectable_id) => {
             // TODO encode this in types
             if matches!(
-                scalar_selection.associated_data,
+                scalar_selection.scalar_selection_directive_set,
                 ScalarSelectionDirectiveSet::Loadable(_)
             ) {
                 return Err(WithLocation::new(
@@ -227,10 +258,8 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
     Ok(ScalarSelection {
         name: scalar_selection.name,
         reader_alias: scalar_selection.reader_alias,
-        associated_data: ValidatedScalarSelectionAssociatedData {
-            location,
-            selection_variant: scalar_selection.associated_data,
-        },
+        associated_data,
+        scalar_selection_directive_set: scalar_selection.scalar_selection_directive_set,
         arguments: scalar_selection.arguments,
     })
 }
@@ -240,7 +269,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
     selection_parent_object_id: ServerObjectEntityId,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
-    object_selection: ObjectSelection<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
+    object_selection: ObjectSelection<(), ()>,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<ValidatedObjectSelection> {
     let location = schema
         .server_entity_data
@@ -267,7 +296,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
             )]
         })?;
 
-    let (location, new_parent_object_entity_id) = match *location {
+    let (associated_data, new_parent_object_entity_id) = match *location {
         DefinitionLocation::Server(server_selectable_id) => {
             let server_object_selectable_id = *server_selectable_id.as_object_result().map_err(
                 |server_scalar_selectable_id| {
@@ -295,12 +324,9 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
             let server_object_selectable =
                 schema.server_object_selectable(server_object_selectable_id);
 
-            let new_parent_object_entity_id =
-                *server_object_selectable.target_object_entity.inner();
-
             (
                 DefinitionLocation::Server(server_object_selectable_id),
-                new_parent_object_entity_id,
+                *server_object_selectable.target_object_entity.inner(),
             )
         }
         DefinitionLocation::Client(client_type) => {
@@ -322,7 +348,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
 
             (
                 DefinitionLocation::Client(client_pointer_id),
-                *client_pointer.to.inner(),
+                *client_pointer.target_object_entity.inner(),
             )
         }
     };
@@ -334,12 +360,8 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     Ok(ObjectSelection {
         name: object_selection.name,
         reader_alias: object_selection.reader_alias,
-        associated_data: ValidatedObjectSelectionAssociatedData {
-            parent_object_entity_id: new_parent_object_entity_id,
-            field_id: location,
-            selection_variant: object_selection.associated_data,
-            concrete_type: new_parent_object.concrete_type,
-        },
+        object_selection_directive_set: object_selection.object_selection_directive_set,
+        associated_data,
         arguments: object_selection.arguments,
         selection_set: get_validated_selection_set(
             schema,
@@ -353,19 +375,12 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
 
 fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    refetch_strategy: Option<
-        RefetchStrategy<ScalarSelectionDirectiveSet, ObjectSelectionDirectiveSet>,
-    >,
+    refetch_strategy: Option<RefetchStrategy<(), ()>>,
     parent_object: &ServerObjectEntity<TNetworkProtocol>,
     selection_parent_object_id: ServerObjectEntityId,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<
-    Option<
-        RefetchStrategy<
-            ValidatedScalarSelectionAssociatedData,
-            ValidatedObjectSelectionAssociatedData,
-        >,
-    >,
+    Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>,
 > {
     match refetch_strategy {
         Some(RefetchStrategy::UseRefetchField(use_refetch_field_strategy)) => Ok(Some(

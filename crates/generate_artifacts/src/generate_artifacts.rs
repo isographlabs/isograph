@@ -10,18 +10,18 @@ use intern::{string_key::Intern, Lookup};
 use core::panic;
 use isograph_config::CompilerConfig;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientScalarSelectableId, DefinitionLocation, NonConstantValue,
-    ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, ServerEntityId,
-    ServerObjectEntityId, TypeAnnotation, UnionVariant, VariableDefinition,
+    ArgumentKeyAndValue, ClientFieldDirectiveSet, ClientScalarSelectableId, DefinitionLocation,
+    EmptyDirectiveSet, NonConstantValue, ObjectSelectionDirectiveSet, ScalarSelection,
+    ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionType,
+    SelectionTypeContainingSelections, ServerEntityId, ServerObjectEntityId, TypeAnnotation,
+    UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
     accessible_client_fields, description, output_type_annotation, selection_map_wrapped,
     ClientFieldVariant, ClientScalarSelectable, ClientSelectableId, FieldTraversalResult,
-    NameAndArguments, NetworkProtocol, NormalizationKey, Schema,
-    SchemaServerObjectSelectableVariant, UserWrittenClientTypeInfo, UserWrittenComponentVariant,
-    ValidatedScalarSelectionAssociatedData, ValidatedSelection, ValidatedVariableDefinition,
-    WrappedSelectionMapSelection,
+    NameAndArguments, NetworkProtocol, NormalizationKey, ScalarSelectableId, Schema,
+    SchemaServerObjectSelectableVariant, UserWrittenClientTypeInfo, ValidatedSelection,
+    ValidatedVariableDefinition, WrappedSelectionMapSelection,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -142,16 +142,18 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
     ) in &encountered_client_type_map
     {
         match encountered_field_id {
-            DefinitionLocation::Server(encountered_server_field_id) => {
-                let encountered_server_field =
-                    schema.server_object_selectable(*encountered_server_field_id);
-                match &encountered_server_field.object_selectable_variant {
+            DefinitionLocation::Server(server_object_selectable_id) => {
+                let server_object_selectable =
+                    schema.server_object_selectable(*server_object_selectable_id);
+                match &server_object_selectable.object_selectable_variant {
                     SchemaServerObjectSelectableVariant::LinkedField => {}
-                    SchemaServerObjectSelectableVariant::InlineFragment(inline_fragment) => {
+                    SchemaServerObjectSelectableVariant::InlineFragment(
+                        inline_fragment_reader_selections,
+                    ) => {
                         path_and_contents.push(generate_eager_reader_condition_artifact(
                             schema,
-                            encountered_server_field,
-                            inline_fragment,
+                            server_object_selectable,
+                            inline_fragment_reader_selections,
                             &traversal_state.refetch_paths,
                             config.options.include_file_extensions_in_import_statements,
                         ));
@@ -159,32 +161,33 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 }
             }
 
-            DefinitionLocation::Client(SelectionType::Object(encountered_client_pointer_id)) => {
-                let encountered_client_pointer =
-                    schema.client_pointer(*encountered_client_pointer_id);
+            DefinitionLocation::Client(SelectionType::Object(client_object_selectable_id)) => {
+                let client_object_selectable = schema.client_pointer(*client_object_selectable_id);
                 path_and_contents.extend(generate_eager_reader_artifacts(
                     schema,
-                    &SelectionType::Object(encountered_client_pointer),
+                    &SelectionType::Object(client_object_selectable),
                     config,
                     UserWrittenClientTypeInfo {
-                        const_export_name: encountered_client_pointer.info.const_export_name,
-                        file_path: encountered_client_pointer.info.file_path,
-                        user_written_component_variant: UserWrittenComponentVariant::Eager,
+                        const_export_name: client_object_selectable.info.const_export_name,
+                        file_path: client_object_selectable.info.file_path,
+                        client_field_directive_set: ClientFieldDirectiveSet::None(
+                            EmptyDirectiveSet {},
+                        ),
                     },
                     &traversal_state.refetch_paths,
                     config.options.include_file_extensions_in_import_statements,
                     traversal_state.has_updatable,
                 ));
             }
-            DefinitionLocation::Client(SelectionType::Scalar(encountered_client_field_id)) => {
-                let encountered_client_field = schema.client_field(*encountered_client_field_id);
+            DefinitionLocation::Client(SelectionType::Scalar(client_scalar_selectable_id)) => {
+                let client_scalar_selectable = schema.client_field(*client_scalar_selectable_id);
 
-                match &encountered_client_field.variant {
+                match &client_scalar_selectable.variant {
                     ClientFieldVariant::Link => (),
                     ClientFieldVariant::UserWritten(info) => {
                         path_and_contents.extend(generate_eager_reader_artifacts(
                             schema,
-                            &SelectionType::Scalar(encountered_client_field),
+                            &SelectionType::Scalar(client_scalar_selectable),
                             config,
                             *info,
                             &traversal_state.refetch_paths,
@@ -195,7 +198,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                         if *was_ever_selected_loadably {
                             path_and_contents.push(generate_refetch_reader_artifact(
                                 schema,
-                                encountered_client_field,
+                                client_scalar_selectable,
                                 None,
                                 &traversal_state.refetch_paths,
                                 true,
@@ -209,12 +212,12 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                             };
 
                             let type_to_refine_to = schema.server_entity_data.server_object_entity(
-                                encountered_client_field.parent_object_entity_id,
+                                client_scalar_selectable.parent_object_entity_id,
                             );
 
                             if schema
                                 .fetchable_types
-                                .contains_key(&encountered_client_field.parent_object_entity_id)
+                                .contains_key(&client_scalar_selectable.parent_object_entity_id)
                             {
                                 panic!("Loadable fields on root objects are not yet supported");
                             }
@@ -246,7 +249,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 )),
                                 default_value: None,
                             };
-                            let variable_definitions_iter = encountered_client_field
+                            let variable_definitions_iter = client_scalar_selectable
                                 .variable_definitions
                                 .iter()
                                 .map(|variable_definition| &variable_definition.item)
@@ -274,7 +277,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                             path_and_contents.extend(
                                 generate_entrypoint_artifacts_with_client_field_traversal_result(
                                     schema,
-                                    encountered_client_field,
+                                    client_scalar_selectable,
                                     &wrapped_map,
                                     &traversal_state,
                                     &encountered_client_type_map,
@@ -288,7 +291,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     ClientFieldVariant::ImperativelyLoadedField(variant) => {
                         path_and_contents.push(generate_refetch_reader_artifact(
                             schema,
-                            encountered_client_field,
+                            client_scalar_selectable,
                             variant.primary_field_info.as_ref(),
                             &traversal_state.refetch_paths,
                             false,
@@ -340,7 +343,9 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     UserWrittenClientTypeInfo {
                         const_export_name: client_pointer.info.const_export_name,
                         file_path: client_pointer.info.file_path,
-                        user_written_component_variant: UserWrittenComponentVariant::Eager,
+                        client_field_directive_set: ClientFieldDirectiveSet::None(
+                            EmptyDirectiveSet {},
+                        ),
                     },
                     config.options.include_file_extensions_in_import_statements,
                 ))
@@ -506,11 +511,11 @@ pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
     let variant = &client_field.variant;
     match variant {
         ClientFieldVariant::Link => ClientFieldOutputType("Link".to_string()),
-        ClientFieldVariant::UserWritten(info) => match info.user_written_component_variant {
-            UserWrittenComponentVariant::Eager => {
+        ClientFieldVariant::UserWritten(info) => match info.client_field_directive_set {
+            ClientFieldDirectiveSet::None(_) => {
                 ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
             }
-            UserWrittenComponentVariant::Component => ClientFieldOutputType(
+            ClientFieldDirectiveSet::Component(_) => ClientFieldOutputType(
                 "(React.FC<CombineWithIntrinsicAttributes<ExtractSecondParam<typeof resolver>>>)"
                     .to_string(),
             ),
@@ -600,7 +605,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 ) {
     match &selection.item {
         SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
-            match scalar_field_selection.associated_data.location {
+            match scalar_field_selection.associated_data {
                 DefinitionLocation::Server(server_scalar_selectable_id) => {
                     let field = schema.server_scalar_selectable(server_scalar_selectable_id);
 
@@ -643,7 +648,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             }
         }
         SelectionTypeContainingSelections::Object(linked_field) => {
-            let field = match linked_field.associated_data.field_id {
+            let field = match linked_field.associated_data {
                 DefinitionLocation::Server(server_object_selectable_id) => {
                     DefinitionLocation::Server(
                         schema.server_object_selectable(server_object_selectable_id),
@@ -690,7 +695,7 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
     loadable_fields: &mut BTreeSet<ObjectTypeAndFieldName>,
     indentation_level: u8,
     link_fields: &mut bool,
-    scalar_field_selection: &ScalarSelection<ValidatedScalarSelectionAssociatedData>,
+    scalar_field_selection: &ScalarSelection<ScalarSelectableId>,
     client_field_id: ClientScalarSelectableId,
 ) {
     let client_field = schema.client_field(client_field_id);
@@ -718,7 +723,7 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
                 "{}__output_type",
                 client_field.type_and_field.underscore_separated()
             );
-            let output_type = match scalar_field_selection.associated_data.selection_variant {
+            let output_type = match scalar_field_selection.scalar_selection_directive_set {
                 ScalarSelectionDirectiveSet::Updatable(_)
                 | ScalarSelectionDirectiveSet::None(_) => inner_output_type,
                 ScalarSelectionDirectiveSet::Loadable(_) => {
@@ -774,7 +779,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 ) {
     match &selection.item {
         SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
-            match scalar_field_selection.associated_data.location {
+            match scalar_field_selection.associated_data {
                 DefinitionLocation::Server(server_scalar_selectable_id) => {
                     let field = schema.server_scalar_selectable(server_scalar_selectable_id);
 
@@ -797,7 +802,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                                     .javascript_name
                             });
 
-                    match scalar_field_selection.associated_data.selection_variant {
+                    match scalar_field_selection.scalar_selection_directive_set {
                         ScalarSelectionDirectiveSet::Updatable(_) => {
                             *updatable_fields = true;
                             query_type_declaration
@@ -836,7 +841,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             }
         }
         SelectionTypeContainingSelections::Object(linked_field) => {
-            let field = schema.object_selectable(linked_field.associated_data.field_id);
+            let field = schema.object_selectable(linked_field.associated_data);
 
             write_optional_description(
                 description(&field),
@@ -858,7 +863,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 )
             });
 
-            match linked_field.associated_data.selection_variant {
+            match linked_field.object_selection_directive_set {
                 ObjectSelectionDirectiveSet::Updatable(_) => {
                     *updatable_fields = true;
                     write_getter_and_setter(

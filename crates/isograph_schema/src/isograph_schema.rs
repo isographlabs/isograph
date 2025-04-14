@@ -12,10 +12,10 @@ use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective, GraphQLNamedTyp
 use intern::string_key::Intern;
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientObjectSelectableId, ClientScalarSelectableId, DefinitionLocation,
-    ObjectSelection, ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionType, SelectionTypeContainingSelections, ServerEntityId, ServerObjectEntityId,
-    ServerObjectSelectableId, ServerScalarEntityId, ServerScalarSelectableId,
+    ArgumentKeyAndValue, ClientFieldDirectiveSet, ClientObjectSelectableId,
+    ClientScalarSelectableId, DefinitionLocation, EmptyDirectiveSet, ObjectSelection,
+    ScalarSelection, SelectionType, SelectionTypeContainingSelections, ServerEntityId,
+    ServerObjectEntityId, ServerObjectSelectableId, ServerScalarEntityId, ServerScalarSelectableId,
     ServerStrongIdFieldId, VariableDefinition, WithId,
 };
 use lazy_static::lazy_static;
@@ -23,10 +23,10 @@ use lazy_static::lazy_static;
 use crate::{
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectableId,
-    NetworkProtocol, NormalizationKey, ServerEntity, ServerObjectEntity,
-    ServerObjectEntityAvailableSelectables, ServerObjectSelectable, ServerScalarEntity,
-    ServerScalarSelectable, ServerSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
-    UserWrittenComponentVariant,
+    NetworkProtocol, NormalizationKey, ObjectSelectable, ObjectSelectableId, ServerEntity,
+    ServerObjectEntity, ServerObjectEntityAvailableSelectables, ServerObjectSelectable,
+    ServerScalarEntity, ServerScalarSelectable, ServerSelectable, ServerSelectableId,
+    UseRefetchFieldRefetchStrategy,
 };
 
 lazy_static! {
@@ -38,17 +38,6 @@ lazy_static! {
 pub struct RootOperationName(pub String);
 
 /// The in-memory representation of a schema.
-///
-/// The TSchemaValidationState type param varies based on how far along in the
-/// validation pipeline the schema instance is, i.e. validating the schema means
-/// consuming an instance and creating a new instance with another
-/// TSchemaValidationState.
-///
-/// The TNetworkProtocol type param will stay constant as the schema is validated.
-///
-/// Invariant: a schema is append-only, because pointers into the Schema are in the
-/// form of newtype wrappers around u32 indexes (e.g. FieldId, etc.) As a result,
-/// the schema does not support removing items.
 #[derive(Debug)]
 pub struct Schema<TNetworkProtocol: NetworkProtocol> {
     pub server_scalar_selectables: Vec<ServerScalarSelectable<TNetworkProtocol>>,
@@ -195,7 +184,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                             }
                             DefinitionLocation::Client(c) => {
                                 let pointer = self.client_pointer(*c);
-                                pointer.to.inner()
+                                pointer.target_object_entity.inner()
                             }
                         };
 
@@ -226,11 +215,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         Ok(WithId::new(current_object_id, current_entity))
     }
 }
-
-pub type ObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
-    &'a ServerObjectSelectable<TNetworkProtocol>,
-    &'a ClientObjectSelectable<TNetworkProtocol>,
->;
 
 #[derive(Debug)]
 pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
@@ -369,7 +353,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         server_object_selectable: ServerObjectSelectable<TNetworkProtocol>,
     ) -> CreateAdditionalFieldsResult<()> {
         let next_server_object_selectable_id = self.server_object_selectables.len().into();
-        let parent_object_entity_id = server_object_selectable.parent_type_id;
+        let parent_object_entity_id = server_object_selectable.parent_object_entity_id;
         let next_object_name = server_object_selectable.name;
 
         if self
@@ -425,7 +409,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     pub fn object_selectable(
         &self,
-        field_id: DefinitionLocation<ServerObjectSelectableId, ClientObjectSelectableId>,
+        field_id: ObjectSelectableId,
     ) -> ObjectSelectable<TNetworkProtocol> {
         match field_id {
             DefinitionLocation::Server(server_field_id) => {
@@ -487,7 +471,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 &ClientScalarSelectable<TNetworkProtocol>,
                 &ClientObjectSelectable<TNetworkProtocol>,
             >,
-            UserWrittenComponentVariant,
+            ClientFieldDirectiveSet,
         ),
     > {
         self.client_scalar_selectables
@@ -498,7 +482,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 ClientFieldVariant::UserWritten(info) => Some((
                     SelectionType::Scalar(id.into()),
                     SelectionType::Scalar(field),
-                    info.user_written_component_variant,
+                    info.client_field_directive_set,
                 )),
                 ClientFieldVariant::ImperativelyLoadedField(_) => None,
             })
@@ -510,7 +494,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         (
                             SelectionType::Object(id.into()),
                             SelectionType::Object(pointer),
-                            UserWrittenComponentVariant::Eager,
+                            ClientFieldDirectiveSet::None(EmptyDirectiveSet {}),
                         )
                     }),
             )
@@ -674,58 +658,26 @@ fn add_schema_defined_scalar_type<TNetworkProtocol: NetworkProtocol>(
 #[derive(Debug, Clone)]
 pub enum SchemaServerObjectSelectableVariant {
     LinkedField,
-    InlineFragment(ServerFieldTypeAssociatedDataInlineFragment),
+    // This is the reader selection set, i.e. the vec![typename, link]
+    // It's very weird to have this here! This is indicative of poor
+    // data modeling.
+    InlineFragment(Vec<WithSpan<ValidatedSelection>>),
 }
 
-#[derive(Debug, Clone)]
-pub struct ServerFieldTypeAssociatedDataInlineFragment {
-    pub server_object_selectable_id: ServerObjectSelectableId,
-    pub concrete_type: IsographObjectTypeName,
-    pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
-}
+pub type ValidatedSelection =
+    SelectionTypeContainingSelections<ScalarSelectableId, ObjectSelectableId>;
 
-pub type ValidatedSelection = SelectionTypeContainingSelections<
-    ValidatedScalarSelectionAssociatedData,
-    ValidatedObjectSelectionAssociatedData,
->;
+pub type ValidatedObjectSelection = ObjectSelection<ScalarSelectableId, ObjectSelectableId>;
 
-pub type ValidatedObjectSelection =
-    ObjectSelection<ValidatedScalarSelectionAssociatedData, ValidatedObjectSelectionAssociatedData>;
-
-pub type ValidatedScalarSelection = ScalarSelection<ValidatedScalarSelectionAssociatedData>;
+pub type ValidatedScalarSelection = ScalarSelection<ScalarSelectableId>;
 
 pub type ValidatedVariableDefinition = VariableDefinition<ServerEntityId>;
 
-pub type ValidatedUseRefetchFieldStrategy = UseRefetchFieldRefetchStrategy<
-    ValidatedScalarSelectionAssociatedData,
-    ValidatedObjectSelectionAssociatedData,
->;
+pub type ValidatedUseRefetchFieldStrategy =
+    UseRefetchFieldRefetchStrategy<ScalarSelectableId, ObjectSelectableId>;
 
-/// The validated defined field that shows up in the TScalarField generic.
-pub type ValidatedFieldDefinitionLocation =
+pub type ScalarSelectableId =
     DefinitionLocation<ServerScalarSelectableId, ClientScalarSelectableId>;
-
-#[derive(Debug, Clone)]
-pub struct ValidatedObjectSelectionAssociatedData {
-    pub parent_object_entity_id: ServerObjectEntityId,
-    pub field_id: DefinitionLocation<ServerObjectSelectableId, ClientObjectSelectableId>,
-    pub selection_variant: ObjectSelectionDirectiveSet,
-    /// Some if the (destination?) object is concrete; None otherwise.
-    pub concrete_type: Option<IsographObjectTypeName>,
-}
-
-// TODO this should encode whether the scalar selection points to a
-// client field or to a server scalar
-#[derive(Debug, Clone)]
-pub struct ValidatedScalarSelectionAssociatedData {
-    pub location: ValidatedFieldDefinitionLocation,
-    pub selection_variant: ScalarSelectionDirectiveSet,
-}
-
-pub type ClientSelectable<'a, TNetworkProtocol> = SelectionType<
-    &'a ClientScalarSelectable<TNetworkProtocol>,
-    &'a ClientObjectSelectable<TNetworkProtocol>,
->;
 
 /// If we have encountered an id field, we can:
 /// - validate that the id field is properly defined, i.e. has type ID!

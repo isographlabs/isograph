@@ -2,6 +2,8 @@ use common_lang_types::{
     IsoLiteralText, ServerScalarSelectableName, UnvalidatedTypeName, WithSpan,
 };
 
+use crate::entrypoint_directive_set::EntrypointDirectiveSet;
+
 // TODO should this be ObjectTypeAndFieldNames?
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct EntrypointDeclaration {
@@ -14,4 +16,5 @@ pub struct EntrypointDeclaration {
     pub entrypoint_keyword: WithSpan<()>,
     pub dot: WithSpan<()>,
     pub iso_literal_text: IsoLiteralText,
+    pub entrypoint_directive_set: EntrypointDirectiveSet,
 }
