@@ -17,9 +17,10 @@ use isograph_lang_types::{
 use serde::Deserialize;
 
 use crate::{
-    generate_refetch_field_strategy, ClientFieldVariant, ClientScalarSelectable,
-    ImperativelyLoadedFieldVariant, NetworkProtocol, PrimaryFieldInfo, RefetchStrategy, Schema,
-    UnprocessedClientFieldItem, WrappedSelectionMapSelection,
+    generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
+    ClientFieldVariant, ClientScalarSelectable, ImperativelyLoadedFieldVariant, NetworkProtocol,
+    PrimaryFieldInfo, RefetchStrategy, Schema, UnprocessedClientFieldItem,
+    WrappedSelectionMapSelection,
 };
 use lazy_static::lazy_static;
 
@@ -121,6 +122,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     fn create_new_exposed_field(
         &mut self,
         expose_field_directive: &ExposeFieldDirective,
+        // e.g. Query or Mutation
         parent_object_name: IsographObjectTypeName,
         parent_object_entity_id: ServerObjectEntityId,
     ) -> Result<UnprocessedClientFieldItem, WithLocation<CreateAdditionalFieldsError>> {
@@ -242,10 +244,29 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .collect();
 
         let top_level_schema_field_concrete_type = payload_object.concrete_type;
-        let primary_field_concrete_type = self
+        let maybe_abstract_parent_object = self
             .server_entity_data
-            .server_object_entity(maybe_abstract_parent_object_entity_id)
-            .concrete_type;
+            .server_object_entity(maybe_abstract_parent_object_entity_id);
+        let primary_field_concrete_type = maybe_abstract_parent_object.concrete_type;
+
+        let top_level_schema_field_arguments = mutation_field_arguments
+            .into_iter()
+            .map(|x| x.item)
+            .collect::<Vec<_>>();
+
+        let primary_field_info = Some(PrimaryFieldInfo {
+            primary_field_name,
+            primary_field_return_type_object_entity_id: maybe_abstract_parent_object_entity_id,
+            primary_field_field_map: field_map.to_vec(),
+            primary_field_concrete_type,
+        });
+
+        let subfields_or_inline_fragments = imperative_field_subfields_or_inline_fragments(
+            top_level_schema_field_name,
+            &top_level_schema_field_arguments,
+            top_level_schema_field_concrete_type,
+            &primary_field_info,
+        );
 
         let mutation_client_field = ClientScalarSelectable {
             description,
@@ -255,21 +276,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             variant: ClientFieldVariant::ImperativelyLoadedField(ImperativelyLoadedFieldVariant {
                 client_field_scalar_selection_name: client_field_scalar_selection_name
                     .unchecked_conversion(),
-                top_level_schema_field_name,
-                top_level_schema_field_arguments: mutation_field_arguments
-                    .into_iter()
-                    .map(|x| x.item)
-                    .collect::<Vec<_>>(),
-                top_level_schema_field_concrete_type,
-                primary_field_info: Some(PrimaryFieldInfo {
-                    primary_field_name,
-                    primary_field_return_type_object_entity_id:
-                        maybe_abstract_parent_object_entity_id,
-                    primary_field_field_map: field_map.to_vec(),
-                    primary_field_concrete_type,
-                }),
+                top_level_schema_field_arguments,
+                primary_field_info,
 
                 root_object_entity_id: parent_object_entity_id,
+                subfields_or_inline_fragments,
             }),
             variable_definitions: vec![],
             type_and_field: ObjectTypeAndFieldName {

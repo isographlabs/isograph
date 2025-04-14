@@ -505,11 +505,11 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
 ) -> ImperativelyLoadedFieldArtifactInfo {
     let ImperativelyLoadedFieldVariant {
         client_field_scalar_selection_name,
-        top_level_schema_field_name,
         top_level_schema_field_arguments,
-        top_level_schema_field_concrete_type,
         primary_field_info,
         root_object_entity_id,
+        mut subfields_or_inline_fragments,
+        ..
     } = variant;
     // This could be Pet
     let refetch_field_parent_type = schema
@@ -530,14 +530,16 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
         });
     }
 
-    let subfields_or_inline_fragments = imperative_field_subfields_or_inline_fragments(
-        refetch_field_parent_id,
-        refetch_field_parent_type.name,
-        top_level_schema_field_name,
-        top_level_schema_field_arguments,
-        top_level_schema_field_concrete_type,
-        &primary_field_info,
-    );
+    if primary_field_info
+        .as_ref()
+        .map(|x| x.primary_field_return_type_object_entity_id != refetch_field_parent_id)
+        .unwrap_or(true)
+    {
+        subfields_or_inline_fragments.insert(
+            0,
+            WrappedSelectionMapSelection::InlineFragment(refetch_field_parent_type.name),
+        );
+    }
 
     let wrapped_selection_map =
         selection_map_wrapped(selection_map.clone(), subfields_or_inline_fragments);
@@ -584,12 +586,10 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
 }
 
 pub fn imperative_field_subfields_or_inline_fragments(
-    refetch_field_parent_id: ServerObjectEntityId,
-    refetch_field_parent_entity_name: IsographObjectTypeName,
     top_level_schema_field_name: ServerObjectSelectableName,
-    top_level_schema_field_arguments: Vec<
-        VariableDefinition<SelectionType<ServerScalarEntityId, ServerObjectEntityId>>,
-    >,
+    top_level_schema_field_arguments: &[VariableDefinition<
+        SelectionType<ServerScalarEntityId, ServerObjectEntityId>,
+    >],
     top_level_schema_field_concrete_type: Option<IsographObjectTypeName>,
     primary_field_info: &Option<PrimaryFieldInfo>,
 ) -> Vec<WrappedSelectionMapSelection> {
@@ -606,17 +606,6 @@ pub fn imperative_field_subfields_or_inline_fragments(
     // TODO consider wrapping this when we first create the RootRefetchedPath?
 
     vec![
-        if primary_field_info
-            .as_ref()
-            .map(|x| x.primary_field_return_type_object_entity_id != refetch_field_parent_id)
-            .unwrap_or(true)
-        {
-            Some(WrappedSelectionMapSelection::InlineFragment(
-                refetch_field_parent_entity_name,
-            ))
-        } else {
-            None
-        },
         primary_field_info.as_ref().map(|primary_field| {
             WrappedSelectionMapSelection::LinkedField {
                 server_object_selectable_name: primary_field.primary_field_name,
@@ -1203,7 +1192,7 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Ord, Eq, Hash)]
 pub enum WrappedSelectionMapSelection {
     LinkedField {
         server_object_selectable_name: ServerObjectSelectableName,

@@ -468,20 +468,21 @@ pub struct PrimaryFieldInfo {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ImperativelyLoadedFieldVariant {
     pub client_field_scalar_selection_name: ClientScalarSelectableName,
-    /// What field should we select when generating the refetch query?
-    pub top_level_schema_field_name: ServerObjectSelectableName,
     /// The arguments we must pass to the top level schema field, e.g. id: ID!
     /// for node(id: $id)
     pub top_level_schema_field_arguments: Vec<VariableDefinition<ServerEntityId>>,
-
-    /// Some if the object is concrete; None otherwise.
-    pub top_level_schema_field_concrete_type: Option<IsographObjectTypeName>,
 
     /// If we need to select a sub-field, this is Some(...). We should model
     /// this differently, this is very awkward!
     pub primary_field_info: Option<PrimaryFieldInfo>,
 
     pub root_object_entity_id: ServerObjectEntityId,
+
+    // Excluding an initial (inner) inline fragment, if the actual concrete type differs
+    // from the field's concrete type. We clone this, so we don't actually know what the
+    // actual concrete type is. Which is weird. This is downstream from us copying the
+    // exposed selectable from an abstract type to a concrete type, I think.
+    pub subfields_or_inline_fragments: Vec<WrappedSelectionMapSelection>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

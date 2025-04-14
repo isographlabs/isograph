@@ -5,9 +5,10 @@ use intern::string_key::Intern;
 use isograph_lang_types::{DefinitionLocation, SelectionType, WithId};
 use isograph_schema::{
     generate_refetch_field_strategy, id_arguments, id_selection, id_top_level_arguments,
-    ClientFieldVariant, ClientScalarSelectable, ImperativelyLoadedFieldVariant, NetworkProtocol,
-    RefetchStrategy, Schema, UnprocessedClientFieldItem, UnprocessedItem,
-    WrappedSelectionMapSelection, NODE_FIELD_NAME, REFETCH_FIELD_NAME,
+    imperative_field_subfields_or_inline_fragments, ClientFieldVariant, ClientScalarSelectable,
+    ImperativelyLoadedFieldVariant, NetworkProtocol, RefetchStrategy, Schema,
+    UnprocessedClientFieldItem, UnprocessedItem, WrappedSelectionMapSelection, NODE_FIELD_NAME,
+    REFETCH_FIELD_NAME,
 };
 
 use crate::batch_compile::BatchCompileError;
@@ -66,6 +67,13 @@ pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
                     next_client_field_id,
                 )));
 
+                let subfields_or_inline_fragments = imperative_field_subfields_or_inline_fragments(
+                    *NODE_FIELD_NAME,
+                    &id_arguments(id_type_id),
+                    None,
+                    &None,
+                );
+
                 schema
                     .client_scalar_selectables
                     .push(ClientScalarSelectable {
@@ -79,12 +87,11 @@ pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
                         variant: ClientFieldVariant::ImperativelyLoadedField(
                             ImperativelyLoadedFieldVariant {
                                 client_field_scalar_selection_name: *REFETCH_FIELD_NAME,
-                                top_level_schema_field_name: *NODE_FIELD_NAME,
                                 top_level_schema_field_arguments: id_arguments(id_type_id),
-                                top_level_schema_field_concrete_type: None,
                                 primary_field_info: None,
 
                                 root_object_entity_id: query_id,
+                                subfields_or_inline_fragments,
                             },
                         ),
                         variable_definitions: vec![],
