@@ -55,10 +55,11 @@ fn isograph_plugin_transform(
     let isograph_config = config.isograph_project_config;
 
     debug!("Config: {:?}", isograph_config);
-    let file_name = metadata
-        .get_context(&TransformPluginMetadataContextKind::Filename)
-        .unwrap_or_default();
-    let path = Path::new(&file_name);
+
+    let file_name = metadata.get_context(&TransformPluginMetadataContextKind::Filename);
+    let file_name = file_name.as_deref().unwrap_or("unknown.js");
+
+    let path = Path::new(file_name);
 
     let mut isograph = compile_iso_literal_visitor(
         &isograph_config,
@@ -95,9 +96,6 @@ enum IsographTransformError {
 
     #[error("Iso invocation require one parameter.")]
     IsoRequiresOneArg,
-
-    #[error("Malformed iso literal. I hope the iso compiler failed to accept this literal!")]
-    MalformedIsoLiteral,
 
     #[error("Only template literals are allowed in iso fragments.")]
     OnlyAllowedTemplateLiteral,
@@ -146,11 +144,10 @@ impl IsographImport {
 }
 
 #[derive(Deserialize, Default, Debug, Clone, Copy, PartialEq)]
-pub enum ArtifactType {
+enum ArtifactType {
     #[default]
     Entrypoint,
     Field,
-    Unknown,
 }
 
 impl fmt::Display for ArtifactType {
@@ -158,7 +155,6 @@ impl fmt::Display for ArtifactType {
         match self {
             ArtifactType::Entrypoint => f.write_str("entrypoint"),
             ArtifactType::Field => f.write_str("field"),
-            ArtifactType::Unknown => f.write_str("unknown"),
         }
     }
 }
@@ -168,7 +164,9 @@ impl From<&str> for ArtifactType {
         match s {
             "entrypoint" => Self::Entrypoint,
             "field" => Self::Field,
-            _ => panic!("Regex will not produce this case!"),
+            _ => {
+                panic!("Regex will not produce this case. This is indicative of a bug in Isograph.")
+            }
         }
     }
 }
@@ -323,7 +321,7 @@ impl IsoLiteralCompilerVisitor<'_> {
         Err(IsographTransformError::OnlyAllowedTemplateLiteral)
     }
 
-    pub fn valid_isograph_template_literal(
+    fn valid_isograph_template_literal(
         &mut self,
         entrypoint: &ValidIsographTemplateLiteral,
     ) -> Expr {
@@ -380,9 +378,6 @@ impl IsoLiteralCompilerVisitor<'_> {
                         // iso(...)>empty<
                         None => Ok(entrypoint.build_arrow_identity_expr()),
                     }
-                }
-                ArtifactType::Unknown => {
-                    return Err(IsographTransformError::MalformedIsoLiteral);
                 }
             },
         }

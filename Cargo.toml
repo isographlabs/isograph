@@ -48,3 +48,10 @@ tinyvec = "1.8.1"
 tokio = { version = "1.35.0", features = ["full"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+
+[profile.release.package.swc_isograph_plugin]
+codegen-units = 1
+# Optimize for size
+opt-level = "s"
+# Strip debug symbols
+strip = "symbols"

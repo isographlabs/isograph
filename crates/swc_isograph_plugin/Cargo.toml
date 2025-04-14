@@ -29,13 +29,3 @@ tracing = { workspace = true, features = ["release_max_level_off"] }
 swc_ecma_parser =  { workspace = true }
 swc_ecma_transforms_testing =  { workspace = true }
 testing =  { workspace = true }
-
-[profile.release]
-codegen-units = 1
-lto = true
-
-# Optimize for size
-opt-level = "s"
-
-# Strip debug symbols
-strip = "symbols"
