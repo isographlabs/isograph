@@ -301,7 +301,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         inner_non_null_named_type: Option<&GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
     ) -> CreateAdditionalFieldsResult<()> {
         let next_server_scalar_selectable_id = self.server_scalar_selectables.len().into();
-        let parent_object_entity_id = server_scalar_selectable.parent_type_id;
+        let parent_object_entity_id = server_scalar_selectable.parent_object_entity_id;
         let next_scalar_name = server_scalar_selectable.name;
 
         let parent_type_name = self

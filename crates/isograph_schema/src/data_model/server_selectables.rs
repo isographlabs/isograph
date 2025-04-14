@@ -18,7 +18,7 @@ pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
 
     pub target_scalar_entity: TypeAnnotation<ServerScalarEntityId>,
 
-    pub parent_type_id: ServerObjectEntityId,
+    pub parent_object_entity_id: ServerObjectEntityId,
     pub arguments: Vec<WithLocation<VariableDefinition<ServerEntityId>>>,
     pub phantom_data: PhantomData<TNetworkProtocol>,
 }

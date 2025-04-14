@@ -998,6 +998,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
         linked_fields: merge_traversal_state.traversal_path.clone(),
         field_name: newly_encountered_scalar_client_selectable.name,
     };
+
     let info = PathToRefetchFieldInfo {
         refetch_field_parent_id: parent_object_entity_id,
         imperatively_loaded_field_variant: variant.clone(),

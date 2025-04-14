@@ -325,7 +325,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
                                     field_definition.item.type_.clone(),
                                 )
                                 .map(&mut |_| *scalar_entity_id),
-                                parent_type_id: parent_object_entity_id,
+                                parent_object_entity_id,
                                 arguments,
                                 phantom_data: std::marker::PhantomData,
                             },
