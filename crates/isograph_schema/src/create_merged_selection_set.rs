@@ -11,9 +11,9 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientScalarSelectableId, DefinitionLocation, EmptyDirectiveSet,
-    NonConstantValue, RefetchQueryIndex, ScalarSelectionDirectiveSet, SelectionFieldArgument,
-    SelectionType, SelectionTypeContainingSelections, ServerEntityId, ServerObjectEntityId,
-    ServerObjectSelectableId, ServerScalarEntityId, VariableDefinition,
+    NonConstantValue, RefetchQueryIndex, ScalarSelection, ScalarSelectionDirectiveSet,
+    SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, ServerEntityId,
+    ServerObjectEntityId, ServerObjectSelectableId, ServerScalarEntityId, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -25,8 +25,8 @@ use crate::{
     ClientOrServerObjectSelectable, ClientScalarOrObjectSelectable, ClientScalarSelectable,
     ClientSelectable, ClientSelectableId, ImperativelyLoadedFieldVariant, NameAndArguments,
     NetworkProtocol, PathToRefetchField, RootOperationName, Schema,
-    SchemaServerObjectSelectableVariant, ServerObjectEntity, ValidatedScalarSelection,
-    ValidatedSelection, VariableContext,
+    SchemaServerObjectSelectableVariant, ServerObjectEntity, ServerObjectSelectable,
+    ValidatedScalarSelection, ValidatedSelection, VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -816,9 +816,11 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             schema.server_object_selectable(server_object_selectable_id);
 
                         match &server_object_selectable.object_selectable_variant {
-                            SchemaServerObjectSelectableVariant::InlineFragment(
-                                inline_fragment_reader_selections,
-                            ) => {
+                            SchemaServerObjectSelectableVariant::InlineFragment => {
+                                let reader_selection_set = inline_fragment_reader_selection_set(
+                                    schema,
+                                    server_object_selectable,
+                                );
                                 let type_to_refine_to = object_selection_parent_object.name;
                                 let normalization_key =
                                     NormalizationKey::InlineFragment(type_to_refine_to);
@@ -858,7 +860,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                             &mut existing_inline_fragment.selection_map,
                                             parent_object_entity_id,
                                             object_selection_parent_object,
-                                            &inline_fragment_reader_selections,
+                                            &reader_selection_set,
                                             merge_traversal_state,
                                             encountered_client_field_map,
                                             variable_context,
@@ -1276,4 +1278,58 @@ pub fn id_arguments(id_type_id: ServerScalarEntityId) -> Vec<VariableDefinition<
         ))),
         default_value: None,
     }]
+}
+
+pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    server_object_selectable: &ServerObjectSelectable<TNetworkProtocol>,
+) -> Vec<WithSpan<ValidatedSelection>> {
+    let selectables_map = &schema
+        .server_entity_data
+        .server_object_entity_available_selectables
+        .get(server_object_selectable.target_object_entity.inner())
+        .expect(
+            "Expected subtype to exist \
+            in server_object_entity_available_selectables",
+        )
+        .0;
+    let typename_selection = WithSpan::new(
+        SelectionTypeContainingSelections::Scalar(ScalarSelection {
+            arguments: vec![],
+            scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
+            associated_data: DefinitionLocation::Server(
+                *selectables_map
+                    .get(&"__typename".intern().into())
+                    .expect("Expected __typename to exist")
+                    .as_server()
+                    .expect("Expected __typename to be server field")
+                    .as_scalar()
+                    .expect("Expected __typename to be scalar"),
+            ),
+            name: WithLocation::new("__typename".intern().into(), Location::generated()),
+            reader_alias: None,
+        }),
+        Span::todo_generated(),
+    );
+
+    let link_selection = WithSpan::new(
+        SelectionTypeContainingSelections::Scalar(ScalarSelection {
+            arguments: vec![],
+            associated_data: DefinitionLocation::Client(
+                *selectables_map
+                    .get(&(*LINK_FIELD_NAME).into())
+                    .expect("Expected link to exist")
+                    .as_client()
+                    .expect("Expected link to be client field")
+                    .as_scalar()
+                    .expect("Expected lnk to be scalar field"),
+            ),
+            scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
+            name: WithLocation::new((*LINK_FIELD_NAME).into(), Location::generated()),
+            reader_alias: None,
+        }),
+        Span::todo_generated(),
+    );
+
+    vec![typename_selection, link_selection]
 }

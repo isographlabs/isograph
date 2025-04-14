@@ -168,7 +168,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         DefinitionLocation::Server(server_field_id) => {
             let server_field = schema.server_object_selectable(server_field_id);
             match &server_field.object_selectable_variant {
-                SchemaServerObjectSelectableVariant::InlineFragment(_) => {
+                SchemaServerObjectSelectableVariant::InlineFragment => {
                     let object = schema
                         .server_entity_data
                         .server_object_entity(server_field.parent_object_entity_id);

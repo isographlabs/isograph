@@ -17,11 +17,11 @@ use isograph_lang_types::{
     UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
-    accessible_client_fields, description, output_type_annotation, selection_map_wrapped,
-    ClientFieldVariant, ClientScalarSelectable, ClientSelectableId, FieldTraversalResult,
-    NameAndArguments, NetworkProtocol, NormalizationKey, ScalarSelectableId, Schema,
-    SchemaServerObjectSelectableVariant, UserWrittenClientTypeInfo, ValidatedSelection,
-    ValidatedVariableDefinition, WrappedSelectionMapSelection,
+    accessible_client_fields, description, inline_fragment_reader_selection_set,
+    output_type_annotation, selection_map_wrapped, ClientFieldVariant, ClientScalarSelectable,
+    ClientSelectableId, FieldTraversalResult, NameAndArguments, NetworkProtocol, NormalizationKey,
+    ScalarSelectableId, Schema, SchemaServerObjectSelectableVariant, UserWrittenClientTypeInfo,
+    ValidatedSelection, ValidatedVariableDefinition, WrappedSelectionMapSelection,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -147,13 +147,11 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     schema.server_object_selectable(*server_object_selectable_id);
                 match &server_object_selectable.object_selectable_variant {
                     SchemaServerObjectSelectableVariant::LinkedField => {}
-                    SchemaServerObjectSelectableVariant::InlineFragment(
-                        inline_fragment_reader_selections,
-                    ) => {
+                    SchemaServerObjectSelectableVariant::InlineFragment => {
                         path_and_contents.push(generate_eager_reader_condition_artifact(
                             schema,
                             server_object_selectable,
-                            inline_fragment_reader_selections,
+                            &inline_fragment_reader_selection_set(schema, server_object_selectable),
                             &traversal_state.refetch_paths,
                             config.options.include_file_extensions_in_import_statements,
                         ));

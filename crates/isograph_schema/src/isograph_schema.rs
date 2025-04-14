@@ -6,7 +6,7 @@ use std::{
 use common_lang_types::{
     ClientScalarSelectableName, GraphQLScalarTypeName, IsoLiteralText, IsographObjectTypeName,
     JavascriptName, Location, ObjectSelectableName, SelectableName, UnvalidatedTypeName,
-    WithLocation, WithSpan,
+    WithLocation,
 };
 use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective, GraphQLNamedTypeAnnotation};
 use intern::string_key::Intern;
@@ -656,12 +656,10 @@ fn add_schema_defined_scalar_type<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[derive(Debug, Clone)]
+// This struct is indicative of poor data modeling.
 pub enum SchemaServerObjectSelectableVariant {
     LinkedField,
-    // This is the reader selection set, i.e. the vec![typename, link]
-    // It's very weird to have this here! This is indicative of poor
-    // data modeling.
-    InlineFragment(Vec<WithSpan<ValidatedSelection>>),
+    InlineFragment,
 }
 
 pub type ValidatedSelection =
