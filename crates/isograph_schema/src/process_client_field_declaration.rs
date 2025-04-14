@@ -2,9 +2,8 @@ use std::collections::HashMap;
 
 use common_lang_types::{
     ClientScalarSelectableName, ConstExportName, IsographDirectiveName, IsographObjectTypeName,
-    Location, ObjectTypeAndFieldName, RelativePathToSourceFile, SelectableName,
-    ServerObjectSelectableName, TextSource, UnvalidatedTypeName, VariableName, WithLocation,
-    WithSpan,
+    Location, ObjectTypeAndFieldName, RelativePathToSourceFile, SelectableName, TextSource,
+    UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -19,7 +18,7 @@ use thiserror::Error;
 use crate::{
     refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
     ClientObjectSelectable, ClientScalarSelectable, FieldMapItem, NetworkProtocol, Schema,
-    WrappedSelectionMapSelection, NODE_FIELD_NAME,
+    ValidatedVariableDefinition, WrappedSelectionMapSelection, NODE_FIELD_NAME,
 };
 
 pub type UnprocessedSelection = WithSpan<UnvalidatedSelection>;
@@ -456,36 +455,18 @@ pub enum ProcessClientFieldDeclarationError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct PrimaryFieldInfo {
-    pub primary_field_name: ServerObjectSelectableName,
-    /// Some if the object is concrete; None otherwise.
-    pub primary_field_concrete_type: Option<IsographObjectTypeName>,
-    /// If this is abstract, we add a fragment spread
-    pub primary_field_return_type_object_entity_id: ServerObjectEntityId,
-    pub primary_field_field_map: Vec<FieldMapItem>,
-    pub client_field_scalar_selection_name: ClientScalarSelectableName,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ImperativelyLoadedFieldVariant {
-    /// The arguments we must pass to the top level schema field, e.g. id: ID!
-    /// for node(id: $id). These are already encoded in the subfields_or_inline_fragments,
-    /// but we nonetheless need to put them into the query definition. (Or we could perhaps
-    /// calculate that by calculating reachable variables.)
-    pub top_level_schema_field_arguments: Vec<VariableDefinition<ServerEntityId>>,
-
-    /// If we need to select a sub-field, this is Some(...). We should model
-    /// this differently, this is very awkward!
-    pub primary_field_info: Option<PrimaryFieldInfo>,
+    pub client_field_scalar_selection_name: ClientScalarSelectableName,
 
     // Mutation or Query or whatnot. Awkward! A GraphQL-ism!
     pub root_object_entity_id: ServerObjectEntityId,
-
-    // Excluding an initial (inner) inline fragment, if the actual concrete type differs
-    // from the field's concrete type. We clone this, so we don't actually know what the
-    // actual concrete type is. Which is weird. This is downstream from us copying the
-    // exposed selectable from an abstract type to a concrete type, I think.
     pub subfields_or_inline_fragments: Vec<WrappedSelectionMapSelection>,
+    pub field_map: Vec<FieldMapItem>,
+    /// The arguments we must pass to the top level schema field, e.g. id: ID!
+    /// for node(id: $id). These are already encoded in the subfields_or_inline_fragments,
+    /// but we nonetheless need to put them into the query definition, and we need
+    /// the variable's type, not just the variable.
+    pub top_level_schema_field_arguments: Vec<ValidatedVariableDefinition>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

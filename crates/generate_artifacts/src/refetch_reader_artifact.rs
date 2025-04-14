@@ -1,11 +1,10 @@
 use common_lang_types::{ArtifactPathAndContent, ObjectTypeAndFieldName};
-use intern::string_key::Intern;
 
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
     initial_variable_context, ClientScalarOrObjectSelectable, ClientScalarSelectable, FieldMapItem,
-    NetworkProtocol, PrimaryFieldInfo, RefetchedPathsMap, Schema,
+    NetworkProtocol, RefetchedPathsMap, Schema,
 };
 
 use crate::{
@@ -20,18 +19,12 @@ use crate::{
 pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
-    primary_field_info: Option<&PrimaryFieldInfo>,
     refetched_paths: &RefetchedPathsMap,
     was_selected_loadably: bool,
     file_extensions: GenerateFileExtensionsOption,
+    field_map: &[FieldMapItem],
 ) -> ArtifactPathAndContent {
-    let read_out_data = match primary_field_info {
-        Some(info) => get_read_out_data(&info.primary_field_field_map),
-        None => get_read_out_data(&[FieldMapItem {
-            from: "id".intern().into(),
-            to: "id".intern().into(),
-        }]),
-    };
+    let read_out_data = get_read_out_data(field_map);
     let function_import_statement = generate_function_import_statement(read_out_data);
     let parent_type = schema
         .server_entity_data

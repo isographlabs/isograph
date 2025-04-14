@@ -19,9 +19,10 @@ use isograph_lang_types::{
 use isograph_schema::{
     accessible_client_fields, description, inline_fragment_reader_selection_set,
     output_type_annotation, selection_map_wrapped, ClientFieldVariant, ClientScalarSelectable,
-    ClientSelectableId, FieldTraversalResult, NameAndArguments, NetworkProtocol, NormalizationKey,
-    ScalarSelectableId, Schema, SchemaServerObjectSelectableVariant, UserWrittenClientTypeInfo,
-    ValidatedSelection, ValidatedVariableDefinition, WrappedSelectionMapSelection,
+    ClientSelectableId, FieldMapItem, FieldTraversalResult, NameAndArguments, NetworkProtocol,
+    NormalizationKey, ScalarSelectableId, Schema, SchemaServerObjectSelectableVariant,
+    UserWrittenClientTypeInfo, ValidatedSelection, ValidatedVariableDefinition,
+    WrappedSelectionMapSelection,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -197,10 +198,13 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                             path_and_contents.push(generate_refetch_reader_artifact(
                                 schema,
                                 client_scalar_selectable,
-                                None,
                                 &traversal_state.refetch_paths,
                                 true,
                                 config.options.include_file_extensions_in_import_statements,
+                                &[FieldMapItem {
+                                    from: "id".intern().into(),
+                                    to: "id".intern().into(),
+                                }],
                             ));
 
                             // Everything about this is quite sus
@@ -286,14 +290,14 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                             );
                         }
                     }
-                    ClientFieldVariant::ImperativelyLoadedField(variant) => {
+                    ClientFieldVariant::ImperativelyLoadedField(s) => {
                         path_and_contents.push(generate_refetch_reader_artifact(
                             schema,
                             client_scalar_selectable,
-                            variant.primary_field_info.as_ref(),
                             &traversal_state.refetch_paths,
                             false,
                             config.options.include_file_extensions_in_import_statements,
+                            &s.field_map,
                         ));
                     }
                 };
@@ -518,14 +522,10 @@ pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
                     .to_string(),
             ),
         },
-        ClientFieldVariant::ImperativelyLoadedField(params) => {
+        ClientFieldVariant::ImperativelyLoadedField(_) => {
+            // TODO - we should not type params as any, but instead use some generated type
             // N.B. the string is a stable id for deduplicating
-            match params.primary_field_info {
-                Some(_) => {
-                    ClientFieldOutputType("(params: any) => [string, () => void]".to_string())
-                }
-                None => ClientFieldOutputType("() => [string, () => void]".to_string()),
-            }
+            ClientFieldOutputType("(params: any) => [string, () => void]".to_string())
         }
     }
 }

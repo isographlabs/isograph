@@ -6,7 +6,7 @@ use isograph_lang_types::{DefinitionLocation, SelectionType, WithId};
 use isograph_schema::{
     generate_refetch_field_strategy, id_arguments, id_selection, id_top_level_arguments,
     imperative_field_subfields_or_inline_fragments, ClientFieldVariant, ClientScalarSelectable,
-    ImperativelyLoadedFieldVariant, NetworkProtocol, RefetchStrategy, Schema,
+    FieldMapItem, ImperativelyLoadedFieldVariant, NetworkProtocol, RefetchStrategy, Schema,
     UnprocessedClientFieldItem, UnprocessedItem, WrappedSelectionMapSelection, NODE_FIELD_NAME,
     REFETCH_FIELD_NAME,
 };
@@ -67,12 +67,14 @@ pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
                     next_client_field_id,
                 )));
 
-                let subfields_or_inline_fragments = imperative_field_subfields_or_inline_fragments(
-                    *NODE_FIELD_NAME,
-                    &id_arguments(id_type_id),
-                    None,
-                    &None,
-                );
+                let subfields_or_inline_fragments = vec![
+                    WrappedSelectionMapSelection::InlineFragment(object_name),
+                    imperative_field_subfields_or_inline_fragments(
+                        *NODE_FIELD_NAME,
+                        &id_arguments(id_type_id),
+                        None,
+                    ),
+                ];
 
                 schema
                     .client_scalar_selectables
@@ -87,10 +89,13 @@ pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
                         variant: ClientFieldVariant::ImperativelyLoadedField(
                             ImperativelyLoadedFieldVariant {
                                 top_level_schema_field_arguments: id_arguments(id_type_id),
-                                primary_field_info: None,
-
                                 root_object_entity_id: query_id,
                                 subfields_or_inline_fragments,
+                                client_field_scalar_selection_name: "__refetch".intern().into(),
+                                field_map: vec![FieldMapItem {
+                                    from: "id".intern().into(),
+                                    to: "id".intern().into(),
+                                }],
                             },
                         ),
                         variable_definitions: vec![],

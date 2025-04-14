@@ -16,6 +16,7 @@ use isograph_schema::{
     ClientScalarSelectable, FieldToCompletedMergeTraversalStateMap, FieldTraversalResult,
     MergedSelectionMap, NetworkProtocol, RootOperationName, RootRefetchedPath,
     ScalarClientFieldTraversalState, Schema, ServerObjectEntity, ValidatedVariableDefinition,
+    WrappedSelectionMapSelection,
 };
 
 use crate::{
@@ -236,14 +237,15 @@ fn generate_refetch_query_artifact_import(
             query_index,
             file_extensions.ts()
         ));
+
         let variable_names_str = variable_names_to_string(
             &item.2,
-            // What are we doing here?
-            path_to_refetch_field_info
-                .imperatively_loaded_field_variant
-                .top_level_schema_field_arguments
-                .iter()
-                .map(|x| x.name.item.unchecked_conversion()),
+            get_used_variables(
+                &path_to_refetch_field_info
+                    .imperatively_loaded_field_variant
+                    .subfields_or_inline_fragments,
+            )
+            .into_iter(),
         );
         array_syntax.push_str(&format!(
             "  {{ artifact: refetchQuery{}, allowedVariables: {} }},\n",
@@ -380,4 +382,24 @@ fn variable_names_to_string(
     s.push(']');
 
     s
+}
+
+fn get_used_variables(
+    inline_fragments_or_linked_fields: &[WrappedSelectionMapSelection],
+) -> BTreeSet<VariableName> {
+    // TODO return impl iterator
+    let mut variables = BTreeSet::new();
+
+    for item in inline_fragments_or_linked_fields {
+        match item {
+            WrappedSelectionMapSelection::LinkedField { arguments, .. } => {
+                for arg in arguments {
+                    variables.extend(arg.value.variables());
+                }
+            }
+            WrappedSelectionMapSelection::InlineFragment(_) => {}
+        }
+    }
+
+    variables
 }
