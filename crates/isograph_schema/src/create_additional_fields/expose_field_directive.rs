@@ -259,6 +259,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             primary_field_return_type_object_entity_id: maybe_abstract_parent_object_entity_id,
             primary_field_field_map: field_map.to_vec(),
             primary_field_concrete_type,
+            client_field_scalar_selection_name: client_field_scalar_selection_name
+                .unchecked_conversion(),
         });
 
         let subfields_or_inline_fragments = imperative_field_subfields_or_inline_fragments(
@@ -274,8 +276,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             reader_selection_set: vec![],
 
             variant: ClientFieldVariant::ImperativelyLoadedField(ImperativelyLoadedFieldVariant {
-                client_field_scalar_selection_name: client_field_scalar_selection_name
-                    .unchecked_conversion(),
                 top_level_schema_field_arguments,
                 primary_field_info,
 

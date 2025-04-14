@@ -463,11 +463,11 @@ pub struct PrimaryFieldInfo {
     /// If this is abstract, we add a fragment spread
     pub primary_field_return_type_object_entity_id: ServerObjectEntityId,
     pub primary_field_field_map: Vec<FieldMapItem>,
+    pub client_field_scalar_selection_name: ClientScalarSelectableName,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ImperativelyLoadedFieldVariant {
-    pub client_field_scalar_selection_name: ClientScalarSelectableName,
     /// The arguments we must pass to the top level schema field, e.g. id: ID!
     /// for node(id: $id)
     pub top_level_schema_field_arguments: Vec<VariableDefinition<ServerEntityId>>,

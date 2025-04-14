@@ -86,7 +86,6 @@ pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
                         reader_selection_set: vec![],
                         variant: ClientFieldVariant::ImperativelyLoadedField(
                             ImperativelyLoadedFieldVariant {
-                                client_field_scalar_selection_name: *REFETCH_FIELD_NAME,
                                 top_level_schema_field_arguments: id_arguments(id_type_id),
                                 primary_field_info: None,
 

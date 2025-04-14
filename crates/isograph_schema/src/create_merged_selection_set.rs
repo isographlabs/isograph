@@ -504,12 +504,10 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ImperativelyLoadedFieldArtifactInfo {
     let ImperativelyLoadedFieldVariant {
-        client_field_scalar_selection_name,
         top_level_schema_field_arguments,
         primary_field_info,
         root_object_entity_id,
         mut subfields_or_inline_fragments,
-        ..
     } = variant;
     // This could be Pet
     let refetch_field_parent_type = schema
@@ -558,10 +556,10 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
         )
         .clone();
 
-    let query_name = if primary_field_info.is_some() {
+    let query_name = if let Some(primary_field_info) = primary_field_info {
         format!(
             "{}__{}",
-            root_parent_object, client_field_scalar_selection_name
+            root_parent_object, primary_field_info.client_field_scalar_selection_name
         )
     } else {
         format!("{}__refetch", refetch_field_parent_type.name)
