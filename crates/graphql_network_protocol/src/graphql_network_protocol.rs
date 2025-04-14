@@ -44,10 +44,9 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 process_graphql_type_extension_document(type_system_extension_document.to_owned())?;
 
             let ProcessTypeSystemDocumentOutcome {
-                unvalidated_subtype_to_supertype_map,
-                unvalidated_supertype_to_subtype_map,
                 scalars,
                 objects,
+                unvalidated_supertype_to_subtype_map: unvalidated_subtype_to_supertype_map,
             } = outcome;
 
             // Note: we process all newly-defined types in schema extensions.
@@ -56,11 +55,8 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             result.objects.extend(objects);
             result.scalars.extend(scalars);
             result
-                .unvalidated_subtype_to_supertype_map
-                .extend(unvalidated_subtype_to_supertype_map);
-            result
                 .unvalidated_supertype_to_subtype_map
-                .extend(unvalidated_supertype_to_subtype_map);
+                .extend(unvalidated_subtype_to_supertype_map);
 
             // - in the extension document, you may have added directives to objects, e.g. @exposeAs
             // - we need to transfer those to the original objects.

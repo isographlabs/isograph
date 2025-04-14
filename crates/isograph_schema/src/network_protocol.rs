@@ -49,20 +49,15 @@ where
 }
 
 pub struct ProcessTypeSystemDocumentOutcome<TNetworkProtocol: NetworkProtocol> {
-    // TODO these fields are a mistake. The concepts of subtypes and supertypes
-    // mapping to asConcreteType fields is a GraphQL-ism! Sure, you may also want
-    // that it in SQL-land, but it should nonetheless be the responsibility of the
-    // network protocol to specify that.
-    pub unvalidated_subtype_to_supertype_map:
-        HashMap<UnvalidatedTypeName, Vec<UnvalidatedTypeName>>,
-    pub unvalidated_supertype_to_subtype_map:
-        HashMap<UnvalidatedTypeName, Vec<UnvalidatedTypeName>>,
-
     pub scalars: Vec<(ServerScalarEntity<TNetworkProtocol>, Location)>,
     pub objects: Vec<(
         ProcessObjectTypeDefinitionOutcome<TNetworkProtocol>,
         Location,
     )>,
+
+    // TODO get rid of this
+    pub unvalidated_supertype_to_subtype_map:
+        HashMap<UnvalidatedTypeName, Vec<UnvalidatedTypeName>>,
 }
 
 pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol> {

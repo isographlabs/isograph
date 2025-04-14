@@ -34,6 +34,8 @@ lazy_static! {
 pub fn process_graphql_type_system_document(
     type_system_document: GraphQLTypeSystemDocument,
 ) -> ProcessGraphqlTypeDefinitionResult<ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>> {
+    // TODO return a vec of errors, not just one
+
     // In the schema, interfaces, unions and objects are the same type of object (SchemaType),
     // with e.g. interfaces "simply" being objects that can be refined to other
     // concrete objects.
@@ -175,10 +177,50 @@ pub fn process_graphql_type_system_document(
         }
     }
 
+    // For each supertype (e.g. Node) and a subtype (e.g. Pet), we need to add an asConcreteType field.
+    for (supertype_name, subtypes) in supertype_to_subtype_map.iter() {
+        if let Some((object_outcome, _)) = objects.iter_mut().find(|obj| {
+            let supertype_name: IsographObjectTypeName = supertype_name.unchecked_conversion();
+
+            obj.0.server_object_entity.name == supertype_name
+        }) {
+            for subtype_name in subtypes.iter() {
+                object_outcome.fields_to_insert.push(WithLocation::new(
+                    GraphQLFieldDefinition {
+                        description: Some(WithSpan::new(
+                            format!("A client pointer for the {} type.", subtype_name)
+                                .intern()
+                                .into(),
+                            Span::todo_generated(),
+                        )),
+                        name: WithLocation::new(
+                            format!("as{}", subtype_name).intern().into(),
+                            Location::generated(),
+                        ),
+                        type_: GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
+                            WithSpan::new(*subtype_name, Span::todo_generated()),
+                        )),
+                        arguments: vec![],
+                        directives: vec![],
+                        is_inline_fragment: true,
+                    },
+                    Location::generated(),
+                ));
+            }
+        } else {
+            return Err(WithLocation::new(
+                ProcessGraphqlTypeSystemDefinitionError::AttemptedToImplementNonExistentType {
+                subtype_name: *subtypes.first().expect("Expected subtypes not to be empty. This is indicative of a bug in Isograph."),
+                    supertype_name: *supertype_name,
+                },
+                Location::generated(),
+            ));
+        };
+    }
+
     Ok(ProcessTypeSystemDocumentOutcome {
         scalars,
         objects,
-        unvalidated_subtype_to_supertype_map: subtype_to_supertype_map,
         unvalidated_supertype_to_subtype_map: supertype_to_subtype_map,
     })
 }
@@ -232,6 +274,12 @@ pub enum ProcessGraphqlTypeSystemDefinitionError {
 
     #[error("Attempted to extend {type_name}, but that type is not defined")]
     AttemptedToExtendUndefinedType { type_name: IsographObjectTypeName },
+
+    #[error("Type {subtype_name} claims to implement {supertype_name}, but {supertype_name} is not a type that has been defined.")]
+    AttemptedToImplementNonExistentType {
+        subtype_name: UnvalidatedTypeName,
+        supertype_name: UnvalidatedTypeName,
+    },
 }
 
 fn process_object_type_definition(
@@ -264,6 +312,7 @@ fn process_object_type_definition(
                 )),
                 arguments: vec![],
                 directives: vec![],
+                is_inline_fragment: false,
             },
             Location::generated(),
         ));

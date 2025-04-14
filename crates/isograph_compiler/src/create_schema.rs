@@ -41,12 +41,6 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
     let ProcessTypeSystemDocumentOutcome {
         scalars,
         objects,
-        // TODO don't return these; instead, creating asConcreteType fields is a responsibility
-        // of the NetworkProtocol
-        //
-        // (I think this means we should not transfer client fields from abstract
-        // types to concrete types! That's probably broken anyway.)
-        unvalidated_subtype_to_supertype_map,
         unvalidated_supertype_to_subtype_map,
     } = TNetworkProtocol::parse_and_process_type_system_documents(
         db,
@@ -107,10 +101,9 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
         &config.options,
     )?;
 
-    let type_refinement_maps = get_type_refinement_map(
-        &mut unvalidated_isograph_schema,
+    let type_refinement_map = get_type_refinement_map(
+        &unvalidated_isograph_schema,
         unvalidated_supertype_to_subtype_map,
-        unvalidated_subtype_to_supertype_map,
     )?;
 
     let contains_iso = parse_iso_literals(
@@ -134,13 +127,9 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
     unprocessed_items.extend(process_exposed_fields(&mut unvalidated_isograph_schema)?);
 
     unvalidated_isograph_schema.transfer_supertype_client_selectables_to_subtypes(
-        &type_refinement_maps.supertype_to_subtype_map,
+        &type_refinement_map.supertype_to_subtype_map,
     )?;
     unvalidated_isograph_schema.add_link_fields()?;
-    unvalidated_isograph_schema.add_object_selectable_to_subtype_on_supertypes(
-        &type_refinement_maps.subtype_to_supertype_map,
-    )?;
-
     unprocessed_items.extend(add_refetch_fields_to_objects(
         &mut unvalidated_isograph_schema,
     )?);
@@ -358,7 +347,12 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
                             arguments,
                             phantom_data: std::marker::PhantomData,
                             object_selectable_variant:
-                                SchemaServerObjectSelectableVariant::LinkedField,
+                                // TODO this is hacky
+                                if field_definition.item.is_inline_fragment {
+                                    SchemaServerObjectSelectableVariant::InlineFragment
+                                } else {
+                                    SchemaServerObjectSelectableVariant::LinkedField
+                                }
                         })
                         .map_err(|e| WithLocation::new(e, field_definition.location))?;
                 }
@@ -476,23 +470,19 @@ fn convert_graphql_constant_value_to_isograph_constant_value(
 // some validation errors. It might be necessary once we handle __asNode etc.
 // style fields.
 fn get_type_refinement_map<TNetworkProtocol: NetworkProtocol>(
-    schema: &mut Schema<TNetworkProtocol>,
+    schema: &Schema<TNetworkProtocol>,
     unvalidated_supertype_to_subtype_map: UnvalidatedTypeRefinementMap,
-    unvalidated_subtype_to_supertype_map: UnvalidatedTypeRefinementMap,
 ) -> Result<TypeRefinementMaps, WithLocation<CreateAdditionalFieldsError>> {
     let supertype_to_subtype_map =
         validate_type_refinement_map(schema, unvalidated_supertype_to_subtype_map)?;
-    let subtype_to_supertype_map =
-        validate_type_refinement_map(schema, unvalidated_subtype_to_supertype_map)?;
 
     Ok(TypeRefinementMaps {
-        subtype_to_supertype_map,
         supertype_to_subtype_map,
     })
 }
 
 fn validate_type_refinement_map<TNetworkProtocol: NetworkProtocol>(
-    schema: &mut Schema<TNetworkProtocol>,
+    schema: &Schema<TNetworkProtocol>,
     unvalidated_type_refinement_map: UnvalidatedTypeRefinementMap,
 ) -> Result<ValidatedTypeRefinementMap, WithLocation<CreateAdditionalFieldsError>> {
     let supertype_to_subtype_map = unvalidated_type_refinement_map
@@ -512,7 +502,7 @@ fn validate_type_refinement_map<TNetworkProtocol: NetworkProtocol>(
 }
 
 fn lookup_object_in_schema<TNetworkProtocol: NetworkProtocol>(
-    schema: &mut Schema<TNetworkProtocol>,
+    schema: &Schema<TNetworkProtocol>,
     unvalidated_type_name: UnvalidatedTypeName,
 ) -> Result<ServerObjectEntityId, WithLocation<CreateAdditionalFieldsError>> {
     let result = (*schema

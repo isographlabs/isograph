@@ -144,7 +144,6 @@ pub enum CreateAdditionalFieldsError {
 
 #[derive(Debug)]
 pub struct TypeRefinementMaps {
-    pub subtype_to_supertype_map: ValidatedTypeRefinementMap,
     pub supertype_to_subtype_map: ValidatedTypeRefinementMap,
 }
 
