@@ -262,7 +262,7 @@ export const schema = createSchema({
       },
     },
     MakeCheckinSuperResponse: {
-      checkin: (object) => getCheckin(object.id),
+      icheckin: (object) => getCheckin(object.id),
     },
   },
 });

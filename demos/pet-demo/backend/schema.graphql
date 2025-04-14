@@ -37,7 +37,7 @@ interface Node {
 
 # TODO make this a union: Success | InvalidId instead of using an optional field
 type MakeCheckinSuperResponse {
-  checkin: ICheckin
+  icheckin: ICheckin
 }
 
 type SetBestFriendResponse {
