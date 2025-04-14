@@ -284,7 +284,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             }),
             variable_definitions: vec![],
             type_and_field: ObjectTypeAndFieldName {
-                // TODO make this zero cost?
                 type_name: maybe_abstract_parent_type_name.unchecked_conversion(), // e.g. Pet
                 field_name: client_field_scalar_selection_name, // set_pet_best_friend
             },
