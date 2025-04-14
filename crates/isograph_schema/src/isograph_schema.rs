@@ -214,6 +214,74 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         Ok(WithId::new(current_object_id, current_entity))
     }
+
+    pub fn get_object_selections_path(
+        &self,
+        root_object_entity_id: ServerObjectEntityId,
+        selections: impl Iterator<Item = ObjectSelectableName>,
+    ) -> Result<Vec<&ServerObjectSelectable<TNetworkProtocol>>, CreateAdditionalFieldsError> {
+        let mut current_entity = self
+            .server_entity_data
+            .server_object_entity(root_object_entity_id);
+
+        let mut current_selectables = &self
+            .server_entity_data
+            .server_object_entity_available_selectables
+            .get(&root_object_entity_id)
+            .expect(
+                "Expected root_object_entity_id to exist \
+                in server_object_entity_avaiable_selectables",
+            )
+            .0;
+
+        let mut path = vec![];
+
+        for selection_name in selections {
+            match current_selectables.get(&selection_name.into()) {
+                Some(entity) => match entity.transpose() {
+                    SelectionType::Scalar(_) => {
+                        // TODO show a better error message
+                        return Err(CreateAdditionalFieldsError::InvalidField);
+                    }
+                    SelectionType::Object(object) => {
+                        let target_object_entity_id = match object {
+                            DefinitionLocation::Server(s) => {
+                                let selectable = self.server_object_selectable(*s);
+                                path.push(selectable);
+                                selectable.target_object_entity.inner()
+                            }
+
+                            DefinitionLocation::Client(_) => {
+                                // TODO better error, or support client fields
+                                return Err(CreateAdditionalFieldsError::InvalidField);
+                            }
+                        };
+
+                        current_entity = self
+                            .server_entity_data
+                            .server_object_entity(*target_object_entity_id);
+                        current_selectables = &self
+                            .server_entity_data
+                            .server_object_entity_available_selectables
+                            .get(target_object_entity_id)
+                            .expect(
+                                "Expected target_object_entity_id to exist \
+                                in server_object_entity_available_selectables",
+                            )
+                            .0;
+                    }
+                },
+                None => {
+                    return Err(CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
+                        primary_type_name: current_entity.name,
+                        field_name: selection_name.unchecked_conversion(),
+                    })
+                }
+            };
+        }
+
+        Ok(path)
+    }
 }
 
 #[derive(Debug)]

@@ -19,7 +19,7 @@ const normalizationAst: NormalizationAst = {
           kind: "Linked",
           fieldName: "icheckin",
           arguments: null,
-          concreteType: null,
+          concreteType: "Checkin",
           selections: [
             {
               kind: "InlineFragment",

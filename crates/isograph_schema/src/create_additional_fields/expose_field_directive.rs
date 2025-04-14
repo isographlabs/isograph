@@ -1,17 +1,15 @@
 use common_lang_types::{
     DirectiveArgumentName, DirectiveName, IsographObjectTypeName, Location, ObjectTypeAndFieldName,
-    SelectableName, ServerObjectSelectableName, Span, StringLiteralValue, ValueKeyName,
-    WithLocation, WithSpan,
+    SelectableName, Span, StringLiteralValue, ValueKeyName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     from_graph_ql_directive, DeserializationError, GraphQLConstantValue, GraphQLDirective,
 };
-use intern::string_key::Intern;
+use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientScalarSelectableId, DefinitionLocation, EmptyDirectiveSet,
-    NonConstantValue, ScalarSelection, ScalarSelectionDirectiveSet, SelectionType,
-    SelectionTypeContainingSelections, ServerEntityId, ServerObjectEntityId,
-    ServerObjectSelectableId, VariableDefinition,
+    ClientScalarSelectableId, DefinitionLocation, EmptyDirectiveSet, ScalarSelection,
+    ScalarSelectionDirectiveSet, SelectionType, SelectionTypeContainingSelections, ServerEntityId,
+    ServerObjectEntityId, ServerObjectSelectableId, VariableDefinition,
 };
 
 use serde::Deserialize;
@@ -19,7 +17,8 @@ use serde::Deserialize;
 use crate::{
     generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
     ClientFieldVariant, ClientScalarSelectable, ImperativelyLoadedFieldVariant, NetworkProtocol,
-    RefetchStrategy, Schema, UnprocessedClientFieldItem, WrappedSelectionMapSelection,
+    RefetchStrategy, Schema, SchemaServerObjectSelectableVariant, UnprocessedClientFieldItem,
+    WrappedSelectionMapSelection,
 };
 use lazy_static::lazy_static;
 
@@ -167,45 +166,21 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_entity_data
             .server_object_entity(payload_object_entity_id);
 
-        // TODO split path on .
-        let primary_field_name: ServerObjectSelectableName = path.unchecked_conversion();
+        let primary_field_name_selection_parts = path
+            .lookup()
+            .split('.')
+            .map(|x| x.intern().into())
+            .collect::<Vec<_>>();
 
-        let primary_field = self
-            .server_entity_data
-            .server_object_entity_available_selectables
-            .get(&payload_object_entity_id)
-            .expect(
-                "Expected payload_object_entity_id to exist \
-                in server_object_entity_available_selectables",
+        let target_object_with_id = self
+            .traverse_object_selections(
+                payload_object_entity_id,
+                primary_field_name_selection_parts.iter().map(|x| *x),
             )
-            .0
-            .get(&primary_field_name.into());
+            .map_err(|e| WithLocation::new(e, Location::generated()))?;
 
-        let (maybe_abstract_parent_object_entity_id, maybe_abstract_parent_type_name) =
-            match primary_field {
-                Some(DefinitionLocation::Server(SelectionType::Object(object_selectable_id))) => {
-                    let server_object_selectable =
-                        self.server_object_selectable(*object_selectable_id);
-
-                    // TODO validate that the payload object has no plural fields in between
-
-                    let client_field_parent_object_entity_id =
-                        server_object_selectable.target_object_entity.inner();
-                    let client_field_parent_object = self
-                        .server_entity_data
-                        .server_object_entity(*client_field_parent_object_entity_id);
-
-                    Ok((
-                        *client_field_parent_object_entity_id,
-                        // This is the parent type name (Pet)
-                        client_field_parent_object.name,
-                    ))
-                }
-                _ => Err(WithLocation::new(
-                    CreateAdditionalFieldsError::InvalidMutationField,
-                    Location::generated(),
-                )),
-            }?;
+        let maybe_abstract_parent_object_entity_id = target_object_with_id.id;
+        let maybe_abstract_parent_type_name = target_object_with_id.item.name;
 
         let fields = processed_field_map_items
             .iter()
@@ -234,13 +209,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .collect::<Vec<_>>();
 
         let mutation_field_client_field_id = self.client_scalar_selectables.len().into();
-        let top_level_arguments = mutation_field_arguments
-            .iter()
-            .map(|input_value_def| ArgumentKeyAndValue {
-                key: input_value_def.item.name.item.unchecked_conversion(),
-                value: NonConstantValue::Variable(input_value_def.item.name.item),
-            })
-            .collect();
 
         let top_level_schema_field_concrete_type = payload_object.concrete_type;
         let maybe_abstract_parent_object = self
@@ -253,18 +221,44 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .map(|x| x.item)
             .collect::<Vec<_>>();
 
-        let subfields_or_inline_fragments = vec![
-            WrappedSelectionMapSelection::LinkedField {
-                server_object_selectable_name: primary_field_name,
-                arguments: vec![],
-                concrete_type: primary_field_concrete_type,
-            },
-            imperative_field_subfields_or_inline_fragments(
-                top_level_schema_field_name,
-                &top_level_schema_field_arguments,
-                top_level_schema_field_concrete_type,
-            ),
-        ];
+        let mut parts_reversed = self
+            .get_object_selections_path(
+                payload_object_entity_id,
+                primary_field_name_selection_parts.iter().map(|x| *x),
+            )
+            .map_err(|e| WithLocation::new(e, Location::generated()))?;
+        parts_reversed.reverse();
+
+        let mut subfields_or_inline_fragments = parts_reversed
+            .iter()
+            .map(|server_object_selectable| {
+                // The server object selectable may represent a linked field or an inline fragment
+                match server_object_selectable.object_selectable_variant {
+                    SchemaServerObjectSelectableVariant::LinkedField => {
+                        WrappedSelectionMapSelection::LinkedField {
+                            server_object_selectable_name: server_object_selectable.name.item,
+                            arguments: vec![],
+                            concrete_type: primary_field_concrete_type,
+                        }
+                    }
+                    SchemaServerObjectSelectableVariant::InlineFragment => {
+                        WrappedSelectionMapSelection::InlineFragment(
+                            self.server_entity_data
+                                .server_object_entity(
+                                    *server_object_selectable.target_object_entity.inner(),
+                                )
+                                .name,
+                        )
+                    }
+                }
+            })
+            .collect::<Vec<_>>();
+
+        subfields_or_inline_fragments.push(imperative_field_subfields_or_inline_fragments(
+            top_level_schema_field_name,
+            &top_level_schema_field_arguments,
+            top_level_schema_field_concrete_type,
+        ));
 
         let mutation_client_field = ClientScalarSelectable {
             description,
@@ -277,7 +271,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     .unchecked_conversion(),
 
                 root_object_entity_id: parent_object_entity_id,
-                subfields_or_inline_fragments,
+                subfields_or_inline_fragments: subfields_or_inline_fragments.clone(),
                 field_map,
             }),
             variable_definitions: vec![],
@@ -306,23 +300,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     // NOTE: this will probably panic if we're not exposing fields which are
                     // originally on Mutation
                     parent_object_entity_id,
-                    vec![
-                        WrappedSelectionMapSelection::LinkedField {
-                            server_object_selectable_name: primary_field_name,
-                            arguments: vec![],
-                            concrete_type: primary_field_concrete_type,
-                        },
-                        // We might need an inline fragment here. What we have is blatantly incorrect
-                        // - at this point, we don't know whether
-                        // we require refinement, since the same field is copied from the abstract
-                        // type to the concrete type. So, when we do that, we need to account
-                        // for this.
-                        WrappedSelectionMapSelection::LinkedField {
-                            server_object_selectable_name: top_level_schema_field_name,
-                            arguments: top_level_arguments,
-                            concrete_type: top_level_schema_field_concrete_type,
-                        },
-                    ],
+                    subfields_or_inline_fragments,
                 ),
             )),
         })

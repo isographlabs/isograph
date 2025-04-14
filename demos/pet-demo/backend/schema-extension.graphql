@@ -13,7 +13,7 @@ extend type Mutation
   @exposeField(
     field: "make_checkin_super"
     as: "make_super"
-    path: "icheckin"
+    path: "icheckin.asCheckin"
     fieldMap: [{ from: "id", to: "checkin_id" }]
   )
   # this field should only be accessed in UnreachableFromEntrypoint.tsx
