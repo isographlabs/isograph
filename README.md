@@ -212,3 +212,11 @@ There's a lot more. These docs are threadbare.
 ## Licensing
 
 Isograph is an open source software project and licensed under the terms of the MIT license.
+
+## Contributors
+
+Thanks to all the contributors to Isograph!
+
+<a href="https://github.com/isographlabs/isograph/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=isographlabs/isograph" />
+</a>
