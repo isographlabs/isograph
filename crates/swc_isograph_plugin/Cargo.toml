@@ -1,0 +1,31 @@
+
+[package]
+authors = ["Robert Balicki <robert.balicki@gmail.com>", "Edmondo Porcu <edmondo.porcu@gmail.com>", "Pablo Crovetto <jpcc077@gmail.com>"]
+description = "SWC plugin for Isograph"
+name = "swc_isograph_plugin"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+anyhow = { workspace = true }
+isograph_config = { path = "../isograph_config" }
+once_cell = { workspace = true }
+pathdiff = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+swc_atoms = { workspace = true }
+swc_core = { workspace = true, features = ["ecma_plugin_transform"] }
+swc_ecma_utils = { workspace = true }
+swc_trace_macro = { workspace = true }
+thiserror =  { workspace = true }
+tracing = { workspace = true, features = ["release_max_level_off"] }
+
+[dev-dependencies]
+swc_ecma_parser =  { workspace = true }
+swc_ecma_transforms_testing =  { workspace = true }
+testing =  { workspace = true }

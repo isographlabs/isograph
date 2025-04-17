@@ -99,7 +99,7 @@ pub enum JavascriptModule {
 }
 
 /// This struct is deserialized from an isograph.config.json file.
-#[derive(Deserialize, JsonSchema)]
+#[derive(Deserialize, JsonSchema, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct IsographProjectConfig {
     /// The user may hard-code the JSON Schema for their version of the config.
@@ -216,7 +216,7 @@ pub fn create_config(
     }
 }
 
-#[derive(Deserialize, Default, JsonSchema)]
+#[derive(Deserialize, Default, JsonSchema, Debug)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConfigFileOptions {
     /// What the compiler should do if it encounters an id field whose
@@ -230,7 +230,7 @@ pub struct ConfigFileOptions {
     /// The babel plugin transforms isograph literals containing entrypoints
     /// into imports or requires of the generated entrypoint.ts file. Should
     /// it generate require calls or esmodule imports?
-    module: ConfigFileJavascriptModule,
+    pub module: ConfigFileJavascriptModule,
     /// A string to generate, in a comment, at the top of every generated file.
     generated_file_header: Option<String>,
 }
