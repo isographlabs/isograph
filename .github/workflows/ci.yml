@@ -248,6 +248,10 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt
+      - name: Install wasm target
+        shell: bash
+        run: |
+          rustup target add wasm32-wasip1
       - name: Build swc
         run: pnpm build-swc
 
