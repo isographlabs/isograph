@@ -53,10 +53,10 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
             let mut s = "{\n".to_string();
             for (name, server_selectable_id) in schema
                 .server_entity_data
-                .server_object_entity_available_selectables
+                .server_object_entity_extra_info
                 .get(&object_entity_id)
                 .expect("Expected object_entity_id to exist in server_object_entity_available_selectables")
-                .0
+                .selectables
                 .iter()
                 .filter_map(
                     |(name, field_definition_location)| match field_definition_location {

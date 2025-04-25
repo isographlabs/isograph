@@ -114,7 +114,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 server_objects: vec![],
                 server_scalars: scalars,
                 defined_entities: defined_types,
-                server_object_entity_available_selectables: HashMap::new(),
+                server_object_entity_extra_info: HashMap::new(),
 
                 id_type_id,
                 string_type_id,
@@ -160,13 +160,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_object_entity(root_object_entity_id);
         let mut current_selectables = &self
             .server_entity_data
-            .server_object_entity_available_selectables
+            .server_object_entity_extra_info
             .get(&root_object_entity_id)
             .expect(
                 "Expected root_object_entity_id to exist \
                 in server_object_entity_avaiable_selectables",
             )
-            .0;
+            .selectables;
         let mut current_object_id = root_object_entity_id;
 
         for selection_name in selections {
@@ -193,13 +193,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                             .server_object_entity(*target_object_entity_id);
                         current_selectables = &self
                             .server_entity_data
-                            .server_object_entity_available_selectables
+                            .server_object_entity_extra_info
                             .get(target_object_entity_id)
                             .expect(
                                 "Expected target_object_entity_id to exist \
                                 in server_object_entity_available_selectables",
                             )
-                            .0;
+                            .selectables;
                         current_object_id = *target_object_entity_id;
                     }
                 },
@@ -226,13 +226,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         let mut current_selectables = &self
             .server_entity_data
-            .server_object_entity_available_selectables
+            .server_object_entity_extra_info
             .get(&root_object_entity_id)
             .expect(
                 "Expected root_object_entity_id to exist \
                 in server_object_entity_avaiable_selectables",
             )
-            .0;
+            .selectables;
 
         let mut path = vec![];
 
@@ -262,13 +262,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                             .server_object_entity(*target_object_entity_id);
                         current_selectables = &self
                             .server_entity_data
-                            .server_object_entity_available_selectables
+                            .server_object_entity_extra_info
                             .get(target_object_entity_id)
                             .expect(
                                 "Expected target_object_entity_id to exist \
                                 in server_object_entity_available_selectables",
                             )
-                            .0;
+                            .selectables;
                     }
                 },
                 None => {
@@ -284,6 +284,14 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct ServerObjectEntityExtraInfo {
+    pub selectables: ServerObjectEntityAvailableSelectables,
+    pub id_field: Option<ServerStrongIdFieldId>,
+    // We probably don't want this
+    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
+}
+
 #[derive(Debug)]
 pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
     pub server_objects: Vec<ServerObjectEntity<TNetworkProtocol>>,
@@ -293,15 +301,7 @@ pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
     // We keep track of available selectables and id fields outside of server_objects so that
     // we don't need a server_object_entity_mut method, which is incompatible with pico.
     #[allow(clippy::type_complexity)]
-    pub server_object_entity_available_selectables: HashMap<
-        ServerObjectEntityId,
-        (
-            ServerObjectEntityAvailableSelectables,
-            Option<ServerStrongIdFieldId>,
-            // We probably don't want this
-            Vec<GraphQLDirective<GraphQLConstantValue>>,
-        ),
-    >,
+    pub server_object_entity_extra_info: HashMap<ServerObjectEntityId, ServerObjectEntityExtraInfo>,
 
     // Well known types
     pub id_type_id: ServerScalarEntityId,
@@ -377,13 +377,17 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_object_entity(parent_object_entity_id)
             .name;
 
-        let (available_selections, id_field, _) = self
+        let ServerObjectEntityExtraInfo {
+            selectables,
+            id_field,
+            ..
+        } = self
             .server_entity_data
-            .server_object_entity_available_selectables
+            .server_object_entity_extra_info
             .entry(parent_object_entity_id)
             .or_default();
 
-        if available_selections
+        if selectables
             .insert(
                 next_scalar_name.item.into(),
                 DefinitionLocation::Server(SelectionType::Scalar(next_server_scalar_selectable_id)),
@@ -426,10 +430,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         if self
             .server_entity_data
-            .server_object_entity_available_selectables
+            .server_object_entity_extra_info
             .entry(parent_object_entity_id)
             .or_default()
-            .0
+            .selectables
             .insert(
                 next_object_name.item.into(),
                 DefinitionLocation::Server(SelectionType::Object(next_server_object_selectable_id)),

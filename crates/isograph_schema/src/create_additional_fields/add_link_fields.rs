@@ -53,10 +53,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         {
             if self
                 .server_entity_data
-                .server_object_entity_available_selectables
+                .server_object_entity_extra_info
                 .entry(object_entity_id)
                 .or_default()
-                .0
+                .selectables
                 .insert(
                     field_name.into(),
                     DefinitionLocation::Client(SelectionType::Scalar(next_client_field_id)),

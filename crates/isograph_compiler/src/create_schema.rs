@@ -70,10 +70,10 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
 
         unvalidated_isograph_schema
             .server_entity_data
-            .server_object_entity_available_selectables
+            .server_object_entity_extra_info
             .entry(new_object_id)
             .or_default()
-            .2
+            .directives
             .extend(directives);
 
         match encountered_root_kind {

@@ -51,6 +51,7 @@ pub struct ProcessTypeSystemDocumentOutcome<TNetworkProtocol: NetworkProtocol> {
 }
 
 pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol> {
+    // TODO this is a GraphQLism, remove
     pub encountered_root_kind: Option<RootOperationKind>,
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
     pub server_object_entity: ServerObjectEntity<TNetworkProtocol>,

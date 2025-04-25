@@ -192,13 +192,13 @@ impl ModifiedArgument {
                 ServerEntityId::Object(object_entity_id) => ModifiedObject {
                     field_map: schema
                         .server_entity_data
-                        .server_object_entity_available_selectables
+                        .server_object_entity_extra_info
                         .get(&object_entity_id)
                         .expect(
                             "Expected object_entity_id to exist \
                             in server_object_entity_available_selectables",
                         )
-                        .0
+                        .selectables
                         .iter()
                         .flat_map(|(name, field_id)| match field_id {
                             DefinitionLocation::Server(s) => {

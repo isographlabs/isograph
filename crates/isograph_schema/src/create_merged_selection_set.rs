@@ -25,8 +25,8 @@ use crate::{
     ClientOrServerObjectSelectable, ClientScalarOrObjectSelectable, ClientScalarSelectable,
     ClientSelectable, ClientSelectableId, ImperativelyLoadedFieldVariant, NameAndArguments,
     NetworkProtocol, PathToRefetchField, RootOperationName, Schema,
-    SchemaServerObjectSelectableVariant, ServerObjectEntity, ServerObjectSelectable,
-    ValidatedScalarSelection, ValidatedSelection, VariableContext,
+    SchemaServerObjectSelectableVariant, ServerObjectEntity, ServerObjectEntityExtraInfo,
+    ServerObjectSelectable, ValidatedScalarSelection, ValidatedSelection, VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -1136,9 +1136,9 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
     // If the type has an id field, we must select it.
     if let Some(id_field) = schema
         .server_entity_data
-        .server_object_entity_available_selectables
+        .server_object_entity_extra_info
         .get(&parent_object_entity_id)
-        .and_then(|(_, id_field, _)| *id_field)
+        .and_then(|ServerObjectEntityExtraInfo { id_field, .. }| *id_field)
     {
         match merged_selection_map.entry(NormalizationKey::Id) {
             Entry::Occupied(occupied) => {
@@ -1275,13 +1275,13 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
 ) -> Vec<WithSpan<ValidatedSelection>> {
     let selectables_map = &schema
         .server_entity_data
-        .server_object_entity_available_selectables
+        .server_object_entity_extra_info
         .get(server_object_selectable.target_object_entity.inner())
         .expect(
             "Expected subtype to exist \
             in server_object_entity_available_selectables",
         )
-        .0;
+        .selectables;
     let typename_selection = WithSpan::new(
         SelectionTypeContainingSelections::Scalar(ScalarSelection {
             arguments: vec![],

@@ -175,10 +175,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         if self
             .server_entity_data
-            .server_object_entity_available_selectables
+            .server_object_entity_extra_info
             .entry(parent_object_entity_id)
             .or_default()
-            .0
+            .selectables
             .insert(
                 client_field_name.into(),
                 DefinitionLocation::Client(SelectionType::Scalar(next_client_field_id)),
@@ -229,13 +229,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let selections = client_field_declaration.item.selection_set;
         let id_field = self
             .server_entity_data
-            .server_object_entity_available_selectables
+            .server_object_entity_extra_info
             .get(&parent_object_entity_id)
             .expect(
                 "Expected parent_object_entity_id to exist in \
                 server_object_entity_available_selectables",
             )
-            .1;
+            .id_field;
         let refetch_strategy = id_field.map(|_| {
             // Assume that if we have an id field, this implements Node
             RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
@@ -298,13 +298,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         let id_field = self
             .server_entity_data
-            .server_object_entity_available_selectables
+            .server_object_entity_extra_info
             .get(&parent_object_entity_id)
             .expect(
                 "Expected parent_object_entity_id \
                 to exist in server_object_entity_available_selectables",
             )
-            .1;
+            .id_field;
         let refetch_strategy = match id_field {
             None => Err(WithSpan::new(
                 ProcessClientFieldDeclarationError::ClientPointerTargetTypeHasNoId {
@@ -367,10 +367,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         if self
             .server_entity_data
-            .server_object_entity_available_selectables
+            .server_object_entity_extra_info
             .entry(parent_object_entity_id)
             .or_default()
-            .0
+            .selectables
             .insert(
                 client_pointer_name.into(),
                 DefinitionLocation::Client(SelectionType::Object(next_client_pointer_id)),

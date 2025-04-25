@@ -33,13 +33,13 @@ pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
              }| {
                 let id_field = schema
                     .server_entity_data
-                    .server_object_entity_available_selectables
+                    .server_object_entity_extra_info
                     .get(&object_entity_id)
                     .expect(
                         "Expected object_entity_id to exist \
                         in server_object_entity_available_selectables",
                     )
-                    .1;
+                    .id_field;
                 if id_field.is_some() {
                     Some((object_entity_id, object.name))
                 } else {
@@ -53,10 +53,10 @@ pub fn add_refetch_fields_to_objects<TNetworkProtocol: NetworkProtocol>(
         let schema: &mut Schema<TNetworkProtocol> = schema;
         let result = match schema
             .server_entity_data
-            .server_object_entity_available_selectables
+            .server_object_entity_extra_info
             .entry(object_entity_id)
             .or_default()
-            .0
+            .selectables
             .entry((*REFETCH_FIELD_NAME).into())
         {
             Entry::Occupied(_) => Err(BatchCompileError::DuplicateRefetchField),

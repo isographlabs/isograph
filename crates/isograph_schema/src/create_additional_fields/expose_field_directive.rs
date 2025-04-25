@@ -90,13 +90,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         // TODO this is a bit ridiculous
         let expose_field_directives = self
             .server_entity_data
-            .server_object_entity_available_selectables
+            .server_object_entity_extra_info
             .get(&parent_object_entity_id)
             .expect(
                 "Expected parent_object_entity_id to exist \
                 in server_object_entity_available_selectables",
             )
-            .2
+            .directives
             .iter()
             .map(|d| self.parse_expose_field_directive(d))
             .collect::<Result<Vec<_>, _>>()?;
@@ -316,10 +316,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
         if self
             .server_entity_data
-            .server_object_entity_available_selectables
+            .server_object_entity_extra_info
             .entry(client_field_parent_object_entity_id)
             .or_default()
-            .0
+            .selectables
             .insert(
                 mutation_field_name,
                 DefinitionLocation::Client(SelectionType::Scalar(client_field_id)),
@@ -366,13 +366,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     ) -> ProcessTypeDefinitionResult<ServerObjectSelectableId> {
         let field_id = self
             .server_entity_data
-            .server_object_entity_available_selectables
+            .server_object_entity_extra_info
             .get(&mutation_object_entity_id)
             .expect(
                 "Expected mutation_object_entity_id to exist \
                 in server_object_entity_available_selectables",
             )
-            .0
+            .selectables
             .iter()
             .find_map(|(name, field_id)| {
                 if let DefinitionLocation::Server(SelectionType::Object(server_field_id)) = field_id
