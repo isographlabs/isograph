@@ -525,7 +525,7 @@ pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
         ClientFieldVariant::ImperativelyLoadedField(_) => {
             // TODO - we should not type params as any, but instead use some generated type
             // N.B. the string is a stable id for deduplicating
-            ClientFieldOutputType("(params: any) => [string, () => void]".to_string())
+            ClientFieldOutputType("(params?: any) => [string, () => void]".to_string())
         }
     }
 }
