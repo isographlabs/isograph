@@ -5,8 +5,8 @@ use std::{
 };
 
 use common_lang_types::{
-    CurrentWorkingDirectory, IsographObjectTypeName, Location, RelativePathToSourceFile,
-    SelectableName, TextSource, UnvalidatedTypeName, VariableName, WithLocation,
+    CurrentWorkingDirectory, IsographObjectTypeName, RelativePathToSourceFile, SelectableName,
+    TextSource, UnvalidatedTypeName, VariableName, WithLocation,
 };
 use graphql_lang_types::{
     GraphQLFieldDefinition, GraphQLInputValueDefinition, NameValuePair, RootOperationKind,
@@ -21,7 +21,7 @@ use isograph_schema::{
     validate_entrypoints, CreateAdditionalFieldsError, NetworkProtocol,
     ProcessObjectTypeDefinitionOutcome, ProcessTypeSystemDocumentOutcome, RootOperationName,
     Schema, SchemaServerObjectSelectableVariant, ServerObjectSelectable, ServerScalarSelectable,
-    TypeRefinementMaps, UnprocessedItem,
+    UnprocessedItem,
 };
 use pico::{Database, SourceId};
 
@@ -38,15 +38,12 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
     source_files: &SourceFiles,
     config: &CompilerConfig,
 ) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), Box<dyn Error>> {
-    let ProcessTypeSystemDocumentOutcome {
-        scalars,
-        objects,
-        unvalidated_supertype_to_subtype_map,
-    } = TNetworkProtocol::parse_and_process_type_system_documents(
-        db,
-        source_files.schema,
-        &source_files.schema_extensions,
-    )?;
+    let ProcessTypeSystemDocumentOutcome { scalars, objects } =
+        TNetworkProtocol::parse_and_process_type_system_documents(
+            db,
+            source_files.schema,
+            &source_files.schema_extensions,
+        )?;
 
     let mut unvalidated_isograph_schema = Schema::<TNetworkProtocol>::new();
     for (server_scalar_entity, name_location) in scalars {
@@ -101,11 +98,6 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
         &config.options,
     )?;
 
-    let type_refinement_map = get_type_refinement_map(
-        &unvalidated_isograph_schema,
-        unvalidated_supertype_to_subtype_map,
-    )?;
-
     let contains_iso = parse_iso_literals(
         db,
         &source_files.iso_literals,
@@ -126,9 +118,6 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
 
     unprocessed_items.extend(process_exposed_fields(&mut unvalidated_isograph_schema)?);
 
-    unvalidated_isograph_schema.transfer_supertype_client_selectables_to_subtypes(
-        &type_refinement_map.supertype_to_subtype_map,
-    )?;
     unvalidated_isograph_schema.add_link_fields()?;
     unprocessed_items.extend(add_refetch_fields_to_objects(
         &mut unvalidated_isograph_schema,
@@ -465,73 +454,3 @@ fn convert_graphql_constant_value_to_isograph_constant_value(
         }
     }
 }
-
-// TODO This is currently a completely useless function, serving only to surface
-// some validation errors. It might be necessary once we handle __asNode etc.
-// style fields.
-fn get_type_refinement_map<TNetworkProtocol: NetworkProtocol>(
-    schema: &Schema<TNetworkProtocol>,
-    unvalidated_supertype_to_subtype_map: UnvalidatedTypeRefinementMap,
-) -> Result<TypeRefinementMaps, WithLocation<CreateAdditionalFieldsError>> {
-    let supertype_to_subtype_map =
-        validate_type_refinement_map(schema, unvalidated_supertype_to_subtype_map)?;
-
-    Ok(TypeRefinementMaps {
-        supertype_to_subtype_map,
-    })
-}
-
-fn validate_type_refinement_map<TNetworkProtocol: NetworkProtocol>(
-    schema: &Schema<TNetworkProtocol>,
-    unvalidated_type_refinement_map: UnvalidatedTypeRefinementMap,
-) -> Result<ValidatedTypeRefinementMap, WithLocation<CreateAdditionalFieldsError>> {
-    let supertype_to_subtype_map = unvalidated_type_refinement_map
-        .into_iter()
-        .map(|(key_type_name, values_type_names)| {
-            let key_id = lookup_object_in_schema(schema, key_type_name)?;
-
-            let value_type_ids = values_type_names
-                .into_iter()
-                .map(|value_type_name| lookup_object_in_schema(schema, value_type_name))
-                .collect::<Result<Vec<_>, _>>()?;
-
-            Ok((key_id, value_type_ids))
-        })
-        .collect::<Result<HashMap<_, _>, WithLocation<CreateAdditionalFieldsError>>>()?;
-    Ok(supertype_to_subtype_map)
-}
-
-fn lookup_object_in_schema<TNetworkProtocol: NetworkProtocol>(
-    schema: &Schema<TNetworkProtocol>,
-    unvalidated_type_name: UnvalidatedTypeName,
-) -> Result<ServerObjectEntityId, WithLocation<CreateAdditionalFieldsError>> {
-    let result = (*schema
-        .server_entity_data
-        .defined_entities
-        .get(&unvalidated_type_name)
-        .ok_or_else(|| {
-            WithLocation::new(
-                CreateAdditionalFieldsError::FieldTypenameDoesNotExist {
-                    target_entity_type_name: unvalidated_type_name,
-                },
-                // TODO don't do this
-                Location::Generated,
-            )
-        })?)
-    .as_object_result()
-    .map_err(|_| {
-        WithLocation::new(
-            CreateAdditionalFieldsError::GenericObjectIsScalar {
-                type_name: unvalidated_type_name,
-            },
-            // TODO don't do this
-            Location::Generated,
-        )
-    })?;
-
-    Ok(*result)
-}
-
-type UnvalidatedTypeRefinementMap = HashMap<UnvalidatedTypeName, Vec<UnvalidatedTypeName>>;
-// When constructing the final map, we can replace object type names with ids.
-pub type ValidatedTypeRefinementMap = HashMap<ServerObjectEntityId, Vec<ServerObjectEntityId>>;

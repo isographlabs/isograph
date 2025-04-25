@@ -41,7 +41,6 @@ pub fn process_graphql_type_system_document(
     // concrete objects.
 
     let mut supertype_to_subtype_map = HashMap::new();
-    let mut subtype_to_supertype_map = HashMap::new();
 
     let mut processed_root_types = None;
 
@@ -58,11 +57,10 @@ pub fn process_graphql_type_system_document(
                 let concrete_type = Some(object_type_definition.name.item.into());
 
                 for interface_name in object_type_definition.interfaces.iter() {
-                    insert_into_type_refinement_maps(
+                    insert_into_type_refinement_map(
                         interface_name.item.into(),
                         object_type_definition.name.item.into(),
                         &mut supertype_to_subtype_map,
-                        &mut subtype_to_supertype_map,
                     );
                 }
 
@@ -153,11 +151,10 @@ pub fn process_graphql_type_system_document(
                 ));
 
                 for union_member_type in union_definition.union_member_types {
-                    insert_into_type_refinement_maps(
+                    insert_into_type_refinement_map(
                         union_definition.name.item.into(),
                         union_member_type.item.into(),
                         &mut supertype_to_subtype_map,
-                        &mut subtype_to_supertype_map,
                     )
                 }
             }
@@ -218,11 +215,7 @@ pub fn process_graphql_type_system_document(
         };
     }
 
-    Ok(ProcessTypeSystemDocumentOutcome {
-        scalars,
-        objects,
-        unvalidated_supertype_to_subtype_map: supertype_to_subtype_map,
-    })
+    Ok(ProcessTypeSystemDocumentOutcome { scalars, objects })
 }
 
 #[allow(clippy::type_complexity)]
@@ -382,20 +375,15 @@ impl GraphQLObjectDefinitionType {
     }
 }
 
-fn insert_into_type_refinement_maps(
+fn insert_into_type_refinement_map(
     supertype_name: UnvalidatedTypeName,
     subtype_name: UnvalidatedTypeName, // aka the concrete type or union member
     supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,
-    subtype_to_supertype_map: &mut UnvalidatedTypeRefinementMap,
 ) {
     supertype_to_subtype_map
         .entry(supertype_name)
         .or_default()
         .push(subtype_name);
-    subtype_to_supertype_map
-        .entry(subtype_name)
-        .or_default()
-        .push(supertype_name);
 }
 
 type UnvalidatedTypeRefinementMap = HashMap<UnvalidatedTypeName, Vec<UnvalidatedTypeName>>;

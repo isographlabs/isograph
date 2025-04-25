@@ -142,9 +142,4 @@ pub enum CreateAdditionalFieldsError {
     GenericObjectIsScalar { type_name: UnvalidatedTypeName },
 }
 
-#[derive(Debug)]
-pub struct TypeRefinementMaps {
-    pub supertype_to_subtype_map: ValidatedTypeRefinementMap,
-}
-
 pub type CreateAdditionalFieldsResult<T> = Result<T, CreateAdditionalFieldsError>;

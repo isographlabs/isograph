@@ -20,7 +20,7 @@ use crate::{
     query_text::generate_query_text,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, std::hash::Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash, Default)]
 pub struct GraphQLNetworkProtocol {}
 
 impl NetworkProtocol for GraphQLNetworkProtocol {
@@ -43,20 +43,13 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             let (outcome, objects_and_directives) =
                 process_graphql_type_extension_document(type_system_extension_document.to_owned())?;
 
-            let ProcessTypeSystemDocumentOutcome {
-                scalars,
-                objects,
-                unvalidated_supertype_to_subtype_map: unvalidated_subtype_to_supertype_map,
-            } = outcome;
+            let ProcessTypeSystemDocumentOutcome { scalars, objects } = outcome;
 
             // Note: we process all newly-defined types in schema extensions.
             // However, we ignore a bunch of things, like newly-defined fields on existing types, etc.
             // We should probably fix that!
             result.objects.extend(objects);
             result.scalars.extend(scalars);
-            result
-                .unvalidated_supertype_to_subtype_map
-                .extend(unvalidated_subtype_to_supertype_map);
 
             // - in the extension document, you may have added directives to objects, e.g. @exposeAs
             // - we need to transfer those to the original objects.

@@ -1,13 +1,7 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    error::Error,
-    fmt::Debug,
-    hash::Hash,
-};
+use std::{collections::BTreeMap, error::Error, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
-    Location, QueryOperationName, QueryText, RelativePathToSourceFile, UnvalidatedTypeName,
-    WithLocation,
+    Location, QueryOperationName, QueryText, RelativePathToSourceFile, WithLocation,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition, RootOperationKind,
@@ -54,10 +48,6 @@ pub struct ProcessTypeSystemDocumentOutcome<TNetworkProtocol: NetworkProtocol> {
         ProcessObjectTypeDefinitionOutcome<TNetworkProtocol>,
         Location,
     )>,
-
-    // TODO get rid of this
-    pub unvalidated_supertype_to_subtype_map:
-        HashMap<UnvalidatedTypeName, Vec<UnvalidatedTypeName>>,
 }
 
 pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol> {

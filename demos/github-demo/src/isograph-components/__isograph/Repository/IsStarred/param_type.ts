@@ -1,5 +1,5 @@
 
-export type Starrable__IsStarred__param = {
+export type Repository__IsStarred__param = {
   readonly data: {
     /**
 Returns a count of how many stargazers there are on this object
