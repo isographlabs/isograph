@@ -1,4 +1,4 @@
-export default 'query Newsfeed  {\
+export default 'query Newsfeed {\
   viewer {\
     id,\
     newsfeed____skip___l_0____limit___l_6: newsfeed(skip: 0, limit: 6) {\

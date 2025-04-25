@@ -1,4 +1,4 @@
-export default 'query UserPage ($userLogin: String!) {\
+export default 'query UserPage($userLogin: String!) {\
   user____login___v_userLogin: user(login: $userLogin) {\
     id,\
     name,\

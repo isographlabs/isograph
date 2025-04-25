@@ -1,4 +1,4 @@
-export default 'query HomePage  {\
+export default 'query HomePage {\
   viewer {\
     id,\
     avatarUrl,\

@@ -1,4 +1,4 @@
-export default 'mutation Query__set_pet_tagline ($input: SetPetTaglineParams!) {\
+export default 'mutation Query__set_pet_tagline($input: SetPetTaglineParams!) {\
   set_pet_tagline____input___v_input: set_pet_tagline(input: $input) {\
     pet {\
       id,\

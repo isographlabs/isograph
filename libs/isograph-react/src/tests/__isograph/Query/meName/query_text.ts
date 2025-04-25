@@ -1,4 +1,4 @@
-export default 'query meName  {\
+export default 'query meName {\
   me {\
     id,\
     name,\
