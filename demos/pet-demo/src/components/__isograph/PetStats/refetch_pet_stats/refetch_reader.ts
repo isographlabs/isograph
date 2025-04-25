@@ -11,8 +11,9 @@ const resolver = (
   readOutData: any,
   filteredVariables: any,
   rootLink: Link,
-  // TODO type this
-  readerArtifact: TopLevelReaderArtifact<any, any, any>,
+  // If readerArtifact is null, the return value is undefined.
+  // TODO reflect this in the types.
+  readerArtifact: TopLevelReaderArtifact<any, any, any> | null,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
 ) => (): ItemCleanupPair<FragmentReference<any, any>> | undefined => {
   const variables = includeReadOutData(filteredVariables, readOutData);
