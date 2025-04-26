@@ -65,7 +65,6 @@ pub struct FieldToInsert {
     pub name: WithLocation<ServerSelectableName>,
     pub type_: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     pub arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
-    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
 
     // TODO we can probably restructure things to make this less awkward.
     // As in, we should not return GraphQLFieldDefinitions to the isograph side,
