@@ -8,7 +8,7 @@ use common_lang_types::{
     JavascriptName, Location, ObjectSelectableName, SelectableName, UnvalidatedTypeName,
     WithLocation,
 };
-use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective, GraphQLNamedTypeAnnotation};
+use graphql_lang_types::GraphQLNamedTypeAnnotation;
 use intern::string_key::Intern;
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
@@ -288,8 +288,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 pub struct ServerObjectEntityExtraInfo {
     pub selectables: ServerObjectEntityAvailableSelectables,
     pub id_field: Option<ServerStrongIdFieldId>,
-    // We probably don't want this
-    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
 }
 
 #[derive(Debug)]

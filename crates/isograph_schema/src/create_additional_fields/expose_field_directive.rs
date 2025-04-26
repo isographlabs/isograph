@@ -2,9 +2,6 @@ use common_lang_types::{
     DirectiveName, IsographObjectTypeName, Location, ObjectTypeAndFieldName, SelectableName, Span,
     StringLiteralValue, WithLocation, WithSpan,
 };
-use graphql_lang_types::{
-    from_graphql_directive, DeserializationError, GraphQLConstantValue, GraphQLDirective,
-};
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ClientScalarSelectableId, DefinitionLocation, EmptyDirectiveSet, ScalarSelection,
@@ -33,6 +30,8 @@ use super::{
 lazy_static! {
     static ref EXPOSE_FIELD_DIRECTIVE: DirectiveName = "exposeField".intern().into();
 }
+
+// TODO move to graphql_network_protocol crate
 #[derive(Deserialize, Eq, PartialEq, Debug)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ExposeFieldDirective {
@@ -62,61 +61,11 @@ impl ExposeFieldDirective {
 }
 
 impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
-    /// Add magical mutation fields.
-    ///
-    /// Using the MagicMutationFieldInfo (derived from @exposeField directives),
-    /// add a magical field to TargetType whose name is the mutation_name, which:
-    /// - executes the mutation
-    /// - has the mutation's arguments (except those from field_map)
-    /// - then acts as a __refetch field on that TargetType, i.e. refetches all the fields
-    ///   selected in the merged selection set.
-    ///
-    /// There is lots of cloning going on here! Not ideal.
-    pub fn add_exposed_fields_to_parent_object_types(
-        &mut self,
-        parent_object_entity_id: ServerObjectEntityId,
-    ) -> ProcessTypeDefinitionResult<Vec<UnprocessedClientFieldItem>> {
-        // TODO don't clone if possible
-        let parent_object = self
-            .server_entity_data
-            .server_object_entity(parent_object_entity_id);
-        let parent_object_name = parent_object.name;
-
-        // TODO this is a bit ridiculous
-        let expose_field_directives = self
-            .server_entity_data
-            .server_object_entity_extra_info
-            .get(&parent_object_entity_id)
-            .expect(
-                "Expected parent_object_entity_id to exist \
-                in server_object_entity_available_selectables",
-            )
-            .directives
-            .iter()
-            .map(|d| self.parse_expose_field_directive(d))
-            .collect::<Result<Vec<_>, _>>()?;
-        let expose_field_directives = expose_field_directives
-            .into_iter()
-            .flatten()
-            .collect::<Vec<_>>();
-
-        let mut unprocessed_client_field_items = vec![];
-        for expose_field_directive in expose_field_directives {
-            unprocessed_client_field_items.push(self.create_new_exposed_field(
-                expose_field_directive,
-                parent_object_name,
-                parent_object_entity_id,
-            )?);
-        }
-
-        Ok(unprocessed_client_field_items)
-    }
-
-    fn create_new_exposed_field(
+    pub fn create_new_exposed_field(
         &mut self,
         expose_field_directive: ExposeFieldDirective,
         // e.g. Query or Mutation
-        parent_object_name: IsographObjectTypeName,
+        parent_entity_name: IsographObjectTypeName,
         parent_object_entity_id: ServerObjectEntityId,
     ) -> Result<UnprocessedClientFieldItem, WithLocation<CreateAdditionalFieldsError>> {
         let ExposeFieldDirective {
@@ -151,7 +100,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             self,
             mutation_field_arguments.clone(),
             mutation_field_payload_type_name,
-            parent_object_name,
+            parent_entity_name,
             client_field_scalar_selection_name,
             // TODO don't clone
             field_map.clone(),
@@ -333,23 +282,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         }
 
         Ok(())
-    }
-
-    fn parse_expose_field_directive(
-        &self,
-        d: &GraphQLDirective<GraphQLConstantValue>,
-    ) -> ProcessTypeDefinitionResult<Option<ExposeFieldDirective>> {
-        if d.name.item == *EXPOSE_FIELD_DIRECTIVE {
-            let expose_field_directive = from_graphql_directive(d).map_err(|err| match err {
-                DeserializationError::Custom(err) => WithLocation::new(
-                    CreateAdditionalFieldsError::FailedToDeserialize(err),
-                    d.name.location.into(), // TODO: use location of the entire directive
-                ),
-            })?;
-            Ok(Some(expose_field_directive))
-        } else {
-            Ok(None)
-        }
     }
 
     /// Here, we are turning "pet" (the field_arg) to the ServerFieldId

@@ -31,9 +31,13 @@ lazy_static! {
     static ref STRING_TYPE_NAME: UnvalidatedTypeName = "String".intern().into();
 }
 
+#[allow(clippy::type_complexity)]
 pub fn process_graphql_type_system_document(
     type_system_document: GraphQLTypeSystemDocument,
-) -> ProcessGraphqlTypeDefinitionResult<ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>> {
+) -> ProcessGraphqlTypeDefinitionResult<(
+    ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>,
+    HashMap<IsographObjectTypeName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
+)> {
     // TODO return a vec of errors, not just one
 
     // In the schema, interfaces, unions and objects are the same type of object (SchemaType),
@@ -46,6 +50,7 @@ pub fn process_graphql_type_system_document(
 
     let mut scalars = vec![];
     let mut objects = vec![];
+    let mut directives = HashMap::<_, Vec<_>>::new();
 
     for with_location in type_system_document.0 {
         let WithLocation {
@@ -64,26 +69,32 @@ pub fn process_graphql_type_system_document(
                     );
                 }
 
+                let object_name = object_type_definition.name.item.unchecked_conversion();
                 let object_type_definition = object_type_definition.into();
 
-                objects.push((
-                    process_object_type_definition(
-                        object_type_definition,
-                        concrete_type,
-                        GraphQLSchemaObjectAssociatedData {
-                            original_definition_type: GraphQLSchemaOriginalDefinitionType::Object,
-                        },
-                        GraphQLObjectDefinitionType::Object,
-                    )?,
-                    location,
-                ));
+                let (object_definition_outcome, new_directives) = process_object_type_definition(
+                    object_type_definition,
+                    concrete_type,
+                    GraphQLSchemaObjectAssociatedData {
+                        original_definition_type: GraphQLSchemaOriginalDefinitionType::Object,
+                    },
+                    GraphQLObjectDefinitionType::Object,
+                )?;
+
+                directives
+                    .entry(object_name)
+                    .or_default()
+                    .extend(new_directives);
+
+                objects.push((object_definition_outcome, location));
             }
             GraphQLTypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
                 scalars.push((process_scalar_definition(scalar_type_definition), location));
                 // N.B. we assume that Mutation will be an object, not a scalar
             }
             GraphQLTypeSystemDefinition::InterfaceTypeDefinition(interface_type_definition) => {
-                objects.push((
+                let interface_name = interface_type_definition.name.item.unchecked_conversion();
+                let (process_object_type_definition_outcome, new_directives) =
                     process_object_type_definition(
                         interface_type_definition.into(),
                         None,
@@ -92,16 +103,24 @@ pub fn process_graphql_type_system_document(
                                 GraphQLSchemaOriginalDefinitionType::Interface,
                         },
                         GraphQLObjectDefinitionType::Interface,
-                    )?,
-                    location,
-                ));
+                    )?;
+                objects.push((process_object_type_definition_outcome, location));
+
+                directives
+                    .entry(interface_name)
+                    .or_default()
+                    .extend(new_directives);
                 // N.B. we assume that Mutation will be an object, not an interface
             }
             GraphQLTypeSystemDefinition::InputObjectTypeDefinition(
                 input_object_type_definition,
             ) => {
                 let concrete_type = Some(input_object_type_definition.name.item.into());
-                objects.push((
+                let input_object_name = input_object_type_definition
+                    .name
+                    .item
+                    .unchecked_conversion();
+                let (process_object_type_definition_outcome, new_directives) =
                     process_object_type_definition(
                         input_object_type_definition.into(),
                         // Shouldn't really matter what we pass here
@@ -111,9 +130,12 @@ pub fn process_graphql_type_system_document(
                                 GraphQLSchemaOriginalDefinitionType::InputObject,
                         },
                         GraphQLObjectDefinitionType::InputObject,
-                    )?,
-                    location,
-                ));
+                    )?;
+                objects.push((process_object_type_definition_outcome, location));
+                directives
+                    .entry(input_object_name)
+                    .or_default()
+                    .extend(new_directives);
             }
             GraphQLTypeSystemDefinition::DirectiveDefinition(_) => {
                 // For now, Isograph ignores directive definitions,
@@ -132,7 +154,7 @@ pub fn process_graphql_type_system_document(
             }
             GraphQLTypeSystemDefinition::UnionTypeDefinition(union_definition) => {
                 // TODO do something reasonable here, once we add support for type refinements.
-                objects.push((
+                let (process_object_type_definition_outcome, new_directives) =
                     process_object_type_definition(
                         IsographObjectTypeDefinition {
                             description: union_definition.description,
@@ -146,9 +168,12 @@ pub fn process_graphql_type_system_document(
                             original_definition_type: GraphQLSchemaOriginalDefinitionType::Union,
                         },
                         GraphQLObjectDefinitionType::Union,
-                    )?,
-                    location,
-                ));
+                    )?;
+                objects.push((process_object_type_definition_outcome, location));
+                directives
+                    .entry(union_definition.name.item.unchecked_conversion())
+                    .or_default()
+                    .extend(new_directives);
 
                 for union_member_type in union_definition.union_member_types {
                     insert_into_type_refinement_map(
@@ -214,7 +239,10 @@ pub fn process_graphql_type_system_document(
         };
     }
 
-    Ok(ProcessTypeSystemDocumentOutcome { scalars, objects })
+    Ok((
+        ProcessTypeSystemDocumentOutcome { scalars, objects },
+        directives,
+    ))
 }
 
 #[allow(clippy::type_complexity)]
@@ -239,15 +267,16 @@ pub fn process_graphql_type_extension_document(
         }
     }
 
-    // N.B. we should probably restructure this...?
-    // Like, we could discover the mutation type right now!
-    let outcome = process_graphql_type_system_document(GraphQLTypeSystemDocument(definitions))?;
+    let (outcome, mut directives) =
+        process_graphql_type_system_document(GraphQLTypeSystemDocument(definitions))?;
 
-    let mut directives = HashMap::new();
     for extension in extensions.into_iter() {
         // TODO collect errors into vec
         // TODO we can encounter new interface implementations; we should account for that
-        directives.extend(process_graphql_type_system_extension(extension));
+
+        for (name, new_directives) in process_graphql_type_system_extension(extension) {
+            directives.entry(name).or_default().extend(new_directives);
+        }
     }
 
     Ok((outcome, directives))
@@ -279,8 +308,10 @@ fn process_object_type_definition(
     concrete_type: Option<IsographObjectTypeName>,
     associated_data: GraphQLSchemaObjectAssociatedData,
     type_definition_type: GraphQLObjectDefinitionType,
-) -> ProcessGraphqlTypeDefinitionResult<ProcessObjectTypeDefinitionOutcome<GraphQLNetworkProtocol>>
-{
+) -> ProcessGraphqlTypeDefinitionResult<(
+    ProcessObjectTypeDefinitionOutcome<GraphQLNetworkProtocol>,
+    Vec<GraphQLDirective<GraphQLConstantValue>>,
+)> {
     let server_object_entity = ServerObjectEntity {
         description: object_type_definition.description.map(|d| d.item),
         name: object_type_definition.name.item,
@@ -333,12 +364,15 @@ fn process_object_type_definition(
         None
     };
 
-    Ok(ProcessObjectTypeDefinitionOutcome {
-        encountered_root_kind,
-        directives: object_type_definition.directives,
-        server_object_entity,
-        fields_to_insert,
-    })
+    Ok((
+        ProcessObjectTypeDefinitionOutcome {
+            encountered_root_kind,
+            server_object_entity,
+            fields_to_insert,
+            expose_as_fields_to_insert: vec![],
+        },
+        object_type_definition.directives,
+    ))
 }
 
 // TODO this should accept an IsographScalarTypeDefinition

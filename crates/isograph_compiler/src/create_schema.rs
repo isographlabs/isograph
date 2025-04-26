@@ -21,7 +21,6 @@ use isograph_schema::{
     validate_entrypoints, CreateAdditionalFieldsError, FieldToInsert, NetworkProtocol,
     ProcessObjectTypeDefinitionOutcome, ProcessTypeSystemDocumentOutcome, RootOperationName,
     Schema, SchemaServerObjectSelectableVariant, ServerObjectSelectable, ServerScalarSelectable,
-    UnprocessedItem,
 };
 use pico::{Database, SourceId};
 
@@ -53,12 +52,13 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
     }
 
     let mut field_queue = HashMap::new();
+    let mut expose_as_field_queue = HashMap::new();
     for (
         ProcessObjectTypeDefinitionOutcome {
             encountered_root_kind,
-            directives,
             server_object_entity,
             fields_to_insert,
+            expose_as_fields_to_insert,
         },
         name_location,
     ) in objects
@@ -67,14 +67,6 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
             .server_entity_data
             .insert_server_object_entity(server_object_entity, name_location)?;
         field_queue.insert(new_object_id, fields_to_insert);
-
-        unvalidated_isograph_schema
-            .server_entity_data
-            .server_object_entity_extra_info
-            .entry(new_object_id)
-            .or_default()
-            .directives
-            .extend(directives);
 
         match encountered_root_kind {
             Some(RootOperationKind::Query) => {
@@ -90,6 +82,8 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
             // TODO handle Subscription
             _ => {}
         }
+
+        expose_as_field_queue.insert(new_object_id, expose_as_fields_to_insert);
     }
 
     process_field_queue(
@@ -98,13 +92,6 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
         &config.options,
     )?;
 
-    let contains_iso = parse_iso_literals(
-        db,
-        &source_files.iso_literals,
-        config.current_working_directory,
-    )?;
-    let contains_iso_stats = contains_iso.stats();
-
     // Step one: we can create client selectables. However, we must create all
     // client selectables before being able to create their selection sets, because
     // selection sets refer to client selectables. We hold onto these selection sets
@@ -112,11 +99,28 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
     // vec, then process it later.
     let mut unprocessed_items = vec![];
 
+    for (parent_object_entity_id, expose_as_fields_to_insert) in expose_as_field_queue {
+        for expose_as_field in expose_as_fields_to_insert {
+            let unprocessed_scalar_item = unvalidated_isograph_schema.create_new_exposed_field(
+                expose_as_field.expose_field_directive,
+                expose_as_field.parent_object_name,
+                parent_object_entity_id,
+            )?;
+
+            unprocessed_items.push(SelectionType::Scalar(unprocessed_scalar_item));
+        }
+    }
+
+    let contains_iso = parse_iso_literals(
+        db,
+        &source_files.iso_literals,
+        config.current_working_directory,
+    )?;
+    let contains_iso_stats = contains_iso.stats();
+
     let (unprocessed_client_types, unprocessed_entrypoints) =
         process_iso_literals(&mut unvalidated_isograph_schema, contains_iso)?;
     unprocessed_items.extend(unprocessed_client_types);
-
-    unprocessed_items.extend(process_exposed_fields(&mut unvalidated_isograph_schema)?);
 
     unvalidated_isograph_schema.add_link_fields()?;
     unprocessed_items.extend(add_refetch_fields_to_objects(
@@ -178,26 +182,6 @@ fn parse_iso_literals(
     } else {
         Err(iso_literal_parse_errors.into())
     }
-}
-
-/// Here, we are processing exposeAs fields. Note that we only process these
-/// directives on root objects (Query, Mutation, Subscription) and we should
-/// validate that no other types have exposeAs directives.
-fn process_exposed_fields<TNetworkProtocol: NetworkProtocol>(
-    schema: &mut Schema<TNetworkProtocol>,
-) -> Result<Vec<UnprocessedItem>, BatchCompileError> {
-    let fetchable_types: Vec<_> = schema.fetchable_types.keys().copied().collect();
-    let mut unprocessed_items = vec![];
-    for fetchable_object_entity_id in fetchable_types.into_iter() {
-        let unprocessed_client_field_item =
-            schema.add_exposed_fields_to_parent_object_types(fetchable_object_entity_id)?;
-        unprocessed_items.extend(
-            unprocessed_client_field_item
-                .into_iter()
-                .map(UnprocessedItem::Scalar),
-        );
-    }
-    Ok(unprocessed_items)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
@@ -266,12 +250,12 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
     options: &CompilerConfigOptions,
 ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
     for (parent_object_entity_id, field_definitions_to_insert) in field_queue {
-        for field_definition in field_definitions_to_insert.into_iter() {
+        for server_field_to_insert in field_definitions_to_insert.into_iter() {
             let parent_object_entity = schema
                 .server_entity_data
                 .server_object_entity(parent_object_entity_id);
 
-            let target_entity_type_name = field_definition.item.type_.inner();
+            let target_entity_type_name = server_field_to_insert.item.type_.inner();
 
             let selection_type = schema
                 .server_entity_data
@@ -282,11 +266,11 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
                         CreateAdditionalFieldsError::FieldTypenameDoesNotExist {
                             target_entity_type_name: *target_entity_type_name,
                         },
-                        field_definition.item.name.location,
+                        server_field_to_insert.item.name.location,
                     )
                 })?;
 
-            let arguments = field_definition
+            let arguments = server_field_to_insert
                 .item
                 .arguments
                 // TODO don't clone
@@ -297,11 +281,11 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
                         &schema.server_entity_data.defined_entities,
                         input_value_definition,
                         parent_object_entity.name,
-                        field_definition.item.name.item.into(),
+                        server_field_to_insert.item.name.item.into(),
                     )
                 })
                 .collect::<Result<Vec<_>, _>>()?;
-            let description = field_definition.item.description.map(|d| d.item);
+            let description = server_field_to_insert.item.description.map(|d| d.item);
 
             match selection_type {
                 SelectionType::Scalar(scalar_entity_id) => {
@@ -309,9 +293,12 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
                         .insert_server_scalar_selectable(
                             ServerScalarSelectable {
                                 description,
-                                name: field_definition.item.name.map(|x| x.unchecked_conversion()),
+                                name: server_field_to_insert
+                                    .item
+                                    .name
+                                    .map(|x| x.unchecked_conversion()),
                                 target_scalar_entity: TypeAnnotation::from_graphql_type_annotation(
-                                    field_definition.item.type_.clone(),
+                                    server_field_to_insert.item.type_.clone(),
                                 )
                                 .map(&mut |_| *scalar_entity_id),
                                 parent_object_entity_id,
@@ -319,17 +306,20 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
                                 phantom_data: std::marker::PhantomData,
                             },
                             options,
-                            field_definition.item.type_.inner_non_null_named_type(),
+                            server_field_to_insert
+                                .item
+                                .type_
+                                .inner_non_null_named_type(),
                         )
-                        .map_err(|e| WithLocation::new(e, field_definition.location))?;
+                        .map_err(|e| WithLocation::new(e, server_field_to_insert.location))?;
                 }
                 SelectionType::Object(object_entity_id) => {
                     schema
                         .insert_server_object_selectable(ServerObjectSelectable {
                             description,
-                            name: field_definition.item.name.map(|x| x.unchecked_conversion()),
+                            name: server_field_to_insert.item.name.map(|x| x.unchecked_conversion()),
                             target_object_entity: TypeAnnotation::from_graphql_type_annotation(
-                                field_definition.item.type_.clone(),
+                                server_field_to_insert.item.type_.clone(),
                             )
                             .map(&mut |_| *object_entity_id),
                             parent_object_entity_id,
@@ -337,13 +327,13 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
                             phantom_data: std::marker::PhantomData,
                             object_selectable_variant:
                                 // TODO this is hacky
-                                if field_definition.item.is_inline_fragment {
+                                if server_field_to_insert.item.is_inline_fragment {
                                     SchemaServerObjectSelectableVariant::InlineFragment
                                 } else {
                                     SchemaServerObjectSelectableVariant::LinkedField
                                 }
                         })
-                        .map_err(|e| WithLocation::new(e, field_definition.location))?;
+                        .map_err(|e| WithLocation::new(e, server_field_to_insert.location))?;
                 }
             }
         }

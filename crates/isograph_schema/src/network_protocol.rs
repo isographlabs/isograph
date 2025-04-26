@@ -1,19 +1,16 @@
 use std::{collections::BTreeMap, error::Error, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
-    DescriptionValue, Location, QueryOperationName, QueryText, RelativePathToSourceFile,
-    ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
+    DescriptionValue, IsographObjectTypeName, Location, QueryOperationName, QueryText,
+    RelativePathToSourceFile, ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
-use graphql_lang_types::{
-    GraphQLConstantValue, GraphQLDirective, GraphQLInputValueDefinition, GraphQLTypeAnnotation,
-    RootOperationKind,
-};
+use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation, RootOperationKind};
 use isograph_lang_types::SchemaSource;
 use pico::{Database, SourceId};
 
 use crate::{
-    MergedSelectionMap, RootOperationName, Schema, ServerObjectEntity, ServerScalarEntity,
-    ValidatedVariableDefinition,
+    ExposeFieldDirective, MergedSelectionMap, RootOperationName, Schema, ServerObjectEntity,
+    ServerScalarEntity, ValidatedVariableDefinition,
 };
 
 pub trait NetworkProtocol:
@@ -55,9 +52,9 @@ pub struct ProcessTypeSystemDocumentOutcome<TNetworkProtocol: NetworkProtocol> {
 pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol> {
     // TODO this is a GraphQLism, remove
     pub encountered_root_kind: Option<RootOperationKind>,
-    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
     pub server_object_entity: ServerObjectEntity<TNetworkProtocol>,
     pub fields_to_insert: Vec<WithLocation<FieldToInsert>>,
+    pub expose_as_fields_to_insert: Vec<ExposeAsFieldToInsert>,
 }
 
 pub struct FieldToInsert {
@@ -77,4 +74,10 @@ pub struct FieldToInsert {
     // that the network protocol should care about?? I don't think so, but how else
     // do we add the __typename and link selections?)
     pub is_inline_fragment: bool,
+}
+
+pub struct ExposeAsFieldToInsert {
+    pub expose_field_directive: ExposeFieldDirective,
+    // e.g. Query or Mutation
+    pub parent_object_name: IsographObjectTypeName,
 }

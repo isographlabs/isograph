@@ -137,9 +137,6 @@ pub enum CreateAdditionalFieldsError {
         type_definition_type: &'static str,
         type_name: UnvalidatedTypeName,
     },
-
-    #[error("Expected {type_name} to be an object, but it was a scalar.")]
-    GenericObjectIsScalar { type_name: UnvalidatedTypeName },
 }
 
 pub type CreateAdditionalFieldsResult<T> = Result<T, CreateAdditionalFieldsError>;

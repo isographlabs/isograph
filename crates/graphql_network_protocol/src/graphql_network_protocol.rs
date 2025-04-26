@@ -1,14 +1,19 @@
 use std::{collections::BTreeMap, error::Error};
 
 use common_lang_types::{
-    Location, QueryOperationName, QueryText, RelativePathToSourceFile, WithLocation,
+    DirectiveName, QueryOperationName, QueryText, RelativePathToSourceFile, WithLocation,
 };
-use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDocument};
+use graphql_lang_types::{
+    from_graphql_directive, DeserializationError, GraphQLTypeSystemDocument,
+    GraphQLTypeSystemExtensionDocument,
+};
+use intern::string_key::Intern;
 use isograph_lang_types::SchemaSource;
 use isograph_schema::{
-    MergedSelectionMap, NetworkProtocol, ProcessTypeSystemDocumentOutcome, RootOperationName,
-    Schema, ValidatedVariableDefinition,
+    CreateAdditionalFieldsError, ExposeAsFieldToInsert, MergedSelectionMap, NetworkProtocol,
+    ProcessTypeSystemDocumentOutcome, RootOperationName, Schema, ValidatedVariableDefinition,
 };
+use lazy_static::lazy_static;
 use pico::{Database, SourceId};
 
 use crate::{
@@ -19,6 +24,10 @@ use crate::{
     },
     query_text::generate_query_text,
 };
+
+lazy_static! {
+    static ref EXPOSE_FIELD_DIRECTIVE: DirectiveName = "exposeField".intern().into();
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash, Default)]
 pub struct GraphQLNetworkProtocol {}
@@ -37,11 +46,16 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         let (type_system_document, type_system_extension_documents) =
             parse_graphql_schema(db, schema_source_id, schema_extension_sources).to_owned()?;
 
-        let mut result = process_graphql_type_system_document(type_system_document.to_owned())?;
+        let (mut result, mut directives) =
+            process_graphql_type_system_document(type_system_document.to_owned())?;
 
-        for (_, type_system_extension_document) in type_system_extension_documents {
+        for type_system_extension_document in type_system_extension_documents.values() {
             let (outcome, objects_and_directives) =
                 process_graphql_type_extension_document(type_system_extension_document.to_owned())?;
+
+            for (name, new_directives) in objects_and_directives {
+                directives.entry(name).or_default().extend(new_directives);
+            }
 
             let ProcessTypeSystemDocumentOutcome { scalars, objects } = outcome;
 
@@ -50,26 +64,46 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             // We should probably fix that!
             result.objects.extend(objects);
             result.scalars.extend(scalars);
+        }
 
-            // - in the extension document, you may have added directives to objects, e.g. @exposeAs
-            // - we need to transfer those to the original objects.
-            //
-            // The way we are doing this is in dire need of cleanup.
-            for (name, directives) in objects_and_directives {
-                let object = result
-                    .objects
-                    .iter_mut()
-                    .find(|(result, _)| result.server_object_entity.name == name)
-                    .ok_or_else(|| {
-                        WithLocation::new(
+        // - in the extension document, you may have added directives to objects, e.g. @exposeAs
+        // - we need to transfer those to the original objects.
+        //
+        // The way we are doing this is in dire need of cleanup.
+        for (name, directives) in directives {
+            // TODO don't do O(n^2) here
+            match result
+                .objects
+                .iter_mut()
+                .find(|(result, _)| result.server_object_entity.name == name)
+            {
+                Some((object, _)) => {
+                    for directive in directives {
+                        if directive.name.item == *EXPOSE_FIELD_DIRECTIVE {
+                            let expose_field_directive = from_graphql_directive(&directive)
+                                .map_err(|err| match err {
+                                    DeserializationError::Custom(err) => WithLocation::new(
+                                        CreateAdditionalFieldsError::FailedToDeserialize(err),
+                                        directive.name.location.into(), // TODO: use location of the entire directive
+                                    ),
+                                })?;
+
+                            object
+                                .expose_as_fields_to_insert
+                                .push(ExposeAsFieldToInsert {
+                                    expose_field_directive,
+                                    parent_object_name: object.server_object_entity.name,
+                                });
+                        }
+                    }
+                }
+                None => {
+                    return Err(Box::new(
                         ProcessGraphqlTypeSystemDefinitionError::AttemptedToExtendUndefinedType {
-                            type_name: name
+                            type_name: name,
                         },
-                        Location::generated()
-                    )
-                    })?;
-
-                object.0.directives.extend(directives);
+                    ));
+                }
             }
         }
 
