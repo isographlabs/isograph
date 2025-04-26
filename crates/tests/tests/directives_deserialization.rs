@@ -1,6 +1,6 @@
 use common_lang_types::{SelectableName, StringLiteralValue, TextSource};
 use graphql_lang_types::{
-    from_graph_ql_directive, DeserializationError, GraphQLConstantValue, GraphQLDirective,
+    from_graphql_directive, DeserializationError, GraphQLConstantValue, GraphQLDirective,
 };
 use intern::string_key::Intern;
 use isograph_schema::{ExposeFieldDirective, FieldMapItem};
@@ -35,7 +35,7 @@ fn parse_mutation(source: &str) -> Result<Vec<ExposeFieldDirective>, Box<dyn Err
         directives.into_iter().flatten().collect();
     let expose_field_directives: Result<Vec<ExposeFieldDirective>, _> = directives
         .into_iter()
-        .map(|directive| from_graph_ql_directive::<ExposeFieldDirective>(&directive))
+        .map(|directive| from_graphql_directive::<ExposeFieldDirective>(&directive))
         .collect();
     Ok(expose_field_directives?)
 }

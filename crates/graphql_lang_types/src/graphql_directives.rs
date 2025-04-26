@@ -25,7 +25,7 @@ impl<T: fmt::Display> fmt::Display for GraphQLDirective<T> {
     }
 }
 
-pub fn from_graph_ql_directive<'a, T: Deserialize<'a>>(
+pub fn from_graphql_directive<'a, T: Deserialize<'a>>(
     directive: &'a GraphQLDirective<GraphQLConstantValue>,
 ) -> Result<T, DeserializationError> {
     T::deserialize(GraphQLDirectiveDeserializer { directive })

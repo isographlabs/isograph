@@ -3,7 +3,7 @@ use common_lang_types::{
     StringLiteralValue, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    from_graph_ql_directive, DeserializationError, GraphQLConstantValue, GraphQLDirective,
+    from_graphql_directive, DeserializationError, GraphQLConstantValue, GraphQLDirective,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
@@ -340,7 +340,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         d: &GraphQLDirective<GraphQLConstantValue>,
     ) -> ProcessTypeDefinitionResult<Option<ExposeFieldDirective>> {
         if d.name.item == *EXPOSE_FIELD_DIRECTIVE {
-            let expose_field_directive = from_graph_ql_directive(d).map_err(|err| match err {
+            let expose_field_directive = from_graphql_directive(d).map_err(|err| match err {
                 DeserializationError::Custom(err) => WithLocation::new(
                     CreateAdditionalFieldsError::FailedToDeserialize(err),
                     d.name.location.into(), // TODO: use location of the entire directive
