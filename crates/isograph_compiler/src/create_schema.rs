@@ -8,9 +8,7 @@ use common_lang_types::{
     CurrentWorkingDirectory, IsographObjectTypeName, RelativePathToSourceFile, SelectableName,
     TextSource, UnvalidatedTypeName, VariableName, WithLocation,
 };
-use graphql_lang_types::{
-    GraphQLFieldDefinition, GraphQLInputValueDefinition, NameValuePair, RootOperationKind,
-};
+use graphql_lang_types::{GraphQLInputValueDefinition, NameValuePair, RootOperationKind};
 use isograph_config::{CompilerConfig, CompilerConfigOptions};
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{
@@ -18,7 +16,7 @@ use isograph_lang_types::{
     VariableDefinition,
 };
 use isograph_schema::{
-    validate_entrypoints, CreateAdditionalFieldsError, NetworkProtocol,
+    validate_entrypoints, CreateAdditionalFieldsError, FieldToInsert, NetworkProtocol,
     ProcessObjectTypeDefinitionOutcome, ProcessTypeSystemDocumentOutcome, RootOperationName,
     Schema, SchemaServerObjectSelectableVariant, ServerObjectSelectable, ServerScalarSelectable,
     UnprocessedItem,
@@ -262,7 +260,7 @@ pub struct ContainsIsoStats {
 /// - if it is an id field, modify the parent object
 fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
     schema: &mut Schema<TNetworkProtocol>,
-    field_queue: HashMap<ServerObjectEntityId, Vec<WithLocation<GraphQLFieldDefinition>>>,
+    field_queue: HashMap<ServerObjectEntityId, Vec<WithLocation<FieldToInsert>>>,
     options: &CompilerConfigOptions,
 ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
     for (parent_object_entity_id, field_definitions_to_insert) in field_queue {

@@ -1,10 +1,12 @@
 use std::{collections::BTreeMap, error::Error, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
-    Location, QueryOperationName, QueryText, RelativePathToSourceFile, WithLocation,
+    DescriptionValue, Location, QueryOperationName, QueryText, RelativePathToSourceFile,
+    ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition, RootOperationKind,
+    GraphQLConstantValue, GraphQLDirective, GraphQLInputValueDefinition, GraphQLTypeAnnotation,
+    RootOperationKind,
 };
 use isograph_lang_types::SchemaSource;
 use pico::{Database, SourceId};
@@ -55,5 +57,25 @@ pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol>
     pub encountered_root_kind: Option<RootOperationKind>,
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
     pub server_object_entity: ServerObjectEntity<TNetworkProtocol>,
-    pub fields_to_insert: Vec<WithLocation<GraphQLFieldDefinition>>,
+    pub fields_to_insert: Vec<WithLocation<FieldToInsert>>,
+}
+
+pub struct FieldToInsert {
+    pub description: Option<WithSpan<DescriptionValue>>,
+    pub name: WithLocation<ServerSelectableName>,
+    pub type_: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+    pub arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
+    pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
+
+    // TODO we can probably restructure things to make this less awkward.
+    // As in, we should not return GraphQLFieldDefinitions to the isograph side,
+    // which is GraphQL-agnostic, and instead pass field definitions. These field
+    // definitions should have an associated_data: TNetworkProtocol::FieldAssociatedData
+    // or the like, which should carry this info.
+    //
+    // Then, that should be consumed by NetworkProtocol::generate_query_text, and also
+    // somehow by generate_merged_selection_set. (Is a merged selection set something
+    // that the network protocol should care about?? I don't think so, but how else
+    // do we add the __typename and link selections?)
+    pub is_inline_fragment: bool,
 }

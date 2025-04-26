@@ -5,16 +5,16 @@ use common_lang_types::{
     WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLNamedTypeAnnotation,
+    GraphQLConstantValue, GraphQLDirective, GraphQLNamedTypeAnnotation,
     GraphQLNonNullTypeAnnotation, GraphQLScalarTypeDefinition, GraphQLTypeAnnotation,
     GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument, GraphQLTypeSystemExtension,
     GraphQLTypeSystemExtensionDocument, GraphQLTypeSystemExtensionOrDefinition, RootOperationKind,
 };
 use intern::string_key::Intern;
 use isograph_schema::{
-    CreateAdditionalFieldsError, IsographObjectTypeDefinition, ProcessObjectTypeDefinitionOutcome,
-    ProcessTypeSystemDocumentOutcome, RootTypes, ServerObjectEntity, ServerScalarEntity,
-    STRING_JAVASCRIPT_TYPE, TYPENAME_FIELD_NAME,
+    CreateAdditionalFieldsError, FieldToInsert, IsographObjectTypeDefinition,
+    ProcessObjectTypeDefinitionOutcome, ProcessTypeSystemDocumentOutcome, RootTypes,
+    ServerObjectEntity, ServerScalarEntity, STRING_JAVASCRIPT_TYPE, TYPENAME_FIELD_NAME,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
@@ -183,7 +183,7 @@ pub fn process_graphql_type_system_document(
         }) {
             for subtype_name in subtypes.iter() {
                 object_outcome.fields_to_insert.push(WithLocation::new(
-                    GraphQLFieldDefinition {
+                    FieldToInsert {
                         description: Some(WithSpan::new(
                             format!("A client pointer for the {} type.", subtype_name)
                                 .intern()
@@ -289,12 +289,28 @@ fn process_object_type_definition(
         output_associated_data: associated_data,
     };
 
-    let mut fields_to_insert = object_type_definition.fields;
+    let mut fields_to_insert: Vec<_> = object_type_definition
+        .fields
+        .into_iter()
+        .map(|field_definition| {
+            WithLocation::new(
+                FieldToInsert {
+                    description: field_definition.item.description,
+                    name: field_definition.item.name,
+                    type_: field_definition.item.type_,
+                    arguments: field_definition.item.arguments,
+                    directives: field_definition.item.directives,
+                    is_inline_fragment: field_definition.item.is_inline_fragment,
+                },
+                field_definition.location,
+            )
+        })
+        .collect();
 
     // We need to define a typename field for objects and interfaces, but not unions or input objects
     if type_definition_type.has_typename_field() {
         fields_to_insert.push(WithLocation::new(
-            GraphQLFieldDefinition {
+            FieldToInsert {
                 description: None,
                 name: WithLocation::new((*TYPENAME_FIELD_NAME).into(), Location::generated()),
                 type_: GraphQLTypeAnnotation::NonNull(Box::new(
