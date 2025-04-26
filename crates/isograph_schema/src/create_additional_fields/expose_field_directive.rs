@@ -1,6 +1,6 @@
 use common_lang_types::{
-    DirectiveArgumentName, DirectiveName, IsographObjectTypeName, Location, ObjectTypeAndFieldName,
-    SelectableName, Span, StringLiteralValue, ValueKeyName, WithLocation, WithSpan,
+    DirectiveName, IsographObjectTypeName, Location, ObjectTypeAndFieldName, SelectableName, Span,
+    StringLiteralValue, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     from_graph_ql_directive, DeserializationError, GraphQLConstantValue, GraphQLDirective,
@@ -32,11 +32,6 @@ use super::{
 
 lazy_static! {
     static ref EXPOSE_FIELD_DIRECTIVE: DirectiveName = "exposeField".intern().into();
-    static ref PATH_DIRECTIVE_ARGUMENT: DirectiveArgumentName = "path".intern().into();
-    static ref FIELD_MAP_DIRECTIVE_ARGUMENT: DirectiveArgumentName = "field_map".intern().into();
-    static ref FIELD_DIRECTIVE_ARGUMENT: DirectiveArgumentName = "field".intern().into();
-    static ref FROM_VALUE_KEY_NAME: ValueKeyName = "from".intern().into();
-    static ref TO_VALUE_KEY_NAME: ValueKeyName = "to".intern().into();
 }
 #[derive(Deserialize, Eq, PartialEq, Debug)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
