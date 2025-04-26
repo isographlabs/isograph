@@ -8,12 +8,14 @@ use common_lang_types::{
     CurrentWorkingDirectory, IsographObjectTypeName, RelativePathToSourceFile, SelectableName,
     TextSource, UnvalidatedTypeName, VariableName, WithLocation,
 };
-use graphql_lang_types::{GraphQLInputValueDefinition, NameValuePair, RootOperationKind};
+use graphql_lang_types::{
+    GraphQLConstantValue, GraphQLInputValueDefinition, NameValuePair, RootOperationKind,
+};
 use isograph_config::{CompilerConfig, CompilerConfigOptions};
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{
-    IsoLiteralsSource, SelectionType, ServerEntityId, ServerObjectEntityId, TypeAnnotation,
-    VariableDefinition,
+    ConstantValue, IsoLiteralsSource, SelectionType, ServerEntityId, ServerObjectEntityId,
+    TypeAnnotation, VariableDefinition,
 };
 use isograph_schema::{
     validate_entrypoints, CreateAdditionalFieldsError, FieldToInsert, NetworkProtocol,
@@ -404,26 +406,16 @@ pub fn graphql_input_value_definition_to_variable_definition(
 }
 
 fn convert_graphql_constant_value_to_isograph_constant_value(
-    graphql_constant_value: graphql_lang_types::GraphQLConstantValue,
-) -> isograph_lang_types::ConstantValue {
+    graphql_constant_value: GraphQLConstantValue,
+) -> ConstantValue {
     match graphql_constant_value {
-        graphql_lang_types::GraphQLConstantValue::Int(i) => {
-            isograph_lang_types::ConstantValue::Integer(i)
-        }
-        graphql_lang_types::GraphQLConstantValue::Boolean(b) => {
-            isograph_lang_types::ConstantValue::Boolean(b)
-        }
-        graphql_lang_types::GraphQLConstantValue::String(s) => {
-            isograph_lang_types::ConstantValue::String(s)
-        }
-        graphql_lang_types::GraphQLConstantValue::Float(f) => {
-            isograph_lang_types::ConstantValue::Float(f)
-        }
-        graphql_lang_types::GraphQLConstantValue::Null => isograph_lang_types::ConstantValue::Null,
-        graphql_lang_types::GraphQLConstantValue::Enum(e) => {
-            isograph_lang_types::ConstantValue::Enum(e)
-        }
-        graphql_lang_types::GraphQLConstantValue::List(l) => {
+        GraphQLConstantValue::Int(i) => ConstantValue::Integer(i),
+        GraphQLConstantValue::Boolean(b) => ConstantValue::Boolean(b),
+        GraphQLConstantValue::String(s) => ConstantValue::String(s),
+        GraphQLConstantValue::Float(f) => ConstantValue::Float(f),
+        GraphQLConstantValue::Null => ConstantValue::Null,
+        GraphQLConstantValue::Enum(e) => ConstantValue::Enum(e),
+        GraphQLConstantValue::List(l) => {
             let converted_list = l
                 .into_iter()
                 .map(|x| {
@@ -433,9 +425,9 @@ fn convert_graphql_constant_value_to_isograph_constant_value(
                     )
                 })
                 .collect::<Vec<_>>();
-            isograph_lang_types::ConstantValue::List(converted_list)
+            ConstantValue::List(converted_list)
         }
-        graphql_lang_types::GraphQLConstantValue::Object(o) => {
+        GraphQLConstantValue::Object(o) => {
             let converted_object = o
                 .into_iter()
                 .map(|name_value_pair| NameValuePair {
@@ -448,7 +440,7 @@ fn convert_graphql_constant_value_to_isograph_constant_value(
                     ),
                 })
                 .collect::<Vec<_>>();
-            isograph_lang_types::ConstantValue::Object(converted_object)
+            ConstantValue::Object(converted_object)
         }
     }
 }
