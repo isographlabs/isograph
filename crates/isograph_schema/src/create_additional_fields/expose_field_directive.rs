@@ -175,7 +175,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let target_object_with_id = self
             .traverse_object_selections(
                 payload_object_entity_id,
-                primary_field_name_selection_parts.iter().map(|x| *x),
+                primary_field_name_selection_parts.iter().copied(),
             )
             .map_err(|e| WithLocation::new(e, Location::generated()))?;
 
@@ -224,7 +224,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let mut parts_reversed = self
             .get_object_selections_path(
                 payload_object_entity_id,
-                primary_field_name_selection_parts.iter().map(|x| *x),
+                primary_field_name_selection_parts.iter().copied(),
             )
             .map_err(|e| WithLocation::new(e, Location::generated()))?;
         parts_reversed.reverse();
