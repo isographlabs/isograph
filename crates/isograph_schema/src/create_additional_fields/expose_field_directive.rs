@@ -106,7 +106,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             field_map.clone(),
         )?;
 
-        let payload_object = self
+        let payload_object_entity = self
             .server_entity_data
             .server_object_entity(payload_object_entity_id);
 
@@ -116,15 +116,17 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .map(|x| x.intern().into())
             .collect::<Vec<_>>();
 
-        let target_object_with_id = self
+        let maybe_abstract_target_object_entity_with_id = self
             .traverse_object_selections(
                 payload_object_entity_id,
                 primary_field_name_selection_parts.iter().copied(),
             )
             .map_err(|e| WithLocation::new(e, Location::generated()))?;
 
-        let maybe_abstract_parent_object_entity_id = target_object_with_id.id;
-        let maybe_abstract_parent_type_name = target_object_with_id.item.name;
+        let maybe_abstract_parent_object_entity_id = maybe_abstract_target_object_entity_with_id.id;
+        let maybe_abstract_parent_object_entity_name =
+            maybe_abstract_target_object_entity_with_id.item.name;
+        let maybe_abstract_parent_object_entity = maybe_abstract_target_object_entity_with_id.item;
 
         let fields = processed_field_map_items
             .iter()
@@ -154,11 +156,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         let mutation_field_client_field_id = self.client_scalar_selectables.len().into();
 
-        let top_level_schema_field_concrete_type = payload_object.concrete_type;
-        let maybe_abstract_parent_object = self
-            .server_entity_data
-            .server_object_entity(maybe_abstract_parent_object_entity_id);
-        let primary_field_concrete_type = maybe_abstract_parent_object.concrete_type;
+        let top_level_schema_field_concrete_type = payload_object_entity.concrete_type;
+        let primary_field_concrete_type = maybe_abstract_parent_object_entity.concrete_type;
 
         let top_level_schema_field_arguments = mutation_field_arguments
             .into_iter()
@@ -204,7 +203,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             top_level_schema_field_concrete_type,
         ));
 
-        let mutation_client_field = ClientScalarSelectable {
+        let mutation_client_scalar_selectable = ClientScalarSelectable {
             description,
             name: client_field_scalar_selection_name.unchecked_conversion(),
             reader_selection_set: vec![],
@@ -220,14 +219,15 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             }),
             variable_definitions: vec![],
             type_and_field: ObjectTypeAndFieldName {
-                type_name: maybe_abstract_parent_type_name.unchecked_conversion(), // e.g. Pet
+                type_name: maybe_abstract_parent_object_entity_name.unchecked_conversion(), // e.g. Pet
                 field_name: client_field_scalar_selection_name, // set_pet_best_friend
             },
             parent_object_entity_id: maybe_abstract_parent_object_entity_id,
             refetch_strategy: None,
             output_format: std::marker::PhantomData,
         };
-        self.client_scalar_selectables.push(mutation_client_field);
+        self.client_scalar_selectables
+            .push(mutation_client_scalar_selectable);
 
         self.insert_client_field_on_object(
             client_field_scalar_selection_name,
