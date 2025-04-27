@@ -92,9 +92,7 @@ At the root of a page, you will define an `iso` entrypoint. For any such entrypo
 
 ## About Isograph: `@exposeField`
 
-> Currently, `@exposeField` is only processed if it is on the Mutation type. But, it will be made more generally available at some point.
-
-Types with the `@exposeField(field: String!, path: String!, fieldMap: [FieldMap!]!)` directive have their fields re-exposed on other objects. For example, consider this schema:
+Types with the `@exposeField(field: String!, fieldMap: [FieldMap!])` directive have their fields re-exposed on other objects. For example, consider this schema:
 
 ```graphql
 input SetUserNameParams {
@@ -108,9 +106,8 @@ type SetUserNameResponse {
 
 type Mutation
   @exposeField(
-    field: "set_user_name" # expose this field
+    field: "set_user_name.updated_user" # expose this field
     as: "set_name" # optionally, rename the field
-    path: "updated_user" # on the type at this path (relative to the response object)
     fieldMap: [{ from: "id", to: "input.id" }] # mapping these fields
   ) {
   set_user_name(input: SetUserNameParams!): SetUserNameResponse!

@@ -164,8 +164,7 @@ type SetUserNameResponse {
 
 type Mutation
   @exposeField(
-    field: "set_user_name" # expose this field
-    path: "updated_user" # on the type at this path (relative to the response object)
+    field: "set_user_name.updated_user" # expose this field
     fieldMap: [{ from: "id", to: "id" }] # mapping these fields
     # as: "custom_field_name"
   ) {
@@ -173,7 +172,7 @@ type Mutation
 }
 ```
 
-In the above example, the `set_user_name` field will be made available on every `User` object, under the key `set_user_name` (this will be customizable.) So, one could write a resolver:
+In the above example, the `set_user_name` field will be made available on every `User` object, under the key `set_user_name` (which can be overridden with the `as` field). So, one could write a resolver:
 
 ```jsx
 export const UpdateUserNameButton = iso(`
