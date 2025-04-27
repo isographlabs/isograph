@@ -69,8 +69,8 @@ pub enum CreateAdditionalFieldsError {
         parent_type: IsographObjectTypeName,
     },
 
-    #[error("Invalid field in @exposeField directive")]
-    InvalidField,
+    #[error("Invalid field `{field_arg}` in @exposeField directive")]
+    InvalidField { field_arg: String },
 
     #[error("Invalid mutation field")]
     InvalidMutationField,

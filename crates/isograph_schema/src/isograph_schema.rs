@@ -10,6 +10,7 @@ use common_lang_types::{
 };
 use graphql_lang_types::GraphQLNamedTypeAnnotation;
 use intern::string_key::Intern;
+use intern::Lookup;
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDirectiveSet, ClientObjectSelectableId,
@@ -174,7 +175,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 Some(entity) => match entity.transpose() {
                     SelectionType::Scalar(_) => {
                         // TODO show a better error message
-                        return Err(CreateAdditionalFieldsError::InvalidField);
+                        return Err(CreateAdditionalFieldsError::InvalidField {
+                            field_arg: selection_name.lookup().to_string(),
+                        });
                     }
                     SelectionType::Object(object) => {
                         let target_object_entity_id = match object {
@@ -241,7 +244,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 Some(entity) => match entity.transpose() {
                     SelectionType::Scalar(_) => {
                         // TODO show a better error message
-                        return Err(CreateAdditionalFieldsError::InvalidField);
+                        return Err(CreateAdditionalFieldsError::InvalidField {
+                            field_arg: selection_name.lookup().to_string(),
+                        });
                     }
                     SelectionType::Object(object) => {
                         let target_object_entity_id = match object {
@@ -253,7 +258,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
                             DefinitionLocation::Client(_) => {
                                 // TODO better error, or support client fields
-                                return Err(CreateAdditionalFieldsError::InvalidField);
+                                return Err(CreateAdditionalFieldsError::InvalidField {
+                                    field_arg: selection_name.lookup().to_string(),
+                                });
                             }
                         };
 

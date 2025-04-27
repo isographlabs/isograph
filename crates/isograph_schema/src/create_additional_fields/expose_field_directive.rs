@@ -33,7 +33,6 @@ pub struct ExposeFieldDirective {
     #[serde(default)]
     #[serde(rename = "as")]
     expose_as: Option<SelectableName>,
-    path: Option<StringLiteralValue>,
     #[serde(default)]
     field_map: Vec<FieldMapItem>,
     field: StringLiteralValue,
@@ -42,13 +41,11 @@ pub struct ExposeFieldDirective {
 impl ExposeFieldDirective {
     pub fn new(
         expose_as: Option<SelectableName>,
-        path: Option<StringLiteralValue>,
         field_map: Vec<FieldMapItem>,
         field: StringLiteralValue,
     ) -> Self {
         Self {
             expose_as,
-            path,
             field_map,
             field,
         }
@@ -65,10 +62,22 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     ) -> Result<UnprocessedClientFieldItem, WithLocation<CreateAdditionalFieldsError>> {
         let ExposeFieldDirective {
             expose_as,
-            path,
             field_map,
             field,
         } = expose_field_directive;
+
+        // HACK: we're essentially splitting the field arg by . and keeping the same
+        // implementation as before. But really, there isn't much a distinction
+        // between field and path, and we should clean this up.
+        //
+        // But, this is an expedient way to combine field and path.
+        let mut path = field.lookup().split('.');
+        let field = path.next().expect(
+            "Expected iter to have at least one element. \
+            This is indicative of a bug in Isograph.",
+        );
+        let primary_field_name_selection_parts =
+            path.map(|x| x.intern().into()).collect::<Vec<_>>();
 
         let mutation_subfield_id =
             self.parse_mutation_subfield_id(field, parent_object_entity_id)?;
@@ -104,15 +113,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let payload_object_entity = self
             .server_entity_data
             .server_object_entity(payload_object_entity_id);
-
-        let primary_field_name_selection_parts = path
-            .map(|path| {
-                path.lookup()
-                    .split('.')
-                    .map(|x| x.intern().into())
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_else(std::vec::Vec::new);
 
         let maybe_abstract_target_object_entity_with_id = self
             .traverse_object_selections(
@@ -286,7 +286,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     /// of that specific field
     fn parse_mutation_subfield_id(
         &self,
-        field_arg: StringLiteralValue,
+        field_arg: &str,
         mutation_object_entity_id: ServerObjectEntityId,
     ) -> ProcessTypeDefinitionResult<ServerObjectSelectableId> {
         let field_id = self
@@ -302,7 +302,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .find_map(|(name, field_id)| {
                 if let DefinitionLocation::Server(SelectionType::Object(server_field_id)) = field_id
                 {
-                    if *name == field_arg {
+                    if name.lookup() == field_arg {
                         return Some(server_field_id);
                     }
                 }
@@ -310,7 +310,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             })
             .ok_or_else(|| {
                 WithLocation::new(
-                    CreateAdditionalFieldsError::InvalidField,
+                    CreateAdditionalFieldsError::InvalidField {
+                        field_arg: field_arg.to_string(),
+                    },
                     // TODO
                     Location::generated(),
                 )
