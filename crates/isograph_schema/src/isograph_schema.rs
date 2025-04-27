@@ -4,10 +4,10 @@ use std::{
 };
 
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, JavascriptName, Location,
-    ObjectSelectableName, SelectableName, ServerObjectEntityName, ServerObjectSelectableName,
-    ServerScalarEntityName, ServerScalarIdSelectableName, ServerScalarSelectableName,
-    UnvalidatedTypeName, WithLocation,
+    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, JavascriptName,
+    Location, ObjectSelectableName, RelativePathToSourceFile, SelectableName,
+    ServerObjectEntityName, ServerObjectSelectableName, ServerScalarEntityName,
+    ServerScalarIdSelectableName, ServerScalarSelectableName, UnvalidatedTypeName, WithLocation,
 };
 use graphql_lang_types::GraphQLNamedTypeAnnotation;
 use intern::string_key::Intern;
@@ -168,7 +168,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .get(&root_object_name)
             .expect(
                 "Expected root_object_entity_name to exist \
-                in server_object_entity_avaiable_selectables",
+                in server_object_entity_available_selectables",
             )
             .selectables;
 
@@ -246,7 +246,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .get(&root_object_name)
             .expect(
                 "Expected root_object_entity_name to exist \
-                in server_object_entity_avaiable_selectables",
+                in server_object_entity_available_selectables",
             )
             .selectables;
 
@@ -709,7 +709,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PathToRefetchField {
     pub linked_fields: Vec<NormalizationKey>,
-    pub field_name: ClientScalarSelectableName,
+    pub field_name: ClientSelectableName,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]

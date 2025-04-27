@@ -102,6 +102,7 @@ fn write_selections_for_query_text<'a>(
                     "  ".repeat(indentation_level as usize)
                 ));
             }
+            MergedServerSelection::ClientPointer(_) => {}
             MergedServerSelection::InlineFragment(inline_fragment) => {
                 query_text.push_str(&"  ".repeat(indentation_level as usize).to_string());
                 query_text.push_str(&format!(
