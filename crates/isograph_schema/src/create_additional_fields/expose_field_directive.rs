@@ -230,8 +230,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
             variant: ClientFieldVariant::ImperativelyLoadedField(ImperativelyLoadedFieldVariant {
                 top_level_schema_field_arguments,
-                client_field_scalar_selection_name: client_field_scalar_selection_name
-                    .unchecked_conversion(),
+                client_selection_name: client_field_scalar_selection_name.unchecked_conversion(),
 
                 root_object_entity_name: parent_object_entity_name,
                 subfields_or_inline_fragments: subfields_or_inline_fragments.clone(),

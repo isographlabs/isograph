@@ -115,6 +115,7 @@ fn write_selections_for_query_text<'a>(
                 );
                 query_text.push_str(&format!("{indent}}},{new_line}"));
             }
+            MergedServerSelection::ClientPointer(_) => {}
             MergedServerSelection::InlineFragment(inline_fragment) => {
                 query_text.push_str(indent);
                 query_text.push_str(&format!(

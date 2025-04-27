@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use common_lang_types::{
     ArtifactPathAndContent, ClientScalarSelectableName, ParentObjectEntityNameAndSelectableName,
     QueryOperationName, QueryText, ServerObjectEntityName, VariableName,
@@ -9,21 +7,26 @@ use isograph_lang_types::{
     DefinitionLocation, EmptyDirectiveSet, EntrypointDirectiveSet, ScalarSelectionDirectiveSet,
     SelectionType,
 };
+
+use isograph_schema::ClientScalarSelectable;
 use isograph_schema::{
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
     get_reachable_variables, initial_variable_context, ClientScalarOrObjectSelectable,
-    ClientScalarSelectable, EntrypointDeclarationInfo, FieldToCompletedMergeTraversalStateMap,
-    FieldTraversalResult, Format, MergedSelectionMap, NetworkProtocol, RootOperationName,
-    RootRefetchedPath, ScalarClientFieldTraversalState, Schema, ServerObjectEntity,
-    ValidatedVariableDefinition, WrappedSelectionMapSelection,
+    EntrypointDeclarationInfo, FieldToCompletedMergeTraversalStateMap, FieldTraversalResult,
+    Format, MergedSelectionMap, NetworkProtocol, RootOperationName, RootRefetchedPath,
+    ScalarClientFieldTraversalState, Schema, ServerObjectEntity, ValidatedVariableDefinition,
+    WrappedSelectionMapSelection,
 };
+use std::collections::BTreeSet;
 
+use crate::generate_artifacts::ENTRYPOINT_FILE_NAME;
+use crate::generate_artifacts::NORMALIZATION_AST_FILE_NAME;
+use crate::generate_artifacts::QUERY_TEXT_FILE_NAME;
 use crate::{
     generate_artifacts::{
-        NormalizationAstText, RefetchQueryArtifactImport, ENTRYPOINT_FILE_NAME, NORMALIZATION_AST,
-        NORMALIZATION_AST_FILE_NAME, QUERY_TEXT, QUERY_TEXT_FILE_NAME, RESOLVER_OUTPUT_TYPE,
-        RESOLVER_PARAM_TYPE, RESOLVER_READER,
+        NormalizationAstText, RefetchQueryArtifactImport, NORMALIZATION_AST, QUERY_TEXT,
+        RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
     },
     imperatively_loaded_fields::get_artifact_for_imperatively_loaded_field,
     normalization_ast_text::generate_normalization_ast_text,
@@ -163,14 +166,11 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
                     // Note: it would be cleaner to include a reference to the merged selection set here via
                     // the selection_variant variable, instead of by looking it up like this.
                     &encountered_client_type_map
-                        .get(&DefinitionLocation::Client(SelectionType::Scalar((
+                        .get(&DefinitionLocation::Client(
                             root_refetch_path
                                 .path_to_refetch_field_info
-                                .refetch_field_parent_object_entity_name,
-                            root_refetch_path
-                                .path_to_refetch_field_info
-                                .client_field_name,
-                        ))))
+                                .client_selectable_id,
+                        ))
                         .expect(
                             "Expected field to have been encountered, \
                                 since it is being used as a refetch field.",

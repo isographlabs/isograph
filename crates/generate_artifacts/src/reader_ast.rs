@@ -62,23 +62,33 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
         }
         SelectionTypeContainingSelections::Object(linked_field_selection) => {
             match linked_field_selection.associated_data {
-                DefinitionLocation::Client((parent_object_entity_name, client_pointer_name)) => {
-                    let client_pointer = schema
-                        .client_pointer(parent_object_entity_name, client_pointer_name)
-                        .expect(
-                            "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
-                        );
+                DefinitionLocation::Client(_) => {
+                    path.push(NormalizationKey::ClientPointer(NameAndArguments {
+                        // TODO use alias
+                        name: linked_field_selection.name.item.into(),
+                        // TODO this clearly does something, but why are we able to pass
+                        // the initial variable context here??
+                        arguments: transform_arguments_with_child_context(
+                            linked_field_selection
+                                .arguments
+                                .iter()
+                                .map(|x| x.item.into_key_and_value()),
+                            // TODO why is this not the transformed context?
+                            initial_variable_context,
+                        ),
+                    }));
 
                     let inner_reader_ast = generate_reader_ast_with_path(
                         schema,
-                        client_pointer.refetch_strategy.refetch_selection_set(),
+                        &linked_field_selection.selection_set,
                         indentation_level + 1,
                         reader_imports,
                         root_refetched_paths,
                         path,
                         initial_variable_context,
                     );
+
+                    path.pop();
 
                     linked_field_ast_node(
                         schema,
@@ -87,6 +97,8 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                         inner_reader_ast,
                         initial_variable_context,
                         reader_imports,
+                        root_refetched_paths,
+                        path,
                     )
                 }
                 DefinitionLocation::Server((
@@ -154,6 +166,8 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                         inner_reader_ast,
                         initial_variable_context,
                         reader_imports,
+                        root_refetched_paths,
+                        path,
                     )
                 }
             }
@@ -168,6 +182,8 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     inner_reader_ast: ReaderAst,
     initial_variable_context: &VariableContext,
     reader_imports: &mut ReaderImports,
+    root_refetched_paths: &RefetchedPathsMap,
+    path: &[NormalizationKey],
 ) -> String {
     let name = linked_field.name.item;
     let alias = linked_field
@@ -248,6 +264,20 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         ObjectSelectionDirectiveSet::Updatable(_)
     );
 
+    let refetch_query = match linked_field.associated_data {
+        DefinitionLocation::Client(_) => {
+            let refetch_query_index = find_imperatively_fetchable_query_index(
+                root_refetched_paths,
+                path,
+                linked_field.name.item.unchecked_conversion(),
+            )
+            .0;
+
+            format!("{}", refetch_query_index)
+        }
+        DefinitionLocation::Server(_) => "null".to_string(),
+    };
+
     format!(
         "{indent_1}{{\n\
         {indent_2}kind: \"Linked\",\n\
@@ -257,7 +287,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         {indent_2}condition: {condition},\n\
         {indent_2}isUpdatable: {is_updatable},\n\
         {indent_2}selections: {inner_reader_ast},\n\
-        {indent_2}refetchQueryIndex: null,\n\
+        {indent_2}refetchQueryIndex: {refetch_query},\n\
         {indent_1}}},\n",
     )
 }
@@ -723,7 +753,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                             Some(Loadability::ImperativelyLoadedField(_)) => {
                                 paths.insert(PathToRefetchField {
                                     linked_fields: path.clone(),
-                                    field_name: client_field.name.item,
+                                    field_name: client_field.name.item.into(),
                                 });
                             }
                             Some(Loadability::LoadablySelectedField(_)) => {
