@@ -182,7 +182,11 @@ impl<'de> Deserializer<'de> for ConstantValueDeserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_some(self)
+        if let GraphQLConstantValue::Null = self.value {
+            visitor.visit_none()
+        } else {
+            visitor.visit_some(self)
+        }
     }
 
     serde::forward_to_deserialize_any! {
