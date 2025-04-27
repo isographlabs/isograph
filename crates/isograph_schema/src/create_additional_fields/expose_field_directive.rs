@@ -1,5 +1,5 @@
 use common_lang_types::{
-    DirectiveName, IsographObjectTypeName, Location, ObjectTypeAndFieldName, SelectableName, Span,
+    IsographObjectTypeName, Location, ObjectTypeAndFieldName, SelectableName, Span,
     StringLiteralValue, WithLocation, WithSpan,
 };
 use intern::{string_key::Intern, Lookup};
@@ -17,7 +17,6 @@ use crate::{
     RefetchStrategy, Schema, SchemaServerObjectSelectableVariant, UnprocessedClientFieldItem,
     WrappedSelectionMapSelection,
 };
-use lazy_static::lazy_static;
 
 use super::{
     argument_map::ArgumentMap,
@@ -27,10 +26,6 @@ use super::{
     },
 };
 
-lazy_static! {
-    static ref EXPOSE_FIELD_DIRECTIVE: DirectiveName = "exposeField".intern().into();
-}
-
 // TODO move to graphql_network_protocol crate
 #[derive(Deserialize, Eq, PartialEq, Debug)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -38,7 +33,7 @@ pub struct ExposeFieldDirective {
     #[serde(default)]
     #[serde(rename = "as")]
     expose_as: Option<SelectableName>,
-    path: StringLiteralValue,
+    path: Option<StringLiteralValue>,
     #[serde(default)]
     field_map: Vec<FieldMapItem>,
     field: StringLiteralValue,
@@ -47,7 +42,7 @@ pub struct ExposeFieldDirective {
 impl ExposeFieldDirective {
     pub fn new(
         expose_as: Option<SelectableName>,
-        path: StringLiteralValue,
+        path: Option<StringLiteralValue>,
         field_map: Vec<FieldMapItem>,
         field: StringLiteralValue,
     ) -> Self {
@@ -111,10 +106,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_object_entity(payload_object_entity_id);
 
         let primary_field_name_selection_parts = path
-            .lookup()
-            .split('.')
-            .map(|x| x.intern().into())
-            .collect::<Vec<_>>();
+            .map(|path| {
+                path.lookup()
+                    .split('.')
+                    .map(|x| x.intern().into())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_else(|| vec![]);
 
         let maybe_abstract_target_object_entity_with_id = self
             .traverse_object_selections(
