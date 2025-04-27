@@ -1,13 +1,4 @@
 export default 'query PetDetailRoute($id: ID!) {\
-  node____id___v_id: node(id: $id) {\
-    __typename,\
-    id,\
-    ... on Pet {\
-      id,\
-      __typename,\
-      tagline,\
-    },\
-  },\
   pet____id___v_id: pet(id: $id) {\
     id,\
     age,\

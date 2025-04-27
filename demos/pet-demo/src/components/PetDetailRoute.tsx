@@ -7,13 +7,8 @@ import { FullPageLoading, PetDetailRoute, useNavigateTo } from './routes';
 
 export const PetDetailRouteComponent = iso(`
   field Query.PetDetailRoute($id: ID!) @component {
-    node(id: $id) {
-      asPet {
-        __refetch
-        tagline
-      }
-    }
     pet(id: $id) {
+      custom_pet_refetch
       name
       PetCheckinsCard
       PetBestFriendCard
@@ -56,11 +51,11 @@ export const PetDetailRouteComponent = iso(`
               <CardContent>
                 <Button
                   onClick={() =>
-                    data.node?.asPet?.__refetch({ id: parameters.id })[1]()
+                    pet.custom_pet_refetch({ id: parameters.id })[1]()
                   }
                   variant="contained"
                 >
-                  Refetch pet tagline
+                  Refetch pet
                 </Button>
               </CardContent>
             </Card>
