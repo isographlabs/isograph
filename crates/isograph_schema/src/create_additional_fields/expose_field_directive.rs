@@ -112,7 +112,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     .map(|x| x.intern().into())
                     .collect::<Vec<_>>()
             })
-            .unwrap_or_else(|| vec![]);
+            .unwrap_or_else(std::vec::Vec::new);
 
         let maybe_abstract_target_object_entity_with_id = self
             .traverse_object_selections(

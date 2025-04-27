@@ -47,7 +47,7 @@ fn test_test_mutation_extension_expose_as() -> Result<(), Box<dyn Error>> {
     ))?;
     let set_tagline_mutation = ExposeFieldDirective::new(
         Some(SelectableName::from("set_puppy_tagline".intern())),
-        StringLiteralValue::from("pet".intern()),
+        Some(StringLiteralValue::from("pet".intern())),
         vec![FieldMapItem {
             from: StringLiteralValue::from("id".intern()),
             to: StringLiteralValue::from("input.id".intern()),
@@ -66,7 +66,7 @@ fn test_test_mutation_extension_set_pet_tagline_parsing() -> Result<(), Box<dyn 
     ))?;
     let set_tagline_mutation = ExposeFieldDirective::new(
         None,
-        StringLiteralValue::from("pet".intern()),
+        Some(StringLiteralValue::from("pet".intern())),
         vec![FieldMapItem {
             from: StringLiteralValue::from("id".intern()),
             to: StringLiteralValue::from("input.id".intern()),
@@ -85,7 +85,7 @@ fn test_mutation_extension_set_pet_bestfriend_parsing() -> Result<(), Box<dyn Er
     ))?;
     let set_pet_best_friend = ExposeFieldDirective::new(
         None,
-        StringLiteralValue::from("pet".intern()),
+        Some(StringLiteralValue::from("pet".intern())),
         vec![FieldMapItem {
             from: StringLiteralValue::from("id".intern()),
             to: StringLiteralValue::from("id".intern()),
