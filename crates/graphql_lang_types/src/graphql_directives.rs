@@ -104,7 +104,7 @@ impl<'de, T: Lookup + Copy> MapAccess<'de> for NameValuePairVecDeserializer<'de,
         match self.arguments.get(self.field_idx) {
             Some(name_value_pair) => {
                 self.field_idx += 1;
-                seed.deserialize(ValueDeserializer { name_value_pair })
+                seed.deserialize(NameValuePairDeserializer { name_value_pair })
             }
             _ => Err(DeserializationError::Custom(format!(
                 "Called deserialization of field value for a field with idx {} that doesn't exist. This is indicative of a bug in Isograph.",
@@ -118,7 +118,7 @@ struct NameDeserializer<'a, TName, TValue> {
     name_value_pair: &'a NameValuePair<TName, TValue>,
 }
 
-struct ValueDeserializer<'a, TName, TValue> {
+struct NameValuePairDeserializer<'a, TName, TValue> {
     name_value_pair: &'a NameValuePair<TName, TValue>,
 }
 
@@ -192,7 +192,7 @@ impl<'de> Deserializer<'de> for ConstantValueDeserializer<'de> {
     }
 }
 
-impl<'de, TName> Deserializer<'de> for ValueDeserializer<'de, TName, GraphQLConstantValue> {
+impl<'de, TName> Deserializer<'de> for NameValuePairDeserializer<'de, TName, GraphQLConstantValue> {
     type Error = DeserializationError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
