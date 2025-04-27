@@ -1,42 +1,54 @@
 import type { IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryNormalizationArtifact } from '@isograph/react';
-import queryText from './__refetch__query_text__0';
+import queryText from './__refetch__query_text__5';
 
 const normalizationAst: NormalizationAst = {
   kind: "NormalizationAst",
   selections: [
     {
       kind: "Linked",
-      fieldName: "node",
+      fieldName: "pet",
       arguments: [
         [
           "id",
           { kind: "Variable", name: "id" },
         ],
       ],
-      concreteType: null,
+      concreteType: "Pet",
       selections: [
         {
-          kind: "InlineFragment",
-          type: "Pet",
+          kind: "Linked",
+          fieldName: "stats",
+          arguments: null,
+          concreteType: "PetStats",
           selections: [
             {
               kind: "Scalar",
-              fieldName: "__typename",
+              fieldName: "cuteness",
               arguments: null,
             },
             {
               kind: "Scalar",
-              fieldName: "id",
+              fieldName: "energy",
               arguments: null,
             },
             {
               kind: "Scalar",
-              fieldName: "__typename",
+              fieldName: "hunger",
               arguments: null,
             },
             {
               kind: "Scalar",
-              fieldName: "tagline",
+              fieldName: "intelligence",
+              arguments: null,
+            },
+            {
+              kind: "Scalar",
+              fieldName: "sociability",
+              arguments: null,
+            },
+            {
+              kind: "Scalar",
+              fieldName: "weight",
               arguments: null,
             },
           ],

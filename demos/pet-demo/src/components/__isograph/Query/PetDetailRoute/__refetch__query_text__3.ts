@@ -1,12 +1,37 @@
-export default 'mutation Query__make_super($checkin_id: ID!) {\
-  make_checkin_super____checkin_id___v_checkin_id: make_checkin_super(checkin_id: $checkin_id) {\
-    icheckin {\
-      ... on Checkin {\
-        __typename,\
+export default 'mutation Query__set_pet_tagline($input: SetPetTaglineParams!) {\
+  set_pet_tagline____input___v_input: set_pet_tagline(input: $input) {\
+    pet {\
+      id,\
+      age,\
+      best_friend_relationship {\
+        best_friend {\
+          id,\
+          name,\
+          picture,\
+        },\
+        picture_together,\
+      },\
+      checkins____skip___l_null____limit___l_null: checkins(skip: null, limit: null) {\
         id,\
         location,\
         time,\
       },\
+      favorite_phrase,\
+      name,\
+      nickname,\
+      potential_new_best_friends {\
+        id,\
+        name,\
+      },\
+      stats {\
+        cuteness,\
+        energy,\
+        hunger,\
+        intelligence,\
+        sociability,\
+        weight,\
+      },\
+      tagline,\
     },\
   },\
 }';

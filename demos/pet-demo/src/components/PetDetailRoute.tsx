@@ -1,12 +1,18 @@
 import { iso } from '@iso';
 import { FragmentReader, useLazyReference } from '@isograph/react';
-import { Container, Stack } from '@mui/material';
+import { Button, Card, CardContent, Container, Stack } from '@mui/material';
 import React from 'react';
 import { ErrorBoundary } from './ErrorBoundary';
 import { FullPageLoading, PetDetailRoute, useNavigateTo } from './routes';
 
 export const PetDetailRouteComponent = iso(`
   field Query.PetDetailRoute($id: ID!) @component {
+    node(id: $id) {
+      asPet {
+        __refetch
+        tagline
+      }
+    }
     pet(id: $id) {
       name
       PetCheckinsCard
@@ -16,7 +22,7 @@ export const PetDetailRouteComponent = iso(`
       PetStatsCard(id: $id)
     }
   }
-`)(function PetDetailRouteComponent({ data }) {
+`)(function PetDetailRouteComponent({ data, parameters }) {
   const navigateTo = useNavigateTo();
   const { pet } = data;
   if (pet == null) {
@@ -42,6 +48,22 @@ export const PetDetailRouteComponent = iso(`
 
             <pet.PetPhraseCard />
             <pet.PetTaglineCard />
+
+            <Card
+              variant="outlined"
+              sx={{ width: 450, boxShadow: 3, backgroundColor: '#BBB' }}
+            >
+              <CardContent>
+                <Button
+                  onClick={() =>
+                    data.node?.asPet?.__refetch({ id: parameters.id })[1]()
+                  }
+                  variant="contained"
+                >
+                  Refetch pet tagline
+                </Button>
+              </CardContent>
+            </Card>
           </Stack>
         </Stack>
       </React.Suspense>

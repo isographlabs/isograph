@@ -6,14 +6,19 @@ const normalizationAst: NormalizationAst = {
   selections: [
     {
       kind: "Linked",
-      fieldName: "set_pet_tagline",
+      fieldName: "set_pet_best_friend",
       arguments: [
         [
-          "input",
-          { kind: "Variable", name: "input" },
+          "id",
+          { kind: "Variable", name: "id" },
+        ],
+
+        [
+          "new_best_friend_id",
+          { kind: "Variable", name: "new_best_friend_id" },
         ],
       ],
-      concreteType: "SetPetTaglineResponse",
+      concreteType: "SetBestFriendResponse",
       selections: [
         {
           kind: "Linked",

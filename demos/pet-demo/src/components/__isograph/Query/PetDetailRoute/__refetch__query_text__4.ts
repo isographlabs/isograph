@@ -1,12 +1,12 @@
-export default 'query Query__refetch_pet_stats($id: ID!) {\
-  pet____id___v_id: pet(id: $id) {\
-    stats {\
-      cuteness,\
-      energy,\
-      hunger,\
-      intelligence,\
-      sociability,\
-      weight,\
+export default 'mutation Query__make_super($checkin_id: ID!) {\
+  make_checkin_super____checkin_id___v_checkin_id: make_checkin_super(checkin_id: $checkin_id) {\
+    icheckin {\
+      ... on Checkin {\
+        __typename,\
+        id,\
+        location,\
+        time,\
+      },\
     },\
   },\
 }';

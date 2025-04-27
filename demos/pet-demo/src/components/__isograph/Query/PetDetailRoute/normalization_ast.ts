@@ -4,6 +4,50 @@ const normalizationAst: NormalizationAst = {
   selections: [
     {
       kind: "Linked",
+      fieldName: "node",
+      arguments: [
+        [
+          "id",
+          { kind: "Variable", name: "id" },
+        ],
+      ],
+      concreteType: null,
+      selections: [
+        {
+          kind: "Scalar",
+          fieldName: "__typename",
+          arguments: null,
+        },
+        {
+          kind: "Scalar",
+          fieldName: "id",
+          arguments: null,
+        },
+        {
+          kind: "InlineFragment",
+          type: "Pet",
+          selections: [
+            {
+              kind: "Scalar",
+              fieldName: "id",
+              arguments: null,
+            },
+            {
+              kind: "Scalar",
+              fieldName: "__typename",
+              arguments: null,
+            },
+            {
+              kind: "Scalar",
+              fieldName: "tagline",
+              arguments: null,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      kind: "Linked",
       fieldName: "pet",
       arguments: [
         [

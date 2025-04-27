@@ -6,26 +6,24 @@ const normalizationAst: NormalizationAst = {
   selections: [
     {
       kind: "Linked",
-      fieldName: "set_pet_best_friend",
+      fieldName: "node",
       arguments: [
         [
           "id",
           { kind: "Variable", name: "id" },
         ],
-
-        [
-          "new_best_friend_id",
-          { kind: "Variable", name: "new_best_friend_id" },
-        ],
       ],
-      concreteType: "SetBestFriendResponse",
+      concreteType: null,
       selections: [
         {
-          kind: "Linked",
-          fieldName: "pet",
-          arguments: null,
-          concreteType: "Pet",
+          kind: "InlineFragment",
+          type: "Pet",
           selections: [
+            {
+              kind: "Scalar",
+              fieldName: "__typename",
+              arguments: null,
+            },
             {
               kind: "Scalar",
               fieldName: "id",
@@ -194,7 +192,7 @@ const artifact: RefetchQueryNormalizationArtifact = {
     queryText,
     normalizationAst,
   },
-  concreteType: "Mutation",
+  concreteType: "Query",
 };
 
 export default artifact;

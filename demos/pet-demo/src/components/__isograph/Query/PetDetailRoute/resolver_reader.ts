@@ -1,13 +1,54 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Query__PetDetailRoute__param } from './param_type';
 import { PetDetailRouteComponent as resolver } from '../../../PetDetailRoute';
+import Node__asPet__resolver_reader from '../../Node/asPet/resolver_reader';
 import Pet__PetBestFriendCard__resolver_reader from '../../Pet/PetBestFriendCard/resolver_reader';
 import Pet__PetCheckinsCard__resolver_reader from '../../Pet/PetCheckinsCard/resolver_reader';
 import Pet__PetPhraseCard__resolver_reader from '../../Pet/PetPhraseCard/resolver_reader';
 import Pet__PetStatsCard__resolver_reader from '../../Pet/PetStatsCard/resolver_reader';
 import Pet__PetTaglineCard__resolver_reader from '../../Pet/PetTaglineCard/resolver_reader';
+import Pet____refetch__refetch_reader from '../../Pet/__refetch/refetch_reader';
 
 const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
+  {
+    kind: "Linked",
+    fieldName: "node",
+    alias: null,
+    arguments: [
+      [
+        "id",
+        { kind: "Variable", name: "id" },
+      ],
+    ],
+    condition: null,
+    isUpdatable: false,
+    selections: [
+      {
+        kind: "Linked",
+        fieldName: "asPet",
+        alias: null,
+        arguments: null,
+        condition: Node__asPet__resolver_reader,
+        isUpdatable: false,
+        selections: [
+          {
+            kind: "ImperativelyLoadedField",
+            alias: "__refetch",
+            refetchReaderArtifact: Pet____refetch__refetch_reader,
+            refetchQuery: 0,
+            name: "__refetch",
+          },
+          {
+            kind: "Scalar",
+            fieldName: "tagline",
+            alias: null,
+            arguments: null,
+            isUpdatable: false,
+          },
+        ],
+      },
+    ],
+  },
   {
     kind: "Linked",
     fieldName: "pet",
@@ -33,14 +74,14 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
         alias: "PetCheckinsCard",
         arguments: null,
         readerArtifact: Pet__PetCheckinsCard__resolver_reader,
-        usedRefetchQueries: [3, ],
+        usedRefetchQueries: [4, ],
       },
       {
         kind: "Resolver",
         alias: "PetBestFriendCard",
         arguments: null,
         readerArtifact: Pet__PetBestFriendCard__resolver_reader,
-        usedRefetchQueries: [0, 1, 2, ],
+        usedRefetchQueries: [1, 2, 3, ],
       },
       {
         kind: "Resolver",
@@ -66,7 +107,7 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
           ],
         ],
         readerArtifact: Pet__PetStatsCard__resolver_reader,
-        usedRefetchQueries: [4, ],
+        usedRefetchQueries: [5, ],
       },
     ],
   },

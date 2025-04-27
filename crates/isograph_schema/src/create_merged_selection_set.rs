@@ -810,6 +810,13 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                     server_object_selectable,
                                 );
                                 let type_to_refine_to = object_selection_parent_object.name;
+
+                                let normalization_key =
+                                    NormalizationKey::InlineFragment(type_to_refine_to);
+                                merge_traversal_state
+                                    .traversal_path
+                                    .push(normalization_key.clone());
+
                                 let normalization_key =
                                     NormalizationKey::InlineFragment(type_to_refine_to);
 
@@ -987,6 +994,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
         extra_selections: BTreeMap::new(),
         client_field_id: newly_encountered_scalar_client_selectable_id,
     };
+
     merge_traversal_state.refetch_paths.insert(
         (
             path,

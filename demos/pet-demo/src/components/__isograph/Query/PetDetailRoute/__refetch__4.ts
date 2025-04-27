@@ -6,50 +6,46 @@ const normalizationAst: NormalizationAst = {
   selections: [
     {
       kind: "Linked",
-      fieldName: "pet",
+      fieldName: "make_checkin_super",
       arguments: [
         [
-          "id",
-          { kind: "Variable", name: "id" },
+          "checkin_id",
+          { kind: "Variable", name: "checkin_id" },
         ],
       ],
-      concreteType: "Pet",
+      concreteType: "MakeCheckinSuperResponse",
       selections: [
         {
           kind: "Linked",
-          fieldName: "stats",
+          fieldName: "icheckin",
           arguments: null,
-          concreteType: "PetStats",
+          concreteType: "Checkin",
           selections: [
             {
-              kind: "Scalar",
-              fieldName: "cuteness",
-              arguments: null,
-            },
-            {
-              kind: "Scalar",
-              fieldName: "energy",
-              arguments: null,
-            },
-            {
-              kind: "Scalar",
-              fieldName: "hunger",
-              arguments: null,
-            },
-            {
-              kind: "Scalar",
-              fieldName: "intelligence",
-              arguments: null,
-            },
-            {
-              kind: "Scalar",
-              fieldName: "sociability",
-              arguments: null,
-            },
-            {
-              kind: "Scalar",
-              fieldName: "weight",
-              arguments: null,
+              kind: "InlineFragment",
+              type: "Checkin",
+              selections: [
+                {
+                  kind: "Scalar",
+                  fieldName: "__typename",
+                  arguments: null,
+                },
+                {
+                  kind: "Scalar",
+                  fieldName: "id",
+                  arguments: null,
+                },
+                {
+                  kind: "Scalar",
+                  fieldName: "location",
+                  arguments: null,
+                },
+                {
+                  kind: "Scalar",
+                  fieldName: "time",
+                  arguments: null,
+                },
+              ],
             },
           ],
         },
@@ -64,7 +60,7 @@ const artifact: RefetchQueryNormalizationArtifact = {
     queryText,
     normalizationAst,
   },
-  concreteType: "Query",
+  concreteType: "Mutation",
 };
 
 export default artifact;
