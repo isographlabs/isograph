@@ -14,6 +14,7 @@ use super::create_additional_fields_error::{
     CreateAdditionalFieldsError, FieldMapItem, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
 };
 
+#[derive(Debug)]
 pub(crate) struct ArgumentMap {
     arguments: Vec<WithLocation<PotentiallyModifiedArgument>>,
 }
@@ -125,6 +126,7 @@ impl ArgumentMap {
     }
 }
 
+#[derive(Debug)]
 enum PotentiallyModifiedArgument {
     Unmodified(ValidatedVariableDefinition),
     Modified(ModifiedArgument),
