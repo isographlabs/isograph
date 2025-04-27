@@ -1,6 +1,6 @@
 use common_lang_types::{
-    ArtifactPathAndContent, ClientScalarSelectableName, IsographObjectTypeName,
-    ObjectTypeAndFieldName, QueryText,
+    ArtifactPathAndContent, ClientSelectableName, IsographObjectTypeName, ObjectTypeAndFieldName,
+    QueryText,
 };
 use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
@@ -18,7 +18,7 @@ use crate::{
 pub(crate) struct ImperativelyLoadedEntrypointArtifactInfo {
     pub normalization_ast_text: NormalizationAstText,
     pub query_text: QueryText,
-    pub root_fetchable_field: ClientScalarSelectableName,
+    pub root_fetchable_field: ClientSelectableName,
     pub root_fetchable_field_parent_object: IsographObjectTypeName,
     pub refetch_query_index: RefetchQueryIndex,
     pub concrete_type: IsographObjectTypeName,

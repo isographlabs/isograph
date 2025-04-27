@@ -1,19 +1,20 @@
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, HashSet};
 
 use common_lang_types::{
-    ClientScalarSelectableName, IsographObjectTypeName, Location, QueryOperationName,
-    ScalarSelectableName, SelectableName, ServerObjectSelectableName, ServerScalarSelectableName,
-    Span, VariableName, WithLocation, WithSpan,
+    ClientScalarSelectableName, ClientSelectableName, IsographObjectTypeName, Location,
+    QueryOperationName, ScalarSelectableName, SelectableName, ServerObjectSelectableName,
+    ServerScalarSelectableName, Span, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientScalarSelectableId, DefinitionLocation, EmptyDirectiveSet,
-    NonConstantValue, RefetchQueryIndex, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, ServerEntityId,
-    ServerObjectEntityId, ServerObjectSelectableId, ServerScalarEntityId, VariableDefinition,
+    ArgumentKeyAndValue, ClientObjectSelectableId, ClientScalarSelectableId, DefinitionLocation,
+    EmptyDirectiveSet, NonConstantValue, RefetchQueryIndex, ScalarSelection,
+    ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionType,
+    SelectionTypeContainingSelections, ServerEntityId, ServerObjectEntityId,
+    ServerObjectSelectableId, ServerScalarEntityId, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -22,11 +23,12 @@ use crate::{
     field_loadability::{categorize_field_loadability, Loadability},
     initial_variable_context, transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context, ClientFieldVariant,
-    ClientOrServerObjectSelectable, ClientScalarOrObjectSelectable, ClientScalarSelectable,
-    ClientSelectable, ClientSelectableId, ImperativelyLoadedFieldVariant, NameAndArguments,
-    NetworkProtocol, PathToRefetchField, RootOperationName, Schema,
+    ClientObjectSelectable, ClientOrServerObjectSelectable, ClientScalarOrObjectSelectable,
+    ClientScalarSelectable, ClientSelectable, ClientSelectableId, ImperativelyLoadedFieldVariant,
+    NameAndArguments, NetworkProtocol, PathToRefetchField, RootOperationName, Schema,
     SchemaServerObjectSelectableVariant, ServerObjectEntity, ServerObjectEntityExtraInfo,
-    ServerObjectSelectable, ValidatedScalarSelection, ValidatedSelection, VariableContext,
+    ServerObjectSelectable, ValidatedObjectSelection, ValidatedScalarSelection, ValidatedSelection,
+    VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -55,7 +57,7 @@ lazy_static! {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RootRefetchedPath {
-    pub field_name: ClientScalarSelectableName,
+    pub field_name: ClientSelectableName,
     pub path_to_refetch_field_info: PathToRefetchFieldInfo,
 }
 
@@ -64,6 +66,7 @@ pub struct RootRefetchedPath {
 pub enum MergedServerSelection {
     ScalarField(MergedScalarFieldSelection),
     LinkedField(MergedLinkedFieldSelection),
+    ClientPointer(MergedLinkedFieldSelection),
     // TODO does this belong? This is very GraphQL specific.
     InlineFragment(MergedInlineFragmentSelection),
 }
@@ -72,7 +75,8 @@ impl MergedServerSelection {
     pub fn reachable_variables(&self) -> Vec<VariableName> {
         match self {
             MergedServerSelection::ScalarField(field) => get_variables(&field.arguments).collect(),
-            MergedServerSelection::LinkedField(field) => get_variables(&field.arguments)
+            MergedServerSelection::ClientPointer(field)
+            | MergedServerSelection::LinkedField(field) => get_variables(&field.arguments)
                 .chain(
                     field
                         .selection_map
@@ -150,6 +154,7 @@ pub enum NormalizationKey {
     Id,
     // TODO this should not have NameAndArguments, but LinkedFieldNameAndArguments
     ServerField(NameAndArguments),
+    ClientPointer(NameAndArguments),
     InlineFragment(IsographObjectTypeName),
 }
 
@@ -168,6 +173,12 @@ impl NormalizationKey {
                     parent_variable_context,
                 ),
             ),
+            NormalizationKey::ClientPointer(s) => NormalizationKey::ClientPointer(
+                transform_name_and_arguments_with_child_variable_context(
+                    s.clone(),
+                    parent_variable_context,
+                ),
+            ),
             NormalizationKey::InlineFragment(o) => NormalizationKey::InlineFragment(*o),
         }
     }
@@ -180,7 +191,7 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
     /// among other things.
     pub variable_definitions: Vec<VariableDefinition<ServerEntityId>>,
     pub root_parent_object: IsographObjectTypeName,
-    pub root_fetchable_field: ClientScalarSelectableName,
+    pub root_fetchable_field: ClientSelectableName,
     pub refetch_query_index: RefetchQueryIndex,
 
     pub root_operation_name: RootOperationName,
@@ -193,7 +204,7 @@ pub struct PathToRefetchFieldInfo {
     refetch_field_parent_id: ServerObjectEntityId,
     pub imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant,
     extra_selections: MergedSelectionMap,
-    pub client_field_id: ClientScalarSelectableId,
+    pub client_selectable_id: ClientSelectableId,
 }
 
 pub type RefetchedPathsMap =
@@ -213,7 +224,6 @@ pub type RefetchedPathsMap =
 pub struct ScalarClientFieldTraversalState {
     /// As we traverse, if we encounter a refetch path, we note it here
     pub refetch_paths: RefetchedPathsMap,
-
     // TODO this should not be NormalizationKey, since a NormalizationKey can represent
     // a scalar field, and a path cannot include scalar fields. So, it should be a two-
     // variant enum, with variants for linked field and for inline fragment.
@@ -282,6 +292,9 @@ pub fn current_target_merged_selections<'a>(
             MergedServerSelection::LinkedField(ref linked_field) => {
                 parent_selection_map = &linked_field.selection_map;
             }
+            MergedServerSelection::ClientPointer(ref client_pointer) => {
+                parent_selection_map = &client_pointer.selection_map;
+            }
             MergedServerSelection::InlineFragment(ref inline_fragment) => {
                 parent_selection_map = &inline_fragment.selection_map;
             }
@@ -326,6 +339,20 @@ fn transform_and_merge_child_selection_map_into_parent_map(
                             ),
                         })
                     }
+                    MergedServerSelection::ClientPointer(linked_field_selection) => {
+                        MergedServerSelection::ClientPointer(MergedLinkedFieldSelection {
+                            concrete_type: linked_field_selection.concrete_type,
+                            name: linked_field_selection.name,
+                            selection_map: transform_child_map_with_parent_context(
+                                &linked_field_selection.selection_map,
+                                parent_variable_context,
+                            ),
+                            arguments: transform_arguments_with_child_context(
+                                linked_field_selection.arguments.into_iter(),
+                                parent_variable_context,
+                            ),
+                        })
+                    }
                     MergedServerSelection::InlineFragment(inline_fragment_selection) => {
                         MergedServerSelection::InlineFragment(MergedInlineFragmentSelection {
                             type_to_refine_to: inline_fragment_selection.type_to_refine_to,
@@ -354,6 +381,22 @@ fn transform_and_merge_child_selection_map_into_parent_map(
                     }
                     MergedServerSelection::LinkedField(target_linked_field) => {
                         if let MergedServerSelection::LinkedField(child_linked_field) =
+                            new_server_field_selection
+                        {
+                            transform_and_merge_child_selection_map_into_parent_map(
+                                &mut target_linked_field.selection_map,
+                                &child_linked_field.selection_map,
+                                parent_variable_context,
+                            )
+                        } else {
+                            panic!(
+                                "Error: tried to merge non-linked field into linked field. This \
+                                is indicative of a bug in Isograph."
+                            )
+                        }
+                    }
+                    MergedServerSelection::ClientPointer(target_linked_field) => {
+                        if let MergedServerSelection::ClientPointer(child_linked_field) =
                             new_server_field_selection
                         {
                             transform_and_merge_child_selection_map_into_parent_map(
@@ -468,10 +511,10 @@ pub fn get_imperatively_loaded_artifact_info<TNetworkProtocol: NetworkProtocol>(
         refetch_field_parent_id,
         imperatively_loaded_field_variant,
         extra_selections: _,
-        client_field_id,
+        client_selectable_id,
     } = path_to_refetch_field_info;
 
-    let client_field = schema.client_field(client_field_id);
+    let client_selectable = schema.client_type(client_selectable_id);
 
     process_imperatively_loaded_field(
         schema,
@@ -481,7 +524,7 @@ pub fn get_imperatively_loaded_artifact_info<TNetworkProtocol: NetworkProtocol>(
         entrypoint,
         index,
         reachable_variables,
-        client_field,
+        &client_selectable,
     )
 }
 
@@ -502,10 +545,10 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
     entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
     index: usize,
     reachable_variables: &BTreeSet<VariableName>,
-    client_field: &ClientScalarSelectable<TNetworkProtocol>,
+    client_selectable: &ClientSelectable<TNetworkProtocol>,
 ) -> ImperativelyLoadedFieldArtifactInfo {
     let ImperativelyLoadedFieldVariant {
-        client_field_scalar_selection_name,
+        client_selection_name,
         root_object_entity_id,
         mut subfields_or_inline_fragments,
         top_level_schema_field_arguments,
@@ -515,7 +558,7 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
     // If the field (e.g. icheckin) returns an abstract type (ICheckin) that is different than
     // the concrete type we want (Checkin), then we refine to that concrete type.
     // TODO investigate whether this can be done when the ImperativelyLoadedFieldVariant is created
-    if refetch_field_parent_id != client_field.parent_object_entity_id {
+    if refetch_field_parent_id != client_selectable.parent_object_entity_id() {
         let refetch_field_parent_type_name = schema
             .server_entity_data
             .server_object_entity(refetch_field_parent_id)
@@ -529,7 +572,7 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
 
     // TODO we need to extend this with variables used in subfields_or_inline_fragments
     let mut definitions_of_used_variables =
-        get_used_variable_definitions(reachable_variables, client_field);
+        get_used_variable_definitions(reachable_variables, client_selectable);
 
     for variable_definition in top_level_schema_field_arguments.iter() {
         definitions_of_used_variables.push(VariableDefinition {
@@ -544,7 +587,7 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
 
     let root_parent_object = schema
         .server_entity_data
-        .server_object_entity(entrypoint.parent_object_entity_id)
+        .server_object_entity(entrypoint.parent_object_entity_id())
         .name;
 
     let root_operation_name = schema
@@ -558,7 +601,7 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
 
     let query_name = format!(
         "{}__{}",
-        root_parent_object, client_field_scalar_selection_name
+        root_parent_object, client_selection_name
     )
     .intern()
     .into();
@@ -568,7 +611,7 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
         merged_selection_set: wrapped_selection_map,
         root_parent_object,
         variable_definitions: definitions_of_used_variables,
-        root_fetchable_field: entrypoint.name,
+        root_fetchable_field: entrypoint.name(),
         refetch_query_index: RefetchQueryIndex(index as u32),
         root_operation_name,
         query_name,
@@ -605,7 +648,7 @@ pub fn imperative_field_subfields_or_inline_fragments(
 
 fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
     reachable_variables: &BTreeSet<VariableName>,
-    entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
+    entrypoint: &ClientSelectable<TNetworkProtocol>,
 ) -> Vec<VariableDefinition<ServerEntityId>> {
     reachable_variables
         .iter()
@@ -616,7 +659,7 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
             } else {
                 Some(
                     entrypoint
-                        .variable_definitions
+                        .variable_definitions()
                         .iter()
                         .find(|definition| definition.item.name.item == *variable_name)
                         .unwrap_or_else(|| {
@@ -625,7 +668,8 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
                                 This might not be validated yet. For now, each client field \
                                 containing a __refetch field must re-defined all used variables. \
                                 Client field {} is missing variable definition {}",
-                                entrypoint.name, variable_name
+                                entrypoint.name(),
+                                variable_name
                             )
                         })
                         .item
@@ -795,8 +839,24 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             &object_selection.arguments,
                         );
 
-                        merge_traversal_state.accessible_client_fields.insert(
-                            SelectionType::Object(newly_encountered_client_object_selectable_id),
+                        let parent_object_entity_id = *newly_encountered_client_object_selectable
+                            .target_object_entity
+                            .inner();
+                        let parent_object = schema
+                            .server_entity_data
+                            .server_object_entity(parent_object_entity_id);
+
+                        insert_client_pointer_into_refetch_paths(
+                            schema,
+                            parent_map,
+                            encountered_client_field_map,
+                            merge_traversal_state,
+                            newly_encountered_client_object_selectable_id,
+                            newly_encountered_client_object_selectable,
+                            parent_object_entity_id,
+                            parent_object,
+                            object_selection,
+                            variable_context,
                         );
                     }
                     DefinitionLocation::Server(server_object_selectable_id) => {
@@ -831,15 +891,11 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                     });
 
                                 match inline_fragment {
-                                    MergedServerSelection::ScalarField(_) => {
+                                    MergedServerSelection::ScalarField(_)
+                                    | MergedServerSelection::ClientPointer(_)
+                                    | MergedServerSelection::LinkedField(_) => {
                                         panic!(
-                                            "Expected inline fragment, but encountered scalar. \
-                                            This is indicative of a bug in Isograph."
-                                        )
-                                    }
-                                    MergedServerSelection::LinkedField(_) => {
-                                        panic!(
-                                            "Expected inline fragment, but encountered linked field. \
+                                            "Expected inline fragment. \
                                             This is indicative of a bug in Isograph."
                                         )
                                     }
@@ -878,7 +934,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                             &object_selection.selection_set,
                                             encountered_client_field_map,
                                             DefinitionLocation::Server(server_object_selectable_id),
-                                            &server_object_selectable.initial_variable_context()
+                                            &server_object_selectable.initial_variable_context(),
                                         );
                                     }
                                 }
@@ -929,12 +985,6 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                         )
                                     });
                                 match linked_field {
-                                    MergedServerSelection::ScalarField(_) => {
-                                        panic!(
-                                            "Expected linked field, but encountered scalar. \
-                                            This is indicative of a bug in Isograph."
-                                        )
-                                    }
                                     MergedServerSelection::LinkedField(existing_linked_field) => {
                                         merge_validated_selections_into_selection_map(
                                             schema,
@@ -947,9 +997,11 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                             variable_context,
                                         );
                                     }
-                                    MergedServerSelection::InlineFragment(_) => {
+                                    MergedServerSelection::ClientPointer(_)
+                                    | MergedServerSelection::ScalarField(_)
+                                    | MergedServerSelection::InlineFragment(_) => {
                                         panic!(
-                                            "Expected linked field, but encountered inline fragment. \
+                                            "Expected linked field. \
                                             This is indicative of a bug in Isograph."
                                         )
                                     }
@@ -985,14 +1037,14 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
 ) {
     let path = PathToRefetchField {
         linked_fields: merge_traversal_state.traversal_path.clone(),
-        field_name: newly_encountered_scalar_client_selectable.name,
+        field_name: newly_encountered_scalar_client_selectable.name.into(),
     };
 
     let info = PathToRefetchFieldInfo {
         refetch_field_parent_id: parent_object_entity_id,
         imperatively_loaded_field_variant: variant.clone(),
         extra_selections: BTreeMap::new(),
-        client_field_id: newly_encountered_scalar_client_selectable_id,
+        client_selectable_id: SelectionType::Scalar(newly_encountered_scalar_client_selectable_id),
     };
 
     merge_traversal_state.refetch_paths.insert(
@@ -1001,7 +1053,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
             ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
         ),
         RootRefetchedPath {
-            field_name: newly_encountered_scalar_client_selectable.name,
+            field_name: newly_encountered_scalar_client_selectable.name.into(),
             path_to_refetch_field_info: info,
         },
     );
@@ -1027,6 +1079,118 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
             newly_encountered_scalar_client_selectable,
         )),
     );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    parent_map: &mut MergedSelectionMap,
+    encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
+    merge_traversal_state: &mut ScalarClientFieldTraversalState,
+    newly_encountered_client_object_selectable_id: ClientObjectSelectableId,
+    newly_encountered_client_object_selectable: &ClientObjectSelectable<TNetworkProtocol>,
+    parent_object_entity_id: ServerObjectEntityId,
+    parent_type: &ServerObjectEntity<TNetworkProtocol>,
+    object_selection: &ValidatedObjectSelection,
+    variable_context: &VariableContext,
+) {
+    let path = PathToRefetchField {
+        linked_fields: merge_traversal_state.traversal_path.clone(),
+        field_name: newly_encountered_client_object_selectable.name.into(),
+    };
+
+    let subfields_or_inline_fragments = vec![
+        WrappedSelectionMapSelection::InlineFragment(parent_type.name),
+        WrappedSelectionMapSelection::LinkedField {
+            server_object_selectable_name: *NODE_FIELD_NAME,
+            arguments: vec![ArgumentKeyAndValue {
+                key: "id".intern().into(),
+                value: NonConstantValue::Variable("id".intern().into()),
+            }],
+            concrete_type: None,
+        },
+    ];
+
+    let info = PathToRefetchFieldInfo {
+        refetch_field_parent_id: parent_object_entity_id,
+        imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant {
+            client_selection_name: newly_encountered_client_object_selectable.name.into(),
+            top_level_schema_field_arguments: id_arguments(schema.server_entity_data.id_type_id),
+            // top_level_schema_field_name: *NODE_FIELD_NAME,
+            // top_level_schema_field_concrete_type: None,
+            // primary_field_info: None,
+            field_map: vec![],
+            subfields_or_inline_fragments,
+            root_object_entity_id: schema.query_id(),
+        },
+        extra_selections: BTreeMap::new(),
+        client_selectable_id: SelectionType::Object(newly_encountered_client_object_selectable_id),
+    };
+
+    merge_traversal_state.refetch_paths.insert(
+        (
+            path,
+            ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
+        ),
+        RootRefetchedPath {
+            field_name: newly_encountered_client_object_selectable.name.into(),
+            path_to_refetch_field_info: info,
+        },
+    );
+
+    merge_traversal_state
+        .accessible_client_fields
+        .insert(SelectionType::Object(
+            newly_encountered_client_object_selectable_id,
+        ));
+
+    let normalization_key = NormalizationKey::ClientPointer(create_transformed_name_and_arguments(
+        object_selection.name.item.into(),
+        &object_selection.arguments,
+        variable_context,
+    ));
+
+    merge_traversal_state
+        .traversal_path
+        .push(normalization_key.clone());
+
+    let client_pointer = parent_map.entry(normalization_key).or_insert_with(|| {
+        MergedServerSelection::ClientPointer(MergedLinkedFieldSelection {
+            concrete_type: parent_type.concrete_type,
+            name: object_selection.name.item,
+            selection_map: BTreeMap::new(),
+            arguments: transform_arguments_with_child_context(
+                object_selection
+                    .arguments
+                    .iter()
+                    .map(|arg| arg.item.into_key_and_value()),
+                variable_context,
+            ),
+        })
+    });
+
+    match client_pointer {
+        MergedServerSelection::ClientPointer(existing_client_pointer) => {
+            merge_validated_selections_into_selection_map(
+                schema,
+                &mut existing_client_pointer.selection_map,
+                parent_object_entity_id,
+                parent_type,
+                &object_selection.selection_set,
+                merge_traversal_state,
+                encountered_client_field_map,
+                variable_context,
+            );
+        }
+        MergedServerSelection::LinkedField(_)
+        | MergedServerSelection::ScalarField(_)
+        | MergedServerSelection::InlineFragment(_) => {
+            panic!(
+                "Expected client pointer. \
+                    This is indicative of a bug in Isograph."
+            )
+        }
+    }
 }
 
 fn filter_id_fields(field: &&WithSpan<ValidatedSelection>) -> bool {
@@ -1109,6 +1273,9 @@ fn merge_scalar_server_field(
                 MergedServerSelection::LinkedField(_) => {
                     panic!("Unexpected linked field, probably a bug in Isograph");
                 }
+                MergedServerSelection::ClientPointer(_) => {
+                    panic!("Unexpected client pointer, probably a bug in Isograph");
+                }
                 MergedServerSelection::InlineFragment(_) => {
                     panic!("Unexpected inline fragment, probably a bug in Isograph");
                 }
@@ -1154,6 +1321,9 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
                     MergedServerSelection::ScalarField(_) => {
                         // TODO check that the existing server field matches the one we
                         // would create.
+                    }
+                    MergedServerSelection::ClientPointer(_) => {
+                        panic!("Unexpected client pointer for id, probably a bug in Isograph");
                     }
                     MergedServerSelection::LinkedField(_) => {
                         panic!("Unexpected linked field for id, probably a bug in Isograph");

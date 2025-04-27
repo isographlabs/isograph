@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    ClientScalarSelectableName, ConstExportName, IsographDirectiveName, IsographObjectTypeName,
-    Location, ObjectTypeAndFieldName, RelativePathToSourceFile, SelectableName, TextSource,
+    ClientSelectableName, ConstExportName, IsographDirectiveName, IsographObjectTypeName, Location,
+    ObjectTypeAndFieldName, RelativePathToSourceFile, SelectableName, TextSource,
     UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use intern::string_key::Intern;
@@ -456,7 +456,7 @@ pub enum ProcessClientFieldDeclarationError {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ImperativelyLoadedFieldVariant {
-    pub client_field_scalar_selection_name: ClientScalarSelectableName,
+    pub client_selection_name: ClientSelectableName,
 
     // Mutation or Query or whatnot. Awkward! A GraphQL-ism!
     pub root_object_entity_id: ServerObjectEntityId,
