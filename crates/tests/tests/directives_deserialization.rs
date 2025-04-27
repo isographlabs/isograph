@@ -47,12 +47,11 @@ fn test_test_mutation_extension_expose_as() -> Result<(), Box<dyn Error>> {
     ))?;
     let set_tagline_mutation = ExposeFieldDirective::new(
         Some(SelectableName::from("set_puppy_tagline".intern())),
-        Some(StringLiteralValue::from("pet".intern())),
         vec![FieldMapItem {
             from: StringLiteralValue::from("id".intern()),
             to: StringLiteralValue::from("input.id".intern()),
         }],
-        StringLiteralValue::from("set_pet_tagline".intern()),
+        StringLiteralValue::from("set_pet_tagline.pet".intern()),
     );
 
     assert_eq!(expose_field_mutations[0], set_tagline_mutation);
@@ -66,12 +65,11 @@ fn test_test_mutation_extension_set_pet_tagline_parsing() -> Result<(), Box<dyn 
     ))?;
     let set_tagline_mutation = ExposeFieldDirective::new(
         None,
-        Some(StringLiteralValue::from("pet".intern())),
         vec![FieldMapItem {
             from: StringLiteralValue::from("id".intern()),
             to: StringLiteralValue::from("input.id".intern()),
         }],
-        StringLiteralValue::from("set_pet_tagline".intern()),
+        StringLiteralValue::from("set_pet_tagline.pet".intern()),
     );
 
     assert_eq!(expose_field_mutations[0], set_tagline_mutation);
@@ -85,12 +83,11 @@ fn test_mutation_extension_set_pet_bestfriend_parsing() -> Result<(), Box<dyn Er
     ))?;
     let set_pet_best_friend = ExposeFieldDirective::new(
         None,
-        Some(StringLiteralValue::from("pet".intern())),
         vec![FieldMapItem {
             from: StringLiteralValue::from("id".intern()),
             to: StringLiteralValue::from("id".intern()),
         }],
-        StringLiteralValue::from("set_pet_best_friend".intern()),
+        StringLiteralValue::from("set_pet_best_friend.pet".intern()),
     );
     assert_eq!(expose_field_directives[1], set_pet_best_friend);
     Ok(())
@@ -122,7 +119,7 @@ fn test_mutation_extension_extra_topfield_parsing_failure() -> Result<(), Box<dy
     ));
     match_failure_message(
         expose_field_directives,
-        "unknown field `weight`, expected one of `as`, `path`, `fieldMap`, `field`",
+        "unknown field `weight`, expected one of `as`, `fieldMap`, `field`",
     );
     Ok(())
 }
