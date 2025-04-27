@@ -289,6 +289,7 @@ impl fmt::Display for GraphQLInputValueDefinition {
     }
 }
 
+#[derive(Debug)]
 pub enum RootOperationKind {
     Query,
     Subscription,

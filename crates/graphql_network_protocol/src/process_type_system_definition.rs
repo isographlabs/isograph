@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    IsographObjectTypeName, Location, ServerScalarSelectableName, Span, UnvalidatedTypeName,
-    WithLocation, WithSpan,
+    GraphQLInterfaceTypeName, IsographObjectTypeName, Location, SelectableName,
+    ServerScalarSelectableName, Span, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLNamedTypeAnnotation,
@@ -12,9 +12,10 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_schema::{
-    CreateAdditionalFieldsError, FieldToInsert, IsographObjectTypeDefinition,
-    ProcessObjectTypeDefinitionOutcome, ProcessTypeSystemDocumentOutcome, RootTypes,
-    ServerObjectEntity, ServerScalarEntity, STRING_JAVASCRIPT_TYPE, TYPENAME_FIELD_NAME,
+    CreateAdditionalFieldsError, ExposeAsFieldToInsert, ExposeFieldDirective, FieldMapItem,
+    FieldToInsert, IsographObjectTypeDefinition, ProcessObjectTypeDefinitionOutcome,
+    ProcessTypeSystemDocumentOutcome, RootTypes, ServerObjectEntity, ServerScalarEntity,
+    STRING_JAVASCRIPT_TYPE, TYPENAME_FIELD_NAME,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
@@ -24,11 +25,14 @@ use crate::{
 };
 
 lazy_static! {
-    static ref QUERY_TYPE: IsographObjectTypeName = "Query".intern().into();
+    pub static ref QUERY_TYPE: IsographObjectTypeName = "Query".intern().into();
     static ref MUTATION_TYPE: IsographObjectTypeName = "Mutation".intern().into();
     static ref ID_FIELD_NAME: ServerScalarSelectableName = "id".intern().into();
     // TODO use schema_data.string_type_id or something
     static ref STRING_TYPE_NAME: UnvalidatedTypeName = "String".intern().into();
+    static ref NODE_INTERFACE_NAME: GraphQLInterfaceTypeName = "Node".intern().into();
+    pub static ref REFETCH_FIELD_NAME: SelectableName = "__refetch".intern().into();
+
 }
 
 #[allow(clippy::type_complexity)]
@@ -37,6 +41,7 @@ pub fn process_graphql_type_system_document(
 ) -> ProcessGraphqlTypeDefinitionResult<(
     ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>,
     HashMap<IsographObjectTypeName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
+    Vec<ExposeAsFieldToInsert>,
 )> {
     // TODO return a vec of errors, not just one
 
@@ -51,6 +56,8 @@ pub fn process_graphql_type_system_document(
     let mut scalars = vec![];
     let mut objects = vec![];
     let mut directives = HashMap::<_, Vec<_>>::new();
+
+    let mut refetch_fields = vec![];
 
     for with_location in type_system_document.0 {
         let WithLocation {
@@ -79,6 +86,7 @@ pub fn process_graphql_type_system_document(
                         original_definition_type: GraphQLSchemaOriginalDefinitionType::Object,
                     },
                     GraphQLObjectDefinitionType::Object,
+                    &mut refetch_fields,
                 )?;
 
                 directives
@@ -103,6 +111,7 @@ pub fn process_graphql_type_system_document(
                                 GraphQLSchemaOriginalDefinitionType::Interface,
                         },
                         GraphQLObjectDefinitionType::Interface,
+                        &mut refetch_fields,
                     )?;
                 objects.push((process_object_type_definition_outcome, location));
 
@@ -130,6 +139,7 @@ pub fn process_graphql_type_system_document(
                                 GraphQLSchemaOriginalDefinitionType::InputObject,
                         },
                         GraphQLObjectDefinitionType::InputObject,
+                        &mut refetch_fields,
                     )?;
                 objects.push((process_object_type_definition_outcome, location));
                 directives
@@ -168,6 +178,7 @@ pub fn process_graphql_type_system_document(
                             original_definition_type: GraphQLSchemaOriginalDefinitionType::Union,
                         },
                         GraphQLObjectDefinitionType::Union,
+                        &mut refetch_fields,
                     )?;
                 objects.push((process_object_type_definition_outcome, location));
                 directives
@@ -242,6 +253,7 @@ pub fn process_graphql_type_system_document(
     Ok((
         ProcessTypeSystemDocumentOutcome { scalars, objects },
         directives,
+        refetch_fields,
     ))
 }
 
@@ -251,6 +263,7 @@ pub fn process_graphql_type_extension_document(
 ) -> ProcessGraphqlTypeDefinitionResult<(
     ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>,
     HashMap<IsographObjectTypeName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
+    Vec<ExposeAsFieldToInsert>,
 )> {
     let mut definitions = Vec::with_capacity(extension_document.0.len());
     let mut extensions = Vec::with_capacity(extension_document.0.len());
@@ -267,7 +280,7 @@ pub fn process_graphql_type_extension_document(
         }
     }
 
-    let (outcome, mut directives) =
+    let (outcome, mut directives, refetch_fields) =
         process_graphql_type_system_document(GraphQLTypeSystemDocument(definitions))?;
 
     for extension in extensions.into_iter() {
@@ -279,7 +292,7 @@ pub fn process_graphql_type_extension_document(
         }
     }
 
-    Ok((outcome, directives))
+    Ok((outcome, directives, refetch_fields))
 }
 
 pub(crate) type ProcessGraphqlTypeDefinitionResult<T> =
@@ -308,10 +321,12 @@ fn process_object_type_definition(
     concrete_type: Option<IsographObjectTypeName>,
     associated_data: GraphQLSchemaObjectAssociatedData,
     type_definition_type: GraphQLObjectDefinitionType,
+    refetch_fields: &mut Vec<ExposeAsFieldToInsert>,
 ) -> ProcessGraphqlTypeDefinitionResult<(
     ProcessObjectTypeDefinitionOutcome<GraphQLNetworkProtocol>,
     Vec<GraphQLDirective<GraphQLConstantValue>>,
 )> {
+    let object_implements_node = implements_node(&object_type_definition);
     let server_object_entity = ServerObjectEntity {
         description: object_type_definition.description.map(|d| d.item),
         name: object_type_definition.name.item,
@@ -353,6 +368,30 @@ fn process_object_type_definition(
             },
             Location::generated(),
         ));
+    }
+
+    if object_implements_node {
+        refetch_fields.push(ExposeAsFieldToInsert {
+            expose_field_directive: ExposeFieldDirective {
+                expose_as: Some(*REFETCH_FIELD_NAME),
+                field_map: vec![FieldMapItem {
+                    from: (*ID_FIELD_NAME).unchecked_conversion(),
+                    to: (*ID_FIELD_NAME).unchecked_conversion(),
+                }],
+                field: format!("node.as{}", object_type_definition.name.item)
+                    .intern()
+                    .into(),
+            },
+            parent_object_name: object_type_definition.name.item,
+            description: Some(
+                format!(
+                    "A refetch field for the {} type.",
+                    object_type_definition.name.item
+                )
+                .intern()
+                .into(),
+            ),
+        });
     }
 
     let encountered_root_kind = if object_type_definition.name.item == *QUERY_TYPE {
@@ -434,3 +473,11 @@ fn insert_into_type_refinement_map(
 }
 
 type UnvalidatedTypeRefinementMap = HashMap<UnvalidatedTypeName, Vec<UnvalidatedTypeName>>;
+
+fn implements_node(object_type_definition: &IsographObjectTypeDefinition) -> bool {
+    object_type_definition
+        .interfaces
+        .iter()
+        .find(|x| x.item == *NODE_INTERFACE_NAME)
+        .is_some()
+}

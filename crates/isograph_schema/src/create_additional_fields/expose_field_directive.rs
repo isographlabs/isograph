@@ -13,9 +13,9 @@ use serde::Deserialize;
 
 use crate::{
     generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
-    ClientFieldVariant, ClientScalarSelectable, ImperativelyLoadedFieldVariant, NetworkProtocol,
-    RefetchStrategy, Schema, SchemaServerObjectSelectableVariant, UnprocessedClientFieldItem,
-    WrappedSelectionMapSelection,
+    ClientFieldVariant, ClientScalarSelectable, ExposeAsFieldToInsert,
+    ImperativelyLoadedFieldVariant, NetworkProtocol, RefetchStrategy, Schema,
+    SchemaServerObjectSelectableVariant, UnprocessedClientFieldItem, WrappedSelectionMapSelection,
 };
 
 use super::{
@@ -30,12 +30,13 @@ use super::{
 #[derive(Deserialize, Eq, PartialEq, Debug)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ExposeFieldDirective {
+    // TODO make this a ScalarSelectableName
     #[serde(default)]
     #[serde(rename = "as")]
-    expose_as: Option<SelectableName>,
+    pub expose_as: Option<SelectableName>,
     #[serde(default)]
-    field_map: Vec<FieldMapItem>,
-    field: StringLiteralValue,
+    pub field_map: Vec<FieldMapItem>,
+    pub field: StringLiteralValue,
 }
 
 impl ExposeFieldDirective {
@@ -55,16 +56,14 @@ impl ExposeFieldDirective {
 impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn create_new_exposed_field(
         &mut self,
-        expose_field_directive: ExposeFieldDirective,
-        // e.g. Query or Mutation
-        parent_entity_name: IsographObjectTypeName,
+        expose_field_to_insert: ExposeAsFieldToInsert,
         parent_object_entity_id: ServerObjectEntityId,
     ) -> Result<UnprocessedClientFieldItem, WithLocation<CreateAdditionalFieldsError>> {
         let ExposeFieldDirective {
             expose_as,
             field_map,
             field,
-        } = expose_field_directive;
+        } = expose_field_to_insert.expose_field_directive;
 
         // HACK: we're essentially splitting the field arg by . and keeping the same
         // implementation as before. But really, there isn't much a distinction
@@ -98,13 +97,15 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         // TODO what is going on here. Should mutation_field have a checked way of converting to LinkedField?
         let top_level_schema_field_name = mutation_field.name.item.unchecked_conversion();
         let mutation_field_arguments = mutation_field.arguments.clone();
-        let description = mutation_field.description;
+        let description = expose_field_to_insert
+            .description
+            .or(mutation_field.description);
 
         let processed_field_map_items = skip_arguments_contained_in_field_map(
             self,
             mutation_field_arguments.clone(),
             mutation_field_payload_type_name,
-            parent_entity_name,
+            expose_field_to_insert.parent_object_name,
             client_field_scalar_selection_name,
             // TODO don't clone
             field_map.clone(),

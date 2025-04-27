@@ -20,7 +20,7 @@ use crate::{
     parse_graphql_schema,
     process_type_system_definition::{
         process_graphql_type_extension_document, process_graphql_type_system_document,
-        ProcessGraphqlTypeSystemDefinitionError,
+        ProcessGraphqlTypeSystemDefinitionError, QUERY_TYPE,
     },
     query_text::generate_query_text,
 };
@@ -46,11 +46,11 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         let (type_system_document, type_system_extension_documents) =
             parse_graphql_schema(db, schema_source_id, schema_extension_sources).to_owned()?;
 
-        let (mut result, mut directives) =
+        let (mut result, mut directives, mut refetch_fields) =
             process_graphql_type_system_document(type_system_document.to_owned())?;
 
         for type_system_extension_document in type_system_extension_documents.values() {
-            let (outcome, objects_and_directives) =
+            let (outcome, objects_and_directives, new_refetch_fields) =
                 process_graphql_type_extension_document(type_system_extension_document.to_owned())?;
 
             for (name, new_directives) in objects_and_directives {
@@ -64,7 +64,15 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             // We should probably fix that!
             result.objects.extend(objects);
             result.scalars.extend(scalars);
+            refetch_fields.extend(new_refetch_fields);
         }
+
+        let query = result
+            .objects
+            .iter_mut()
+            .find(|(object, _)| object.server_object_entity.name == *QUERY_TYPE)
+            .expect("Expected query type to be defined. Renaming the query is not yet supported.");
+        query.0.expose_as_fields_to_insert.extend(refetch_fields);
 
         // - in the extension document, you may have added directives to objects, e.g. @exposeAs
         // - we need to transfer those to the original objects.
@@ -93,6 +101,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                 .push(ExposeAsFieldToInsert {
                                     expose_field_directive,
                                     parent_object_name: object.server_object_entity.name,
+                                    description: None,
                                 });
                         }
                     }

@@ -28,7 +28,6 @@ use crate::{
     add_selection_sets::add_selection_sets_to_client_selectables,
     batch_compile::BatchCompileError,
     isograph_literals::{parse_iso_literal_in_source, process_iso_literals},
-    refetch_fields::add_refetch_fields_to_objects,
     source_files::SourceFiles,
 };
 
@@ -101,11 +100,8 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
 
     for (parent_object_entity_id, expose_as_fields_to_insert) in expose_as_field_queue {
         for expose_as_field in expose_as_fields_to_insert {
-            let unprocessed_scalar_item = unvalidated_isograph_schema.create_new_exposed_field(
-                expose_as_field.expose_field_directive,
-                expose_as_field.parent_object_name,
-                parent_object_entity_id,
-            )?;
+            let unprocessed_scalar_item = unvalidated_isograph_schema
+                .create_new_exposed_field(expose_as_field, parent_object_entity_id)?;
 
             unprocessed_items.push(SelectionType::Scalar(unprocessed_scalar_item));
         }
@@ -123,9 +119,6 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
     unprocessed_items.extend(unprocessed_client_types);
 
     unvalidated_isograph_schema.add_link_fields()?;
-    unprocessed_items.extend(add_refetch_fields_to_objects(
-        &mut unvalidated_isograph_schema,
-    )?);
 
     unvalidated_isograph_schema.entrypoints = validate_entrypoints(
         &unvalidated_isograph_schema,

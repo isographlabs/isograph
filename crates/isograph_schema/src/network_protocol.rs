@@ -49,6 +49,7 @@ pub struct ProcessTypeSystemDocumentOutcome<TNetworkProtocol: NetworkProtocol> {
     )>,
 }
 
+#[derive(Debug)]
 pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol> {
     // TODO this is a GraphQLism, remove
     pub encountered_root_kind: Option<RootOperationKind>,
@@ -57,6 +58,7 @@ pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol>
     pub expose_as_fields_to_insert: Vec<ExposeAsFieldToInsert>,
 }
 
+#[derive(Debug)]
 pub struct FieldToInsert {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<ServerSelectableName>,
@@ -76,8 +78,10 @@ pub struct FieldToInsert {
     pub is_inline_fragment: bool,
 }
 
+#[derive(Debug)]
 pub struct ExposeAsFieldToInsert {
     pub expose_field_directive: ExposeFieldDirective,
     // e.g. Query or Mutation
     pub parent_object_name: IsographObjectTypeName,
+    pub description: Option<DescriptionValue>,
 }
