@@ -588,7 +588,10 @@ fn find_imperatively_fetchable_query_index(
                 None
             }
         })
-        .expect("Expected refetch query to be found")
+        .expect(
+            "Expected refetch query to be found. \
+            This is indicative of a bug in Isograph.",
+        )
 }
 
 pub(crate) fn generate_reader_ast<'schema, TNetworkProtocol: NetworkProtocol>(
