@@ -1,6 +1,10 @@
 use std::{path::PathBuf, str::Utf8Error};
 
-use crate::{compiler_state::compile, source_files::SourceFiles, with_duration::WithDuration};
+use crate::{
+    compiler_state::{compile, StandardSources},
+    source_files::SourceFiles,
+    with_duration::WithDuration,
+};
 use colored::Colorize;
 use common_lang_types::{CurrentWorkingDirectory, WithLocation};
 use isograph_lang_parser::IsographLiteralParseError;
@@ -17,7 +21,7 @@ pub struct CompilationStats {
     pub total_artifacts_written: usize,
 }
 
-pub fn compile_and_print<TNetworkProtocol: NetworkProtocol>(
+pub fn compile_and_print<TNetworkProtocol: NetworkProtocol<Sources = StandardSources>>(
     config_location: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(), Box<dyn std::error::Error>> {

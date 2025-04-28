@@ -28,20 +28,16 @@ use crate::{
     add_selection_sets::add_selection_sets_to_client_selectables,
     batch_compile::BatchCompileError,
     isograph_literals::{parse_iso_literal_in_source, process_iso_literals},
-    source_files::SourceFiles,
 };
 
 pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
     db: &Database,
-    source_files: &SourceFiles,
+    sources: &TNetworkProtocol::Sources,
+    iso_literals: &HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>,
     config: &CompilerConfig,
 ) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), Box<dyn Error>> {
     let ProcessTypeSystemDocumentOutcome { scalars, objects } =
-        TNetworkProtocol::parse_and_process_type_system_documents(
-            db,
-            source_files.schema,
-            &source_files.schema_extensions,
-        )?;
+        TNetworkProtocol::parse_and_process_type_system_documents(db, sources)?;
 
     let mut unvalidated_isograph_schema = Schema::<TNetworkProtocol>::new();
     for (server_scalar_entity, name_location) in scalars {
@@ -107,11 +103,7 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
         }
     }
 
-    let contains_iso = parse_iso_literals(
-        db,
-        &source_files.iso_literals,
-        config.current_working_directory,
-    )?;
+    let contains_iso = parse_iso_literals(db, iso_literals, config.current_working_directory)?;
     let contains_iso_stats = contains_iso.stats();
 
     let (unprocessed_client_types, unprocessed_entrypoints) =

@@ -3,10 +3,7 @@ use std::{collections::BTreeMap, error::Error};
 use common_lang_types::{
     DirectiveName, QueryOperationName, QueryText, RelativePathToSourceFile, WithLocation,
 };
-use graphql_lang_types::{
-    from_graphql_directive, DeserializationError, GraphQLTypeSystemDocument,
-    GraphQLTypeSystemExtensionDocument,
-};
+use graphql_lang_types::{from_graphql_directive, DeserializationError};
 use intern::string_key::Intern;
 use isograph_lang_types::SchemaSource;
 use isograph_schema::{
@@ -33,18 +30,21 @@ lazy_static! {
 pub struct GraphQLNetworkProtocol {}
 
 impl NetworkProtocol for GraphQLNetworkProtocol {
-    type TypeSystemDocument = GraphQLTypeSystemDocument;
-    type TypeSystemExtensionDocument = GraphQLTypeSystemExtensionDocument;
+    type Sources = (
+        SourceId<SchemaSource>,
+        BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
+    );
 
     type SchemaObjectAssociatedData = GraphQLSchemaObjectAssociatedData;
 
     fn parse_and_process_type_system_documents(
         db: &Database,
-        schema_source_id: SourceId<SchemaSource>,
-        schema_extension_sources: &BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
+        sources: &Self::Sources,
     ) -> Result<ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>, Box<dyn Error>> {
+        let (schema_source_id, schema_extension_sources) = sources;
+
         let (type_system_document, type_system_extension_documents) =
-            parse_graphql_schema(db, schema_source_id, schema_extension_sources).to_owned()?;
+            parse_graphql_schema(db, *schema_source_id, schema_extension_sources).to_owned()?;
 
         let (mut result, mut directives, mut refetch_fields) =
             process_graphql_type_system_document(type_system_document.to_owned())?;

@@ -15,14 +15,14 @@ use tracing::info;
 
 use crate::{
     batch_compile::print_result,
-    compiler_state::{compile, CompilerState},
+    compiler_state::{compile, CompilerState, StandardSources},
     source_files::SourceFiles,
     with_duration::WithDuration,
 };
 
 const MAX_CHANGED_FILES: usize = 100;
 
-pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
+pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol<Sources = StandardSources>>(
     config_location: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(), Vec<Error>> {

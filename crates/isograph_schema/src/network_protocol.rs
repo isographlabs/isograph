@@ -1,12 +1,11 @@
-use std::{collections::BTreeMap, error::Error, fmt::Debug, hash::Hash};
+use std::{error::Error, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
     DescriptionValue, IsographObjectTypeName, Location, QueryOperationName, QueryText,
-    RelativePathToSourceFile, ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
+    ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation, RootOperationKind};
-use isograph_lang_types::SchemaSource;
-use pico::{Database, SourceId};
+use pico::Database;
 
 use crate::{
     ExposeFieldDirective, MergedSelectionMap, RootOperationName, Schema, ServerObjectEntity,
@@ -18,18 +17,14 @@ pub trait NetworkProtocol:
 where
     Self: Sized,
 {
-    // These two types should be combined into a single type, this is a
-    // GraphQL-ism leaking in
-    type TypeSystemDocument: Debug + Clone + 'static;
-    type TypeSystemExtensionDocument: Debug + Clone + 'static;
+    type Sources;
 
     type SchemaObjectAssociatedData: Debug;
 
     #[allow(clippy::type_complexity)]
     fn parse_and_process_type_system_documents(
         db: &Database,
-        schema_source_id: SourceId<SchemaSource>,
-        schema_extension_sources: &BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
+        sources: &Self::Sources,
     ) -> Result<ProcessTypeSystemDocumentOutcome<Self>, Box<dyn Error>>;
 
     fn generate_query_text<'a>(
