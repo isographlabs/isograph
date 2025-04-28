@@ -478,6 +478,5 @@ fn implements_node(object_type_definition: &IsographObjectTypeDefinition) -> boo
     object_type_definition
         .interfaces
         .iter()
-        .find(|x| x.item == *NODE_INTERFACE_NAME)
-        .is_some()
+        .any(|x| x.item == *NODE_INTERFACE_NAME)
 }
