@@ -4,9 +4,8 @@ use std::{
 };
 
 use common_lang_types::{
-    ClientScalarSelectableName, GraphQLScalarTypeName, IsoLiteralText, IsographObjectTypeName,
-    JavascriptName, Location, ObjectSelectableName, SelectableName, UnvalidatedTypeName,
-    WithLocation,
+    ClientScalarSelectableName, GraphQLScalarTypeName, IsographObjectTypeName, JavascriptName,
+    Location, ObjectSelectableName, SelectableName, UnvalidatedTypeName, WithLocation,
 };
 use graphql_lang_types::GraphQLNamedTypeAnnotation;
 use intern::string_key::Intern;
@@ -24,10 +23,10 @@ use lazy_static::lazy_static;
 use crate::{
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectableId,
-    NetworkProtocol, NormalizationKey, ObjectSelectable, ObjectSelectableId, ServerEntity,
-    ServerObjectEntity, ServerObjectEntityAvailableSelectables, ServerObjectSelectable,
-    ServerScalarEntity, ServerScalarSelectable, ServerSelectable, ServerSelectableId,
-    UseRefetchFieldRefetchStrategy,
+    EntrypointDeclarationInfo, NetworkProtocol, NormalizationKey, ObjectSelectable,
+    ObjectSelectableId, ServerEntity, ServerObjectEntity, ServerObjectEntityAvailableSelectables,
+    ServerObjectSelectable, ServerScalarEntity, ServerScalarSelectable, ServerSelectable,
+    ServerSelectableId, UseRefetchFieldRefetchStrategy,
 };
 
 lazy_static! {
@@ -45,7 +44,7 @@ pub struct Schema<TNetworkProtocol: NetworkProtocol> {
     pub server_object_selectables: Vec<ServerObjectSelectable<TNetworkProtocol>>,
     pub client_scalar_selectables: Vec<ClientScalarSelectable<TNetworkProtocol>>,
     pub client_object_selectables: Vec<ClientObjectSelectable<TNetworkProtocol>>,
-    pub entrypoints: HashMap<ClientScalarSelectableId, IsoLiteralText>,
+    pub entrypoints: HashMap<ClientScalarSelectableId, EntrypointDeclarationInfo>,
     pub server_entity_data: ServerEntityData<TNetworkProtocol>,
 
     /// These are root types like Query, Mutation, Subscription
