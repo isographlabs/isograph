@@ -63,7 +63,7 @@ export {
   type StableId,
   type ResolverFirstParameter,
   type ReaderImperativelyLoadedField,
-  type ReaderLoadableField,
+  type LoadablySelectedField as ReaderLoadableField,
   type ReaderLinkField,
   type StartUpdate,
 } from './core/reader';

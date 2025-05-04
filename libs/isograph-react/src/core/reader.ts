@@ -83,7 +83,7 @@ export type ReaderAstNode =
   | ReaderLinkedField
   | ReaderNonLoadableResolverField
   | ReaderImperativelyLoadedField
-  | ReaderLoadableField
+  | LoadablySelectedField
   | ReaderLinkField;
 
 // @ts-ignore
@@ -132,7 +132,7 @@ export type ReaderImperativelyLoadedField = {
   readonly name: string;
 };
 
-export type ReaderLoadableField = {
+export type LoadablySelectedField = {
   readonly kind: 'LoadablySelectedField';
   readonly alias: string;
 

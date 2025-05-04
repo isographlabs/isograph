@@ -38,9 +38,9 @@ import {
 } from './PromiseWrapper';
 import {
   ReaderAst,
+  type LoadablySelectedField,
   type ReaderImperativelyLoadedField,
   type ReaderLinkedField,
-  type ReaderLoadableField,
   type ReaderNonLoadableResolverField,
   type ReaderScalarField,
 } from './reader';
@@ -282,7 +282,7 @@ function readData<TReadFromStore>(
 
 export function readLoadablySelectedFieldData(
   environment: IsographEnvironment,
-  field: ReaderLoadableField,
+  field: LoadablySelectedField,
   root: Link,
   variables: Variables,
   networkRequest: PromiseWrapper<void, any>,
