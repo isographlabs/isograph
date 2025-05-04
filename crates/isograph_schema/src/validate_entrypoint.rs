@@ -16,7 +16,7 @@ use crate::{NetworkProtocol, Schema};
 #[derive(Debug)]
 pub struct EntrypointDeclarationInfo {
     pub iso_literal_text: IsoLiteralText,
-    pub is_lazy_loaded: bool,
+    pub directive_set: EntrypointDirectiveSet,
 }
 
 pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol>(
@@ -34,14 +34,11 @@ pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol>(
             Ok(client_field_id) => {
                 let new_entrypoint = EntrypointDeclarationInfo {
                     iso_literal_text: entrypoint_declaration.item.iso_literal_text,
-                    is_lazy_loaded: matches!(
-                        entrypoint_declaration.item.entrypoint_directive_set,
-                        EntrypointDirectiveSet::LazyLoad(_)
-                    ),
+                    directive_set: entrypoint_declaration.item.entrypoint_directive_set,
                 };
                 match entrypoints.entry(client_field_id) {
                     Entry::Occupied(occupied_entry) => {
-                        if occupied_entry.get().is_lazy_loaded != new_entrypoint.is_lazy_loaded {
+                        if occupied_entry.get().directive_set != new_entrypoint.directive_set {
                             errors.push(WithLocation::new(
                                 ValidateEntrypointDeclarationError::LazyLoadInconsistentEntrypoint,
                                 Location::new(
