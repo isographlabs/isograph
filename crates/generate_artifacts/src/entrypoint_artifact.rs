@@ -13,10 +13,10 @@ use isograph_schema::{
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
     get_reachable_variables, initial_variable_context, ClientScalarOrObjectSelectable,
-    ClientScalarSelectable, FieldToCompletedMergeTraversalStateMap, FieldTraversalResult,
-    MergedSelectionMap, NetworkProtocol, RootOperationName, RootRefetchedPath,
-    ScalarClientFieldTraversalState, Schema, ServerObjectEntity, ValidatedVariableDefinition,
-    WrappedSelectionMapSelection,
+    ClientScalarSelectable, EntrypointDeclarationInfo, FieldToCompletedMergeTraversalStateMap,
+    FieldTraversalResult, MergedSelectionMap, NetworkProtocol, RootOperationName,
+    RootRefetchedPath, ScalarClientFieldTraversalState, Schema, ServerObjectEntity,
+    ValidatedVariableDefinition, WrappedSelectionMapSelection,
 };
 
 use crate::{
@@ -335,23 +335,23 @@ impl<TNetworkProtocol: NetworkProtocol> EntrypointArtifactInfo<'_, TNetworkProto
         let normalization_text_file_name = *NORMALIZATION_AST;
         format!(
             "import type {{IsographEntrypoint, \
-            NormalizationAst, RefetchQueryNormalizationArtifactWrapper}} from '@isograph/react';\n\
+            NormalizationAstLoader, RefetchQueryNormalizationArtifactWrapper}} from '@isograph/react';\n\
             import {{{entrypoint_params_typename}}} from './{param_type_file_name}{ts_file_extension}';\n\
             import {{{entrypoint_output_type_name}}} from './{output_type_file_name}{ts_file_extension}';\n\
             import readerResolver from './{resolver_reader_file_name}{ts_file_extension}';\n\
             import queryText from './{query_text_file_name}{ts_file_extension}';\n\
-            import normalizationAst from './{normalization_text_file_name}{ts_file_extension}';\n\
+            // import normalizationAst from './{normalization_text_file_name}{ts_file_extension}';\n\
             {refetch_query_artifact_import}\n\n\
             const artifact: IsographEntrypoint<\n\
             {}{entrypoint_params_typename},\n\
             {}{entrypoint_output_type_name},\n\
-            {}NormalizationAst\n\
+            {}NormalizationAstLoader\n\
             > = {{\n\
             {}kind: \"Entrypoint\",\n\
             {}networkRequestInfo: {{\n\
             {}  kind: \"NetworkRequestInfo\",\n\
             {}  queryText,\n\
-            {}  normalizationAst,\n\
+            {}  normalizationAst: {{ kind: \"NormalizationAstLoader\", loader: () => import('./{normalization_text_file_name}{ts_file_extension}').then(x => x.default) }},\n\
             {}}},\n\
             {}concreteType: \"{concrete_type}\",\n\
             {}readerWithRefetchQueries: {{\n\

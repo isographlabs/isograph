@@ -71,6 +71,7 @@ export function PetDetailRouteLoader({ route }: { route: PetDetailRoute }) {
     iso(`entrypoint Query.PetDetailRoute`),
     { id: route.id },
     {
+      shouldFetch: 'Yes',
       onComplete: (data) => {
         console.log(
           'The Query.PetDetailRoute network request has completed.',

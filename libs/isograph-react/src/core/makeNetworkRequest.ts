@@ -132,6 +132,7 @@ export function makeNetworkRequest<
     loadNormalizationAst(artifact.networkRequestInfo.normalizationAst),
   ])
     .then(([networkResponse, normalizationAst]) => {
+      console.log('asdf normalization ast', normalizationAst);
       logMessage(environment, () => ({
         kind: 'ReceivedNetworkResponse',
         networkResponse,

@@ -29,6 +29,9 @@ export function HomeRouteLoader() {
   const { fragmentReference } = useLazyReference(
     iso(`entrypoint Query.HomeRoute`),
     {},
+    {
+      shouldFetch: 'Yes',
+    },
   );
 
   return (
