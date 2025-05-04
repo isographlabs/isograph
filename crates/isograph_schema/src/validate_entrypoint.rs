@@ -1,34 +1,60 @@
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
     IsoLiteralText, IsographObjectTypeName, Location, ServerScalarSelectableName, TextSource,
     UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use isograph_lang_types::{
-    ClientScalarSelectableId, DefinitionLocation, EntrypointDeclaration, SelectionType,
-    ServerEntityId, ServerObjectEntityId,
+    ClientScalarSelectableId, DefinitionLocation, EntrypointDeclaration, EntrypointDirectiveSet,
+    SelectionType, ServerEntityId, ServerObjectEntityId,
 };
 
 use thiserror::Error;
 
 use crate::{NetworkProtocol, Schema};
 
+#[derive(Debug)]
+pub struct EntrypointDeclarationInfo {
+    pub iso_literal_text: IsoLiteralText,
+    pub is_lazy_loaded: bool,
+}
+
 pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     entrypoint_declarations: Vec<(TextSource, WithSpan<EntrypointDeclaration>)>,
 ) -> Result<
-    HashMap<ClientScalarSelectableId, IsoLiteralText>,
+    HashMap<ClientScalarSelectableId, EntrypointDeclarationInfo>,
     Vec<WithLocation<ValidateEntrypointDeclarationError>>,
 > {
     let mut errors = vec![];
-    let mut entrypoints = HashMap::new();
+    let mut entrypoints: HashMap<ClientScalarSelectableId, EntrypointDeclarationInfo> =
+        HashMap::new();
     for (text_source, entrypoint_declaration) in entrypoint_declarations {
         match validate_entrypoint_type_and_field(schema, text_source, entrypoint_declaration) {
             Ok(client_field_id) => {
-                entrypoints.insert(
-                    client_field_id,
-                    entrypoint_declaration.item.iso_literal_text,
-                );
+                let new_entrypoint = EntrypointDeclarationInfo {
+                    iso_literal_text: entrypoint_declaration.item.iso_literal_text,
+                    is_lazy_loaded: matches!(
+                        entrypoint_declaration.item.entrypoint_directive_set,
+                        EntrypointDirectiveSet::LazyLoad(_)
+                    ),
+                };
+                match entrypoints.entry(client_field_id) {
+                    Entry::Occupied(occupied_entry) => {
+                        if occupied_entry.get().is_lazy_loaded != new_entrypoint.is_lazy_loaded {
+                            errors.push(WithLocation::new(
+                                ValidateEntrypointDeclarationError::LazyLoadInconsistentEntrypoint,
+                                Location::new(
+                                    text_source,
+                                    entrypoint_declaration.item.entrypoint_keyword.span,
+                                ),
+                            ));
+                        }
+                    }
+                    Entry::Vacant(vacant) => {
+                        vacant.insert(new_entrypoint);
+                    }
+                }
             }
             Err(e) => {
                 errors.push(e);
@@ -197,4 +223,7 @@ pub enum ValidateEntrypointDeclarationError {
         parent_type_name: IsographObjectTypeName,
         client_field_name: ServerScalarSelectableName,
     },
+
+    #[error("Entrypoint declared lazy in one location and declared eager in another location. Entrypoint must be either lazy or non-lazy in all instances.")]
+    LazyLoadInconsistentEntrypoint,
 }

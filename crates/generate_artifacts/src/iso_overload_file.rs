@@ -3,10 +3,10 @@ use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{ClientFieldDirectiveSet, SelectionType};
 use std::cmp::Ordering;
 
-use common_lang_types::{ArtifactPathAndContent, IsoLiteralText, SelectableName};
+use common_lang_types::{ArtifactPathAndContent, SelectableName};
 use isograph_schema::{
-    ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, NetworkProtocol,
-    Schema,
+    ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable,
+    EntrypointDeclarationInfo, NetworkProtocol, Schema,
 };
 
 use crate::generate_artifacts::ISO_TS_FILE_NAME;
@@ -176,17 +176,16 @@ export function iso(_isographLiteralText: string):
       'set options.no_babel_transform to true in your Isograph config. ');\n}")
         }
         true => {
-            let switch_cases =
-                sorted_entrypoints(schema)
-                    .into_iter()
-                    .map(|(field, iso_literal_text)| {
-                        format!(
-                            "    case '{}':
+            let switch_cases = sorted_entrypoints(schema).into_iter().map(
+                |(field, entrypoint_declaration_info)| {
+                    format!(
+                        "    case '{}':
       return entrypoint_{};\n",
-                            iso_literal_text,
-                            field.type_and_field.underscore_separated()
-                        )
-                    });
+                        entrypoint_declaration_info.iso_literal_text,
+                        field.type_and_field.underscore_separated()
+                    )
+                },
+            );
 
             content.push_str(
                 "
@@ -243,12 +242,18 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
 
 fn sorted_entrypoints<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-) -> Vec<(&ClientScalarSelectable<TNetworkProtocol>, &IsoLiteralText)> {
+) -> Vec<(
+    &ClientScalarSelectable<TNetworkProtocol>,
+    &EntrypointDeclarationInfo,
+)> {
     let mut entrypoints = schema
         .entrypoints
         .iter()
-        .map(|(client_field_id, iso_literal_text)| {
-            (schema.client_field(*client_field_id), iso_literal_text)
+        .map(|(client_field_id, entrypoint_declaration_info)| {
+            (
+                schema.client_field(*client_field_id),
+                entrypoint_declaration_info,
+            )
         })
         .collect::<Vec<_>>();
     entrypoints.sort_by(|(client_field_1, _), (client_field_2, _)| {
