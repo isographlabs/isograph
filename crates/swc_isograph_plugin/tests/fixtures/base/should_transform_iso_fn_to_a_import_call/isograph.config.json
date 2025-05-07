@@ -1,0 +1,7 @@
+{
+  "$schema": "../../../../../../../libs/isograph-compiler/isograph-config-schema.json",
+  "project_root": "./src/components",
+  "schema": "./backend/schema.graphql",
+  "schema_extensions": ["./backend/schema-extension.graphql"],
+  "options": { "module": "esmodule" }
+}

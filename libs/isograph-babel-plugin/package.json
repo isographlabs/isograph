@@ -17,7 +17,8 @@
   },
   "scripts": {
     "tsc": "tsc",
-    "tsc-force": "tsc --build --clean && tsc --build --force"
+    "tsc-force": "tsc --build --clean && tsc --build --force",
+    "test": "vitest run"
   },
   "dependencies": {
     "@babel/helper-module-imports": "^7.0.0",
