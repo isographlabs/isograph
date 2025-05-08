@@ -41,8 +41,10 @@ const readerAst: ReaderAst<PullRequest__PullRequestLink__param> = [
             isUpdatable: false,
           },
         ],
+        refetchQuery: null,
       },
     ],
+    refetchQuery: null,
   },
 ];
 

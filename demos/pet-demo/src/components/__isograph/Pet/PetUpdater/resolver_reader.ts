@@ -36,6 +36,7 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
         isUpdatable: false,
       },
     ],
+    refetchQuery: null,
   },
   {
     kind: "ImperativelyLoadedField",

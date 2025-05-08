@@ -73,6 +73,7 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
                 isUpdatable: false,
               },
             ],
+            refetchQuery: null,
           },
           {
             kind: "Scalar",
@@ -96,8 +97,10 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
             usedRefetchQueries: [],
           },
         ],
+        refetchQuery: null,
       },
     ],
+    refetchQuery: null,
   },
 ];
 

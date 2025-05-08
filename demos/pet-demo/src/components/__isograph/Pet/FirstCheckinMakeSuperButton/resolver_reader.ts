@@ -37,6 +37,7 @@ const readerAst: ReaderAst<Pet__FirstCheckinMakeSuperButton__param> = [
         isUpdatable: false,
       },
     ],
+    refetchQuery: null,
   },
 ];
 

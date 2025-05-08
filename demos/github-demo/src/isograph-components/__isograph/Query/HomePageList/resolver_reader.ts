@@ -42,6 +42,7 @@ const readerAst: ReaderAst<Query__HomePageList__param> = [
         name: "__refetch",
       },
     ],
+    refetchQuery: null,
   },
 ];
 

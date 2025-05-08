@@ -25,6 +25,7 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
         usedRefetchQueries: [],
       },
     ],
+    refetchQuery: null,
   },
   {
     kind: "Linked",
@@ -56,6 +57,7 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
         isUpdatable: false,
       },
     ],
+    refetchQuery: null,
   },
 ];
 
