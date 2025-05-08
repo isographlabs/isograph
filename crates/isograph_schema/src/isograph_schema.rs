@@ -709,7 +709,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PathToRefetchField {
     pub linked_fields: Vec<NormalizationKey>,
-    pub field_name: ClientSelectableName,
+    pub field_name: SelectionType<ClientScalarSelectableName, NameAndArguments>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
