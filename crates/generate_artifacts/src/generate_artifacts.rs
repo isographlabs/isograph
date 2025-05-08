@@ -1009,7 +1009,7 @@ fn write_optional_description(
     }
 }
 
-fn print_javascript_type_declaration<T: Display + Ord + Debug>(
+pub(crate) fn print_javascript_type_declaration<T: Display + Ord + Debug>(
     type_annotation: &TypeAnnotation<T>,
 ) -> String {
     let mut s = String::new();
