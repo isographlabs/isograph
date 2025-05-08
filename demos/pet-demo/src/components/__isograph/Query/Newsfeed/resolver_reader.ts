@@ -47,6 +47,7 @@ const readerAst: ReaderAst<Query__Newsfeed__param> = [
         entrypoint: Viewer__NewsfeedPaginationComponent__entrypoint,
       },
     ],
+    refetchQuery: null,
   },
 ];
 

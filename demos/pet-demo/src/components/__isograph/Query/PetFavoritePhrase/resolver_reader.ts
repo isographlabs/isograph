@@ -31,6 +31,7 @@ const readerAst: ReaderAst<Query__PetFavoritePhrase__param> = [
         isUpdatable: false,
       },
     ],
+    refetchQuery: null,
   },
 ];
 

@@ -32,6 +32,7 @@ const readerAst: ReaderAst<Query__UserDetail__param> = [
         usedRefetchQueries: [],
       },
     ],
+    refetchQuery: null,
   },
 ];
 

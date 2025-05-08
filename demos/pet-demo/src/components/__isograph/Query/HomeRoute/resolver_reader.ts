@@ -27,6 +27,7 @@ const readerAst: ReaderAst<Query__HomeRoute__param> = [
         usedRefetchQueries: [],
       },
     ],
+    refetchQuery: null,
   },
 ];
 

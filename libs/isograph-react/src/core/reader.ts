@@ -109,10 +109,11 @@ export type ReaderLinkedField = {
   readonly selections: ReaderAst<unknown>;
   readonly arguments: Arguments | null;
   readonly condition: EagerReaderArtifact<
-    { data: object; parameters: any; startUpdate?: StartUpdate<object> },
+    { data: any; parameters: any; startUpdate?: StartUpdate<any> },
     boolean | Link | null
   > | null;
   readonly isUpdatable: boolean;
+  readonly refetchQuery: number | null;
 };
 
 export type ReaderNonLoadableResolverField = {

@@ -70,12 +70,16 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
                     isUpdatable: false,
                   },
                 ],
+                refetchQuery: null,
               },
             ],
+            refetchQuery: null,
           },
         ],
+        refetchQuery: null,
       },
     ],
+    refetchQuery: null,
   },
 ];
 

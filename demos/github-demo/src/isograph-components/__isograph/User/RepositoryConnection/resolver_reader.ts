@@ -46,6 +46,7 @@ const readerAst: ReaderAst<User__RepositoryConnection__param> = [
             isUpdatable: false,
           },
         ],
+        refetchQuery: null,
       },
       {
         kind: "Linked",
@@ -78,10 +79,13 @@ const readerAst: ReaderAst<User__RepositoryConnection__param> = [
                 isUpdatable: false,
               },
             ],
+            refetchQuery: null,
           },
         ],
+        refetchQuery: null,
       },
     ],
+    refetchQuery: null,
   },
 ];
 
