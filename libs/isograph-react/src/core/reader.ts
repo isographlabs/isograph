@@ -113,6 +113,7 @@ export type ReaderLinkedField = {
     boolean | Link | null
   > | null;
   readonly isUpdatable: boolean;
+  readonly refetchQuery: number | null;
 };
 
 export type ReaderNonLoadableResolverField = {
