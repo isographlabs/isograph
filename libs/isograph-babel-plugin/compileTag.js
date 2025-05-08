@@ -17,7 +17,7 @@ function compileTag(t, path, config) {
     if (keyword === 'entrypoint') {
       // This throws if the tag is invalid
       compileImportStatement(t, path, type, field, 'entrypoint', config);
-    } else if (keyword === 'field') {
+    } else if (keyword === 'field' || keyword === 'pointer') {
       if (t.isCallExpression(path.parentPath.node)) {
         const firstArg = path.parentPath.node.arguments[0];
         if (path.parentPath.node.arguments.length === 1 && firstArg != null) {
@@ -42,7 +42,7 @@ function compileTag(t, path, config) {
 }
 
 const typeAndFieldRegex = new RegExp(
-  '\\s*(entrypoint|field)\\s*([^\\.\\s]+)\\.([^\\s\\(]+)',
+  '\\s*(entrypoint|field|pointer)\\s*([^\\.\\s]+)\\.([^\\s\\(]+)',
   'm',
 );
 
