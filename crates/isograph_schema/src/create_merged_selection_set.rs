@@ -599,12 +599,9 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
         )
         .clone();
 
-    let query_name = format!(
-        "{}__{}",
-        root_parent_object, client_selection_name
-    )
-    .intern()
-    .into();
+    let query_name = format!("{}__{}", root_parent_object, client_selection_name)
+        .intern()
+        .into();
 
     ImperativelyLoadedFieldArtifactInfo {
         // TODO don't clone, have lifetime parameter
@@ -1037,7 +1034,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
 ) {
     let path = PathToRefetchField {
         linked_fields: merge_traversal_state.traversal_path.clone(),
-        field_name: newly_encountered_scalar_client_selectable.name.into(),
+        field_name: SelectionType::Scalar(newly_encountered_scalar_client_selectable.name),
     };
 
     let info = PathToRefetchFieldInfo {
@@ -1094,9 +1091,15 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
     object_selection: &ValidatedObjectSelection,
     variable_context: &VariableContext,
 ) {
+    let name_and_arguments = create_transformed_name_and_arguments(
+        object_selection.name.item.into(),
+        &object_selection.arguments,
+        variable_context,
+    );
+
     let path = PathToRefetchField {
         linked_fields: merge_traversal_state.traversal_path.clone(),
-        field_name: newly_encountered_client_object_selectable.name.into(),
+        field_name: SelectionType::Object(name_and_arguments.clone()),
     };
 
     let subfields_or_inline_fragments = vec![
@@ -1144,11 +1147,7 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
             newly_encountered_client_object_selectable_id,
         ));
 
-    let normalization_key = NormalizationKey::ClientPointer(create_transformed_name_and_arguments(
-        object_selection.name.item.into(),
-        &object_selection.arguments,
-        variable_context,
-    ));
+    let normalization_key = NormalizationKey::ClientPointer(name_and_arguments);
 
     merge_traversal_state
         .traversal_path
