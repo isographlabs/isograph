@@ -274,10 +274,19 @@ impl<TNetworkProtocol: NetworkProtocol> EntrypointArtifactInfo<'_, TNetworkProto
             parent_type,
             query_text,
             normalization_ast_text,
-            ..
+            refetch_query_artifact_import,
+            concrete_type,
         } = &self;
         let field_name = (*query_name).into();
         let type_name = parent_type.name;
+
+        let entrypoint_file_content = entrypoint_file_content(
+            file_extensions,
+            query_name,
+            parent_type,
+            refetch_query_artifact_import,
+            concrete_type,
+        );
 
         vec![
             ArtifactPathAndContent {
@@ -305,7 +314,7 @@ impl<TNetworkProtocol: NetworkProtocol> EntrypointArtifactInfo<'_, TNetworkProto
                 }),
             },
             ArtifactPathAndContent {
-                file_content: self.file_contents(file_extensions),
+                file_content: entrypoint_file_content,
                 file_name: *ENTRYPOINT_FILE_NAME,
                 type_and_field: Some(ObjectTypeAndFieldName {
                     type_name,
@@ -314,56 +323,53 @@ impl<TNetworkProtocol: NetworkProtocol> EntrypointArtifactInfo<'_, TNetworkProto
             },
         ]
     }
+}
 
-    fn file_contents(self, file_extensions: GenerateFileExtensionsOption) -> String {
-        let EntrypointArtifactInfo {
-            refetch_query_artifact_import,
-            query_name,
-            parent_type,
-            concrete_type,
-            ..
-        } = self;
-        let ts_file_extension = file_extensions.ts();
-        let entrypoint_params_typename = format!("{}__{}__param", parent_type.name, query_name);
-        let entrypoint_output_type_name =
-            format!("{}__{}__output_type", parent_type.name, query_name);
-
-        let resolver_reader_file_name = *RESOLVER_READER;
-        let param_type_file_name = *RESOLVER_PARAM_TYPE;
-        let output_type_file_name = *RESOLVER_OUTPUT_TYPE;
-        let query_text_file_name = *QUERY_TEXT;
-        let normalization_text_file_name = *NORMALIZATION_AST;
-        format!(
-            "import type {{IsographEntrypoint, \
-            NormalizationAst, RefetchQueryNormalizationArtifactWrapper}} from '@isograph/react';\n\
-            import {{{entrypoint_params_typename}}} from './{param_type_file_name}{ts_file_extension}';\n\
-            import {{{entrypoint_output_type_name}}} from './{output_type_file_name}{ts_file_extension}';\n\
-            import readerResolver from './{resolver_reader_file_name}{ts_file_extension}';\n\
-            import queryText from './{query_text_file_name}{ts_file_extension}';\n\
-            import normalizationAst from './{normalization_text_file_name}{ts_file_extension}';\n\
-            {refetch_query_artifact_import}\n\n\
-            const artifact: IsographEntrypoint<\n\
-            {}{entrypoint_params_typename},\n\
-            {}{entrypoint_output_type_name},\n\
-            {}NormalizationAst\n\
-            > = {{\n\
-            {}kind: \"Entrypoint\",\n\
-            {}networkRequestInfo: {{\n\
-            {}  kind: \"NetworkRequestInfo\",\n\
-            {}  queryText,\n\
-            {}  normalizationAst,\n\
-            {}}},\n\
-            {}concreteType: \"{concrete_type}\",\n\
-            {}readerWithRefetchQueries: {{\n\
-            {}  kind: \"ReaderWithRefetchQueries\",\n\
-            {}  nestedRefetchQueries,\n\
-            {}  readerArtifact: readerResolver,\n\
-            {}}},\n\
-            }};\n\n\
-            export default artifact;\n",
-            "  ", "  ", "  ","  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ",
-        )
-    }
+fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
+    file_extensions: GenerateFileExtensionsOption,
+    query_name: &QueryOperationName,
+    parent_type: &ServerObjectEntity<TNetworkProtocol>,
+    refetch_query_artifact_import: &RefetchQueryArtifactImport,
+    concrete_type: &IsographObjectTypeName,
+) -> String {
+    let ts_file_extension = file_extensions.ts();
+    let entrypoint_params_typename = format!("{}__{}__param", parent_type.name, query_name);
+    let entrypoint_output_type_name = format!("{}__{}__output_type", parent_type.name, query_name);
+    let resolver_reader_file_name = *RESOLVER_READER;
+    let param_type_file_name = *RESOLVER_PARAM_TYPE;
+    let output_type_file_name = *RESOLVER_OUTPUT_TYPE;
+    let query_text_file_name = *QUERY_TEXT;
+    let normalization_text_file_name = *NORMALIZATION_AST;
+    let indent = "  ";
+    format!(
+        "import type {{IsographEntrypoint, \
+        NormalizationAst, RefetchQueryNormalizationArtifactWrapper}} from '@isograph/react';\n\
+        import {{{entrypoint_params_typename}}} from './{param_type_file_name}{ts_file_extension}';\n\
+        import {{{entrypoint_output_type_name}}} from './{output_type_file_name}{ts_file_extension}';\n\
+        import readerResolver from './{resolver_reader_file_name}{ts_file_extension}';\n\
+        import queryText from './{query_text_file_name}{ts_file_extension}';\n\
+        import normalizationAst from './{normalization_text_file_name}{ts_file_extension}';\n\
+        {refetch_query_artifact_import}\n\n\
+        const artifact: IsographEntrypoint<\n\
+        {indent}{entrypoint_params_typename},\n\
+        {indent}{entrypoint_output_type_name},\n\
+        {indent}NormalizationAst\n\
+        > = {{\n\
+        {indent}kind: \"Entrypoint\",\n\
+        {indent}networkRequestInfo: {{\n\
+        {indent}  kind: \"NetworkRequestInfo\",\n\
+        {indent}  queryText,\n\
+        {indent}  normalizationAst,\n\
+        {indent}}},\n\
+        {indent}concreteType: \"{concrete_type}\",\n\
+        {indent}readerWithRefetchQueries: {{\n\
+        {indent}  kind: \"ReaderWithRefetchQueries\",\n\
+        {indent}  nestedRefetchQueries,\n\
+        {indent}  readerArtifact: readerResolver,\n\
+        {indent}}},\n\
+        }};\n\n\
+        export default artifact;\n",
+    )
 }
 
 fn variable_names_to_string(
