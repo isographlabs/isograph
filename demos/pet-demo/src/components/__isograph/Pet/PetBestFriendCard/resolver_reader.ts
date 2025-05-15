@@ -63,8 +63,10 @@ const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
             isUpdatable: false,
           },
         ],
+        refetchQuery: null,
       },
     ],
+    refetchQuery: null,
   },
 ];
 

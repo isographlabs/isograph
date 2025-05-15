@@ -62,8 +62,10 @@ const readerAst: ReaderAst<Query__PullRequestDetail__param> = [
             usedRefetchQueries: [],
           },
         ],
+        refetchQuery: null,
       },
     ],
+    refetchQuery: null,
   },
 ];
 
