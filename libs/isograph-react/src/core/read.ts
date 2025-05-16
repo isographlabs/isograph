@@ -1,4 +1,4 @@
-import { CleanupFn } from '@isograph/disposable-types';
+import { CleanupFn, type ItemCleanupPair } from '@isograph/disposable-types';
 import {
   getParentRecordKey,
   insertIfNotExists,
@@ -196,6 +196,7 @@ function readData<TReadFromStore>(
           storeRecord,
           root,
           variables,
+          nestedRefetchQueries,
           networkRequest,
           (ast, root) =>
             readData(
@@ -644,8 +645,8 @@ export function readLinkedFieldData(
   storeRecord: StoreRecord,
   root: Link,
   variables: Variables,
+  nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   networkRequest: PromiseWrapper<void, any>,
-
   readData: <TReadFromStore>(
     ast: ReaderAst<TReadFromStore>,
     root: Link,
@@ -726,7 +727,7 @@ export function readLinkedFieldData(
       variables: generateChildVariableMap(
         variables,
         // TODO this is wrong
-        // should use field.condition.variables
+        // should use field.arguments
         // but it doesn't exist
         [],
       ),
@@ -797,6 +798,104 @@ export function readLinkedFieldData(
     };
   }
   const targetId = link;
+  if (typeof field.refetchQuery === 'number') {
+    root = link;
+    const refetchReaderParams = readData(
+      [
+        {
+          kind: 'Scalar',
+          fieldName: 'id',
+          alias: null,
+          arguments: null,
+          isUpdatable: false,
+        },
+      ],
+      root,
+    );
+
+    if (refetchReaderParams.kind === 'MissingData') {
+      return {
+        kind: 'MissingData',
+        reason: 'Missing data for ' + field.alias + ' on root ' + root.__link,
+        nestedReason: refetchReaderParams,
+        recordLink: refetchReaderParams.recordLink,
+      };
+    }
+    const refetchQueryIndex = field.refetchQuery;
+    const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
+
+    if (refetchQuery == null) {
+      throw new Error(
+        'refetchQuery is null in RefetchField. This is indicative of a bug in Isograph.',
+      );
+    }
+    const refetchQueryArtifact = refetchQuery.artifact;
+    const allowedVariables = refetchQuery.allowedVariables;
+
+    return {
+      kind: 'Success',
+      data: (
+        args: any,
+        // TODO get the associated type for FetchOptions from the loadably selected field
+        fetchOptions?: FetchOptions<any>,
+      ) => {
+        const includeReadOutData = (variables: any, readOutData: any) => {
+          variables.id = readOutData.id;
+          return variables;
+        };
+        const localVariables = includeReadOutData(
+          args ?? {},
+          refetchReaderParams.data,
+        );
+        writeQueryArgsToVariables(localVariables, field.arguments, variables);
+
+        return [
+          // Stable id
+          root.__typename +
+            ':' +
+            root.__link +
+            '/' +
+            field.fieldName +
+            '/' +
+            stableStringifyArgs(localVariables),
+          // Fetcher
+          (): ItemCleanupPair<FragmentReference<any, any>> | undefined => {
+            const variables = includeReadOutData(
+              filterVariables({ ...args, ...localVariables }, allowedVariables),
+              refetchReaderParams.data,
+            );
+
+            const [networkRequest, disposeNetworkRequest] =
+              maybeMakeNetworkRequest(
+                environment,
+                refetchQueryArtifact,
+                variables,
+                fetchOptions,
+              );
+
+            const fragmentReference: FragmentReference<any, any> = {
+              kind: 'FragmentReference',
+              readerWithRefetchQueries: wrapResolvedValue({
+                kind: 'ReaderWithRefetchQueries',
+                readerArtifact: {
+                  kind: 'EagerReaderArtifact',
+                  fieldName: field.fieldName,
+                  readerAst: field.selections,
+                  resolver: ({ data }) => data,
+                  hasUpdatable: false,
+                },
+                nestedRefetchQueries,
+              }),
+              root,
+              variables,
+              networkRequest,
+            };
+            return [fragmentReference, disposeNetworkRequest];
+          },
+        ];
+      },
+    };
+  }
   const data = readData(field.selections, targetId);
   if (data.kind === 'MissingData') {
     return {
