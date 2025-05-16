@@ -62,7 +62,7 @@ pub async fn run(
                 state.send_message(response.into());
             }
             lsp_server::Message::Notification(notification) => {
-                dispatch_notification(notification, &mut state);
+                let _ = dispatch_notification(notification, &mut state);
             }
             lsp_server::Message::Response(response) => {
                 eprintln!("Received response: {:?}", response);
