@@ -223,7 +223,6 @@ pub fn process_iso_literal_extraction(
         ));
     }
 
-    // TODO return errors if any occurred, otherwise Ok
     let iso_literal_extraction_result = parse_iso_literal(
         iso_literal_text,
         relative_path_to_source_file,

@@ -4,7 +4,7 @@ import { TwitterTweetEmbed } from 'react-twitter-embed';
 export default function Home(): JSX.Element {
   return (
     <Layout
-      title={`Isograph, the UI framework for teams that move fast without breaking things`}
+      title="Isograph, the UI framework for teams that move fast without breaking things"
       description="Isograph, the UI framework for teams that move fast without breaking things"
     >
       <main>
@@ -16,7 +16,7 @@ export default function Home(): JSX.Element {
           }}
         >
           <div style={{ minWidth: 500 }}>
-            <TwitterTweetEmbed tweetId={'1758185952759992507'} />
+            <TwitterTweetEmbed tweetId="1758185952759992507" />
           </div>
         </div>
       </main>

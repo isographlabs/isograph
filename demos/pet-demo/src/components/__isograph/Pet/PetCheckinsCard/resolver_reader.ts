@@ -44,6 +44,7 @@ const readerAst: ReaderAst<Pet__PetCheckinsCard__param> = [
         isUpdatable: false,
       },
     ],
+    refetchQuery: null,
   },
 ];
 

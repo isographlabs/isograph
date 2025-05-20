@@ -15,14 +15,14 @@ use pico::{Database, SourceId};
 
 use crate::{
     batch_compile::BatchCompileError,
+    compiler_state::StandardSources,
     isograph_literals::{read_file, read_files_in_folder},
     watch::{ChangedFileKind, SourceEventKind, SourceFileEvent},
 };
 
 #[derive(Debug, Clone)]
 pub struct SourceFiles {
-    pub schema: SourceId<SchemaSource>,
-    pub schema_extensions: BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
+    pub sources: StandardSources,
     pub iso_literals: HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>,
 }
 
@@ -32,8 +32,7 @@ impl SourceFiles {
         let schema_extensions = read_schema_extensions(db, config)?;
         let iso_literals = read_iso_literals_from_project_root(db, config)?;
         Ok(Self {
-            schema,
-            schema_extensions,
+            sources: (schema, schema_extensions),
             iso_literals,
         })
     }
@@ -79,7 +78,7 @@ impl SourceFiles {
     ) -> Result<(), Box<dyn Error>> {
         match event_kind {
             SourceEventKind::CreateOrModify(_) => {
-                self.schema = read_schema(db, &config.schema, config.current_working_directory)?;
+                self.sources.0 = read_schema(db, &config.schema, config.current_working_directory)?;
             }
             SourceEventKind::Rename((_, target_path)) => {
                 if config.schema.absolute_path != *target_path {
@@ -113,7 +112,7 @@ impl SourceFiles {
                         config.current_working_directory,
                         source_path,
                     );
-                    self.schema_extensions.remove(&interned_file_path);
+                    self.sources.1.remove(&interned_file_path);
                 }
             }
             SourceEventKind::Remove(path) => {
@@ -121,7 +120,7 @@ impl SourceFiles {
                     config.current_working_directory,
                     path,
                 );
-                self.schema_extensions.remove(&interned_file_path);
+                self.sources.1.remove(&interned_file_path);
             }
         }
         Ok(())
@@ -136,7 +135,8 @@ impl SourceFiles {
         let absolute_and_relative =
             absolute_and_relative_paths(config.current_working_directory, path.to_path_buf());
         let schema_id = read_schema(db, &absolute_and_relative, config.current_working_directory)?;
-        self.schema_extensions
+        self.sources
+            .1
             .insert(absolute_and_relative.relative_path, schema_id);
         Ok(())
     }

@@ -311,13 +311,13 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 ) -> Result<(), WithLocation<ValidateArgumentTypesError>> {
     validate_no_extraneous_fields(
         &server_entity_data
-            .server_object_entity_available_selectables
+            .server_object_entity_extra_info
             .get(&object_entity_id)
             .expect(
                 "Expected object_entity_id to exist \
                 in server_object_entity_available_selectables",
             )
-            .0,
+            .selectables,
         object_literal,
         selection_supplied_argument_value.location,
     )?;
@@ -377,13 +377,13 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
     object_entity_id: ServerObjectEntityId,
 ) -> Vec<ObjectLiteralFieldType> {
     server_entity_data
-        .server_object_entity_available_selectables
+        .server_object_entity_extra_info
         .get(&object_entity_id)
         .expect(
             "Expected object_entity_id to exist \
             in server_object_entity_available_selectables",
         )
-        .0
+        .selectables
         .iter()
         .filter_map(|(field_name, field_type)| {
             let iso_type_annotation = match field_type.as_server()? {

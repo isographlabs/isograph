@@ -12,7 +12,7 @@ use isograph_schema::{RefetchedPathsMap, UserWrittenClientTypeInfo};
 
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
-use crate::generate_artifacts::ClientFieldOutputType;
+use crate::generate_artifacts::{print_javascript_type_declaration, ClientFieldOutputType};
 use crate::{
     generate_artifacts::{
         generate_client_field_parameter_type, generate_client_field_updatable_data_type,
@@ -165,11 +165,14 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
         .server_entity_data
         .server_object_entity(server_object_selectable.parent_object_entity_id);
 
-    let concrete_type = parent_object_entity.name;
+    let concrete_type = schema
+        .server_entity_data
+        .server_object_entity(*server_object_selectable.target_object_entity.inner())
+        .name;
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         schema,
-        &inline_fragment_reader_selections,
+        inline_fragment_reader_selections,
         0,
         refetch_paths,
         &server_object_selectable.initial_variable_context(),
@@ -341,7 +344,14 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
         generate_function_import_statement(config, info, file_extensions);
 
     let client_field_output_type = match client_field {
-        SelectionType::Object(_) => ClientFieldOutputType("Link".to_string()),
+        SelectionType::Object(client_pointer) => {
+            ClientFieldOutputType(print_javascript_type_declaration(
+                &client_pointer
+                    .target_object_entity
+                    .clone()
+                    .map(&mut |_| "Link"),
+            ))
+        }
         SelectionType::Scalar(client_field) => generate_output_type(client_field),
     };
 

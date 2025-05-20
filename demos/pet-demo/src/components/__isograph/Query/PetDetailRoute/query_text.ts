@@ -1,4 +1,4 @@
-export default 'query PetDetailRoute ($id: ID!) {\
+export default 'query PetDetailRoute($id: ID!) {\
   pet____id___v_id: pet(id: $id) {\
     id,\
     age,\

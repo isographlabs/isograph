@@ -881,6 +881,7 @@ fn parse_field(
             description,
             arguments,
             directives,
+            is_inline_fragment: false,
         })
     })?;
     Ok(with_span.to_with_location(text_source))

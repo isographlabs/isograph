@@ -137,9 +137,7 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field<TNetworkProtocol: Netwo
         query_name,
         schema,
         &merged_selection_set,
-        variable_definitions
-            .iter()
-            .map(|variable_definition| &variable_definition.item),
+        variable_definitions.iter(),
         &root_operation_name,
     );
 

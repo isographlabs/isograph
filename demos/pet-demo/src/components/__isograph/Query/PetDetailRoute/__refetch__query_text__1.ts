@@ -1,6 +1,7 @@
-export default 'mutation Query__set_best_friend ($id: ID!, $new_best_friend_id: ID!) {\
-  set_pet_best_friend____id___v_id____new_best_friend_id___v_new_best_friend_id: set_pet_best_friend(id: $id, new_best_friend_id: $new_best_friend_id) {\
-    pet {\
+export default 'query Query__custom_pet_refetch($id: ID!) {\
+  node____id___v_id: node(id: $id) {\
+    ... on Pet {\
+      __typename,\
       id,\
       age,\
       best_friend_relationship {\

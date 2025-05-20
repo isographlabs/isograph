@@ -5,23 +5,22 @@ use std::{
 };
 
 use common_lang_types::{
-    CurrentWorkingDirectory, IsographObjectTypeName, Location, RelativePathToSourceFile,
-    SelectableName, TextSource, UnvalidatedTypeName, VariableName, WithLocation,
+    CurrentWorkingDirectory, IsographObjectTypeName, RelativePathToSourceFile, SelectableName,
+    TextSource, UnvalidatedTypeName, VariableName, WithLocation,
 };
 use graphql_lang_types::{
-    GraphQLFieldDefinition, GraphQLInputValueDefinition, NameValuePair, RootOperationKind,
+    GraphQLConstantValue, GraphQLInputValueDefinition, NameValuePair, RootOperationKind,
 };
 use isograph_config::{CompilerConfig, CompilerConfigOptions};
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{
-    IsoLiteralsSource, SelectionType, ServerEntityId, ServerObjectEntityId, TypeAnnotation,
-    VariableDefinition,
+    ConstantValue, IsoLiteralsSource, SelectionType, ServerEntityId, ServerObjectEntityId,
+    TypeAnnotation, VariableDefinition,
 };
 use isograph_schema::{
-    validate_entrypoints, CreateAdditionalFieldsError, NetworkProtocol,
+    validate_entrypoints, CreateAdditionalFieldsError, FieldToInsert, NetworkProtocol,
     ProcessObjectTypeDefinitionOutcome, ProcessTypeSystemDocumentOutcome, RootOperationName,
     Schema, SchemaServerObjectSelectableVariant, ServerObjectSelectable, ServerScalarSelectable,
-    TypeRefinementMaps, UnprocessedItem,
 };
 use pico::{Database, SourceId};
 
@@ -29,30 +28,16 @@ use crate::{
     add_selection_sets::add_selection_sets_to_client_selectables,
     batch_compile::BatchCompileError,
     isograph_literals::{parse_iso_literal_in_source, process_iso_literals},
-    refetch_fields::add_refetch_fields_to_objects,
-    source_files::SourceFiles,
 };
 
 pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
     db: &Database,
-    source_files: &SourceFiles,
+    sources: &TNetworkProtocol::Sources,
+    iso_literals: &HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>,
     config: &CompilerConfig,
 ) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), Box<dyn Error>> {
-    let ProcessTypeSystemDocumentOutcome {
-        scalars,
-        objects,
-        // TODO don't return these; instead, creating asConcreteType fields is a responsibility
-        // of the NetworkProtocol
-        //
-        // (I think this means we should not transfer client fields from abstract
-        // types to concrete types! That's probably broken anyway.)
-        unvalidated_subtype_to_supertype_map,
-        unvalidated_supertype_to_subtype_map,
-    } = TNetworkProtocol::parse_and_process_type_system_documents(
-        db,
-        source_files.schema,
-        &source_files.schema_extensions,
-    )?;
+    let ProcessTypeSystemDocumentOutcome { scalars, objects } =
+        TNetworkProtocol::parse_and_process_type_system_documents(db, sources)?;
 
     let mut unvalidated_isograph_schema = Schema::<TNetworkProtocol>::new();
     for (server_scalar_entity, name_location) in scalars {
@@ -62,12 +47,13 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
     }
 
     let mut field_queue = HashMap::new();
+    let mut expose_as_field_queue = HashMap::new();
     for (
         ProcessObjectTypeDefinitionOutcome {
             encountered_root_kind,
-            directives,
             server_object_entity,
             fields_to_insert,
+            expose_as_fields_to_insert,
         },
         name_location,
     ) in objects
@@ -76,14 +62,6 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
             .server_entity_data
             .insert_server_object_entity(server_object_entity, name_location)?;
         field_queue.insert(new_object_id, fields_to_insert);
-
-        unvalidated_isograph_schema
-            .server_entity_data
-            .server_object_entity_available_selectables
-            .entry(new_object_id)
-            .or_default()
-            .2
-            .extend(directives);
 
         match encountered_root_kind {
             Some(RootOperationKind::Query) => {
@@ -99,6 +77,8 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
             // TODO handle Subscription
             _ => {}
         }
+
+        expose_as_field_queue.insert(new_object_id, expose_as_fields_to_insert);
     }
 
     process_field_queue(
@@ -107,19 +87,6 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
         &config.options,
     )?;
 
-    let type_refinement_maps = get_type_refinement_map(
-        &mut unvalidated_isograph_schema,
-        unvalidated_supertype_to_subtype_map,
-        unvalidated_subtype_to_supertype_map,
-    )?;
-
-    let contains_iso = parse_iso_literals(
-        db,
-        &source_files.iso_literals,
-        config.current_working_directory,
-    )?;
-    let contains_iso_stats = contains_iso.stats();
-
     // Step one: we can create client selectables. However, we must create all
     // client selectables before being able to create their selection sets, because
     // selection sets refer to client selectables. We hold onto these selection sets
@@ -127,23 +94,23 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
     // vec, then process it later.
     let mut unprocessed_items = vec![];
 
+    for (parent_object_entity_id, expose_as_fields_to_insert) in expose_as_field_queue {
+        for expose_as_field in expose_as_fields_to_insert {
+            let unprocessed_scalar_item = unvalidated_isograph_schema
+                .create_new_exposed_field(expose_as_field, parent_object_entity_id)?;
+
+            unprocessed_items.push(SelectionType::Scalar(unprocessed_scalar_item));
+        }
+    }
+
+    let contains_iso = parse_iso_literals(db, iso_literals, config.current_working_directory)?;
+    let contains_iso_stats = contains_iso.stats();
+
     let (unprocessed_client_types, unprocessed_entrypoints) =
         process_iso_literals(&mut unvalidated_isograph_schema, contains_iso)?;
     unprocessed_items.extend(unprocessed_client_types);
 
-    unprocessed_items.extend(process_exposed_fields(&mut unvalidated_isograph_schema)?);
-
-    unvalidated_isograph_schema.transfer_supertype_client_selectables_to_subtypes(
-        &type_refinement_maps.supertype_to_subtype_map,
-    )?;
     unvalidated_isograph_schema.add_link_fields()?;
-    unvalidated_isograph_schema.add_object_selectable_to_subtype_on_supertypes(
-        &type_refinement_maps.subtype_to_supertype_map,
-    )?;
-
-    unprocessed_items.extend(add_refetch_fields_to_objects(
-        &mut unvalidated_isograph_schema,
-    )?);
 
     unvalidated_isograph_schema.entrypoints = validate_entrypoints(
         &unvalidated_isograph_schema,
@@ -200,26 +167,6 @@ fn parse_iso_literals(
     } else {
         Err(iso_literal_parse_errors.into())
     }
-}
-
-/// Here, we are processing exposeAs fields. Note that we only process these
-/// directives on root objects (Query, Mutation, Subscription) and we should
-/// validate that no other types have exposeAs directives.
-fn process_exposed_fields<TNetworkProtocol: NetworkProtocol>(
-    schema: &mut Schema<TNetworkProtocol>,
-) -> Result<Vec<UnprocessedItem>, BatchCompileError> {
-    let fetchable_types: Vec<_> = schema.fetchable_types.keys().copied().collect();
-    let mut unprocessed_items = vec![];
-    for fetchable_object_entity_id in fetchable_types.into_iter() {
-        let unprocessed_client_field_item =
-            schema.add_exposed_fields_to_parent_object_types(fetchable_object_entity_id)?;
-        unprocessed_items.extend(
-            unprocessed_client_field_item
-                .into_iter()
-                .map(UnprocessedItem::Scalar),
-        );
-    }
-    Ok(unprocessed_items)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
@@ -284,16 +231,16 @@ pub struct ContainsIsoStats {
 /// - if it is an id field, modify the parent object
 fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
     schema: &mut Schema<TNetworkProtocol>,
-    field_queue: HashMap<ServerObjectEntityId, Vec<WithLocation<GraphQLFieldDefinition>>>,
+    field_queue: HashMap<ServerObjectEntityId, Vec<WithLocation<FieldToInsert>>>,
     options: &CompilerConfigOptions,
 ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
     for (parent_object_entity_id, field_definitions_to_insert) in field_queue {
-        for field_definition in field_definitions_to_insert.into_iter() {
+        for server_field_to_insert in field_definitions_to_insert.into_iter() {
             let parent_object_entity = schema
                 .server_entity_data
                 .server_object_entity(parent_object_entity_id);
 
-            let target_entity_type_name = field_definition.item.type_.inner();
+            let target_entity_type_name = server_field_to_insert.item.type_.inner();
 
             let selection_type = schema
                 .server_entity_data
@@ -304,11 +251,11 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
                         CreateAdditionalFieldsError::FieldTypenameDoesNotExist {
                             target_entity_type_name: *target_entity_type_name,
                         },
-                        field_definition.item.name.location,
+                        server_field_to_insert.item.name.location,
                     )
                 })?;
 
-            let arguments = field_definition
+            let arguments = server_field_to_insert
                 .item
                 .arguments
                 // TODO don't clone
@@ -319,11 +266,11 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
                         &schema.server_entity_data.defined_entities,
                         input_value_definition,
                         parent_object_entity.name,
-                        field_definition.item.name.item.into(),
+                        server_field_to_insert.item.name.item.into(),
                     )
                 })
                 .collect::<Result<Vec<_>, _>>()?;
-            let description = field_definition.item.description.map(|d| d.item);
+            let description = server_field_to_insert.item.description.map(|d| d.item);
 
             match selection_type {
                 SelectionType::Scalar(scalar_entity_id) => {
@@ -331,36 +278,47 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
                         .insert_server_scalar_selectable(
                             ServerScalarSelectable {
                                 description,
-                                name: field_definition.item.name.map(|x| x.unchecked_conversion()),
+                                name: server_field_to_insert
+                                    .item
+                                    .name
+                                    .map(|x| x.unchecked_conversion()),
                                 target_scalar_entity: TypeAnnotation::from_graphql_type_annotation(
-                                    field_definition.item.type_.clone(),
+                                    server_field_to_insert.item.type_.clone(),
                                 )
                                 .map(&mut |_| *scalar_entity_id),
-                                parent_type_id: parent_object_entity_id,
+                                parent_object_entity_id,
                                 arguments,
                                 phantom_data: std::marker::PhantomData,
                             },
                             options,
-                            field_definition.item.type_.inner_non_null_named_type(),
+                            server_field_to_insert
+                                .item
+                                .type_
+                                .inner_non_null_named_type(),
                         )
-                        .map_err(|e| WithLocation::new(e, field_definition.location))?;
+                        .map_err(|e| WithLocation::new(e, server_field_to_insert.location))?;
                 }
                 SelectionType::Object(object_entity_id) => {
                     schema
                         .insert_server_object_selectable(ServerObjectSelectable {
                             description,
-                            name: field_definition.item.name.map(|x| x.unchecked_conversion()),
+                            name: server_field_to_insert.item.name.map(|x| x.unchecked_conversion()),
                             target_object_entity: TypeAnnotation::from_graphql_type_annotation(
-                                field_definition.item.type_.clone(),
+                                server_field_to_insert.item.type_.clone(),
                             )
                             .map(&mut |_| *object_entity_id),
                             parent_object_entity_id,
                             arguments,
                             phantom_data: std::marker::PhantomData,
                             object_selectable_variant:
-                                SchemaServerObjectSelectableVariant::LinkedField,
+                                // TODO this is hacky
+                                if server_field_to_insert.item.is_inline_fragment {
+                                    SchemaServerObjectSelectableVariant::InlineFragment
+                                } else {
+                                    SchemaServerObjectSelectableVariant::LinkedField
+                                }
                         })
-                        .map_err(|e| WithLocation::new(e, field_definition.location))?;
+                        .map_err(|e| WithLocation::new(e, server_field_to_insert.location))?;
                 }
             }
         }
@@ -423,26 +381,16 @@ pub fn graphql_input_value_definition_to_variable_definition(
 }
 
 fn convert_graphql_constant_value_to_isograph_constant_value(
-    graphql_constant_value: graphql_lang_types::GraphQLConstantValue,
-) -> isograph_lang_types::ConstantValue {
+    graphql_constant_value: GraphQLConstantValue,
+) -> ConstantValue {
     match graphql_constant_value {
-        graphql_lang_types::GraphQLConstantValue::Int(i) => {
-            isograph_lang_types::ConstantValue::Integer(i)
-        }
-        graphql_lang_types::GraphQLConstantValue::Boolean(b) => {
-            isograph_lang_types::ConstantValue::Boolean(b)
-        }
-        graphql_lang_types::GraphQLConstantValue::String(s) => {
-            isograph_lang_types::ConstantValue::String(s)
-        }
-        graphql_lang_types::GraphQLConstantValue::Float(f) => {
-            isograph_lang_types::ConstantValue::Float(f)
-        }
-        graphql_lang_types::GraphQLConstantValue::Null => isograph_lang_types::ConstantValue::Null,
-        graphql_lang_types::GraphQLConstantValue::Enum(e) => {
-            isograph_lang_types::ConstantValue::Enum(e)
-        }
-        graphql_lang_types::GraphQLConstantValue::List(l) => {
+        GraphQLConstantValue::Int(i) => ConstantValue::Integer(i),
+        GraphQLConstantValue::Boolean(b) => ConstantValue::Boolean(b),
+        GraphQLConstantValue::String(s) => ConstantValue::String(s),
+        GraphQLConstantValue::Float(f) => ConstantValue::Float(f),
+        GraphQLConstantValue::Null => ConstantValue::Null,
+        GraphQLConstantValue::Enum(e) => ConstantValue::Enum(e),
+        GraphQLConstantValue::List(l) => {
             let converted_list = l
                 .into_iter()
                 .map(|x| {
@@ -452,9 +400,9 @@ fn convert_graphql_constant_value_to_isograph_constant_value(
                     )
                 })
                 .collect::<Vec<_>>();
-            isograph_lang_types::ConstantValue::List(converted_list)
+            ConstantValue::List(converted_list)
         }
-        graphql_lang_types::GraphQLConstantValue::Object(o) => {
+        GraphQLConstantValue::Object(o) => {
             let converted_object = o
                 .into_iter()
                 .map(|name_value_pair| NameValuePair {
@@ -467,81 +415,7 @@ fn convert_graphql_constant_value_to_isograph_constant_value(
                     ),
                 })
                 .collect::<Vec<_>>();
-            isograph_lang_types::ConstantValue::Object(converted_object)
+            ConstantValue::Object(converted_object)
         }
     }
 }
-
-// TODO This is currently a completely useless function, serving only to surface
-// some validation errors. It might be necessary once we handle __asNode etc.
-// style fields.
-fn get_type_refinement_map<TNetworkProtocol: NetworkProtocol>(
-    schema: &mut Schema<TNetworkProtocol>,
-    unvalidated_supertype_to_subtype_map: UnvalidatedTypeRefinementMap,
-    unvalidated_subtype_to_supertype_map: UnvalidatedTypeRefinementMap,
-) -> Result<TypeRefinementMaps, WithLocation<CreateAdditionalFieldsError>> {
-    let supertype_to_subtype_map =
-        validate_type_refinement_map(schema, unvalidated_supertype_to_subtype_map)?;
-    let subtype_to_supertype_map =
-        validate_type_refinement_map(schema, unvalidated_subtype_to_supertype_map)?;
-
-    Ok(TypeRefinementMaps {
-        subtype_to_supertype_map,
-        supertype_to_subtype_map,
-    })
-}
-
-fn validate_type_refinement_map<TNetworkProtocol: NetworkProtocol>(
-    schema: &mut Schema<TNetworkProtocol>,
-    unvalidated_type_refinement_map: UnvalidatedTypeRefinementMap,
-) -> Result<ValidatedTypeRefinementMap, WithLocation<CreateAdditionalFieldsError>> {
-    let supertype_to_subtype_map = unvalidated_type_refinement_map
-        .into_iter()
-        .map(|(key_type_name, values_type_names)| {
-            let key_id = lookup_object_in_schema(schema, key_type_name)?;
-
-            let value_type_ids = values_type_names
-                .into_iter()
-                .map(|value_type_name| lookup_object_in_schema(schema, value_type_name))
-                .collect::<Result<Vec<_>, _>>()?;
-
-            Ok((key_id, value_type_ids))
-        })
-        .collect::<Result<HashMap<_, _>, WithLocation<CreateAdditionalFieldsError>>>()?;
-    Ok(supertype_to_subtype_map)
-}
-
-fn lookup_object_in_schema<TNetworkProtocol: NetworkProtocol>(
-    schema: &mut Schema<TNetworkProtocol>,
-    unvalidated_type_name: UnvalidatedTypeName,
-) -> Result<ServerObjectEntityId, WithLocation<CreateAdditionalFieldsError>> {
-    let result = (*schema
-        .server_entity_data
-        .defined_entities
-        .get(&unvalidated_type_name)
-        .ok_or_else(|| {
-            WithLocation::new(
-                CreateAdditionalFieldsError::FieldTypenameDoesNotExist {
-                    target_entity_type_name: unvalidated_type_name,
-                },
-                // TODO don't do this
-                Location::Generated,
-            )
-        })?)
-    .as_object_result()
-    .map_err(|_| {
-        WithLocation::new(
-            CreateAdditionalFieldsError::GenericObjectIsScalar {
-                type_name: unvalidated_type_name,
-            },
-            // TODO don't do this
-            Location::Generated,
-        )
-    })?;
-
-    Ok(*result)
-}
-
-type UnvalidatedTypeRefinementMap = HashMap<UnvalidatedTypeName, Vec<UnvalidatedTypeName>>;
-// When constructing the final map, we can replace object type names with ids.
-pub type ValidatedTypeRefinementMap = HashMap<ServerObjectEntityId, Vec<ServerObjectEntityId>>;

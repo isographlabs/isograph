@@ -59,7 +59,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
     }
 
     fn parent_type_id(&self) -> ServerObjectEntityId {
-        self.parent_type_id
+        self.parent_object_entity_id
     }
 
     fn arguments(&self) -> &[WithLocation<VariableDefinition<ServerEntityId>>] {

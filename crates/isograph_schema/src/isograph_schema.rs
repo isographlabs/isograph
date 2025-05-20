@@ -4,12 +4,12 @@ use std::{
 };
 
 use common_lang_types::{
-    ClientScalarSelectableName, GraphQLScalarTypeName, IsoLiteralText, IsographObjectTypeName,
-    JavascriptName, Location, ObjectSelectableName, SelectableName, UnvalidatedTypeName,
-    WithLocation, WithSpan,
+    ClientScalarSelectableName, GraphQLScalarTypeName, IsographObjectTypeName, JavascriptName,
+    Location, ObjectSelectableName, SelectableName, UnvalidatedTypeName, WithLocation,
 };
-use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective, GraphQLNamedTypeAnnotation};
+use graphql_lang_types::GraphQLNamedTypeAnnotation;
 use intern::string_key::Intern;
+use intern::Lookup;
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDirectiveSet, ClientObjectSelectableId,
@@ -23,10 +23,10 @@ use lazy_static::lazy_static;
 use crate::{
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectableId,
-    NetworkProtocol, NormalizationKey, ObjectSelectable, ObjectSelectableId, ServerEntity,
-    ServerObjectEntity, ServerObjectEntityAvailableSelectables, ServerObjectSelectable,
-    ServerScalarEntity, ServerScalarSelectable, ServerSelectable, ServerSelectableId,
-    UseRefetchFieldRefetchStrategy,
+    EntrypointDeclarationInfo, NetworkProtocol, NormalizationKey, ObjectSelectable,
+    ObjectSelectableId, ServerEntity, ServerObjectEntity, ServerObjectEntityAvailableSelectables,
+    ServerObjectSelectable, ServerScalarEntity, ServerScalarSelectable, ServerSelectable,
+    ServerSelectableId, UseRefetchFieldRefetchStrategy,
 };
 
 lazy_static! {
@@ -44,7 +44,7 @@ pub struct Schema<TNetworkProtocol: NetworkProtocol> {
     pub server_object_selectables: Vec<ServerObjectSelectable<TNetworkProtocol>>,
     pub client_scalar_selectables: Vec<ClientScalarSelectable<TNetworkProtocol>>,
     pub client_object_selectables: Vec<ClientObjectSelectable<TNetworkProtocol>>,
-    pub entrypoints: HashMap<ClientScalarSelectableId, IsoLiteralText>,
+    pub entrypoints: HashMap<ClientScalarSelectableId, EntrypointDeclarationInfo>,
     pub server_entity_data: ServerEntityData<TNetworkProtocol>,
 
     /// These are root types like Query, Mutation, Subscription
@@ -114,7 +114,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 server_objects: vec![],
                 server_scalars: scalars,
                 defined_entities: defined_types,
-                server_object_entity_available_selectables: HashMap::new(),
+                server_object_entity_extra_info: HashMap::new(),
 
                 id_type_id,
                 string_type_id,
@@ -160,13 +160,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_object_entity(root_object_entity_id);
         let mut current_selectables = &self
             .server_entity_data
-            .server_object_entity_available_selectables
+            .server_object_entity_extra_info
             .get(&root_object_entity_id)
             .expect(
                 "Expected root_object_entity_id to exist \
                 in server_object_entity_avaiable_selectables",
             )
-            .0;
+            .selectables;
         let mut current_object_id = root_object_entity_id;
 
         for selection_name in selections {
@@ -174,7 +174,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 Some(entity) => match entity.transpose() {
                     SelectionType::Scalar(_) => {
                         // TODO show a better error message
-                        return Err(CreateAdditionalFieldsError::InvalidField);
+                        return Err(CreateAdditionalFieldsError::InvalidField {
+                            field_arg: selection_name.lookup().to_string(),
+                        });
                     }
                     SelectionType::Object(object) => {
                         let target_object_entity_id = match object {
@@ -193,13 +195,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                             .server_object_entity(*target_object_entity_id);
                         current_selectables = &self
                             .server_entity_data
-                            .server_object_entity_available_selectables
+                            .server_object_entity_extra_info
                             .get(target_object_entity_id)
                             .expect(
                                 "Expected target_object_entity_id to exist \
                                 in server_object_entity_available_selectables",
                             )
-                            .0;
+                            .selectables;
                         current_object_id = *target_object_entity_id;
                     }
                 },
@@ -214,6 +216,84 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         Ok(WithId::new(current_object_id, current_entity))
     }
+
+    pub fn get_object_selections_path(
+        &self,
+        root_object_entity_id: ServerObjectEntityId,
+        selections: impl Iterator<Item = ObjectSelectableName>,
+    ) -> Result<Vec<&ServerObjectSelectable<TNetworkProtocol>>, CreateAdditionalFieldsError> {
+        let mut current_entity = self
+            .server_entity_data
+            .server_object_entity(root_object_entity_id);
+
+        let mut current_selectables = &self
+            .server_entity_data
+            .server_object_entity_extra_info
+            .get(&root_object_entity_id)
+            .expect(
+                "Expected root_object_entity_id to exist \
+                in server_object_entity_avaiable_selectables",
+            )
+            .selectables;
+
+        let mut path = vec![];
+
+        for selection_name in selections {
+            match current_selectables.get(&selection_name.into()) {
+                Some(entity) => match entity.transpose() {
+                    SelectionType::Scalar(_) => {
+                        // TODO show a better error message
+                        return Err(CreateAdditionalFieldsError::InvalidField {
+                            field_arg: selection_name.lookup().to_string(),
+                        });
+                    }
+                    SelectionType::Object(object) => {
+                        let target_object_entity_id = match object {
+                            DefinitionLocation::Server(s) => {
+                                let selectable = self.server_object_selectable(*s);
+                                path.push(selectable);
+                                selectable.target_object_entity.inner()
+                            }
+
+                            DefinitionLocation::Client(_) => {
+                                // TODO better error, or support client fields
+                                return Err(CreateAdditionalFieldsError::InvalidField {
+                                    field_arg: selection_name.lookup().to_string(),
+                                });
+                            }
+                        };
+
+                        current_entity = self
+                            .server_entity_data
+                            .server_object_entity(*target_object_entity_id);
+                        current_selectables = &self
+                            .server_entity_data
+                            .server_object_entity_extra_info
+                            .get(target_object_entity_id)
+                            .expect(
+                                "Expected target_object_entity_id to exist \
+                                in server_object_entity_available_selectables",
+                            )
+                            .selectables;
+                    }
+                },
+                None => {
+                    return Err(CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
+                        primary_type_name: current_entity.name,
+                        field_name: selection_name.unchecked_conversion(),
+                    })
+                }
+            };
+        }
+
+        Ok(path)
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct ServerObjectEntityExtraInfo {
+    pub selectables: ServerObjectEntityAvailableSelectables,
+    pub id_field: Option<ServerStrongIdFieldId>,
 }
 
 #[derive(Debug)]
@@ -225,15 +305,7 @@ pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
     // We keep track of available selectables and id fields outside of server_objects so that
     // we don't need a server_object_entity_mut method, which is incompatible with pico.
     #[allow(clippy::type_complexity)]
-    pub server_object_entity_available_selectables: HashMap<
-        ServerObjectEntityId,
-        (
-            ServerObjectEntityAvailableSelectables,
-            Option<ServerStrongIdFieldId>,
-            // We probably don't want this
-            Vec<GraphQLDirective<GraphQLConstantValue>>,
-        ),
-    >,
+    pub server_object_entity_extra_info: HashMap<ServerObjectEntityId, ServerObjectEntityExtraInfo>,
 
     // Well known types
     pub id_type_id: ServerScalarEntityId,
@@ -301,7 +373,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         inner_non_null_named_type: Option<&GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
     ) -> CreateAdditionalFieldsResult<()> {
         let next_server_scalar_selectable_id = self.server_scalar_selectables.len().into();
-        let parent_object_entity_id = server_scalar_selectable.parent_type_id;
+        let parent_object_entity_id = server_scalar_selectable.parent_object_entity_id;
         let next_scalar_name = server_scalar_selectable.name;
 
         let parent_type_name = self
@@ -309,13 +381,17 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_object_entity(parent_object_entity_id)
             .name;
 
-        let (available_selections, id_field, _) = self
+        let ServerObjectEntityExtraInfo {
+            selectables,
+            id_field,
+            ..
+        } = self
             .server_entity_data
-            .server_object_entity_available_selectables
+            .server_object_entity_extra_info
             .entry(parent_object_entity_id)
             .or_default();
 
-        if available_selections
+        if selectables
             .insert(
                 next_scalar_name.item.into(),
                 DefinitionLocation::Server(SelectionType::Scalar(next_server_scalar_selectable_id)),
@@ -358,10 +434,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         if self
             .server_entity_data
-            .server_object_entity_available_selectables
+            .server_object_entity_extra_info
             .entry(parent_object_entity_id)
             .or_default()
-            .0
+            .selectables
             .insert(
                 next_object_name.item.into(),
                 DefinitionLocation::Server(SelectionType::Object(next_server_object_selectable_id)),
@@ -656,12 +732,10 @@ fn add_schema_defined_scalar_type<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[derive(Debug, Clone)]
+// This struct is indicative of poor data modeling.
 pub enum SchemaServerObjectSelectableVariant {
     LinkedField,
-    // This is the reader selection set, i.e. the vec![typename, link]
-    // It's very weird to have this here! This is indicative of poor
-    // data modeling.
-    InlineFragment(Vec<WithSpan<ValidatedSelection>>),
+    InlineFragment,
 }
 
 pub type ValidatedSelection =

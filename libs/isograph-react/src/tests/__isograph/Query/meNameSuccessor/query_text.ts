@@ -1,4 +1,4 @@
-export default 'query meNameSuccessor  {\
+export default 'query meNameSuccessor {\
   me {\
     id,\
     name,\

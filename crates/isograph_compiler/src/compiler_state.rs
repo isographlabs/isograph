@@ -1,14 +1,16 @@
 use std::{
+    collections::BTreeMap,
     error::Error,
     path::PathBuf,
     time::{Duration, Instant},
 };
 
-use common_lang_types::{CurrentWorkingDirectory, WithLocation};
+use common_lang_types::{CurrentWorkingDirectory, RelativePathToSourceFile, WithLocation};
 use generate_artifacts::get_artifact_path_and_content;
 use isograph_config::{create_config, CompilerConfig};
+use isograph_lang_types::SchemaSource;
 use isograph_schema::{validate_use_of_arguments, NetworkProtocol};
-use pico::Database;
+use pico::{Database, SourceId};
 
 use crate::{
     batch_compile::{BatchCompileError, CompilationStats},
@@ -47,6 +49,16 @@ impl CompilerState {
     }
 }
 
+// We're using this type to constrain the types of sources that we accept. i.e.
+// in theory, you can have a TNetworkProtocol with a different Source associated
+// type, but for now, we get a source + set of extensions, and have to restrict
+// TNetworkProtocol accordingly. Perhaps the config can have a generic, and
+// thus we can thread this further back, but that is not yet implemented.
+pub type StandardSources = (
+    SourceId<SchemaSource>,
+    BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
+);
+
 /// This the "workhorse" command of batch compilation.
 ///
 /// ## Overall plan
@@ -78,13 +90,18 @@ impl CompilerState {
 ///
 /// These are less "core" to the overall mission, and thus invite the question
 /// of whether they belong in this function, or at all.
-pub fn compile<TNetworkProtocol: NetworkProtocol>(
+pub fn compile<TNetworkProtocol: NetworkProtocol<Sources = StandardSources>>(
     db: &Database,
     source_files: &SourceFiles,
     config: &CompilerConfig,
 ) -> Result<CompilationStats, Box<dyn Error>> {
     // Create schema
-    let (isograph_schema, stats) = create_schema::<TNetworkProtocol>(db, source_files, config)?;
+    let (isograph_schema, stats) = create_schema::<TNetworkProtocol>(
+        db,
+        &(source_files.sources),
+        &source_files.iso_literals,
+        config,
+    )?;
 
     validate_use_of_arguments(&isograph_schema).map_err(|messages| {
         Box::new(BatchCompileError::MultipleErrorsWithLocations {

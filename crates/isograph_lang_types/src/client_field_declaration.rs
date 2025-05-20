@@ -220,6 +220,28 @@ impl NonConstantValue {
             }
         }
     }
+
+    pub fn variables(&self) -> Vec<VariableName> {
+        // TODO return impl Iterator
+        match self {
+            NonConstantValue::Variable(variable_name) => vec![*variable_name],
+            NonConstantValue::List(items) => {
+                let mut variables = vec![];
+                for item in items {
+                    variables.extend(item.item.variables());
+                }
+                variables
+            }
+            NonConstantValue::Object(name_value_pairs) => {
+                let mut variables = vec![];
+                for item in name_value_pairs {
+                    variables.extend(item.value.item.variables());
+                }
+                variables
+            }
+            _ => vec![],
+        }
+    }
 }
 
 impl From<ConstantValue> for NonConstantValue {

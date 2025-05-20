@@ -3,7 +3,6 @@ pub mod batch_compile;
 mod compiler_state;
 mod create_schema;
 mod isograph_literals;
-mod refetch_fields;
 mod source_files;
 pub mod watch;
 mod with_duration;

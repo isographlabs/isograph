@@ -1,18 +1,19 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    IsographObjectTypeName, Location, ServerScalarSelectableName, Span, UnvalidatedTypeName,
-    WithLocation, WithSpan,
+    GraphQLInterfaceTypeName, IsographObjectTypeName, Location, SelectableName,
+    ServerScalarSelectableName, Span, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
-    GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLNamedTypeAnnotation,
+    GraphQLConstantValue, GraphQLDirective, GraphQLNamedTypeAnnotation,
     GraphQLNonNullTypeAnnotation, GraphQLScalarTypeDefinition, GraphQLTypeAnnotation,
     GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument, GraphQLTypeSystemExtension,
     GraphQLTypeSystemExtensionDocument, GraphQLTypeSystemExtensionOrDefinition, RootOperationKind,
 };
 use intern::string_key::Intern;
 use isograph_schema::{
-    CreateAdditionalFieldsError, IsographObjectTypeDefinition, ProcessObjectTypeDefinitionOutcome,
+    CreateAdditionalFieldsError, ExposeAsFieldToInsert, ExposeFieldDirective, FieldMapItem,
+    FieldToInsert, IsographObjectTypeDefinition, ProcessObjectTypeDefinitionOutcome,
     ProcessTypeSystemDocumentOutcome, RootTypes, ServerObjectEntity, ServerScalarEntity,
     STRING_JAVASCRIPT_TYPE, TYPENAME_FIELD_NAME,
 };
@@ -24,27 +25,39 @@ use crate::{
 };
 
 lazy_static! {
-    static ref QUERY_TYPE: IsographObjectTypeName = "Query".intern().into();
+    pub static ref QUERY_TYPE: IsographObjectTypeName = "Query".intern().into();
     static ref MUTATION_TYPE: IsographObjectTypeName = "Mutation".intern().into();
     static ref ID_FIELD_NAME: ServerScalarSelectableName = "id".intern().into();
     // TODO use schema_data.string_type_id or something
     static ref STRING_TYPE_NAME: UnvalidatedTypeName = "String".intern().into();
+    static ref NODE_INTERFACE_NAME: GraphQLInterfaceTypeName = "Node".intern().into();
+    pub static ref REFETCH_FIELD_NAME: SelectableName = "__refetch".intern().into();
+
 }
 
+#[allow(clippy::type_complexity)]
 pub fn process_graphql_type_system_document(
     type_system_document: GraphQLTypeSystemDocument,
-) -> ProcessGraphqlTypeDefinitionResult<ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>> {
+) -> ProcessGraphqlTypeDefinitionResult<(
+    ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>,
+    HashMap<IsographObjectTypeName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
+    Vec<ExposeAsFieldToInsert>,
+)> {
+    // TODO return a vec of errors, not just one
+
     // In the schema, interfaces, unions and objects are the same type of object (SchemaType),
     // with e.g. interfaces "simply" being objects that can be refined to other
     // concrete objects.
 
     let mut supertype_to_subtype_map = HashMap::new();
-    let mut subtype_to_supertype_map = HashMap::new();
 
     let mut processed_root_types = None;
 
     let mut scalars = vec![];
     let mut objects = vec![];
+    let mut directives = HashMap::<_, Vec<_>>::new();
+
+    let mut refetch_fields = vec![];
 
     for with_location in type_system_document.0 {
         let WithLocation {
@@ -56,34 +69,40 @@ pub fn process_graphql_type_system_document(
                 let concrete_type = Some(object_type_definition.name.item.into());
 
                 for interface_name in object_type_definition.interfaces.iter() {
-                    insert_into_type_refinement_maps(
+                    insert_into_type_refinement_map(
                         interface_name.item.into(),
                         object_type_definition.name.item.into(),
                         &mut supertype_to_subtype_map,
-                        &mut subtype_to_supertype_map,
                     );
                 }
 
+                let object_name = object_type_definition.name.item.unchecked_conversion();
                 let object_type_definition = object_type_definition.into();
 
-                objects.push((
-                    process_object_type_definition(
-                        object_type_definition,
-                        concrete_type,
-                        GraphQLSchemaObjectAssociatedData {
-                            original_definition_type: GraphQLSchemaOriginalDefinitionType::Object,
-                        },
-                        GraphQLObjectDefinitionType::Object,
-                    )?,
-                    location,
-                ));
+                let (object_definition_outcome, new_directives) = process_object_type_definition(
+                    object_type_definition,
+                    concrete_type,
+                    GraphQLSchemaObjectAssociatedData {
+                        original_definition_type: GraphQLSchemaOriginalDefinitionType::Object,
+                    },
+                    GraphQLObjectDefinitionType::Object,
+                    &mut refetch_fields,
+                )?;
+
+                directives
+                    .entry(object_name)
+                    .or_default()
+                    .extend(new_directives);
+
+                objects.push((object_definition_outcome, location));
             }
             GraphQLTypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
                 scalars.push((process_scalar_definition(scalar_type_definition), location));
                 // N.B. we assume that Mutation will be an object, not a scalar
             }
             GraphQLTypeSystemDefinition::InterfaceTypeDefinition(interface_type_definition) => {
-                objects.push((
+                let interface_name = interface_type_definition.name.item.unchecked_conversion();
+                let (process_object_type_definition_outcome, new_directives) =
                     process_object_type_definition(
                         interface_type_definition.into(),
                         None,
@@ -92,16 +111,25 @@ pub fn process_graphql_type_system_document(
                                 GraphQLSchemaOriginalDefinitionType::Interface,
                         },
                         GraphQLObjectDefinitionType::Interface,
-                    )?,
-                    location,
-                ));
+                        &mut refetch_fields,
+                    )?;
+                objects.push((process_object_type_definition_outcome, location));
+
+                directives
+                    .entry(interface_name)
+                    .or_default()
+                    .extend(new_directives);
                 // N.B. we assume that Mutation will be an object, not an interface
             }
             GraphQLTypeSystemDefinition::InputObjectTypeDefinition(
                 input_object_type_definition,
             ) => {
                 let concrete_type = Some(input_object_type_definition.name.item.into());
-                objects.push((
+                let input_object_name = input_object_type_definition
+                    .name
+                    .item
+                    .unchecked_conversion();
+                let (process_object_type_definition_outcome, new_directives) =
                     process_object_type_definition(
                         input_object_type_definition.into(),
                         // Shouldn't really matter what we pass here
@@ -111,9 +139,13 @@ pub fn process_graphql_type_system_document(
                                 GraphQLSchemaOriginalDefinitionType::InputObject,
                         },
                         GraphQLObjectDefinitionType::InputObject,
-                    )?,
-                    location,
-                ));
+                        &mut refetch_fields,
+                    )?;
+                objects.push((process_object_type_definition_outcome, location));
+                directives
+                    .entry(input_object_name)
+                    .or_default()
+                    .extend(new_directives);
             }
             GraphQLTypeSystemDefinition::DirectiveDefinition(_) => {
                 // For now, Isograph ignores directive definitions,
@@ -132,7 +164,7 @@ pub fn process_graphql_type_system_document(
             }
             GraphQLTypeSystemDefinition::UnionTypeDefinition(union_definition) => {
                 // TODO do something reasonable here, once we add support for type refinements.
-                objects.push((
+                let (process_object_type_definition_outcome, new_directives) =
                     process_object_type_definition(
                         IsographObjectTypeDefinition {
                             description: union_definition.description,
@@ -146,16 +178,19 @@ pub fn process_graphql_type_system_document(
                             original_definition_type: GraphQLSchemaOriginalDefinitionType::Union,
                         },
                         GraphQLObjectDefinitionType::Union,
-                    )?,
-                    location,
-                ));
+                        &mut refetch_fields,
+                    )?;
+                objects.push((process_object_type_definition_outcome, location));
+                directives
+                    .entry(union_definition.name.item.unchecked_conversion())
+                    .or_default()
+                    .extend(new_directives);
 
                 for union_member_type in union_definition.union_member_types {
-                    insert_into_type_refinement_maps(
+                    insert_into_type_refinement_map(
                         union_definition.name.item.into(),
                         union_member_type.item.into(),
                         &mut supertype_to_subtype_map,
-                        &mut subtype_to_supertype_map,
                     )
                 }
             }
@@ -175,12 +210,51 @@ pub fn process_graphql_type_system_document(
         }
     }
 
-    Ok(ProcessTypeSystemDocumentOutcome {
-        scalars,
-        objects,
-        unvalidated_subtype_to_supertype_map: subtype_to_supertype_map,
-        unvalidated_supertype_to_subtype_map: supertype_to_subtype_map,
-    })
+    // For each supertype (e.g. Node) and a subtype (e.g. Pet), we need to add an asConcreteType field.
+    for (supertype_name, subtypes) in supertype_to_subtype_map.iter() {
+        if let Some((object_outcome, _)) = objects.iter_mut().find(|obj| {
+            let supertype_name: IsographObjectTypeName = supertype_name.unchecked_conversion();
+
+            obj.0.server_object_entity.name == supertype_name
+        }) {
+            for subtype_name in subtypes.iter() {
+                object_outcome.fields_to_insert.push(WithLocation::new(
+                    FieldToInsert {
+                        description: Some(WithSpan::new(
+                            format!("A client pointer for the {} type.", subtype_name)
+                                .intern()
+                                .into(),
+                            Span::todo_generated(),
+                        )),
+                        name: WithLocation::new(
+                            format!("as{}", subtype_name).intern().into(),
+                            Location::generated(),
+                        ),
+                        type_: GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
+                            WithSpan::new(*subtype_name, Span::todo_generated()),
+                        )),
+                        arguments: vec![],
+                        is_inline_fragment: true,
+                    },
+                    Location::generated(),
+                ));
+            }
+        } else {
+            return Err(WithLocation::new(
+                ProcessGraphqlTypeSystemDefinitionError::AttemptedToImplementNonExistentType {
+                subtype_name: *subtypes.first().expect("Expected subtypes not to be empty. This is indicative of a bug in Isograph."),
+                    supertype_name: *supertype_name,
+                },
+                Location::generated(),
+            ));
+        };
+    }
+
+    Ok((
+        ProcessTypeSystemDocumentOutcome { scalars, objects },
+        directives,
+        refetch_fields,
+    ))
 }
 
 #[allow(clippy::type_complexity)]
@@ -189,6 +263,7 @@ pub fn process_graphql_type_extension_document(
 ) -> ProcessGraphqlTypeDefinitionResult<(
     ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>,
     HashMap<IsographObjectTypeName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
+    Vec<ExposeAsFieldToInsert>,
 )> {
     let mut definitions = Vec::with_capacity(extension_document.0.len());
     let mut extensions = Vec::with_capacity(extension_document.0.len());
@@ -205,18 +280,19 @@ pub fn process_graphql_type_extension_document(
         }
     }
 
-    // N.B. we should probably restructure this...?
-    // Like, we could discover the mutation type right now!
-    let outcome = process_graphql_type_system_document(GraphQLTypeSystemDocument(definitions))?;
+    let (outcome, mut directives, refetch_fields) =
+        process_graphql_type_system_document(GraphQLTypeSystemDocument(definitions))?;
 
-    let mut directives = HashMap::new();
     for extension in extensions.into_iter() {
         // TODO collect errors into vec
         // TODO we can encounter new interface implementations; we should account for that
-        directives.extend(process_graphql_type_system_extension(extension));
+
+        for (name, new_directives) in process_graphql_type_system_extension(extension) {
+            directives.entry(name).or_default().extend(new_directives);
+        }
     }
 
-    Ok((outcome, directives))
+    Ok((outcome, directives, refetch_fields))
 }
 
 pub(crate) type ProcessGraphqlTypeDefinitionResult<T> =
@@ -232,6 +308,12 @@ pub enum ProcessGraphqlTypeSystemDefinitionError {
 
     #[error("Attempted to extend {type_name}, but that type is not defined")]
     AttemptedToExtendUndefinedType { type_name: IsographObjectTypeName },
+
+    #[error("Type {subtype_name} claims to implement {supertype_name}, but {supertype_name} is not a type that has been defined.")]
+    AttemptedToImplementNonExistentType {
+        subtype_name: UnvalidatedTypeName,
+        supertype_name: UnvalidatedTypeName,
+    },
 }
 
 fn process_object_type_definition(
@@ -239,8 +321,12 @@ fn process_object_type_definition(
     concrete_type: Option<IsographObjectTypeName>,
     associated_data: GraphQLSchemaObjectAssociatedData,
     type_definition_type: GraphQLObjectDefinitionType,
-) -> ProcessGraphqlTypeDefinitionResult<ProcessObjectTypeDefinitionOutcome<GraphQLNetworkProtocol>>
-{
+    refetch_fields: &mut Vec<ExposeAsFieldToInsert>,
+) -> ProcessGraphqlTypeDefinitionResult<(
+    ProcessObjectTypeDefinitionOutcome<GraphQLNetworkProtocol>,
+    Vec<GraphQLDirective<GraphQLConstantValue>>,
+)> {
+    let object_implements_node = implements_node(&object_type_definition);
     let server_object_entity = ServerObjectEntity {
         description: object_type_definition.description.map(|d| d.item),
         name: object_type_definition.name.item,
@@ -248,12 +334,27 @@ fn process_object_type_definition(
         output_associated_data: associated_data,
     };
 
-    let mut fields_to_insert = object_type_definition.fields;
+    let mut fields_to_insert: Vec<_> = object_type_definition
+        .fields
+        .into_iter()
+        .map(|field_definition| {
+            WithLocation::new(
+                FieldToInsert {
+                    description: field_definition.item.description,
+                    name: field_definition.item.name,
+                    type_: field_definition.item.type_,
+                    arguments: field_definition.item.arguments,
+                    is_inline_fragment: field_definition.item.is_inline_fragment,
+                },
+                field_definition.location,
+            )
+        })
+        .collect();
 
     // We need to define a typename field for objects and interfaces, but not unions or input objects
     if type_definition_type.has_typename_field() {
         fields_to_insert.push(WithLocation::new(
-            GraphQLFieldDefinition {
+            FieldToInsert {
                 description: None,
                 name: WithLocation::new((*TYPENAME_FIELD_NAME).into(), Location::generated()),
                 type_: GraphQLTypeAnnotation::NonNull(Box::new(
@@ -263,10 +364,34 @@ fn process_object_type_definition(
                     ))),
                 )),
                 arguments: vec![],
-                directives: vec![],
+                is_inline_fragment: false,
             },
             Location::generated(),
         ));
+    }
+
+    if object_implements_node {
+        refetch_fields.push(ExposeAsFieldToInsert {
+            expose_field_directive: ExposeFieldDirective {
+                expose_as: Some(*REFETCH_FIELD_NAME),
+                field_map: vec![FieldMapItem {
+                    from: (*ID_FIELD_NAME).unchecked_conversion(),
+                    to: (*ID_FIELD_NAME).unchecked_conversion(),
+                }],
+                field: format!("node.as{}", object_type_definition.name.item)
+                    .intern()
+                    .into(),
+            },
+            parent_object_name: object_type_definition.name.item,
+            description: Some(
+                format!(
+                    "A refetch field for the {} type.",
+                    object_type_definition.name.item
+                )
+                .intern()
+                .into(),
+            ),
+        });
     }
 
     let encountered_root_kind = if object_type_definition.name.item == *QUERY_TYPE {
@@ -278,12 +403,15 @@ fn process_object_type_definition(
         None
     };
 
-    Ok(ProcessObjectTypeDefinitionOutcome {
-        encountered_root_kind,
-        directives: object_type_definition.directives,
-        server_object_entity,
-        fields_to_insert,
-    })
+    Ok((
+        ProcessObjectTypeDefinitionOutcome {
+            encountered_root_kind,
+            server_object_entity,
+            fields_to_insert,
+            expose_as_fields_to_insert: vec![],
+        },
+        object_type_definition.directives,
+    ))
 }
 
 // TODO this should accept an IsographScalarTypeDefinition
@@ -333,20 +461,22 @@ impl GraphQLObjectDefinitionType {
     }
 }
 
-fn insert_into_type_refinement_maps(
+fn insert_into_type_refinement_map(
     supertype_name: UnvalidatedTypeName,
     subtype_name: UnvalidatedTypeName, // aka the concrete type or union member
     supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,
-    subtype_to_supertype_map: &mut UnvalidatedTypeRefinementMap,
 ) {
     supertype_to_subtype_map
         .entry(supertype_name)
         .or_default()
         .push(subtype_name);
-    subtype_to_supertype_map
-        .entry(subtype_name)
-        .or_default()
-        .push(supertype_name);
 }
 
 type UnvalidatedTypeRefinementMap = HashMap<UnvalidatedTypeName, Vec<UnvalidatedTypeName>>;
+
+fn implements_node(object_type_definition: &IsographObjectTypeDefinition) -> bool {
+    object_type_definition
+        .interfaces
+        .iter()
+        .any(|x| x.item == *NODE_INTERFACE_NAME)
+}

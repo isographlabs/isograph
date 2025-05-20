@@ -41,6 +41,7 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
             isUpdatable: false,
           },
         ],
+        refetchQuery: null,
       },
       {
         kind: "Linked",
@@ -58,6 +59,7 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
             isUpdatable: false,
           },
         ],
+        refetchQuery: null,
       },
       {
         kind: "Resolver",
@@ -67,6 +69,7 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
         usedRefetchQueries: [],
       },
     ],
+    refetchQuery: null,
   },
 ];
 

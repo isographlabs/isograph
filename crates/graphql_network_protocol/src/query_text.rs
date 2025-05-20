@@ -20,7 +20,7 @@ pub(crate) fn generate_query_text<'a>(
     let variable_text = write_variables_to_string(schema, query_variables);
 
     query_text.push_str(&format!(
-        "{} {} {} {{\\\n",
+        "{} {}{} {{\\\n",
         root_operation_name.0, query_name, variable_text
     ));
     write_selections_for_query_text(&mut query_text, selection_map.values(), 1);

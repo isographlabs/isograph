@@ -131,8 +131,7 @@ export const SomeComponent = iso(`
 ```graphql
 extend type Mutation
   @exposeField(
-    field: "FIELD_NAME"
-    path: "PATH_TO_EXPOSED_TYPE"
+    field: "FIELD_NAME" # this is a path from the Mutation object to whatever field we are exposing, for example modify_user.updated_user
     fieldMap: [
       { from: "FIELD_ON_EXPOSED_TYPE", to: "MUTATION_FIELD_INPUT_TYPE" }
     ]

@@ -1,7 +1,7 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Pet__FirstCheckinMakeSuperButton__param } from './param_type';
 import { FirstCheckinMakeSuperButton as resolver } from '../../../PetMakeFirstCheckinSuperButton';
-import ICheckin__make_super__refetch_reader from '../../ICheckin/make_super/refetch_reader';
+import Checkin__make_super__refetch_reader from '../../Checkin/make_super/refetch_reader';
 
 const readerAst: ReaderAst<Pet__FirstCheckinMakeSuperButton__param> = [
   {
@@ -25,7 +25,7 @@ const readerAst: ReaderAst<Pet__FirstCheckinMakeSuperButton__param> = [
       {
         kind: "ImperativelyLoadedField",
         alias: "make_super",
-        refetchReaderArtifact: ICheckin__make_super__refetch_reader,
+        refetchReaderArtifact: Checkin__make_super__refetch_reader,
         refetchQuery: 0,
         name: "make_super",
       },
@@ -37,6 +37,7 @@ const readerAst: ReaderAst<Pet__FirstCheckinMakeSuperButton__param> = [
         isUpdatable: false,
       },
     ],
+    refetchQuery: null,
   },
 ];
 

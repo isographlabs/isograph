@@ -23,6 +23,7 @@ const readerAst: ReaderAst<NewsfeedItem__NewsfeedAdOrBlog__param> = [
         usedRefetchQueries: [],
       },
     ],
+    refetchQuery: null,
   },
   {
     kind: "Linked",
@@ -40,6 +41,7 @@ const readerAst: ReaderAst<NewsfeedItem__NewsfeedAdOrBlog__param> = [
         usedRefetchQueries: [],
       },
     ],
+    refetchQuery: null,
   },
 ];
 

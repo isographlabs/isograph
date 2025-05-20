@@ -1,8 +1,8 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
-import { Starrable__IsStarred__param } from './param_type';
+import { Repository__IsStarred__param } from './param_type';
 import { IsStarred as resolver } from '../../../RepositoryDetail';
 
-const readerAst: ReaderAst<Starrable__IsStarred__param> = [
+const readerAst: ReaderAst<Repository__IsStarred__param> = [
   {
     kind: "Scalar",
     fieldName: "stargazerCount",
@@ -20,11 +20,11 @@ const readerAst: ReaderAst<Starrable__IsStarred__param> = [
 ];
 
 const artifact: ComponentReaderArtifact<
-  Starrable__IsStarred__param,
+  Repository__IsStarred__param,
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  fieldName: "Starrable.IsStarred",
+  fieldName: "Repository.IsStarred",
   resolver,
   readerAst,
   hasUpdatable: false,

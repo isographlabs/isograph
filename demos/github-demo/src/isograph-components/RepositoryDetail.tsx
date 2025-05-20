@@ -2,8 +2,11 @@ import { iso } from '@iso';
 import { Route } from './GithubDemo';
 import { RepoGitHubLink } from './RepoGitHubLink';
 
+// N.B. it's a bit unfortunate that we currently don't support Starrable.IsStarred,
+// even though this is using only fields defined on Starrable. But that's (probably)
+// a temporary restriction.
 export const IsStarred = iso(`
-  field Starrable.IsStarred @component {
+  field Repository.IsStarred @component {
     stargazerCount
     viewerHasStarred
   }

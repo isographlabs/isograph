@@ -1,4 +1,4 @@
-export default 'query HomeRoute  {\
+export default 'query HomeRoute {\
   pets {\
     id,\
     name,\

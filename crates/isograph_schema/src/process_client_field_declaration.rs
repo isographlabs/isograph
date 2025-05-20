@@ -2,9 +2,8 @@ use std::collections::HashMap;
 
 use common_lang_types::{
     ClientScalarSelectableName, ConstExportName, IsographDirectiveName, IsographObjectTypeName,
-    Location, ObjectTypeAndFieldName, RelativePathToSourceFile, SelectableName,
-    ServerObjectSelectableName, TextSource, UnvalidatedTypeName, VariableName, WithLocation,
-    WithSpan,
+    Location, ObjectTypeAndFieldName, RelativePathToSourceFile, SelectableName, TextSource,
+    UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -19,7 +18,7 @@ use thiserror::Error;
 use crate::{
     refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
     ClientObjectSelectable, ClientScalarSelectable, FieldMapItem, NetworkProtocol, Schema,
-    WrappedSelectionMapSelection, NODE_FIELD_NAME,
+    ValidatedVariableDefinition, WrappedSelectionMapSelection, NODE_FIELD_NAME,
 };
 
 pub type UnprocessedSelection = WithSpan<UnvalidatedSelection>;
@@ -176,10 +175,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         if self
             .server_entity_data
-            .server_object_entity_available_selectables
+            .server_object_entity_extra_info
             .entry(parent_object_entity_id)
             .or_default()
-            .0
+            .selectables
             .insert(
                 client_field_name.into(),
                 DefinitionLocation::Client(SelectionType::Scalar(next_client_field_id)),
@@ -230,13 +229,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let selections = client_field_declaration.item.selection_set;
         let id_field = self
             .server_entity_data
-            .server_object_entity_available_selectables
+            .server_object_entity_extra_info
             .get(&parent_object_entity_id)
             .expect(
                 "Expected parent_object_entity_id to exist in \
                 server_object_entity_available_selectables",
             )
-            .1;
+            .id_field;
         let refetch_strategy = id_field.map(|_| {
             // Assume that if we have an id field, this implements Node
             RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
@@ -299,13 +298,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         let id_field = self
             .server_entity_data
-            .server_object_entity_available_selectables
+            .server_object_entity_extra_info
             .get(&parent_object_entity_id)
             .expect(
                 "Expected parent_object_entity_id \
                 to exist in server_object_entity_available_selectables",
             )
-            .1;
+            .id_field;
         let refetch_strategy = match id_field {
             None => Err(WithSpan::new(
                 ProcessClientFieldDeclarationError::ClientPointerTargetTypeHasNoId {
@@ -368,10 +367,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         if self
             .server_entity_data
-            .server_object_entity_available_selectables
+            .server_object_entity_extra_info
             .entry(parent_object_entity_id)
             .or_default()
-            .0
+            .selectables
             .insert(
                 client_pointer_name.into(),
                 DefinitionLocation::Client(SelectionType::Object(next_client_pointer_id)),
@@ -456,32 +455,18 @@ pub enum ProcessClientFieldDeclarationError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct PrimaryFieldInfo {
-    pub primary_field_name: ServerObjectSelectableName,
-    /// Some if the object is concrete; None otherwise.
-    pub primary_field_concrete_type: Option<IsographObjectTypeName>,
-    /// If this is abstract, we add a fragment spread
-    pub primary_field_return_type_object_entity_id: ServerObjectEntityId,
-    pub primary_field_field_map: Vec<FieldMapItem>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ImperativelyLoadedFieldVariant {
     pub client_field_scalar_selection_name: ClientScalarSelectableName,
-    /// What field should we select when generating the refetch query?
-    pub top_level_schema_field_name: ServerObjectSelectableName,
-    /// The arguments we must pass to the top level schema field, e.g. id: ID!
-    /// for node(id: $id)
-    pub top_level_schema_field_arguments: Vec<VariableDefinition<ServerEntityId>>,
 
-    /// Some if the object is concrete; None otherwise.
-    pub top_level_schema_field_concrete_type: Option<IsographObjectTypeName>,
-
-    /// If we need to select a sub-field, this is Some(...). We should model
-    /// this differently, this is very awkward!
-    pub primary_field_info: Option<PrimaryFieldInfo>,
-
+    // Mutation or Query or whatnot. Awkward! A GraphQL-ism!
     pub root_object_entity_id: ServerObjectEntityId,
+    pub subfields_or_inline_fragments: Vec<WrappedSelectionMapSelection>,
+    pub field_map: Vec<FieldMapItem>,
+    /// The arguments we must pass to the top level schema field, e.g. id: ID!
+    /// for node(id: $id). These are already encoded in the subfields_or_inline_fragments,
+    /// but we nonetheless need to put them into the query definition, and we need
+    /// the variable's type, not just the variable.
+    pub top_level_schema_field_arguments: Vec<ValidatedVariableDefinition>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

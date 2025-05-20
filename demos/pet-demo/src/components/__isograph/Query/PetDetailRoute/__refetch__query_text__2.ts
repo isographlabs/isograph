@@ -1,5 +1,5 @@
-export default 'mutation Query__set_pet_tagline ($input: SetPetTaglineParams!) {\
-  set_pet_tagline____input___v_input: set_pet_tagline(input: $input) {\
+export default 'mutation Query__set_best_friend($id: ID!, $new_best_friend_id: ID!) {\
+  set_pet_best_friend____id___v_id____new_best_friend_id___v_new_best_friend_id: set_pet_best_friend(id: $id, new_best_friend_id: $new_best_friend_id) {\
     pet {\
       id,\
       age,\

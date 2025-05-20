@@ -69,8 +69,8 @@ pub enum CreateAdditionalFieldsError {
         parent_type: IsographObjectTypeName,
     },
 
-    #[error("Invalid field in @exposeField directive")]
-    InvalidField,
+    #[error("Invalid field `{field_arg}` in @exposeField directive")]
+    InvalidField { field_arg: String },
 
     #[error("Invalid mutation field")]
     InvalidMutationField,
@@ -137,15 +137,6 @@ pub enum CreateAdditionalFieldsError {
         type_definition_type: &'static str,
         type_name: UnvalidatedTypeName,
     },
-
-    #[error("Expected {type_name} to be an object, but it was a scalar.")]
-    GenericObjectIsScalar { type_name: UnvalidatedTypeName },
-}
-
-#[derive(Debug)]
-pub struct TypeRefinementMaps {
-    pub subtype_to_supertype_map: ValidatedTypeRefinementMap,
-    pub supertype_to_subtype_map: ValidatedTypeRefinementMap,
 }
 
 pub type CreateAdditionalFieldsResult<T> = Result<T, CreateAdditionalFieldsError>;

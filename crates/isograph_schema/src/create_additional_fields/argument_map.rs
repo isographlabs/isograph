@@ -14,6 +14,7 @@ use super::create_additional_fields_error::{
     CreateAdditionalFieldsError, FieldMapItem, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
 };
 
+#[derive(Debug)]
 pub(crate) struct ArgumentMap {
     arguments: Vec<WithLocation<PotentiallyModifiedArgument>>,
 }
@@ -125,6 +126,7 @@ impl ArgumentMap {
     }
 }
 
+#[derive(Debug)]
 enum PotentiallyModifiedArgument {
     Unmodified(ValidatedVariableDefinition),
     Modified(ModifiedArgument),
@@ -192,13 +194,13 @@ impl ModifiedArgument {
                 ServerEntityId::Object(object_entity_id) => ModifiedObject {
                     field_map: schema
                         .server_entity_data
-                        .server_object_entity_available_selectables
+                        .server_object_entity_extra_info
                         .get(&object_entity_id)
                         .expect(
                             "Expected object_entity_id to exist \
                             in server_object_entity_available_selectables",
                         )
-                        .0
+                        .selectables
                         .iter()
                         .flat_map(|(name, field_id)| match field_id {
                             DefinitionLocation::Server(s) => {

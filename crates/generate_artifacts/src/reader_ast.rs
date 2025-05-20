@@ -77,9 +77,12 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                         reader_imports,
                     )
                 }
-                DefinitionLocation::Server(_) => {
-                    path.push(
-                        NameAndArguments {
+                DefinitionLocation::Server(server_object_selectable_id) => {
+                    let server_object_selectable =
+                        schema.server_object_selectable(server_object_selectable_id);
+                    let normalization_key = match server_object_selectable.object_selectable_variant
+                    {
+                        SchemaServerObjectSelectableVariant::LinkedField => NameAndArguments {
                             // TODO use alias
                             name: linked_field_selection.name.item.into(),
                             // TODO this clearly does something, but why are we able to pass
@@ -94,7 +97,16 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                             ),
                         }
                         .normalization_key(),
-                    );
+                        SchemaServerObjectSelectableVariant::InlineFragment => {
+                            let target_object_entity =
+                                schema.server_entity_data.server_object_entity(
+                                    *server_object_selectable.target_object_entity.inner(),
+                                );
+                            NormalizationKey::InlineFragment(target_object_entity.name)
+                        }
+                    };
+
+                    path.push(normalization_key);
 
                     let inner_reader_ast = generate_reader_ast_with_path(
                         schema,
@@ -168,7 +180,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         DefinitionLocation::Server(server_field_id) => {
             let server_field = schema.server_object_selectable(server_field_id);
             match &server_field.object_selectable_variant {
-                SchemaServerObjectSelectableVariant::InlineFragment(_) => {
+                SchemaServerObjectSelectableVariant::InlineFragment => {
                     let object = schema
                         .server_entity_data
                         .server_object_entity(server_field.parent_object_entity_id);
@@ -204,6 +216,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         {indent_2}condition: {condition},\n\
         {indent_2}isUpdatable: {is_updatable},\n\
         {indent_2}selections: {inner_reader_ast},\n\
+        {indent_2}refetchQuery: null,\n\
         {indent_1}}},\n",
     )
 }
@@ -588,7 +601,10 @@ fn find_imperatively_fetchable_query_index(
                 None
             }
         })
-        .expect("Expected refetch query to be found")
+        .expect(
+            "Expected refetch query to be found. \
+            This is indicative of a bug in Isograph.",
+        )
 }
 
 pub(crate) fn generate_reader_ast<'schema, TNetworkProtocol: NetworkProtocol>(
@@ -690,9 +706,13 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                     DefinitionLocation::Client(_) => {
                         // Do not recurse into selections of client pointers
                     }
-                    DefinitionLocation::Server(_) => {
-                        path.push(
-                            NameAndArguments {
+                    DefinitionLocation::Server(server_object_selectable_id) => {
+                        let server_object_selectable =
+                            schema.server_object_selectable(server_object_selectable_id);
+                        let normalization_key = match server_object_selectable
+                            .object_selectable_variant
+                        {
+                            SchemaServerObjectSelectableVariant::LinkedField => NameAndArguments {
                                 // TODO use alias
                                 name: linked_field_selection.name.item.into(),
                                 arguments: transform_arguments_with_child_context(
@@ -706,7 +726,17 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                                 ),
                             }
                             .normalization_key(),
-                        );
+                            SchemaServerObjectSelectableVariant::InlineFragment => {
+                                let target_object_entity =
+                                    schema.server_entity_data.server_object_entity(
+                                        *server_object_selectable.target_object_entity.inner(),
+                                    );
+                                NormalizationKey::InlineFragment(target_object_entity.name)
+                            }
+                        };
+
+                        path.push(normalization_key);
+
                         let new_paths = refetched_paths_with_path(
                             &linked_field_selection.selection_set,
                             schema,

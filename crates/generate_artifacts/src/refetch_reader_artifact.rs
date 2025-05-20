@@ -1,11 +1,10 @@
 use common_lang_types::{ArtifactPathAndContent, ObjectTypeAndFieldName};
-use intern::string_key::Intern;
 
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
     initial_variable_context, ClientScalarOrObjectSelectable, ClientScalarSelectable, FieldMapItem,
-    NetworkProtocol, PrimaryFieldInfo, RefetchedPathsMap, Schema,
+    NetworkProtocol, RefetchedPathsMap, Schema,
 };
 
 use crate::{
@@ -20,17 +19,13 @@ use crate::{
 pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
-    primary_field_info: Option<&PrimaryFieldInfo>,
     refetched_paths: &RefetchedPathsMap,
     was_selected_loadably: bool,
     file_extensions: GenerateFileExtensionsOption,
+    field_map: &[FieldMapItem],
 ) -> ArtifactPathAndContent {
-    let function_import_statement = match primary_field_info {
-        Some(info) => {
-            generate_function_import_statement_for_mutation_reader(&info.primary_field_field_map)
-        }
-        None => generate_function_import_statement_for_refetch_reader(),
-    };
+    let read_out_data = get_read_out_data(field_map);
+    let function_import_statement = generate_function_import_statement(read_out_data);
     let parent_type = schema
         .server_entity_data
         .server_object_entity(client_field.parent_object_entity_id);
@@ -116,60 +111,10 @@ pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkPro
     }
 }
 
-fn generate_function_import_statement_for_refetch_reader() -> ClientFieldFunctionImportStatement {
-    let include_read_out_data = get_read_out_data(&[FieldMapItem {
-        from: "id".intern().into(),
-        to: "id".intern().into(),
-    }]);
-    let indent = "  ";
-    // TODO we need to generate nested refetch queries, which may either be
-    // passed from the original entrypoint or specific to the loadable field.
-    //
-    // It should probably be passed from the original entrypoint.
-    let content = format!(
-        "{include_read_out_data}\n\
-        import {{ makeNetworkRequest, wrapResolvedValue, type IsographEnvironment, \
-        type FragmentReference, type RefetchQueryNormalizationArtifactWrapper, \
-        type Link, type TopLevelReaderArtifact }} \
-        from '@isograph/react';\n\
-        import {{ type ItemCleanupPair }} from '@isograph/react-disposable-state';\n\
-        const resolver = (\n\
-        {indent}environment: IsographEnvironment,\n\
-        {indent}artifact: RefetchQueryNormalizationArtifact,\n\
-        {indent}readOutData: any,\n\
-        {indent}filteredVariables: any,\n\
-        {indent}rootLink: Link,\n\
-        {indent}// TODO type this\n\
-        {indent}readerArtifact: TopLevelReaderArtifact<any, any, any> | null,\n\
-        {indent}nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],\n\
-        ) => (): ItemCleanupPair<FragmentReference<any, any>> | undefined => {{\n\
-        {indent}const variables = includeReadOutData(filteredVariables, readOutData);\n\
-        {indent}const [networkRequest, disposeNetworkRequest] = makeNetworkRequest(environment, artifact, variables);\n\
-        {indent}if (readerArtifact == null) return;\n\
-        {indent}const fragmentReference = {{\n\
-        {indent}  kind: \"FragmentReference\",\n\
-        {indent}  readerWithRefetchQueries: wrapResolvedValue({{\n\
-        {indent}    kind: \"ReaderWithRefetchQueries\",\n\
-        {indent}    readerArtifact,\n\
-        {indent}    nestedRefetchQueries,\n\
-        {indent}  }} as const),\n\
-        {indent}  root: rootLink,\n\
-        {indent}  variables,\n\
-        {indent}  networkRequest,\n\
-        {indent}}} as const;\n\
-        {indent}return [fragmentReference, disposeNetworkRequest];\n\
-        }};\n"
-    );
-    ClientFieldFunctionImportStatement(content)
-}
-
-fn generate_function_import_statement_for_mutation_reader(
-    field_map: &[FieldMapItem],
-) -> ClientFieldFunctionImportStatement {
-    let include_read_out_data = get_read_out_data(field_map);
+fn generate_function_import_statement(read_out_data: String) -> ClientFieldFunctionImportStatement {
     let indent = "  ";
     ClientFieldFunctionImportStatement(format!(
-        "{include_read_out_data}\n\
+        "{read_out_data}\n\
         import {{ makeNetworkRequest, wrapResolvedValue, type IsographEnvironment, \
         type Link, type TopLevelReaderArtifact, \
         type FragmentReference, \
@@ -182,8 +127,9 @@ fn generate_function_import_statement_for_mutation_reader(
         {indent}readOutData: any,\n\
         {indent}filteredVariables: any,\n\
         {indent}rootLink: Link,\n\
-        {indent}// TODO type this\n\
-        {indent}readerArtifact: TopLevelReaderArtifact<any, any, any>,\n\
+        {indent}// If readerArtifact is null, the return value is undefined.\n\
+        {indent}// TODO reflect this in the types.\n\
+        {indent}readerArtifact: TopLevelReaderArtifact<any, any, any> | null,\n\
         {indent}nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],\n\
         ) => (): ItemCleanupPair<FragmentReference<any, any>> | undefined => {{\n\
         {indent}const variables = includeReadOutData(filteredVariables, readOutData);\n\

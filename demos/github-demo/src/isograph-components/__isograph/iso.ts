@@ -14,9 +14,9 @@ import { type Query__RepositoryDetail__param } from './Query/RepositoryDetail/pa
 import { type Query__RepositoryPage__param } from './Query/RepositoryPage/param_type';
 import { type Query__UserDetail__param } from './Query/UserDetail/param_type';
 import { type Query__UserPage__param } from './Query/UserPage/param_type';
+import { type Repository__IsStarred__param } from './Repository/IsStarred/param_type';
 import { type Repository__RepositoryLink__param } from './Repository/RepositoryLink/param_type';
 import { type Repository__RepositoryRow__param } from './Repository/RepositoryRow/param_type';
-import { type Starrable__IsStarred__param } from './Starrable/IsStarred/param_type';
 import { type User__Avatar__param } from './User/Avatar/param_type';
 import { type User__RepositoryConnection__param } from './User/RepositoryConnection/param_type';
 import { type User__RepositoryList__param } from './User/RepositoryList/param_type';
@@ -134,16 +134,16 @@ export function iso<T>(
 ): IdentityWithParamComponent<Query__UserPage__param>;
 
 export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Repository.IsStarred', T>
+): IdentityWithParamComponent<Repository__IsStarred__param>;
+
+export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Repository.RepositoryLink', T>
 ): IdentityWithParamComponent<Repository__RepositoryLink__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Repository.RepositoryRow', T>
 ): IdentityWithParamComponent<Repository__RepositoryRow__param>;
-
-export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'field Starrable.IsStarred', T>
-): IdentityWithParamComponent<Starrable__IsStarred__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field User.Avatar', T>

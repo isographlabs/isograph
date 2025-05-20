@@ -25,6 +25,7 @@ const readerAst: ReaderAst<Query__PetByName__param> = [
         usedRefetchQueries: [],
       },
     ],
+    refetchQuery: null,
   },
 ];
 
