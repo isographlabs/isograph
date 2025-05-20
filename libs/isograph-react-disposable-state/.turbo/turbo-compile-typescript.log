@@ -1,4 +1,0 @@
-
-> @isograph/react-disposable-state@0.3.1 compile-typescript /home/pablocrov/code/isograph/libs/isograph-react-disposable-state
-> rm -rf dist/* && tsc -p tsconfig.pkg.json
-

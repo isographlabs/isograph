@@ -1,4 +1,0 @@
-
-> @isograph/disposable-types@0.3.1 compile-typescript /home/pablocrov/code/isograph/libs/isograph-disposable-types
-> rm -rf dist/* && tsc -p tsconfig.pkg.json
-

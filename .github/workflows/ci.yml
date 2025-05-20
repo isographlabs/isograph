@@ -248,11 +248,20 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt
-      - name: Install wasm target
-        shell: bash
-        run: |
-          rustup target add wasm32-wasip1
+      - uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: musl-tools # provides musl-gcc
+          version: 1.0
+      - uses: pnpm/action-setup@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org/
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Build swc
+        target: wasm32-wasip1
         run: pnpm build-swc
 
   all-checks-passed:
