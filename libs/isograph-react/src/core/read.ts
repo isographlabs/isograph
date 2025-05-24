@@ -798,8 +798,9 @@ export function readLinkedFieldData(
     };
   }
   const targetId = link;
-  if (typeof field.refetchQuery === 'number') {
-    root = link;
+  if (field.refetchQuery != null) {
+    // if field.refetchQuery is not null, then the field is a client pointer, i.e.
+    // it is like a loadable field that returns the selections.
     const refetchReaderParams = readData(
       [
         {
@@ -810,13 +811,14 @@ export function readLinkedFieldData(
           isUpdatable: false,
         },
       ],
-      root,
+      targetId,
     );
 
     if (refetchReaderParams.kind === 'MissingData') {
       return {
         kind: 'MissingData',
-        reason: 'Missing data for ' + field.alias + ' on root ' + root.__link,
+        reason:
+          'Missing data for ' + field.alias + ' on root ' + targetId.__link,
         nestedReason: refetchReaderParams,
         recordLink: refetchReaderParams.recordLink,
       };
@@ -851,9 +853,9 @@ export function readLinkedFieldData(
 
         return [
           // Stable id
-          root.__typename +
+          targetId.__typename +
             ':' +
-            root.__link +
+            targetId.__link +
             '/' +
             field.fieldName +
             '/' +
@@ -886,7 +888,7 @@ export function readLinkedFieldData(
                 },
                 nestedRefetchQueries,
               }),
-              root,
+              root: targetId,
               variables,
               networkRequest,
             };

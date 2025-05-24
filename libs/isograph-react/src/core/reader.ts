@@ -113,6 +113,9 @@ export type ReaderLinkedField = {
     boolean | Link | null
   > | null;
   readonly isUpdatable: boolean;
+  /**
+   * If refetchQuery != null, then the linked field is a client pointer.
+   */
   readonly refetchQuery: number | null;
 };
 
