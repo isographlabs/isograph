@@ -32,10 +32,10 @@ const readerAst: ReaderAst<Mutation__SetTagline__param> = [
             isUpdatable: false,
           },
         ],
-        refetchQuery: null,
+        refetchQueryIndex: null,
       },
     ],
-    refetchQuery: null,
+    refetchQueryIndex: null,
   },
 ];
 

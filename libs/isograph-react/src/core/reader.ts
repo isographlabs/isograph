@@ -114,9 +114,9 @@ export type ReaderLinkedField = {
   > | null;
   readonly isUpdatable: boolean;
   /**
-   * If refetchQuery != null, then the linked field is a client pointer.
+   * If refetchQueryIndex != null, then the linked field is a client pointer.
    */
-  readonly refetchQuery: number | null;
+  readonly refetchQueryIndex: number | null;
 };
 
 export type ReaderNonLoadableResolverField = {

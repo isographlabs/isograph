@@ -44,7 +44,7 @@ const readerAst: ReaderAst<Query__HomePage__param> = [
         usedRefetchQueries: [],
       },
     ],
-    refetchQuery: null,
+    refetchQueryIndex: null,
   },
 ];
 

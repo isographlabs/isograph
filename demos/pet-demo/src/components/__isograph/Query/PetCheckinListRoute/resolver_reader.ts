@@ -52,7 +52,7 @@ const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
         },
       },
     ],
-    refetchQuery: null,
+    refetchQueryIndex: null,
   },
 ];
 

@@ -216,7 +216,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         {indent_2}condition: {condition},\n\
         {indent_2}isUpdatable: {is_updatable},\n\
         {indent_2}selections: {inner_reader_ast},\n\
-        {indent_2}refetchQuery: null,\n\
+        {indent_2}refetchQueryIndex: null,\n\
         {indent_1}}},\n",
     )
 }

@@ -77,7 +77,7 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
         usedRefetchQueries: [5, ],
       },
     ],
-    refetchQuery: null,
+    refetchQueryIndex: null,
   },
 ];
 

@@ -83,7 +83,7 @@ const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
         name: "refetch_pet_stats",
       },
     ],
-    refetchQuery: null,
+    refetchQueryIndex: null,
   },
 ];
 

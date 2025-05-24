@@ -798,8 +798,9 @@ export function readLinkedFieldData(
     };
   }
   const targetId = link;
-  if (field.refetchQuery != null) {
-    // if field.refetchQuery is not null, then the field is a client pointer, i.e.
+  const { refetchQueryIndex } = field;
+  if (refetchQueryIndex != null) {
+    // if field.refetchQueryIndex is not null, then the field is a client pointer, i.e.
     // it is like a loadable field that returns the selections.
     const refetchReaderParams = readData(
       [
@@ -823,9 +824,8 @@ export function readLinkedFieldData(
         recordLink: refetchReaderParams.recordLink,
       };
     }
-    const refetchQueryIndex = field.refetchQuery;
-    const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
 
+    const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
     if (refetchQuery == null) {
       throw new Error(
         'refetchQuery is null in RefetchField. This is indicative of a bug in Isograph.',

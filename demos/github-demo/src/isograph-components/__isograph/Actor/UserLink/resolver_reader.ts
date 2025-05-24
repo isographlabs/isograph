@@ -34,7 +34,7 @@ const readerAst: ReaderAst<Actor__UserLink__param> = [
         isUpdatable: false,
       },
     ],
-    refetchQuery: null,
+    refetchQueryIndex: null,
   },
 ];
 
