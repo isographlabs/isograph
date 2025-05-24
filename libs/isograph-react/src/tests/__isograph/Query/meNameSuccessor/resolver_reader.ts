@@ -43,10 +43,13 @@ const readerAst: ReaderAst<Query__meNameSuccessor__param> = [
                 isUpdatable: false,
               },
             ],
+            refetchQuery: null,
           },
         ],
+        refetchQuery: null,
       },
     ],
+    refetchQuery: null,
   },
 ];
 

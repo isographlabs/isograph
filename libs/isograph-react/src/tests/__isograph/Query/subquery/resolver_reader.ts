@@ -33,8 +33,10 @@ const readerAst: ReaderAst<Query__subquery__param> = [
             isUpdatable: false,
           },
         ],
+        refetchQuery: null,
       },
     ],
+    refetchQuery: null,
   },
 ];
 

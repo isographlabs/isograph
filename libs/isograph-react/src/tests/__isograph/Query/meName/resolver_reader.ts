@@ -20,6 +20,7 @@ const readerAst: ReaderAst<Query__meName__param> = [
         isUpdatable: false,
       },
     ],
+    refetchQuery: null,
   },
 ];
 

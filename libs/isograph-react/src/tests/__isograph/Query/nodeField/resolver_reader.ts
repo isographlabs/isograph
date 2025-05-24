@@ -25,6 +25,7 @@ const readerAst: ReaderAst<Query__nodeField__param> = [
         isUpdatable: false,
       },
     ],
+    refetchQuery: null,
   },
 ];
 
