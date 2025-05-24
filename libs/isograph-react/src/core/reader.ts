@@ -132,7 +132,7 @@ export type ReaderImperativelyLoadedField = {
   readonly kind: 'ImperativelyLoadedField';
   readonly alias: string;
   readonly refetchReaderArtifact: RefetchReaderArtifact;
-  readonly refetchQuery: number;
+  readonly refetchQueryIndex: number;
   readonly name: string;
 };
 

@@ -26,7 +26,7 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
         kind: "ImperativelyLoadedField",
         alias: "custom_pet_refetch",
         refetchReaderArtifact: Pet__custom_pet_refetch__refetch_reader,
-        refetchQuery: 1,
+        refetchQueryIndex: 1,
         name: "custom_pet_refetch",
       },
       {

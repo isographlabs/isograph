@@ -403,7 +403,7 @@ fn imperatively_loaded_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
         {indent_2}kind: \"ImperativelyLoadedField\",\n\
         {indent_2}alias: \"{alias}\",\n\
         {indent_2}refetchReaderArtifact: {refetch_reader_artifact_import_name},\n\
-        {indent_2}refetchQuery: {refetch_query_index},\n\
+        {indent_2}refetchQueryIndex: {refetch_query_index},\n\
         {indent_2}name: \"{name}\",\n\
         {indent_1}}},\n",
     )

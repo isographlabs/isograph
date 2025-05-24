@@ -972,11 +972,11 @@ export function readImperativelyLoadedField(
       recordLink: data.recordLink,
     };
   } else {
-    const refetchQueryIndex = field.refetchQuery;
+    const { refetchQueryIndex } = field;
     const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
     if (refetchQuery == null) {
       throw new Error(
-        'refetchQuery is null in RefetchField. This is indicative of a bug in Isograph.',
+        'Refetch query not found. This is indicative of a bug in Isograph.',
       );
     }
     const refetchQueryArtifact = refetchQuery.artifact;
