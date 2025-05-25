@@ -335,6 +335,7 @@ impl IsoLiteralCompilerVisitor<'_> {
                 self.unresolved_mark,
             ),
             ConfigFileJavascriptModule::EsModule => {
+                // TODO ensure `ident_name` is unique
                 let ident_name = format!("_{}", entrypoint.field_name);
 
                 // hoist import
@@ -360,12 +361,12 @@ impl IsoLiteralCompilerVisitor<'_> {
             return Err(IsographTransformError::IsoRequiresOneArg);
         };
 
-        let entrypoint = self.parse_iso_call_arg_into_type(first);
+        let iso_keyword = self.parse_iso_call_arg_into_type(first);
 
-        match entrypoint {
+        match iso_keyword {
             Err(e) => return Err(e),
-            Ok(entrypoint) => match entrypoint.artifact_type {
-                ArtifactType::Entrypoint => Ok(self.valid_isograph_template_literal(&entrypoint)),
+            Ok(iso_keyword) => match iso_keyword.artifact_type {
+                ArtifactType::Entrypoint => Ok(self.valid_isograph_template_literal(&iso_keyword)),
                 ArtifactType::Field => {
                     match fn_args {
                         Some(fn_args) => {
@@ -376,7 +377,7 @@ impl IsoLiteralCompilerVisitor<'_> {
                             return Err(IsographTransformError::IsoFnCallRequiresOneArg);
                         }
                         // iso(...)>empty<
-                        None => Ok(entrypoint.build_arrow_identity_expr()),
+                        None => Ok(iso_keyword.build_arrow_identity_expr()),
                     }
                 }
             },

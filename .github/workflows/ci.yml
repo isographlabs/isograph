@@ -246,6 +246,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
+          target: wasm32-wasip1
           toolchain: stable
           components: rustfmt
       - uses: awalsh128/cache-apt-pkgs-action@v1
@@ -261,7 +262,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Build swc
-        target: wasm32-wasip1
         run: pnpm build-swc
 
   all-checks-passed:
