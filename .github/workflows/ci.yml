@@ -18,7 +18,6 @@ jobs:
             build-name: isograph_cli
             artifact-name: isograph_cli-bin-linux-arm64
             cross: true
-            musl: true
           - target: x86_64-apple-darwin
             os: macos-latest
             build-name: isograph_cli
@@ -50,6 +49,7 @@ jobs:
       os: ubuntu-latest
       build-name: isograph_cli
       artifact-name: isograph_cli-linux-x64
+      musl: true
 
   build-demos:
     name: Build demos
