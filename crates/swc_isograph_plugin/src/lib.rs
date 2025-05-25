@@ -275,6 +275,7 @@ impl ValidIsographTemplateLiteral {
                 PathBuf::from(format!("{}", file_to_artifact.display()).replace("\\", "/"));
         }
 
+        // TODO Identify if this is needed
         if file_to_artifact.starts_with(ISOGRAPH_FOLDER) {
             file_to_artifact = PathBuf::from(format!("./{}", file_to_artifact.display()));
         }
