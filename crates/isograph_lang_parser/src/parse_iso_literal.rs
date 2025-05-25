@@ -824,7 +824,6 @@ fn from_control_flow<T, E>(control_flow: impl FnOnce() -> ControlFlow<T, E>) -> 
 
 #[cfg(test)]
 mod test {
-
     use crate::{IsographLangTokenKind, PeekableLexer};
 
     #[test]
