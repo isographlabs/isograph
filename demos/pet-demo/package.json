@@ -3,7 +3,7 @@
   "version": "0.3.1",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "cd ../../libs/isograph-swc-plugin && pnpm build && cd ../../demos/pet-demo && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
