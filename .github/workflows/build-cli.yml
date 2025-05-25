@@ -19,6 +19,9 @@ on:
       cross:
         required: false
         type: boolean
+      musl:
+        required: false
+        type: boolean
 
 jobs:
   build-cli:
@@ -58,6 +61,12 @@ jobs:
         with:
           command: install
           args: cross
+      - uses: awalsh128/cache-apt-pkgs-action@v1
+        if: inputs.musl
+        with:
+          packages: musl-tools # provides musl-gcc
+          version: 1.0
+      # - name: Install cross for wasm32-wasip1
       - name: 'Build isograph_cli with cargo (${{inputs.target}})'
         run: pnpm exec turbo ${{ inputs.cross && 'cross' || 'build' }} -- --target ${{ inputs.target }} --release
       - uses: actions/upload-artifact@v4
