@@ -3,9 +3,10 @@
   "version": "0.3.1",
   "private": true,
   "scripts": {
-    "dev": "cd ../../libs/isograph-swc-plugin && pnpm build && cd ../../demos/pet-demo && next dev",
-    "build": "next build",
-    "start": "next start",
+    "build:swc-plugin": "cd ../../libs/isograph-swc-plugin && pnpm build && cd ../../demos/pet-demo",
+    "dev": "build:swc-plugin && next dev",
+    "build": "build:swc-plugin && next build",
+    "start": "build:swc-plugin && next start",
     "lint": "next lint",
     "backend": "cd backend && node ./src/index.js",
     "tsc": "tsc",
