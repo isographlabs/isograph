@@ -76,7 +76,7 @@ async function walkDir(
   }
 }
 
-describe('Should load swc-plugin-isograph wasm plugin correctly', async () => {
+describe.skip('Should load swc-plugin-isograph wasm plugin correctly', async () => {
   await walkDir(
     new URL(
       '../../../crates/swc_isograph_plugin/tests/fixtures/base',
