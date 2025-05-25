@@ -1,4 +1,4 @@
-import { CleanupFn } from '@isograph/disposable-types';
+import { CleanupFn, type ItemCleanupPair } from '@isograph/disposable-types';
 import {
   getParentRecordKey,
   insertIfNotExists,
@@ -196,6 +196,7 @@ function readData<TReadFromStore>(
           storeRecord,
           root,
           variables,
+          nestedRefetchQueries,
           networkRequest,
           (ast, root) =>
             readData(
@@ -644,8 +645,8 @@ export function readLinkedFieldData(
   storeRecord: StoreRecord,
   root: Link,
   variables: Variables,
+  nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   networkRequest: PromiseWrapper<void, any>,
-
   readData: <TReadFromStore>(
     ast: ReaderAst<TReadFromStore>,
     root: Link,
@@ -726,7 +727,7 @@ export function readLinkedFieldData(
       variables: generateChildVariableMap(
         variables,
         // TODO this is wrong
-        // should use field.condition.variables
+        // should use field.arguments
         // but it doesn't exist
         [],
       ),
@@ -797,6 +798,106 @@ export function readLinkedFieldData(
     };
   }
   const targetId = link;
+  const { refetchQueryIndex } = field;
+  if (refetchQueryIndex != null) {
+    // if field.refetchQueryIndex is not null, then the field is a client pointer, i.e.
+    // it is like a loadable field that returns the selections.
+    const refetchReaderParams = readData(
+      [
+        {
+          kind: 'Scalar',
+          fieldName: 'id',
+          alias: null,
+          arguments: null,
+          isUpdatable: false,
+        },
+      ],
+      targetId,
+    );
+
+    if (refetchReaderParams.kind === 'MissingData') {
+      return {
+        kind: 'MissingData',
+        reason:
+          'Missing data for ' + field.alias + ' on root ' + targetId.__link,
+        nestedReason: refetchReaderParams,
+        recordLink: refetchReaderParams.recordLink,
+      };
+    }
+
+    const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
+    if (refetchQuery == null) {
+      throw new Error(
+        'refetchQuery is null in RefetchField. This is indicative of a bug in Isograph.',
+      );
+    }
+    const refetchQueryArtifact = refetchQuery.artifact;
+    const allowedVariables = refetchQuery.allowedVariables;
+
+    return {
+      kind: 'Success',
+      data: (
+        args: any,
+        // TODO get the associated type for FetchOptions from the loadably selected field
+        fetchOptions?: FetchOptions<any>,
+      ) => {
+        const includeReadOutData = (variables: any, readOutData: any) => {
+          variables.id = readOutData.id;
+          return variables;
+        };
+        const localVariables = includeReadOutData(
+          args ?? {},
+          refetchReaderParams.data,
+        );
+        writeQueryArgsToVariables(localVariables, field.arguments, variables);
+
+        return [
+          // Stable id
+          targetId.__typename +
+            ':' +
+            targetId.__link +
+            '/' +
+            field.fieldName +
+            '/' +
+            stableStringifyArgs(localVariables),
+          // Fetcher
+          (): ItemCleanupPair<FragmentReference<any, any>> | undefined => {
+            const variables = includeReadOutData(
+              filterVariables({ ...args, ...localVariables }, allowedVariables),
+              refetchReaderParams.data,
+            );
+
+            const [networkRequest, disposeNetworkRequest] =
+              maybeMakeNetworkRequest(
+                environment,
+                refetchQueryArtifact,
+                variables,
+                fetchOptions,
+              );
+
+            const fragmentReference: FragmentReference<any, any> = {
+              kind: 'FragmentReference',
+              readerWithRefetchQueries: wrapResolvedValue({
+                kind: 'ReaderWithRefetchQueries',
+                readerArtifact: {
+                  kind: 'EagerReaderArtifact',
+                  fieldName: field.fieldName,
+                  readerAst: field.selections,
+                  resolver: ({ data }) => data,
+                  hasUpdatable: false,
+                },
+                nestedRefetchQueries,
+              }),
+              root: targetId,
+              variables,
+              networkRequest,
+            };
+            return [fragmentReference, disposeNetworkRequest];
+          },
+        ];
+      },
+    };
+  }
   const data = readData(field.selections, targetId);
   if (data.kind === 'MissingData') {
     return {
@@ -871,11 +972,11 @@ export function readImperativelyLoadedField(
       recordLink: data.recordLink,
     };
   } else {
-    const refetchQueryIndex = field.refetchQuery;
+    const { refetchQueryIndex } = field;
     const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
     if (refetchQuery == null) {
       throw new Error(
-        'refetchQuery is null in RefetchField. This is indicative of a bug in Isograph.',
+        'Refetch query not found. This is indicative of a bug in Isograph.',
       );
     }
     const refetchQueryArtifact = refetchQuery.artifact;

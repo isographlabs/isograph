@@ -61,7 +61,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
             isUpdatable: false,
           },
         ],
-        refetchQuery: null,
+        refetchQueryIndex: null,
       },
       {
         kind: "Linked",
@@ -84,10 +84,10 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
             usedRefetchQueries: [],
           },
         ],
-        refetchQuery: null,
+        refetchQueryIndex: null,
       },
     ],
-    refetchQuery: null,
+    refetchQueryIndex: null,
   },
 ];
 

@@ -33,7 +33,7 @@ const readerAst: ReaderAst<Repository__RepositoryLink__param> = [
         isUpdatable: false,
       },
     ],
-    refetchQuery: null,
+    refetchQueryIndex: null,
   },
 ];
 

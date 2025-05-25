@@ -12,13 +12,13 @@ use isograph_schema::{RefetchedPathsMap, UserWrittenClientTypeInfo};
 
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
-use crate::generate_artifacts::{print_javascript_type_declaration, ClientFieldOutputType};
 use crate::{
     generate_artifacts::{
         generate_client_field_parameter_type, generate_client_field_updatable_data_type,
-        generate_output_type, generate_parameters, ClientFieldFunctionImportStatement,
-        RESOLVER_OUTPUT_TYPE, RESOLVER_OUTPUT_TYPE_FILE_NAME, RESOLVER_PARAMETERS_TYPE_FILE_NAME,
-        RESOLVER_PARAM_TYPE, RESOLVER_PARAM_TYPE_FILE_NAME, RESOLVER_READER_FILE_NAME,
+        generate_output_type, generate_parameters, print_javascript_type_declaration,
+        ClientFieldFunctionImportStatement, ClientFieldOutputType, RESOLVER_OUTPUT_TYPE,
+        RESOLVER_OUTPUT_TYPE_FILE_NAME, RESOLVER_PARAMETERS_TYPE_FILE_NAME, RESOLVER_PARAM_TYPE,
+        RESOLVER_PARAM_TYPE_FILE_NAME, RESOLVER_READER_FILE_NAME,
     },
     import_statements::{
         param_type_imports_to_import_param_statement, param_type_imports_to_import_statement,

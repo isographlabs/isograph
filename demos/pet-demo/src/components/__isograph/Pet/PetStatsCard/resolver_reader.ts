@@ -79,11 +79,11 @@ const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
         kind: "ImperativelyLoadedField",
         alias: "refetch_pet_stats",
         refetchReaderArtifact: PetStats__refetch_pet_stats__refetch_reader,
-        refetchQuery: 0,
+        refetchQueryIndex: 0,
         name: "refetch_pet_stats",
       },
     ],
-    refetchQuery: null,
+    refetchQueryIndex: null,
   },
 ];
 

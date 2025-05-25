@@ -27,7 +27,7 @@ const readerAst: ReaderAst<Query__Header__param> = [
         usedRefetchQueries: [],
       },
     ],
-    refetchQuery: null,
+    refetchQueryIndex: null,
   },
 ];
 

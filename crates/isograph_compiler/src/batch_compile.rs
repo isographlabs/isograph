@@ -1,7 +1,7 @@
 use std::{path::PathBuf, str::Utf8Error};
 
 use crate::{
-    compiler_state::{compile, StandardSources},
+    compiler_state::{compile, CompilerState, StandardSources},
     source_files::SourceFiles,
     with_duration::WithDuration,
 };
@@ -12,8 +12,6 @@ use isograph_schema::{NetworkProtocol, ProcessClientFieldDeclarationError};
 use pretty_duration::pretty_duration;
 use thiserror::Error;
 use tracing::{error, info};
-
-use crate::compiler_state::CompilerState;
 
 pub struct CompilationStats {
     pub client_field_count: usize,

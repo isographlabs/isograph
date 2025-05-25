@@ -55,7 +55,7 @@ const readerAst: ReaderAst<Repository__RepositoryRow__param> = [
         isUpdatable: false,
       },
     ],
-    refetchQuery: null,
+    refetchQueryIndex: null,
   },
   {
     kind: "Scalar",
@@ -80,7 +80,7 @@ const readerAst: ReaderAst<Repository__RepositoryRow__param> = [
         isUpdatable: false,
       },
     ],
-    refetchQuery: null,
+    refetchQueryIndex: null,
   },
 ];
 

@@ -61,7 +61,7 @@ const readerAst: ReaderAst<BlogItem__BlogItemDisplay__param> = [
         usedRefetchQueries: [],
       },
     ],
-    refetchQuery: null,
+    refetchQueryIndex: null,
   },
 ];
 

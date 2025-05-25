@@ -113,7 +113,10 @@ export type ReaderLinkedField = {
     boolean | Link | null
   > | null;
   readonly isUpdatable: boolean;
-  readonly refetchQuery: number | null;
+  /**
+   * If refetchQueryIndex != null, then the linked field is a client pointer.
+   */
+  readonly refetchQueryIndex: number | null;
 };
 
 export type ReaderNonLoadableResolverField = {
@@ -129,7 +132,7 @@ export type ReaderImperativelyLoadedField = {
   readonly kind: 'ImperativelyLoadedField';
   readonly alias: string;
   readonly refetchReaderArtifact: RefetchReaderArtifact;
-  readonly refetchQuery: number;
+  readonly refetchQueryIndex: number;
   readonly name: string;
 };
 

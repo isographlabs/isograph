@@ -26,7 +26,7 @@ const readerAst: ReaderAst<Pet__FirstCheckinMakeSuperButton__param> = [
         kind: "ImperativelyLoadedField",
         alias: "make_super",
         refetchReaderArtifact: Checkin__make_super__refetch_reader,
-        refetchQuery: 0,
+        refetchQueryIndex: 0,
         name: "make_super",
       },
       {
@@ -37,7 +37,7 @@ const readerAst: ReaderAst<Pet__FirstCheckinMakeSuperButton__param> = [
         isUpdatable: false,
       },
     ],
-    refetchQuery: null,
+    refetchQueryIndex: null,
   },
 ];
 
