@@ -10,7 +10,7 @@
     "prepack": "cp ../../target/wasm32-wasip1/release/swc_isograph_plugin.wasm .",
     "build": "cd ../../crates/swc_isograph_plugin && cargo build --release -p swc_isograph_plugin  --target wasm32-wasip1 && cp ../../target/wasm32-wasip1/release/swc_isograph_plugin.wasm ../../libs/isograph-swc-plugin/",
     "build:debug": "cd ../../crates/swc_isograph_plugin && cargo build -p swc_isograph_plugin  --target wasm32-wasip1 && cp ../../target/wasm32-wasip1/debug/swc_isograph_plugin.wasm ../../libs/isograph-swc-plugin/",
-    "test": "vitest run"
+    "test-swc": "vitest run"
   },
   "repository": {
     "type": "git",
