@@ -324,20 +324,20 @@ impl IsoLiteralCompilerVisitor<'_> {
 
     fn valid_isograph_template_literal(
         &mut self,
-        entrypoint: &ValidIsographTemplateLiteral,
+        iso_keyword: &ValidIsographTemplateLiteral,
     ) -> Expr {
-        let file_to_artifact = entrypoint
+        let file_to_artifact = iso_keyword
             .path_for_artifact(self.filepath, self.config, self.root_dir)
             .expect("Failed to get path for artifact.");
 
         match self.config.options.module {
-            ConfigFileJavascriptModule::CommonJs => entrypoint.build_require_expr_from_path(
+            ConfigFileJavascriptModule::CommonJs => iso_keyword.build_require_expr_from_path(
                 &file_to_artifact.display().to_string(),
                 self.unresolved_mark,
             ),
             ConfigFileJavascriptModule::EsModule => {
                 // TODO ensure `ident_name` is unique
-                let ident_name = format!("_{}", entrypoint.field_name);
+                let ident_name = format!("_{}", iso_keyword.field_name);
 
                 // hoist import
                 self.imports.push(IsographImport {
@@ -345,7 +345,7 @@ impl IsoLiteralCompilerVisitor<'_> {
                     item: ident_name.clone().into(),
                     unresolved_mark: self.unresolved_mark,
                 });
-                entrypoint.build_ident_expr_for_hoisted_import(&ident_name, self.unresolved_mark)
+                iso_keyword.build_ident_expr_for_hoisted_import(&ident_name, self.unresolved_mark)
             }
         }
     }
