@@ -253,8 +253,8 @@ jobs:
         with:
           packages: musl-tools # provides musl-gcc
           version: 1.0
-      - uses: pnpm/action-setup@v2
-      - uses: actions/setup-node@v2
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org/
