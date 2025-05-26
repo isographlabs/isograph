@@ -1,0 +1,30 @@
+{
+  "name": "@isograph/plugin-swc",
+  "version": "0.3.1",
+  "description": "SWC plugin for Isograph",
+  "homepage": "https://isograph.dev",
+  "main": "swc_isograph_plugin.wasm",
+  "author": "Isograph Labs",
+  "license": "MIT",
+  "scripts": {
+    "prepack": "cp ../../target/wasm32-wasip1/release/swc_isograph_plugin.wasm .",
+    "build": "cd ../../crates/swc_isograph_plugin && cargo build --release -p swc_isograph_plugin  --target wasm32-wasip1 && cp ../../target/wasm32-wasip1/release/swc_isograph_plugin.wasm ../../libs/isograph-swc-plugin/",
+    "build:debug": "cd ../../crates/swc_isograph_plugin && cargo build -p swc_isograph_plugin  --target wasm32-wasip1 && cp ../../target/wasm32-wasip1/debug/swc_isograph_plugin.wasm ../../libs/isograph-swc-plugin/",
+    "swc:test": "vitest run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/isographlabs/isograph.git",
+    "directory": "libs/isograph-swc-plugin"
+  },
+  "keywords": [
+    "graphql",
+    "isograph",
+    "swc",
+    "swc-plugin"
+  ],
+  "preferUnplugged": true,
+  "dependencies": {
+    "@swc/counter": "^0.1.3"
+  }
+}

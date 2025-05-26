@@ -3,6 +3,7 @@
   "private": true,
   "devDependencies": {
     "@ianvs/prettier-plugin-sort-imports": "^4.4.1",
+    "@swc/core": "1.4.0",
     "cross-env": "^7.0.3",
     "gulp": "4.0.2",
     "prettier": "^3.2.4",
@@ -12,8 +13,10 @@
   },
   "scripts": {
     "watch-rs": "bacon -j build -p ./crates/",
+    "watch-swc": "bacon -j build-swc -p ./crates/",
     "check-rs": "bacon -j check -p ./crates/",
     "build": "cargo build",
+    "build-swc": "cargo build -p swc_isograph_plugin --release --target wasm32-wasip1 && cd ./libs/isograph-swc-plugin && pnpm prepack",
     "compile-libs": "pnpm turbo compile-libs --log-order=grouped",
     "cross": "cross build",
     "build-json-schema": "./target/debug/build_json_schema",

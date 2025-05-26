@@ -119,3 +119,10 @@ allow_warnings = true
 # alt-m = "job:my-job"
 c = "job:clippy-all" # comment this to have 'c' run clippy on only the default target
 b = "job:build"
+
+[jobs.build-swc]
+command = [
+	"cargo", "build", "-p", "swc_isograph_plugin", "--release", "--target", "wasm32-wasip1", 
+	"--color", "always",
+]
+need_stdout = false

@@ -39,6 +39,7 @@ jobs:
       artifact-name: ${{ matrix.target.artifact-name }}
       longpaths: ${{ matrix.target.longpaths || false }}
       cross: ${{ matrix.target.cross || false }}
+      musl: ${{ matrix.target.musl || false }}
 
   build-cli-linux:
     name: Build compiler (x86_64-unknown-linux-musl)
@@ -48,6 +49,7 @@ jobs:
       os: ubuntu-latest
       build-name: isograph_cli
       artifact-name: isograph_cli-linux-x64
+      musl: true
 
   build-demos:
     name: Build demos
@@ -115,6 +117,7 @@ jobs:
   build-js-packages:
     name: Build js packages
     runs-on: ubuntu-latest
+    needs: [build-swc]
     steps:
       - uses: actions/checkout@v2
       - name: Cache turbo
@@ -237,6 +240,32 @@ jobs:
       binary: generate_isograph_fixtures
       params: --dir ./crates/isograph_lang_parser/fixtures/
 
+  build-swc:
+    name: Build swc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: wasm32-wasip1
+          toolchain: stable
+          components: rustfmt
+      - uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: musl-tools # provides musl-gcc
+          version: 1.0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org/
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Build swc
+        run: pnpm build-swc
+
   all-checks-passed:
     name: All checks passed
     runs-on: ubuntu-latest
@@ -254,6 +283,7 @@ jobs:
         cargo-clippy,
         cargo-test,
         typecheck-demos,
+        build-swc,
       ]
     steps:
       - name: Do nothing
