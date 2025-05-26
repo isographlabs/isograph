@@ -48,7 +48,7 @@ const typeAndFieldRegex = new RegExp(
 
 /**
  * @param {babel.NodePath<babel.types.CallExpression>} path
- *  */
+ **/
 function getTypeAndField(path) {
   const firstArg = path.node.arguments[0];
   if (path.node.arguments.length !== 1 || firstArg == null) {

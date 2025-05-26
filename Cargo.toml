@@ -36,7 +36,7 @@ serde_derive = "1.0.197"
 serde_json = "1.0.108"
 strum = { version = "0.25.0", features = ["derive"] }
 swc_atoms = "0.6.5"
-swc_core =  "0.90.6"
+swc_core = "0.90.6"
 swc_ecma_parser = "0.143.3"
 swc_ecma_transforms_testing = "0.140.3"
 swc_ecma_utils = "0.127.3"

@@ -3,7 +3,7 @@
 # Bacon repository: https://github.com/Canop/bacon
 # Complete help on configuration: https://dystroy.org/bacon/config/
 # You can also check bacon's own bacon.toml file
-#  as an example: https://github.com/Canop/bacon/blob/main/bacon.toml
+# as an example: https://github.com/Canop/bacon/blob/main/bacon.toml
 
 default_job = "check"
 
