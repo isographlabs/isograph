@@ -279,7 +279,7 @@ struct IsoLiteralCompilerVisitor<'a> {
 
 #[swc_trace]
 impl IsoLiteralCompilerVisitor<'_> {
-    fn parse_iso_call_arg_into_type(
+    fn parse_iso_template_literal(
         &self,
         expr_or_spread: &ExprOrSpread,
     ) -> Result<ValidIsographTemplateLiteral, IsographTransformError> {
@@ -308,20 +308,24 @@ impl IsoLiteralCompilerVisitor<'_> {
 
     fn valid_isograph_template_literal(
         &mut self,
-        iso_keyword: &ValidIsographTemplateLiteral,
+        iso_template_literal: &ValidIsographTemplateLiteral,
     ) -> Expr {
-        let file_to_artifact = iso_keyword
+        let file_to_artifact = iso_template_literal
             .path_for_artifact(self.filepath, self.config, self.root_dir)
             .expect("Failed to get path for artifact.");
 
         match self.config.options.module {
-            ConfigFileJavascriptModule::CommonJs => iso_keyword.build_require_expr_from_path(
-                &file_to_artifact.display().to_string(),
-                self.unresolved_mark,
-            ),
+            ConfigFileJavascriptModule::CommonJs => iso_template_literal
+                .build_require_expr_from_path(
+                    &file_to_artifact.display().to_string(),
+                    self.unresolved_mark,
+                ),
             ConfigFileJavascriptModule::EsModule => {
                 // TODO ensure `ident_name` is unique
-                let ident_name = format!("_{}", iso_keyword.field_name);
+                let ident_name = format!(
+                    "_{}__{}",
+                    iso_template_literal.field_type, iso_template_literal.field_name
+                );
 
                 // hoist import
                 self.imports.push(IsographImport {
@@ -329,7 +333,8 @@ impl IsoLiteralCompilerVisitor<'_> {
                     item: ident_name.clone().into(),
                     unresolved_mark: self.unresolved_mark,
                 });
-                iso_keyword.build_ident_expr_for_hoisted_import(&ident_name, self.unresolved_mark)
+                iso_template_literal
+                    .build_ident_expr_for_hoisted_import(&ident_name, self.unresolved_mark)
             }
         }
     }
@@ -346,12 +351,14 @@ impl IsoLiteralCompilerVisitor<'_> {
             return Err(IsographTransformError::IsoRequiresOneArg);
         };
 
-        let iso_keyword = self.parse_iso_call_arg_into_type(first);
+        let iso_keyword = self.parse_iso_template_literal(first);
 
         match iso_keyword {
             Err(e) => return Err(e),
-            Ok(iso_keyword) => match iso_keyword.artifact_type {
-                ArtifactType::Entrypoint => Ok(self.valid_isograph_template_literal(&iso_keyword)),
+            Ok(iso_template_literal) => match iso_template_literal.artifact_type {
+                ArtifactType::Entrypoint => {
+                    Ok(self.valid_isograph_template_literal(&iso_template_literal))
+                }
                 ArtifactType::Field => {
                     match fn_args {
                         Some(fn_args) => {
