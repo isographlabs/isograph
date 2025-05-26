@@ -67,12 +67,8 @@ async function walkDir(
       `/src/components/Home/Header/File.ts`,
     );
 
-    try {
-      const input = await fs.readFile(inputFilePath, 'utf-8');
-      await callback(dir, input, config, filename, baseDir);
-    } catch (e) {
-      console.log(e);
-    }
+    const input = await fs.readFile(inputFilePath, 'utf-8');
+    await callback(dir, input, config, filename, baseDir);
   }
 }
 
