@@ -4,6 +4,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::Deserialize;
 use std::{
+    collections::BTreeMap,
     fmt,
     path::{Path, PathBuf},
 };
@@ -80,7 +81,7 @@ pub fn compile_iso_literal_visitor<'a>(
         config,
         filepath,
         unresolved_mark,
-        imports: vec![],
+        imports: BTreeMap::new(),
         root_dir,
     }
 }
@@ -169,6 +170,16 @@ impl From<&str> for ArtifactType {
     }
 }
 
+fn build_ident_expr_for_hoisted_import(ident_name: &str, unresolved_mark: Option<Mark>) -> Expr {
+    Expr::Ident(Ident {
+        span: unresolved_mark
+            .map(|m| DUMMY_SP.apply_mark(m))
+            .unwrap_or_default(),
+        sym: ident_name.into(),
+        optional: false,
+    })
+}
+
 #[derive(Debug, Clone)]
 struct ValidIsographTemplateLiteral {
     pub field_type: String,
@@ -177,20 +188,6 @@ struct ValidIsographTemplateLiteral {
 }
 
 impl ValidIsographTemplateLiteral {
-    fn build_ident_expr_for_hoisted_import(
-        &self,
-        ident_name: &str,
-        unresolved_mark: Option<Mark>,
-    ) -> Expr {
-        Expr::Ident(Ident {
-            span: unresolved_mark
-                .map(|m| DUMMY_SP.apply_mark(m))
-                .unwrap_or_default(),
-            sym: ident_name.into(),
-            optional: false,
-        })
-    }
-
     fn build_require_expr_from_path(&self, path: &str, mark: Option<Mark>) -> Expr {
         Expr::Member(MemberExpr {
             span: DUMMY_SP,
@@ -269,7 +266,7 @@ struct IsoLiteralCompilerVisitor<'a> {
     root_dir: &'a Path,
     config: &'a IsographProjectConfig,
     filepath: &'a Path,
-    imports: Vec<IsographImport>,
+    imports: BTreeMap<(String, String), IsographImport>,
     unresolved_mark: Option<Mark>,
 }
 
@@ -304,7 +301,7 @@ impl IsoLiteralCompilerVisitor<'_> {
 
     fn handle_valid_isograph_entrypoint_literal(
         &mut self,
-        iso_template_literal: &ValidIsographTemplateLiteral,
+        iso_template_literal: ValidIsographTemplateLiteral,
     ) -> Expr {
         let file_to_artifact = iso_template_literal
             .path_for_artifact(self.filepath, self.config, self.root_dir)
@@ -324,13 +321,19 @@ impl IsoLiteralCompilerVisitor<'_> {
                 );
 
                 // hoist import
-                self.imports.push(IsographImport {
-                    path: file_to_artifact.display().to_string().into(),
-                    item: ident_name.clone().into(),
-                    unresolved_mark: self.unresolved_mark,
-                });
-                iso_template_literal
-                    .build_ident_expr_for_hoisted_import(&ident_name, self.unresolved_mark)
+                self.imports.insert(
+                    (
+                        iso_template_literal.field_type,
+                        iso_template_literal.field_name,
+                    ),
+                    IsographImport {
+                        path: file_to_artifact.display().to_string().into(),
+                        item: ident_name.clone().into(),
+                        unresolved_mark: self.unresolved_mark,
+                    },
+                );
+
+                build_ident_expr_for_hoisted_import(&ident_name, self.unresolved_mark)
             }
         }
     }
@@ -351,7 +354,7 @@ impl IsoLiteralCompilerVisitor<'_> {
 
         match iso_template_literal.artifact_type {
             ArtifactType::Entrypoint => {
-                Ok(self.handle_valid_isograph_entrypoint_literal(&iso_template_literal))
+                Ok(self.handle_valid_isograph_entrypoint_literal(iso_template_literal))
             }
             ArtifactType::Field => {
                 match fn_args {
@@ -436,7 +439,7 @@ impl Fold for IsoLiteralCompilerVisitor<'_> {
 
         prepend_stmts(
             &mut items,
-            self.imports.iter().map(|import| import.as_module_item()),
+            self.imports.values().map(|import| import.as_module_item()),
         );
 
         items
