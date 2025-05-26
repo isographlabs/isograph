@@ -36,8 +36,7 @@ struct WasmConfig {
     /// mounted path, which we can't use in this case.
     /// Must be an absolute path
     pub root_dir: PathBuf,
-    #[serde(flatten)]
-    pub isograph_project_config: IsographProjectConfig,
+    pub config: IsographProjectConfig,
 }
 
 #[plugin_transform]
@@ -52,12 +51,9 @@ fn isograph_plugin_transform(
     )
     .unwrap_or_else(|e| panic!("Error parsing plugin config. Error: {}", e));
 
-    let WasmConfig {
-        root_dir,
-        isograph_project_config,
-    } = config;
+    let WasmConfig { root_dir, config } = config;
 
-    debug!("Config: {:?}", isograph_project_config);
+    debug!("Config: {:?}", config);
 
     let file_name = metadata.get_context(&TransformPluginMetadataContextKind::Filename);
     let file_name = file_name.as_deref().unwrap_or("unknown.js");
@@ -65,7 +61,7 @@ fn isograph_plugin_transform(
     let path = Path::new(file_name);
 
     let mut isograph = compile_iso_literal_visitor(
-        &isograph_project_config,
+        &config,
         path,
         root_dir.as_path(),
         Some(metadata.unresolved_mark),

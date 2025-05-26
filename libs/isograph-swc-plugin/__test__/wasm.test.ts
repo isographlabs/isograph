@@ -58,7 +58,7 @@ async function walkDir(
     const config = {
       // must be an absolute path
       root_dir: path.join(baseDir, dir),
-      ...(isographConfig || {}),
+      config: isographConfig ?? {},
     };
 
     const filename = path.join(
