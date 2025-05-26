@@ -7,7 +7,7 @@ export default function () {
         <div className="row">
           <div className="col">
             {/* <div className="kicker">Show me the money</div> */}
-            <h2 className="text--center  margin-bottom--lg">Fetching data</h2>
+            <h2 className="text--center margin-bottom--lg">Fetching data</h2>
           </div>
         </div>
 

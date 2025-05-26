@@ -3,8 +3,10 @@ use isograph_config::{ConfigFileJavascriptModule, IsographProjectConfig, ISOGRAP
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::Deserialize;
-use std::fmt;
-use std::path::{Path, PathBuf};
+use std::{
+    fmt,
+    path::{Path, PathBuf},
+};
 use swc_atoms::Atom;
 use swc_core::{
     common::{
@@ -28,7 +30,7 @@ static OPERATION_REGEX: Lazy<Regex> =
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct WasmConfig {
-    /// Unlike native env,  in WASM we can't use env::current_dir
+    /// Unlike native env, in WASM we can't use env::current_dir
     /// as well as `/cwd` alias. current_dir cannot resolve to actual path,
     /// `/cwd` alias won't expand to `real` path but only gives ACCESS to the cwd as
     /// mounted path, which we can't use in this case.
@@ -50,11 +52,12 @@ fn isograph_plugin_transform(
     )
     .unwrap_or_else(|e| panic!("Error parsing plugin config. Error: {}", e));
 
-    let root_dir = config.root_dir;
+    let WasmConfig {
+        root_dir,
+        isograph_project_config,
+    } = config;
 
-    let isograph_config = config.isograph_project_config;
-
-    debug!("Config: {:?}", isograph_config);
+    debug!("Config: {:?}", isograph_project_config);
 
     let file_name = metadata.get_context(&TransformPluginMetadataContextKind::Filename);
     let file_name = file_name.as_deref().unwrap_or("unknown.js");
@@ -62,7 +65,7 @@ fn isograph_plugin_transform(
     let path = Path::new(file_name);
 
     let mut isograph = compile_iso_literal_visitor(
-        &isograph_config,
+        &isograph_project_config,
         path,
         root_dir.as_path(),
         Some(metadata.unresolved_mark),
@@ -143,9 +146,8 @@ impl IsographImport {
     }
 }
 
-#[derive(Deserialize, Default, Debug, Clone, Copy, PartialEq)]
+#[derive(Deserialize, Debug, Clone, Copy, PartialEq)]
 enum ArtifactType {
-    #[default]
     Entrypoint,
     Field,
 }
@@ -171,13 +173,7 @@ impl From<&str> for ArtifactType {
     }
 }
 
-impl From<String> for ArtifactType {
-    fn from(s: String) -> Self {
-        s.as_str().into()
-    }
-}
-
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone)]
 struct ValidIsographTemplateLiteral {
     pub field_type: String,
     pub field_name: String,
@@ -222,18 +218,6 @@ impl ValidIsographTemplateLiteral {
                 span: DUMMY_SP,
                 optional: false,
             }),
-        })
-    }
-
-    fn build_arrow_identity_expr(&self) -> Expr {
-        Expr::Arrow(ArrowExpr {
-            params: vec![Pat::Ident(Ident::new("x".into(), DUMMY_SP).into())],
-            body: Box::new(Ident::new("x".into(), DUMMY_SP).into()),
-            span: DUMMY_SP,
-            is_async: false,
-            is_generator: false,
-            return_type: None,
-            type_params: None,
         })
     }
 
@@ -312,7 +296,7 @@ impl IsoLiteralCompilerVisitor<'_> {
                 .map(|capture_group| {
                     debug!("capture_group {:?}", capture_group);
                     ValidIsographTemplateLiteral {
-                        artifact_type: ArtifactType::from(capture_group[1].to_string()),
+                        artifact_type: ArtifactType::from(&capture_group[1]),
                         field_type: capture_group[2].to_string(),
                         field_name: capture_group[3].to_string(),
                     }
@@ -378,7 +362,7 @@ impl IsoLiteralCompilerVisitor<'_> {
                             return Err(IsographTransformError::IsoFnCallRequiresOneArg);
                         }
                         // iso(...)>empty<
-                        None => Ok(iso_keyword.build_arrow_identity_expr()),
+                        None => Ok(build_arrow_identity_expr()),
                     }
                 }
             },
@@ -457,4 +441,16 @@ impl Fold for IsoLiteralCompilerVisitor<'_> {
 
         items
     }
+}
+
+fn build_arrow_identity_expr() -> Expr {
+    Expr::Arrow(ArrowExpr {
+        params: vec![Pat::Ident(Ident::new("x".into(), DUMMY_SP).into())],
+        body: Box::new(Ident::new("x".into(), DUMMY_SP).into()),
+        span: DUMMY_SP,
+        is_async: false,
+        is_generator: false,
+        return_type: None,
+        type_params: None,
+    })
 }

@@ -1,7 +1,6 @@
 # SWC Isograph plugin
 
-Setting up your environment
-Please follow the instructions (here)[https://swc.rs/docs/plugin/ecmascript/getting-started] to setup your environment
+If you follow the instructions in `development-workflow.md`, then the plugin will be built when you run `pnpm dev` in `demos/pet-demo`.
 
 ## Fold vs VisitMut
 
