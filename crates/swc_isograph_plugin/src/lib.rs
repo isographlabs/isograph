@@ -306,7 +306,7 @@ impl IsoLiteralCompilerVisitor<'_> {
         Err(IsographTransformError::OnlyAllowedTemplateLiteral)
     }
 
-    fn valid_isograph_template_literal(
+    fn handle_valid_isograph_entrypoint_literal(
         &mut self,
         iso_template_literal: &ValidIsographTemplateLiteral,
     ) -> Expr {
@@ -351,28 +351,25 @@ impl IsoLiteralCompilerVisitor<'_> {
             return Err(IsographTransformError::IsoRequiresOneArg);
         };
 
-        let iso_keyword = self.parse_iso_template_literal(first);
+        let iso_template_literal = self.parse_iso_template_literal(first)?;
 
-        match iso_keyword {
-            Err(e) => return Err(e),
-            Ok(iso_template_literal) => match iso_template_literal.artifact_type {
-                ArtifactType::Entrypoint => {
-                    Ok(self.valid_isograph_template_literal(&iso_template_literal))
-                }
-                ArtifactType::Field => {
-                    match fn_args {
-                        Some(fn_args) => {
-                            if let Some((first, [])) = fn_args.split_first() {
-                                return Ok(first.expr.as_ref().clone());
-                            }
-                            // iso(...)(>args empty<) or iso(...)(first_arg, second_arg)
-                            return Err(IsographTransformError::IsoFnCallRequiresOneArg);
+        match iso_template_literal.artifact_type {
+            ArtifactType::Entrypoint => {
+                Ok(self.handle_valid_isograph_entrypoint_literal(&iso_template_literal))
+            }
+            ArtifactType::Field => {
+                match fn_args {
+                    Some(fn_args) => {
+                        if let Some((first, [])) = fn_args.split_first() {
+                            return Ok(first.expr.as_ref().clone());
                         }
-                        // iso(...)>empty<
-                        None => Ok(build_arrow_identity_expr()),
+                        // iso(...)(>args empty<) or iso(...)(first_arg, second_arg)
+                        return Err(IsographTransformError::IsoFnCallRequiresOneArg);
                     }
+                    // iso(...)>empty<
+                    None => Ok(build_arrow_identity_expr()),
                 }
-            },
+            }
         }
     }
 }
