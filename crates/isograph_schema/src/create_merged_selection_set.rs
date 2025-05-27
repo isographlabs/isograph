@@ -1319,7 +1319,7 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
                     .as_client()
                     .expect("Expected link to be client field")
                     .as_scalar()
-                    .expect("Expected lnk to be scalar field"),
+                    .expect("Expected link to be scalar field"),
             ),
             scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
             name: WithLocation::new((*LINK_FIELD_NAME).into(), Location::generated()),
