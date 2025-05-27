@@ -6,9 +6,9 @@ exports[`Should load swc-plugin-isograph wasm plugin correctly > Should transfor
 `;
 
 exports[`Should load swc-plugin-isograph wasm plugin correctly > Should transform should_transform_iso_fn_to_a_import_call correctly 1`] = `
-"import _HomeRoute from "../../__isograph/Query/HomeRoute/entrypoint.ts";
+"import _Query__HomeRoute from "../../__isograph/Query/HomeRoute/entrypoint.ts";
 function test() {
-    const a = _HomeRoute;
+    const a = _Query__HomeRoute;
 }
 "
 `;
