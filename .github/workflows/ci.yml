@@ -328,7 +328,7 @@ jobs:
 
   main-release:
     name: Main NPM release
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     if: >-
       github.event_name == 'push' &&
       github.repository == 'isographlabs/isograph' &&
@@ -424,7 +424,7 @@ jobs:
 
   versioned-release:
     name: Versioned NPM release
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.repository == 'isographlabs/isograph' && github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
     needs: [all-checks-passed]
     steps:
