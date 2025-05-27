@@ -359,8 +359,11 @@ jobs:
         run: pnpm gulp setMainVersion
         env:
           RELEASE_COMMIT_SHA: ${{ github.sha }}
+
+      # TODO do not rebuild the libs
       - name: Build
         run: pnpm compile-libs
+
       - name: Download artifact isograph_cli-linux-x64
         uses: actions/download-artifact@v4
         with:
@@ -393,6 +396,21 @@ jobs:
           chmod +x libs/isograph-compiler/artifacts/macos-x64/isograph_cli
           chmod +x libs/isograph-compiler/artifacts/macos-arm64/isograph_cli
           chmod +x libs/isograph-compiler/artifacts/win-x64/isograph_cli.exe
+
+      # TODO do not rebuild the swc plugin
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: wasm32-wasip1
+          toolchain: stable
+          components: rustfmt
+      - uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: musl-tools # provides musl-gcc
+          version: 1.0
+      - name: Build swc
+        run: pnpm build-swc
+
       - name: Publish to NPM
         run: |
           for pkg in libs/*; do
@@ -429,6 +447,8 @@ jobs:
       # - name: Change package versions to commit
       #   run: pnpm gulp setMainVersion
       #   # TODO do this less hackily
+
+      # TODO do not rebuild the libs
       - name: Build
         run: pnpm compile-libs
       - name: Download artifact isograph_cli-linux-x64
@@ -463,6 +483,21 @@ jobs:
           chmod +x libs/isograph-compiler/artifacts/macos-x64/isograph_cli
           chmod +x libs/isograph-compiler/artifacts/macos-arm64/isograph_cli
           chmod +x libs/isograph-compiler/artifacts/win-x64/isograph_cli.exe
+
+      # TODO do not rebuild the swc plugin
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: wasm32-wasip1
+          toolchain: stable
+          components: rustfmt
+      - uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: musl-tools # provides musl-gcc
+          version: 1.0
+      - name: Build swc
+        run: pnpm build-swc
+
       - name: Publish latest version to NPM
         run: |
           for pkg in libs/*; do
