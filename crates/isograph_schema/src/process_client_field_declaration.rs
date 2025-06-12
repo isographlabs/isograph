@@ -9,8 +9,8 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientFieldDirectiveSet, ClientObjectSelectableId,
     ClientPointerDeclaration, ClientScalarSelectableId, DefinitionLocation, DeserializationError,
-    NonConstantValue, SelectionType, ServerEntityId, ServerObjectEntityId, TypeAnnotation,
-    UnvalidatedSelection, VariableDefinition,
+    NonConstantValue, SelectionType, ServerEntityId, TypeAnnotation, UnvalidatedSelection,
+    VariableDefinition,
 };
 
 use thiserror::Error;
@@ -53,8 +53,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             ))?;
 
         let unprocess_client_field_items = match parent_type_id {
-            ServerEntityId::Object(object_entity_id) => self
-                .add_client_field_to_object(*object_entity_id, client_field_declaration)
+            ServerEntityId::Object(object_entity_name) => self
+                .add_client_field_to_object(*object_entity_name, client_field_declaration)
                 .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?,
             ServerEntityId::Scalar(scalar_entity_id) => {
                 let scalar_name = self
@@ -161,12 +161,15 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     fn add_client_field_to_object(
         &mut self,
-        parent_object_entity_id: ServerObjectEntityId,
+        parent_object_entity_name: IsographObjectTypeName,
         client_field_declaration: WithSpan<ClientFieldDeclaration>,
     ) -> ProcessClientFieldDeclarationResult<UnprocessedClientFieldItem> {
         let query_id = self.query_id();
-        let object =
-            &mut self.server_entity_data.server_objects[parent_object_entity_id.as_usize()];
+        let object = &mut self
+            .server_entity_data
+            .server_objects
+            .get(&parent_object_entity_name)
+            .expect("Expected type to exist");
         let client_field_field_name_ws = client_field_declaration.item.client_field_name;
         let client_field_name = client_field_field_name_ws.item;
         let client_field_name_span = client_field_field_name_ws.span;
@@ -176,7 +179,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         if self
             .server_entity_data
             .server_object_entity_extra_info
-            .entry(parent_object_entity_id)
+            .entry(parent_object_entity_name)
             .or_default()
             .selectables
             .insert(
@@ -221,7 +224,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 field_name: name.into(),
             },
 
-            parent_object_entity_name: parent_object_entity_id,
+            parent_object_entity_name,
             refetch_strategy: None,
             output_format: std::marker::PhantomData,
         });
@@ -230,7 +233,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let id_field = self
             .server_entity_data
             .server_object_entity_extra_info
-            .get(&parent_object_entity_id)
+            .get(&parent_object_entity_name)
             .expect(
                 "Expected parent_object_entity_id to exist in \
                 server_object_entity_available_selectables",
@@ -261,17 +264,17 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     fn add_client_pointer_to_object(
         &mut self,
-        parent_object_entity_id: ServerObjectEntityId,
-        to_object_entity_id: TypeAnnotation<ServerObjectEntityId>,
+        parent_object_name: IsographObjectTypeName,
+        to_object_name: TypeAnnotation<IsographObjectTypeName>,
         client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
     ) -> ProcessClientFieldDeclarationResult<UnprocessedClientPointerItem> {
         let query_id = self.query_id();
         let to_object = self
             .server_entity_data
-            .server_object_entity(*to_object_entity_id.inner());
+            .server_object_entity(*to_object_name.inner());
         let parent_object = self
             .server_entity_data
-            .server_object_entity(parent_object_entity_id);
+            .server_object_entity(parent_object_name);
         let client_pointer_pointer_name_ws = client_pointer_declaration.item.client_pointer_name;
         let client_pointer_name = client_pointer_pointer_name_ws.item;
         let client_pointer_name_span = client_pointer_pointer_name_ws.span;
@@ -299,7 +302,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let id_field = self
             .server_entity_data
             .server_object_entity_extra_info
-            .get(&parent_object_entity_id)
+            .get(&parent_object_name)
             .expect(
                 "Expected parent_object_entity_id \
                 to exist in server_object_entity_available_selectables",
@@ -354,9 +357,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 field_name: name.into(),
             },
 
-            parent_object_entity_id,
+            parent_object_name,
             refetch_strategy,
-            target_object_entity: to_object_entity_id,
+            target_object_entity_name: to_object_name,
             output_format: std::marker::PhantomData,
 
             info: UserWrittenClientPointerInfo {
@@ -368,7 +371,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         if self
             .server_entity_data
             .server_object_entity_extra_info
-            .entry(parent_object_entity_id)
+            .entry(parent_object_name)
             .or_default()
             .selectables
             .insert(
@@ -379,7 +382,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         {
             let parent_object = self
                 .server_entity_data
-                .server_object_entity(parent_object_entity_id);
+                .server_object_entity(parent_object_name);
             // Did not insert, so this object already has a field with the same name :(
             return Err(WithSpan::new(
                 ProcessClientFieldDeclarationError::ParentAlreadyHasField {
@@ -459,7 +462,7 @@ pub struct ImperativelyLoadedFieldVariant {
     pub client_field_scalar_selection_name: ClientScalarSelectableName,
 
     // Mutation or Query or whatnot. Awkward! A GraphQL-ism!
-    pub root_object_entity_id: ServerObjectEntityId,
+    pub root_object_entity_name: IsographObjectTypeName,
     pub subfields_or_inline_fragments: Vec<WrappedSelectionMapSelection>,
     pub field_map: Vec<FieldMapItem>,
     /// The arguments we must pass to the top level schema field, e.g. id: ID!

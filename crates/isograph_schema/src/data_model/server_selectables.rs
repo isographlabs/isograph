@@ -1,13 +1,12 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use common_lang_types::{
-    DescriptionValue, IsographObjectTypeName, ServerObjectSelectableName,
+    DescriptionValue, GraphQLScalarTypeName, IsographObjectTypeName, ServerObjectSelectableName,
     ServerScalarSelectableName, WithLocation,
 };
 use isograph_lang_types::{
-    impl_with_id, impl_with_target_id, SelectionType, ServerEntityId, ServerObjectEntityId,
-    ServerObjectSelectableId, ServerScalarEntityId, ServerScalarSelectableId, TypeAnnotation,
-    VariableDefinition,
+    impl_with_id, impl_with_target_id, SelectionType, ServerEntityId, ServerObjectSelectableId,
+    ServerScalarSelectableId, TypeAnnotation, VariableDefinition,
 };
 
 use crate::{NetworkProtocol, SchemaServerObjectSelectableVariant};
@@ -17,7 +16,7 @@ pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: WithLocation<ServerScalarSelectableName>,
 
-    pub target_scalar_entity: TypeAnnotation<ServerScalarEntityId>,
+    pub target_scalar_entity: TypeAnnotation<GraphQLScalarTypeName>,
 
     pub parent_object_entity_name: IsographObjectTypeName,
     pub arguments: Vec<WithLocation<VariableDefinition<ServerEntityId>>>,
@@ -32,7 +31,7 @@ pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: WithLocation<ServerObjectSelectableName>,
 
-    pub target_object_entity: TypeAnnotation<ServerObjectEntityId>,
+    pub target_object_entity: TypeAnnotation<IsographObjectTypeName>,
 
     pub object_selectable_variant: SchemaServerObjectSelectableVariant,
 
@@ -42,7 +41,6 @@ pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
 }
 
 impl_with_id!(ServerObjectSelectable<TNetworkProtocol: NetworkProtocol>, ServerObjectSelectableId);
-impl_with_target_id!(ServerObjectSelectable<TNetworkProtocol: NetworkProtocol>, ServerObjectEntityId);
 
 pub type ServerSelectableId = SelectionType<ServerScalarSelectableId, ServerObjectSelectableId>;
 

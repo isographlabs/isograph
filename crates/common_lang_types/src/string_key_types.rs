@@ -49,6 +49,7 @@ string_key_newtype!(GraphQLInputObjectTypeName);
 // TODO this doesn't belong in common
 // This type represents any type with fields *in the Isograph world*.
 // TypeWithFields is a GraphQL concept, this is an Isograph concept.
+// TODO rename this IsographSchemaObjectName or something for clarity
 string_key_newtype!(IsographObjectTypeName);
 string_key_one_way_conversion!(from: GraphQLObjectTypeName, to: IsographObjectTypeName);
 string_key_one_way_conversion!(from: GraphQLInterfaceTypeName, to: IsographObjectTypeName);

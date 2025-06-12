@@ -1,8 +1,8 @@
-use common_lang_types::{DescriptionValue, ServerSelectableName, WithLocation};
-use impl_base_types_macro::impl_for_selection_type;
-use isograph_lang_types::{
-    SelectionType, ServerEntityId, ServerObjectEntityId, TypeAnnotation, VariableDefinition,
+use common_lang_types::{
+    DescriptionValue, IsographObjectTypeName, ServerSelectableName, WithLocation,
 };
+use impl_base_types_macro::impl_for_selection_type;
+use isograph_lang_types::{SelectionType, ServerEntityId, TypeAnnotation, VariableDefinition};
 
 use crate::{NetworkProtocol, ServerObjectSelectable, ServerScalarSelectable};
 
@@ -10,8 +10,8 @@ use crate::{NetworkProtocol, ServerObjectSelectable, ServerScalarSelectable};
 pub trait ServerScalarOrObjectSelectable {
     fn description(&self) -> Option<DescriptionValue>;
     fn name(&self) -> WithLocation<ServerSelectableName>;
-    fn target_entity_id(&self) -> TypeAnnotation<ServerEntityId>;
-    fn parent_type_id(&self) -> ServerObjectEntityId;
+    fn target_entity_name(&self) -> TypeAnnotation<ServerEntityId>;
+    fn parent_type_name(&self) -> IsographObjectTypeName;
     fn arguments(&self) -> &[WithLocation<VariableDefinition<ServerEntityId>>];
 }
 
@@ -26,13 +26,13 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
         self.name.map(|x| x.into())
     }
 
-    fn target_entity_id(&self) -> TypeAnnotation<ServerEntityId> {
+    fn target_entity_name(&self) -> TypeAnnotation<ServerEntityId> {
         self.target_object_entity
             .clone()
             .map(&mut SelectionType::Object)
     }
 
-    fn parent_type_id(&self) -> ServerObjectEntityId {
+    fn parent_type_name(&self) -> IsographObjectTypeName {
         self.parent_object_name
     }
 
@@ -52,13 +52,13 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
         self.name.map(|x| x.into())
     }
 
-    fn target_entity_id(&self) -> TypeAnnotation<ServerEntityId> {
+    fn target_entity_name(&self) -> TypeAnnotation<ServerEntityId> {
         self.target_scalar_entity
             .clone()
             .map(&mut SelectionType::Scalar)
     }
 
-    fn parent_type_id(&self) -> ServerObjectEntityId {
+    fn parent_type_name(&self) -> IsographObjectTypeName {
         self.parent_object_entity_name
     }
 

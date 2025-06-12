@@ -6,7 +6,7 @@ use common_lang_types::{
 };
 use isograph_lang_types::{
     ClientScalarSelectableId, DefinitionLocation, EntrypointDeclaration, EntrypointDirectiveSet,
-    SelectionType, ServerEntityId, ServerObjectEntityId,
+    SelectionType, ServerEntityId,
 };
 
 use thiserror::Error;
@@ -90,7 +90,7 @@ fn validate_parent_object_entity_id<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     parent_type: WithSpan<UnvalidatedTypeName>,
     text_source: TextSource,
-) -> Result<ServerObjectEntityId, WithLocation<ValidateEntrypointDeclarationError>> {
+) -> Result<IsographObjectTypeName, WithLocation<ValidateEntrypointDeclarationError>> {
     let parent_type_id = schema
         .server_entity_data
         .defined_entities
@@ -147,16 +147,16 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     field_name: WithSpan<ServerScalarSelectableName>,
     text_source: TextSource,
-    parent_object_entity_id: ServerObjectEntityId,
+    parent_object_name: IsographObjectTypeName,
 ) -> Result<ClientScalarSelectableId, WithLocation<ValidateEntrypointDeclarationError>> {
     let parent_object = schema
         .server_entity_data
-        .server_object_entity(parent_object_entity_id);
+        .server_object_entity(parent_object_name);
 
     match schema
         .server_entity_data
         .server_object_entity_extra_info
-        .get(&parent_object_entity_id)
+        .get(&parent_object_name)
         .expect(
             "Expected parent_object_entity_id to exist \
             in server_object_entity_available_selectables",

@@ -3,7 +3,7 @@ use common_lang_types::{
 };
 use isograph_lang_types::{
     DefinitionLocation, ObjectSelection, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionType, ServerObjectEntityId, UnvalidatedScalarFieldSelection, UnvalidatedSelection,
+    SelectionType, UnvalidatedScalarFieldSelection, UnvalidatedSelection,
 };
 use isograph_schema::{
     ClientScalarOrObjectSelectable, NetworkProtocol, ObjectSelectableId, RefetchStrategy,
@@ -90,13 +90,13 @@ fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol>(
     let client_pointer = schema.client_pointer(unprocessed_item.client_pointer_id);
     let parent_object = schema
         .server_entity_data
-        .server_object_entity(client_pointer.parent_object_entity_id);
+        .server_object_entity(client_pointer.parent_object_name);
 
     let new_selection_set = get_validated_selection_set(
         schema,
         unprocessed_item.reader_selection_set,
         parent_object,
-        client_pointer.parent_object_entity_id,
+        client_pointer.parent_object_name,
         &client_pointer,
     )?;
 
@@ -117,7 +117,7 @@ fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     parent_object: &ServerObjectEntity<TNetworkProtocol>,
-    selection_parent_object_id: ServerObjectEntityId,
+    selection_parent_object_name: IsographObjectTypeName,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<Vec<WithSpan<ValidatedSelection>>> {
     get_all_errors_or_all_ok(selection_set.into_iter().map(|selection| {
@@ -125,7 +125,7 @@ fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol>(
             schema,
             selection,
             parent_object,
-            selection_parent_object_id,
+            selection_parent_object_name,
             top_level_field_or_pointer,
         )
     }))
@@ -135,7 +135,7 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     with_span: WithSpan<UnvalidatedSelection>,
     selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
-    selection_parent_object_id: ServerObjectEntityId,
+    selection_parent_object_name: IsographObjectTypeName,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<WithSpan<ValidatedSelection>> {
     with_span.and_then(|selection| match selection {
@@ -143,7 +143,7 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
             get_validated_scalar_selection(
                 schema,
                 selection_parent_object,
-                selection_parent_object_id,
+                selection_parent_object_name,
                 top_level_field_or_pointer,
                 scalar_selection,
             )
@@ -153,7 +153,7 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
             Ok(SelectionType::Object(get_validated_object_selection(
                 schema,
                 selection_parent_object,
-                selection_parent_object_id,
+                selection_parent_object_name,
                 top_level_field_or_pointer,
                 object_selection,
             )?))
@@ -164,14 +164,14 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
 fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
-    selection_parent_object_id: ServerObjectEntityId,
+    selection_parent_object_name: IsographObjectTypeName,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
     scalar_selection: UnvalidatedScalarFieldSelection,
 ) -> AddSelectionSetsResult<ValidatedScalarSelection> {
     let location = schema
         .server_entity_data
         .server_object_entity_extra_info
-        .get(&selection_parent_object_id)
+        .get(&selection_parent_object_name)
         .expect(
             "Expected selection_parent_object_id to exist \
             in server_object_entity_available_selectables",
@@ -267,14 +267,14 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
 fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
-    selection_parent_object_id: ServerObjectEntityId,
+    selection_parent_object_name: IsographObjectTypeName,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
     object_selection: ObjectSelection<(), ()>,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<ValidatedObjectSelection> {
     let location = schema
         .server_entity_data
         .server_object_entity_extra_info
-        .get(&selection_parent_object_id)
+        .get(&selection_parent_object_name)
         .expect(
             "Expected selection_parent_object_id to exist \
             in server_object_entity_available_selectables",
@@ -348,7 +348,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
 
             (
                 DefinitionLocation::Client(client_pointer_id),
-                *client_pointer.target_object_entity.inner(),
+                *client_pointer.target_object_entity_name.inner(),
             )
         }
     };
@@ -377,7 +377,7 @@ fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     refetch_strategy: Option<RefetchStrategy<(), ()>>,
     parent_object: &ServerObjectEntity<TNetworkProtocol>,
-    selection_parent_object_id: ServerObjectEntityId,
+    selection_parent_object_name: IsographObjectTypeName,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<
     Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>,
@@ -389,10 +389,10 @@ fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol>(
                     schema,
                     use_refetch_field_strategy.refetch_selection_set,
                     parent_object,
-                    selection_parent_object_id,
+                    selection_parent_object_name,
                     top_level_field_or_pointer,
                 )?,
-                root_fetchable_type: use_refetch_field_strategy.root_fetchable_type,
+                root_fetchable_type_name: use_refetch_field_strategy.root_fetchable_type_name,
                 generate_refetch_query: use_refetch_field_strategy.generate_refetch_query,
             }),
         )),

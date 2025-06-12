@@ -1,6 +1,6 @@
 use common_lang_types::{
-    EnumLiteralValue, GraphQLScalarTypeName, Location, SelectableName, UnvalidatedTypeName,
-    ValueKeyName, VariableName, WithLocation, WithSpan,
+    EnumLiteralValue, GraphQLScalarTypeName, IsographObjectTypeName, Location, SelectableName,
+    UnvalidatedTypeName, ValueKeyName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
@@ -10,7 +10,7 @@ use thiserror::Error;
 
 use isograph_lang_types::{
     graphql_type_annotation_from_type_annotation, NonConstantValue, SelectionType, ServerEntityId,
-    ServerObjectEntityId, ServerScalarEntityId, VariableDefinition,
+    VariableDefinition,
 };
 
 use crate::{
@@ -38,14 +38,17 @@ fn graphql_type_to_nullable_type<TValue>(
 }
 
 fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
-    scalar_literal: &ServerScalarEntityId,
+    scalar_literal_name: &GraphQLScalarTypeName,
     type_: &GraphQLTypeAnnotation<ServerEntityId>,
     schema_data: &ServerEntityData<TNetworkProtocol>,
     location: Location,
 ) -> Result<(), WithLocation<ValidateArgumentTypesError>> {
     match graphql_type_to_non_null_type(type_.clone()) {
         GraphQLNonNullTypeAnnotation::List(_) => {
-            let actual = schema_data.server_scalar_entity(*scalar_literal).name.item;
+            let actual = schema_data
+                .server_scalar_entity(*scalar_literal_name)
+                .name
+                .item;
 
             Err(WithLocation::new(
                 ValidateArgumentTypesError::ExpectedTypeFoundScalar {
@@ -57,10 +60,13 @@ fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
         }
         GraphQLNonNullTypeAnnotation::Named(named_type) => match named_type.item {
             SelectionType::Scalar(expected_scalar_entity_id) => {
-                if expected_scalar_entity_id == *scalar_literal {
+                if expected_scalar_entity_id == *scalar_literal_name {
                     return Ok(());
                 }
-                let actual = schema_data.server_scalar_entity(*scalar_literal).name.item;
+                let actual = schema_data
+                    .server_scalar_entity(*scalar_literal_name)
+                    .name
+                    .item;
 
                 let expected = id_annotation_to_typename_annotation(type_, schema_data);
 
@@ -70,7 +76,10 @@ fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                 ))
             }
             SelectionType::Object(_) => {
-                let actual = schema_data.server_scalar_entity(*scalar_literal).name.item;
+                let actual = schema_data
+                    .server_scalar_entity(*scalar_literal_name)
+                    .name
+                    .item;
 
                 let expected = id_annotation_to_typename_annotation(type_, schema_data);
 
@@ -307,12 +316,12 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
     server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
-    object_entity_id: ServerObjectEntityId,
+    object_entity_name: IsographObjectTypeName,
 ) -> Result<(), WithLocation<ValidateArgumentTypesError>> {
     validate_no_extraneous_fields(
         &server_entity_data
             .server_object_entity_extra_info
-            .get(&object_entity_id)
+            .get(&object_entity_name)
             .expect(
                 "Expected object_entity_id to exist \
                 in server_object_entity_available_selectables",
@@ -327,7 +336,7 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
         server_scalar_selectables,
         server_object_selectables,
         object_literal,
-        object_entity_id,
+        object_entity_name,
     )
     .iter()
     .filter_map(|field| match field {
@@ -374,11 +383,11 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
     server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
     server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
-    object_entity_id: ServerObjectEntityId,
+    object_entity_name: IsographObjectTypeName,
 ) -> Vec<ObjectLiteralFieldType> {
     server_entity_data
         .server_object_entity_extra_info
-        .get(&object_entity_id)
+        .get(&object_entity_name)
         .expect(
             "Expected object_entity_id to exist \
             in server_object_entity_available_selectables",

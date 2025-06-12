@@ -1,3 +1,6 @@
+// Almost all of these types should not exist. We are using names, not indexes,
+// as ids.
+
 use common_lang_types::{GraphQLScalarTypeName, IsographObjectTypeName};
 use u32_newtypes::{u32_conversion, u32_newtype};
 
@@ -14,10 +17,6 @@ u32_conversion!(from: ServerStrongIdFieldId, to: ServerScalarSelectableId);
 u32_newtype!(ClientScalarSelectableId);
 
 u32_newtype!(ClientObjectSelectableId);
-
-u32_newtype!(ServerObjectEntityId);
-
-u32_newtype!(ServerScalarEntityId);
 
 pub type ServerEntityId = SelectionType<GraphQLScalarTypeName, IsographObjectTypeName>;
 

@@ -1,18 +1,12 @@
-use std::collections::HashMap;
-
 use crate::{NetworkProtocol, Schema};
 use common_lang_types::{
     IsographObjectTypeName, SelectableName, StringLiteralValue, UnvalidatedTypeName, VariableName,
     WithLocation,
 };
 use intern::{string_key::Intern, Lookup};
-use isograph_lang_types::ServerObjectEntityId;
 
 use serde::Deserialize;
 use thiserror::Error;
-
-// When constructing the final map, we can replace object type names with ids.
-pub type ValidatedTypeRefinementMap = HashMap<ServerObjectEntityId, Vec<ServerObjectEntityId>>;
 
 impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {}
 

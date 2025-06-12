@@ -6,7 +6,7 @@ use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ClientScalarSelectableId, DefinitionLocation, EmptyDirectiveSet, ScalarSelection,
     ScalarSelectionDirectiveSet, SelectionType, SelectionTypeContainingSelections, ServerEntityId,
-    ServerObjectEntityId, ServerObjectSelectableId, VariableDefinition,
+    ServerObjectSelectableId, VariableDefinition,
 };
 
 use serde::Deserialize;
@@ -57,7 +57,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn create_new_exposed_field(
         &mut self,
         expose_field_to_insert: ExposeAsFieldToInsert,
-        parent_object_entity_id: ServerObjectEntityId,
+        parent_object_entity_name: IsographObjectTypeName,
     ) -> Result<UnprocessedClientFieldItem, WithLocation<CreateAdditionalFieldsError>> {
         let ExposeFieldDirective {
             expose_as,
@@ -79,7 +79,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             path.map(|x| x.intern().into()).collect::<Vec<_>>();
 
         let mutation_subfield_id =
-            self.parse_mutation_subfield_id(field, parent_object_entity_id)?;
+            self.parse_mutation_subfield_id(field, parent_object_entity_name)?;
 
         // TODO do not use mutation naming here
         let mutation_field = self.server_object_selectable(mutation_subfield_id);
@@ -122,7 +122,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             )
             .map_err(|e| WithLocation::new(e, Location::generated()))?;
 
-        let maybe_abstract_parent_object_entity_id = maybe_abstract_target_object_entity_with_id.id;
         let maybe_abstract_parent_object_entity_name =
             maybe_abstract_target_object_entity_with_id.item.name;
         let maybe_abstract_parent_object_entity = maybe_abstract_target_object_entity_with_id.item;
@@ -212,7 +211,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 client_field_scalar_selection_name: client_field_scalar_selection_name
                     .unchecked_conversion(),
 
-                root_object_entity_id: parent_object_entity_id,
+                root_object_entity_name: parent_object_entity_name,
                 subfields_or_inline_fragments: subfields_or_inline_fragments.clone(),
                 field_map,
             }),
@@ -221,7 +220,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 type_name: maybe_abstract_parent_object_entity_name.unchecked_conversion(), // e.g. Pet
                 field_name: client_field_scalar_selection_name, // set_pet_best_friend
             },
-            parent_object_entity_name: maybe_abstract_parent_object_entity_id,
+            parent_object_entity_name: maybe_abstract_parent_object_entity_name,
             refetch_strategy: None,
             output_format: std::marker::PhantomData,
         };
@@ -230,7 +229,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         self.insert_client_field_on_object(
             client_field_scalar_selection_name,
-            maybe_abstract_parent_object_entity_id,
+            maybe_abstract_parent_object_entity_name,
             mutation_field_client_field_id,
             mutation_field_payload_type_name,
         )?;
@@ -242,7 +241,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     fields.to_vec(),
                     // NOTE: this will probably panic if we're not exposing fields which are
                     // originally on Mutation
-                    parent_object_entity_id,
+                    parent_object_entity_name,
                     subfields_or_inline_fragments,
                 ),
             )),
@@ -253,14 +252,14 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn insert_client_field_on_object(
         &mut self,
         mutation_field_name: SelectableName,
-        client_field_parent_object_entity_id: ServerObjectEntityId,
+        client_field_parent_object_entity_name: IsographObjectTypeName,
         client_field_id: ClientScalarSelectableId,
         payload_object_name: IsographObjectTypeName,
     ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
         if self
             .server_entity_data
             .server_object_entity_extra_info
-            .entry(client_field_parent_object_entity_id)
+            .entry(client_field_parent_object_entity_name)
             .or_default()
             .selectables
             .insert(
@@ -288,12 +287,12 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     fn parse_mutation_subfield_id(
         &self,
         field_arg: &str,
-        mutation_object_entity_id: ServerObjectEntityId,
+        mutation_object_entity_name: IsographObjectTypeName,
     ) -> ProcessTypeDefinitionResult<ServerObjectSelectableId> {
         let field_id = self
             .server_entity_data
             .server_object_entity_extra_info
-            .get(&mutation_object_entity_id)
+            .get(&mutation_object_entity_name)
             .expect(
                 "Expected mutation_object_entity_id to exist \
                 in server_object_entity_available_selectables",

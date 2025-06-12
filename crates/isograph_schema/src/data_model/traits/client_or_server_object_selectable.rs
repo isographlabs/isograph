@@ -1,8 +1,7 @@
-use common_lang_types::{DescriptionValue, ObjectSelectableName};
+use common_lang_types::{DescriptionValue, IsographObjectTypeName, ObjectSelectableName};
 use impl_base_types_macro::impl_for_definition_location;
 use isograph_lang_types::{
-    ClientObjectSelectableId, DefinitionLocation, ServerObjectEntityId, ServerObjectSelectableId,
-    TypeAnnotation,
+    ClientObjectSelectableId, DefinitionLocation, ServerObjectSelectableId, TypeAnnotation,
 };
 
 use crate::{ClientObjectSelectable, NetworkProtocol, ServerObjectSelectable};
@@ -19,8 +18,8 @@ pub type ObjectSelectableId =
 pub trait ClientOrServerObjectSelectable {
     fn description(&self) -> Option<DescriptionValue>;
     fn name(&self) -> ObjectSelectableName;
-    fn parent_object_entity_id(&self) -> ServerObjectEntityId;
-    fn target_object_entity_id(&self) -> TypeAnnotation<ServerObjectEntityId>;
+    fn parent_object_entity_name(&self) -> IsographObjectTypeName;
+    fn target_object_entity_name(&self) -> TypeAnnotation<IsographObjectTypeName>;
 }
 
 impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
@@ -34,12 +33,12 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
         self.name.into()
     }
 
-    fn parent_object_entity_id(&self) -> ServerObjectEntityId {
-        self.parent_object_entity_id
+    fn parent_object_entity_name(&self) -> IsographObjectTypeName {
+        self.parent_object_name
     }
 
-    fn target_object_entity_id(&self) -> TypeAnnotation<ServerObjectEntityId> {
-        self.target_object_entity.clone()
+    fn target_object_entity_name(&self) -> TypeAnnotation<IsographObjectTypeName> {
+        self.target_object_entity_name.clone()
     }
 }
 
@@ -54,11 +53,11 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
         self.name.item.into()
     }
 
-    fn parent_object_entity_id(&self) -> ServerObjectEntityId {
+    fn parent_object_entity_name(&self) -> IsographObjectTypeName {
         self.parent_object_name
     }
 
-    fn target_object_entity_id(&self) -> TypeAnnotation<ServerObjectEntityId> {
+    fn target_object_entity_name(&self) -> TypeAnnotation<IsographObjectTypeName> {
         self.target_object_entity.clone()
     }
 }

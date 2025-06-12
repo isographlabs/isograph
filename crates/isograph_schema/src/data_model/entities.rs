@@ -4,7 +4,7 @@ use common_lang_types::{
     DescriptionValue, GraphQLScalarTypeName, IsographObjectTypeName, JavascriptName,
     SelectableName, WithLocation, WithSpan,
 };
-use isograph_lang_types::{impl_with_id, DefinitionLocation, SelectionType, ServerObjectEntityId};
+use isograph_lang_types::{impl_with_id, DefinitionLocation, SelectionType};
 
 use crate::{ClientSelectableId, NetworkProtocol, ServerSelectableId};
 

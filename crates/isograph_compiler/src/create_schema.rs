@@ -14,8 +14,8 @@ use graphql_lang_types::{
 use isograph_config::{CompilerConfig, CompilerConfigOptions};
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{
-    ConstantValue, IsoLiteralsSource, SelectionType, ServerEntityId, ServerObjectEntityId,
-    TypeAnnotation, VariableDefinition,
+    ConstantValue, IsoLiteralsSource, SelectionType, ServerEntityId, TypeAnnotation,
+    VariableDefinition,
 };
 use isograph_schema::{
     validate_entrypoints, CreateAdditionalFieldsError, FieldToInsert, NetworkProtocol,
@@ -231,7 +231,7 @@ pub struct ContainsIsoStats {
 /// - if it is an id field, modify the parent object
 fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
     schema: &mut Schema<TNetworkProtocol>,
-    field_queue: HashMap<ServerObjectEntityId, Vec<WithLocation<FieldToInsert>>>,
+    field_queue: HashMap<IsographObjectTypeName, Vec<WithLocation<FieldToInsert>>>,
     options: &CompilerConfigOptions,
 ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
     for (parent_object_entity_id, field_definitions_to_insert) in field_queue {

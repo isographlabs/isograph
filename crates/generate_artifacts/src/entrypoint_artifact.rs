@@ -7,7 +7,6 @@ use common_lang_types::{
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
     ClientScalarSelectableId, DefinitionLocation, ScalarSelectionDirectiveSet, SelectionType,
-    ServerObjectEntityId,
 };
 use isograph_schema::{
     create_merged_selection_map_for_field_and_insert_into_global_map,
@@ -89,7 +88,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     traversal_state: &ScalarClientFieldTraversalState,
     encountered_client_type_map: &FieldToCompletedMergeTraversalStateMap,
     variable_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
-    default_root_operation: &Option<(&ServerObjectEntityId, &RootOperationName)>,
+    default_root_operation: &Option<(&IsographObjectTypeName, &RootOperationName)>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> Vec<ArtifactPathAndContent> {
     let query_name = entrypoint.name.into();

@@ -1,6 +1,7 @@
 use common_lang_types::{
     derive_display, ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent, DescriptionValue,
-    Location, ObjectTypeAndFieldName, SelectableNameOrAlias, Span, WithLocation, WithSpan,
+    IsographObjectTypeName, Location, ObjectTypeAndFieldName, SelectableNameOrAlias, Span,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
@@ -13,8 +14,8 @@ use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDirectiveSet, ClientScalarSelectableId, DefinitionLocation,
     EmptyDirectiveSet, NonConstantValue, ObjectSelectionDirectiveSet, ScalarSelection,
     ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionType,
-    SelectionTypeContainingSelections, ServerEntityId, ServerObjectEntityId, TypeAnnotation,
-    UnionVariant, VariableDefinition,
+    SelectionTypeContainingSelections, ServerEntityId, TypeAnnotation, UnionVariant,
+    VariableDefinition,
 };
 use isograph_schema::{
     accessible_client_fields, description, inline_fragment_reader_selection_set,
@@ -901,7 +902,7 @@ fn write_getter_and_setter(
     query_type_declaration: &mut String,
     indentation_level: u8,
     name_or_alias: SelectableNameOrAlias,
-    output_type_annotation: &TypeAnnotation<ServerObjectEntityId>,
+    output_type_annotation: &TypeAnnotation<IsographObjectTypeName>,
     type_annotation: &TypeAnnotation<ClientFieldUpdatableDataType>,
 ) {
     query_type_declaration.push_str(&format!(

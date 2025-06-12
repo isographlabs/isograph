@@ -1,10 +1,12 @@
 use std::{collections::BTreeSet, fmt::Debug};
 
-use common_lang_types::{Location, Span, VariableName, WithLocation, WithSpan};
+use common_lang_types::{
+    IsographObjectTypeName, Location, Span, VariableName, WithLocation, WithSpan,
+};
 use intern::string_key::Intern;
 use isograph_lang_types::{
     EmptyDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionTypeContainingSelections, ServerObjectEntityId,
+    SelectionTypeContainingSelections,
 };
 
 use crate::{
@@ -65,7 +67,7 @@ pub fn generate_refetch_field_strategy<
             >,
         >,
     >,
-    root_fetchable_type: ServerObjectEntityId,
+    root_fetchable_type_name: IsographObjectTypeName,
     subfields: Vec<WrappedSelectionMapSelection>,
 ) -> UseRefetchFieldRefetchStrategy<
     TSelectionTypeSelectionScalarFieldAssociatedData,
@@ -73,7 +75,7 @@ pub fn generate_refetch_field_strategy<
 > {
     UseRefetchFieldRefetchStrategy {
         refetch_selection_set,
-        root_fetchable_type,
+        root_fetchable_type_name,
         generate_refetch_query: Box::new(GenerateRefetchQueryImpl { subfields }),
     }
 }
@@ -94,7 +96,7 @@ pub struct UseRefetchFieldRefetchStrategy<
         >,
     >,
     /// Query, Mutation, etc.
-    pub root_fetchable_type: ServerObjectEntityId,
+    pub root_fetchable_type_name: IsographObjectTypeName,
 
     /// Given the content one needs to refetch (which can be empty?), generate
     /// the merged selection map and variables representing the entire query.

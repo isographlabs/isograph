@@ -2,6 +2,9 @@ pub trait HasId {
     type Id;
 }
 
+// TODO this struct doesn't need to exist; it only existed because ids were
+// not part of the entity. Now, we are using names as ids, and names exist
+// on the entities.
 pub struct WithId<T: HasId> {
     pub item: T,
     pub id: T::Id,

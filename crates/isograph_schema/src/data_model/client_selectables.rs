@@ -6,7 +6,7 @@ use common_lang_types::{
 };
 use isograph_lang_types::{
     impl_with_id, ClientObjectSelectableId, ClientScalarSelectableId, SelectionType,
-    ServerEntityId, ServerObjectEntityId, TypeAnnotation, VariableDefinition,
+    ServerEntityId, TypeAnnotation, VariableDefinition,
 };
 
 use crate::{
@@ -54,7 +54,7 @@ impl_with_id!(ClientScalarSelectable<TNetworkProtocol: NetworkProtocol>, ClientS
 pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: ClientObjectSelectableName,
-    pub target_object_entity: TypeAnnotation<ServerObjectEntityId>,
+    pub target_object_entity_name: TypeAnnotation<IsographObjectTypeName>,
 
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 
@@ -65,7 +65,7 @@ pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     // Why is this not calculated when needed?
     pub type_and_field: ObjectTypeAndFieldName,
 
-    pub parent_object_entity_id: ServerObjectEntityId,
+    pub parent_object_name: IsographObjectTypeName,
 
     pub output_format: PhantomData<TNetworkProtocol>,
     pub info: UserWrittenClientPointerInfo,

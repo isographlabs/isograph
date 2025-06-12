@@ -1,6 +1,9 @@
-use common_lang_types::{ClientSelectableName, DescriptionValue, ObjectTypeAndFieldName, WithSpan};
+use common_lang_types::{
+    ClientSelectableName, DescriptionValue, IsographObjectTypeName, ObjectTypeAndFieldName,
+    WithSpan,
+};
 use impl_base_types_macro::impl_for_selection_type;
-use isograph_lang_types::{ServerEntityId, ServerObjectEntityId, VariableDefinition};
+use isograph_lang_types::{ServerEntityId, VariableDefinition};
 
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, NetworkProtocol,
@@ -12,7 +15,7 @@ pub trait ClientScalarOrObjectSelectable {
     fn description(&self) -> Option<DescriptionValue>;
     fn name(&self) -> ClientSelectableName;
     fn type_and_field(&self) -> ObjectTypeAndFieldName;
-    fn parent_object_entity_id(&self) -> ServerObjectEntityId;
+    fn parent_object_entity_name(&self) -> IsographObjectTypeName;
     fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>];
     fn refetch_strategy(&self) -> Option<&RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>;
     fn selection_set_for_parent_query(&self) -> &[WithSpan<ValidatedSelection>];
@@ -37,7 +40,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         self.type_and_field
     }
 
-    fn parent_object_entity_id(&self) -> ServerObjectEntityId {
+    fn parent_object_entity_name(&self) -> IsographObjectTypeName {
         self.parent_object_entity_name
     }
 
@@ -87,8 +90,8 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         self.type_and_field
     }
 
-    fn parent_object_entity_id(&self) -> ServerObjectEntityId {
-        self.parent_object_entity_id
+    fn parent_object_entity_name(&self) -> IsographObjectTypeName {
+        self.parent_object_name
     }
 
     fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>] {
