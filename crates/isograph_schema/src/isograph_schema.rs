@@ -743,8 +743,10 @@ pub type ValidatedVariableDefinition = VariableDefinition<ServerEntityName>;
 pub type ValidatedUseRefetchFieldStrategy =
     UseRefetchFieldRefetchStrategy<ScalarSelectableId, ObjectSelectableId>;
 
-pub type ScalarSelectableId =
-    DefinitionLocation<ServerScalarSelectableId, ClientScalarSelectableId>;
+pub type ScalarSelectableId = DefinitionLocation<
+    ServerScalarSelectableId,
+    (SchemaServerObjectEntityName, ClientScalarSelectableId),
+>;
 
 /// If we have encountered an id field, we can:
 /// - validate that the id field is properly defined, i.e. has type ID!

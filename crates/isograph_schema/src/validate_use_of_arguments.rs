@@ -79,8 +79,11 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         .iter()
                         .map(|x| &x.item)
                         .collect::<Vec<_>>(),
-                    DefinitionLocation::Client(c) => schema
-                        .client_field(c)
+                    DefinitionLocation::Client((
+                        _parent_entity_name,
+                        client_scalar_selectable_name,
+                    )) => schema
+                        .client_field(client_scalar_selectable_name)
                         .variable_definitions
                         .iter()
                         .map(|x| &x.item)

@@ -634,16 +634,18 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         print_javascript_type_declaration(&output_type)
                     ));
                 }
-                DefinitionLocation::Client(client_field_id) => write_param_type_from_client_field(
-                    schema,
-                    query_type_declaration,
-                    nested_client_field_imports,
-                    loadable_fields,
-                    indentation_level,
-                    link_fields,
-                    scalar_field_selection,
-                    client_field_id,
-                ),
+                DefinitionLocation::Client((_parent_entity_name, client_field_id)) => {
+                    write_param_type_from_client_field(
+                        schema,
+                        query_type_declaration,
+                        nested_client_field_imports,
+                        loadable_fields,
+                        indentation_level,
+                        link_fields,
+                        scalar_field_selection,
+                        client_field_id,
+                    )
+                }
             }
         }
         SelectionTypeContainingSelections::Object(linked_field) => {
@@ -838,7 +840,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         }
                     }
                 }
-                DefinitionLocation::Client(client_field_id) => {
+                DefinitionLocation::Client((_parent_entity_name, client_field_id)) => {
                     write_param_type_from_client_field(
                         schema,
                         query_type_declaration,

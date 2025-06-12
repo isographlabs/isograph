@@ -252,7 +252,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
                     scalar_selection.name.location,
                 )
             })?;
-            DefinitionLocation::Client(client_field_id)
+            DefinitionLocation::Client((selection_parent_object.name, client_field_id))
         }
     };
 

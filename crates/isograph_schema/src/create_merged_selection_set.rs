@@ -689,7 +689,10 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             variable_context,
                         );
                     }
-                    DefinitionLocation::Client(newly_encountered_scalar_client_selectable_id) => {
+                    DefinitionLocation::Client((
+                        _parent_entity_name,
+                        newly_encountered_scalar_client_selectable_id,
+                    )) => {
                         let newly_encountered_scalar_client_selectable =
                             schema.client_field(*newly_encountered_scalar_client_selectable_id);
 
@@ -1313,7 +1316,8 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
     let link_selection = WithSpan::new(
         SelectionTypeContainingSelections::Scalar(ScalarSelection {
             arguments: vec![],
-            associated_data: DefinitionLocation::Client(
+            associated_data: DefinitionLocation::Client((
+                *server_object_selectable.target_object_entity.inner(),
                 *selectables_map
                     .get(&(*LINK_FIELD_NAME).into())
                     .expect("Expected link to exist")
@@ -1321,7 +1325,7 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
                     .expect("Expected link to be client field")
                     .as_scalar()
                     .expect("Expected link to be scalar field"),
-            ),
+            )),
             scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
             name: WithLocation::new((*LINK_FIELD_NAME).into(), Location::generated()),
             reader_alias: None,
