@@ -50,6 +50,7 @@ pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol>
     pub encountered_root_kind: Option<RootOperationKind>,
     pub server_object_entity: ServerObjectEntity<TNetworkProtocol>,
     pub fields_to_insert: Vec<WithLocation<FieldToInsert>>,
+    // TODO this seems sketch
     pub expose_as_fields_to_insert: Vec<ExposeAsFieldToInsert>,
 }
 

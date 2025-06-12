@@ -590,8 +590,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
     ) -> impl Iterator<Item = WithId<&ServerScalarEntity<TNetworkProtocol>>> + '_ {
         self.server_scalars
             .iter()
-            .enumerate()
-            .map(|(id, scalar)| WithId::new(id.into(), scalar))
+            .map(|scalar| WithId::new(scalar.name.item, scalar))
     }
 
     pub fn server_entity(&self, type_id: ServerEntityId) -> ServerEntity<TNetworkProtocol> {

@@ -119,9 +119,9 @@ pub fn compile<TNetworkProtocol: NetworkProtocol<Sources = StandardSources>>(
     // system occur while we're writing and we get unpredictable results.
 
     let artifacts = get_artifact_path_and_content(&isograph_schema, config);
-
     let total_artifacts_written =
         write_artifacts_to_disk(artifacts, &config.artifact_directory.absolute_path)?;
+
     Ok(CompilationStats {
         client_field_count: stats.client_field_count,
         entrypoint_count: stats.entrypoint_count,

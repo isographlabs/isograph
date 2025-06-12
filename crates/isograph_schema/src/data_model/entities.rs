@@ -4,9 +4,7 @@ use common_lang_types::{
     DescriptionValue, GraphQLScalarTypeName, IsographObjectTypeName, JavascriptName,
     SelectableName, WithLocation, WithSpan,
 };
-use isograph_lang_types::{
-    impl_with_id, DefinitionLocation, SelectionType, ServerObjectEntityId, ServerScalarEntityId,
-};
+use isograph_lang_types::{impl_with_id, DefinitionLocation, SelectionType, ServerObjectEntityId};
 
 use crate::{ClientSelectableId, NetworkProtocol, ServerSelectableId};
 
@@ -18,7 +16,7 @@ pub struct ServerScalarEntity<TNetworkProtocol: NetworkProtocol> {
     pub output_format: PhantomData<TNetworkProtocol>,
 }
 
-impl_with_id!(ServerScalarEntity<TNetworkProtocol: NetworkProtocol>, ServerScalarEntityId);
+impl_with_id!(ServerScalarEntity<TNetworkProtocol: NetworkProtocol>, GraphQLScalarTypeName);
 
 type SelectableId = DefinitionLocation<ServerSelectableId, ClientSelectableId>;
 
