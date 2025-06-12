@@ -437,7 +437,7 @@ function normalizeDataIntoRecord(
     }
   }
   if (recordHasBeenUpdated) {
-    let encounteredRecordsIds = insertIfNotExists(
+    let encounteredRecordsIds = insertEmptySetIfMissing(
       mutableEncounteredIds,
       targetParentRecordLink.__typename,
     );
@@ -447,7 +447,7 @@ function normalizeDataIntoRecord(
   return recordHasBeenUpdated;
 }
 
-export function insertIfNotExists<K, V>(map: Map<K, Set<V>>, key: K) {
+export function insertEmptySetIfMissing<K, V>(map: Map<K, Set<V>>, key: K) {
   let result = map.get(key);
   if (result === undefined) {
     result = new Set();

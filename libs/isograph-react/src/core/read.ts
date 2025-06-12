@@ -1,7 +1,7 @@
 import { CleanupFn, type ItemCleanupPair } from '@isograph/disposable-types';
 import {
   getParentRecordKey,
-  insertIfNotExists,
+  insertEmptySetIfMissing,
   onNextChangeToRecord,
   type EncounteredIds,
 } from './cache';
@@ -151,7 +151,7 @@ function readData<TReadFromStore>(
   networkRequestOptions: NetworkRequestReaderOptions,
   mutableEncounteredRecords: EncounteredIds,
 ): ReadDataResult<ExtractData<TReadFromStore>> {
-  const encounteredIds = insertIfNotExists(
+  const encounteredIds = insertEmptySetIfMissing(
     mutableEncounteredRecords,
     root.__typename,
   );
