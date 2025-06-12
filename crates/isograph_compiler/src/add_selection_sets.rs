@@ -55,13 +55,13 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
     let client_field = schema.client_field(unprocessed_item.client_field_id);
     let parent_object = schema
         .server_entity_data
-        .server_object_entity(client_field.parent_object_entity_id);
+        .server_object_entity(client_field.parent_object_entity_name);
 
     let new_selection_set = get_validated_selection_set(
         schema,
         unprocessed_item.reader_selection_set,
         parent_object,
-        client_field.parent_object_entity_id,
+        client_field.parent_object_entity_name,
         &client_field,
     )?;
 
@@ -69,7 +69,7 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
         schema,
         unprocessed_item.refetch_strategy,
         parent_object,
-        client_field.parent_object_entity_id,
+        client_field.parent_object_entity_name,
         &client_field,
     )?;
 

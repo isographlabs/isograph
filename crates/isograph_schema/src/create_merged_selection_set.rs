@@ -515,7 +515,7 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
     // If the field (e.g. icheckin) returns an abstract type (ICheckin) that is different than
     // the concrete type we want (Checkin), then we refine to that concrete type.
     // TODO investigate whether this can be done when the ImperativelyLoadedFieldVariant is created
-    if refetch_field_parent_id != client_field.parent_object_entity_id {
+    if refetch_field_parent_id != client_field.parent_object_entity_name {
         let refetch_field_parent_type_name = schema
             .server_entity_data
             .server_object_entity(refetch_field_parent_id)
@@ -544,7 +544,7 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
 
     let root_parent_object = schema
         .server_entity_data
-        .server_object_entity(entrypoint.parent_object_entity_id)
+        .server_object_entity(entrypoint.parent_object_entity_name)
         .name;
 
     let root_operation_name = schema

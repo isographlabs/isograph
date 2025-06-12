@@ -221,7 +221,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 field_name: name.into(),
             },
 
-            parent_object_entity_id,
+            parent_object_entity_name: parent_object_entity_id,
             refetch_strategy: None,
             output_format: std::marker::PhantomData,
         });

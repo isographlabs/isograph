@@ -24,7 +24,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         .into(),
                 ),
                 name: field_name,
-                parent_object_entity_id: object_entity_id,
+                parent_object_entity_name: object_entity_id,
                 variable_definitions: vec![],
                 reader_selection_set: vec![],
                 variant: ClientFieldVariant::Link,

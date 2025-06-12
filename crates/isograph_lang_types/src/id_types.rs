@@ -1,3 +1,4 @@
+use common_lang_types::{GraphQLScalarTypeName, IsographObjectTypeName};
 use u32_newtypes::{u32_conversion, u32_newtype};
 
 use crate::SelectionType;
@@ -18,6 +19,6 @@ u32_newtype!(ServerObjectEntityId);
 
 u32_newtype!(ServerScalarEntityId);
 
-pub type ServerEntityId = SelectionType<ServerScalarEntityId, ServerObjectEntityId>;
+pub type ServerEntityId = SelectionType<GraphQLScalarTypeName, IsographObjectTypeName>;
 
 u32_newtype!(RefetchQueryIndex);

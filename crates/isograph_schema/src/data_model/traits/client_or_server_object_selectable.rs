@@ -55,7 +55,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
     }
 
     fn parent_object_entity_id(&self) -> ServerObjectEntityId {
-        self.parent_object_entity_id
+        self.parent_object_name
     }
 
     fn target_object_entity_id(&self) -> TypeAnnotation<ServerObjectEntityId> {

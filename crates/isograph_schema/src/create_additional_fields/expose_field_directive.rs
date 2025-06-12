@@ -221,7 +221,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 type_name: maybe_abstract_parent_object_entity_name.unchecked_conversion(), // e.g. Pet
                 field_name: client_field_scalar_selection_name, // set_pet_best_friend
             },
-            parent_object_entity_id: maybe_abstract_parent_object_entity_id,
+            parent_object_entity_name: maybe_abstract_parent_object_entity_id,
             refetch_strategy: None,
             output_format: std::marker::PhantomData,
         };

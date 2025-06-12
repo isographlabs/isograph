@@ -286,7 +286,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
                                     server_field_to_insert.item.type_.clone(),
                                 )
                                 .map(&mut |_| *scalar_entity_id),
-                                parent_object_entity_id,
+                                parent_object_entity_name: parent_object_entity_id,
                                 arguments,
                                 phantom_data: std::marker::PhantomData,
                             },
@@ -307,7 +307,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
                                 server_field_to_insert.item.type_.clone(),
                             )
                             .map(&mut |_| *object_entity_id),
-                            parent_object_entity_id,
+                            parent_object_name: parent_object_entity_id,
                             arguments,
                             phantom_data: std::marker::PhantomData,
                             object_selectable_variant:

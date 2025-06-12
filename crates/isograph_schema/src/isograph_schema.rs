@@ -167,7 +167,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 in server_object_entity_avaiable_selectables",
             )
             .selectables;
-        let mut current_object_id = root_object_entity_id;
 
         for selection_name in selections {
             match current_selectables.get(&selection_name.into()) {
@@ -202,7 +201,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                                 in server_object_entity_available_selectables",
                             )
                             .selectables;
-                        current_object_id = *target_object_entity_id;
                     }
                 },
                 None => {
@@ -214,7 +212,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             };
         }
 
-        Ok(WithId::new(current_object_id, current_entity))
+        Ok(WithId::new(current_entity.name, current_entity))
     }
 
     pub fn get_object_selections_path(
@@ -298,14 +296,17 @@ pub struct ServerObjectEntityExtraInfo {
 
 #[derive(Debug)]
 pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
+    pub server_object_name_to_id_map: HashMap<IsographObjectTypeName, ServerObjectEntityId>,
     pub server_objects: Vec<ServerObjectEntity<TNetworkProtocol>>,
+
+    pub server_scalar_name_to_id_map: HashMap<GraphQLScalarTypeName, ServerScalarEntityId>,
     pub server_scalars: Vec<ServerScalarEntity<TNetworkProtocol>>,
     pub defined_entities: HashMap<UnvalidatedTypeName, ServerEntityId>,
 
     // We keep track of available selectables and id fields outside of server_objects so that
     // we don't need a server_object_entity_mut method, which is incompatible with pico.
-    #[allow(clippy::type_complexity)]
-    pub server_object_entity_extra_info: HashMap<ServerObjectEntityId, ServerObjectEntityExtraInfo>,
+    pub server_object_entity_extra_info:
+        HashMap<IsographObjectTypeName, ServerObjectEntityExtraInfo>,
 
     // Well known types
     pub id_type_id: ServerScalarEntityId,
@@ -373,7 +374,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         inner_non_null_named_type: Option<&GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
     ) -> CreateAdditionalFieldsResult<()> {
         let next_server_scalar_selectable_id = self.server_scalar_selectables.len().into();
-        let parent_object_entity_id = server_scalar_selectable.parent_object_entity_id;
+        let parent_object_entity_id = server_scalar_selectable.parent_object_entity_name;
         let next_scalar_name = server_scalar_selectable.name;
 
         let parent_type_name = self
@@ -429,7 +430,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         server_object_selectable: ServerObjectSelectable<TNetworkProtocol>,
     ) -> CreateAdditionalFieldsResult<()> {
         let next_server_object_selectable_id = self.server_object_selectables.len().into();
-        let parent_object_entity_id = server_object_selectable.parent_object_entity_id;
+        let parent_object_entity_id = server_object_selectable.parent_object_name;
         let next_object_name = server_object_selectable.name;
 
         if self
@@ -606,9 +607,14 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
 
     pub fn server_object_entity(
         &self,
-        object_entity_id: ServerObjectEntityId,
+        object_entity_name: IsographObjectTypeName,
     ) -> &ServerObjectEntity<TNetworkProtocol> {
-        &self.server_objects[object_entity_id.as_usize()]
+        let id = self
+            .server_object_name_to_id_map
+            .get(&object_entity_name)
+            // TODO make this return a result
+            .expect("Expected id to exist");
+        &self.server_objects[id.as_usize()]
     }
 
     pub fn server_object_entities_and_ids(
@@ -616,8 +622,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
     ) -> impl Iterator<Item = WithId<&ServerObjectEntity<TNetworkProtocol>>> + '_ {
         self.server_objects
             .iter()
-            .enumerate()
-            .map(|(id, object)| WithId::new(id.into(), object))
+            .map(|object| WithId::new(object.name, object))
     }
 
     pub fn server_object_entities_and_ids_mut(
@@ -625,8 +630,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
     ) -> impl Iterator<Item = WithId<&mut ServerObjectEntity<TNetworkProtocol>>> + '_ {
         self.server_objects
             .iter_mut()
-            .enumerate()
-            .map(|(id, object)| WithId::new(id.into(), object))
+            .map(|object| WithId::new(object.name, object))
     }
 
     pub fn insert_server_scalar_entity(

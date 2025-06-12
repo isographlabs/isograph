@@ -38,7 +38,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     }
 
     fn parent_object_entity_id(&self) -> ServerObjectEntityId {
-        self.parent_object_entity_id
+        self.parent_object_entity_name
     }
 
     fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>] {

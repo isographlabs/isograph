@@ -1,7 +1,8 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use common_lang_types::{
-    DescriptionValue, ServerObjectSelectableName, ServerScalarSelectableName, WithLocation,
+    DescriptionValue, IsographObjectTypeName, ServerObjectSelectableName,
+    ServerScalarSelectableName, WithLocation,
 };
 use isograph_lang_types::{
     impl_with_id, impl_with_target_id, SelectionType, ServerEntityId, ServerObjectEntityId,
@@ -18,7 +19,7 @@ pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
 
     pub target_scalar_entity: TypeAnnotation<ServerScalarEntityId>,
 
-    pub parent_object_entity_id: ServerObjectEntityId,
+    pub parent_object_entity_name: IsographObjectTypeName,
     pub arguments: Vec<WithLocation<VariableDefinition<ServerEntityId>>>,
     pub phantom_data: PhantomData<TNetworkProtocol>,
 }
@@ -35,7 +36,7 @@ pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
 
     pub object_selectable_variant: SchemaServerObjectSelectableVariant,
 
-    pub parent_object_entity_id: ServerObjectEntityId,
+    pub parent_object_name: IsographObjectTypeName,
     pub arguments: Vec<WithLocation<VariableDefinition<ServerEntityId>>>,
     pub phantom_data: PhantomData<TNetworkProtocol>,
 }

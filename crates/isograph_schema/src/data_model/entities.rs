@@ -32,7 +32,7 @@ pub struct ServerObjectEntity<TNetworkProtocol: NetworkProtocol> {
     pub output_associated_data: TNetworkProtocol::SchemaObjectAssociatedData,
 }
 
-impl_with_id!(ServerObjectEntity<TNetworkProtocol: NetworkProtocol>, ServerObjectEntityId);
+impl_with_id!(ServerObjectEntity<TNetworkProtocol: NetworkProtocol>, IsographObjectTypeName);
 
 pub type ServerEntity<'a, TNetworkProtocol> = SelectionType<
     &'a ServerScalarEntity<TNetworkProtocol>,

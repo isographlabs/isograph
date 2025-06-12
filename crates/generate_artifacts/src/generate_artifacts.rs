@@ -214,12 +214,12 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                             };
 
                             let type_to_refine_to = schema.server_entity_data.server_object_entity(
-                                client_scalar_selectable.parent_object_entity_id,
+                                client_scalar_selectable.parent_object_entity_name,
                             );
 
                             if schema
                                 .fetchable_types
-                                .contains_key(&client_scalar_selectable.parent_object_entity_id)
+                                .contains_key(&client_scalar_selectable.parent_object_entity_name)
                             {
                                 panic!("Loadable fields on root objects are not yet supported");
                             }

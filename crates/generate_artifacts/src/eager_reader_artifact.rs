@@ -163,7 +163,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
 
     let parent_object_entity = schema
         .server_entity_data
-        .server_object_entity(server_object_selectable.parent_object_entity_id);
+        .server_object_entity(server_object_selectable.parent_object_name);
 
     let concrete_type = schema
         .server_entity_data
