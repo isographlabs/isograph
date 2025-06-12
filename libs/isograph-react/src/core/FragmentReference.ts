@@ -50,6 +50,12 @@ export type FragmentReference<
     ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
   >;
   readonly root: Link;
+  // TODO we potentially stably copy and stringify variables a lot!
+  // So, we should employ interior mutability: pretend that fragent reference
+  // is immutable, but actually store something like
+  // `Map<Variable, StablyCopiedStringifiedOutput>`
+  // and read or update that map when we would otherwise stably copy and
+  // stringify.
   readonly variables: ExtractParameters<TReadFromStore>;
   readonly networkRequest: PromiseWrapper<void, any>;
 };
