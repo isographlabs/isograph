@@ -1,7 +1,7 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
-    IsoLiteralText, IsographObjectTypeName, Location, ServerScalarSelectableName, TextSource,
+    IsoLiteralText, Location, SchemaServerObjectEntityName, ServerScalarSelectableName, TextSource,
     UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use isograph_lang_types::{
@@ -90,7 +90,7 @@ fn validate_parent_object_entity_id<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     parent_type: WithSpan<UnvalidatedTypeName>,
     text_source: TextSource,
-) -> Result<IsographObjectTypeName, WithLocation<ValidateEntrypointDeclarationError>> {
+) -> Result<SchemaServerObjectEntityName, WithLocation<ValidateEntrypointDeclarationError>> {
     let parent_type_id = schema
         .server_entity_data
         .defined_entities
@@ -147,7 +147,7 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     field_name: WithSpan<ServerScalarSelectableName>,
     text_source: TextSource,
-    parent_object_name: IsographObjectTypeName,
+    parent_object_name: SchemaServerObjectEntityName,
 ) -> Result<ClientScalarSelectableId, WithLocation<ValidateEntrypointDeclarationError>> {
     let parent_object = schema
         .server_entity_data
@@ -210,14 +210,14 @@ pub enum ValidateEntrypointDeclarationError {
 
     #[error("The client field `{parent_type_name}.{client_field_name}` is not defined.")]
     ClientFieldMustExist {
-        parent_type_name: IsographObjectTypeName,
+        parent_type_name: SchemaServerObjectEntityName,
         client_field_name: ServerScalarSelectableName,
     },
 
     // N.B. We could conceivably support fetching server fields, though!
     #[error("The field `{parent_type_name}.{client_field_name}` is a server field. It must be a client defined field.")]
     FieldMustBeClientField {
-        parent_type_name: IsographObjectTypeName,
+        parent_type_name: SchemaServerObjectEntityName,
         client_field_name: ServerScalarSelectableName,
     },
 

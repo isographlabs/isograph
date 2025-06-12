@@ -1,5 +1,5 @@
 use common_lang_types::{
-    IsographObjectTypeName, Location, ObjectTypeAndFieldName, SelectableName, Span,
+    Location, ObjectTypeAndFieldName, SchemaServerObjectEntityName, SelectableName, Span,
     StringLiteralValue, WithLocation, WithSpan,
 };
 use intern::{string_key::Intern, Lookup};
@@ -57,7 +57,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn create_new_exposed_field(
         &mut self,
         expose_field_to_insert: ExposeAsFieldToInsert,
-        parent_object_entity_name: IsographObjectTypeName,
+        parent_object_entity_name: SchemaServerObjectEntityName,
     ) -> Result<UnprocessedClientFieldItem, WithLocation<CreateAdditionalFieldsError>> {
         let ExposeFieldDirective {
             expose_as,
@@ -252,9 +252,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn insert_client_field_on_object(
         &mut self,
         mutation_field_name: SelectableName,
-        client_field_parent_object_entity_name: IsographObjectTypeName,
+        client_field_parent_object_entity_name: SchemaServerObjectEntityName,
         client_field_id: ClientScalarSelectableId,
-        payload_object_name: IsographObjectTypeName,
+        payload_object_name: SchemaServerObjectEntityName,
     ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
         if self
             .server_entity_data
@@ -287,7 +287,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     fn parse_mutation_subfield_id(
         &self,
         field_arg: &str,
-        mutation_object_entity_name: IsographObjectTypeName,
+        mutation_object_entity_name: SchemaServerObjectEntityName,
     ) -> ProcessTypeDefinitionResult<ServerObjectSelectableId> {
         let field_id = self
             .server_entity_data
@@ -326,8 +326,8 @@ fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol>(
     // TODO move this to impl Schema
     schema: &mut Schema<TNetworkProtocol>,
     arguments: Vec<WithLocation<VariableDefinition<ServerEntityId>>>,
-    primary_type_name: IsographObjectTypeName,
-    mutation_object_name: IsographObjectTypeName,
+    primary_type_name: SchemaServerObjectEntityName,
+    mutation_object_name: SchemaServerObjectEntityName,
     mutation_field_name: SelectableName,
     field_map_items: Vec<FieldMapItem>,
 ) -> ProcessTypeDefinitionResult<Vec<ProcessedFieldMapItem>> {

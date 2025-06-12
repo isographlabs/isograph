@@ -1,7 +1,7 @@
 // Almost all of these types should not exist. We are using names, not indexes,
 // as ids.
 
-use common_lang_types::{GraphQLScalarTypeName, IsographObjectTypeName};
+use common_lang_types::{SchemaServerObjectEntityName, SchemaServerScalarEntityName};
 use u32_newtypes::{u32_conversion, u32_newtype};
 
 use crate::SelectionType;
@@ -18,6 +18,6 @@ u32_newtype!(ClientScalarSelectableId);
 
 u32_newtype!(ClientObjectSelectableId);
 
-pub type ServerEntityId = SelectionType<GraphQLScalarTypeName, IsographObjectTypeName>;
+pub type ServerEntityId = SelectionType<SchemaServerScalarEntityName, SchemaServerObjectEntityName>;
 
 u32_newtype!(RefetchQueryIndex);

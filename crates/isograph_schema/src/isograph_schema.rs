@@ -4,8 +4,9 @@ use std::{
 };
 
 use common_lang_types::{
-    ClientScalarSelectableName, GraphQLScalarTypeName, IsographObjectTypeName, JavascriptName,
-    Location, ObjectSelectableName, SelectableName, UnvalidatedTypeName, WithLocation,
+    ClientScalarSelectableName, JavascriptName, Location, ObjectSelectableName,
+    SchemaServerObjectEntityName, SchemaServerScalarEntityName, SelectableName,
+    UnvalidatedTypeName, WithLocation,
 };
 use graphql_lang_types::GraphQLNamedTypeAnnotation;
 use intern::string_key::Intern;
@@ -30,7 +31,7 @@ use crate::{
 };
 
 lazy_static! {
-    pub static ref ID_GRAPHQL_TYPE: GraphQLScalarTypeName = "ID".intern().into();
+    pub static ref ID_GRAPHQL_TYPE: SchemaServerScalarEntityName = "ID".intern().into();
     pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
 }
 
@@ -49,7 +50,7 @@ pub struct Schema<TNetworkProtocol: NetworkProtocol> {
 
     /// These are root types like Query, Mutation, Subscription
     // TODO remove??? It's a GraphQL-ism
-    pub fetchable_types: BTreeMap<IsographObjectTypeName, RootOperationName>,
+    pub fetchable_types: BTreeMap<SchemaServerObjectEntityName, RootOperationName>,
 }
 
 impl<TNetworkProtocol: NetworkProtocol> Default for Schema<TNetworkProtocol> {
@@ -130,7 +131,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     /// This is a smell, and we should refactor away from it, or all schema's
     /// should have a root type.
-    pub fn query_id(&self) -> IsographObjectTypeName {
+    pub fn query_id(&self) -> SchemaServerObjectEntityName {
         *self
             .fetchable_types
             .iter()
@@ -139,13 +140,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .0
     }
 
-    pub fn find_mutation(&self) -> Option<(&IsographObjectTypeName, &RootOperationName)> {
+    pub fn find_mutation(&self) -> Option<(&SchemaServerObjectEntityName, &RootOperationName)> {
         self.fetchable_types
             .iter()
             .find(|(_, root_operation_name)| root_operation_name.0 == "mutation")
     }
 
-    pub fn find_query(&self) -> Option<(&IsographObjectTypeName, &RootOperationName)> {
+    pub fn find_query(&self) -> Option<(&SchemaServerObjectEntityName, &RootOperationName)> {
         self.fetchable_types
             .iter()
             .find(|(_, root_operation_name)| root_operation_name.0 == "query")
@@ -153,7 +154,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     pub fn traverse_object_selections(
         &self,
-        root_object_name: IsographObjectTypeName,
+        root_object_name: SchemaServerObjectEntityName,
         selections: impl Iterator<Item = ObjectSelectableName>,
     ) -> Result<WithId<&ServerObjectEntity<TNetworkProtocol>>, CreateAdditionalFieldsError> {
         let mut current_entity = self
@@ -218,7 +219,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     pub fn get_object_selections_path(
         &self,
-        root_object_name: IsographObjectTypeName,
+        root_object_name: SchemaServerObjectEntityName,
         selections: impl Iterator<Item = ObjectSelectableName>,
     ) -> Result<Vec<&ServerObjectSelectable<TNetworkProtocol>>, CreateAdditionalFieldsError> {
         let mut current_entity = self
@@ -298,8 +299,8 @@ pub struct ServerObjectEntityExtraInfo {
 #[derive(Debug)]
 pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
     // TODO consider combining these.
-    pub server_objects: HashMap<IsographObjectTypeName, ServerObjectEntity<TNetworkProtocol>>,
-    pub server_scalars: HashMap<GraphQLScalarTypeName, ServerScalarEntity<TNetworkProtocol>>,
+    pub server_objects: HashMap<SchemaServerObjectEntityName, ServerObjectEntity<TNetworkProtocol>>,
+    pub server_scalars: HashMap<SchemaServerScalarEntityName, ServerScalarEntity<TNetworkProtocol>>,
 
     // TODO consider whether this is needed. Especially when server_objects and server_scalars
     // are combined, this seems pretty useless.
@@ -308,19 +309,19 @@ pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
     // We keep track of available selectables and id fields outside of server_objects so that
     // we don't need a server_object_entity_mut method, which is incompatible with pico.
     pub server_object_entity_extra_info:
-        HashMap<IsographObjectTypeName, ServerObjectEntityExtraInfo>,
+        HashMap<SchemaServerObjectEntityName, ServerObjectEntityExtraInfo>,
 
     // TODO remove. These are GraphQL-isms. And we can just hard code them, they're
     // just interned strings!
     // Well known types
-    pub id_type_id: GraphQLScalarTypeName,
-    pub string_type_id: GraphQLScalarTypeName,
-    pub float_type_id: GraphQLScalarTypeName,
-    pub boolean_type_id: GraphQLScalarTypeName,
-    pub int_type_id: GraphQLScalarTypeName,
+    pub id_type_id: SchemaServerScalarEntityName,
+    pub string_type_id: SchemaServerScalarEntityName,
+    pub float_type_id: SchemaServerScalarEntityName,
+    pub boolean_type_id: SchemaServerScalarEntityName,
+    pub int_type_id: SchemaServerScalarEntityName,
     // TODO restructure UnionTypeAnnotation to not have a nullable field, but to instead
     // include null in its variants.
-    pub null_type_id: GraphQLScalarTypeName,
+    pub null_type_id: SchemaServerScalarEntityName,
 }
 
 impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
@@ -585,7 +586,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
     pub fn server_scalar_entity(
         &self,
-        scalar_entity_name: GraphQLScalarTypeName,
+        scalar_entity_name: SchemaServerScalarEntityName,
     ) -> &ServerScalarEntity<TNetworkProtocol> {
         &self
             .server_scalars
@@ -606,7 +607,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
 
     pub fn server_object_entity(
         &self,
-        object_entity_name: IsographObjectTypeName,
+        object_entity_name: SchemaServerObjectEntityName,
     ) -> &ServerObjectEntity<TNetworkProtocol> {
         &self
             .server_objects
@@ -652,7 +653,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
         &mut self,
         server_object_entity: ServerObjectEntity<TNetworkProtocol>,
         name_location: Location,
-    ) -> Result<IsographObjectTypeName, WithLocation<CreateAdditionalFieldsError>> {
+    ) -> Result<SchemaServerObjectEntityName, WithLocation<CreateAdditionalFieldsError>> {
         let name = server_object_entity.name;
         if self
             .defined_entities
@@ -700,11 +701,11 @@ impl NameAndArguments {
 }
 
 fn add_schema_defined_scalar_type<TNetworkProtocol: NetworkProtocol>(
-    scalars: &mut HashMap<GraphQLScalarTypeName, ServerScalarEntity<TNetworkProtocol>>,
+    scalars: &mut HashMap<SchemaServerScalarEntityName, ServerScalarEntity<TNetworkProtocol>>,
     defined_types: &mut HashMap<UnvalidatedTypeName, ServerEntityId>,
     field_name: &'static str,
     javascript_name: JavascriptName,
-) -> GraphQLScalarTypeName {
+) -> SchemaServerScalarEntityName {
     // TODO this is problematic, we have no span (or really, no location) associated with this
     // schema-defined scalar, so we will not be able to properly show error messages if users
     // e.g. have Foo implements String
@@ -750,7 +751,7 @@ pub type ScalarSelectableId =
 fn set_and_validate_id_field(
     id_field: &mut Option<ServerStrongIdFieldId>,
     current_field_id: ServerScalarSelectableId,
-    parent_type_name: IsographObjectTypeName,
+    parent_type_name: SchemaServerObjectEntityName,
     options: &CompilerConfigOptions,
     inner_non_null_named_type: Option<&GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
 ) -> CreateAdditionalFieldsResult<()> {

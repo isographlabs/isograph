@@ -1,6 +1,6 @@
 use common_lang_types::{
-    EnumLiteralValue, GraphQLScalarTypeName, IsographObjectTypeName, Location, SelectableName,
-    UnvalidatedTypeName, ValueKeyName, VariableName, WithLocation, WithSpan,
+    EnumLiteralValue, Location, SchemaServerObjectEntityName, SchemaServerScalarEntityName,
+    SelectableName, UnvalidatedTypeName, ValueKeyName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
@@ -38,7 +38,7 @@ fn graphql_type_to_nullable_type<TValue>(
 }
 
 fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
-    scalar_literal_name: &GraphQLScalarTypeName,
+    scalar_literal_name: &SchemaServerScalarEntityName,
     type_: &GraphQLTypeAnnotation<ServerEntityId>,
     schema_data: &ServerEntityData<TNetworkProtocol>,
     location: Location,
@@ -316,7 +316,7 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
     server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
-    object_entity_name: IsographObjectTypeName,
+    object_entity_name: SchemaServerObjectEntityName,
 ) -> Result<(), WithLocation<ValidateArgumentTypesError>> {
     validate_no_extraneous_fields(
         &server_entity_data
@@ -383,7 +383,7 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
     server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
     server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
-    object_entity_name: IsographObjectTypeName,
+    object_entity_name: SchemaServerObjectEntityName,
 ) -> Vec<ObjectLiteralFieldType> {
     server_entity_data
         .server_object_entity_extra_info
@@ -564,7 +564,7 @@ pub enum ValidateArgumentTypesError {
     #[error("Expected input of type {expected}, found {actual} scalar literal")]
     ExpectedTypeFoundScalar {
         expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
-        actual: GraphQLScalarTypeName,
+        actual: SchemaServerScalarEntityName,
     },
 
     #[error("Expected input of type {expected}, found object literal")]

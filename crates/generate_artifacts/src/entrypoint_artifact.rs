@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use common_lang_types::{
-    ArtifactPathAndContent, IsographObjectTypeName, ObjectTypeAndFieldName, QueryOperationName,
-    QueryText, VariableName,
+    ArtifactPathAndContent, ObjectTypeAndFieldName, QueryOperationName, QueryText,
+    SchemaServerObjectEntityName, VariableName,
 };
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
@@ -35,7 +35,7 @@ struct EntrypointArtifactInfo<'schema, TNetworkProtocol: NetworkProtocol> {
     query_text: QueryText,
     normalization_ast_text: NormalizationAstText,
     refetch_query_artifact_import: RefetchQueryArtifactImport,
-    concrete_type: IsographObjectTypeName,
+    concrete_type: SchemaServerObjectEntityName,
 }
 
 pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
@@ -88,7 +88,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     traversal_state: &ScalarClientFieldTraversalState,
     encountered_client_type_map: &FieldToCompletedMergeTraversalStateMap,
     variable_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
-    default_root_operation: &Option<(&IsographObjectTypeName, &RootOperationName)>,
+    default_root_operation: &Option<(&SchemaServerObjectEntityName, &RootOperationName)>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> Vec<ArtifactPathAndContent> {
     let query_name = entrypoint.name.into();
@@ -329,7 +329,7 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
     query_name: &QueryOperationName,
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
     refetch_query_artifact_import: &RefetchQueryArtifactImport,
-    concrete_type: &IsographObjectTypeName,
+    concrete_type: &SchemaServerObjectEntityName,
 ) -> String {
     let ts_file_extension = file_extensions.ts();
     let entrypoint_params_typename = format!("{}__{}__param", parent_type.name, query_name);

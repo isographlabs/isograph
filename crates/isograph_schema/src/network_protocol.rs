@@ -1,7 +1,7 @@
 use std::{error::Error, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
-    DescriptionValue, IsographObjectTypeName, Location, QueryOperationName, QueryText,
+    DescriptionValue, Location, QueryOperationName, QueryText, SchemaServerObjectEntityName,
     ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation, RootOperationKind};
@@ -78,6 +78,6 @@ pub struct FieldToInsert {
 pub struct ExposeAsFieldToInsert {
     pub expose_field_directive: ExposeFieldDirective,
     // e.g. Query or Mutation
-    pub parent_object_name: IsographObjectTypeName,
+    pub parent_object_name: SchemaServerObjectEntityName,
     pub description: Option<DescriptionValue>,
 }

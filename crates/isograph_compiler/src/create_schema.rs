@@ -5,8 +5,8 @@ use std::{
 };
 
 use common_lang_types::{
-    CurrentWorkingDirectory, IsographObjectTypeName, RelativePathToSourceFile, SelectableName,
-    TextSource, UnvalidatedTypeName, VariableName, WithLocation,
+    CurrentWorkingDirectory, RelativePathToSourceFile, SchemaServerObjectEntityName,
+    SelectableName, TextSource, UnvalidatedTypeName, VariableName, WithLocation,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLInputValueDefinition, NameValuePair, RootOperationKind,
@@ -231,7 +231,7 @@ pub struct ContainsIsoStats {
 /// - if it is an id field, modify the parent object
 fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
     schema: &mut Schema<TNetworkProtocol>,
-    field_queue: HashMap<IsographObjectTypeName, Vec<WithLocation<FieldToInsert>>>,
+    field_queue: HashMap<SchemaServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
     options: &CompilerConfigOptions,
 ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
     for (parent_object_entity_id, field_definitions_to_insert) in field_queue {
@@ -330,7 +330,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
 pub fn graphql_input_value_definition_to_variable_definition(
     defined_types: &HashMap<UnvalidatedTypeName, ServerEntityId>,
     input_value_definition: WithLocation<GraphQLInputValueDefinition>,
-    parent_type_name: IsographObjectTypeName,
+    parent_type_name: SchemaServerObjectEntityName,
     field_name: SelectableName,
 ) -> Result<
     WithLocation<VariableDefinition<ServerEntityId>>,

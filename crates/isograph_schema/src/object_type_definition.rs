@@ -1,5 +1,6 @@
 use common_lang_types::{
-    DescriptionValue, GraphQLInterfaceTypeName, IsographObjectTypeName, WithLocation, WithSpan,
+    DescriptionValue, GraphQLInterfaceTypeName, SchemaServerObjectEntityName, WithLocation,
+    WithSpan,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition,
@@ -9,7 +10,7 @@ use graphql_lang_types::{
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct IsographObjectTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub name: WithLocation<IsographObjectTypeName>,
+    pub name: WithLocation<SchemaServerObjectEntityName>,
     // maybe this should be Vec<WithSpan<IsographObjectTypeName>>>
     pub interfaces: Vec<WithLocation<GraphQLInterfaceTypeName>>,
     /// Directives that we don't know about. Maybe this should be validated to be

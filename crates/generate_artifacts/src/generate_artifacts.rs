@@ -1,6 +1,6 @@
 use common_lang_types::{
     derive_display, ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent, DescriptionValue,
-    IsographObjectTypeName, Location, ObjectTypeAndFieldName, SelectableNameOrAlias, Span,
+    Location, ObjectTypeAndFieldName, SchemaServerObjectEntityName, SelectableNameOrAlias, Span,
     WithLocation, WithSpan,
 };
 use graphql_lang_types::{
@@ -902,7 +902,7 @@ fn write_getter_and_setter(
     query_type_declaration: &mut String,
     indentation_level: u8,
     name_or_alias: SelectableNameOrAlias,
-    output_type_annotation: &TypeAnnotation<IsographObjectTypeName>,
+    output_type_annotation: &TypeAnnotation<SchemaServerObjectEntityName>,
     type_annotation: &TypeAnnotation<ClientFieldUpdatableDataType>,
 ) {
     query_type_declaration.push_str(&format!(

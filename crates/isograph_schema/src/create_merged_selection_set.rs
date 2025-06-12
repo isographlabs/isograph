@@ -1,9 +1,10 @@
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, HashSet};
 
 use common_lang_types::{
-    ClientScalarSelectableName, GraphQLScalarTypeName, IsographObjectTypeName, Location,
-    QueryOperationName, ScalarSelectableName, SelectableName, ServerObjectSelectableName,
-    ServerScalarSelectableName, Span, VariableName, WithLocation, WithSpan,
+    ClientScalarSelectableName, Location, QueryOperationName, ScalarSelectableName,
+    SchemaServerObjectEntityName, SchemaServerScalarEntityName, SelectableName,
+    ServerObjectSelectableName, ServerScalarSelectableName, Span, VariableName, WithLocation,
+    WithSpan,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
@@ -120,7 +121,7 @@ pub struct MergedLinkedFieldSelection {
     pub selection_map: MergedSelectionMap,
     pub arguments: Vec<ArgumentKeyAndValue>,
     /// Some if the object is concrete; None otherwise.
-    pub concrete_type: Option<IsographObjectTypeName>,
+    pub concrete_type: Option<SchemaServerObjectEntityName>,
 }
 
 impl MergedLinkedFieldSelection {
@@ -139,7 +140,7 @@ impl MergedLinkedFieldSelection {
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct MergedInlineFragmentSelection {
-    pub type_to_refine_to: IsographObjectTypeName,
+    pub type_to_refine_to: SchemaServerObjectEntityName,
     // TODO make this type more precise, this selection map should not contain inline fragments
     pub selection_map: MergedSelectionMap,
 }
@@ -150,7 +151,7 @@ pub enum NormalizationKey {
     Id,
     // TODO this should not have NameAndArguments, but LinkedFieldNameAndArguments
     ServerField(NameAndArguments),
-    InlineFragment(IsographObjectTypeName),
+    InlineFragment(SchemaServerObjectEntityName),
 }
 
 impl NormalizationKey {
@@ -179,18 +180,18 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
     /// Used to look up what type to narrow on in the generated refetch query,
     /// among other things.
     pub variable_definitions: Vec<VariableDefinition<ServerEntityId>>,
-    pub root_parent_object: IsographObjectTypeName,
+    pub root_parent_object: SchemaServerObjectEntityName,
     pub root_fetchable_field: ClientScalarSelectableName,
     pub refetch_query_index: RefetchQueryIndex,
 
     pub root_operation_name: RootOperationName,
     pub query_name: QueryOperationName,
-    pub concrete_type: IsographObjectTypeName,
+    pub concrete_type: SchemaServerObjectEntityName,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PathToRefetchFieldInfo {
-    refetch_field_parent_entity_name: IsographObjectTypeName,
+    refetch_field_parent_entity_name: SchemaServerObjectEntityName,
     pub imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant,
     extra_selections: MergedSelectionMap,
     pub client_field_id: ClientScalarSelectableId,
@@ -407,7 +408,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     TNetworkProtocol: NetworkProtocol,
 >(
     schema: &Schema<TNetworkProtocol>,
-    parent_object_entity_name: IsographObjectTypeName,
+    parent_object_entity_name: SchemaServerObjectEntityName,
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
@@ -497,7 +498,7 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     variant: ImperativelyLoadedFieldVariant,
     // ID of e.g. Pet, Checkin, etc. i.e. the field on which e.g. __refetch or make_super is selected
-    refetch_field_parent_entity_name: IsographObjectTypeName,
+    refetch_field_parent_entity_name: SchemaServerObjectEntityName,
     selection_map: &MergedSelectionMap,
     entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
     index: usize,
@@ -582,7 +583,7 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
 pub fn imperative_field_subfields_or_inline_fragments(
     top_level_schema_field_name: ServerObjectSelectableName,
     top_level_schema_field_arguments: &[VariableDefinition<ServerEntityId>],
-    top_level_schema_field_concrete_type: Option<IsographObjectTypeName>,
+    top_level_schema_field_concrete_type: Option<SchemaServerObjectEntityName>,
 ) -> WrappedSelectionMapSelection {
     let top_level_schema_field_arguments = top_level_schema_field_arguments
         .iter()
@@ -636,7 +637,7 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
 
 fn create_selection_map_with_merge_traversal_state<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    parent_object_entity_name: IsographObjectTypeName,
+    parent_object_entity_name: SchemaServerObjectEntityName,
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
@@ -662,7 +663,7 @@ fn create_selection_map_with_merge_traversal_state<TNetworkProtocol: NetworkProt
 fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
-    parent_object_entity_name: IsographObjectTypeName,
+    parent_object_entity_name: SchemaServerObjectEntityName,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
@@ -977,7 +978,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     newly_encountered_scalar_client_selectable_id: ClientScalarSelectableId,
     newly_encountered_scalar_client_selectable: &ClientScalarSelectable<TNetworkProtocol>,
-    parent_object_entity_name: IsographObjectTypeName,
+    parent_object_entity_name: SchemaServerObjectEntityName,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     variant: &ImperativelyLoadedFieldVariant,
 ) {
@@ -1044,7 +1045,7 @@ fn filter_id_fields(field: &&WithSpan<ValidatedSelection>) -> bool {
 
 #[allow(clippy::too_many_arguments)]
 fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
-    parent_object_entity_name: IsographObjectTypeName,
+    parent_object_entity_name: SchemaServerObjectEntityName,
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
@@ -1133,7 +1134,7 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
     schema: &Schema<TNetworkProtocol>,
     merged_selection_map: &mut MergedSelectionMap,
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
-    parent_object_entity_name: IsographObjectTypeName,
+    parent_object_entity_name: SchemaServerObjectEntityName,
 ) {
     if parent_type.concrete_type.is_none() {
         maybe_add_typename_selection(merged_selection_map)
@@ -1184,9 +1185,9 @@ pub enum WrappedSelectionMapSelection {
     LinkedField {
         server_object_selectable_name: ServerObjectSelectableName,
         arguments: Vec<ArgumentKeyAndValue>,
-        concrete_type: Option<IsographObjectTypeName>,
+        concrete_type: Option<SchemaServerObjectEntityName>,
     },
-    InlineFragment(IsographObjectTypeName),
+    InlineFragment(SchemaServerObjectEntityName),
 }
 
 pub fn selection_map_wrapped(
@@ -1263,7 +1264,7 @@ fn get_aliased_mutation_field_name(
 }
 
 pub fn id_arguments(
-    id_type_name: GraphQLScalarTypeName,
+    id_type_name: SchemaServerScalarEntityName,
 ) -> Vec<VariableDefinition<ServerEntityId>> {
     vec![VariableDefinition {
         name: WithLocation::new("id".intern().into(), Location::generated()),

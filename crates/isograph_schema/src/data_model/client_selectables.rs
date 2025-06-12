@@ -2,7 +2,7 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, DescriptionValue,
-    IsographObjectTypeName, ObjectTypeAndFieldName, WithSpan,
+    ObjectTypeAndFieldName, SchemaServerObjectEntityName, WithSpan,
 };
 use isograph_lang_types::{
     impl_with_id, ClientObjectSelectableId, ClientScalarSelectableId, SelectionType,
@@ -42,7 +42,7 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     // Why is this not calculated when needed?
     pub type_and_field: ObjectTypeAndFieldName,
 
-    pub parent_object_entity_name: IsographObjectTypeName,
+    pub parent_object_entity_name: SchemaServerObjectEntityName,
     pub output_format: PhantomData<TNetworkProtocol>,
 }
 
@@ -54,7 +54,7 @@ impl_with_id!(ClientScalarSelectable<TNetworkProtocol: NetworkProtocol>, ClientS
 pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: ClientObjectSelectableName,
-    pub target_object_entity_name: TypeAnnotation<IsographObjectTypeName>,
+    pub target_object_entity_name: TypeAnnotation<SchemaServerObjectEntityName>,
 
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 
@@ -65,7 +65,7 @@ pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     // Why is this not calculated when needed?
     pub type_and_field: ObjectTypeAndFieldName,
 
-    pub parent_object_name: IsographObjectTypeName,
+    pub parent_object_name: SchemaServerObjectEntityName,
 
     pub output_format: PhantomData<TNetworkProtocol>,
     pub info: UserWrittenClientPointerInfo,

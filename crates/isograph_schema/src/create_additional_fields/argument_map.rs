@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    IsographObjectTypeName, Location, SelectableName, StringLiteralValue, VariableName,
+    Location, SchemaServerObjectEntityName, SelectableName, StringLiteralValue, VariableName,
     WithLocation,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
@@ -32,8 +32,8 @@ impl ArgumentMap {
     pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol>(
         &mut self,
         field_map_item: FieldMapItem,
-        primary_type_name: IsographObjectTypeName,
-        mutation_object_name: IsographObjectTypeName,
+        primary_type_name: SchemaServerObjectEntityName,
+        mutation_object_name: SchemaServerObjectEntityName,
         mutation_field_name: SelectableName,
         schema: &mut Schema<TNetworkProtocol>,
     ) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem> {
@@ -228,7 +228,7 @@ impl ModifiedArgument {
         &mut self,
         first: StringLiteralValue,
         rest: &[StringLiteralValue],
-        primary_type_name: IsographObjectTypeName,
+        primary_type_name: SchemaServerObjectEntityName,
     ) -> ProcessTypeDefinitionResult<()> {
         let argument_object = self.object.inner_mut();
 

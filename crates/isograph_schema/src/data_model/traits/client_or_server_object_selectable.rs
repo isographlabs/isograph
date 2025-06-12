@@ -1,4 +1,4 @@
-use common_lang_types::{DescriptionValue, IsographObjectTypeName, ObjectSelectableName};
+use common_lang_types::{DescriptionValue, ObjectSelectableName, SchemaServerObjectEntityName};
 use impl_base_types_macro::impl_for_definition_location;
 use isograph_lang_types::{
     ClientObjectSelectableId, DefinitionLocation, ServerObjectSelectableId, TypeAnnotation,
@@ -18,8 +18,8 @@ pub type ObjectSelectableId =
 pub trait ClientOrServerObjectSelectable {
     fn description(&self) -> Option<DescriptionValue>;
     fn name(&self) -> ObjectSelectableName;
-    fn parent_object_entity_name(&self) -> IsographObjectTypeName;
-    fn target_object_entity_name(&self) -> TypeAnnotation<IsographObjectTypeName>;
+    fn parent_object_entity_name(&self) -> SchemaServerObjectEntityName;
+    fn target_object_entity_name(&self) -> TypeAnnotation<SchemaServerObjectEntityName>;
 }
 
 impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
@@ -33,11 +33,11 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
         self.name.into()
     }
 
-    fn parent_object_entity_name(&self) -> IsographObjectTypeName {
+    fn parent_object_entity_name(&self) -> SchemaServerObjectEntityName {
         self.parent_object_name
     }
 
-    fn target_object_entity_name(&self) -> TypeAnnotation<IsographObjectTypeName> {
+    fn target_object_entity_name(&self) -> TypeAnnotation<SchemaServerObjectEntityName> {
         self.target_object_entity_name.clone()
     }
 }
@@ -53,11 +53,11 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
         self.name.item.into()
     }
 
-    fn parent_object_entity_name(&self) -> IsographObjectTypeName {
+    fn parent_object_entity_name(&self) -> SchemaServerObjectEntityName {
         self.parent_object_name
     }
 
-    fn target_object_entity_name(&self) -> TypeAnnotation<IsographObjectTypeName> {
+    fn target_object_entity_name(&self) -> TypeAnnotation<SchemaServerObjectEntityName> {
         self.target_object_entity.clone()
     }
 }
