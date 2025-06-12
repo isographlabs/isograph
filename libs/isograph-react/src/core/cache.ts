@@ -760,13 +760,14 @@ function getStoreKeyChunkForArgumentValue(
 }
 
 function getStoreKeyChunkForArgument(argument: Argument, variables: Variables) {
-  let chunk = getStoreKeyChunkForArgumentValue(argument[1], variables);
+  const [argumentName, argumentValue] = argument;
+  let chunk = getStoreKeyChunkForArgumentValue(argumentValue, variables);
 
   if (typeof chunk === 'object') {
     chunk = JSON.stringify(stableCopy(chunk));
   }
 
-  return `${FIRST_SPLIT_KEY}${argument[0]}${SECOND_SPLIT_KEY}${chunk}`;
+  return `${FIRST_SPLIT_KEY}${argumentName}${SECOND_SPLIT_KEY}${chunk}`;
 }
 
 function getNetworkResponseKey(
