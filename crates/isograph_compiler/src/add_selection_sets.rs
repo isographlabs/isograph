@@ -53,7 +53,10 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
     schema: &mut Schema<TNetworkProtocol>,
     unprocessed_item: UnprocessedClientFieldItem,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
-    let client_field = schema.client_field(unprocessed_item.client_field_id);
+    let client_field = schema.client_field(
+        unprocessed_item.parent_object_entity_name,
+        unprocessed_item.client_field_name,
+    );
     let parent_object = schema
         .server_entity_data
         .server_object_entity(client_field.parent_object_entity_name);
@@ -74,7 +77,10 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
         &client_field,
     )?;
 
-    let client_field = schema.client_field_mut(unprocessed_item.client_field_id);
+    let client_field = schema.client_field_mut(
+        unprocessed_item.parent_object_entity_name,
+        unprocessed_item.client_field_name,
+    );
 
     client_field.reader_selection_set = new_selection_set;
     client_field.refetch_strategy = refetch_strategy;
@@ -238,8 +244,9 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
             DefinitionLocation::Server(server_scalar_selectable_id)
         }
         DefinitionLocation::Client(client_type) => {
-            let client_field_id = *client_type.as_scalar().ok_or_else(|| {
-                WithLocation::new(
+            let (parent_entity_name, client_field_name) =
+                *client_type.as_scalar().ok_or_else(|| {
+                    WithLocation::new(
                     AddSelectionSetsError::SelectionTypeSelectionClientPointerSelectedAsScalar {
                         client_field_parent_type_name: top_level_field_or_pointer
                             .type_and_field()
@@ -251,8 +258,8 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
                     },
                     scalar_selection.name.location,
                 )
-            })?;
-            DefinitionLocation::Client((selection_parent_object.name, client_field_id))
+                })?;
+            DefinitionLocation::Client((parent_entity_name, client_field_name))
         }
     };
 

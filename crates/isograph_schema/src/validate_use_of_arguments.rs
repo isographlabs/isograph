@@ -39,7 +39,7 @@ pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
     validated_schema: &Schema<TNetworkProtocol>,
 ) -> Result<(), Vec<WithLocation<ValidateUseOfArgumentsError>>> {
     let mut errors = vec![];
-    for client_scalar_selectable in &validated_schema.client_scalar_selectables {
+    for client_scalar_selectable in validated_schema.client_scalar_selectables.values() {
         validate_use_of_arguments_for_client_type(
             validated_schema,
             client_scalar_selectable,
@@ -80,10 +80,10 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         .map(|x| &x.item)
                         .collect::<Vec<_>>(),
                     DefinitionLocation::Client((
-                        _parent_entity_name,
-                        client_scalar_selectable_name,
+                        parent_object_entity_name,
+                        client_selectable_name,
                     )) => schema
-                        .client_field(client_scalar_selectable_name)
+                        .client_field(parent_object_entity_name, client_selectable_name)
                         .variable_definitions
                         .iter()
                         .map(|x| &x.item)

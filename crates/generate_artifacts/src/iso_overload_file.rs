@@ -249,12 +249,14 @@ fn sorted_entrypoints<TNetworkProtocol: NetworkProtocol>(
     let mut entrypoints = schema
         .entrypoints
         .iter()
-        .map(|(client_field_id, entrypoint_declaration_info)| {
-            (
-                schema.client_field(*client_field_id),
-                entrypoint_declaration_info,
-            )
-        })
+        .map(
+            |((parent_entity_name, client_field_name), entrypoint_declaration_info)| {
+                (
+                    schema.client_field(*parent_entity_name, *client_field_name),
+                    entrypoint_declaration_info,
+                )
+            },
+        )
         .collect::<Vec<_>>();
     entrypoints.sort_by(|(client_field_1, _), (client_field_2, _)| {
         match client_field_1

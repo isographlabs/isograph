@@ -1,12 +1,12 @@
 use common_lang_types::{
-    Location, ObjectTypeAndFieldName, SchemaServerObjectEntityName, SelectableName, Span,
-    StringLiteralValue, WithLocation, WithSpan,
+    ClientScalarSelectableName, Location, ObjectTypeAndFieldName, SchemaServerObjectEntityName,
+    SelectableName, Span, StringLiteralValue, WithLocation, WithSpan,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
-    ClientScalarSelectableId, DefinitionLocation, EmptyDirectiveSet, ScalarSelection,
-    ScalarSelectionDirectiveSet, SelectionType, SelectionTypeContainingSelections,
-    ServerEntityName, ServerObjectSelectableId, VariableDefinition,
+    DefinitionLocation, EmptyDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
+    SelectionType, SelectionTypeContainingSelections, ServerEntityName, ServerObjectSelectableId,
+    VariableDefinition,
 };
 
 use serde::Deserialize;
@@ -152,7 +152,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             })
             .collect::<Vec<_>>();
 
-        let mutation_field_client_field_id = self.client_scalar_selectables.len().into();
+        let mutation_field_client_field_name =
+            client_field_scalar_selection_name.unchecked_conversion();
 
         let top_level_schema_field_concrete_type = payload_object_entity.concrete_type;
         let primary_field_concrete_type = maybe_abstract_parent_object_entity.concrete_type;
@@ -224,17 +225,23 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             refetch_strategy: None,
             output_format: std::marker::PhantomData,
         };
-        self.client_scalar_selectables
-            .push(mutation_client_scalar_selectable);
+        self.client_scalar_selectables.insert(
+            (
+                maybe_abstract_parent_object_entity_name,
+                mutation_client_scalar_selectable.name,
+            ),
+            mutation_client_scalar_selectable,
+        );
 
         self.insert_client_field_on_object(
             client_field_scalar_selection_name,
             maybe_abstract_parent_object_entity_name,
-            mutation_field_client_field_id,
+            mutation_field_client_field_name,
             mutation_field_payload_type_name,
         )?;
         Ok(UnprocessedClientFieldItem {
-            client_field_id: mutation_field_client_field_id,
+            client_field_name: mutation_field_client_field_name,
+            parent_object_entity_name: maybe_abstract_parent_object_entity_name,
             reader_selection_set: vec![],
             refetch_strategy: Some(RefetchStrategy::UseRefetchField(
                 generate_refetch_field_strategy(
@@ -253,7 +260,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &mut self,
         mutation_field_name: SelectableName,
         client_field_parent_object_entity_name: SchemaServerObjectEntityName,
-        client_field_id: ClientScalarSelectableId,
+        client_field_name: ClientScalarSelectableName,
         payload_object_name: SchemaServerObjectEntityName,
     ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
         if self
@@ -264,7 +271,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .selectables
             .insert(
                 mutation_field_name,
-                DefinitionLocation::Client(SelectionType::Scalar(client_field_id)),
+                DefinitionLocation::Client(SelectionType::Scalar((
+                    client_field_parent_object_entity_name,
+                    client_field_name,
+                ))),
             )
             .is_some()
         {

@@ -11,10 +11,10 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientScalarSelectableId, DefinitionLocation, EmptyDirectiveSet,
-    NonConstantValue, RefetchQueryIndex, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, ServerEntityName,
-    ServerObjectSelectableId, VariableDefinition,
+    ArgumentKeyAndValue, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
+    RefetchQueryIndex, ScalarSelection, ScalarSelectionDirectiveSet, SelectionFieldArgument,
+    SelectionType, SelectionTypeContainingSelections, ServerEntityName, ServerObjectSelectableId,
+    VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -191,10 +191,10 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PathToRefetchFieldInfo {
-    refetch_field_parent_entity_name: SchemaServerObjectEntityName,
+    pub refetch_field_parent_entity_name: SchemaServerObjectEntityName,
     pub imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant,
     extra_selections: MergedSelectionMap,
-    pub client_field_id: ClientScalarSelectableId,
+    pub client_field_name: ClientScalarSelectableName,
 }
 
 pub type RefetchedPathsMap =
@@ -469,10 +469,11 @@ pub fn get_imperatively_loaded_artifact_info<TNetworkProtocol: NetworkProtocol>(
         refetch_field_parent_entity_name,
         imperatively_loaded_field_variant,
         extra_selections: _,
-        client_field_id,
+        client_field_name,
     } = path_to_refetch_field_info;
 
-    let client_field = schema.client_field(client_field_id);
+    let client_scalar_selectable =
+        schema.client_field(refetch_field_parent_entity_name, client_field_name);
 
     process_imperatively_loaded_field(
         schema,
@@ -482,7 +483,7 @@ pub fn get_imperatively_loaded_artifact_info<TNetworkProtocol: NetworkProtocol>(
         entrypoint,
         index,
         reachable_variables,
-        client_field,
+        client_scalar_selectable,
     )
 }
 
@@ -503,7 +504,7 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
     entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
     index: usize,
     reachable_variables: &BTreeSet<VariableName>,
-    client_field: &ClientScalarSelectable<TNetworkProtocol>,
+    client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ImperativelyLoadedFieldArtifactInfo {
     let ImperativelyLoadedFieldVariant {
         client_field_scalar_selection_name,
@@ -516,7 +517,7 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
     // If the field (e.g. icheckin) returns an abstract type (ICheckin) that is different than
     // the concrete type we want (Checkin), then we refine to that concrete type.
     // TODO investigate whether this can be done when the ImperativelyLoadedFieldVariant is created
-    if refetch_field_parent_entity_name != client_field.parent_object_entity_name {
+    if refetch_field_parent_entity_name != client_scalar_selectable.parent_object_entity_name {
         let refetch_field_parent_type_name = schema
             .server_entity_data
             .server_object_entity(refetch_field_parent_entity_name)
@@ -530,7 +531,7 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
 
     // TODO we need to extend this with variables used in subfields_or_inline_fragments
     let mut definitions_of_used_variables =
-        get_used_variable_definitions(reachable_variables, client_field);
+        get_used_variable_definitions(reachable_variables, client_scalar_selectable);
 
     for variable_definition in top_level_schema_field_arguments.iter() {
         definitions_of_used_variables.push(VariableDefinition {
@@ -663,6 +664,7 @@ fn create_selection_map_with_merge_traversal_state<TNetworkProtocol: NetworkProt
 fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
+    // TODO do we need to pass this? We have it from associated data anyway
     parent_object_entity_name: SchemaServerObjectEntityName,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     validated_selections: &[WithSpan<ValidatedSelection>],
@@ -690,11 +692,13 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                         );
                     }
                     DefinitionLocation::Client((
-                        _parent_entity_name,
+                        parent_object_entity_name,
                         newly_encountered_scalar_client_selectable_id,
                     )) => {
-                        let newly_encountered_scalar_client_selectable =
-                            schema.client_field(*newly_encountered_scalar_client_selectable_id);
+                        let newly_encountered_scalar_client_selectable = schema.client_field(
+                            *parent_object_entity_name,
+                            *newly_encountered_scalar_client_selectable_id,
+                        );
 
                         // If the field is selected loadably or is imperative, we must note the refetch path,
                         // because this results in an artifact being generated.
@@ -705,23 +709,25 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             Some(Loadability::LoadablySelectedField(_loadable_variant)) => {
                                 create_merged_selection_map_for_field_and_insert_into_global_map(
                                     schema,
-                                    parent_object_entity_name,
+                                    *parent_object_entity_name,
                                     parent_object_entity,
                                     newly_encountered_scalar_client_selectable
                                         .selection_set_for_parent_query(),
                                     encountered_client_field_map,
-                                    DefinitionLocation::Client(SelectionType::Scalar(
+                                    DefinitionLocation::Client(SelectionType::Scalar((
+                                        *parent_object_entity_name,
                                         *newly_encountered_scalar_client_selectable_id,
-                                    )),
+                                    ))),
                                     &initial_variable_context(&SelectionType::Scalar(
                                         newly_encountered_scalar_client_selectable,
                                     )),
                                 );
 
                                 let state = encountered_client_field_map
-                                    .get_mut(&DefinitionLocation::Client(SelectionType::Scalar(
+                                    .get_mut(&DefinitionLocation::Client(SelectionType::Scalar((
+                                        *parent_object_entity_name,
                                         *newly_encountered_scalar_client_selectable_id,
-                                    )))
+                                    ))))
                                     .expect(
                                         "Expected field to exist when \
                                                 it is encountered loadably",
@@ -735,7 +741,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                     merge_traversal_state,
                                     *newly_encountered_scalar_client_selectable_id,
                                     newly_encountered_scalar_client_selectable,
-                                    parent_object_entity_name,
+                                    *parent_object_entity_name,
                                     parent_object_entity,
                                     variant,
                                 );
@@ -745,14 +751,15 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                 ClientFieldVariant::ImperativelyLoadedField(_)
                                 | ClientFieldVariant::UserWritten(_) => {
                                     merge_non_loadable_client_type(
-                                        parent_object_entity_name,
+                                        *parent_object_entity_name,
                                         parent_object_entity,
                                         schema,
                                         parent_map,
                                         merge_traversal_state,
-                                        SelectionType::Scalar(
+                                        SelectionType::Scalar((
+                                            *parent_object_entity_name,
                                             *newly_encountered_scalar_client_selectable_id,
-                                        ),
+                                        )),
                                         SelectionType::Scalar(
                                             newly_encountered_scalar_client_selectable,
                                         ),
@@ -765,7 +772,10 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                         }
 
                         merge_traversal_state.accessible_client_fields.insert(
-                            SelectionType::Scalar(*newly_encountered_scalar_client_selectable_id),
+                            SelectionType::Scalar((
+                                *parent_object_entity_name,
+                                *newly_encountered_scalar_client_selectable_id,
+                            )),
                         );
                     }
                 };
@@ -979,7 +989,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
     schema: &Schema<TNetworkProtocol>,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    newly_encountered_scalar_client_selectable_id: ClientScalarSelectableId,
+    newly_encountered_scalar_client_selectable_name: ClientScalarSelectableName,
     newly_encountered_scalar_client_selectable: &ClientScalarSelectable<TNetworkProtocol>,
     parent_object_entity_name: SchemaServerObjectEntityName,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
@@ -994,7 +1004,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
         refetch_field_parent_entity_name: parent_object_entity_name,
         imperatively_loaded_field_variant: variant.clone(),
         extra_selections: BTreeMap::new(),
-        client_field_id: newly_encountered_scalar_client_selectable_id,
+        client_field_name: newly_encountered_scalar_client_selectable_name,
     };
 
     merge_traversal_state.refetch_paths.insert(
@@ -1022,9 +1032,10 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
             )
             .refetch_selection_set(),
         encountered_client_field_map,
-        DefinitionLocation::Client(SelectionType::Scalar(
-            newly_encountered_scalar_client_selectable_id,
-        )),
+        DefinitionLocation::Client(SelectionType::Scalar((
+            parent_object_entity_name,
+            newly_encountered_scalar_client_selectable_name,
+        ))),
         &initial_variable_context(&SelectionType::Scalar(
             newly_encountered_scalar_client_selectable,
         )),
@@ -1316,8 +1327,7 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
     let link_selection = WithSpan::new(
         SelectionTypeContainingSelections::Scalar(ScalarSelection {
             arguments: vec![],
-            associated_data: DefinitionLocation::Client((
-                *server_object_selectable.target_object_entity.inner(),
+            associated_data: DefinitionLocation::Client(
                 *selectables_map
                     .get(&(*LINK_FIELD_NAME).into())
                     .expect("Expected link to exist")
@@ -1325,7 +1335,7 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
                     .expect("Expected link to be client field")
                     .as_scalar()
                     .expect("Expected link to be scalar field"),
-            )),
+            ),
             scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
             name: WithLocation::new((*LINK_FIELD_NAME).into(), Location::generated()),
             reader_alias: None,

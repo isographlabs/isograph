@@ -14,8 +14,6 @@ u32_newtype!(ServerStrongIdFieldId);
 
 u32_conversion!(from: ServerStrongIdFieldId, to: ServerScalarSelectableId);
 
-u32_newtype!(ClientScalarSelectableId);
-
 u32_newtype!(ClientObjectSelectableId);
 
 pub type ServerEntityName =

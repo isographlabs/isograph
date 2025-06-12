@@ -13,11 +13,10 @@ use intern::string_key::Intern;
 use intern::Lookup;
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldDirectiveSet, ClientObjectSelectableId,
-    ClientScalarSelectableId, DefinitionLocation, EmptyDirectiveSet, ObjectSelection,
-    ScalarSelection, SelectionType, SelectionTypeContainingSelections, ServerEntityName,
-    ServerObjectSelectableId, ServerScalarSelectableId, ServerStrongIdFieldId, VariableDefinition,
-    WithId,
+    ArgumentKeyAndValue, ClientFieldDirectiveSet, ClientObjectSelectableId, DefinitionLocation,
+    EmptyDirectiveSet, ObjectSelection, ScalarSelection, SelectionType,
+    SelectionTypeContainingSelections, ServerEntityName, ServerObjectSelectableId,
+    ServerScalarSelectableId, ServerStrongIdFieldId, VariableDefinition, WithId,
 };
 use lazy_static::lazy_static;
 
@@ -43,9 +42,15 @@ pub struct RootOperationName(pub String);
 pub struct Schema<TNetworkProtocol: NetworkProtocol> {
     pub server_scalar_selectables: Vec<ServerScalarSelectable<TNetworkProtocol>>,
     pub server_object_selectables: Vec<ServerObjectSelectable<TNetworkProtocol>>,
-    pub client_scalar_selectables: Vec<ClientScalarSelectable<TNetworkProtocol>>,
+    pub client_scalar_selectables: HashMap<
+        (SchemaServerObjectEntityName, ClientScalarSelectableName),
+        ClientScalarSelectable<TNetworkProtocol>,
+    >,
     pub client_object_selectables: Vec<ClientObjectSelectable<TNetworkProtocol>>,
-    pub entrypoints: HashMap<ClientScalarSelectableId, EntrypointDeclarationInfo>,
+    pub entrypoints: HashMap<
+        (SchemaServerObjectEntityName, ClientScalarSelectableName),
+        EntrypointDeclarationInfo,
+    >,
     pub server_entity_data: ServerEntityData<TNetworkProtocol>,
 
     /// These are root types like Query, Mutation, Subscription
@@ -108,7 +113,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         Self {
             server_scalar_selectables: vec![],
             server_object_selectables: vec![],
-            client_scalar_selectables: vec![],
+            client_scalar_selectables: HashMap::new(),
             client_object_selectables: vec![],
 
             entrypoints: Default::default(),
@@ -371,6 +376,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         }
     }
 
+    // TODO this function should not exist
     pub fn insert_server_scalar_selectable(
         &mut self,
         server_scalar_selectable: ServerScalarSelectable<TNetworkProtocol>,
@@ -430,6 +436,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         Ok(())
     }
 
+    // TODO this function should not exist
     pub fn insert_server_object_selectable(
         &mut self,
         server_object_selectable: ServerObjectSelectable<TNetworkProtocol>,
@@ -465,28 +472,27 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         Ok(())
     }
 
-    /// Get a reference to a given client field by its id.
+    /// Get a reference to a given client field by its field name and parent name.
+    ///
     pub fn client_field(
         &self,
-        client_field_id: ClientScalarSelectableId,
+        parent_type_name: SchemaServerObjectEntityName,
+        client_field_name: ClientScalarSelectableName,
     ) -> &ClientScalarSelectable<TNetworkProtocol> {
-        &self.client_scalar_selectables[client_field_id.as_usize()]
+        self.client_scalar_selectables
+            .get(&(parent_type_name, client_field_name))
+            .expect("Expected client field to exist")
     }
 
+    // TODO this function should not exist
     pub fn client_field_mut(
         &mut self,
-        client_field_id: ClientScalarSelectableId,
+        parent_type_name: SchemaServerObjectEntityName,
+        client_field_name: ClientScalarSelectableName,
     ) -> &mut ClientScalarSelectable<TNetworkProtocol> {
-        &mut self.client_scalar_selectables[client_field_id.as_usize()]
-    }
-
-    pub fn client_scalar_selectables_and_ids(
-        &self,
-    ) -> impl Iterator<Item = WithId<&ClientScalarSelectable<TNetworkProtocol>>> {
         self.client_scalar_selectables
-            .iter()
-            .enumerate()
-            .map(|(id, client_scalar_selectable)| WithId::new(id.into(), client_scalar_selectable))
+            .get_mut(&(parent_type_name, client_field_name))
+            .expect("Expected client field to exist")
     }
 
     pub fn object_selectable(
@@ -510,6 +516,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &self.client_object_selectables[client_pointer_id.as_usize()]
     }
 
+    // TODO this function should not exist
     pub fn client_pointer_mut(
         &mut self,
         client_pointer_id: ClientObjectSelectableId,
@@ -534,8 +541,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &ClientObjectSelectable<TNetworkProtocol>,
     > {
         match client_type_id {
-            SelectionType::Scalar(client_field_id) => {
-                SelectionType::Scalar(self.client_field(client_field_id))
+            SelectionType::Scalar((parent_type_name, client_field_id)) => {
+                SelectionType::Scalar(self.client_field(parent_type_name, client_field_id))
             }
             SelectionType::Object(client_pointer_id) => {
                 SelectionType::Object(self.client_pointer(client_pointer_id))
@@ -548,7 +555,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &self,
     ) -> impl Iterator<
         Item = (
-            SelectionType<ClientScalarSelectableId, ClientObjectSelectableId>,
+            SelectionType<
+                (SchemaServerObjectEntityName, ClientScalarSelectableName),
+                ClientObjectSelectableId,
+            >,
             SelectionType<
                 &ClientScalarSelectable<TNetworkProtocol>,
                 &ClientObjectSelectable<TNetworkProtocol>,
@@ -557,12 +567,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         ),
     > {
         self.client_scalar_selectables
-            .iter()
-            .enumerate()
-            .flat_map(|(id, field)| match field.variant {
+            .values()
+            .flat_map(|field| match field.variant {
                 ClientFieldVariant::Link => None,
                 ClientFieldVariant::UserWritten(info) => Some((
-                    SelectionType::Scalar(id.into()),
+                    SelectionType::Scalar((field.parent_object_entity_name, field.name)),
                     SelectionType::Scalar(field),
                     info.client_field_directive_set,
                 )),
@@ -613,6 +622,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
             .expect("Expected object to exist")
     }
 
+    // TODO this function should not exist
     pub fn server_object_entities_and_ids_mut(
         &mut self,
     ) -> impl Iterator<Item = WithId<&mut ServerObjectEntity<TNetworkProtocol>>> + '_ {
@@ -621,6 +631,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
             .map(|(name, object)| WithId::new(*name, object))
     }
 
+    // TODO this function should not exist
     pub fn insert_server_scalar_entity(
         &mut self,
         server_scalar_entity: ServerScalarEntity<TNetworkProtocol>,
@@ -647,6 +658,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
         Ok(())
     }
 
+    // TODO this function should not exist
     pub fn insert_server_object_entity(
         &mut self,
         server_object_entity: ServerObjectEntity<TNetworkProtocol>,
@@ -745,7 +757,7 @@ pub type ValidatedUseRefetchFieldStrategy =
 
 pub type ScalarSelectableId = DefinitionLocation<
     ServerScalarSelectableId,
-    (SchemaServerObjectEntityName, ClientScalarSelectableId),
+    (SchemaServerObjectEntityName, ClientScalarSelectableName),
 >;
 
 /// If we have encountered an id field, we can:

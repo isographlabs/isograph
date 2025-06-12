@@ -38,8 +38,8 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                     indentation_level,
                     initial_variable_context,
                 ),
-                DefinitionLocation::Client((_parent_entity_name, client_field_id)) => {
-                    let client_field = schema.client_field(client_field_id);
+                DefinitionLocation::Client((parent_entity_name, client_field_name)) => {
+                    let client_field = schema.client_field(parent_entity_name, client_field_name);
                     scalar_client_defined_field_ast_node(
                         scalar_field_selection,
                         schema,
@@ -668,8 +668,9 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                     DefinitionLocation::Server(_) => {
                         // Do nothing, we encountered a server field
                     }
-                    DefinitionLocation::Client((_parent_entity_name, client_field_id)) => {
-                        let client_field = schema.client_field(client_field_id);
+                    DefinitionLocation::Client((parent_entity_name, client_field_name)) => {
+                        let client_field =
+                            schema.client_field(parent_entity_name, client_field_name);
                         match categorize_field_loadability(
                             client_field,
                             &scalar_field_selection.scalar_selection_directive_set,

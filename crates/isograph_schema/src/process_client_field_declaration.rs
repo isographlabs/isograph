@@ -8,9 +8,8 @@ use common_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientFieldDirectiveSet, ClientObjectSelectableId,
-    ClientPointerDeclaration, ClientScalarSelectableId, DefinitionLocation, DeserializationError,
-    NonConstantValue, SelectionType, ServerEntityName, TypeAnnotation, UnvalidatedSelection,
-    VariableDefinition,
+    ClientPointerDeclaration, DefinitionLocation, DeserializationError, NonConstantValue,
+    SelectionType, ServerEntityName, TypeAnnotation, UnvalidatedSelection, VariableDefinition,
 };
 
 use thiserror::Error;
@@ -24,7 +23,8 @@ use crate::{
 pub type UnprocessedSelection = WithSpan<UnvalidatedSelection>;
 
 pub struct UnprocessedClientFieldItem {
-    pub client_field_id: ClientScalarSelectableId,
+    pub parent_object_entity_name: SchemaServerObjectEntityName,
+    pub client_field_name: ClientScalarSelectableName,
     pub reader_selection_set: Vec<UnprocessedSelection>,
     pub refetch_strategy: Option<RefetchStrategy<(), ()>>,
 }
@@ -173,8 +173,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let client_field_field_name_ws = client_field_declaration.item.client_field_name;
         let client_field_name = client_field_field_name_ws.item;
         let client_field_name_span = client_field_field_name_ws.span;
-
-        let next_client_field_id = self.client_scalar_selectables.len().into();
+        let client_scalar_selectable_name = client_field_declaration.item.client_field_name.item;
 
         if self
             .server_entity_data
@@ -184,7 +183,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .selectables
             .insert(
                 client_field_name.into(),
-                DefinitionLocation::Client(SelectionType::Scalar(next_client_field_id)),
+                DefinitionLocation::Client(SelectionType::Scalar((
+                    parent_object_entity_name,
+                    client_scalar_selectable_name,
+                ))),
             )
             .is_some()
         {
@@ -198,36 +200,38 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             ));
         }
 
-        let name = client_field_declaration.item.client_field_name.item;
         let variant = get_client_variant(&client_field_declaration.item);
 
-        self.client_scalar_selectables.push(ClientScalarSelectable {
-            description: client_field_declaration.item.description.map(|x| x.item),
-            name,
-            reader_selection_set: vec![],
-            variant,
-            variable_definitions: client_field_declaration
-                .item
-                .variable_definitions
-                .into_iter()
-                .map(|variable_definition| {
-                    validate_variable_definition(
-                        &self.server_entity_data.defined_entities,
-                        variable_definition,
-                        object.name,
-                        client_field_name.into(),
-                    )
-                })
-                .collect::<Result<_, _>>()?,
-            type_and_field: ObjectTypeAndFieldName {
-                type_name: object.name,
-                field_name: name.into(),
-            },
+        self.client_scalar_selectables.insert(
+            (object.name, client_scalar_selectable_name),
+            ClientScalarSelectable {
+                description: client_field_declaration.item.description.map(|x| x.item),
+                name: client_scalar_selectable_name,
+                reader_selection_set: vec![],
+                variant,
+                variable_definitions: client_field_declaration
+                    .item
+                    .variable_definitions
+                    .into_iter()
+                    .map(|variable_definition| {
+                        validate_variable_definition(
+                            &self.server_entity_data.defined_entities,
+                            variable_definition,
+                            object.name,
+                            client_field_name.into(),
+                        )
+                    })
+                    .collect::<Result<_, _>>()?,
+                type_and_field: ObjectTypeAndFieldName {
+                    type_name: object.name,
+                    field_name: client_scalar_selectable_name.into(),
+                },
 
-            parent_object_entity_name,
-            refetch_strategy: None,
-            output_format: std::marker::PhantomData,
-        });
+                parent_object_entity_name,
+                refetch_strategy: None,
+                output_format: std::marker::PhantomData,
+            },
+        );
 
         let selections = client_field_declaration.item.selection_set;
         let id_field = self
@@ -256,7 +260,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         });
 
         Ok(UnprocessedClientFieldItem {
-            client_field_id: next_client_field_id,
+            parent_object_entity_name,
+            client_field_name: client_scalar_selectable_name,
             reader_selection_set: selections,
             refetch_strategy,
         })

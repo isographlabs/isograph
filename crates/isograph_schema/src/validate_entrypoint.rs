@@ -1,12 +1,12 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
-    IsoLiteralText, Location, SchemaServerObjectEntityName, ServerScalarSelectableName, TextSource,
-    UnvalidatedTypeName, WithLocation, WithSpan,
+    ClientScalarSelectableName, IsoLiteralText, Location, SchemaServerObjectEntityName,
+    ServerScalarSelectableName, TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use isograph_lang_types::{
-    ClientScalarSelectableId, DefinitionLocation, EntrypointDeclaration, EntrypointDirectiveSet,
-    SelectionType, ServerEntityName,
+    DefinitionLocation, EntrypointDeclaration, EntrypointDirectiveSet, SelectionType,
+    ServerEntityName,
 };
 
 use thiserror::Error;
@@ -19,16 +19,19 @@ pub struct EntrypointDeclarationInfo {
     pub directive_set: EntrypointDirectiveSet,
 }
 
+#[allow(clippy::type_complexity)]
 pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     entrypoint_declarations: Vec<(TextSource, WithSpan<EntrypointDeclaration>)>,
 ) -> Result<
-    HashMap<ClientScalarSelectableId, EntrypointDeclarationInfo>,
+    HashMap<(SchemaServerObjectEntityName, ClientScalarSelectableName), EntrypointDeclarationInfo>,
     Vec<WithLocation<ValidateEntrypointDeclarationError>>,
 > {
     let mut errors = vec![];
-    let mut entrypoints: HashMap<ClientScalarSelectableId, EntrypointDeclarationInfo> =
-        HashMap::new();
+    let mut entrypoints: HashMap<
+        (SchemaServerObjectEntityName, ClientScalarSelectableName),
+        EntrypointDeclarationInfo,
+    > = HashMap::new();
     for (text_source, entrypoint_declaration) in entrypoint_declarations {
         match validate_entrypoint_type_and_field(schema, text_source, entrypoint_declaration) {
             Ok(client_field_id) => {
@@ -36,7 +39,14 @@ pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol>(
                     iso_literal_text: entrypoint_declaration.item.iso_literal_text,
                     directive_set: entrypoint_declaration.item.entrypoint_directive_set,
                 };
-                match entrypoints.entry(client_field_id) {
+                match entrypoints.entry((
+                    entrypoint_declaration
+                        .item
+                        .parent_type
+                        .item
+                        .unchecked_conversion(),
+                    client_field_id,
+                )) {
                     Entry::Occupied(occupied_entry) => {
                         if occupied_entry.get().directive_set != new_entrypoint.directive_set {
                             errors.push(WithLocation::new(
@@ -70,7 +80,7 @@ fn validate_entrypoint_type_and_field<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     text_source: TextSource,
     entrypoint_declaration: WithSpan<EntrypointDeclaration>,
-) -> Result<ClientScalarSelectableId, WithLocation<ValidateEntrypointDeclarationError>> {
+) -> Result<ClientScalarSelectableName, WithLocation<ValidateEntrypointDeclarationError>> {
     let parent_object_entity_id = validate_parent_object_entity_id(
         schema,
         entrypoint_declaration.item.parent_type,
@@ -148,7 +158,7 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
     field_name: WithSpan<ServerScalarSelectableName>,
     text_source: TextSource,
     parent_object_name: SchemaServerObjectEntityName,
-) -> Result<ClientScalarSelectableId, WithLocation<ValidateEntrypointDeclarationError>> {
+) -> Result<ClientScalarSelectableName, WithLocation<ValidateEntrypointDeclarationError>> {
     let parent_object = schema
         .server_entity_data
         .server_object_entity(parent_object_name);
@@ -173,9 +183,10 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
                 },
                 Location::new(text_source, field_name.span),
             )),
-            DefinitionLocation::Client(SelectionType::Scalar(client_field_id)) => {
-                Ok(*client_field_id)
-            }
+            DefinitionLocation::Client(SelectionType::Scalar((
+                _parent_entity_name,
+                client_field_name,
+            ))) => Ok(*client_field_name),
         },
         None => Err(WithLocation::new(
             ValidateEntrypointDeclarationError::ClientFieldMustExist {

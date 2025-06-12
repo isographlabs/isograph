@@ -1,13 +1,11 @@
 use std::collections::BTreeSet;
 
 use common_lang_types::{
-    ArtifactPathAndContent, ObjectTypeAndFieldName, QueryOperationName, QueryText,
-    SchemaServerObjectEntityName, VariableName,
+    ArtifactPathAndContent, ClientScalarSelectableName, ObjectTypeAndFieldName, QueryOperationName,
+    QueryText, SchemaServerObjectEntityName, VariableName,
 };
 use isograph_config::GenerateFileExtensionsOption;
-use isograph_lang_types::{
-    ClientScalarSelectableId, DefinitionLocation, ScalarSelectionDirectiveSet, SelectionType,
-};
+use isograph_lang_types::{DefinitionLocation, ScalarSelectionDirectiveSet, SelectionType};
 use isograph_schema::{
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
@@ -40,11 +38,12 @@ struct EntrypointArtifactInfo<'schema, TNetworkProtocol: NetworkProtocol> {
 
 pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    entrypoint_id: ClientScalarSelectableId,
+    parent_entity_name: SchemaServerObjectEntityName,
+    entrypoint_scalar_selectable_name: ClientScalarSelectableName,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     file_extensions: GenerateFileExtensionsOption,
 ) -> Vec<ArtifactPathAndContent> {
-    let entrypoint = schema.client_field(entrypoint_id);
+    let entrypoint = schema.client_field(parent_entity_name, entrypoint_scalar_selectable_name);
 
     let FieldTraversalResult {
         traversal_state,
@@ -58,7 +57,10 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
             .server_object_entity(entrypoint.parent_object_entity_name),
         entrypoint.selection_set_for_parent_query(),
         encountered_client_type_map,
-        DefinitionLocation::Client(SelectionType::Scalar(entrypoint_id)),
+        DefinitionLocation::Client(SelectionType::Scalar((
+            entrypoint.parent_object_entity_name,
+            entrypoint_scalar_selectable_name,
+        ))),
         &initial_variable_context(&SelectionType::Scalar(entrypoint)),
     );
 
@@ -135,9 +137,14 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
                     // Note: it would be cleaner to include a reference to the merged selection set here via
                     // the selection_variant variable, instead of by looking it up like this.
                     &encountered_client_type_map
-                        .get(&DefinitionLocation::Client(SelectionType::Scalar(
-                            root_refetch_path.path_to_refetch_field_info.client_field_id,
-                        )))
+                        .get(&DefinitionLocation::Client(SelectionType::Scalar((
+                            root_refetch_path
+                                .path_to_refetch_field_info
+                                .refetch_field_parent_entity_name,
+                            root_refetch_path
+                                .path_to_refetch_field_info
+                                .client_field_name,
+                        ))))
                         .expect(
                             "Expected field to have been encountered, \
                                 since it is being used as a refetch field.",

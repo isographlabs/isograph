@@ -1,7 +1,7 @@
 use common_lang_types::{
-    derive_display, ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent, DescriptionValue,
-    Location, ObjectTypeAndFieldName, SchemaServerObjectEntityName, SelectableNameOrAlias, Span,
-    WithLocation, WithSpan,
+    derive_display, ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent,
+    ClientScalarSelectableName, DescriptionValue, Location, ObjectTypeAndFieldName,
+    SchemaServerObjectEntityName, SelectableNameOrAlias, Span, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
@@ -11,11 +11,10 @@ use intern::{string_key::Intern, Lookup};
 use core::panic;
 use isograph_config::CompilerConfig;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldDirectiveSet, ClientScalarSelectableId, DefinitionLocation,
-    EmptyDirectiveSet, NonConstantValue, ObjectSelectionDirectiveSet, ScalarSelection,
-    ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionType,
-    SelectionTypeContainingSelections, ServerEntityName, TypeAnnotation, UnionVariant,
-    VariableDefinition,
+    ArgumentKeyAndValue, ClientFieldDirectiveSet, DefinitionLocation, EmptyDirectiveSet,
+    NonConstantValue, ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
+    SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, ServerEntityName,
+    TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
     accessible_client_fields, description, inline_fragment_reader_selection_set,
@@ -120,17 +119,21 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
     let mut encountered_output_types = HashSet::<ClientSelectableId>::new();
 
     // For each entrypoint, generate an entrypoint artifact and refetch artifacts
-    for entrypoint_id in schema.entrypoints.keys() {
+    for (parent_entity_name, entrypoint_selectable_name) in schema.entrypoints.keys() {
         let entrypoint_path_and_content = generate_entrypoint_artifacts(
             schema,
-            *entrypoint_id,
+            *parent_entity_name,
+            *entrypoint_selectable_name,
             &mut encountered_client_type_map,
             config.options.include_file_extensions_in_import_statements,
         );
         path_and_contents.extend(entrypoint_path_and_content);
 
         // We also need to generate output types for entrypoints
-        encountered_output_types.insert(SelectionType::Scalar(*entrypoint_id));
+        encountered_output_types.insert(SelectionType::Scalar((
+            *parent_entity_name,
+            *entrypoint_selectable_name,
+        )));
     }
 
     for (
@@ -179,8 +182,12 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     traversal_state.has_updatable,
                 ));
             }
-            DefinitionLocation::Client(SelectionType::Scalar(client_scalar_selectable_id)) => {
-                let client_scalar_selectable = schema.client_field(*client_scalar_selectable_id);
+            DefinitionLocation::Client(SelectionType::Scalar((
+                parent_entity_id,
+                client_scalar_selectable_name,
+            ))) => {
+                let client_scalar_selectable =
+                    schema.client_field(*parent_entity_id, *client_scalar_selectable_name);
 
                 match &client_scalar_selectable.variant {
                     ClientFieldVariant::Link => (),
@@ -306,7 +313,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
         }
     }
 
-    for (client_type_id, user_written_client_type, _) in schema.user_written_client_types() {
+    for (client_type_name, user_written_client_type, _) in schema.user_written_client_types() {
         // For each user-written client types, generate a param type artifact
         path_and_contents.push(generate_eager_reader_param_type_artifact(
             schema,
@@ -314,7 +321,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
             config.options.include_file_extensions_in_import_statements,
         ));
 
-        match encountered_client_type_map.get(&DefinitionLocation::Client(client_type_id)) {
+        match encountered_client_type_map.get(&DefinitionLocation::Client(client_type_name)) {
             Some(FieldTraversalResult {
                 traversal_state, ..
             }) => {
@@ -634,7 +641,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         print_javascript_type_declaration(&output_type)
                     ));
                 }
-                DefinitionLocation::Client((_parent_entity_name, client_field_id)) => {
+                DefinitionLocation::Client((parent_entity_name, client_field_name)) => {
                     write_param_type_from_client_field(
                         schema,
                         query_type_declaration,
@@ -643,7 +650,8 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         indentation_level,
                         link_fields,
                         scalar_field_selection,
-                        client_field_id,
+                        parent_entity_name,
+                        client_field_name,
                     )
                 }
             }
@@ -710,9 +718,10 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
     indentation_level: u8,
     link_fields: &mut bool,
     scalar_field_selection: &ScalarSelection<ScalarSelectableId>,
-    client_field_id: ClientScalarSelectableId,
+    parent_entity_name: SchemaServerObjectEntityName,
+    client_field_name: ClientScalarSelectableName,
 ) {
-    let client_field = schema.client_field(client_field_id);
+    let client_field = schema.client_field(parent_entity_name, client_field_name);
     write_optional_description(
         client_field.description,
         query_type_declaration,
@@ -840,7 +849,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         }
                     }
                 }
-                DefinitionLocation::Client((_parent_entity_name, client_field_id)) => {
+                DefinitionLocation::Client((parent_entity_name, client_field_id)) => {
                     write_param_type_from_client_field(
                         schema,
                         query_type_declaration,
@@ -849,6 +858,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         indentation_level,
                         link_fields,
                         scalar_field_selection,
+                        parent_entity_name,
                         client_field_id,
                     );
                 }

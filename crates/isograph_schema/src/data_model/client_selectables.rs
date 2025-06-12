@@ -5,8 +5,8 @@ use common_lang_types::{
     ObjectTypeAndFieldName, SchemaServerObjectEntityName, WithSpan,
 };
 use isograph_lang_types::{
-    impl_with_id, ClientObjectSelectableId, ClientScalarSelectableId, SelectionType,
-    ServerEntityName, TypeAnnotation, VariableDefinition,
+    impl_with_id, ClientObjectSelectableId, SelectionType, ServerEntityName, TypeAnnotation,
+    VariableDefinition,
 };
 
 use crate::{
@@ -14,7 +14,10 @@ use crate::{
     UserWrittenClientPointerInfo, ValidatedSelection,
 };
 
-pub type ClientSelectableId = SelectionType<ClientScalarSelectableId, ClientObjectSelectableId>;
+pub type ClientSelectableId = SelectionType<
+    (SchemaServerObjectEntityName, ClientScalarSelectableName),
+    ClientObjectSelectableId,
+>;
 
 pub type ClientSelectable<'a, TNetworkProtocol> = SelectionType<
     &'a ClientScalarSelectable<TNetworkProtocol>,
@@ -46,7 +49,7 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub output_format: PhantomData<TNetworkProtocol>,
 }
 
-impl_with_id!(ClientScalarSelectable<TNetworkProtocol: NetworkProtocol>, ClientScalarSelectableId);
+impl_with_id!(ClientScalarSelectable<TNetworkProtocol: NetworkProtocol>, ClientScalarSelectableName);
 
 /// The struct formally known as a client pointer, and declared with the pointer keyword
 /// in iso literals.
