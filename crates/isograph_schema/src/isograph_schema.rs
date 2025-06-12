@@ -588,8 +588,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
         &self,
         scalar_entity_name: SchemaServerScalarEntityName,
     ) -> &ServerScalarEntity<TNetworkProtocol> {
-        &self
-            .server_scalars
+        self.server_scalars
             .get(&scalar_entity_name)
             .expect("Expected scalar to exist")
     }
@@ -609,8 +608,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
         &self,
         object_entity_name: SchemaServerObjectEntityName,
     ) -> &ServerObjectEntity<TNetworkProtocol> {
-        &self
-            .server_objects
+        self.server_objects
             .get(&object_entity_name)
             .expect("Expected object to exist")
     }
