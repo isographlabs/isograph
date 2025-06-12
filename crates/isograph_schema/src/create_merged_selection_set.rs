@@ -34,7 +34,10 @@ pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
 
 // Maybe this should be FNVHashMap? We don't really need stable iteration order
 pub type FieldToCompletedMergeTraversalStateMap = BTreeMap<
-    DefinitionLocation<ServerObjectSelectableId, ClientSelectableId>,
+    DefinitionLocation<
+        (SchemaServerObjectEntityName, ServerObjectSelectableId),
+        ClientSelectableId,
+    >,
     FieldTraversalResult,
 >;
 
@@ -412,7 +415,10 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
-    root_field_id: DefinitionLocation<ServerObjectSelectableId, ClientSelectableId>,
+    root_field_id: DefinitionLocation<
+        (SchemaServerObjectEntityName, ServerObjectSelectableId),
+        ClientSelectableId,
+    >,
     variable_context: &VariableContext,
     // TODO return Cow?
 ) -> FieldTraversalResult {
@@ -791,7 +797,10 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                     .server_object_entity(parent_object_entity_name);
 
                 match object_selection.associated_data {
-                    DefinitionLocation::Client(newly_encountered_client_object_selectable_id) => {
+                    DefinitionLocation::Client((
+                        _parent_object_entity_name,
+                        newly_encountered_client_object_selectable_id,
+                    )) => {
                         let newly_encountered_client_object_selectable =
                             schema.client_pointer(newly_encountered_client_object_selectable_id);
 
@@ -801,7 +810,10 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             schema,
                             parent_map,
                             merge_traversal_state,
-                            SelectionType::Object(newly_encountered_client_object_selectable_id),
+                            SelectionType::Object((
+                                parent_object_entity_name,
+                                newly_encountered_client_object_selectable_id,
+                            )),
                             SelectionType::Object(newly_encountered_client_object_selectable),
                             encountered_client_type_map,
                             variable_context,
@@ -809,10 +821,16 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                         );
 
                         merge_traversal_state.accessible_client_fields.insert(
-                            SelectionType::Object(newly_encountered_client_object_selectable_id),
+                            SelectionType::Object((
+                                parent_object_entity_name,
+                                newly_encountered_client_object_selectable_id,
+                            )),
                         );
                     }
-                    DefinitionLocation::Server(server_object_selectable_id) => {
+                    DefinitionLocation::Server((
+                        _parent_object_entity_name,
+                        server_object_selectable_id,
+                    )) => {
                         let server_object_selectable =
                             schema.server_object_selectable(server_object_selectable_id);
 
@@ -890,7 +908,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                             parent_object_entity,
                                             &object_selection.selection_set,
                                             encountered_client_type_map,
-                                            DefinitionLocation::Server(server_object_selectable_id),
+                                            DefinitionLocation::Server((parent_object_entity_name, server_object_selectable_id)),
                                             &server_object_selectable.initial_variable_context()
                                         );
                                     }

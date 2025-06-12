@@ -381,7 +381,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .selectables
             .insert(
                 client_pointer_name.into(),
-                DefinitionLocation::Client(SelectionType::Object(next_client_pointer_id)),
+                DefinitionLocation::Client(SelectionType::Object((
+                    parent_object_name,
+                    next_client_pointer_id,
+                ))),
             )
             .is_some()
         {

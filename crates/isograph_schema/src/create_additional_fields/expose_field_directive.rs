@@ -78,7 +78,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let primary_field_name_selection_parts =
             path.map(|x| x.intern().into()).collect::<Vec<_>>();
 
-        let mutation_subfield_id =
+        let (_parent_object_entity_name, mutation_subfield_id) =
             self.parse_mutation_subfield_id(field, parent_object_entity_name)?;
 
         // TODO do not use mutation naming here
@@ -298,7 +298,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &self,
         field_arg: &str,
         mutation_object_entity_name: SchemaServerObjectEntityName,
-    ) -> ProcessTypeDefinitionResult<ServerObjectSelectableId> {
+    ) -> ProcessTypeDefinitionResult<(SchemaServerObjectEntityName, ServerObjectSelectableId)> {
         let field_id = self
             .server_entity_data
             .server_object_entity_extra_info

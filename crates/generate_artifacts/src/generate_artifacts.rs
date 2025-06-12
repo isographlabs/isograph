@@ -147,7 +147,10 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
     ) in &encountered_client_type_map
     {
         match encountered_field_id {
-            DefinitionLocation::Server(server_object_selectable_id) => {
+            DefinitionLocation::Server((
+                _parent_object_entity_name,
+                server_object_selectable_id,
+            )) => {
                 let server_object_selectable =
                     schema.server_object_selectable(*server_object_selectable_id);
                 match &server_object_selectable.object_selectable_variant {
@@ -164,7 +167,10 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 }
             }
 
-            DefinitionLocation::Client(SelectionType::Object(client_object_selectable_id)) => {
+            DefinitionLocation::Client(SelectionType::Object((
+                _parent_object_entity_name,
+                client_object_selectable_id,
+            ))) => {
                 let client_object_selectable = schema.client_pointer(*client_object_selectable_id);
                 path_and_contents.extend(generate_eager_reader_artifacts(
                     schema,
@@ -612,7 +618,10 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     match &selection.item {
         SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
             match scalar_field_selection.associated_data {
-                DefinitionLocation::Server(server_scalar_selectable_id) => {
+                DefinitionLocation::Server((
+                    _parent_object_entity_name,
+                    server_scalar_selectable_id,
+                )) => {
                     let field = schema.server_scalar_selectable(server_scalar_selectable_id);
 
                     write_optional_description(
@@ -658,12 +667,13 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
         }
         SelectionTypeContainingSelections::Object(linked_field) => {
             let field = match linked_field.associated_data {
-                DefinitionLocation::Server(server_object_selectable_id) => {
-                    DefinitionLocation::Server(
-                        schema.server_object_selectable(server_object_selectable_id),
-                    )
-                }
-                DefinitionLocation::Client(client_pointer_id) => {
+                DefinitionLocation::Server((
+                    _parent_object_entity_name,
+                    server_object_selectable_id,
+                )) => DefinitionLocation::Server(
+                    schema.server_object_selectable(server_object_selectable_id),
+                ),
+                DefinitionLocation::Client((_parent_object_entity_name, client_pointer_id)) => {
                     DefinitionLocation::Client(schema.client_pointer(client_pointer_id))
                 }
             };
@@ -803,7 +813,10 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     match &selection.item {
         SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
             match scalar_field_selection.associated_data {
-                DefinitionLocation::Server(server_scalar_selectable_id) => {
+                DefinitionLocation::Server((
+                    _parent_object_entity_name,
+                    server_scalar_selectable_id,
+                )) => {
                     let field = schema.server_scalar_selectable(server_scalar_selectable_id);
 
                     write_optional_description(

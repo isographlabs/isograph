@@ -186,12 +186,19 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     }
                     SelectionType::Object(object) => {
                         let target_object_entity_name = match object {
-                            DefinitionLocation::Server(s) => {
-                                let selectable = self.server_object_selectable(*s);
+                            DefinitionLocation::Server((
+                                _parent_object_entity_name,
+                                server_object_selectable_id,
+                            )) => {
+                                let selectable =
+                                    self.server_object_selectable(*server_object_selectable_id);
                                 selectable.target_object_entity.inner()
                             }
-                            DefinitionLocation::Client(c) => {
-                                let pointer = self.client_pointer(*c);
+                            DefinitionLocation::Client((
+                                _parent_object_entity_name,
+                                client_object_selectable_id,
+                            )) => {
+                                let pointer = self.client_pointer(*client_object_selectable_id);
                                 pointer.target_object_entity_name.inner()
                             }
                         };
@@ -254,8 +261,12 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     }
                     SelectionType::Object(object) => {
                         let target_object_entity_name = match object {
-                            DefinitionLocation::Server(s) => {
-                                let selectable = self.server_object_selectable(*s);
+                            DefinitionLocation::Server((
+                                _parent_object_entity_name,
+                                server_object_selectable_id,
+                            )) => {
+                                let selectable =
+                                    self.server_object_selectable(*server_object_selectable_id);
                                 path.push(selectable);
                                 selectable.target_object_entity.inner()
                             }
@@ -367,10 +378,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         server_selectable_id: ServerSelectableId,
     ) -> ServerSelectable<TNetworkProtocol> {
         match server_selectable_id {
-            SelectionType::Scalar(server_scalar_selectable_id) => {
+            SelectionType::Scalar((_parent_object_entity_name, server_scalar_selectable_id)) => {
                 SelectionType::Scalar(self.server_scalar_selectable(server_scalar_selectable_id))
             }
-            SelectionType::Object(server_object_selectable_id) => {
+            SelectionType::Object((_parent_object_entity_name, server_object_selectable_id)) => {
                 SelectionType::Object(self.server_object_selectable(server_object_selectable_id))
             }
         }
@@ -406,7 +417,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         if selectables
             .insert(
                 next_scalar_name.item.into(),
-                DefinitionLocation::Server(SelectionType::Scalar(next_server_scalar_selectable_id)),
+                DefinitionLocation::Server(SelectionType::Scalar((
+                    parent_type_name,
+                    next_server_scalar_selectable_id,
+                ))),
             )
             .is_some()
         {
@@ -453,7 +467,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .selectables
             .insert(
                 next_object_name.item.into(),
-                DefinitionLocation::Server(SelectionType::Object(next_server_object_selectable_id)),
+                DefinitionLocation::Server(SelectionType::Object((
+                    parent_object_entity_name,
+                    next_server_object_selectable_id,
+                ))),
             )
             .is_some()
         {
@@ -500,10 +517,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         field_id: ObjectSelectableId,
     ) -> ObjectSelectable<TNetworkProtocol> {
         match field_id {
-            DefinitionLocation::Server(server_field_id) => {
+            DefinitionLocation::Server((_parent_object_entity_name, server_field_id)) => {
                 DefinitionLocation::Server(self.server_object_selectable(server_field_id))
             }
-            DefinitionLocation::Client(client_pointer_id) => {
+            DefinitionLocation::Client((_parent_object_entity_name, client_pointer_id)) => {
                 DefinitionLocation::Client(self.client_pointer(client_pointer_id))
             }
         }
@@ -544,7 +561,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             SelectionType::Scalar((parent_type_name, client_field_id)) => {
                 SelectionType::Scalar(self.client_field(parent_type_name, client_field_id))
             }
-            SelectionType::Object(client_pointer_id) => {
+            SelectionType::Object((_parent_type_name, client_pointer_id)) => {
                 SelectionType::Object(self.client_pointer(client_pointer_id))
             }
         }
@@ -557,7 +574,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         Item = (
             SelectionType<
                 (SchemaServerObjectEntityName, ClientScalarSelectableName),
-                ClientObjectSelectableId,
+                (SchemaServerObjectEntityName, ClientObjectSelectableId),
             >,
             SelectionType<
                 &ClientScalarSelectable<TNetworkProtocol>,
@@ -583,7 +600,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     .enumerate()
                     .map(|(id, pointer)| {
                         (
-                            SelectionType::Object(id.into()),
+                            SelectionType::Object((pointer.parent_object_name, id.into())),
                             SelectionType::Object(pointer),
                             ClientFieldDirectiveSet::None(EmptyDirectiveSet {}),
                         )
@@ -756,7 +773,7 @@ pub type ValidatedUseRefetchFieldStrategy =
     UseRefetchFieldRefetchStrategy<ScalarSelectableId, ObjectSelectableId>;
 
 pub type ScalarSelectableId = DefinitionLocation<
-    ServerScalarSelectableId,
+    (SchemaServerObjectEntityName, ServerScalarSelectableId),
     (SchemaServerObjectEntityName, ClientScalarSelectableName),
 >;
 

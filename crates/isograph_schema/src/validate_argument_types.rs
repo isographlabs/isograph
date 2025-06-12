@@ -396,14 +396,14 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
         .iter()
         .filter_map(|(field_name, field_type)| {
             let iso_type_annotation = match field_type.as_server()? {
-                SelectionType::Scalar(scalar_selectable_id) => {
+                SelectionType::Scalar((_parent_object_entity_name, scalar_selectable_id)) => {
                     let field = &server_scalar_selectables[scalar_selectable_id.as_usize()];
                     let field_type_annotation = &field.target_scalar_entity;
                     field_type_annotation
                         .clone()
                         .map(&mut SelectionType::Scalar)
                 }
-                SelectionType::Object(object_selectable_id) => {
+                SelectionType::Object((_parent_object_entity_name, object_selectable_id)) => {
                     let field = &server_object_selectables[object_selectable_id.as_usize()];
                     let field_type_annotation = &field.target_object_entity;
                     field_type_annotation

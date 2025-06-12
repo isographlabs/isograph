@@ -73,8 +73,11 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
         &mut |selection| match selection {
             SelectionType::Scalar(scalar_selection) => {
                 let field_argument_definitions = match scalar_selection.associated_data {
-                    DefinitionLocation::Server(s) => schema
-                        .server_scalar_selectable(s)
+                    DefinitionLocation::Server((
+                        _parent_object_entity_name,
+                        server_scalar_selectable_name,
+                    )) => schema
+                        .server_scalar_selectable(server_scalar_selectable_name)
                         .arguments
                         .iter()
                         .map(|x| &x.item)
@@ -109,13 +112,16 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
             }
             SelectionType::Object(object_selection) => {
                 let field_argument_definitions = match object_selection.associated_data {
-                    DefinitionLocation::Server(object_selectable_id) => schema
+                    DefinitionLocation::Server((
+                        _parent_object_entity_name,
+                        object_selectable_id,
+                    )) => schema
                         .server_object_selectable(object_selectable_id)
                         .arguments
                         .iter()
                         .map(|x| &x.item)
                         .collect::<Vec<_>>(),
-                    DefinitionLocation::Client(pointer_id) => schema
+                    DefinitionLocation::Client((_parent_object_entity_name, pointer_id)) => schema
                         .client_pointer(pointer_id)
                         .variable_definitions
                         .iter()

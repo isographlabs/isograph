@@ -56,7 +56,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
         }
         SelectionTypeContainingSelections::Object(linked_field_selection) => {
             match linked_field_selection.associated_data {
-                DefinitionLocation::Client(client_pointer_id) => {
+                DefinitionLocation::Client((_parent_object_entity_name, client_pointer_id)) => {
                     let client_pointer = schema.client_pointer(client_pointer_id);
 
                     let inner_reader_ast = generate_reader_ast_with_path(
@@ -78,7 +78,10 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                         reader_imports,
                     )
                 }
-                DefinitionLocation::Server(server_object_selectable_id) => {
+                DefinitionLocation::Server((
+                    _parent_object_entity_name,
+                    server_object_selectable_id,
+                )) => {
                     let server_object_selectable =
                         schema.server_object_selectable(server_object_selectable_id);
                     let normalization_key = match server_object_selectable.object_selectable_variant
@@ -163,7 +166,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
 
     let condition = match linked_field.associated_data {
-        DefinitionLocation::Client(client_pointer_id) => {
+        DefinitionLocation::Client((_parent_object_entity_name, client_pointer_id)) => {
             let client_pointer = schema.client_pointer(client_pointer_id);
 
             let reader_artifact_import_name = format!(
@@ -178,7 +181,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
 
             reader_artifact_import_name
         }
-        DefinitionLocation::Server(server_field_id) => {
+        DefinitionLocation::Server((_parent_object_entity_name, server_field_id)) => {
             let server_field = schema.server_object_selectable(server_field_id);
             match &server_field.object_selectable_variant {
                 SchemaServerObjectSelectableVariant::InlineFragment => {
@@ -708,7 +711,10 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                     DefinitionLocation::Client(_) => {
                         // Do not recurse into selections of client pointers
                     }
-                    DefinitionLocation::Server(server_object_selectable_id) => {
+                    DefinitionLocation::Server((
+                        _parent_object_entity_name,
+                        server_object_selectable_id,
+                    )) => {
                         let server_object_selectable =
                             schema.server_object_selectable(server_object_selectable_id);
                         let normalization_key = match server_object_selectable

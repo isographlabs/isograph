@@ -14,9 +14,10 @@ use crate::{
     UserWrittenClientPointerInfo, ValidatedSelection,
 };
 
+// TODO rename
 pub type ClientSelectableId = SelectionType<
     (SchemaServerObjectEntityName, ClientScalarSelectableName),
-    ClientObjectSelectableId,
+    (SchemaServerObjectEntityName, ClientObjectSelectableId),
 >;
 
 pub type ClientSelectable<'a, TNetworkProtocol> = SelectionType<

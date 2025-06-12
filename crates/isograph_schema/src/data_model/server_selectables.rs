@@ -42,7 +42,11 @@ pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
 
 impl_with_id!(ServerObjectSelectable<TNetworkProtocol: NetworkProtocol>, ServerObjectSelectableId);
 
-pub type ServerSelectableId = SelectionType<ServerScalarSelectableId, ServerObjectSelectableId>;
+// TODO rename
+pub type ServerSelectableId = SelectionType<
+    (SchemaServerObjectEntityName, ServerScalarSelectableId),
+    (SchemaServerObjectEntityName, ServerObjectSelectableId),
+>;
 
 pub type ServerSelectable<'a, TNetworkProtocol> = SelectionType<
     &'a ServerScalarSelectable<TNetworkProtocol>,
