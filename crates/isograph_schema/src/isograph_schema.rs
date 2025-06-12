@@ -15,7 +15,7 @@ use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDirectiveSet, ClientObjectSelectableId,
     ClientScalarSelectableId, DefinitionLocation, EmptyDirectiveSet, ObjectSelection,
-    ScalarSelection, SelectionType, SelectionTypeContainingSelections, ServerEntityId,
+    ScalarSelection, SelectionType, SelectionTypeContainingSelections, ServerEntityName,
     ServerObjectSelectableId, ServerScalarSelectableId, ServerStrongIdFieldId, VariableDefinition,
     WithId,
 };
@@ -304,7 +304,7 @@ pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
 
     // TODO consider whether this is needed. Especially when server_objects and server_scalars
     // are combined, this seems pretty useless.
-    pub defined_entities: HashMap<UnvalidatedTypeName, ServerEntityId>,
+    pub defined_entities: HashMap<UnvalidatedTypeName, ServerEntityName>,
 
     // We keep track of available selectables and id fields outside of server_objects so that
     // we don't need a server_object_entity_mut method, which is incompatible with pico.
@@ -594,12 +594,12 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
             .expect("Expected scalar to exist")
     }
 
-    pub fn server_entity(&self, type_id: ServerEntityId) -> ServerEntity<TNetworkProtocol> {
+    pub fn server_entity(&self, type_id: ServerEntityName) -> ServerEntity<TNetworkProtocol> {
         match type_id {
-            ServerEntityId::Object(object_entity_id) => {
+            ServerEntityName::Object(object_entity_id) => {
                 ServerEntity::Object(self.server_object_entity(object_entity_id))
             }
-            ServerEntityId::Scalar(scalar_entity_id) => {
+            ServerEntityName::Scalar(scalar_entity_id) => {
                 ServerEntity::Scalar(self.server_scalar_entity(scalar_entity_id))
             }
         }
@@ -702,7 +702,7 @@ impl NameAndArguments {
 
 fn add_schema_defined_scalar_type<TNetworkProtocol: NetworkProtocol>(
     scalars: &mut HashMap<SchemaServerScalarEntityName, ServerScalarEntity<TNetworkProtocol>>,
-    defined_types: &mut HashMap<UnvalidatedTypeName, ServerEntityId>,
+    defined_types: &mut HashMap<UnvalidatedTypeName, ServerEntityName>,
     field_name: &'static str,
     javascript_name: JavascriptName,
 ) -> SchemaServerScalarEntityName {
@@ -719,7 +719,10 @@ fn add_schema_defined_scalar_type<TNetworkProtocol: NetworkProtocol>(
             output_format: std::marker::PhantomData,
         },
     );
-    defined_types.insert(typename.item.into(), ServerEntityId::Scalar(typename.item));
+    defined_types.insert(
+        typename.item.into(),
+        ServerEntityName::Scalar(typename.item),
+    );
     typename.item
 }
 
@@ -737,7 +740,7 @@ pub type ValidatedObjectSelection = ObjectSelection<ScalarSelectableId, ObjectSe
 
 pub type ValidatedScalarSelection = ScalarSelection<ScalarSelectableId>;
 
-pub type ValidatedVariableDefinition = VariableDefinition<ServerEntityId>;
+pub type ValidatedVariableDefinition = VariableDefinition<ServerEntityName>;
 
 pub type ValidatedUseRefetchFieldStrategy =
     UseRefetchFieldRefetchStrategy<ScalarSelectableId, ObjectSelectableId>;

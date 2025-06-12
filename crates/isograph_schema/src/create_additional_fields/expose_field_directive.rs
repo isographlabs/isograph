@@ -5,8 +5,8 @@ use common_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     ClientScalarSelectableId, DefinitionLocation, EmptyDirectiveSet, ScalarSelection,
-    ScalarSelectionDirectiveSet, SelectionType, SelectionTypeContainingSelections, ServerEntityId,
-    ServerObjectSelectableId, VariableDefinition,
+    ScalarSelectionDirectiveSet, SelectionType, SelectionTypeContainingSelections,
+    ServerEntityName, ServerObjectSelectableId, VariableDefinition,
 };
 
 use serde::Deserialize;
@@ -325,7 +325,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol>(
     // TODO move this to impl Schema
     schema: &mut Schema<TNetworkProtocol>,
-    arguments: Vec<WithLocation<VariableDefinition<ServerEntityId>>>,
+    arguments: Vec<WithLocation<VariableDefinition<ServerEntityName>>>,
     primary_type_name: SchemaServerObjectEntityName,
     mutation_object_name: SchemaServerObjectEntityName,
     mutation_field_name: SelectableName,

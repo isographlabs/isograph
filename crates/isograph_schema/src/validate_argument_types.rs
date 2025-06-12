@@ -9,8 +9,8 @@ use graphql_lang_types::{
 use thiserror::Error;
 
 use isograph_lang_types::{
-    graphql_type_annotation_from_type_annotation, NonConstantValue, SelectionType, ServerEntityId,
-    VariableDefinition,
+    graphql_type_annotation_from_type_annotation, NonConstantValue, SelectionType,
+    ServerEntityName, VariableDefinition,
 };
 
 use crate::{
@@ -39,7 +39,7 @@ fn graphql_type_to_nullable_type<TValue>(
 
 fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     scalar_literal_name: &SchemaServerScalarEntityName,
-    type_: &GraphQLTypeAnnotation<ServerEntityId>,
+    type_: &GraphQLTypeAnnotation<ServerEntityName>,
     schema_data: &ServerEntityData<TNetworkProtocol>,
     location: Location,
 ) -> Result<(), WithLocation<ValidateArgumentTypesError>> {
@@ -93,8 +93,8 @@ fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 }
 
 fn variable_type_satisfies_argument_type(
-    variable_type: &GraphQLTypeAnnotation<ServerEntityId>,
-    argument_type: &GraphQLTypeAnnotation<ServerEntityId>,
+    variable_type: &GraphQLTypeAnnotation<ServerEntityName>,
+    argument_type: &GraphQLTypeAnnotation<ServerEntityName>,
 ) -> bool {
     match argument_type {
         GraphQLTypeAnnotation::List(list_type) => {
@@ -133,7 +133,7 @@ fn variable_type_satisfies_argument_type(
 
 pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
-    field_argument_definition_type: &GraphQLTypeAnnotation<ServerEntityId>,
+    field_argument_definition_type: &GraphQLTypeAnnotation<ServerEntityName>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     schema_data: &ServerEntityData<TNetworkProtocol>,
     server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
@@ -311,7 +311,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 
 fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
-    variable_definitions: &[WithSpan<VariableDefinition<ServerEntityId>>],
+    variable_definitions: &[WithSpan<VariableDefinition<ServerEntityName>>],
     server_entity_data: &ServerEntityData<TNetworkProtocol>,
     server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
     server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
@@ -372,7 +372,7 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 
 enum ObjectLiteralFieldType {
     Provided(
-        GraphQLTypeAnnotation<ServerEntityId>,
+        GraphQLTypeAnnotation<ServerEntityName>,
         NameValuePair<ValueKeyName, NonConstantValue>,
     ),
     Missing(SelectableName),
@@ -464,7 +464,7 @@ fn validate_no_extraneous_fields(
 }
 
 fn id_annotation_to_typename_annotation<TNetworkProtocol: NetworkProtocol>(
-    type_: &GraphQLTypeAnnotation<ServerEntityId>,
+    type_: &GraphQLTypeAnnotation<ServerEntityName>,
     schema_data: &ServerEntityData<TNetworkProtocol>,
 ) -> GraphQLTypeAnnotation<UnvalidatedTypeName> {
     type_.clone().map(|type_id| match type_id {
@@ -482,7 +482,7 @@ fn id_annotation_to_typename_annotation<TNetworkProtocol: NetworkProtocol>(
 
 fn enum_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     enum_literal_value: &EnumLiteralValue,
-    enum_type: &GraphQLNamedTypeAnnotation<ServerEntityId>,
+    enum_type: &GraphQLNamedTypeAnnotation<ServerEntityName>,
     schema_data: &ServerEntityData<TNetworkProtocol>,
     location: Location,
 ) -> ValidateArgumentTypesResult<()> {
@@ -513,7 +513,7 @@ fn enum_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 
 fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     list: &[WithLocation<NonConstantValue>],
-    list_type: GraphQLListTypeAnnotation<ServerEntityId>,
+    list_type: GraphQLListTypeAnnotation<ServerEntityName>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     schema_data: &ServerEntityData<TNetworkProtocol>,
     server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
@@ -535,7 +535,7 @@ fn get_variable_type<'a>(
     variable_name: &'a VariableName,
     variable_definitions: &'a [WithSpan<ValidatedVariableDefinition>],
     location: Location,
-) -> ValidateArgumentTypesResult<&'a GraphQLTypeAnnotation<ServerEntityId>> {
+) -> ValidateArgumentTypesResult<&'a GraphQLTypeAnnotation<ServerEntityName>> {
     match variable_definitions
         .iter()
         .find(|definition| definition.item.name.item == *variable_name)

@@ -6,7 +6,7 @@ use common_lang_types::{
 };
 use isograph_lang_types::{
     ClientScalarSelectableId, DefinitionLocation, EntrypointDeclaration, EntrypointDirectiveSet,
-    SelectionType, ServerEntityId,
+    SelectionType, ServerEntityName,
 };
 
 use thiserror::Error;
@@ -103,7 +103,7 @@ fn validate_parent_object_entity_id<TNetworkProtocol: NetworkProtocol>(
         ))?;
 
     match parent_type_id {
-        ServerEntityId::Object(object_entity_id) => {
+        ServerEntityName::Object(object_entity_id) => {
             if !schema.fetchable_types.contains_key(object_entity_id) {
                 Err(WithLocation::new(
                     ValidateEntrypointDeclarationError::NonFetchableParentType {
@@ -127,7 +127,7 @@ fn validate_parent_object_entity_id<TNetworkProtocol: NetworkProtocol>(
                 Ok(*object_entity_id)
             }
         }
-        ServerEntityId::Scalar(scalar_entity_id) => {
+        ServerEntityName::Scalar(scalar_entity_id) => {
             let scalar_name = schema
                 .server_entity_data
                 .server_scalar_entity(*scalar_entity_id)

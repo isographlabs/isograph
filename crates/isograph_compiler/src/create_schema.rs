@@ -14,7 +14,7 @@ use graphql_lang_types::{
 use isograph_config::{CompilerConfig, CompilerConfigOptions};
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{
-    ConstantValue, IsoLiteralsSource, SelectionType, ServerEntityId, TypeAnnotation,
+    ConstantValue, IsoLiteralsSource, SelectionType, ServerEntityName, TypeAnnotation,
     VariableDefinition,
 };
 use isograph_schema::{
@@ -328,12 +328,12 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
 }
 
 pub fn graphql_input_value_definition_to_variable_definition(
-    defined_types: &HashMap<UnvalidatedTypeName, ServerEntityId>,
+    defined_types: &HashMap<UnvalidatedTypeName, ServerEntityName>,
     input_value_definition: WithLocation<GraphQLInputValueDefinition>,
     parent_type_name: SchemaServerObjectEntityName,
     field_name: SelectableName,
 ) -> Result<
-    WithLocation<VariableDefinition<ServerEntityId>>,
+    WithLocation<VariableDefinition<ServerEntityName>>,
     WithLocation<CreateAdditionalFieldsError>,
 > {
     let default_value = input_value_definition

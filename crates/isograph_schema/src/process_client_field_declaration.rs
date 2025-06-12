@@ -9,7 +9,7 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientFieldDirectiveSet, ClientObjectSelectableId,
     ClientPointerDeclaration, ClientScalarSelectableId, DefinitionLocation, DeserializationError,
-    NonConstantValue, SelectionType, ServerEntityId, TypeAnnotation, UnvalidatedSelection,
+    NonConstantValue, SelectionType, ServerEntityName, TypeAnnotation, UnvalidatedSelection,
     VariableDefinition,
 };
 
@@ -53,10 +53,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             ))?;
 
         let unprocess_client_field_items = match parent_type_id {
-            ServerEntityId::Object(object_entity_name) => self
+            ServerEntityName::Object(object_entity_name) => self
                 .add_client_field_to_object(*object_entity_name, client_field_declaration)
                 .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?,
-            ServerEntityId::Scalar(scalar_entity_id) => {
+            ServerEntityName::Scalar(scalar_entity_id) => {
                 let scalar_name = self
                     .server_entity_data
                     .server_scalar_entity(*scalar_entity_id)
@@ -109,8 +109,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             ))?;
 
         let unprocessed_client_pointer_items = match parent_type_id {
-            ServerEntityId::Object(object_entity_id) => match target_type_id {
-                ServerEntityId::Object(to_object_entity_id) => self
+            ServerEntityName::Object(object_entity_id) => match target_type_id {
+                ServerEntityName::Object(to_object_entity_id) => self
                     .add_client_pointer_to_object(
                         *object_entity_id,
                         TypeAnnotation::from_graphql_type_annotation(
@@ -123,7 +123,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         client_pointer_declaration,
                     )
                     .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?,
-                ServerEntityId::Scalar(scalar_entity_id) => {
+                ServerEntityName::Scalar(scalar_entity_id) => {
                     let scalar_name = self
                         .server_entity_data
                         .server_scalar_entity(*scalar_entity_id)
@@ -139,7 +139,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     ));
                 }
             },
-            ServerEntityId::Scalar(scalar_entity_id) => {
+            ServerEntityName::Scalar(scalar_entity_id) => {
                 let scalar_name = self
                     .server_entity_data
                     .server_scalar_entity(*scalar_entity_id)
@@ -510,11 +510,11 @@ pub fn id_top_level_arguments() -> Vec<ArgumentKeyAndValue> {
 }
 
 pub fn validate_variable_definition(
-    defined_types: &HashMap<UnvalidatedTypeName, ServerEntityId>,
+    defined_types: &HashMap<UnvalidatedTypeName, ServerEntityName>,
     variable_definition: WithSpan<VariableDefinition<UnvalidatedTypeName>>,
     parent_type_name: SchemaServerObjectEntityName,
     field_name: SelectableName,
-) -> ProcessClientFieldDeclarationResult<WithSpan<VariableDefinition<ServerEntityId>>> {
+) -> ProcessClientFieldDeclarationResult<WithSpan<VariableDefinition<ServerEntityName>>> {
     let type_ = variable_definition
         .item
         .type_

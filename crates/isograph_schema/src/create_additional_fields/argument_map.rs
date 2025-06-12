@@ -6,7 +6,7 @@ use common_lang_types::{
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
-use isograph_lang_types::{DefinitionLocation, ServerEntityId, VariableDefinition};
+use isograph_lang_types::{DefinitionLocation, ServerEntityName, VariableDefinition};
 
 use crate::{NetworkProtocol, Schema, ServerSelectableId, ValidatedVariableDefinition};
 
@@ -20,7 +20,7 @@ pub(crate) struct ArgumentMap {
 }
 
 impl ArgumentMap {
-    pub(crate) fn new(arguments: Vec<WithLocation<VariableDefinition<ServerEntityId>>>) -> Self {
+    pub(crate) fn new(arguments: Vec<WithLocation<VariableDefinition<ServerEntityName>>>) -> Self {
         Self {
             arguments: arguments
                 .into_iter()
@@ -184,14 +184,14 @@ impl ModifiedArgument {
     ///
     /// This panics if unmodified's type is a scalar.
     pub fn from_unmodified<TNetworkProtocol: NetworkProtocol>(
-        unmodified: &VariableDefinition<ServerEntityId>,
+        unmodified: &VariableDefinition<ServerEntityName>,
         schema: &Schema<TNetworkProtocol>,
     ) -> Self {
         // TODO I think we have validated that the item exists already.
         // But we should double check that, and return an error if necessary
         let object = unmodified.type_.clone().map(|input_type_name| {
             match input_type_name {
-                ServerEntityId::Object(object_entity_id) => ModifiedObject {
+                ServerEntityName::Object(object_entity_id) => ModifiedObject {
                     field_map: schema
                         .server_entity_data
                         .server_object_entity_extra_info
@@ -210,7 +210,7 @@ impl ModifiedArgument {
                         })
                         .collect(),
                 },
-                ServerEntityId::Scalar(_scalar_entity_id) => {
+                ServerEntityName::Scalar(_scalar_entity_id) => {
                     // TODO don't be lazy, return an error
                     panic!("Cannot modify a scalar")
                 }

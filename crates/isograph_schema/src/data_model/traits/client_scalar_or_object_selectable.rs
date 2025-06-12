@@ -3,7 +3,7 @@ use common_lang_types::{
     WithSpan,
 };
 use impl_base_types_macro::impl_for_selection_type;
-use isograph_lang_types::{ServerEntityId, VariableDefinition};
+use isograph_lang_types::{ServerEntityName, VariableDefinition};
 
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, NetworkProtocol,
@@ -20,7 +20,7 @@ pub trait ClientScalarOrObjectSelectable {
     fn refetch_strategy(&self) -> Option<&RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>;
     fn selection_set_for_parent_query(&self) -> &[WithSpan<ValidatedSelection>];
 
-    fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityId>>];
+    fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityName>>];
 
     fn client_type(&self) -> &'static str;
 }
@@ -66,7 +66,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         }
     }
 
-    fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityId>>] {
+    fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityName>>] {
         &self.variable_definitions
     }
 
@@ -106,7 +106,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         &self.reader_selection_set
     }
 
-    fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityId>>] {
+    fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityName>>] {
         &self.variable_definitions
     }
 

@@ -6,7 +6,7 @@ use common_lang_types::{
 };
 use isograph_lang_types::{
     impl_with_id, ClientObjectSelectableId, ClientScalarSelectableId, SelectionType,
-    ServerEntityId, TypeAnnotation, VariableDefinition,
+    ServerEntityName, TypeAnnotation, VariableDefinition,
 };
 
 use crate::{
@@ -37,7 +37,7 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     // TODO we should probably model this differently
     pub variant: ClientFieldVariant,
 
-    pub variable_definitions: Vec<WithSpan<VariableDefinition<ServerEntityId>>>,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<ServerEntityName>>>,
 
     // Why is this not calculated when needed?
     pub type_and_field: ObjectTypeAndFieldName,
@@ -60,7 +60,7 @@ pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
 
     pub refetch_strategy: RefetchStrategy<ScalarSelectableId, ObjectSelectableId>,
 
-    pub variable_definitions: Vec<WithSpan<VariableDefinition<ServerEntityId>>>,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<ServerEntityName>>>,
 
     // Why is this not calculated when needed?
     pub type_and_field: ObjectTypeAndFieldName,

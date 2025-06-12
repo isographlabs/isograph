@@ -4,13 +4,13 @@ use common_lang_types::SelectableName;
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 
 use isograph_lang_types::{
-    DefinitionLocation, SelectionType, ServerEntityId, TypeAnnotation, UnionVariant,
+    DefinitionLocation, SelectionType, ServerEntityName, TypeAnnotation, UnionVariant,
 };
 use isograph_schema::{NetworkProtocol, Schema, ServerSelectableId};
 
 pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    type_: GraphQLTypeAnnotation<ServerEntityId>,
+    type_: GraphQLTypeAnnotation<ServerEntityName>,
     indentation_level: u8,
 ) -> String {
     match type_ {
@@ -42,11 +42,11 @@ pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
 
 fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    field: ServerEntityId,
+    field: ServerEntityName,
     indentation_level: u8,
 ) -> String {
     match field {
-        ServerEntityId::Object(object_entity_id) => {
+        ServerEntityName::Object(object_entity_id) => {
             // TODO this is bad; we should never create a type containing all of the fields
             // on a given object. This is currently used for input objects, and we should
             // consider how to do this is a not obviously broken manner.
@@ -76,7 +76,7 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
             s.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
             s
         }
-        ServerEntityId::Scalar(scalar_entity_id) => schema
+        ServerEntityName::Scalar(scalar_entity_id) => schema
             .server_entity_data
             .server_scalar_entity(scalar_entity_id)
             .javascript_name
@@ -126,7 +126,7 @@ fn is_nullable<T: Ord + Debug>(type_annotation: &TypeAnnotation<T>) -> bool {
 
 fn format_type_annotation<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    type_annotation: &TypeAnnotation<ServerEntityId>,
+    type_annotation: &TypeAnnotation<ServerEntityName>,
     indentation_level: u8,
 ) -> String {
     match &type_annotation {

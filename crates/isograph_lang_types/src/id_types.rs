@@ -18,6 +18,7 @@ u32_newtype!(ClientScalarSelectableId);
 
 u32_newtype!(ClientObjectSelectableId);
 
-pub type ServerEntityId = SelectionType<SchemaServerScalarEntityName, SchemaServerObjectEntityName>;
+pub type ServerEntityName =
+    SelectionType<SchemaServerScalarEntityName, SchemaServerObjectEntityName>;
 
 u32_newtype!(RefetchQueryIndex);

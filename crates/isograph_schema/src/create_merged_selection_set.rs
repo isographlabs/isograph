@@ -13,7 +13,7 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientScalarSelectableId, DefinitionLocation, EmptyDirectiveSet,
     NonConstantValue, RefetchQueryIndex, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, ServerEntityId,
+    SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, ServerEntityName,
     ServerObjectSelectableId, VariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -179,7 +179,7 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
     pub merged_selection_set: MergedSelectionMap,
     /// Used to look up what type to narrow on in the generated refetch query,
     /// among other things.
-    pub variable_definitions: Vec<VariableDefinition<ServerEntityId>>,
+    pub variable_definitions: Vec<VariableDefinition<ServerEntityName>>,
     pub root_parent_object: SchemaServerObjectEntityName,
     pub root_fetchable_field: ClientScalarSelectableName,
     pub refetch_query_index: RefetchQueryIndex,
@@ -582,7 +582,7 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
 
 pub fn imperative_field_subfields_or_inline_fragments(
     top_level_schema_field_name: ServerObjectSelectableName,
-    top_level_schema_field_arguments: &[VariableDefinition<ServerEntityId>],
+    top_level_schema_field_arguments: &[VariableDefinition<ServerEntityName>],
     top_level_schema_field_concrete_type: Option<SchemaServerObjectEntityName>,
 ) -> WrappedSelectionMapSelection {
     let top_level_schema_field_arguments = top_level_schema_field_arguments
@@ -605,7 +605,7 @@ pub fn imperative_field_subfields_or_inline_fragments(
 fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
     reachable_variables: &BTreeSet<VariableName>,
     entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
-) -> Vec<VariableDefinition<ServerEntityId>> {
+) -> Vec<VariableDefinition<ServerEntityName>> {
     reachable_variables
         .iter()
         .flat_map(|variable_name| {
@@ -1265,7 +1265,7 @@ fn get_aliased_mutation_field_name(
 
 pub fn id_arguments(
     id_type_name: SchemaServerScalarEntityName,
-) -> Vec<VariableDefinition<ServerEntityId>> {
+) -> Vec<VariableDefinition<ServerEntityName>> {
     vec![VariableDefinition {
         name: WithLocation::new("id".intern().into(), Location::generated()),
         type_: GraphQLTypeAnnotation::NonNull(Box::new(GraphQLNonNullTypeAnnotation::Named(

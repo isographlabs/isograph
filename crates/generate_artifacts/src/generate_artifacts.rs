@@ -14,7 +14,7 @@ use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDirectiveSet, ClientScalarSelectableId, DefinitionLocation,
     EmptyDirectiveSet, NonConstantValue, ObjectSelectionDirectiveSet, ScalarSelection,
     ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionType,
-    SelectionTypeContainingSelections, ServerEntityId, TypeAnnotation, UnionVariant,
+    SelectionTypeContainingSelections, ServerEntityName, TypeAnnotation, UnionVariant,
     VariableDefinition,
 };
 use isograph_schema::{
@@ -243,7 +243,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 type_: GraphQLTypeAnnotation::NonNull(Box::new(
                                     GraphQLNonNullTypeAnnotation::Named(
                                         GraphQLNamedTypeAnnotation(WithSpan::new(
-                                            ServerEntityId::Scalar(
+                                            ServerEntityName::Scalar(
                                                 schema.server_entity_data.id_type_id,
                                             ),
                                             Span::todo_generated(),
@@ -946,17 +946,17 @@ fn get_loadable_field_type_from_arguments<TNetworkProtocol: NetworkProtocol>(
 
 fn format_type_for_js<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    type_: GraphQLTypeAnnotation<ServerEntityId>,
+    type_: GraphQLTypeAnnotation<ServerEntityName>,
 ) -> String {
     let new_type = type_.map(
         |selectable_server_field_id| match selectable_server_field_id {
-            ServerEntityId::Object(_) => {
+            ServerEntityName::Object(_) => {
                 panic!(
                     "Unexpected object. Objects are not supported as parameters, yet. \
                     This is indicative of an unimplemented feature in Isograph."
                 )
             }
-            ServerEntityId::Scalar(scalar_entity_id) => {
+            ServerEntityName::Scalar(scalar_entity_id) => {
                 schema
                     .server_entity_data
                     .server_scalar_entity(scalar_entity_id)
@@ -991,7 +991,7 @@ fn format_type_for_js_inner(
 
 pub(crate) fn generate_parameters<'a, TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    argument_definitions: impl Iterator<Item = &'a VariableDefinition<ServerEntityId>>,
+    argument_definitions: impl Iterator<Item = &'a VariableDefinition<ServerEntityName>>,
 ) -> String {
     let mut s = "{\n".to_string();
     let indent = "  ";
