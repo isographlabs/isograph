@@ -294,14 +294,14 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                         },
                         selection_supplied_argument_value.location,
                     )),
-                    SelectionType::Object(object_entity_id) => object_satisfies_type(
+                    SelectionType::Object(object_entity_name) => object_satisfies_type(
                         selection_supplied_argument_value,
                         variable_definitions,
                         schema_data,
                         server_scalar_selectables,
                         server_object_selectables,
                         object_literal,
-                        object_entity_id,
+                        object_entity_name,
                     ),
                 },
             }
@@ -323,7 +323,7 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             .server_object_entity_extra_info
             .get(&object_entity_name)
             .expect(
-                "Expected object_entity_id to exist \
+                "Expected object_entity_name to exist \
                 in server_object_entity_available_selectables",
             )
             .selectables,
@@ -389,7 +389,7 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
         .server_object_entity_extra_info
         .get(&object_entity_name)
         .expect(
-            "Expected object_entity_id to exist \
+            "Expected object_entity_name to exist \
             in server_object_entity_available_selectables",
         )
         .selectables
@@ -473,8 +473,8 @@ fn id_annotation_to_typename_annotation<TNetworkProtocol: NetworkProtocol>(
             .name
             .item
             .into(),
-        SelectionType::Object(object_entity_id) => schema_data
-            .server_object_entity(object_entity_id)
+        SelectionType::Object(object_entity_name) => schema_data
+            .server_object_entity(object_entity_name)
             .name
             .into(),
     })
@@ -487,11 +487,11 @@ fn enum_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     location: Location,
 ) -> ValidateArgumentTypesResult<()> {
     match enum_type.item {
-        SelectionType::Object(object_entity_id) => {
+        SelectionType::Object(object_entity_name) => {
             let expected = GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
                 enum_type.clone().map(|_| {
                     schema_data
-                        .server_object_entity(object_entity_id)
+                        .server_object_entity(object_entity_name)
                         .name
                         .into()
                 }),

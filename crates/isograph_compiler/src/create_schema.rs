@@ -94,10 +94,10 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
     // vec, then process it later.
     let mut unprocessed_items = vec![];
 
-    for (parent_object_entity_id, expose_as_fields_to_insert) in expose_as_field_queue {
+    for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
         for expose_as_field in expose_as_fields_to_insert {
             let unprocessed_scalar_item = unvalidated_isograph_schema
-                .create_new_exposed_field(expose_as_field, parent_object_entity_id)?;
+                .create_new_exposed_field(expose_as_field, parent_object_entity_name)?;
 
             unprocessed_items.push(SelectionType::Scalar(unprocessed_scalar_item));
         }
@@ -234,11 +234,11 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
     field_queue: HashMap<SchemaServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
     options: &CompilerConfigOptions,
 ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
-    for (parent_object_entity_id, field_definitions_to_insert) in field_queue {
+    for (parent_object_entity_name, field_definitions_to_insert) in field_queue {
         for server_field_to_insert in field_definitions_to_insert.into_iter() {
             let parent_object_entity = schema
                 .server_entity_data
-                .server_object_entity(parent_object_entity_id);
+                .server_object_entity(parent_object_entity_name);
 
             let target_entity_type_name = server_field_to_insert.item.type_.inner();
 
@@ -286,7 +286,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
                                     server_field_to_insert.item.type_.clone(),
                                 )
                                 .map(&mut |_| *scalar_entity_id),
-                                parent_object_entity_name: parent_object_entity_id,
+                                parent_object_entity_name,
                                 arguments,
                                 phantom_data: std::marker::PhantomData,
                             },
@@ -298,7 +298,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
                         )
                         .map_err(|e| WithLocation::new(e, server_field_to_insert.location))?;
                 }
-                SelectionType::Object(object_entity_id) => {
+                SelectionType::Object(object_entity_name) => {
                     schema
                         .insert_server_object_selectable(ServerObjectSelectable {
                             description,
@@ -306,8 +306,8 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
                             target_object_entity: TypeAnnotation::from_graphql_type_annotation(
                                 server_field_to_insert.item.type_.clone(),
                             )
-                            .map(&mut |_| *object_entity_id),
-                            parent_object_name: parent_object_entity_id,
+                            .map(&mut |_| *object_entity_name),
+                            parent_object_name: parent_object_entity_name,
                             arguments,
                             phantom_data: std::marker::PhantomData,
                             object_selectable_variant:

@@ -170,7 +170,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_object_entity_extra_info
             .get(&root_object_name)
             .expect(
-                "Expected root_object_entity_id to exist \
+                "Expected root_object_entity_name to exist \
                 in server_object_entity_avaiable_selectables",
             )
             .selectables;
@@ -185,7 +185,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         });
                     }
                     SelectionType::Object(object) => {
-                        let target_object_entity_id = match object {
+                        let target_object_entity_name = match object {
                             DefinitionLocation::Server(s) => {
                                 let selectable = self.server_object_selectable(*s);
                                 selectable.target_object_entity.inner()
@@ -198,13 +198,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
                         current_entity = self
                             .server_entity_data
-                            .server_object_entity(*target_object_entity_id);
+                            .server_object_entity(*target_object_entity_name);
                         current_selectables = &self
                             .server_entity_data
                             .server_object_entity_extra_info
-                            .get(target_object_entity_id)
+                            .get(target_object_entity_name)
                             .expect(
-                                "Expected target_object_entity_id to exist \
+                                "Expected target_object_entity_name to exist \
                                 in server_object_entity_available_selectables",
                             )
                             .selectables;
@@ -236,7 +236,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_object_entity_extra_info
             .get(&root_object_name)
             .expect(
-                "Expected root_object_entity_id to exist \
+                "Expected root_object_entity_name to exist \
                 in server_object_entity_avaiable_selectables",
             )
             .selectables;
@@ -253,7 +253,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         });
                     }
                     SelectionType::Object(object) => {
-                        let target_object_entity_id = match object {
+                        let target_object_entity_name = match object {
                             DefinitionLocation::Server(s) => {
                                 let selectable = self.server_object_selectable(*s);
                                 path.push(selectable);
@@ -270,13 +270,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
                         current_entity = self
                             .server_entity_data
-                            .server_object_entity(*target_object_entity_id);
+                            .server_object_entity(*target_object_entity_name);
                         current_selectables = &self
                             .server_entity_data
                             .server_object_entity_extra_info
-                            .get(target_object_entity_id)
+                            .get(target_object_entity_name)
                             .expect(
-                                "Expected target_object_entity_id to exist \
+                                "Expected target_object_entity_name to exist \
                                 in server_object_entity_available_selectables",
                             )
                             .selectables;
@@ -385,12 +385,12 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         inner_non_null_named_type: Option<&GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
     ) -> CreateAdditionalFieldsResult<()> {
         let next_server_scalar_selectable_id = self.server_scalar_selectables.len().into();
-        let parent_object_entity_id = server_scalar_selectable.parent_object_entity_name;
+        let parent_object_entity_name = server_scalar_selectable.parent_object_entity_name;
         let next_scalar_name = server_scalar_selectable.name;
 
         let parent_type_name = self
             .server_entity_data
-            .server_object_entity(parent_object_entity_id)
+            .server_object_entity(parent_object_entity_name)
             .name;
 
         let ServerObjectEntityExtraInfo {
@@ -400,7 +400,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         } = self
             .server_entity_data
             .server_object_entity_extra_info
-            .entry(parent_object_entity_id)
+            .entry(parent_object_entity_name)
             .or_default();
 
         if selectables
@@ -412,7 +412,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         {
             let parent_object = self
                 .server_entity_data
-                .server_object_entity(parent_object_entity_id);
+                .server_object_entity(parent_object_entity_name);
             return Err(CreateAdditionalFieldsError::DuplicateField {
                 field_name: server_scalar_selectable.name.item.into(),
                 parent_type: parent_object.name,
@@ -442,13 +442,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         server_object_selectable: ServerObjectSelectable<TNetworkProtocol>,
     ) -> CreateAdditionalFieldsResult<()> {
         let next_server_object_selectable_id = self.server_object_selectables.len().into();
-        let parent_object_entity_id = server_object_selectable.parent_object_name;
+        let parent_object_entity_name = server_object_selectable.parent_object_name;
         let next_object_name = server_object_selectable.name;
 
         if self
             .server_entity_data
             .server_object_entity_extra_info
-            .entry(parent_object_entity_id)
+            .entry(parent_object_entity_name)
             .or_default()
             .selectables
             .insert(
@@ -459,7 +459,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         {
             let parent_object = self
                 .server_entity_data
-                .server_object_entity(parent_object_entity_id);
+                .server_object_entity(parent_object_entity_name);
             return Err(CreateAdditionalFieldsError::DuplicateField {
                 field_name: next_object_name.item.into(),
                 parent_type: parent_object.name,
@@ -604,8 +604,8 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
 
     pub fn server_entity(&self, type_id: ServerEntityName) -> ServerEntity<TNetworkProtocol> {
         match type_id {
-            ServerEntityName::Object(object_entity_id) => {
-                ServerEntity::Object(self.server_object_entity(object_entity_id))
+            ServerEntityName::Object(object_entity_name) => {
+                ServerEntity::Object(self.server_object_entity(object_entity_name))
             }
             ServerEntityName::Scalar(scalar_entity_id) => {
                 ServerEntity::Scalar(self.server_scalar_entity(scalar_entity_id))

@@ -46,7 +46,7 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
     indentation_level: u8,
 ) -> String {
     match field {
-        ServerEntityName::Object(object_entity_id) => {
+        ServerEntityName::Object(object_entity_name) => {
             // TODO this is bad; we should never create a type containing all of the fields
             // on a given object. This is currently used for input objects, and we should
             // consider how to do this is a not obviously broken manner.
@@ -54,8 +54,8 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
             for (name, server_selectable_id) in schema
                 .server_entity_data
                 .server_object_entity_extra_info
-                .get(&object_entity_id)
-                .expect("Expected object_entity_id to exist in server_object_entity_available_selectables")
+                .get(&object_entity_name)
+                .expect("Expected object_entity_name to exist in server_object_entity_available_selectables")
                 .selectables
                 .iter()
                 .filter_map(

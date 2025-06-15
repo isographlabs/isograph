@@ -304,7 +304,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
             )]
         })?;
 
-    let (associated_data, new_parent_object_entity_id) = match *location {
+    let (associated_data, new_parent_object_entity_name) = match *location {
         DefinitionLocation::Server(server_selectable_id) => {
             let server_object_selectable_id = *server_selectable_id.as_object_result().map_err(
                 |server_scalar_selectable_id| {
@@ -363,7 +363,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
 
     let new_parent_object = schema
         .server_entity_data
-        .server_object_entity(new_parent_object_entity_id);
+        .server_object_entity(new_parent_object_entity_name);
 
     Ok(ObjectSelection {
         name: object_selection.name,
@@ -375,7 +375,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
             schema,
             object_selection.selection_set,
             new_parent_object,
-            new_parent_object_entity_id,
+            new_parent_object_entity_name,
             top_level_field_or_pointer,
         )?,
     })

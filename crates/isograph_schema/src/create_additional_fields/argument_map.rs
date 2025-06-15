@@ -191,13 +191,13 @@ impl ModifiedArgument {
         // But we should double check that, and return an error if necessary
         let object = unmodified.type_.clone().map(|input_type_name| {
             match input_type_name {
-                ServerEntityName::Object(object_entity_id) => ModifiedObject {
+                ServerEntityName::Object(object_entity_name) => ModifiedObject {
                     field_map: schema
                         .server_entity_data
                         .server_object_entity_extra_info
-                        .get(&object_entity_id)
+                        .get(&object_entity_name)
                         .expect(
-                            "Expected object_entity_id to exist \
+                            "Expected object_entity_name to exist \
                             in server_object_entity_available_selectables",
                         )
                         .selectables

@@ -84,12 +84,12 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         // TODO do not use mutation naming here
         let mutation_field = self.server_object_selectable(mutation_subfield_id);
         let payload_object_type_annotation = &mutation_field.target_object_entity;
-        let payload_object_entity_id = *payload_object_type_annotation.inner();
+        let payload_object_entity_name = *payload_object_type_annotation.inner();
 
         // TODO it's a bit annoying that we call .object twice!
         let mutation_field_payload_type_name = self
             .server_entity_data
-            .server_object_entity(payload_object_entity_id)
+            .server_object_entity(payload_object_entity_name)
             .name;
 
         let client_field_scalar_selection_name =
@@ -113,11 +113,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         let payload_object_entity = self
             .server_entity_data
-            .server_object_entity(payload_object_entity_id);
+            .server_object_entity(payload_object_entity_name);
 
         let maybe_abstract_target_object_entity_with_id = self
             .traverse_object_selections(
-                payload_object_entity_id,
+                payload_object_entity_name,
                 primary_field_name_selection_parts.iter().copied(),
             )
             .map_err(|e| WithLocation::new(e, Location::generated()))?;
@@ -165,7 +165,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         let mut parts_reversed = self
             .get_object_selections_path(
-                payload_object_entity_id,
+                payload_object_entity_name,
                 primary_field_name_selection_parts.iter().copied(),
             )
             .map_err(|e| WithLocation::new(e, Location::generated()))?;
@@ -304,7 +304,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_object_entity_extra_info
             .get(&mutation_object_entity_name)
             .expect(
-                "Expected mutation_object_entity_id to exist \
+                "Expected mutation_object_entity_name to exist \
                 in server_object_entity_available_selectables",
             )
             .selectables

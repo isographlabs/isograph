@@ -81,7 +81,7 @@ fn validate_entrypoint_type_and_field<TNetworkProtocol: NetworkProtocol>(
     text_source: TextSource,
     entrypoint_declaration: WithSpan<EntrypointDeclaration>,
 ) -> Result<ClientScalarSelectableName, WithLocation<ValidateEntrypointDeclarationError>> {
-    let parent_object_entity_id = validate_parent_object_entity_id(
+    let parent_object_entity_name = validate_parent_object_entity_name(
         schema,
         entrypoint_declaration.item.parent_type,
         text_source,
@@ -90,13 +90,13 @@ fn validate_entrypoint_type_and_field<TNetworkProtocol: NetworkProtocol>(
         schema,
         entrypoint_declaration.item.client_field_name,
         text_source,
-        parent_object_entity_id,
+        parent_object_entity_name,
     )?;
 
     Ok(client_field_id)
 }
 
-fn validate_parent_object_entity_id<TNetworkProtocol: NetworkProtocol>(
+fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     parent_type: WithSpan<UnvalidatedTypeName>,
     text_source: TextSource,
@@ -113,18 +113,18 @@ fn validate_parent_object_entity_id<TNetworkProtocol: NetworkProtocol>(
         ))?;
 
     match parent_type_id {
-        ServerEntityName::Object(object_entity_id) => {
-            if !schema.fetchable_types.contains_key(object_entity_id) {
+        ServerEntityName::Object(object_entity_name) => {
+            if !schema.fetchable_types.contains_key(object_entity_name) {
                 Err(WithLocation::new(
                     ValidateEntrypointDeclarationError::NonFetchableParentType {
                         parent_type_name: parent_type.item,
                         fetchable_types: schema
                             .fetchable_types
                             .keys()
-                            .map(|object_entity_id| {
+                            .map(|object_entity_name| {
                                 schema
                                     .server_entity_data
-                                    .server_object_entity(*object_entity_id)
+                                    .server_object_entity(*object_entity_name)
                                     .name
                                     .to_string()
                             })
@@ -134,7 +134,7 @@ fn validate_parent_object_entity_id<TNetworkProtocol: NetworkProtocol>(
                     Location::new(text_source, parent_type.span),
                 ))
             } else {
-                Ok(*object_entity_id)
+                Ok(*object_entity_name)
             }
         }
         ServerEntityName::Scalar(scalar_entity_id) => {
@@ -168,7 +168,7 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
         .server_object_entity_extra_info
         .get(&parent_object_name)
         .expect(
-            "Expected parent_object_entity_id to exist \
+            "Expected parent_object_entity_name to exist \
             in server_object_entity_available_selectables",
         )
         .selectables

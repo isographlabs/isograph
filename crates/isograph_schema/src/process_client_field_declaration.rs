@@ -109,16 +109,16 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             ))?;
 
         let unprocessed_client_pointer_items = match parent_type_id {
-            ServerEntityName::Object(object_entity_id) => match target_type_id {
-                ServerEntityName::Object(to_object_entity_id) => self
+            ServerEntityName::Object(object_entity_name) => match target_type_id {
+                ServerEntityName::Object(to_object_entity_name) => self
                     .add_client_pointer_to_object(
-                        *object_entity_id,
+                        *object_entity_name,
                         TypeAnnotation::from_graphql_type_annotation(
                             client_pointer_declaration
                                 .item
                                 .target_type
                                 .clone()
-                                .map(|_| *to_object_entity_id),
+                                .map(|_| *to_object_entity_name),
                         ),
                         client_pointer_declaration,
                     )
@@ -239,7 +239,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_object_entity_extra_info
             .get(&parent_object_entity_name)
             .expect(
-                "Expected parent_object_entity_id to exist in \
+                "Expected parent_object_entity_name to exist in \
                 server_object_entity_available_selectables",
             )
             .id_field;
@@ -309,7 +309,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_object_entity_extra_info
             .get(&parent_object_name)
             .expect(
-                "Expected parent_object_entity_id \
+                "Expected parent_object_entity_name \
                 to exist in server_object_entity_available_selectables",
             )
             .id_field;
