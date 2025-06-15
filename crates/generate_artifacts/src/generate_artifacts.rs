@@ -183,11 +183,11 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 ));
             }
             DefinitionLocation::Client(SelectionType::Scalar((
-                parent_entity_name,
+                parent_object_entity_name,
                 client_scalar_selectable_name,
             ))) => {
                 let client_scalar_selectable =
-                    schema.client_field(*parent_entity_name, *client_scalar_selectable_name);
+                    schema.client_field(*parent_object_entity_name, *client_scalar_selectable_name);
 
                 match &client_scalar_selectable.variant {
                     ClientFieldVariant::Link => (),
