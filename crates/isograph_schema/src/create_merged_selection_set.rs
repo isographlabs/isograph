@@ -191,7 +191,7 @@ pub struct ImperativelyLoadedFieldArtifactInfo {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PathToRefetchFieldInfo {
-    pub refetch_field_parent_entity_name: SchemaServerObjectEntityName,
+    pub refetch_field_parent_object_entity_name: SchemaServerObjectEntityName,
     pub imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant,
     extra_selections: MergedSelectionMap,
     pub client_field_name: ClientScalarSelectableName,
@@ -466,19 +466,19 @@ pub fn get_imperatively_loaded_artifact_info<TNetworkProtocol: NetworkProtocol>(
         ..
     } = root_refetch_path;
     let PathToRefetchFieldInfo {
-        refetch_field_parent_entity_name,
+        refetch_field_parent_object_entity_name,
         imperatively_loaded_field_variant,
         extra_selections: _,
         client_field_name,
     } = path_to_refetch_field_info;
 
     let client_scalar_selectable =
-        schema.client_field(refetch_field_parent_entity_name, client_field_name);
+        schema.client_field(refetch_field_parent_object_entity_name, client_field_name);
 
     process_imperatively_loaded_field(
         schema,
         imperatively_loaded_field_variant,
-        refetch_field_parent_entity_name,
+        refetch_field_parent_object_entity_name,
         nested_selection_map,
         entrypoint,
         index,
@@ -499,7 +499,7 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     variant: ImperativelyLoadedFieldVariant,
     // ID of e.g. Pet, Checkin, etc. i.e. the field on which e.g. __refetch or make_super is selected
-    refetch_field_parent_entity_name: SchemaServerObjectEntityName,
+    refetch_field_parent_object_entity_name: SchemaServerObjectEntityName,
     selection_map: &MergedSelectionMap,
     entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
     index: usize,
@@ -517,10 +517,11 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
     // If the field (e.g. icheckin) returns an abstract type (ICheckin) that is different than
     // the concrete type we want (Checkin), then we refine to that concrete type.
     // TODO investigate whether this can be done when the ImperativelyLoadedFieldVariant is created
-    if refetch_field_parent_entity_name != client_scalar_selectable.parent_object_entity_name {
+    if refetch_field_parent_object_entity_name != client_scalar_selectable.parent_object_entity_name
+    {
         let refetch_field_parent_type_name = schema
             .server_entity_data
-            .server_object_entity(refetch_field_parent_entity_name)
+            .server_object_entity(refetch_field_parent_object_entity_name)
             .name;
         // This could be Pet
         subfields_or_inline_fragments.insert(
@@ -1001,7 +1002,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
     };
 
     let info = PathToRefetchFieldInfo {
-        refetch_field_parent_entity_name: parent_object_entity_name,
+        refetch_field_parent_object_entity_name: parent_object_entity_name,
         imperatively_loaded_field_variant: variant.clone(),
         extra_selections: BTreeMap::new(),
         client_field_name: newly_encountered_scalar_client_selectable_name,

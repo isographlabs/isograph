@@ -54,10 +54,13 @@ impl<TNetworkProtocol: NetworkProtocol> Iterator
                                 self.index += 1;
                                 continue 'main_loop;
                             }
-                            DefinitionLocation::Client((parent_entity_name, client_field_name)) => {
+                            DefinitionLocation::Client((
+                                parent_object_entity_name,
+                                client_field_name,
+                            )) => {
                                 self.index += 1;
                                 return Some(SelectionType::Scalar((
-                                    parent_entity_name,
+                                    parent_object_entity_name,
                                     client_field_name,
                                 )));
                             }

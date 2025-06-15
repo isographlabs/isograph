@@ -250,9 +250,9 @@ fn sorted_entrypoints<TNetworkProtocol: NetworkProtocol>(
         .entrypoints
         .iter()
         .map(
-            |((parent_entity_name, client_field_name), entrypoint_declaration_info)| {
+            |((parent_object_entity_name, client_field_name), entrypoint_declaration_info)| {
                 (
-                    schema.client_field(*parent_entity_name, *client_field_name),
+                    schema.client_field(*parent_object_entity_name, *client_field_name),
                     entrypoint_declaration_info,
                 )
             },

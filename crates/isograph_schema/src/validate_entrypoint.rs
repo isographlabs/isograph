@@ -184,7 +184,7 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
                 Location::new(text_source, field_name.span),
             )),
             DefinitionLocation::Client(SelectionType::Scalar((
-                _parent_entity_name,
+                _parent_object_entity_name,
                 client_field_name,
             ))) => Ok(*client_field_name),
         },

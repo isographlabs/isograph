@@ -38,12 +38,13 @@ struct EntrypointArtifactInfo<'schema, TNetworkProtocol: NetworkProtocol> {
 
 pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    parent_entity_name: SchemaServerObjectEntityName,
+    parent_object_entity_name: SchemaServerObjectEntityName,
     entrypoint_scalar_selectable_name: ClientScalarSelectableName,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     file_extensions: GenerateFileExtensionsOption,
 ) -> Vec<ArtifactPathAndContent> {
-    let entrypoint = schema.client_field(parent_entity_name, entrypoint_scalar_selectable_name);
+    let entrypoint =
+        schema.client_field(parent_object_entity_name, entrypoint_scalar_selectable_name);
 
     let FieldTraversalResult {
         traversal_state,
@@ -140,7 +141,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
                         .get(&DefinitionLocation::Client(SelectionType::Scalar((
                             root_refetch_path
                                 .path_to_refetch_field_info
-                                .refetch_field_parent_entity_name,
+                                .refetch_field_parent_object_entity_name,
                             root_refetch_path
                                 .path_to_refetch_field_info
                                 .client_field_name,

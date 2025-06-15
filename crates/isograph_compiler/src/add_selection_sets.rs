@@ -244,7 +244,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
             DefinitionLocation::Server(server_scalar_selectable_id)
         }
         DefinitionLocation::Client(client_type) => {
-            let (parent_entity_name, client_field_name) =
+            let (parent_object_entity_name, client_field_name) =
                 *client_type.as_scalar().ok_or_else(|| {
                     WithLocation::new(
                     AddSelectionSetsError::SelectionTypeSelectionClientPointerSelectedAsScalar {
@@ -259,7 +259,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
                     scalar_selection.name.location,
                 )
                 })?;
-            DefinitionLocation::Client((parent_entity_name, client_field_name))
+            DefinitionLocation::Client((parent_object_entity_name, client_field_name))
         }
     };
 
