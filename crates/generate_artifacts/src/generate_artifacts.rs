@@ -79,7 +79,7 @@ lazy_static! {
 /// generating the merged selection map.
 ///
 /// - While creating a client field's merged selection map, whenever we enter
-///   a client field, we check a cache (`encountered_client_field_map`). If that
+///   a client field, we check a cache (`encountered_client_type_map`). If that
 ///   cache is empty, we populate it with the client field's merged selection
 ///   map, reachable variables, and paths to refetch fields.
 /// - If that cache is full, we reuse the values in the cache.
