@@ -183,11 +183,11 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 ));
             }
             DefinitionLocation::Client(SelectionType::Scalar((
-                parent_entity_id,
+                parent_entity_name,
                 client_scalar_selectable_name,
             ))) => {
                 let client_scalar_selectable =
-                    schema.client_field(*parent_entity_id, *client_scalar_selectable_name);
+                    schema.client_field(*parent_entity_name, *client_scalar_selectable_name);
 
                 match &client_scalar_selectable.variant {
                     ClientFieldVariant::Link => (),
@@ -627,10 +627,10 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         field
                             .target_scalar_entity
                             .clone()
-                            .map(&mut |scalar_entity_id| {
+                            .map(&mut |scalar_entity_name| {
                                 schema
                                     .server_entity_data
-                                    .server_scalar_entity(scalar_entity_id)
+                                    .server_scalar_entity(scalar_entity_name)
                                     .javascript_name
                             });
 
@@ -818,10 +818,10 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         field
                             .target_scalar_entity
                             .clone()
-                            .map(&mut |scalar_entity_id| {
+                            .map(&mut |scalar_entity_name| {
                                 schema
                                     .server_entity_data
-                                    .server_scalar_entity(scalar_entity_id)
+                                    .server_scalar_entity(scalar_entity_name)
                                     .javascript_name
                             });
 
@@ -968,10 +968,10 @@ fn format_type_for_js<TNetworkProtocol: NetworkProtocol>(
                     This is indicative of an unimplemented feature in Isograph."
                 )
             }
-            ServerEntityName::Scalar(scalar_entity_id) => {
+            ServerEntityName::Scalar(scalar_entity_name) => {
                 schema
                     .server_entity_data
-                    .server_scalar_entity(scalar_entity_id)
+                    .server_scalar_entity(scalar_entity_name)
                     .javascript_name
             }
         },

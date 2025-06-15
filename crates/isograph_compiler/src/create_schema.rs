@@ -273,7 +273,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
             let description = server_field_to_insert.item.description.map(|d| d.item);
 
             match selection_type {
-                SelectionType::Scalar(scalar_entity_id) => {
+                SelectionType::Scalar(scalar_entity_name) => {
                     schema
                         .insert_server_scalar_selectable(
                             ServerScalarSelectable {
@@ -285,7 +285,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
                                 target_scalar_entity: TypeAnnotation::from_graphql_type_annotation(
                                     server_field_to_insert.item.type_.clone(),
                                 )
-                                .map(&mut |_| *scalar_entity_id),
+                                .map(&mut |_| *scalar_entity_name),
                                 parent_object_entity_name,
                                 arguments,
                                 phantom_data: std::marker::PhantomData,

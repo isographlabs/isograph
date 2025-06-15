@@ -76,9 +76,9 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
             s.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
             s
         }
-        ServerEntityName::Scalar(scalar_entity_id) => schema
+        ServerEntityName::Scalar(scalar_entity_name) => schema
             .server_entity_data
-            .server_scalar_entity(scalar_entity_id)
+            .server_scalar_entity(scalar_entity_name)
             .javascript_name
             .to_string(),
     }

@@ -59,8 +59,8 @@ fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             ))
         }
         GraphQLNonNullTypeAnnotation::Named(named_type) => match named_type.item {
-            SelectionType::Scalar(expected_scalar_entity_id) => {
-                if expected_scalar_entity_id == *scalar_literal_name {
+            SelectionType::Scalar(expected_scalar_entity_name) => {
+                if expected_scalar_entity_name == *scalar_literal_name {
                     return Ok(());
                 }
                 let actual = schema_data
@@ -468,8 +468,8 @@ fn id_annotation_to_typename_annotation<TNetworkProtocol: NetworkProtocol>(
     schema_data: &ServerEntityData<TNetworkProtocol>,
 ) -> GraphQLTypeAnnotation<UnvalidatedTypeName> {
     type_.clone().map(|type_id| match type_id {
-        SelectionType::Scalar(scalar_entity_id) => schema_data
-            .server_scalar_entity(scalar_entity_id)
+        SelectionType::Scalar(scalar_entity_name) => schema_data
+            .server_scalar_entity(scalar_entity_name)
             .name
             .item
             .into(),
@@ -505,7 +505,7 @@ fn enum_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                 location,
             ))
         }
-        SelectionType::Scalar(_scalar_entity_id) => {
+        SelectionType::Scalar(_scalar_entity_name) => {
             todo!("Validate enum literal. Parser doesn't support enum literals yet")
         }
     }

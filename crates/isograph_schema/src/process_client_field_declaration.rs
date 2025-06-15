@@ -56,10 +56,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             ServerEntityName::Object(object_entity_name) => self
                 .add_client_field_to_object(*object_entity_name, client_field_declaration)
                 .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?,
-            ServerEntityName::Scalar(scalar_entity_id) => {
+            ServerEntityName::Scalar(scalar_entity_name) => {
                 let scalar_name = self
                     .server_entity_data
-                    .server_scalar_entity(*scalar_entity_id)
+                    .server_scalar_entity(*scalar_entity_name)
                     .name;
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
@@ -123,10 +123,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         client_pointer_declaration,
                     )
                     .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?,
-                ServerEntityName::Scalar(scalar_entity_id) => {
+                ServerEntityName::Scalar(scalar_entity_name) => {
                     let scalar_name = self
                         .server_entity_data
-                        .server_scalar_entity(*scalar_entity_id)
+                        .server_scalar_entity(*scalar_entity_name)
                         .name;
                     return Err(WithLocation::new(
                         ProcessClientFieldDeclarationError::ClientPointerInvalidTargetType {
@@ -139,10 +139,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     ));
                 }
             },
-            ServerEntityName::Scalar(scalar_entity_id) => {
+            ServerEntityName::Scalar(scalar_entity_name) => {
                 let scalar_name = self
                     .server_entity_data
-                    .server_scalar_entity(*scalar_entity_id)
+                    .server_scalar_entity(*scalar_entity_name)
                     .name;
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {

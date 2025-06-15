@@ -210,7 +210,7 @@ impl ModifiedArgument {
                         })
                         .collect(),
                 },
-                ServerEntityName::Scalar(_scalar_entity_id) => {
+                ServerEntityName::Scalar(_scalar_entity_name) => {
                     // TODO don't be lazy, return an error
                     panic!("Cannot modify a scalar")
                 }

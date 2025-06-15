@@ -607,8 +607,8 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
             ServerEntityName::Object(object_entity_name) => {
                 ServerEntity::Object(self.server_object_entity(object_entity_name))
             }
-            ServerEntityName::Scalar(scalar_entity_id) => {
-                ServerEntity::Scalar(self.server_scalar_entity(scalar_entity_id))
+            ServerEntityName::Scalar(scalar_entity_name) => {
+                ServerEntity::Scalar(self.server_scalar_entity(scalar_entity_name))
             }
         }
     }

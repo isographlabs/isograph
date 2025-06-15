@@ -137,10 +137,10 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
                 Ok(*object_entity_name)
             }
         }
-        ServerEntityName::Scalar(scalar_entity_id) => {
+        ServerEntityName::Scalar(scalar_entity_name) => {
             let scalar_name = schema
                 .server_entity_data
-                .server_scalar_entity(*scalar_entity_id)
+                .server_scalar_entity(*scalar_entity_name)
                 .name;
             Err(WithLocation::new(
                 ValidateEntrypointDeclarationError::InvalidParentType {
