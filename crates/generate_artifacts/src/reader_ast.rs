@@ -56,8 +56,9 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
         }
         SelectionTypeContainingSelections::Object(linked_field_selection) => {
             match linked_field_selection.associated_data {
-                DefinitionLocation::Client((_parent_object_entity_name, client_pointer_id)) => {
-                    let client_pointer = schema.client_pointer(client_pointer_id);
+                DefinitionLocation::Client((parent_object_entity_name, client_pointer_name)) => {
+                    let client_pointer =
+                        schema.client_pointer(parent_object_entity_name, client_pointer_name);
 
                     let inner_reader_ast = generate_reader_ast_with_path(
                         schema,
@@ -166,8 +167,9 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
 
     let condition = match linked_field.associated_data {
-        DefinitionLocation::Client((_parent_object_entity_name, client_pointer_id)) => {
-            let client_pointer = schema.client_pointer(client_pointer_id);
+        DefinitionLocation::Client((parent_object_entity_name, client_pointer_name)) => {
+            let client_pointer =
+                schema.client_pointer(parent_object_entity_name, client_pointer_name);
 
             let reader_artifact_import_name = format!(
                 "{}__resolver_reader",

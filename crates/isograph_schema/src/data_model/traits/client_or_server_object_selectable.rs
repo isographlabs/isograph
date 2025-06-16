@@ -1,8 +1,9 @@
-use common_lang_types::{DescriptionValue, ObjectSelectableName, SchemaServerObjectEntityName};
-use impl_base_types_macro::impl_for_definition_location;
-use isograph_lang_types::{
-    ClientObjectSelectableId, DefinitionLocation, ServerObjectSelectableId, TypeAnnotation,
+use common_lang_types::{
+    ClientObjectSelectableName, DescriptionValue, ObjectSelectableName,
+    SchemaServerObjectEntityName,
 };
+use impl_base_types_macro::impl_for_definition_location;
+use isograph_lang_types::{DefinitionLocation, ServerObjectSelectableId, TypeAnnotation};
 
 use crate::{ClientObjectSelectable, NetworkProtocol, ServerObjectSelectable};
 
@@ -13,7 +14,7 @@ pub type ObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
 
 pub type ObjectSelectableId = DefinitionLocation<
     (SchemaServerObjectEntityName, ServerObjectSelectableId),
-    (SchemaServerObjectEntityName, ClientObjectSelectableId),
+    (SchemaServerObjectEntityName, ClientObjectSelectableName),
 >;
 
 #[impl_for_definition_location]

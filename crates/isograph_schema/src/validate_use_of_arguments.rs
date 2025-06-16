@@ -46,7 +46,7 @@ pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
             &mut errors,
         );
     }
-    for client_object_selectable in &validated_schema.client_object_selectables {
+    for client_object_selectable in validated_schema.client_object_selectables.values() {
         validate_use_of_arguments_for_client_type(
             validated_schema,
             client_object_selectable,
@@ -121,8 +121,11 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         .iter()
                         .map(|x| &x.item)
                         .collect::<Vec<_>>(),
-                    DefinitionLocation::Client((_parent_object_entity_name, pointer_id)) => schema
-                        .client_pointer(pointer_id)
+                    DefinitionLocation::Client((
+                        parent_object_entity_name,
+                        client_object_selectable_name,
+                    )) => schema
+                        .client_pointer(parent_object_entity_name, client_object_selectable_name)
                         .variable_definitions
                         .iter()
                         .map(|x| &x.item)

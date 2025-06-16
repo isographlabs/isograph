@@ -1,15 +1,15 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    ClientScalarSelectableName, ConstExportName, IsographDirectiveName, Location,
-    ObjectTypeAndFieldName, RelativePathToSourceFile, SchemaServerObjectEntityName, SelectableName,
-    TextSource, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
+    ClientObjectSelectableName, ClientScalarSelectableName, ConstExportName, IsographDirectiveName,
+    Location, ObjectTypeAndFieldName, RelativePathToSourceFile, SchemaServerObjectEntityName,
+    SelectableName, TextSource, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldDeclaration, ClientFieldDirectiveSet, ClientObjectSelectableId,
-    ClientPointerDeclaration, DefinitionLocation, DeserializationError, NonConstantValue,
-    SelectionType, ServerEntityName, TypeAnnotation, UnvalidatedSelection, VariableDefinition,
+    ArgumentKeyAndValue, ClientFieldDeclaration, ClientFieldDirectiveSet, ClientPointerDeclaration,
+    DefinitionLocation, DeserializationError, NonConstantValue, SelectionType, ServerEntityName,
+    TypeAnnotation, UnvalidatedSelection, VariableDefinition,
 };
 
 use thiserror::Error;
@@ -29,7 +29,8 @@ pub struct UnprocessedClientFieldItem {
     pub refetch_strategy: Option<RefetchStrategy<(), ()>>,
 }
 pub struct UnprocessedClientPointerItem {
-    pub client_pointer_id: ClientObjectSelectableId,
+    pub parent_object_entity_name: SchemaServerObjectEntityName,
+    pub client_object_selectable_name: ClientObjectSelectableName,
     pub reader_selection_set: Vec<UnprocessedSelection>,
     pub refetch_selection_set: Vec<UnprocessedSelection>,
 }
@@ -284,10 +285,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let client_pointer_name = client_pointer_pointer_name_ws.item;
         let client_pointer_name_span = client_pointer_pointer_name_ws.span;
 
-        let next_client_pointer_id: ClientObjectSelectableId =
-            self.client_object_selectables.len().into();
-
-        let name = client_pointer_declaration.item.client_pointer_name.item;
+        let client_object_selectable_name =
+            client_pointer_declaration.item.client_pointer_name.item;
 
         if let Some(directive) = client_pointer_declaration
             .item
@@ -339,39 +338,42 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             }
         }?;
 
-        self.client_object_selectables.push(ClientObjectSelectable {
-            description: client_pointer_declaration.item.description.map(|x| x.item),
-            name,
-            reader_selection_set: vec![],
+        self.client_object_selectables.insert(
+            (parent_object_name, client_object_selectable_name),
+            ClientObjectSelectable {
+                description: client_pointer_declaration.item.description.map(|x| x.item),
+                name: client_object_selectable_name,
+                reader_selection_set: vec![],
 
-            variable_definitions: client_pointer_declaration
-                .item
-                .variable_definitions
-                .into_iter()
-                .map(|variable_definition| {
-                    validate_variable_definition(
-                        &self.server_entity_data.defined_entities,
-                        variable_definition,
-                        parent_object.name,
-                        client_pointer_name.into(),
-                    )
-                })
-                .collect::<Result<_, _>>()?,
-            type_and_field: ObjectTypeAndFieldName {
-                type_name: parent_object.name,
-                field_name: name.into(),
+                variable_definitions: client_pointer_declaration
+                    .item
+                    .variable_definitions
+                    .into_iter()
+                    .map(|variable_definition| {
+                        validate_variable_definition(
+                            &self.server_entity_data.defined_entities,
+                            variable_definition,
+                            parent_object.name,
+                            client_pointer_name.into(),
+                        )
+                    })
+                    .collect::<Result<_, _>>()?,
+                type_and_field: ObjectTypeAndFieldName {
+                    type_name: parent_object.name,
+                    field_name: client_object_selectable_name.into(),
+                },
+
+                parent_object_name,
+                refetch_strategy,
+                target_object_entity_name: to_object_name,
+                output_format: std::marker::PhantomData,
+
+                info: UserWrittenClientPointerInfo {
+                    const_export_name: client_pointer_declaration.item.const_export_name,
+                    file_path: client_pointer_declaration.item.definition_path,
+                },
             },
-
-            parent_object_name,
-            refetch_strategy,
-            target_object_entity_name: to_object_name,
-            output_format: std::marker::PhantomData,
-
-            info: UserWrittenClientPointerInfo {
-                const_export_name: client_pointer_declaration.item.const_export_name,
-                file_path: client_pointer_declaration.item.definition_path,
-            },
-        });
+        );
 
         if self
             .server_entity_data
@@ -383,7 +385,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 client_pointer_name.into(),
                 DefinitionLocation::Client(SelectionType::Object((
                     parent_object_name,
-                    next_client_pointer_id,
+                    client_object_selectable_name,
                 ))),
             )
             .is_some()
@@ -402,7 +404,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         }
 
         Ok(UnprocessedClientPointerItem {
-            client_pointer_id: next_client_pointer_id,
+            client_object_selectable_name: client_pointer_name,
+            parent_object_entity_name: parent_object_name,
             reader_selection_set: unprocessed_fields,
             refetch_selection_set: vec![id_selection()],
         })

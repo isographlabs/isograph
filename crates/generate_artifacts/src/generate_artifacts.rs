@@ -168,10 +168,11 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
             }
 
             DefinitionLocation::Client(SelectionType::Object((
-                _parent_object_entity_name,
+                parent_object_entity_name,
                 client_object_selectable_id,
             ))) => {
-                let client_object_selectable = schema.client_pointer(*client_object_selectable_id);
+                let client_object_selectable =
+                    schema.client_pointer(*parent_object_entity_name, *client_object_selectable_id);
                 path_and_contents.extend(generate_eager_reader_artifacts(
                     schema,
                     &SelectionType::Object(client_object_selectable),
@@ -673,8 +674,10 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 )) => DefinitionLocation::Server(
                     schema.server_object_selectable(server_object_selectable_id),
                 ),
-                DefinitionLocation::Client((_parent_object_entity_name, client_pointer_id)) => {
-                    DefinitionLocation::Client(schema.client_pointer(client_pointer_id))
+                DefinitionLocation::Client((parent_object_entity_name, client_pointer_name)) => {
+                    DefinitionLocation::Client(
+                        schema.client_pointer(parent_object_entity_name, client_pointer_name),
+                    )
                 }
             };
 

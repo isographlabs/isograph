@@ -4,19 +4,19 @@ use std::{
 };
 
 use common_lang_types::{
-    ClientScalarSelectableName, JavascriptName, Location, ObjectSelectableName,
-    SchemaServerObjectEntityName, SchemaServerScalarEntityName, SelectableName,
-    UnvalidatedTypeName, WithLocation,
+    ClientObjectSelectableName, ClientScalarSelectableName, JavascriptName, Location,
+    ObjectSelectableName, SchemaServerObjectEntityName, SchemaServerScalarEntityName,
+    SelectableName, UnvalidatedTypeName, WithLocation,
 };
 use graphql_lang_types::GraphQLNamedTypeAnnotation;
 use intern::string_key::Intern;
 use intern::Lookup;
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldDirectiveSet, ClientObjectSelectableId, DefinitionLocation,
-    EmptyDirectiveSet, ObjectSelection, ScalarSelection, SelectionType,
-    SelectionTypeContainingSelections, ServerEntityName, ServerObjectSelectableId,
-    ServerScalarSelectableId, ServerStrongIdFieldId, VariableDefinition, WithId,
+    ArgumentKeyAndValue, ClientFieldDirectiveSet, DefinitionLocation, EmptyDirectiveSet,
+    ObjectSelection, ScalarSelection, SelectionType, SelectionTypeContainingSelections,
+    ServerEntityName, ServerObjectSelectableId, ServerScalarSelectableId, ServerStrongIdFieldId,
+    VariableDefinition, WithId,
 };
 use lazy_static::lazy_static;
 
@@ -46,7 +46,10 @@ pub struct Schema<TNetworkProtocol: NetworkProtocol> {
         (SchemaServerObjectEntityName, ClientScalarSelectableName),
         ClientScalarSelectable<TNetworkProtocol>,
     >,
-    pub client_object_selectables: Vec<ClientObjectSelectable<TNetworkProtocol>>,
+    pub client_object_selectables: HashMap<
+        (SchemaServerObjectEntityName, ClientObjectSelectableName),
+        ClientObjectSelectable<TNetworkProtocol>,
+    >,
     pub entrypoints: HashMap<
         (SchemaServerObjectEntityName, ClientScalarSelectableName),
         EntrypointDeclarationInfo,
@@ -114,7 +117,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             server_scalar_selectables: vec![],
             server_object_selectables: vec![],
             client_scalar_selectables: HashMap::new(),
-            client_object_selectables: vec![],
+            client_object_selectables: HashMap::new(),
 
             entrypoints: Default::default(),
             server_entity_data: ServerEntityData {
@@ -195,10 +198,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                                 selectable.target_object_entity.inner()
                             }
                             DefinitionLocation::Client((
-                                _parent_object_entity_name,
+                                parent_object_entity_name,
                                 client_object_selectable_id,
                             )) => {
-                                let pointer = self.client_pointer(*client_object_selectable_id);
+                                let pointer = self.client_pointer(
+                                    *parent_object_entity_name,
+                                    *client_object_selectable_id,
+                                );
                                 pointer.target_object_entity_name.inner()
                             }
                         };
@@ -502,25 +508,34 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             DefinitionLocation::Server((_parent_object_entity_name, server_field_id)) => {
                 DefinitionLocation::Server(self.server_object_selectable(server_field_id))
             }
-            DefinitionLocation::Client((_parent_object_entity_name, client_pointer_id)) => {
-                DefinitionLocation::Client(self.client_pointer(client_pointer_id))
-            }
+            DefinitionLocation::Client((
+                parent_object_entity_name,
+                client_object_selectable_name,
+            )) => DefinitionLocation::Client(
+                self.client_pointer(parent_object_entity_name, client_object_selectable_name),
+            ),
         }
     }
 
     pub fn client_pointer(
         &self,
-        client_pointer_id: ClientObjectSelectableId,
+        parent_object_entity_name: SchemaServerObjectEntityName,
+        client_object_selectable_name: ClientObjectSelectableName,
     ) -> &ClientObjectSelectable<TNetworkProtocol> {
-        &self.client_object_selectables[client_pointer_id.as_usize()]
+        self.client_object_selectables
+            .get(&(parent_object_entity_name, client_object_selectable_name))
+            .expect("Expected client pointer to exist")
     }
 
     // TODO this function should not exist
     pub fn client_pointer_mut(
         &mut self,
-        client_pointer_id: ClientObjectSelectableId,
+        parent_object_entity_name: SchemaServerObjectEntityName,
+        client_object_selectable_name: ClientObjectSelectableName,
     ) -> &mut ClientObjectSelectable<TNetworkProtocol> {
-        &mut self.client_object_selectables[client_pointer_id.as_usize()]
+        self.client_object_selectables
+            .get_mut(&(parent_object_entity_name, client_object_selectable_name))
+            .expect("Expected client pointer to exist")
     }
 
     pub fn client_type(
@@ -531,11 +546,15 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &ClientObjectSelectable<TNetworkProtocol>,
     > {
         match client_type_id {
-            SelectionType::Scalar((parent_type_name, client_field_id)) => {
-                SelectionType::Scalar(self.client_field(parent_type_name, client_field_id))
+            SelectionType::Scalar((parent_entity_object_name, client_field_name)) => {
+                SelectionType::Scalar(
+                    self.client_field(parent_entity_object_name, client_field_name),
+                )
             }
-            SelectionType::Object((_parent_type_name, client_pointer_id)) => {
-                SelectionType::Object(self.client_pointer(client_pointer_id))
+            SelectionType::Object((parent_entity_object_name, client_pointer_name)) => {
+                SelectionType::Object(
+                    self.client_pointer(parent_entity_object_name, client_pointer_name),
+                )
             }
         }
     }
@@ -547,7 +566,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         Item = (
             SelectionType<
                 (SchemaServerObjectEntityName, ClientScalarSelectableName),
-                (SchemaServerObjectEntityName, ClientObjectSelectableId),
+                (SchemaServerObjectEntityName, ClientObjectSelectableName),
             >,
             SelectionType<
                 &ClientScalarSelectable<TNetworkProtocol>,
@@ -567,18 +586,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 )),
                 ClientFieldVariant::ImperativelyLoadedField(_) => None,
             })
-            .chain(
-                self.client_object_selectables
-                    .iter()
-                    .enumerate()
-                    .map(|(id, pointer)| {
-                        (
-                            SelectionType::Object((pointer.parent_object_name, id.into())),
-                            SelectionType::Object(pointer),
-                            ClientFieldDirectiveSet::None(EmptyDirectiveSet {}),
-                        )
-                    }),
-            )
+            .chain(self.client_object_selectables.values().map(|pointer| {
+                (
+                    SelectionType::Object((pointer.parent_object_name, pointer.name)),
+                    SelectionType::Object(pointer),
+                    ClientFieldDirectiveSet::None(EmptyDirectiveSet {}),
+                )
+            }))
     }
 }
 

@@ -4,9 +4,7 @@ use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, DescriptionValue,
     ObjectTypeAndFieldName, SchemaServerObjectEntityName, WithSpan,
 };
-use isograph_lang_types::{
-    ClientObjectSelectableId, SelectionType, ServerEntityName, TypeAnnotation, VariableDefinition,
-};
+use isograph_lang_types::{SelectionType, ServerEntityName, TypeAnnotation, VariableDefinition};
 
 use crate::{
     ClientFieldVariant, NetworkProtocol, ObjectSelectableId, RefetchStrategy, ScalarSelectableId,
@@ -16,7 +14,7 @@ use crate::{
 // TODO rename
 pub type ClientSelectableId = SelectionType<
     (SchemaServerObjectEntityName, ClientScalarSelectableName),
-    (SchemaServerObjectEntityName, ClientObjectSelectableId),
+    (SchemaServerObjectEntityName, ClientObjectSelectableName),
 >;
 
 pub type ClientSelectable<'a, TNetworkProtocol> = SelectionType<

@@ -94,7 +94,10 @@ fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol>(
     schema: &mut Schema<TNetworkProtocol>,
     unprocessed_item: UnprocessedClientPointerItem,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
-    let client_pointer = schema.client_pointer(unprocessed_item.client_pointer_id);
+    let client_pointer = schema.client_pointer(
+        unprocessed_item.parent_object_entity_name,
+        unprocessed_item.client_object_selectable_name,
+    );
     let parent_object = schema
         .server_entity_data
         .server_object_entity(client_pointer.parent_object_name);
@@ -107,7 +110,10 @@ fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol>(
         &client_pointer,
     )?;
 
-    let client_pointer = schema.client_pointer_mut(unprocessed_item.client_pointer_id);
+    let client_pointer = schema.client_pointer_mut(
+        unprocessed_item.parent_object_entity_name,
+        unprocessed_item.client_object_selectable_name,
+    );
 
     client_pointer.reader_selection_set = new_selection_set;
 
@@ -340,7 +346,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
             )
         }
         DefinitionLocation::Client(client_type) => {
-            let (parent_object_entity_name, client_pointer_id) =
+            let (parent_object_entity_name, client_pointer_name) =
                 *client_type.as_object().ok_or_else(|| {
                     vec![WithLocation::new(
                     AddSelectionSetsError::SelectionTypeSelectionClientPointerSelectedAsScalar {
@@ -355,10 +361,11 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                     Location::generated(),
                 )]
                 })?;
-            let client_pointer = schema.client_pointer(client_pointer_id);
+            let client_pointer =
+                schema.client_pointer(parent_object_entity_name, client_pointer_name);
 
             (
-                DefinitionLocation::Client((parent_object_entity_name, client_pointer_id)),
+                DefinitionLocation::Client((parent_object_entity_name, client_pointer_name)),
                 *client_pointer.target_object_entity_name.inner(),
             )
         }

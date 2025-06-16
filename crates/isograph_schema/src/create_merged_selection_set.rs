@@ -798,11 +798,13 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
 
                 match object_selection.associated_data {
                     DefinitionLocation::Client((
-                        _parent_object_entity_name,
+                        parent_object_entity_name,
                         newly_encountered_client_object_selectable_id,
                     )) => {
-                        let newly_encountered_client_object_selectable =
-                            schema.client_pointer(newly_encountered_client_object_selectable_id);
+                        let newly_encountered_client_object_selectable = schema.client_pointer(
+                            parent_object_entity_name,
+                            newly_encountered_client_object_selectable_id,
+                        );
 
                         merge_non_loadable_client_type(
                             parent_object_entity_name,
