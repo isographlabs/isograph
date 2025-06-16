@@ -387,11 +387,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let parent_object_entity_name = server_scalar_selectable.parent_object_entity_name;
         let next_scalar_name = server_scalar_selectable.name;
 
-        let parent_type_name = self
-            .server_entity_data
-            .server_object_entity(parent_object_entity_name)
-            .name;
-
         let ServerObjectEntityExtraInfo {
             selectables,
             id_field,
@@ -406,7 +401,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .insert(
                 next_scalar_name.item.into(),
                 DefinitionLocation::Server(SelectionType::Scalar((
-                    parent_type_name,
+                    parent_object_entity_name,
                     next_server_scalar_selectable_id,
                 ))),
             )
@@ -426,7 +421,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             set_and_validate_id_field(
                 id_field,
                 next_server_scalar_selectable_id,
-                parent_type_name,
+                parent_object_entity_name,
                 options,
                 inner_non_null_named_type,
             )?;
@@ -770,7 +765,7 @@ pub type ScalarSelectableId = DefinitionLocation<
 fn set_and_validate_id_field(
     id_field: &mut Option<ServerStrongIdFieldId>,
     current_field_id: ServerScalarSelectableId,
-    parent_type_name: SchemaServerObjectEntityName,
+    parent_object_entity_name: SchemaServerObjectEntityName,
     options: &CompilerConfigOptions,
     inner_non_null_named_type: Option<&GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
 ) -> CreateAdditionalFieldsResult<()> {
@@ -788,7 +783,7 @@ fn set_and_validate_id_field(
                 options.on_invalid_id_type.on_failure(|| {
                     CreateAdditionalFieldsError::IdFieldMustBeNonNullIdType {
                         strong_field_name: "id",
-                        parent_type: parent_type_name,
+                        parent_type: parent_object_entity_name,
                     }
                 })?;
             }
@@ -798,7 +793,7 @@ fn set_and_validate_id_field(
             options.on_invalid_id_type.on_failure(|| {
                 CreateAdditionalFieldsError::IdFieldMustBeNonNullIdType {
                     strong_field_name: "id",
-                    parent_type: parent_type_name,
+                    parent_type: parent_object_entity_name,
                 }
             })?;
             Ok(())
