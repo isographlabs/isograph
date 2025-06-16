@@ -348,29 +348,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &self.server_scalar_selectables[server_scalar_selectable_id.as_usize()]
     }
 
-    pub fn server_scalar_selectables_and_ids(
-        &self,
-    ) -> impl Iterator<Item = WithId<&ServerScalarSelectable<TNetworkProtocol>>> {
-        self.server_scalar_selectables
-            .iter()
-            .enumerate()
-            .map(|(id, scalar)| WithId::new(id.into(), scalar))
-    }
-
     pub fn server_object_selectable(
         &self,
         server_object_selectable_id: ServerObjectSelectableId,
     ) -> &ServerObjectSelectable<TNetworkProtocol> {
         &self.server_object_selectables[server_object_selectable_id.as_usize()]
-    }
-
-    pub fn server_object_selectables_and_ids(
-        &self,
-    ) -> impl Iterator<Item = WithId<&ServerObjectSelectable<TNetworkProtocol>>> {
-        self.server_object_selectables
-            .iter()
-            .enumerate()
-            .map(|(id, object)| WithId::new(id.into(), object))
     }
 
     pub fn server_selectable(
@@ -539,15 +521,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         client_pointer_id: ClientObjectSelectableId,
     ) -> &mut ClientObjectSelectable<TNetworkProtocol> {
         &mut self.client_object_selectables[client_pointer_id.as_usize()]
-    }
-
-    pub fn client_object_selectables_and_ids(
-        &self,
-    ) -> impl Iterator<Item = WithId<&ClientObjectSelectable<TNetworkProtocol>>> {
-        self.client_object_selectables
-            .iter()
-            .enumerate()
-            .map(|(id, client_object_selectable)| WithId::new(id.into(), client_object_selectable))
     }
 
     pub fn client_type(

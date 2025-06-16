@@ -5,8 +5,7 @@ use common_lang_types::{
     ObjectTypeAndFieldName, SchemaServerObjectEntityName, WithSpan,
 };
 use isograph_lang_types::{
-    impl_with_id, ClientObjectSelectableId, SelectionType, ServerEntityName, TypeAnnotation,
-    VariableDefinition,
+    ClientObjectSelectableId, SelectionType, ServerEntityName, TypeAnnotation, VariableDefinition,
 };
 
 use crate::{
@@ -50,8 +49,6 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub output_format: PhantomData<TNetworkProtocol>,
 }
 
-impl_with_id!(ClientScalarSelectable<TNetworkProtocol: NetworkProtocol>, ClientScalarSelectableName);
-
 /// The struct formally known as a client pointer, and declared with the pointer keyword
 /// in iso literals.
 #[derive(Debug)]
@@ -74,5 +71,3 @@ pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub output_format: PhantomData<TNetworkProtocol>,
     pub info: UserWrittenClientPointerInfo,
 }
-
-impl_with_id!(ClientObjectSelectable<TNetworkProtocol: NetworkProtocol>, ClientObjectSelectableId);

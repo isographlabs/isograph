@@ -5,7 +5,7 @@ use common_lang_types::{
     ServerObjectSelectableName, ServerScalarSelectableName, WithLocation,
 };
 use isograph_lang_types::{
-    impl_with_id, impl_with_target_id, SelectionType, ServerEntityName, ServerObjectSelectableId,
+    impl_with_target_id, SelectionType, ServerEntityName, ServerObjectSelectableId,
     ServerScalarSelectableId, TypeAnnotation, VariableDefinition,
 };
 
@@ -24,7 +24,6 @@ pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
 }
 
 impl_with_target_id!(ServerScalarSelectable<TNetworkProtocol: NetworkProtocol>, ServerEntityName);
-impl_with_id!(ServerScalarSelectable<TNetworkProtocol: NetworkProtocol>, ServerScalarSelectableId);
 
 #[derive(Debug, Clone)]
 pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
@@ -39,8 +38,6 @@ pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub arguments: Vec<WithLocation<VariableDefinition<ServerEntityName>>>,
     pub phantom_data: PhantomData<TNetworkProtocol>,
 }
-
-impl_with_id!(ServerObjectSelectable<TNetworkProtocol: NetworkProtocol>, ServerObjectSelectableId);
 
 // TODO rename
 pub type ServerSelectableId = SelectionType<
