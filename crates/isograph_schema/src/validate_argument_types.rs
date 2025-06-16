@@ -1,6 +1,9 @@
+use std::collections::HashMap;
+
 use common_lang_types::{
     EnumLiteralValue, Location, SchemaServerObjectEntityName, SchemaServerScalarEntityName,
-    SelectableName, UnvalidatedTypeName, ValueKeyName, VariableName, WithLocation, WithSpan,
+    SelectableName, ServerScalarSelectableName, UnvalidatedTypeName, ValueKeyName, VariableName,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
@@ -136,7 +139,10 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     field_argument_definition_type: &GraphQLTypeAnnotation<ServerEntityName>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     schema_data: &ServerEntityData<TNetworkProtocol>,
-    server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
+    server_scalar_selectables: &HashMap<
+        (SchemaServerObjectEntityName, ServerScalarSelectableName),
+        ServerScalarSelectable<TNetworkProtocol>,
+    >,
     server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
 ) -> ValidateArgumentTypesResult<()> {
     match &selection_supplied_argument_value.item {
@@ -313,7 +319,10 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
     variable_definitions: &[WithSpan<VariableDefinition<ServerEntityName>>],
     server_entity_data: &ServerEntityData<TNetworkProtocol>,
-    server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
+    server_scalar_selectables: &HashMap<
+        (SchemaServerObjectEntityName, ServerScalarSelectableName),
+        ServerScalarSelectable<TNetworkProtocol>,
+    >,
     server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     object_entity_name: SchemaServerObjectEntityName,
@@ -380,7 +389,10 @@ enum ObjectLiteralFieldType {
 
 fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtocol>(
     server_entity_data: &ServerEntityData<TNetworkProtocol>,
-    server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
+    server_scalar_selectables: &HashMap<
+        (SchemaServerObjectEntityName, ServerScalarSelectableName),
+        ServerScalarSelectable<TNetworkProtocol>,
+    >,
     server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     object_entity_name: SchemaServerObjectEntityName,
@@ -396,8 +408,13 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
         .iter()
         .filter_map(|(field_name, field_type)| {
             let iso_type_annotation = match field_type.as_server()? {
-                SelectionType::Scalar((_parent_object_entity_name, scalar_selectable_id)) => {
-                    let field = &server_scalar_selectables[scalar_selectable_id.as_usize()];
+                SelectionType::Scalar((
+                    parent_object_entity_name,
+                    scalar_scalar_selectable_name,
+                )) => {
+                    let field = &server_scalar_selectables
+                        .get(&(*parent_object_entity_name, *scalar_scalar_selectable_name))
+                        .expect("Expected server scalar selectable to exist");
                     let field_type_annotation = &field.target_scalar_entity;
                     field_type_annotation
                         .clone()
@@ -516,7 +533,10 @@ fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     list_type: GraphQLListTypeAnnotation<ServerEntityName>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     schema_data: &ServerEntityData<TNetworkProtocol>,
-    server_scalar_selectables: &[ServerScalarSelectable<TNetworkProtocol>],
+    server_scalar_selectables: &HashMap<
+        (SchemaServerObjectEntityName, ServerScalarSelectableName),
+        ServerScalarSelectable<TNetworkProtocol>,
+    >,
     server_object_selectables: &[ServerObjectSelectable<TNetworkProtocol>],
 ) -> ValidateArgumentTypesResult<()> {
     list.iter().try_for_each(|element| {

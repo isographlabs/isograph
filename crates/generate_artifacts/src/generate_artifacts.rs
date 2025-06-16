@@ -620,10 +620,13 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
         SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
             match scalar_field_selection.associated_data {
                 DefinitionLocation::Server((
-                    _parent_object_entity_name,
-                    server_scalar_selectable_id,
+                    parent_object_entity_name,
+                    server_scalar_selectable_name,
                 )) => {
-                    let field = schema.server_scalar_selectable(server_scalar_selectable_id);
+                    let field = schema.server_scalar_selectable(
+                        parent_object_entity_name,
+                        server_scalar_selectable_name,
+                    );
 
                     write_optional_description(
                         field.description,
@@ -817,10 +820,13 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
         SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
             match scalar_field_selection.associated_data {
                 DefinitionLocation::Server((
-                    _parent_object_entity_name,
-                    server_scalar_selectable_id,
+                    parent_object_entity_name,
+                    server_scalar_selectable_name,
                 )) => {
-                    let field = schema.server_scalar_selectable(server_scalar_selectable_id);
+                    let field = schema.server_scalar_selectable(
+                        parent_object_entity_name,
+                        server_scalar_selectable_name,
+                    );
 
                     write_optional_description(
                         field.description,

@@ -74,10 +74,13 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
             SelectionType::Scalar(scalar_selection) => {
                 let field_argument_definitions = match scalar_selection.associated_data {
                     DefinitionLocation::Server((
-                        _parent_object_entity_name,
+                        parent_object_entity_name,
                         server_scalar_selectable_name,
                     )) => schema
-                        .server_scalar_selectable(server_scalar_selectable_name)
+                        .server_scalar_selectable(
+                            parent_object_entity_name,
+                            server_scalar_selectable_name,
+                        )
                         .arguments
                         .iter()
                         .map(|x| &x.item)

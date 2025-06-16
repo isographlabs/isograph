@@ -312,9 +312,11 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
         DefinitionLocation::Server(server_selectable_id) => {
             let (parent_object_entity_name, server_object_selectable_id) =
                 *server_selectable_id.as_object_result().map_err(
-                    |(_parent_object_entity_name, server_scalar_selectable_id)| {
-                        let server_scalar_selectable =
-                            schema.server_scalar_selectable(*server_scalar_selectable_id);
+                    |(parent_object_entity_name, server_scalar_selectable_name)| {
+                        let server_scalar_selectable = schema.server_scalar_selectable(
+                            *parent_object_entity_name,
+                            *server_scalar_selectable_name,
+                        );
                         let server_scalar = schema.server_entity_data.server_scalar_entity(
                             *server_scalar_selectable.target_scalar_entity.inner(),
                         );

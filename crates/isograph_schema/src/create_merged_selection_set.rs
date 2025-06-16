@@ -1200,7 +1200,7 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
             Entry::Vacant(vacant_entry) => {
                 // TODO why is this difficult. Can this be fixed with better modeling?
                 let name = schema
-                    .server_scalar_selectable(id_field.into())
+                    .server_scalar_selectable(parent_object_entity_name, id_field.into())
                     .name
                     .item
                     .unchecked_conversion();

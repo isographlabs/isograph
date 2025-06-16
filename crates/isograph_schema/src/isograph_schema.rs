@@ -6,7 +6,8 @@ use std::{
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, JavascriptName, Location,
     ObjectSelectableName, SchemaServerObjectEntityName, SchemaServerScalarEntityName,
-    SelectableName, UnvalidatedTypeName, WithLocation,
+    SelectableName, ServerScalarIdSelectableName, ServerScalarSelectableName, UnvalidatedTypeName,
+    WithLocation,
 };
 use graphql_lang_types::GraphQLNamedTypeAnnotation;
 use intern::string_key::Intern;
@@ -15,8 +16,7 @@ use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDirectiveSet, DefinitionLocation, EmptyDirectiveSet,
     ObjectSelection, ScalarSelection, SelectionType, SelectionTypeContainingSelections,
-    ServerEntityName, ServerObjectSelectableId, ServerScalarSelectableId, ServerStrongIdFieldId,
-    VariableDefinition, WithId,
+    ServerEntityName, ServerObjectSelectableId, VariableDefinition, WithId,
 };
 use lazy_static::lazy_static;
 
@@ -40,7 +40,10 @@ pub struct RootOperationName(pub String);
 /// The in-memory representation of a schema.
 #[derive(Debug)]
 pub struct Schema<TNetworkProtocol: NetworkProtocol> {
-    pub server_scalar_selectables: Vec<ServerScalarSelectable<TNetworkProtocol>>,
+    pub server_scalar_selectables: HashMap<
+        (SchemaServerObjectEntityName, ServerScalarSelectableName),
+        ServerScalarSelectable<TNetworkProtocol>,
+    >,
     pub server_object_selectables: Vec<ServerObjectSelectable<TNetworkProtocol>>,
     pub client_scalar_selectables: HashMap<
         (SchemaServerObjectEntityName, ClientScalarSelectableName),
@@ -114,7 +117,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         );
 
         Self {
-            server_scalar_selectables: vec![],
+            server_scalar_selectables: HashMap::new(),
             server_object_selectables: vec![],
             client_scalar_selectables: HashMap::new(),
             client_object_selectables: HashMap::new(),
@@ -315,7 +318,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 #[derive(Debug, Default)]
 pub struct ServerObjectEntityExtraInfo {
     pub selectables: ServerObjectEntityAvailableSelectables,
-    pub id_field: Option<ServerStrongIdFieldId>,
+    pub id_field: Option<ServerScalarIdSelectableName>,
 }
 
 #[derive(Debug)]
@@ -349,9 +352,12 @@ pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
 impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn server_scalar_selectable(
         &self,
-        server_scalar_selectable_id: ServerScalarSelectableId,
+        parent_object_entity_name: SchemaServerObjectEntityName,
+        server_scalar_selectable_name: ServerScalarSelectableName,
     ) -> &ServerScalarSelectable<TNetworkProtocol> {
-        &self.server_scalar_selectables[server_scalar_selectable_id.as_usize()]
+        self.server_scalar_selectables
+            .get(&(parent_object_entity_name, server_scalar_selectable_name))
+            .expect("Expected server scalar selectable to exist")
     }
 
     pub fn server_object_selectable(
@@ -366,8 +372,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         server_selectable_id: ServerSelectableId,
     ) -> ServerSelectable<TNetworkProtocol> {
         match server_selectable_id {
-            SelectionType::Scalar((_parent_object_entity_name, server_scalar_selectable_id)) => {
-                SelectionType::Scalar(self.server_scalar_selectable(server_scalar_selectable_id))
+            SelectionType::Scalar((parent_object_entity_name, server_scalar_selectable_name)) => {
+                SelectionType::Scalar(self.server_scalar_selectable(
+                    parent_object_entity_name,
+                    server_scalar_selectable_name,
+                ))
             }
             SelectionType::Object((_parent_object_entity_name, server_object_selectable_id)) => {
                 SelectionType::Object(self.server_object_selectable(server_object_selectable_id))
@@ -383,7 +392,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         options: &CompilerConfigOptions,
         inner_non_null_named_type: Option<&GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
     ) -> CreateAdditionalFieldsResult<()> {
-        let next_server_scalar_selectable_id = self.server_scalar_selectables.len().into();
         let parent_object_entity_name = server_scalar_selectable.parent_object_entity_name;
         let next_scalar_name = server_scalar_selectable.name;
 
@@ -402,7 +410,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 next_scalar_name.item.into(),
                 DefinitionLocation::Server(SelectionType::Scalar((
                     parent_object_entity_name,
-                    next_server_scalar_selectable_id,
+                    server_scalar_selectable.name.item,
                 ))),
             )
             .is_some()
@@ -420,15 +428,20 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         if server_scalar_selectable.name.item == "id" {
             set_and_validate_id_field(
                 id_field,
-                next_server_scalar_selectable_id,
+                server_scalar_selectable.name.item,
                 parent_object_entity_name,
                 options,
                 inner_non_null_named_type,
             )?;
         }
 
-        self.server_scalar_selectables
-            .push(server_scalar_selectable);
+        self.server_scalar_selectables.insert(
+            (
+                server_scalar_selectable.parent_object_entity_name,
+                server_scalar_selectable.name.item,
+            ),
+            server_scalar_selectable,
+        );
 
         Ok(())
     }
@@ -755,7 +768,7 @@ pub type ValidatedUseRefetchFieldStrategy =
     UseRefetchFieldRefetchStrategy<ScalarSelectableId, ObjectSelectableId>;
 
 pub type ScalarSelectableId = DefinitionLocation<
-    (SchemaServerObjectEntityName, ServerScalarSelectableId),
+    (SchemaServerObjectEntityName, ServerScalarSelectableName),
     (SchemaServerObjectEntityName, ClientScalarSelectableName),
 >;
 
@@ -763,8 +776,8 @@ pub type ScalarSelectableId = DefinitionLocation<
 /// - validate that the id field is properly defined, i.e. has type ID!
 /// - set the id field
 fn set_and_validate_id_field(
-    id_field: &mut Option<ServerStrongIdFieldId>,
-    current_field_id: ServerScalarSelectableId,
+    id_field: &mut Option<ServerScalarIdSelectableName>,
+    current_field_id: ServerScalarSelectableName,
     parent_object_entity_name: SchemaServerObjectEntityName,
     options: &CompilerConfigOptions,
     inner_non_null_named_type: Option<&GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,

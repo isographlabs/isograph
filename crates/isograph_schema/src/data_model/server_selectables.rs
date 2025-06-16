@@ -5,8 +5,8 @@ use common_lang_types::{
     ServerObjectSelectableName, ServerScalarSelectableName, WithLocation,
 };
 use isograph_lang_types::{
-    impl_with_target_id, SelectionType, ServerEntityName, ServerObjectSelectableId,
-    ServerScalarSelectableId, TypeAnnotation, VariableDefinition,
+    impl_with_target_id, SelectionType, ServerEntityName, ServerObjectSelectableId, TypeAnnotation,
+    VariableDefinition,
 };
 
 use crate::{NetworkProtocol, SchemaServerObjectSelectableVariant};
@@ -41,7 +41,7 @@ pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
 
 // TODO rename
 pub type ServerSelectableId = SelectionType<
-    (SchemaServerObjectEntityName, ServerScalarSelectableId),
+    (SchemaServerObjectEntityName, ServerScalarSelectableName),
     (SchemaServerObjectEntityName, ServerObjectSelectableId),
 >;
 
