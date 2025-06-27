@@ -565,11 +565,9 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
         )
         .clone();
 
-    let query_name = format!(
-        "{root_parent_object}__{client_field_scalar_selection_name}"
-    )
-    .intern()
-    .into();
+    let query_name = format!("{root_parent_object}__{client_field_scalar_selection_name}")
+        .intern()
+        .into();
 
     ImperativelyLoadedFieldArtifactInfo {
         // TODO don't clone, have lifetime parameter

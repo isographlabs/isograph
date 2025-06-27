@@ -299,9 +299,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
 
     let indent = "  ";
     let start_update_type = if updatable_fields {
-        format!(
-            "{indent}readonly startUpdate: StartUpdate<{updatable_data_type}>,\n"
-        )
+        format!("{indent}readonly startUpdate: StartUpdate<{updatable_data_type}>,\n")
     } else {
         "".to_string()
     };

@@ -89,11 +89,7 @@ fn process_input_file(input_file: PathBuf, output_file: PathBuf, config: &Compil
         fs::read(input_file.clone())
             .unwrap_or_else(|_| panic!("Expected file {input_file:?} to be readable")),
     )
-    .unwrap_or_else(|_| {
-        panic!(
-            "Content cannot be turned into string (path: {input_file:?})"
-        )
-    });
+    .unwrap_or_else(|_| panic!("Content cannot be turned into string (path: {input_file:?})"));
 
     // N.B. for now, we are just parsing and printing those results.
     // But, we actually want to either just parse iso literals, or

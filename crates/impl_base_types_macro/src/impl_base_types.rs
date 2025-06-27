@@ -66,9 +66,7 @@ pub(crate) fn impl_base_types(
             .to_compile_error(),
             TraitItem::Macro(_) => Error::new_spanned(
                 item,
-                format!(
-                    "{invocation_name}: macros in traits are not supported for now"
-                ),
+                format!("{invocation_name}: macros in traits are not supported for now"),
             )
             .to_compile_error(),
             TraitItem::Verbatim(_) => {
