@@ -74,8 +74,12 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
                     .fetchable_types
                     .insert(new_object_id, RootOperationName("mutation".to_string()));
             }
-            // TODO handle Subscription
-            _ => {}
+            Some(RootOperationKind::Subscription) => {
+                unvalidated_isograph_schema
+                    .fetchable_types
+                    .insert(new_object_id, RootOperationName("subscription".to_string()));
+            }
+            None => {}
         }
 
         expose_as_field_queue.insert(new_object_id, expose_as_fields_to_insert);
