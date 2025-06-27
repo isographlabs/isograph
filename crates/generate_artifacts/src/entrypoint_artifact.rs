@@ -255,8 +255,7 @@ fn generate_refetch_query_artifact_import(
             .into_iter(),
         );
         array_syntax.push_str(&format!(
-            "  {{ artifact: refetchQuery{}, allowedVariables: {} }},\n",
-            query_index, variable_names_str
+            "  {{ artifact: refetchQuery{query_index}, allowedVariables: {variable_names_str} }},\n"
         ));
     }
     output.push_str(&format!(
@@ -297,7 +296,7 @@ impl<TNetworkProtocol: NetworkProtocol> EntrypointArtifactInfo<'_, TNetworkProto
 
         vec![
             ArtifactPathAndContent {
-                file_content: format!("export default '{}';", query_text),
+                file_content: format!("export default '{query_text}';"),
                 file_name: *QUERY_TEXT_FILE_NAME,
                 type_and_field: Some(ObjectTypeAndFieldName {
                     type_name,
@@ -386,10 +385,10 @@ fn variable_names_to_string(
     let mut s = "[".to_string();
 
     for variable in variable_names {
-        s.push_str(&format!("\"{}\", ", variable));
+        s.push_str(&format!("\"{variable}\", "));
     }
     for variable in field_variables {
-        s.push_str(&format!("\"{}\", ", variable));
+        s.push_str(&format!("\"{variable}\", "));
     }
 
     s.push(']');

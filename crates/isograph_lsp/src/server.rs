@@ -56,16 +56,16 @@ pub async fn run(
     while let Ok(message) = connection.receiver.recv() {
         match message {
             lsp_server::Message::Request(request) => {
-                eprintln!("Received request: {:?}", request);
+                eprintln!("Received request: {request:?}");
                 let response = dispatch_request(request, &mut state);
-                eprintln!("Sending response: {:?}", response);
+                eprintln!("Sending response: {response:?}");
                 state.send_message(response.into());
             }
             lsp_server::Message::Notification(notification) => {
                 let _ = dispatch_notification(notification, &mut state);
             }
             lsp_server::Message::Response(response) => {
-                eprintln!("Received response: {:?}", response);
+                eprintln!("Received response: {response:?}");
             }
         }
     }

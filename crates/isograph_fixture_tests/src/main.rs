@@ -26,11 +26,11 @@ fn main() {
             .join(fixture_dir.clone())
             .canonicalize()
             .unwrap_or_else(|_| {
-                panic!("Failed to canonicalize {:?}", fixture_dir);
+                panic!("Failed to canonicalize {fixture_dir:?}");
             });
 
         if !canonicalized_folder.is_dir() {
-            panic!("Expected {:?} to be a directory", fixture_dir);
+            panic!("Expected {fixture_dir:?} to be a directory");
         }
 
         generate_fixtures_for_files_in_folder(canonicalized_folder, &config);
@@ -58,7 +58,7 @@ fn generate_fixtures_for_files_in_folder(folder: PathBuf, config: &CompilerConfi
                 let path = entry.path();
 
                 if !path.is_file() {
-                    panic!("Expected {:?} to be a file", path);
+                    panic!("Expected {path:?} to be a file");
                 }
                 let path_as_str = path
                     .to_str()
@@ -79,7 +79,7 @@ fn generate_fixtures_for_files_in_folder(folder: PathBuf, config: &CompilerConfi
                     );
                 }
             }
-            Err(_) => panic!("Failed to read an item in {:?}", folder),
+            Err(_) => panic!("Failed to read an item in {folder:?}"),
         }
     }
 }
@@ -87,12 +87,11 @@ fn generate_fixtures_for_files_in_folder(folder: PathBuf, config: &CompilerConfi
 fn process_input_file(input_file: PathBuf, output_file: PathBuf, config: &CompilerConfig) {
     let file_content = String::from_utf8(
         fs::read(input_file.clone())
-            .unwrap_or_else(|_| panic!("Expected file {:?} to be readable", input_file)),
+            .unwrap_or_else(|_| panic!("Expected file {input_file:?} to be readable")),
     )
     .unwrap_or_else(|_| {
         panic!(
-            "Content cannot be turned into string (path: {:?})",
-            input_file
+            "Content cannot be turned into string (path: {input_file:?})"
         )
     });
 
@@ -105,7 +104,7 @@ fn process_input_file(input_file: PathBuf, output_file: PathBuf, config: &Compil
     let results = generate_content_for_output_file(input_file, file_content, config);
 
     fs::write(output_file.clone(), results)
-        .unwrap_or_else(|_| panic!("Failed to write to {:?}", output_file));
+        .unwrap_or_else(|_| panic!("Failed to write to {output_file:?}"));
 }
 
 fn generate_content_for_output_file(
@@ -126,14 +125,14 @@ fn generate_content_for_output_file(
     ) {
         Ok(item) => {
             let item: Result<_, ()> = Ok(item);
-            format!("{:#?}", item)
+            format!("{item:#?}")
         }
         Err(errs) => {
             let mut s = String::new();
             for err in errs {
-                let err_printed = format!("{}", err);
+                let err_printed = format!("{err}");
                 let wrapped_err: Result<(), _> = Err(err);
-                s.push_str(&format!("{:#?}\n\n{}\n---\n", wrapped_err, err_printed));
+                s.push_str(&format!("{wrapped_err:#?}\n\n{err_printed}\n---\n"));
             }
             s
         }

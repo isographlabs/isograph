@@ -77,21 +77,21 @@ fn write_selections_for_query_text<'a>(
             MergedServerSelection::ScalarField(scalar_field) => {
                 query_text.push_str(&"  ".repeat(indentation_level as usize).to_string());
                 if let Some(alias) = scalar_field.normalization_alias() {
-                    query_text.push_str(&format!("{}: ", alias));
+                    query_text.push_str(&format!("{alias}: "));
                 }
                 let name = scalar_field.name;
                 let arguments = get_serialized_arguments_for_query_text(&scalar_field.arguments);
-                query_text.push_str(&format!("{}{},\\\n", name, arguments));
+                query_text.push_str(&format!("{name}{arguments},\\\n"));
             }
             MergedServerSelection::LinkedField(linked_field) => {
                 query_text.push_str(&"  ".repeat(indentation_level as usize).to_string());
                 if let Some(alias) = linked_field.normalization_alias() {
                     // This is bad, alias is WithLocation
-                    query_text.push_str(&format!("{}: ", alias));
+                    query_text.push_str(&format!("{alias}: "));
                 }
                 let name = linked_field.name;
                 let arguments = get_serialized_arguments_for_query_text(&linked_field.arguments);
-                query_text.push_str(&format!("{}{} {{\\\n", name, arguments));
+                query_text.push_str(&format!("{name}{arguments} {{\\\n"));
                 write_selections_for_query_text(
                     query_text,
                     linked_field.selection_map.values(),
@@ -145,11 +145,11 @@ fn get_serialized_arguments_for_query_text(arguments: &[ArgumentKeyAndValue]) ->
 
 fn serialize_non_constant_value_for_graphql(value: &NonConstantValue) -> String {
     match value {
-        NonConstantValue::Variable(variable_name) => format!("${}", variable_name),
+        NonConstantValue::Variable(variable_name) => format!("${variable_name}"),
         NonConstantValue::Integer(int_value) => int_value.to_string(),
         NonConstantValue::Boolean(bool) => bool.to_string(),
         // This clearly isn't correct — the string might have quotes in it and such
-        NonConstantValue::String(s) => format!("\"{}\"", s),
+        NonConstantValue::String(s) => format!("\"{s}\""),
         NonConstantValue::Float(f) => f.as_float().to_string(),
         NonConstantValue::Null => "null".to_string(),
         NonConstantValue::Enum(e) => e.to_string(),

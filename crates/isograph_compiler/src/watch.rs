@@ -285,7 +285,7 @@ fn create_debounced_file_watcher(
 
             rt.spawn(async move {
                 if let Err(e) = tx.send(result).await {
-                    println!("Error sending event result: {:?}", e);
+                    println!("Error sending event result: {e:?}");
                 }
             });
         },

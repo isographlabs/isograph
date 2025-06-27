@@ -106,8 +106,7 @@ where
     })
     .map_err(|err| {
         LSPRuntimeError::UnexpectedError(format!(
-            "panic in the `extract_request_params`: {:?}",
-            err
+            "panic in the `extract_request_params`: {err:?}"
         ))
     })
 }

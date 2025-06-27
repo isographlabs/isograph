@@ -46,7 +46,7 @@ impl fmt::Display for GraphQLConstantValue {
         match self {
             GraphQLConstantValue::Int(value) => f.write_fmt(format_args!("{value}")),
             GraphQLConstantValue::Float(value) => f.write_fmt(format_args!("{value}")),
-            GraphQLConstantValue::String(value) => f.write_fmt(format_args!("\"{}\"", value)),
+            GraphQLConstantValue::String(value) => f.write_fmt(format_args!("\"{value}\"")),
             GraphQLConstantValue::Boolean(value) => f.write_fmt(format_args!("{value}")),
             GraphQLConstantValue::Null => f.write_str("null"),
             GraphQLConstantValue::Enum(value) => f.write_fmt(format_args!("{value}")),

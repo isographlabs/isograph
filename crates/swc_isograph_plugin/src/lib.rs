@@ -50,7 +50,7 @@ fn isograph_plugin_transform(
             .get_transform_plugin_config()
             .expect("Failed to get plugin config for isograph"),
     )
-    .unwrap_or_else(|e| panic!("Error parsing plugin config. Error: {}", e));
+    .unwrap_or_else(|e| panic!("Error parsing plugin config. Error: {e}"));
 
     let WasmConfig { root_dir, config } = config;
 

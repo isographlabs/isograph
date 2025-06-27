@@ -300,8 +300,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     let indent = "  ";
     let start_update_type = if updatable_fields {
         format!(
-            "{}readonly startUpdate: StartUpdate<{}>,\n",
-            indent, updatable_data_type
+            "{indent}readonly startUpdate: StartUpdate<{updatable_data_type}>,\n"
         )
     } else {
         "".to_string()
@@ -438,7 +437,6 @@ fn generate_function_import_statement(
 
     let const_export_name = target_field_info.const_export_name;
     ClientFieldFunctionImportStatement(format!(
-        "import {{ {const_export_name} as resolver }} from '{}';",
-        file_name
+        "import {{ {const_export_name} as resolver }} from '{file_name}';"
     ))
 }

@@ -566,8 +566,7 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
         .clone();
 
     let query_name = format!(
-        "{}__{}",
-        root_parent_object, client_field_scalar_selection_name
+        "{root_parent_object}__{client_field_scalar_selection_name}"
     )
     .intern()
     .into();

@@ -88,7 +88,7 @@ pub enum BatchCompileError {
         "{}{}",
         if messages.len() == 1 { "Unable to parse Isograph literal:" } else { "Unable to parse Isograph literals:" },
         messages.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{}", x));
+            output.push_str(&format!("\n\n{x}"));
             output
         })
     )]
@@ -107,7 +107,7 @@ pub enum BatchCompileError {
             "Errors when processing client field declarations:"
         },
         messages.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{}", x));
+            output.push_str(&format!("\n\n{x}"));
             output
         })
     )]
@@ -127,7 +127,7 @@ pub enum BatchCompileError {
     #[error(
         "{}",
         messages.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{}", x));
+            output.push_str(&format!("\n\n{x}"));
             output
         })
     )]
@@ -138,7 +138,7 @@ pub enum BatchCompileError {
     #[error(
         "{}",
         messages.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{}", x));
+            output.push_str(&format!("\n\n{x}"));
             output
         })
     )]
