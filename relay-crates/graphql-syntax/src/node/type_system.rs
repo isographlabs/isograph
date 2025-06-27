@@ -483,7 +483,7 @@ impl fmt::Display for InputValueDefinition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}: {}", self.name, self.type_)?;
         if let Some(v) = &self.default_value {
-            write!(f, " = {}", v)?;
+            write!(f, " = {v}")?;
         }
 
         if !self.directives.is_empty() {
@@ -534,7 +534,7 @@ fn write_list(
         .map(|elem| elem.to_string())
         .collect::<Vec<String>>()
         .join(separator);
-    write!(f, "{}", v)
+    write!(f, "{v}")
 }
 
 fn write_arguments(f: &mut fmt::Formatter<'_>, arguments: &[impl fmt::Display]) -> fmt::Result {

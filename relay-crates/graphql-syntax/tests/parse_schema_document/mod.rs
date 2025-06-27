@@ -17,7 +17,7 @@ pub async fn transform_fixture(fixture: &Fixture<'_>) -> Result<String, String> 
         fixture.content,
         SourceLocationKey::standalone(fixture.file_name),
     )
-    .map(|x| format!("{:#?}", x))
+    .map(|x| format!("{x:#?}"))
     .map_err(|diagnostics| diagnostics_to_sorted_string(fixture.content, &diagnostics))
 }
 
