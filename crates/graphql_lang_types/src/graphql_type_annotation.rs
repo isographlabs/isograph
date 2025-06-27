@@ -160,8 +160,8 @@ impl<TValue> GraphQLNonNullTypeAnnotation<TValue> {
 impl<TValue: fmt::Display> fmt::Display for GraphQLNonNullTypeAnnotation<TValue> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            GraphQLNonNullTypeAnnotation::Named(named) => f.write_fmt(format_args!("{}!", named)),
-            GraphQLNonNullTypeAnnotation::List(list) => f.write_fmt(format_args!("{}!", list)),
+            GraphQLNonNullTypeAnnotation::Named(named) => f.write_fmt(format_args!("{named}!")),
+            GraphQLNonNullTypeAnnotation::List(list) => f.write_fmt(format_args!("{list}!")),
         }
     }
 }

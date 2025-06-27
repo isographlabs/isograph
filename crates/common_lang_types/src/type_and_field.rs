@@ -23,9 +23,9 @@ impl ObjectTypeAndFieldName {
             field_name,
         } = *self;
         if type_name != current_file_type_name {
-            format!("../../{type_name}/{field_name}/{}", file_type)
+            format!("../../{type_name}/{field_name}/{file_type}")
         } else {
-            format!("../{field_name}/{}", file_type)
+            format!("../{field_name}/{file_type}")
         }
     }
 }

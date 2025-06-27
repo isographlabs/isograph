@@ -25,10 +25,8 @@ impl Span {
     pub fn new(start: u32, end: u32) -> Self {
         debug_assert!(
             start <= end,
-            "span.start ({}) should be less than or \
-            equal to span.end ({})",
-            start,
-            end
+            "span.start ({start}) should be less than or \
+            equal to span.end ({end})"
         );
         Span { start, end }
     }
