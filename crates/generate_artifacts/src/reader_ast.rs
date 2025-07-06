@@ -274,7 +274,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
             )
             .0;
 
-            format!("{}", refetch_query_index)
+            format!("{refetch_query_index}")
         }
         DefinitionLocation::Server(_) => "null".to_string(),
     };
