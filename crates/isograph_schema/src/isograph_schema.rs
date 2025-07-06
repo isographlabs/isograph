@@ -4,10 +4,10 @@ use std::{
 };
 
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, JavascriptName,
-    Location, ObjectSelectableName, RelativePathToSourceFile, SelectableName,
-    ServerObjectEntityName, ServerObjectSelectableName, ServerScalarEntityName,
-    ServerScalarIdSelectableName, ServerScalarSelectableName, UnvalidatedTypeName, WithLocation,
+    ClientObjectSelectableName, ClientScalarSelectableName, JavascriptName, Location,
+    ObjectSelectableName, RelativePathToSourceFile, SelectableName, ServerObjectEntityName,
+    ServerObjectSelectableName, ServerScalarEntityName, ServerScalarIdSelectableName,
+    ServerScalarSelectableName, UnvalidatedTypeName, WithLocation,
 };
 use graphql_lang_types::GraphQLNamedTypeAnnotation;
 use intern::string_key::Intern;
