@@ -103,8 +103,7 @@ fn match_failure_message(
             if let Some(deserialization_error) = e.downcast_ref::<DeserializationError>() {
                 assert!(
                     matches!(deserialization_error, DeserializationError::Custom(ref msg) if msg==message),
-                    "Expected DeserializationError::Custom, got {:?}",
-                    deserialization_error
+                    "Expected DeserializationError::Custom, got {deserialization_error:?}"
                 );
             } else {
                 panic!("Expected DeserializationError, got a different error type");

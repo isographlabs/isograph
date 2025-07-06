@@ -130,7 +130,7 @@ pub fn create_config(
         Ok(contents) => contents,
         Err(_) => match config_location.to_str() {
             Some(loc) => {
-                panic!("Expected config to be found at {}", loc)
+                panic!("Expected config to be found at {loc}")
             }
             None => {
                 panic!("Expected config to be found.")
@@ -139,7 +139,7 @@ pub fn create_config(
     };
 
     let config_parsed: IsographProjectConfig = serde_json::from_str(&config_contents)
-        .unwrap_or_else(|e| panic!("Error parsing config. Error: {}", e));
+        .unwrap_or_else(|e| panic!("Error parsing config. Error: {e}"));
 
     let mut config = config_location.clone();
     config.pop();
@@ -161,8 +161,7 @@ pub fn create_config(
     CompilerConfig {
         config_location: config_location.canonicalize().unwrap_or_else(|_| {
             panic!(
-                "Unable to canonicalize config_file at {:?}.",
-                config_location
+                "Unable to canonicalize config_file at {config_location:?}."
             )
         }),
         project_root: project_root_dir.canonicalize().unwrap_or_else(|_| {
@@ -203,8 +202,7 @@ pub fn create_config(
                         .canonicalize()
                         .unwrap_or_else(|_| {
                             panic!(
-                                "Unable to canonicalize schema extension path. Does {:?} exist?",
-                                schema_extension
+                                "Unable to canonicalize schema extension path. Does {schema_extension:?} exist?"
                             )
                         }),
                 )

@@ -23,7 +23,7 @@ pub async fn transform_fixture(fixture: &Fixture<'_>) -> Result<String, String> 
                 FragmentArgumentSyntaxKind::SpreadArgumentsAndFragmentVariableDefinitions,
         },
     )
-    .map(|x| format!("{:#?}", x))
+    .map(|x| format!("{x:#?}"))
     .map_err(|diagnostics| diagnostics_to_sorted_string(fixture.content, &diagnostics))
 }
 

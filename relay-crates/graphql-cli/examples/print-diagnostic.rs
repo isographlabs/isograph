@@ -33,5 +33,5 @@ fn main() {
     let diagnostic = Diagnostic::error("Field `photo` is not defined type `User`", location_field)
         .annotate("type defined here", location_type);
     printer.write_diagnostic(&mut res, &diagnostic).unwrap();
-    print!("{}", res);
+    print!("{res}");
 }

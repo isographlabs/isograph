@@ -17,7 +17,7 @@ pub async fn transform_fixture(fixture: &Fixture<'_>) -> Result<String, String> 
 
     let result = type_system_definitions
         .iter()
-        .map(|node| format!("{}", node))
+        .map(|node| format!("{node}"))
         .collect::<Vec<String>>()
         .join("\n");
 

@@ -53,7 +53,7 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
 
         vec![
             ArtifactPathAndContent {
-                file_content: format!("export default '{}';", query_text),
+                file_content: format!("export default '{query_text}';"),
                 file_name: query_text_file_name,
                 type_and_field: Some(ObjectTypeAndFieldName {
                     type_name,

@@ -577,7 +577,7 @@ fn get_nested_refetch_query_text(
             })
         {
             found_at_least_one = true;
-            s.push_str(&format!("{}, ", index));
+            s.push_str(&format!("{index}, "));
         }
 
         assert!(

@@ -613,7 +613,7 @@ pub enum ValidateArgumentTypesError {
 
     #[error(
         "This object has missing fields: {0}",
-        missing_fields_names.iter().map(|field_name| format!("${}", field_name)).collect::<Vec<_>>().join(", ")
+        missing_fields_names.iter().map(|field_name| format!("${field_name}")).collect::<Vec<_>>().join(", ")
     )]
     MissingFields {
         missing_fields_names: Vec<SelectableName>,

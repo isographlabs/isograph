@@ -36,7 +36,7 @@ pub fn write_list(
         .map(|elem| elem.to_string())
         .collect::<Vec<String>>()
         .join(separator);
-    write!(f, "{}", v)
+    write!(f, "{v}")
 }
 
 pub fn write_arguments(f: &mut fmt::Formatter<'_>, arguments: &[impl fmt::Display]) -> fmt::Result {

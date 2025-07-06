@@ -53,7 +53,7 @@ fn generate_normalization_ast_node<TNetworkProtocol: NetworkProtocol>(
 
             let concrete_type = linked_field
                 .concrete_type
-                .map(|name| format!("\"{}\"", name))
+                .map(|name| format!("\"{name}\""))
                 .unwrap_or("null".to_string());
 
             let indent = "  ".repeat(indentation_level as usize);

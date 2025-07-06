@@ -181,10 +181,10 @@ pub enum NonConstantValue {
 impl NonConstantValue {
     pub fn to_alias_str_chunk(&self) -> String {
         match self {
-            NonConstantValue::Variable(name) => format!("v_{}", name),
+            NonConstantValue::Variable(name) => format!("v_{name}"),
             // l for literal, i.e. this is shared with others
-            NonConstantValue::Integer(int_value) => format!("l_{}", int_value),
-            NonConstantValue::Boolean(bool) => format!("l_{}", bool),
+            NonConstantValue::Integer(int_value) => format!("l_{int_value}"),
+            NonConstantValue::Boolean(bool) => format!("l_{bool}"),
             NonConstantValue::String(string) => format!(
                 "s_{}",
                 string

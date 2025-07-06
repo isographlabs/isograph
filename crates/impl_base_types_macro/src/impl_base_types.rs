@@ -66,17 +66,14 @@ pub(crate) fn impl_base_types(
             .to_compile_error(),
             TraitItem::Macro(_) => Error::new_spanned(
                 item,
-                format!(
-                    "{}: macros in traits are not supported for now",
-                    invocation_name
-                ),
+                format!("{invocation_name}: macros in traits are not supported for now"),
             )
             .to_compile_error(),
             TraitItem::Verbatim(_) => {
-                Error::new_spanned(item, format!("{}: unknown trait item", invocation_name))
+                Error::new_spanned(item, format!("{invocation_name}: unknown trait item"))
                     .to_compile_error()
             }
-            _ => Error::new_spanned(item, format!("{}: Unknown trait item", invocation_name))
+            _ => Error::new_spanned(item, format!("{invocation_name}: Unknown trait item"))
                 .to_compile_error(),
         });
 

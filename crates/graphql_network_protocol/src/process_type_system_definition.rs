@@ -222,13 +222,13 @@ pub fn process_graphql_type_system_document(
                 object_outcome.fields_to_insert.push(WithLocation::new(
                     FieldToInsert {
                         description: Some(WithSpan::new(
-                            format!("A client pointer for the {} type.", subtype_name)
+                            format!("A client pointer for the {subtype_name} type.")
                                 .intern()
                                 .into(),
                             Span::todo_generated(),
                         )),
                         name: WithLocation::new(
-                            format!("as{}", subtype_name).intern().into(),
+                            format!("as{subtype_name}").intern().into(),
                             Location::generated(),
                         ),
                         type_: GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
