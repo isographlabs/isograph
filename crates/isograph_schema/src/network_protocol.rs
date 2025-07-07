@@ -17,6 +17,11 @@ pub trait NetworkProtocol:
 where
     Self: Sized,
 {
+    // We're using this type to constrain the types of sources that we accept. i.e.
+    // in theory, you can have a TNetworkProtocol with a different Source associated
+    // type, but for now, we get a source + set of extensions, and have to restrict
+    // TNetworkProtocol accordingly. Perhaps the config can have a generic, and
+    // thus we can thread this further back, but that is not yet implemented.
     type Sources;
 
     type SchemaObjectAssociatedData: Debug;
