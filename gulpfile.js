@@ -31,6 +31,10 @@ const builds = [
     folder: 'isograph-compiler',
     packageName: '@isograph/compiler',
   },
+  {
+    folder: 'isograph-swc-plugin',
+    packageName: '@isograph/plugin-swc',
+  },
 ];
 
 const setMainVersion = async () => {
