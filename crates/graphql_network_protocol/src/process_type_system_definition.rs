@@ -27,6 +27,7 @@ use crate::{
 lazy_static! {
     pub static ref QUERY_TYPE: SchemaServerObjectEntityName = "Query".intern().into();
     static ref MUTATION_TYPE: SchemaServerObjectEntityName = "Mutation".intern().into();
+    static ref SUBSCRIPTION_TYPE: SchemaServerObjectEntityName = "Subscription".intern().into();
     static ref ID_FIELD_NAME: ServerScalarSelectableName = "id".intern().into();
     // TODO use schema_data.string_type_id or something
     static ref STRING_TYPE_NAME: UnvalidatedTypeName = "String".intern().into();
@@ -401,8 +402,9 @@ fn process_object_type_definition(
         Some(RootOperationKind::Query)
     } else if object_type_definition.name.item == *MUTATION_TYPE {
         Some(RootOperationKind::Mutation)
+    } else if object_type_definition.name.item == *SUBSCRIPTION_TYPE {
+        Some(RootOperationKind::Subscription)
     } else {
-        // TODO subscription
         None
     };
 
