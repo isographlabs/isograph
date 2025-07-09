@@ -1,7 +1,7 @@
 import {
   callSubscriptions,
   getParentRecordKey,
-  insertIfNotExists,
+  insertEmptySetIfMissing,
   type EncounteredIds,
 } from './cache';
 import type { RefetchQueryNormalizationArtifactWrapper } from './entrypoint';
@@ -176,7 +176,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             ? {
                 set: (newValue) => {
                   storeRecord[storeRecordName] = newValue;
-                  const updatedIds = insertIfNotExists(
+                  const updatedIds = insertEmptySetIfMissing(
                     mutableUpdatedIds,
                     root.__typename,
                   );
@@ -198,6 +198,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
               storeRecord,
               root,
               variables,
+              nestedRefetchQueries,
               networkRequest,
               networkRequestOptions,
               (ast, root) =>
@@ -228,7 +229,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
                   } else {
                     storeRecord[storeRecordName] = assertLink(newValue?.link);
                   }
-                  const updatedIds = insertIfNotExists(
+                  const updatedIds = insertEmptySetIfMissing(
                     mutableUpdatedIds,
                     root.__typename,
                   );
