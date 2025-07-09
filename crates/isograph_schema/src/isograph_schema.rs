@@ -177,7 +177,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .get(&root_object_name)
             .expect(
                 "Expected root_object_entity_name to exist \
-                in server_object_entity_avaiable_selectables",
+                in server_object_entity_available_selectables",
             )
             .selectables;
 
@@ -253,7 +253,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .get(&root_object_name)
             .expect(
                 "Expected root_object_entity_name to exist \
-                in server_object_entity_avaiable_selectables",
+                in server_object_entity_available_selectables",
             )
             .selectables;
 
@@ -703,7 +703,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PathToRefetchField {
     pub linked_fields: Vec<NormalizationKey>,
-    pub field_name: ClientScalarSelectableName,
+    pub field_name: SelectionType<ClientScalarSelectableName, NameAndArguments>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]

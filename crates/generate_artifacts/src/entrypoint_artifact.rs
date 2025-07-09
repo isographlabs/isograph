@@ -1,26 +1,28 @@
-use std::collections::BTreeSet;
-
 use common_lang_types::{
     ArtifactPathAndContent, ClientScalarSelectableName, ObjectTypeAndFieldName, QueryOperationName,
     QueryText, SchemaServerObjectEntityName, VariableName,
 };
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{DefinitionLocation, ScalarSelectionDirectiveSet, SelectionType};
+
 use isograph_schema::{
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
     get_reachable_variables, initial_variable_context, ClientScalarOrObjectSelectable,
-    ClientScalarSelectable, FieldToCompletedMergeTraversalStateMap, FieldTraversalResult,
-    MergedSelectionMap, NetworkProtocol, RootOperationName, RootRefetchedPath,
-    ScalarClientFieldTraversalState, Schema, ServerObjectEntity, ValidatedVariableDefinition,
-    WrappedSelectionMapSelection,
+    FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, MergedSelectionMap,
+    NetworkProtocol, RootOperationName, RootRefetchedPath, ScalarClientFieldTraversalState, Schema,
+    ServerObjectEntity, ValidatedVariableDefinition, WrappedSelectionMapSelection,
 };
+use isograph_schema::{ClientScalarSelectable, NormalizationKey};
+use std::collections::BTreeSet;
 
+use crate::generate_artifacts::ENTRYPOINT_FILE_NAME;
+use crate::generate_artifacts::NORMALIZATION_AST_FILE_NAME;
+use crate::generate_artifacts::QUERY_TEXT_FILE_NAME;
 use crate::{
     generate_artifacts::{
-        NormalizationAstText, RefetchQueryArtifactImport, ENTRYPOINT_FILE_NAME, NORMALIZATION_AST,
-        NORMALIZATION_AST_FILE_NAME, QUERY_TEXT, QUERY_TEXT_FILE_NAME, RESOLVER_OUTPUT_TYPE,
-        RESOLVER_PARAM_TYPE, RESOLVER_READER,
+        NormalizationAstText, RefetchQueryArtifactImport, NORMALIZATION_AST, QUERY_TEXT,
+        RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
     },
     imperatively_loaded_fields::get_artifact_for_imperatively_loaded_field,
     normalization_ast_text::generate_normalization_ast_text,
@@ -129,28 +131,36 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         .refetch_paths
         .iter()
         .map(|((path, selection_variant), root_refetch_path)| {
-            let current_target_merged_selections = match selection_variant {
-                ScalarSelectionDirectiveSet::Updatable(_)
-                | ScalarSelectionDirectiveSet::None(_) => {
-                    current_target_merged_selections(&path.linked_fields, merged_selection_map)
+            let current_target_merged_selections = match &path.field_name {
+                SelectionType::Object(name_and_arguments) => {
+                    let mut linked_fields = path.linked_fields.clone();
+                    linked_fields.push(NormalizationKey::ClientPointer(name_and_arguments.clone()));
+
+                    current_target_merged_selections(&linked_fields, merged_selection_map)
                 }
-                ScalarSelectionDirectiveSet::Loadable(_) => {
-                    // Note: it would be cleaner to include a reference to the merged selection set here via
-                    // the selection_variant variable, instead of by looking it up like this.
-                    &encountered_client_type_map
-                        .get(&DefinitionLocation::Client(SelectionType::Scalar((
-                            root_refetch_path
-                                .path_to_refetch_field_info
-                                .refetch_field_parent_object_entity_name,
-                            root_refetch_path
-                                .path_to_refetch_field_info
-                                .client_field_name,
-                        ))))
-                        .expect(
-                            "Expected field to have been encountered, \
-                                since it is being used as a refetch field.",
-                        )
-                        .merged_selection_map
+                SelectionType::Scalar(_) => {
+                    match selection_variant {
+                        ScalarSelectionDirectiveSet::Updatable(_)
+                        | ScalarSelectionDirectiveSet::None(_) => current_target_merged_selections(
+                            &path.linked_fields,
+                            merged_selection_map,
+                        ),
+                        ScalarSelectionDirectiveSet::Loadable(_) => {
+                            // Note: it would be cleaner to include a reference to the merged selection set here via
+                            // the selection_variant variable, instead of by looking it up like this.
+                            &encountered_client_type_map
+                                .get(&DefinitionLocation::Client(
+                                    root_refetch_path
+                                        .path_to_refetch_field_info
+                                        .client_selectable_id,
+                                ))
+                                .expect(
+                                    "Expected field to have been encountered, \
+                                        since it is being used as a refetch field.",
+                                )
+                                .merged_selection_map
+                        }
+                    }
                 }
             };
 
