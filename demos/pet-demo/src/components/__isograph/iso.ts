@@ -21,6 +21,7 @@ import { type Pet__PetTaglineCard__param } from './Pet/PetTaglineCard/param_type
 import { type Pet__PetUpdater__param } from './Pet/PetUpdater/param_type';
 import { type Pet__Unreachable2__param } from './Pet/Unreachable2/param_type';
 import { type Pet__UnreachableFromEntrypoint__param } from './Pet/UnreachableFromEntrypoint/param_type';
+import { type Query__Foo__param } from './Query/Foo/param_type';
 import { type Query__HomeRoute__param } from './Query/HomeRoute/param_type';
 import { type Query__Newsfeed__param } from './Query/Newsfeed/param_type';
 import { type Query__PetByName__param } from './Query/PetByName/param_type';
@@ -30,6 +31,7 @@ import { type Query__PetDetailRoute__param } from './Query/PetDetailRoute/param_
 import { type Query__PetFavoritePhrase__param } from './Query/PetFavoritePhrase/param_type';
 import { type Viewer__NewsfeedPaginationComponent__param } from './Viewer/NewsfeedPaginationComponent/param_type';
 import entrypoint_Mutation__SetTagline from '../__isograph/Mutation/SetTagline/entrypoint';
+import entrypoint_Query__Foo from '../__isograph/Query/Foo/entrypoint';
 import entrypoint_Query__HomeRoute from '../__isograph/Query/HomeRoute/entrypoint';
 import entrypoint_Query__Newsfeed from '../__isograph/Query/Newsfeed/entrypoint';
 import entrypoint_Query__PetByName from '../__isograph/Query/PetByName/entrypoint';
@@ -175,6 +177,10 @@ export function iso<T>(
 ): IdentityWithParam<Pet__UnreachableFromEntrypoint__param>;
 
 export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.Foo', T>
+): IdentityWithParam<Query__Foo__param>;
+
+export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.HomeRoute', T>
 ): IdentityWithParamComponent<Query__HomeRoute__param>;
 
@@ -209,6 +215,10 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Mutation.SetTagline', T>
 ): typeof entrypoint_Mutation__SetTagline;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.Foo', T>
+): typeof entrypoint_Query__Foo;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.HomeRoute', T>

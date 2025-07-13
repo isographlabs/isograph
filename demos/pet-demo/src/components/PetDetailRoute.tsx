@@ -1,5 +1,11 @@
 import { iso } from '@iso';
-import { FragmentReader, useLazyReference } from '@isograph/react';
+import {
+  FragmentReader,
+  normalizeData,
+  ROOT_ID,
+  useIsographEnvironment,
+  useLazyReference,
+} from '@isograph/react';
 import { Button, Card, CardContent, Container, Stack } from '@mui/material';
 import React from 'react';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -18,6 +24,7 @@ export const PetDetailRouteComponent = iso(`
     }
   }
 `)(function PetDetailRouteComponent({ data, parameters }) {
+  const env = useIsographEnvironment();
   const navigateTo = useNavigateTo();
   const { pet } = data;
   if (pet == null) {
@@ -31,6 +38,33 @@ export const PetDetailRouteComponent = iso(`
         style={{ cursor: 'pointer' }}
       >
         ← Home
+      </h3>
+      <h3
+        onClick={() => {
+          normalizeData(
+            env,
+            iso(` entrypoint Query.Foo `).networkRequestInfo.normalizationAst
+              .selections,
+            {
+              pet____id___v_id: {
+                id: parameters.id,
+                __typename: 'Pet',
+                name: 'POOPFACE',
+              },
+            },
+            {
+              id: parameters.id,
+            },
+            [],
+            {
+              __link: ROOT_ID,
+              __typename: 'Query',
+            },
+          );
+        }}
+        style={{ cursor: 'pointer' }}
+      >
+        ← Set name to POOPFACE
       </h3>
       <React.Suspense fallback={<h2>Loading pet details...</h2>}>
         <Stack direction="row" spacing={4}>
