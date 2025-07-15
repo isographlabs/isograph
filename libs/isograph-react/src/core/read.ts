@@ -988,7 +988,7 @@ export function readImperativelyLoadedField(
       kind: 'Success',
       data: (args: any) => [
         // Stable id
-        root.__link + '__' + field.name,
+        root.__typename + ':' + root.__link + '__' + field.name,
         // Fetcher
         field.refetchReaderArtifact.resolver(
           environment,
