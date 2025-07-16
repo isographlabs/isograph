@@ -1177,7 +1177,7 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
                     .server_scalar_selectable(parent_type.name, id_field.into())
                     .name
                     .item
-                    .unchecked_conversion();
+                    .into();
                 vacant_entry.insert(MergedServerSelection::ScalarField(
                     MergedScalarFieldSelection {
                         name,
