@@ -660,7 +660,6 @@ fn create_selection_map_with_merge_traversal_state<TNetworkProtocol: NetworkProt
     merged_selection_map
 }
 
-#[allow(clippy::too_many_arguments)]
 fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
