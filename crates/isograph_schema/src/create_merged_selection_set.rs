@@ -837,9 +837,6 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                                     .traversal_path
                                     .push(normalization_key.clone());
 
-                                let normalization_key =
-                                    NormalizationKey::InlineFragment(type_to_refine_to);
-
                                 let inline_fragment =
                                     parent_map.entry(normalization_key).or_insert_with(|| {
                                         MergedServerSelection::InlineFragment(
