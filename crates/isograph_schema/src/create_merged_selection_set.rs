@@ -1094,7 +1094,7 @@ fn merge_scalar_server_field(
         NormalizationKey::Id
     } else {
         NormalizationKey::ServerField(create_transformed_name_and_arguments(
-            scalar_field.name.item.into(),
+            scalar_field_name.into(),
             &scalar_field.arguments,
             variable_context,
         ))
@@ -1117,7 +1117,7 @@ fn merge_scalar_server_field(
         Entry::Vacant(vacant_entry) => {
             vacant_entry.insert(MergedServerSelection::ScalarField(
                 MergedScalarFieldSelection {
-                    name: scalar_field.name.item,
+                    name: scalar_field_name,
                     arguments: transform_arguments_with_child_context(
                         scalar_field
                             .arguments
