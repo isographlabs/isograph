@@ -669,7 +669,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
 ) {
-    for validated_selection in validated_selections.iter().filter(filter_id_fields) {
+    for validated_selection in validated_selections.iter() {
         match &validated_selection.item {
             SelectionType::Scalar(scalar_field_selection) => {
                 match &scalar_field_selection.associated_data {
@@ -1038,21 +1038,6 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
     );
 }
 
-fn filter_id_fields(field: &&WithSpan<ValidatedSelection>) -> bool {
-    // filter out id fields, and eventually other always-selected fields like __typename
-    match &field.item {
-        SelectionTypeContainingSelections::Scalar(scalar_field) => {
-            // -------- HACK --------
-            // Here, we check whether the field is named "id", but we should really
-            // know whether it is an id field in some other way. There can be non-id fields
-            // named id and id fields not named "id".
-            scalar_field.name.item != "id"
-            // ------ END HACK ------
-        }
-        SelectionTypeContainingSelections::Object(_) => true,
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
 fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
@@ -1101,11 +1086,19 @@ fn merge_scalar_server_field(
     parent_map: &mut MergedSelectionMap,
     variable_context: &VariableContext,
 ) {
-    let normalization_key = NormalizationKey::ServerField(create_transformed_name_and_arguments(
-        scalar_field.name.item.into(),
-        &scalar_field.arguments,
-        variable_context,
-    ));
+    // HACK. We probably should filter these out in a better way.
+    let scalar_field_name = scalar_field.name.item;
+    let normalization_key = if scalar_field_name == "__typename" {
+        NormalizationKey::Discriminator
+    } else if scalar_field_name == "id" {
+        NormalizationKey::Id
+    } else {
+        NormalizationKey::ServerField(create_transformed_name_and_arguments(
+            scalar_field.name.item.into(),
+            &scalar_field.arguments,
+            variable_context,
+        ))
+    };
     match parent_map.entry(normalization_key) {
         Entry::Occupied(occupied) => {
             match occupied.get() {

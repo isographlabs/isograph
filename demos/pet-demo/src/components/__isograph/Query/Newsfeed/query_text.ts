@@ -4,12 +4,12 @@ export default 'query Newsfeed {\
     newsfeed____skip___l_0____limit___l_6: newsfeed(skip: 0, limit: 6) {\
       __typename,\
       ... on AdItem {\
-        id,\
         __typename,\
+        id,\
       },\
       ... on BlogItem {\
-        id,\
         __typename,\
+        id,\
         author,\
         content,\
         image {\

@@ -20,8 +20,8 @@ export default 'query RepositoryPage($repositoryName: String!, $repositoryOwner:
             __typename,\
             login,\
             ... on User {\
-              id,\
               __typename,\
+              id,\
               twitterUsername,\
             },\
           },\
