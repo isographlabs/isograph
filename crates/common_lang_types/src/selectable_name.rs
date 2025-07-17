@@ -81,6 +81,7 @@ string_key_one_way_conversion!(from: ServerScalarSelectableName, to: ScalarSelec
 
 string_key_newtype!(ServerScalarIdSelectableName);
 string_key_one_way_conversion!(from: ServerScalarIdSelectableName, to: ServerScalarSelectableName);
+string_key_one_way_conversion!(from: ServerScalarIdSelectableName, to: ScalarSelectableName);
 
 string_key_newtype!(ServerObjectSelectableName);
 string_key_one_way_conversion!(from: ServerObjectSelectableName, to: SelectableName);

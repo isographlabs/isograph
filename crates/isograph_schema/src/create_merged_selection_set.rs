@@ -1170,15 +1170,9 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
                 };
             }
             Entry::Vacant(vacant_entry) => {
-                // TODO why is this difficult. Can this be fixed with better modeling?
-                let name = schema
-                    .server_scalar_selectable(parent_type.name, id_field.into())
-                    .name
-                    .item
-                    .into();
                 vacant_entry.insert(MergedServerSelection::ScalarField(
                     MergedScalarFieldSelection {
-                        name,
+                        name: id_field.into(),
                         arguments: vec![],
                     },
                 ));
