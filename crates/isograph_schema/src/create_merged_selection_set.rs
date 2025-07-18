@@ -665,18 +665,11 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
             SelectionType::Scalar(scalar_field_selection) => {
                 match &scalar_field_selection.associated_data {
                     DefinitionLocation::Server(_) => {
-                        match scalar_field_selection.scalar_selection_directive_set {
-                            ScalarSelectionDirectiveSet::Updatable(_) => {
-                                merge_traversal_state.has_updatable = true;
-                            }
-                            ScalarSelectionDirectiveSet::None(_) => (),
-                            ScalarSelectionDirectiveSet::Loadable(_) => (),
-                        };
-
                         merge_scalar_server_field(
                             scalar_field_selection,
                             parent_map,
                             variable_context,
+                            merge_traversal_state,
                         );
                     }
                     DefinitionLocation::Client((
@@ -1073,12 +1066,19 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
 }
 
 fn merge_scalar_server_field(
-    scalar_field: &ValidatedScalarSelection,
+    scalar_field_selection: &ValidatedScalarSelection,
     parent_map: &mut MergedSelectionMap,
     variable_context: &VariableContext,
+    merge_traversal_state: &mut ScalarClientFieldTraversalState,
 ) {
+    if let ScalarSelectionDirectiveSet::Updatable(_) =
+        scalar_field_selection.scalar_selection_directive_set
+    {
+        merge_traversal_state.has_updatable = true;
+    }
+
     // HACK. We probably should filter these out in a better way.
-    let scalar_field_name = scalar_field.name.item;
+    let scalar_field_name = scalar_field_selection.name.item;
     let normalization_key = if scalar_field_name == "__typename" {
         NormalizationKey::Discriminator
     } else if scalar_field_name == "id" {
@@ -1086,10 +1086,11 @@ fn merge_scalar_server_field(
     } else {
         NormalizationKey::ServerField(create_transformed_name_and_arguments(
             scalar_field_name.into(),
-            &scalar_field.arguments,
+            &scalar_field_selection.arguments,
             variable_context,
         ))
     };
+
     match parent_map.entry(normalization_key) {
         Entry::Occupied(occupied) => {
             match occupied.get() {
@@ -1110,7 +1111,7 @@ fn merge_scalar_server_field(
                 MergedScalarFieldSelection {
                     name: scalar_field_name,
                     arguments: transform_arguments_with_child_context(
-                        scalar_field
+                        scalar_field_selection
                             .arguments
                             .iter()
                             .map(|arg| arg.item.into_key_and_value()),
