@@ -882,6 +882,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
     select_typename_and_id_fields_in_merged_selection(schema, parent_map, parent_object_entity);
 }
 
+#[allow(clippy::too_many_arguments)]
 fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut BTreeMap<NormalizationKey, MergedServerSelection>,
@@ -921,6 +922,7 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
         )));
 }
 
+#[allow(clippy::too_many_arguments)]
 fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut BTreeMap<NormalizationKey, MergedServerSelection>,
