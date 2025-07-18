@@ -1,6 +1,6 @@
 use common_lang_types::{
-    ClientObjectSelectableName, DescriptionValue, ObjectSelectableName,
-    SchemaServerObjectEntityName, ServerObjectSelectableName,
+    ClientObjectSelectableName, DescriptionValue, ObjectSelectableName, ServerObjectEntityName,
+    ServerObjectSelectableName,
 };
 use impl_base_types_macro::impl_for_definition_location;
 use isograph_lang_types::{DefinitionLocation, TypeAnnotation};
@@ -13,16 +13,16 @@ pub type ObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
 >;
 
 pub type ObjectSelectableId = DefinitionLocation<
-    (SchemaServerObjectEntityName, ServerObjectSelectableName),
-    (SchemaServerObjectEntityName, ClientObjectSelectableName),
+    (ServerObjectEntityName, ServerObjectSelectableName),
+    (ServerObjectEntityName, ClientObjectSelectableName),
 >;
 
 #[impl_for_definition_location]
 pub trait ClientOrServerObjectSelectable {
     fn description(&self) -> Option<DescriptionValue>;
     fn name(&self) -> ObjectSelectableName;
-    fn parent_object_entity_name(&self) -> SchemaServerObjectEntityName;
-    fn target_object_entity_name(&self) -> TypeAnnotation<SchemaServerObjectEntityName>;
+    fn parent_object_entity_name(&self) -> ServerObjectEntityName;
+    fn target_object_entity_name(&self) -> TypeAnnotation<ServerObjectEntityName>;
 }
 
 impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
@@ -36,11 +36,11 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
         self.name.into()
     }
 
-    fn parent_object_entity_name(&self) -> SchemaServerObjectEntityName {
+    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
         self.parent_object_name
     }
 
-    fn target_object_entity_name(&self) -> TypeAnnotation<SchemaServerObjectEntityName> {
+    fn target_object_entity_name(&self) -> TypeAnnotation<ServerObjectEntityName> {
         self.target_object_entity_name.clone()
     }
 }
@@ -56,11 +56,11 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
         self.name.item.into()
     }
 
-    fn parent_object_entity_name(&self) -> SchemaServerObjectEntityName {
+    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
         self.parent_object_name
     }
 
-    fn target_object_entity_name(&self) -> TypeAnnotation<SchemaServerObjectEntityName> {
+    fn target_object_entity_name(&self) -> TypeAnnotation<ServerObjectEntityName> {
         self.target_object_entity.clone()
     }
 }

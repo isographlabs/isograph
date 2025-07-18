@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    GraphQLInterfaceTypeName, Location, SchemaServerObjectEntityName, SelectableName,
+    GraphQLInterfaceTypeName, Location, SelectableName, ServerObjectEntityName,
     ServerScalarSelectableName, Span, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
@@ -25,9 +25,9 @@ use crate::{
 };
 
 lazy_static! {
-    pub static ref QUERY_TYPE: SchemaServerObjectEntityName = "Query".intern().into();
-    static ref MUTATION_TYPE: SchemaServerObjectEntityName = "Mutation".intern().into();
-    static ref SUBSCRIPTION_TYPE: SchemaServerObjectEntityName = "Subscription".intern().into();
+    pub static ref QUERY_TYPE: ServerObjectEntityName = "Query".intern().into();
+    static ref MUTATION_TYPE: ServerObjectEntityName = "Mutation".intern().into();
+    static ref SUBSCRIPTION_TYPE: ServerObjectEntityName = "Subscription".intern().into();
     static ref ID_FIELD_NAME: ServerScalarSelectableName = "id".intern().into();
     // TODO use schema_data.string_type_id or something
     static ref STRING_TYPE_NAME: UnvalidatedTypeName = "String".intern().into();
@@ -41,7 +41,7 @@ pub fn process_graphql_type_system_document(
     type_system_document: GraphQLTypeSystemDocument,
 ) -> ProcessGraphqlTypeDefinitionResult<(
     ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>,
-    HashMap<SchemaServerObjectEntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
+    HashMap<ServerObjectEntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
     Vec<ExposeAsFieldToInsert>,
 )> {
     // TODO return a vec of errors, not just one
@@ -214,8 +214,7 @@ pub fn process_graphql_type_system_document(
     // For each supertype (e.g. Node) and a subtype (e.g. Pet), we need to add an asConcreteType field.
     for (supertype_name, subtypes) in supertype_to_subtype_map.iter() {
         if let Some((object_outcome, _)) = objects.iter_mut().find(|obj| {
-            let supertype_name: SchemaServerObjectEntityName =
-                supertype_name.unchecked_conversion();
+            let supertype_name: ServerObjectEntityName = supertype_name.unchecked_conversion();
 
             obj.0.server_object_entity.name == supertype_name
         }) {
@@ -264,7 +263,7 @@ pub fn process_graphql_type_extension_document(
     extension_document: GraphQLTypeSystemExtensionDocument,
 ) -> ProcessGraphqlTypeDefinitionResult<(
     ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>,
-    HashMap<SchemaServerObjectEntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
+    HashMap<ServerObjectEntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
     Vec<ExposeAsFieldToInsert>,
 )> {
     let mut definitions = Vec::with_capacity(extension_document.0.len());
@@ -309,9 +308,7 @@ pub enum ProcessGraphqlTypeSystemDefinitionError {
     CreateAdditionalFieldsError(#[from] CreateAdditionalFieldsError),
 
     #[error("Attempted to extend {type_name}, but that type is not defined")]
-    AttemptedToExtendUndefinedType {
-        type_name: SchemaServerObjectEntityName,
-    },
+    AttemptedToExtendUndefinedType { type_name: ServerObjectEntityName },
 
     #[error("Type {subtype_name} claims to implement {supertype_name}, but {supertype_name} is not a type that has been defined.")]
     AttemptedToImplementNonExistentType {
@@ -322,7 +319,7 @@ pub enum ProcessGraphqlTypeSystemDefinitionError {
 
 fn process_object_type_definition(
     object_type_definition: IsographObjectTypeDefinition,
-    concrete_type: Option<SchemaServerObjectEntityName>,
+    concrete_type: Option<ServerObjectEntityName>,
     associated_data: GraphQLSchemaObjectAssociatedData,
     type_definition_type: GraphQLObjectDefinitionType,
     refetch_fields: &mut Vec<ExposeAsFieldToInsert>,
@@ -433,7 +430,7 @@ fn process_scalar_definition(
 
 fn process_graphql_type_system_extension(
     extension: WithLocation<GraphQLTypeSystemExtension>,
-) -> HashMap<SchemaServerObjectEntityName, Vec<GraphQLDirective<GraphQLConstantValue>>> {
+) -> HashMap<ServerObjectEntityName, Vec<GraphQLDirective<GraphQLConstantValue>>> {
     let mut types_and_directives = HashMap::new();
     match extension.item {
         GraphQLTypeSystemExtension::ObjectTypeExtension(object_extension) => {

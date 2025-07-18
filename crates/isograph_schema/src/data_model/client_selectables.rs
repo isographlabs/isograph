@@ -2,7 +2,7 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, DescriptionValue,
-    ObjectTypeAndFieldName, SchemaServerObjectEntityName, WithSpan,
+    ObjectTypeAndFieldName, ServerObjectEntityName, WithSpan,
 };
 use isograph_lang_types::{SelectionType, TypeAnnotation, VariableDefinition};
 
@@ -13,8 +13,8 @@ use crate::{
 
 // TODO rename
 pub type ClientSelectableId = SelectionType<
-    (SchemaServerObjectEntityName, ClientScalarSelectableName),
-    (SchemaServerObjectEntityName, ClientObjectSelectableName),
+    (ServerObjectEntityName, ClientScalarSelectableName),
+    (ServerObjectEntityName, ClientObjectSelectableName),
 >;
 
 pub type ClientSelectable<'a, TNetworkProtocol> = SelectionType<
@@ -43,7 +43,7 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     // Why is this not calculated when needed?
     pub type_and_field: ObjectTypeAndFieldName,
 
-    pub parent_object_entity_name: SchemaServerObjectEntityName,
+    pub parent_object_entity_name: ServerObjectEntityName,
     pub output_format: PhantomData<TNetworkProtocol>,
 }
 
@@ -53,7 +53,7 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
 pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: ClientObjectSelectableName,
-    pub target_object_entity_name: TypeAnnotation<SchemaServerObjectEntityName>,
+    pub target_object_entity_name: TypeAnnotation<ServerObjectEntityName>,
 
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 
@@ -64,7 +64,7 @@ pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     // Why is this not calculated when needed?
     pub type_and_field: ObjectTypeAndFieldName,
 
-    pub parent_object_name: SchemaServerObjectEntityName,
+    pub parent_object_name: ServerObjectEntityName,
 
     pub output_format: PhantomData<TNetworkProtocol>,
     pub info: UserWrittenClientPointerInfo,

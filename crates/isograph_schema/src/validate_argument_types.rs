@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    EnumLiteralValue, Location, SchemaServerObjectEntityName, SchemaServerScalarEntityName,
-    SelectableName, ServerObjectSelectableName, ServerScalarSelectableName, UnvalidatedTypeName,
-    ValueKeyName, VariableName, WithLocation, WithSpan,
+    EnumLiteralValue, Location, SelectableName, ServerObjectEntityName, ServerObjectSelectableName,
+    ServerScalarEntityName, ServerScalarSelectableName, UnvalidatedTypeName, ValueKeyName,
+    VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
@@ -41,7 +41,7 @@ fn graphql_type_to_nullable_type<TValue>(
 }
 
 fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
-    scalar_literal_name: &SchemaServerScalarEntityName,
+    scalar_literal_name: &ServerScalarEntityName,
     type_: &GraphQLTypeAnnotation<ServerEntityName>,
     schema_data: &ServerEntityData<TNetworkProtocol>,
     location: Location,
@@ -140,11 +140,11 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     schema_data: &ServerEntityData<TNetworkProtocol>,
     server_scalar_selectables: &HashMap<
-        (SchemaServerObjectEntityName, ServerScalarSelectableName),
+        (ServerObjectEntityName, ServerScalarSelectableName),
         ServerScalarSelectable<TNetworkProtocol>,
     >,
     server_object_selectables: &HashMap<
-        (SchemaServerObjectEntityName, ServerObjectSelectableName),
+        (ServerObjectEntityName, ServerObjectSelectableName),
         ServerObjectSelectable<TNetworkProtocol>,
     >,
 ) -> ValidateArgumentTypesResult<()> {
@@ -323,15 +323,15 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     variable_definitions: &[WithSpan<VariableDefinition<ServerEntityName>>],
     server_entity_data: &ServerEntityData<TNetworkProtocol>,
     server_scalar_selectables: &HashMap<
-        (SchemaServerObjectEntityName, ServerScalarSelectableName),
+        (ServerObjectEntityName, ServerScalarSelectableName),
         ServerScalarSelectable<TNetworkProtocol>,
     >,
     server_object_selectables: &HashMap<
-        (SchemaServerObjectEntityName, ServerObjectSelectableName),
+        (ServerObjectEntityName, ServerObjectSelectableName),
         ServerObjectSelectable<TNetworkProtocol>,
     >,
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
-    object_entity_name: SchemaServerObjectEntityName,
+    object_entity_name: ServerObjectEntityName,
 ) -> Result<(), WithLocation<ValidateArgumentTypesError>> {
     validate_no_extraneous_fields(
         &server_entity_data
@@ -396,15 +396,15 @@ enum ObjectLiteralFieldType {
 fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtocol>(
     server_entity_data: &ServerEntityData<TNetworkProtocol>,
     server_scalar_selectables: &HashMap<
-        (SchemaServerObjectEntityName, ServerScalarSelectableName),
+        (ServerObjectEntityName, ServerScalarSelectableName),
         ServerScalarSelectable<TNetworkProtocol>,
     >,
     server_object_selectables: &HashMap<
-        (SchemaServerObjectEntityName, ServerObjectSelectableName),
+        (ServerObjectEntityName, ServerObjectSelectableName),
         ServerObjectSelectable<TNetworkProtocol>,
     >,
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
-    object_entity_name: SchemaServerObjectEntityName,
+    object_entity_name: ServerObjectEntityName,
 ) -> Vec<ObjectLiteralFieldType> {
     server_entity_data
         .server_object_entity_extra_info
@@ -548,11 +548,11 @@ fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     schema_data: &ServerEntityData<TNetworkProtocol>,
     server_scalar_selectables: &HashMap<
-        (SchemaServerObjectEntityName, ServerScalarSelectableName),
+        (ServerObjectEntityName, ServerScalarSelectableName),
         ServerScalarSelectable<TNetworkProtocol>,
     >,
     server_object_selectables: &HashMap<
-        (SchemaServerObjectEntityName, ServerObjectSelectableName),
+        (ServerObjectEntityName, ServerObjectSelectableName),
         ServerObjectSelectable<TNetworkProtocol>,
     >,
 ) -> ValidateArgumentTypesResult<()> {
@@ -601,7 +601,7 @@ pub enum ValidateArgumentTypesError {
     #[error("Expected input of type {expected}, found {actual} scalar literal")]
     ExpectedTypeFoundScalar {
         expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
-        actual: SchemaServerScalarEntityName,
+        actual: ServerScalarEntityName,
     },
 
     #[error("Expected input of type {expected}, found object literal")]

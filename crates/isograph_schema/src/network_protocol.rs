@@ -1,7 +1,7 @@
 use std::{error::Error, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
-    DescriptionValue, Location, QueryOperationName, QueryText, SchemaServerObjectEntityName,
+    DescriptionValue, Location, QueryOperationName, QueryText, ServerObjectEntityName,
     ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation, RootOperationKind};
@@ -83,6 +83,6 @@ pub struct FieldToInsert {
 pub struct ExposeAsFieldToInsert {
     pub expose_field_directive: ExposeFieldDirective,
     // e.g. Query or Mutation
-    pub parent_object_name: SchemaServerObjectEntityName,
+    pub parent_object_name: ServerObjectEntityName,
     pub description: Option<DescriptionValue>,
 }

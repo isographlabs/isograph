@@ -1,7 +1,7 @@
 use common_lang_types::{
     derive_display, ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent,
     ClientScalarSelectableName, DescriptionValue, Location, ObjectTypeAndFieldName,
-    SchemaServerObjectEntityName, SelectableNameOrAlias, Span, WithLocation, WithSpan,
+    SelectableNameOrAlias, ServerObjectEntityName, Span, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
@@ -20,8 +20,8 @@ use isograph_schema::{
     accessible_client_fields, description, inline_fragment_reader_selection_set,
     output_type_annotation, selection_map_wrapped, ClientFieldVariant, ClientScalarSelectable,
     ClientSelectableId, FieldMapItem, FieldTraversalResult, NameAndArguments, NetworkProtocol,
-    NormalizationKey, ScalarSelectableId, Schema, SchemaServerObjectSelectableVariant,
-    ServerEntityName, UserWrittenClientTypeInfo, ValidatedSelection, ValidatedVariableDefinition,
+    NormalizationKey, ScalarSelectableId, Schema, ServerEntityName, ServerObjectSelectableVariant,
+    UserWrittenClientTypeInfo, ValidatedSelection, ValidatedVariableDefinition,
     WrappedSelectionMapSelection,
 };
 use lazy_static::lazy_static;
@@ -156,8 +156,8 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     *server_object_selectable_name,
                 );
                 match &server_object_selectable.object_selectable_variant {
-                    SchemaServerObjectSelectableVariant::LinkedField => {}
-                    SchemaServerObjectSelectableVariant::InlineFragment => {
+                    ServerObjectSelectableVariant::LinkedField => {}
+                    ServerObjectSelectableVariant::InlineFragment => {
                         path_and_contents.push(generate_eager_reader_condition_artifact(
                             schema,
                             server_object_selectable,
@@ -737,7 +737,7 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
     indentation_level: u8,
     link_fields: &mut bool,
     scalar_field_selection: &ScalarSelection<ScalarSelectableId>,
-    parent_object_entity_name: SchemaServerObjectEntityName,
+    parent_object_entity_name: ServerObjectEntityName,
     client_field_name: ClientScalarSelectableName,
 ) {
     let client_field = schema.client_field(parent_object_entity_name, client_field_name);
@@ -939,7 +939,7 @@ fn write_getter_and_setter(
     query_type_declaration: &mut String,
     indentation_level: u8,
     name_or_alias: SelectableNameOrAlias,
-    output_type_annotation: &TypeAnnotation<SchemaServerObjectEntityName>,
+    output_type_annotation: &TypeAnnotation<ServerObjectEntityName>,
     type_annotation: &TypeAnnotation<ClientFieldUpdatableDataType>,
 ) {
     query_type_declaration.push_str(&format!(

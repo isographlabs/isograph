@@ -5,9 +5,9 @@ use std::{
 
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, JavascriptName, Location,
-    ObjectSelectableName, SchemaServerObjectEntityName, SchemaServerScalarEntityName,
-    SelectableName, ServerObjectSelectableName, ServerScalarIdSelectableName,
-    ServerScalarSelectableName, UnvalidatedTypeName, WithLocation,
+    ObjectSelectableName, SelectableName, ServerObjectEntityName, ServerObjectSelectableName,
+    ServerScalarEntityName, ServerScalarIdSelectableName, ServerScalarSelectableName,
+    UnvalidatedTypeName, WithLocation,
 };
 use graphql_lang_types::GraphQLNamedTypeAnnotation;
 use intern::string_key::Intern;
@@ -30,7 +30,7 @@ use crate::{
 };
 
 lazy_static! {
-    pub static ref ID_GRAPHQL_TYPE: SchemaServerScalarEntityName = "ID".intern().into();
+    pub static ref ID_GRAPHQL_TYPE: ServerScalarEntityName = "ID".intern().into();
     pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
 }
 
@@ -41,30 +41,28 @@ pub struct RootOperationName(pub String);
 #[derive(Debug)]
 pub struct Schema<TNetworkProtocol: NetworkProtocol> {
     pub server_scalar_selectables: HashMap<
-        (SchemaServerObjectEntityName, ServerScalarSelectableName),
+        (ServerObjectEntityName, ServerScalarSelectableName),
         ServerScalarSelectable<TNetworkProtocol>,
     >,
     pub server_object_selectables: HashMap<
-        (SchemaServerObjectEntityName, ServerObjectSelectableName),
+        (ServerObjectEntityName, ServerObjectSelectableName),
         ServerObjectSelectable<TNetworkProtocol>,
     >,
     pub client_scalar_selectables: HashMap<
-        (SchemaServerObjectEntityName, ClientScalarSelectableName),
+        (ServerObjectEntityName, ClientScalarSelectableName),
         ClientScalarSelectable<TNetworkProtocol>,
     >,
     pub client_object_selectables: HashMap<
-        (SchemaServerObjectEntityName, ClientObjectSelectableName),
+        (ServerObjectEntityName, ClientObjectSelectableName),
         ClientObjectSelectable<TNetworkProtocol>,
     >,
-    pub entrypoints: HashMap<
-        (SchemaServerObjectEntityName, ClientScalarSelectableName),
-        EntrypointDeclarationInfo,
-    >,
+    pub entrypoints:
+        HashMap<(ServerObjectEntityName, ClientScalarSelectableName), EntrypointDeclarationInfo>,
     pub server_entity_data: ServerEntityData<TNetworkProtocol>,
 
     /// These are root types like Query, Mutation, Subscription
     // TODO remove??? It's a GraphQL-ism
-    pub fetchable_types: BTreeMap<SchemaServerObjectEntityName, RootOperationName>,
+    pub fetchable_types: BTreeMap<ServerObjectEntityName, RootOperationName>,
 }
 
 impl<TNetworkProtocol: NetworkProtocol> Default for Schema<TNetworkProtocol> {
@@ -145,7 +143,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     /// This is a smell, and we should refactor away from it, or all schema's
     /// should have a root type.
-    pub fn query_id(&self) -> SchemaServerObjectEntityName {
+    pub fn query_id(&self) -> ServerObjectEntityName {
         *self
             .fetchable_types
             .iter()
@@ -154,13 +152,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .0
     }
 
-    pub fn find_mutation(&self) -> Option<(&SchemaServerObjectEntityName, &RootOperationName)> {
+    pub fn find_mutation(&self) -> Option<(&ServerObjectEntityName, &RootOperationName)> {
         self.fetchable_types
             .iter()
             .find(|(_, root_operation_name)| root_operation_name.0 == "mutation")
     }
 
-    pub fn find_query(&self) -> Option<(&SchemaServerObjectEntityName, &RootOperationName)> {
+    pub fn find_query(&self) -> Option<(&ServerObjectEntityName, &RootOperationName)> {
         self.fetchable_types
             .iter()
             .find(|(_, root_operation_name)| root_operation_name.0 == "query")
@@ -168,7 +166,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     pub fn traverse_object_selections(
         &self,
-        root_object_name: SchemaServerObjectEntityName,
+        root_object_name: ServerObjectEntityName,
         selections: impl Iterator<Item = ObjectSelectableName>,
     ) -> Result<WithId<&ServerObjectEntity<TNetworkProtocol>>, CreateAdditionalFieldsError> {
         let mut current_entity = self
@@ -245,7 +243,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     pub fn get_object_selections_path(
         &self,
-        root_object_name: SchemaServerObjectEntityName,
+        root_object_name: ServerObjectEntityName,
         selections: impl Iterator<Item = ObjectSelectableName>,
     ) -> Result<Vec<&ServerObjectSelectable<TNetworkProtocol>>, CreateAdditionalFieldsError> {
         let mut current_entity = self
@@ -331,8 +329,8 @@ pub struct ServerObjectEntityExtraInfo {
 #[derive(Debug)]
 pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
     // TODO consider combining these.
-    pub server_objects: HashMap<SchemaServerObjectEntityName, ServerObjectEntity<TNetworkProtocol>>,
-    pub server_scalars: HashMap<SchemaServerScalarEntityName, ServerScalarEntity<TNetworkProtocol>>,
+    pub server_objects: HashMap<ServerObjectEntityName, ServerObjectEntity<TNetworkProtocol>>,
+    pub server_scalars: HashMap<ServerScalarEntityName, ServerScalarEntity<TNetworkProtocol>>,
 
     // TODO consider whether this is needed. Especially when server_objects and server_scalars
     // are combined, this seems pretty useless.
@@ -341,25 +339,25 @@ pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
     // We keep track of available selectables and id fields outside of server_objects so that
     // we don't need a server_object_entity_mut method, which is incompatible with pico.
     pub server_object_entity_extra_info:
-        HashMap<SchemaServerObjectEntityName, ServerObjectEntityExtraInfo>,
+        HashMap<ServerObjectEntityName, ServerObjectEntityExtraInfo>,
 
     // TODO remove. These are GraphQL-isms. And we can just hard code them, they're
     // just interned strings!
     // Well known types
-    pub id_type_id: SchemaServerScalarEntityName,
-    pub string_type_id: SchemaServerScalarEntityName,
-    pub float_type_id: SchemaServerScalarEntityName,
-    pub boolean_type_id: SchemaServerScalarEntityName,
-    pub int_type_id: SchemaServerScalarEntityName,
+    pub id_type_id: ServerScalarEntityName,
+    pub string_type_id: ServerScalarEntityName,
+    pub float_type_id: ServerScalarEntityName,
+    pub boolean_type_id: ServerScalarEntityName,
+    pub int_type_id: ServerScalarEntityName,
     // TODO restructure UnionTypeAnnotation to not have a nullable field, but to instead
     // include null in its variants.
-    pub null_type_id: SchemaServerScalarEntityName,
+    pub null_type_id: ServerScalarEntityName,
 }
 
 impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn server_scalar_selectable(
         &self,
-        parent_object_entity_name: SchemaServerObjectEntityName,
+        parent_object_entity_name: ServerObjectEntityName,
         server_scalar_selectable_name: ServerScalarSelectableName,
     ) -> &ServerScalarSelectable<TNetworkProtocol> {
         self.server_scalar_selectables
@@ -369,7 +367,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     pub fn server_object_selectable(
         &self,
-        parent_object_entity_name: SchemaServerObjectEntityName,
+        parent_object_entity_name: ServerObjectEntityName,
         server_object_selectable_name: ServerObjectSelectableName,
     ) -> &ServerObjectSelectable<TNetworkProtocol> {
         self.server_object_selectables
@@ -506,7 +504,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     ///
     pub fn client_field(
         &self,
-        parent_type_name: SchemaServerObjectEntityName,
+        parent_type_name: ServerObjectEntityName,
         client_field_name: ClientScalarSelectableName,
     ) -> &ClientScalarSelectable<TNetworkProtocol> {
         self.client_scalar_selectables
@@ -517,7 +515,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     // TODO this function should not exist
     pub fn client_field_mut(
         &mut self,
-        parent_type_name: SchemaServerObjectEntityName,
+        parent_type_name: ServerObjectEntityName,
         client_field_name: ClientScalarSelectableName,
     ) -> &mut ClientScalarSelectable<TNetworkProtocol> {
         self.client_scalar_selectables
@@ -548,7 +546,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     pub fn client_pointer(
         &self,
-        parent_object_entity_name: SchemaServerObjectEntityName,
+        parent_object_entity_name: ServerObjectEntityName,
         client_object_selectable_name: ClientObjectSelectableName,
     ) -> &ClientObjectSelectable<TNetworkProtocol> {
         self.client_object_selectables
@@ -559,7 +557,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     // TODO this function should not exist
     pub fn client_pointer_mut(
         &mut self,
-        parent_object_entity_name: SchemaServerObjectEntityName,
+        parent_object_entity_name: ServerObjectEntityName,
         client_object_selectable_name: ClientObjectSelectableName,
     ) -> &mut ClientObjectSelectable<TNetworkProtocol> {
         self.client_object_selectables
@@ -594,8 +592,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     ) -> impl Iterator<
         Item = (
             SelectionType<
-                (SchemaServerObjectEntityName, ClientScalarSelectableName),
-                (SchemaServerObjectEntityName, ClientObjectSelectableName),
+                (ServerObjectEntityName, ClientScalarSelectableName),
+                (ServerObjectEntityName, ClientObjectSelectableName),
             >,
             SelectionType<
                 &ClientScalarSelectable<TNetworkProtocol>,
@@ -628,7 +626,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
     pub fn server_scalar_entity(
         &self,
-        scalar_entity_name: SchemaServerScalarEntityName,
+        scalar_entity_name: ServerScalarEntityName,
     ) -> &ServerScalarEntity<TNetworkProtocol> {
         self.server_scalars
             .get(&scalar_entity_name)
@@ -648,7 +646,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
 
     pub fn server_object_entity(
         &self,
-        object_entity_name: SchemaServerObjectEntityName,
+        object_entity_name: ServerObjectEntityName,
     ) -> &ServerObjectEntity<TNetworkProtocol> {
         self.server_objects
             .get(&object_entity_name)
@@ -696,7 +694,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
         &mut self,
         server_object_entity: ServerObjectEntity<TNetworkProtocol>,
         name_location: Location,
-    ) -> Result<SchemaServerObjectEntityName, WithLocation<CreateAdditionalFieldsError>> {
+    ) -> Result<ServerObjectEntityName, WithLocation<CreateAdditionalFieldsError>> {
         let name = server_object_entity.name;
         if self
             .defined_entities
@@ -744,11 +742,11 @@ impl NameAndArguments {
 }
 
 fn add_schema_defined_scalar_type<TNetworkProtocol: NetworkProtocol>(
-    scalars: &mut HashMap<SchemaServerScalarEntityName, ServerScalarEntity<TNetworkProtocol>>,
+    scalars: &mut HashMap<ServerScalarEntityName, ServerScalarEntity<TNetworkProtocol>>,
     defined_types: &mut HashMap<UnvalidatedTypeName, ServerEntityName>,
     field_name: &'static str,
     javascript_name: JavascriptName,
-) -> SchemaServerScalarEntityName {
+) -> ServerScalarEntityName {
     // TODO this is problematic, we have no span (or really, no location) associated with this
     // schema-defined scalar, so we will not be able to properly show error messages if users
     // e.g. have Foo implements String
@@ -771,7 +769,7 @@ fn add_schema_defined_scalar_type<TNetworkProtocol: NetworkProtocol>(
 
 #[derive(Debug, Clone)]
 // This struct is indicative of poor data modeling.
-pub enum SchemaServerObjectSelectableVariant {
+pub enum ServerObjectSelectableVariant {
     LinkedField,
     InlineFragment,
 }
@@ -789,8 +787,8 @@ pub type ValidatedUseRefetchFieldStrategy =
     UseRefetchFieldRefetchStrategy<ScalarSelectableId, ObjectSelectableId>;
 
 pub type ScalarSelectableId = DefinitionLocation<
-    (SchemaServerObjectEntityName, ServerScalarSelectableName),
-    (SchemaServerObjectEntityName, ClientScalarSelectableName),
+    (ServerObjectEntityName, ServerScalarSelectableName),
+    (ServerObjectEntityName, ClientScalarSelectableName),
 >;
 
 /// If we have encountered an id field, we can:
@@ -799,7 +797,7 @@ pub type ScalarSelectableId = DefinitionLocation<
 fn set_and_validate_id_field(
     id_field: &mut Option<ServerScalarIdSelectableName>,
     current_field_id: ServerScalarSelectableName,
-    parent_object_entity_name: SchemaServerObjectEntityName,
+    parent_object_entity_name: ServerObjectEntityName,
     options: &CompilerConfigOptions,
     inner_non_null_named_type: Option<&GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
 ) -> CreateAdditionalFieldsResult<()> {

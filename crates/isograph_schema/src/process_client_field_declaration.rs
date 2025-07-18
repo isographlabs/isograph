@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ConstExportName, IsographDirectiveName,
-    Location, ObjectTypeAndFieldName, RelativePathToSourceFile, SchemaServerObjectEntityName,
-    SelectableName, TextSource, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
+    Location, ObjectTypeAndFieldName, RelativePathToSourceFile, SelectableName,
+    ServerObjectEntityName, TextSource, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -23,13 +23,13 @@ use crate::{
 pub type UnprocessedSelection = WithSpan<UnvalidatedSelection>;
 
 pub struct UnprocessedClientFieldItem {
-    pub parent_object_entity_name: SchemaServerObjectEntityName,
+    pub parent_object_entity_name: ServerObjectEntityName,
     pub client_field_name: ClientScalarSelectableName,
     pub reader_selection_set: Vec<UnprocessedSelection>,
     pub refetch_strategy: Option<RefetchStrategy<(), ()>>,
 }
 pub struct UnprocessedClientPointerItem {
-    pub parent_object_entity_name: SchemaServerObjectEntityName,
+    pub parent_object_entity_name: ServerObjectEntityName,
     pub client_object_selectable_name: ClientObjectSelectableName,
     pub reader_selection_set: Vec<UnprocessedSelection>,
     pub refetch_selection_set: Vec<UnprocessedSelection>,
@@ -162,7 +162,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     fn add_client_field_to_object(
         &mut self,
-        parent_object_entity_name: SchemaServerObjectEntityName,
+        parent_object_entity_name: ServerObjectEntityName,
         client_field_declaration: WithSpan<ClientFieldDeclaration>,
     ) -> ProcessClientFieldDeclarationResult<UnprocessedClientFieldItem> {
         let query_id = self.query_id();
@@ -270,8 +270,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     fn add_client_pointer_to_object(
         &mut self,
-        parent_object_name: SchemaServerObjectEntityName,
-        to_object_name: TypeAnnotation<SchemaServerObjectEntityName>,
+        parent_object_name: ServerObjectEntityName,
+        to_object_name: TypeAnnotation<ServerObjectEntityName>,
         client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
     ) -> ProcessClientFieldDeclarationResult<UnprocessedClientPointerItem> {
         let query_id = self.query_id();
@@ -450,7 +450,7 @@ pub enum ProcessClientFieldDeclarationError {
         "The Isograph object type \"{parent_type_name}\" already has a field named \"{client_field_name}\"."
     )]
     ParentAlreadyHasField {
-        parent_type_name: SchemaServerObjectEntityName,
+        parent_type_name: ServerObjectEntityName,
         client_field_name: SelectableName,
     },
 
@@ -462,7 +462,7 @@ pub enum ProcessClientFieldDeclarationError {
     )]
     FieldArgumentTypeDoesNotExist {
         argument_name: VariableName,
-        parent_type_name: SchemaServerObjectEntityName,
+        parent_type_name: ServerObjectEntityName,
         field_name: SelectableName,
         argument_type: UnvalidatedTypeName,
     },
@@ -473,7 +473,7 @@ pub struct ImperativelyLoadedFieldVariant {
     pub client_field_scalar_selection_name: ClientScalarSelectableName,
 
     // Mutation or Query or whatnot. Awkward! A GraphQL-ism!
-    pub root_object_entity_name: SchemaServerObjectEntityName,
+    pub root_object_entity_name: ServerObjectEntityName,
     pub subfields_or_inline_fragments: Vec<WrappedSelectionMapSelection>,
     pub field_map: Vec<FieldMapItem>,
     /// The arguments we must pass to the top level schema field, e.g. id: ID!
@@ -523,7 +523,7 @@ pub fn id_top_level_arguments() -> Vec<ArgumentKeyAndValue> {
 pub fn validate_variable_definition(
     defined_types: &HashMap<UnvalidatedTypeName, ServerEntityName>,
     variable_definition: WithSpan<VariableDefinition<UnvalidatedTypeName>>,
-    parent_type_name: SchemaServerObjectEntityName,
+    parent_type_name: ServerObjectEntityName,
     field_name: SelectableName,
 ) -> ProcessClientFieldDeclarationResult<WithSpan<VariableDefinition<ServerEntityName>>> {
     let type_ = variable_definition

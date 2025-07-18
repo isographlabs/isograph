@@ -75,7 +75,7 @@ Each object contains:
 
 The `Schema` struct is generic over a type implementing `SchemaValidationState`, which is a trait that contains some associated types. When a schema is first constructed, those types are unvalidated (e.g. some generic types are basically unvalidated strings.) As we progressively validate the schema, the unvalidated string types are changed to the appropriate type of ID.
 
-For example, `SchemaServerField`s have a field whose type is the `FieldTypeAssociatedData` associated type. For an unvalidated schema, that type is `UnvalidatedTypeName` (a wrapper around an arbitrary string.) After we validate that that `UnvalidatedTypeName` refers to a type which exists, we construct a new schema whose `FieldTypeAssociatedData` is an enum containing a scalar ID or an object ID.
+For example, `ServerField`s have a field whose type is the `FieldTypeAssociatedData` associated type. For an unvalidated schema, that type is `UnvalidatedTypeName` (a wrapper around an arbitrary string.) After we validate that that `UnvalidatedTypeName` refers to a type which exists, we construct a new schema whose `FieldTypeAssociatedData` is an enum containing a scalar ID or an object ID.
 
 The reason we cannot start by constructing this union is that when we initially construct an object, it may have fields whose types have not yet been defined. Consider this example:
 

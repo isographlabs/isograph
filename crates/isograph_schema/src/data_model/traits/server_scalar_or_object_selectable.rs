@@ -1,5 +1,5 @@
 use common_lang_types::{
-    DescriptionValue, SchemaServerObjectEntityName, ServerSelectableName, WithLocation,
+    DescriptionValue, ServerObjectEntityName, ServerSelectableName, WithLocation,
 };
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{SelectionType, TypeAnnotation, VariableDefinition};
@@ -11,7 +11,7 @@ pub trait ServerScalarOrObjectSelectable {
     fn description(&self) -> Option<DescriptionValue>;
     fn name(&self) -> WithLocation<ServerSelectableName>;
     fn target_entity_name(&self) -> TypeAnnotation<ServerEntityName>;
-    fn parent_type_name(&self) -> SchemaServerObjectEntityName;
+    fn parent_type_name(&self) -> ServerObjectEntityName;
     fn arguments(&self) -> &[WithLocation<VariableDefinition<ServerEntityName>>];
 }
 
@@ -32,7 +32,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
             .map(&mut SelectionType::Object)
     }
 
-    fn parent_type_name(&self) -> SchemaServerObjectEntityName {
+    fn parent_type_name(&self) -> ServerObjectEntityName {
         self.parent_object_name
     }
 
@@ -58,7 +58,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
             .map(&mut SelectionType::Scalar)
     }
 
-    fn parent_type_name(&self) -> SchemaServerObjectEntityName {
+    fn parent_type_name(&self) -> ServerObjectEntityName {
         self.parent_object_entity_name
     }
 

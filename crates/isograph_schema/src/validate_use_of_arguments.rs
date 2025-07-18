@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use common_lang_types::{
-    FieldArgumentName, Location, ObjectTypeAndFieldName, SchemaServerObjectEntityName,
-    SelectableName, VariableName, WithLocation, WithSpan,
+    FieldArgumentName, Location, ObjectTypeAndFieldName, SelectableName, ServerObjectEntityName,
+    VariableName, WithLocation, WithSpan,
 };
 
 use intern::string_key::Intern;
@@ -399,7 +399,7 @@ pub enum ValidateUseOfArgumentsError {
     )]
     UnusedVariables {
         unused_variables: Vec<WithSpan<ValidatedVariableDefinition>>,
-        type_name: SchemaServerObjectEntityName,
+        type_name: ServerObjectEntityName,
         field_name: SelectableName,
     },
 

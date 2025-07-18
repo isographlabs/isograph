@@ -1,5 +1,5 @@
 use common_lang_types::{
-    ClientSelectableName, DescriptionValue, ObjectTypeAndFieldName, SchemaServerObjectEntityName,
+    ClientSelectableName, DescriptionValue, ObjectTypeAndFieldName, ServerObjectEntityName,
     WithSpan,
 };
 use impl_base_types_macro::impl_for_selection_type;
@@ -15,7 +15,7 @@ pub trait ClientScalarOrObjectSelectable {
     fn description(&self) -> Option<DescriptionValue>;
     fn name(&self) -> ClientSelectableName;
     fn type_and_field(&self) -> ObjectTypeAndFieldName;
-    fn parent_object_entity_name(&self) -> SchemaServerObjectEntityName;
+    fn parent_object_entity_name(&self) -> ServerObjectEntityName;
     fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>];
     fn refetch_strategy(&self) -> Option<&RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>;
     fn selection_set_for_parent_query(&self) -> &[WithSpan<ValidatedSelection>];
@@ -40,7 +40,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         self.type_and_field
     }
 
-    fn parent_object_entity_name(&self) -> SchemaServerObjectEntityName {
+    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
         self.parent_object_entity_name
     }
 
@@ -90,7 +90,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         self.type_and_field
     }
 
-    fn parent_object_entity_name(&self) -> SchemaServerObjectEntityName {
+    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
         self.parent_object_name
     }
 

@@ -6,8 +6,7 @@ use super::{write_arguments, write_directives, GraphQLConstantValue};
 use common_lang_types::{
     DescriptionValue, DirectiveName, EnumLiteralValue, GraphQLInterfaceTypeName,
     GraphQLObjectTypeName, GraphQLUnionTypeName, InputTypeName, InputValueName,
-    SchemaServerScalarEntityName, ServerSelectableName, UnvalidatedTypeName, WithLocation,
-    WithSpan,
+    ServerScalarEntityName, ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use strum::EnumString;
 
@@ -131,7 +130,7 @@ pub struct GraphQLObjectTypeExtension {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLScalarTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub name: WithLocation<SchemaServerScalarEntityName>,
+    pub name: WithLocation<ServerScalarEntityName>,
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
 }
 

@@ -1,6 +1,6 @@
 use common_lang_types::{
     ArtifactPathAndContent, ClientScalarSelectableName, ObjectTypeAndFieldName, QueryText,
-    SchemaServerObjectEntityName,
+    ServerObjectEntityName,
 };
 use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
@@ -19,9 +19,9 @@ pub(crate) struct ImperativelyLoadedEntrypointArtifactInfo {
     pub normalization_ast_text: NormalizationAstText,
     pub query_text: QueryText,
     pub root_fetchable_field: ClientScalarSelectableName,
-    pub root_fetchable_field_parent_object: SchemaServerObjectEntityName,
+    pub root_fetchable_field_parent_object: ServerObjectEntityName,
     pub refetch_query_index: RefetchQueryIndex,
-    pub concrete_type: SchemaServerObjectEntityName,
+    pub concrete_type: ServerObjectEntityName,
 }
 
 impl ImperativelyLoadedEntrypointArtifactInfo {

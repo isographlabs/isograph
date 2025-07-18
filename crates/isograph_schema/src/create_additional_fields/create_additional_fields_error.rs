@@ -1,7 +1,7 @@
 use crate::{NetworkProtocol, Schema};
 use common_lang_types::{
-    SchemaServerObjectEntityName, SelectableName, StringLiteralValue, UnvalidatedTypeName,
-    VariableName, WithLocation,
+    SelectableName, ServerObjectEntityName, StringLiteralValue, UnvalidatedTypeName, VariableName,
+    WithLocation,
 };
 use intern::{string_key::Intern, Lookup};
 
@@ -53,14 +53,14 @@ pub enum CreateAdditionalFieldsError {
     )]
     CompilerCreatedFieldExistsOnType {
         field_name: SelectableName,
-        parent_type: SchemaServerObjectEntityName,
+        parent_type: ServerObjectEntityName,
     },
 
     // TODO include info about where the field was previously defined
     #[error("Duplicate field named \"{field_name}\" on type \"{parent_type}\"")]
     DuplicateField {
         field_name: SelectableName,
-        parent_type: SchemaServerObjectEntityName,
+        parent_type: ServerObjectEntityName,
     },
 
     #[error("Invalid field `{field_arg}` in @exposeField directive")]
@@ -75,8 +75,8 @@ pub enum CreateAdditionalFieldsError {
         or it was previously processed by another field_map item."
     )]
     PrimaryDirectiveArgumentDoesNotExistOnField {
-        primary_type_name: SchemaServerObjectEntityName,
-        mutation_object_name: SchemaServerObjectEntityName,
+        primary_type_name: ServerObjectEntityName,
+        mutation_object_name: ServerObjectEntityName,
         mutation_field_name: SelectableName,
         field_name: StringLiteralValue,
     },
@@ -86,7 +86,7 @@ pub enum CreateAdditionalFieldsError {
         The field `{field_name}` is an object, and cannot be remapped. Remap scalars only."
     )]
     PrimaryDirectiveCannotRemapObject {
-        primary_type_name: SchemaServerObjectEntityName,
+        primary_type_name: ServerObjectEntityName,
         field_name: String,
     },
 
@@ -95,7 +95,7 @@ pub enum CreateAdditionalFieldsError {
         The field `{field_name}` is not found."
     )]
     PrimaryDirectiveFieldNotFound {
-        primary_type_name: SchemaServerObjectEntityName,
+        primary_type_name: ServerObjectEntityName,
         field_name: StringLiteralValue,
     },
 
@@ -107,7 +107,7 @@ pub enum CreateAdditionalFieldsError {
         This error can be suppressed using the \"on_invalid_id_type\" config parameter."
     )]
     IdFieldMustBeNonNullIdType {
-        parent_type: SchemaServerObjectEntityName,
+        parent_type: ServerObjectEntityName,
         strong_field_name: &'static str,
     },
 
@@ -116,7 +116,7 @@ pub enum CreateAdditionalFieldsError {
     )]
     FieldArgumentTypeDoesNotExist {
         argument_name: VariableName,
-        parent_type_name: SchemaServerObjectEntityName,
+        parent_type_name: ServerObjectEntityName,
         field_name: SelectableName,
         argument_type: UnvalidatedTypeName,
     },

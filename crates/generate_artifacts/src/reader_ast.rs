@@ -10,7 +10,7 @@ use isograph_schema::{
     categorize_field_loadability, transform_arguments_with_child_context, ClientFieldVariant,
     ClientScalarOrObjectSelectable, ClientScalarSelectable, Loadability, NameAndArguments,
     NetworkProtocol, NormalizationKey, PathToRefetchField, RefetchedPathsMap, Schema,
-    SchemaServerObjectSelectableVariant, ValidatedObjectSelection, ValidatedScalarSelection,
+    ServerObjectSelectableVariant, ValidatedObjectSelection, ValidatedScalarSelection,
     ValidatedSelection, VariableContext,
 };
 
@@ -89,7 +89,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                     );
                     let normalization_key = match server_object_selectable.object_selectable_variant
                     {
-                        SchemaServerObjectSelectableVariant::LinkedField => NameAndArguments {
+                        ServerObjectSelectableVariant::LinkedField => NameAndArguments {
                             // TODO use alias
                             name: linked_field_selection.name.item.into(),
                             // TODO this clearly does something, but why are we able to pass
@@ -104,7 +104,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                             ),
                         }
                         .normalization_key(),
-                        SchemaServerObjectSelectableVariant::InlineFragment => {
+                        ServerObjectSelectableVariant::InlineFragment => {
                             let target_object_entity =
                                 schema.server_entity_data.server_object_entity(
                                     *server_object_selectable.target_object_entity.inner(),
@@ -189,7 +189,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
             let server_field = schema
                 .server_object_selectable(parent_object_entity_name, server_object_selectable_name);
             match &server_field.object_selectable_variant {
-                SchemaServerObjectSelectableVariant::InlineFragment => {
+                ServerObjectSelectableVariant::InlineFragment => {
                     let object = schema
                         .server_entity_data
                         .server_object_entity(server_field.parent_object_name);
@@ -206,7 +206,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
 
                     reader_artifact_import_name
                 }
-                SchemaServerObjectSelectableVariant::LinkedField => "null".to_string(),
+                ServerObjectSelectableVariant::LinkedField => "null".to_string(),
             }
         }
     };
@@ -724,31 +724,30 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                             parent_object_entity_name,
                             server_object_selectable_name,
                         );
-                        let normalization_key = match server_object_selectable
-                            .object_selectable_variant
-                        {
-                            SchemaServerObjectSelectableVariant::LinkedField => NameAndArguments {
-                                // TODO use alias
-                                name: linked_field_selection.name.item.into(),
-                                arguments: transform_arguments_with_child_context(
-                                    linked_field_selection
-                                        .arguments
-                                        .iter()
-                                        .map(|x| x.item.into_key_and_value()),
-                                    // TODO this clearly does something, but why are we able to pass
-                                    // the initial variable context here??
-                                    initial_variable_context,
-                                ),
-                            }
-                            .normalization_key(),
-                            SchemaServerObjectSelectableVariant::InlineFragment => {
-                                let target_object_entity =
-                                    schema.server_entity_data.server_object_entity(
-                                        *server_object_selectable.target_object_entity.inner(),
-                                    );
-                                NormalizationKey::InlineFragment(target_object_entity.name)
-                            }
-                        };
+                        let normalization_key =
+                            match server_object_selectable.object_selectable_variant {
+                                ServerObjectSelectableVariant::LinkedField => NameAndArguments {
+                                    // TODO use alias
+                                    name: linked_field_selection.name.item.into(),
+                                    arguments: transform_arguments_with_child_context(
+                                        linked_field_selection
+                                            .arguments
+                                            .iter()
+                                            .map(|x| x.item.into_key_and_value()),
+                                        // TODO this clearly does something, but why are we able to pass
+                                        // the initial variable context here??
+                                        initial_variable_context,
+                                    ),
+                                }
+                                .normalization_key(),
+                                ServerObjectSelectableVariant::InlineFragment => {
+                                    let target_object_entity =
+                                        schema.server_entity_data.server_object_entity(
+                                            *server_object_selectable.target_object_entity.inner(),
+                                        );
+                                    NormalizationKey::InlineFragment(target_object_entity.name)
+                                }
+                            };
 
                         path.push(normalization_key);
 

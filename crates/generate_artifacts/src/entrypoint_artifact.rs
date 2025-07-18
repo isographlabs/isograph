@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use common_lang_types::{
     ArtifactPathAndContent, ClientScalarSelectableName, ObjectTypeAndFieldName, QueryOperationName,
-    QueryText, SchemaServerObjectEntityName, VariableName,
+    QueryText, ServerObjectEntityName, VariableName,
 };
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{DefinitionLocation, ScalarSelectionDirectiveSet, SelectionType};
@@ -33,12 +33,12 @@ struct EntrypointArtifactInfo<'schema, TNetworkProtocol: NetworkProtocol> {
     query_text: QueryText,
     normalization_ast_text: NormalizationAstText,
     refetch_query_artifact_import: RefetchQueryArtifactImport,
-    concrete_type: SchemaServerObjectEntityName,
+    concrete_type: ServerObjectEntityName,
 }
 
 pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    parent_object_entity_name: SchemaServerObjectEntityName,
+    parent_object_entity_name: ServerObjectEntityName,
     entrypoint_scalar_selectable_name: ClientScalarSelectableName,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     file_extensions: GenerateFileExtensionsOption,
@@ -90,7 +90,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     traversal_state: &ScalarClientFieldTraversalState,
     encountered_client_type_map: &FieldToCompletedMergeTraversalStateMap,
     variable_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
-    default_root_operation: &Option<(&SchemaServerObjectEntityName, &RootOperationName)>,
+    default_root_operation: &Option<(&ServerObjectEntityName, &RootOperationName)>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> Vec<ArtifactPathAndContent> {
     let query_name = entrypoint.name.into();
@@ -335,7 +335,7 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
     query_name: &QueryOperationName,
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
     refetch_query_artifact_import: &RefetchQueryArtifactImport,
-    concrete_type: &SchemaServerObjectEntityName,
+    concrete_type: &ServerObjectEntityName,
 ) -> String {
     let ts_file_extension = file_extensions.ts();
     let entrypoint_params_typename = format!("{}__{}__param", parent_type.name, query_name);

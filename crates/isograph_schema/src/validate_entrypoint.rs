@@ -1,7 +1,7 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use common_lang_types::{
-    ClientScalarSelectableName, IsoLiteralText, Location, SchemaServerObjectEntityName,
+    ClientScalarSelectableName, IsoLiteralText, Location, ServerObjectEntityName,
     ServerScalarSelectableName, TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use isograph_lang_types::{
@@ -23,12 +23,12 @@ pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     entrypoint_declarations: Vec<(TextSource, WithSpan<EntrypointDeclaration>)>,
 ) -> Result<
-    HashMap<(SchemaServerObjectEntityName, ClientScalarSelectableName), EntrypointDeclarationInfo>,
+    HashMap<(ServerObjectEntityName, ClientScalarSelectableName), EntrypointDeclarationInfo>,
     Vec<WithLocation<ValidateEntrypointDeclarationError>>,
 > {
     let mut errors = vec![];
     let mut entrypoints: HashMap<
-        (SchemaServerObjectEntityName, ClientScalarSelectableName),
+        (ServerObjectEntityName, ClientScalarSelectableName),
         EntrypointDeclarationInfo,
     > = HashMap::new();
     for (text_source, entrypoint_declaration) in entrypoint_declarations {
@@ -99,7 +99,7 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     parent_type: WithSpan<UnvalidatedTypeName>,
     text_source: TextSource,
-) -> Result<SchemaServerObjectEntityName, WithLocation<ValidateEntrypointDeclarationError>> {
+) -> Result<ServerObjectEntityName, WithLocation<ValidateEntrypointDeclarationError>> {
     let parent_type_id = schema
         .server_entity_data
         .defined_entities
@@ -156,7 +156,7 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     field_name: WithSpan<ServerScalarSelectableName>,
     text_source: TextSource,
-    parent_object_name: SchemaServerObjectEntityName,
+    parent_object_name: ServerObjectEntityName,
 ) -> Result<ClientScalarSelectableName, WithLocation<ValidateEntrypointDeclarationError>> {
     let parent_object = schema
         .server_entity_data
@@ -220,14 +220,14 @@ pub enum ValidateEntrypointDeclarationError {
 
     #[error("The client field `{parent_type_name}.{client_field_name}` is not defined.")]
     ClientFieldMustExist {
-        parent_type_name: SchemaServerObjectEntityName,
+        parent_type_name: ServerObjectEntityName,
         client_field_name: ServerScalarSelectableName,
     },
 
     // N.B. We could conceivably support fetching server fields, though!
     #[error("The field `{parent_type_name}.{client_field_name}` is a server field. It must be a client defined field.")]
     FieldMustBeClientField {
-        parent_type_name: SchemaServerObjectEntityName,
+        parent_type_name: ServerObjectEntityName,
         client_field_name: ServerScalarSelectableName,
     },
 

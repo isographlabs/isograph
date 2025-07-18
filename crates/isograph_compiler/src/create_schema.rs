@@ -5,8 +5,8 @@ use std::{
 };
 
 use common_lang_types::{
-    CurrentWorkingDirectory, RelativePathToSourceFile, SchemaServerObjectEntityName,
-    SelectableName, TextSource, UnvalidatedTypeName, VariableName, WithLocation,
+    CurrentWorkingDirectory, RelativePathToSourceFile, SelectableName, ServerObjectEntityName,
+    TextSource, UnvalidatedTypeName, VariableName, WithLocation,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLInputValueDefinition, NameValuePair, RootOperationKind,
@@ -19,7 +19,7 @@ use isograph_lang_types::{
 use isograph_schema::{
     validate_entrypoints, CreateAdditionalFieldsError, FieldToInsert, NetworkProtocol,
     ProcessObjectTypeDefinitionOutcome, ProcessTypeSystemDocumentOutcome, RootOperationName,
-    Schema, SchemaServerObjectSelectableVariant, ServerEntityName, ServerObjectSelectable,
+    Schema, ServerEntityName, ServerObjectSelectable, ServerObjectSelectableVariant,
     ServerScalarSelectable,
 };
 use pico::{Database, SourceId};
@@ -235,7 +235,7 @@ pub struct ContainsIsoStats {
 /// - if it is an id field, modify the parent object
 fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
     schema: &mut Schema<TNetworkProtocol>,
-    field_queue: HashMap<SchemaServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
+    field_queue: HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
     options: &CompilerConfigOptions,
 ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
     for (parent_object_entity_name, field_definitions_to_insert) in field_queue {
@@ -317,9 +317,9 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
                             object_selectable_variant:
                                 // TODO this is hacky
                                 if server_field_to_insert.item.is_inline_fragment {
-                                    SchemaServerObjectSelectableVariant::InlineFragment
+                                    ServerObjectSelectableVariant::InlineFragment
                                 } else {
-                                    SchemaServerObjectSelectableVariant::LinkedField
+                                    ServerObjectSelectableVariant::LinkedField
                                 }
                         })
                         .map_err(|e| WithLocation::new(e, server_field_to_insert.location))?;
@@ -334,7 +334,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
 pub fn graphql_input_value_definition_to_variable_definition(
     defined_types: &HashMap<UnvalidatedTypeName, ServerEntityName>,
     input_value_definition: WithLocation<GraphQLInputValueDefinition>,
-    parent_type_name: SchemaServerObjectEntityName,
+    parent_type_name: ServerObjectEntityName,
     field_name: SelectableName,
 ) -> Result<
     WithLocation<VariableDefinition<ServerEntityName>>,

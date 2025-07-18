@@ -1,6 +1,5 @@
 use common_lang_types::{
-    Location, SchemaServerObjectEntityName, SelectableName, UnvalidatedTypeName, WithLocation,
-    WithSpan,
+    Location, SelectableName, ServerObjectEntityName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use isograph_lang_types::{
     DefinitionLocation, ObjectSelection, ScalarSelection, ScalarSelectionDirectiveSet,
@@ -130,7 +129,7 @@ fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     parent_object: &ServerObjectEntity<TNetworkProtocol>,
-    selection_parent_object_name: SchemaServerObjectEntityName,
+    selection_parent_object_name: ServerObjectEntityName,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<Vec<WithSpan<ValidatedSelection>>> {
     get_all_errors_or_all_ok(selection_set.into_iter().map(|selection| {
@@ -148,7 +147,7 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     with_span: WithSpan<UnvalidatedSelection>,
     selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
-    selection_parent_object_name: SchemaServerObjectEntityName,
+    selection_parent_object_name: ServerObjectEntityName,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<WithSpan<ValidatedSelection>> {
     with_span.and_then(|selection| match selection {
@@ -177,7 +176,7 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
 fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
-    selection_parent_object_name: SchemaServerObjectEntityName,
+    selection_parent_object_name: ServerObjectEntityName,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
     scalar_selection: UnvalidatedScalarFieldSelection,
 ) -> AddSelectionSetsResult<ValidatedScalarSelection> {
@@ -282,7 +281,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
 fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
-    selection_parent_object_name: SchemaServerObjectEntityName,
+    selection_parent_object_name: ServerObjectEntityName,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
     object_selection: ObjectSelection<(), ()>,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<ValidatedObjectSelection> {
@@ -400,7 +399,7 @@ fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     refetch_strategy: Option<RefetchStrategy<(), ()>>,
     parent_object: &ServerObjectEntity<TNetworkProtocol>,
-    selection_parent_object_name: SchemaServerObjectEntityName,
+    selection_parent_object_name: ServerObjectEntityName,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<
     Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>,
@@ -453,9 +452,9 @@ pub enum AddSelectionSetsError {
         field does not exist on `{field_parent_type_name}`"
     )]
     SelectionTypeSelectionFieldDoesNotExist {
-        client_field_parent_type_name: SchemaServerObjectEntityName,
+        client_field_parent_type_name: ServerObjectEntityName,
         client_field_name: SelectableName,
-        field_parent_type_name: SchemaServerObjectEntityName,
+        field_parent_type_name: ServerObjectEntityName,
         field_name: SelectableName,
         client_type: String,
     },
@@ -466,9 +465,9 @@ pub enum AddSelectionSetsError {
         but that field's type is `{target_type_name}`, which is {field_type}."
     )]
     SelectionTypeSelectionFieldIsNotScalar {
-        client_field_parent_type_name: SchemaServerObjectEntityName,
+        client_field_parent_type_name: ServerObjectEntityName,
         client_field_name: SelectableName,
-        field_parent_type_name: SchemaServerObjectEntityName,
+        field_parent_type_name: ServerObjectEntityName,
         field_name: SelectableName,
         field_type: &'static str,
         target_type_name: UnvalidatedTypeName,
@@ -481,9 +480,9 @@ pub enum AddSelectionSetsError {
         but that field's type is `{target_type_name}`, which is a scalar."
     )]
     SelectionTypeSelectionFieldIsScalar {
-        client_field_parent_type_name: SchemaServerObjectEntityName,
+        client_field_parent_type_name: ServerObjectEntityName,
         client_field_name: SelectableName,
-        field_parent_type_name: SchemaServerObjectEntityName,
+        field_parent_type_name: ServerObjectEntityName,
         field_name: SelectableName,
         target_type_name: UnvalidatedTypeName,
         client_type: String,
@@ -495,9 +494,9 @@ pub enum AddSelectionSetsError {
         However, client pointers can only be selected as linked fields."
     )]
     SelectionTypeSelectionClientPointerSelectedAsScalar {
-        client_field_parent_type_name: SchemaServerObjectEntityName,
+        client_field_parent_type_name: ServerObjectEntityName,
         client_field_name: SelectableName,
-        field_parent_type_name: SchemaServerObjectEntityName,
+        field_parent_type_name: ServerObjectEntityName,
         field_name: SelectableName,
         client_type: String,
     },

@@ -1,6 +1,7 @@
 use common_lang_types::{
-    ClientScalarSelectableName, Location, ObjectTypeAndFieldName, SchemaServerObjectEntityName,
-    SelectableName, ServerObjectSelectableName, Span, StringLiteralValue, WithLocation, WithSpan,
+    ClientScalarSelectableName, Location, ObjectTypeAndFieldName, SelectableName,
+    ServerObjectEntityName, ServerObjectSelectableName, Span, StringLiteralValue, WithLocation,
+    WithSpan,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
@@ -13,9 +14,8 @@ use serde::Deserialize;
 use crate::{
     generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
     ClientFieldVariant, ClientScalarSelectable, ExposeAsFieldToInsert,
-    ImperativelyLoadedFieldVariant, NetworkProtocol, RefetchStrategy, Schema,
-    SchemaServerObjectSelectableVariant, ServerEntityName, UnprocessedClientFieldItem,
-    WrappedSelectionMapSelection,
+    ImperativelyLoadedFieldVariant, NetworkProtocol, RefetchStrategy, Schema, ServerEntityName,
+    ServerObjectSelectableVariant, UnprocessedClientFieldItem, WrappedSelectionMapSelection,
 };
 
 use super::{
@@ -57,7 +57,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn create_new_exposed_field(
         &mut self,
         expose_field_to_insert: ExposeAsFieldToInsert,
-        parent_object_entity_name: SchemaServerObjectEntityName,
+        parent_object_entity_name: ServerObjectEntityName,
     ) -> Result<UnprocessedClientFieldItem, WithLocation<CreateAdditionalFieldsError>> {
         let ExposeFieldDirective {
             expose_as,
@@ -177,14 +177,14 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .map(|server_object_selectable| {
                 // The server object selectable may represent a linked field or an inline fragment
                 match server_object_selectable.object_selectable_variant {
-                    SchemaServerObjectSelectableVariant::LinkedField => {
+                    ServerObjectSelectableVariant::LinkedField => {
                         WrappedSelectionMapSelection::LinkedField {
                             server_object_selectable_name: server_object_selectable.name.item,
                             arguments: vec![],
                             concrete_type: primary_field_concrete_type,
                         }
                     }
-                    SchemaServerObjectSelectableVariant::InlineFragment => {
+                    ServerObjectSelectableVariant::InlineFragment => {
                         WrappedSelectionMapSelection::InlineFragment(
                             self.server_entity_data
                                 .server_object_entity(
@@ -260,9 +260,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn insert_client_field_on_object(
         &mut self,
         mutation_field_name: SelectableName,
-        client_field_parent_object_entity_name: SchemaServerObjectEntityName,
+        client_field_parent_object_entity_name: ServerObjectEntityName,
         client_field_name: ClientScalarSelectableName,
-        payload_object_name: SchemaServerObjectEntityName,
+        payload_object_name: ServerObjectEntityName,
     ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
         if self
             .server_entity_data
@@ -298,9 +298,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     fn parse_mutation_subfield_id(
         &self,
         field_arg: &str,
-        mutation_object_entity_name: SchemaServerObjectEntityName,
-    ) -> ProcessTypeDefinitionResult<(SchemaServerObjectEntityName, ServerObjectSelectableName)>
-    {
+        mutation_object_entity_name: ServerObjectEntityName,
+    ) -> ProcessTypeDefinitionResult<(ServerObjectEntityName, ServerObjectSelectableName)> {
         let parent_entity_name_and_mutation_subfield_name = self
             .server_entity_data
             .server_object_entity_extra_info
@@ -338,8 +337,8 @@ fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol>(
     // TODO move this to impl Schema
     schema: &mut Schema<TNetworkProtocol>,
     arguments: Vec<WithLocation<VariableDefinition<ServerEntityName>>>,
-    primary_type_name: SchemaServerObjectEntityName,
-    mutation_object_name: SchemaServerObjectEntityName,
+    primary_type_name: ServerObjectEntityName,
+    mutation_object_name: ServerObjectEntityName,
     mutation_field_name: SelectableName,
     field_map_items: Vec<FieldMapItem>,
 ) -> ProcessTypeDefinitionResult<Vec<ProcessedFieldMapItem>> {
