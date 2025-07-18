@@ -665,7 +665,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
             SelectionType::Scalar(scalar_field_selection) => {
                 match &scalar_field_selection.associated_data {
                     DefinitionLocation::Server(_) => {
-                        merge_scalar_server_field(
+                        merge_server_scalar_field(
                             scalar_field_selection,
                             parent_map,
                             variable_context,
@@ -676,7 +676,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                         parent_object_entity_name,
                         newly_encountered_scalar_client_selectable_id,
                     )) => {
-                        merge_scalar_client_field(
+                        merge_client_scalar_field(
                             schema,
                             parent_map,
                             parent_object_entity,
@@ -896,7 +896,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
     select_typename_and_id_fields_in_merged_selection(schema, parent_map, parent_object_entity);
 }
 
-fn merge_scalar_client_field<TNetworkProtocol: NetworkProtocol>(
+fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut BTreeMap<NormalizationKey, MergedServerSelection>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
@@ -1085,7 +1085,7 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
     );
 }
 
-fn merge_scalar_server_field(
+fn merge_server_scalar_field(
     scalar_field_selection: &ValidatedScalarSelection,
     parent_map: &mut MergedSelectionMap,
     variable_context: &VariableContext,
