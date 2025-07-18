@@ -2,9 +2,9 @@ use common_lang_types::{
     DescriptionValue, SchemaServerObjectEntityName, ServerSelectableName, WithLocation,
 };
 use impl_base_types_macro::impl_for_selection_type;
-use isograph_lang_types::{SelectionType, ServerEntityName, TypeAnnotation, VariableDefinition};
+use isograph_lang_types::{SelectionType, TypeAnnotation, VariableDefinition};
 
-use crate::{NetworkProtocol, ServerObjectSelectable, ServerScalarSelectable};
+use crate::{NetworkProtocol, ServerEntityName, ServerObjectSelectable, ServerScalarSelectable};
 
 #[impl_for_selection_type]
 pub trait ServerScalarOrObjectSelectable {

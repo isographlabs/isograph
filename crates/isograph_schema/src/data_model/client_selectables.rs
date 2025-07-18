@@ -4,11 +4,11 @@ use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, DescriptionValue,
     ObjectTypeAndFieldName, SchemaServerObjectEntityName, WithSpan,
 };
-use isograph_lang_types::{SelectionType, ServerEntityName, TypeAnnotation, VariableDefinition};
+use isograph_lang_types::{SelectionType, TypeAnnotation, VariableDefinition};
 
 use crate::{
     ClientFieldVariant, NetworkProtocol, ObjectSelectableId, RefetchStrategy, ScalarSelectableId,
-    UserWrittenClientPointerInfo, ValidatedSelection,
+    ServerEntityName, UserWrittenClientPointerInfo, ValidatedSelection,
 };
 
 // TODO rename

@@ -8,8 +8,8 @@ use common_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientFieldDirectiveSet, ClientPointerDeclaration,
-    DefinitionLocation, DeserializationError, NonConstantValue, SelectionType, ServerEntityName,
-    TypeAnnotation, UnvalidatedSelection, VariableDefinition,
+    DefinitionLocation, DeserializationError, NonConstantValue, SelectionType, TypeAnnotation,
+    UnvalidatedSelection, VariableDefinition,
 };
 
 use thiserror::Error;
@@ -17,7 +17,7 @@ use thiserror::Error;
 use crate::{
     refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
     ClientObjectSelectable, ClientScalarSelectable, FieldMapItem, NetworkProtocol, Schema,
-    ValidatedVariableDefinition, WrappedSelectionMapSelection, NODE_FIELD_NAME,
+    ServerEntityName, ValidatedVariableDefinition, WrappedSelectionMapSelection, NODE_FIELD_NAME,
 };
 
 pub type UnprocessedSelection = WithSpan<UnvalidatedSelection>;

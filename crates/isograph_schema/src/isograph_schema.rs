@@ -16,7 +16,7 @@ use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDirectiveSet, DefinitionLocation, EmptyDirectiveSet,
     ObjectSelection, ScalarSelection, SelectionType, SelectionTypeContainingSelections,
-    ServerEntityName, VariableDefinition, WithId,
+    VariableDefinition, WithId,
 };
 use lazy_static::lazy_static;
 
@@ -24,9 +24,9 @@ use crate::{
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectableId,
     EntrypointDeclarationInfo, NetworkProtocol, NormalizationKey, ObjectSelectable,
-    ObjectSelectableId, ServerEntity, ServerObjectEntity, ServerObjectEntityAvailableSelectables,
-    ServerObjectSelectable, ServerScalarEntity, ServerScalarSelectable, ServerSelectable,
-    ServerSelectableId, UseRefetchFieldRefetchStrategy,
+    ObjectSelectableId, ServerEntity, ServerEntityName, ServerObjectEntity,
+    ServerObjectEntityAvailableSelectables, ServerObjectSelectable, ServerScalarEntity,
+    ServerScalarSelectable, ServerSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
 };
 
 lazy_static! {

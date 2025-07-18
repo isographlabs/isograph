@@ -13,15 +13,15 @@ use isograph_config::CompilerConfig;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDirectiveSet, DefinitionLocation, EmptyDirectiveSet,
     NonConstantValue, ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, ServerEntityName,
-    TypeAnnotation, UnionVariant, VariableDefinition,
+    SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, TypeAnnotation,
+    UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
     accessible_client_fields, description, inline_fragment_reader_selection_set,
     output_type_annotation, selection_map_wrapped, ClientFieldVariant, ClientScalarSelectable,
     ClientSelectableId, FieldMapItem, FieldTraversalResult, NameAndArguments, NetworkProtocol,
     NormalizationKey, ScalarSelectableId, Schema, SchemaServerObjectSelectableVariant,
-    UserWrittenClientTypeInfo, ValidatedSelection, ValidatedVariableDefinition,
+    ServerEntityName, UserWrittenClientTypeInfo, ValidatedSelection, ValidatedVariableDefinition,
     WrappedSelectionMapSelection,
 };
 use lazy_static::lazy_static;

@@ -4,11 +4,9 @@ use common_lang_types::{
     DescriptionValue, SchemaServerObjectEntityName, SchemaServerScalarEntityName,
     ServerObjectSelectableName, ServerScalarSelectableName, WithLocation,
 };
-use isograph_lang_types::{
-    impl_with_target_id, SelectionType, ServerEntityName, TypeAnnotation, VariableDefinition,
-};
+use isograph_lang_types::{impl_with_target_id, SelectionType, TypeAnnotation, VariableDefinition};
 
-use crate::{NetworkProtocol, SchemaServerObjectSelectableVariant};
+use crate::{NetworkProtocol, SchemaServerObjectSelectableVariant, ServerEntityName};
 
 #[derive(Debug, Clone)]
 pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {

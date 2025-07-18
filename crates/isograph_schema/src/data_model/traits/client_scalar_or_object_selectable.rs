@@ -3,11 +3,11 @@ use common_lang_types::{
     WithSpan,
 };
 use impl_base_types_macro::impl_for_selection_type;
-use isograph_lang_types::{ServerEntityName, VariableDefinition};
+use isograph_lang_types::VariableDefinition;
 
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, NetworkProtocol,
-    ObjectSelectableId, RefetchStrategy, ScalarSelectableId, ValidatedSelection,
+    ObjectSelectableId, RefetchStrategy, ScalarSelectableId, ServerEntityName, ValidatedSelection,
 };
 
 #[impl_for_selection_type]

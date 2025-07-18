@@ -13,7 +13,7 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
     RefetchQueryIndex, ScalarSelection, ScalarSelectionDirectiveSet, SelectionFieldArgument,
-    SelectionType, SelectionTypeContainingSelections, ServerEntityName, VariableDefinition,
+    SelectionType, SelectionTypeContainingSelections, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -25,9 +25,9 @@ use crate::{
     ClientOrServerObjectSelectable, ClientScalarOrObjectSelectable, ClientScalarSelectable,
     ClientSelectable, ClientSelectableId, ImperativelyLoadedFieldVariant, NameAndArguments,
     NetworkProtocol, PathToRefetchField, RootOperationName, Schema,
-    SchemaServerObjectSelectableVariant, ServerObjectEntity, ServerObjectEntityExtraInfo,
-    ServerObjectSelectable, ValidatedObjectSelection, ValidatedScalarSelection, ValidatedSelection,
-    VariableContext,
+    SchemaServerObjectSelectableVariant, ServerEntityName, ServerObjectEntity,
+    ServerObjectEntityExtraInfo, ServerObjectSelectable, ValidatedObjectSelection,
+    ValidatedScalarSelection, ValidatedSelection, VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;

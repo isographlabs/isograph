@@ -3,10 +3,8 @@ use std::fmt::Debug;
 use common_lang_types::SelectableName;
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 
-use isograph_lang_types::{
-    DefinitionLocation, SelectionType, ServerEntityName, TypeAnnotation, UnionVariant,
-};
-use isograph_schema::{NetworkProtocol, Schema, ServerSelectableId};
+use isograph_lang_types::{DefinitionLocation, SelectionType, TypeAnnotation, UnionVariant};
+use isograph_schema::{NetworkProtocol, Schema, ServerEntityName, ServerSelectableId};
 
 pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,

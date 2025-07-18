@@ -6,12 +6,11 @@ use common_lang_types::{
 };
 use isograph_lang_types::{
     DefinitionLocation, EntrypointDeclaration, EntrypointDirectiveSet, SelectionType,
-    ServerEntityName,
 };
 
 use thiserror::Error;
 
-use crate::{NetworkProtocol, Schema};
+use crate::{NetworkProtocol, Schema, ServerEntityName};
 
 #[derive(Debug)]
 pub struct EntrypointDeclarationInfo {

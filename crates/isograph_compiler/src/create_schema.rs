@@ -14,13 +14,13 @@ use graphql_lang_types::{
 use isograph_config::{CompilerConfig, CompilerConfigOptions};
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{
-    ConstantValue, IsoLiteralsSource, SelectionType, ServerEntityName, TypeAnnotation,
-    VariableDefinition,
+    ConstantValue, IsoLiteralsSource, SelectionType, TypeAnnotation, VariableDefinition,
 };
 use isograph_schema::{
     validate_entrypoints, CreateAdditionalFieldsError, FieldToInsert, NetworkProtocol,
     ProcessObjectTypeDefinitionOutcome, ProcessTypeSystemDocumentOutcome, RootOperationName,
-    Schema, SchemaServerObjectSelectableVariant, ServerObjectSelectable, ServerScalarSelectable,
+    Schema, SchemaServerObjectSelectableVariant, ServerEntityName, ServerObjectSelectable,
+    ServerScalarSelectable,
 };
 use pico::{Database, SourceId};
 

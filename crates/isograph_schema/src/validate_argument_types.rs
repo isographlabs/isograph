@@ -13,11 +13,11 @@ use thiserror::Error;
 
 use isograph_lang_types::{
     graphql_type_annotation_from_type_annotation, NonConstantValue, SelectionType,
-    ServerEntityName, VariableDefinition,
+    VariableDefinition,
 };
 
 use crate::{
-    NetworkProtocol, ServerEntityData, ServerObjectEntityAvailableSelectables,
+    NetworkProtocol, ServerEntityData, ServerEntityName, ServerObjectEntityAvailableSelectables,
     ServerObjectSelectable, ServerScalarSelectable, ValidatedVariableDefinition,
 };
 

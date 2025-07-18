@@ -6,9 +6,11 @@ use common_lang_types::{
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
-use isograph_lang_types::{DefinitionLocation, ServerEntityName, VariableDefinition};
+use isograph_lang_types::{DefinitionLocation, VariableDefinition};
 
-use crate::{NetworkProtocol, Schema, ServerSelectableId, ValidatedVariableDefinition};
+use crate::{
+    NetworkProtocol, Schema, ServerEntityName, ServerSelectableId, ValidatedVariableDefinition,
+};
 
 use super::create_additional_fields_error::{
     CreateAdditionalFieldsError, FieldMapItem, ProcessTypeDefinitionResult, ProcessedFieldMapItem,

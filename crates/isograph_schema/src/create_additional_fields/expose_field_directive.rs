@@ -5,7 +5,7 @@ use common_lang_types::{
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     DefinitionLocation, EmptyDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionType, SelectionTypeContainingSelections, ServerEntityName, VariableDefinition,
+    SelectionType, SelectionTypeContainingSelections, VariableDefinition,
 };
 
 use serde::Deserialize;
@@ -14,7 +14,8 @@ use crate::{
     generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
     ClientFieldVariant, ClientScalarSelectable, ExposeAsFieldToInsert,
     ImperativelyLoadedFieldVariant, NetworkProtocol, RefetchStrategy, Schema,
-    SchemaServerObjectSelectableVariant, UnprocessedClientFieldItem, WrappedSelectionMapSelection,
+    SchemaServerObjectSelectableVariant, ServerEntityName, UnprocessedClientFieldItem,
+    WrappedSelectionMapSelection,
 };
 
 use super::{
