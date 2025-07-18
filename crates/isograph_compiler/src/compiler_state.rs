@@ -98,7 +98,7 @@ pub fn compile<TNetworkProtocol: NetworkProtocol<Sources = StandardSources>>(
     // Create schema
     let (isograph_schema, stats) = create_schema::<TNetworkProtocol>(
         db,
-        &(source_files.sources),
+        &source_files.sources,
         &source_files.iso_literals,
         config,
     )?;
