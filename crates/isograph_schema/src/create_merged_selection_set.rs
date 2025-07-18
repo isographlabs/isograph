@@ -1,10 +1,10 @@
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, HashSet};
 
 use common_lang_types::{
-    ClientScalarSelectableName, Location, QueryOperationName, ScalarSelectableName,
-    SchemaServerObjectEntityName, SchemaServerScalarEntityName, SelectableName,
-    ServerObjectSelectableName, ServerScalarSelectableName, Span, VariableName, WithLocation,
-    WithSpan,
+    ClientObjectSelectableName, ClientScalarSelectableName, Location, QueryOperationName,
+    ScalarSelectableName, SchemaServerObjectEntityName, SchemaServerScalarEntityName,
+    SelectableName, ServerObjectSelectableName, ServerScalarSelectableName, Span, VariableName,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
@@ -27,7 +27,8 @@ use crate::{
     ClientSelectable, ClientSelectableId, ImperativelyLoadedFieldVariant, NameAndArguments,
     NetworkProtocol, PathToRefetchField, RootOperationName, Schema,
     SchemaServerObjectSelectableVariant, ServerObjectEntity, ServerObjectEntityExtraInfo,
-    ServerObjectSelectable, ValidatedScalarSelection, ValidatedSelection, VariableContext,
+    ServerObjectSelectable, ValidatedObjectSelection, ValidatedScalarSelection, ValidatedSelection,
+    VariableContext,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -704,31 +705,16 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                         parent_object_entity_name,
                         newly_encountered_client_object_selectable_id,
                     )) => {
-                        let newly_encountered_client_object_selectable = schema.client_pointer(
-                            parent_object_entity_name,
-                            newly_encountered_client_object_selectable_id,
-                        );
-
-                        merge_non_loadable_client_type(
-                            parent_object_entity,
+                        merge_client_object_field(
                             schema,
                             parent_map,
+                            parent_object_entity,
                             merge_traversal_state,
-                            SelectionType::Object((
-                                parent_object_entity_name,
-                                newly_encountered_client_object_selectable_id,
-                            )),
-                            SelectionType::Object(newly_encountered_client_object_selectable),
                             encountered_client_type_map,
                             variable_context,
-                            &object_selection.arguments,
-                        );
-
-                        merge_traversal_state.accessible_client_fields.insert(
-                            SelectionType::Object((
-                                parent_object_entity_name,
-                                newly_encountered_client_object_selectable_id,
-                            )),
+                            object_selection,
+                            parent_object_entity_name,
+                            newly_encountered_client_object_selectable_id,
                         );
                     }
                     DefinitionLocation::Server((
@@ -894,6 +880,45 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
     }
 
     select_typename_and_id_fields_in_merged_selection(schema, parent_map, parent_object_entity);
+}
+
+fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    parent_map: &mut BTreeMap<NormalizationKey, MergedServerSelection>,
+    parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
+    merge_traversal_state: &mut ScalarClientFieldTraversalState,
+    encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
+    variable_context: &VariableContext,
+    object_selection: &ValidatedObjectSelection,
+    parent_object_entity_name: SchemaServerObjectEntityName,
+    newly_encountered_client_object_selectable_id: ClientObjectSelectableName,
+) {
+    let newly_encountered_client_object_selectable = schema.client_pointer(
+        parent_object_entity_name,
+        newly_encountered_client_object_selectable_id,
+    );
+
+    merge_non_loadable_client_type(
+        parent_object_entity,
+        schema,
+        parent_map,
+        merge_traversal_state,
+        SelectionType::Object((
+            parent_object_entity_name,
+            newly_encountered_client_object_selectable_id,
+        )),
+        SelectionType::Object(newly_encountered_client_object_selectable),
+        encountered_client_type_map,
+        variable_context,
+        &object_selection.arguments,
+    );
+
+    merge_traversal_state
+        .accessible_client_fields
+        .insert(SelectionType::Object((
+            parent_object_entity_name,
+            newly_encountered_client_object_selectable_id,
+        )));
 }
 
 fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
