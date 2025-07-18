@@ -1329,7 +1329,6 @@ dependencies = [
  "pico_macros",
  "serde",
  "thiserror",
- "u32_newtypes",
 ]
 
 [[package]]
@@ -3349,10 +3348,6 @@ dependencies = [
  "quote",
  "syn 2.0.98",
 ]
-
-[[package]]
-name = "u32_newtypes"
-version = "0.3.1"
 
 [[package]]
 name = "u64_newtypes"

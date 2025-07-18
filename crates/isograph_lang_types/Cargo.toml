@@ -10,6 +10,5 @@ graphql_lang_types = { path = "../graphql_lang_types" }
 intern = { path = "../../relay-crates/intern" }
 pico = { path = "../pico" }
 pico_macros = { path = "../pico_macros" }
-u32_newtypes = { path = "../u32_newtypes" }
 serde = { workspace = true }
 thiserror = { workspace = true }

@@ -41,7 +41,7 @@ Since watch mode is a simple wrapper around batch mode, the rest of this documen
 This list is likely not up-to-date, consult [this](https://github.com/isographlabs/isograph/tree/main/crates) for an accurate summary.
 :::
 
-The Isograph compiler contains the following crates. The most important ones are marked with a 🟢:
+The Isograph compiler contains the following crates (and more!). The most important ones are marked with a 🟢:
 
 - `common_lang_types`
 - `graphql_lang_types`: GraphQL types that are also used by Isograph. (This is a smell. These types should only be used by `graphql_schema_parser`.)
@@ -51,7 +51,6 @@ The Isograph compiler contains the following crates. The most important ones are
 - `isograph_lang_types`: Some common types.
 - 🟢 `isograph_schema`: The in-memory representation of the Isograph schema. This includes server fields and fields generated from `iso` invocations. It should probably not include representations of `iso` entrypoints, but currently does.
 - `string_key_newtype`: A library for generating typesafe newtype wrappers around `StringKey` types.
-- `u32_newtypes`: A library for generating typesafe newtype wrappers around `u32` types.
 
 ## The Isograph schema
 
