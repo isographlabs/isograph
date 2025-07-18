@@ -676,85 +676,16 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                         parent_object_entity_name,
                         newly_encountered_scalar_client_selectable_id,
                     )) => {
-                        let newly_encountered_scalar_client_selectable = schema.client_field(
-                            *parent_object_entity_name,
-                            *newly_encountered_scalar_client_selectable_id,
-                        );
-
-                        // If the field is selected loadably or is imperative, we must note the refetch path,
-                        // because this results in an artifact being generated.
-                        match categorize_field_loadability(
-                            newly_encountered_scalar_client_selectable,
-                            &scalar_field_selection.scalar_selection_directive_set,
-                        ) {
-                            Some(Loadability::LoadablySelectedField(_loadable_variant)) => {
-                                create_merged_selection_map_for_field_and_insert_into_global_map(
-                                    schema,
-                                    parent_object_entity,
-                                    newly_encountered_scalar_client_selectable
-                                        .selection_set_for_parent_query(),
-                                    encountered_client_type_map,
-                                    DefinitionLocation::Client(SelectionType::Scalar((
-                                        *parent_object_entity_name,
-                                        *newly_encountered_scalar_client_selectable_id,
-                                    ))),
-                                    &initial_variable_context(&SelectionType::Scalar(
-                                        newly_encountered_scalar_client_selectable,
-                                    )),
-                                );
-
-                                let state = encountered_client_type_map
-                                    .get_mut(&DefinitionLocation::Client(SelectionType::Scalar((
-                                        *parent_object_entity_name,
-                                        *newly_encountered_scalar_client_selectable_id,
-                                    ))))
-                                    .expect(
-                                        "Expected field to exist when \
-                                                it is encountered loadably",
-                                    );
-                                state.was_ever_selected_loadably = true;
-                            }
-                            Some(Loadability::ImperativelyLoadedField(variant)) => {
-                                insert_imperative_field_into_refetch_paths(
-                                    schema,
-                                    encountered_client_type_map,
-                                    merge_traversal_state,
-                                    *newly_encountered_scalar_client_selectable_id,
-                                    newly_encountered_scalar_client_selectable,
-                                    *parent_object_entity_name,
-                                    parent_object_entity,
-                                    variant,
-                                );
-                            }
-                            None => match newly_encountered_scalar_client_selectable.variant {
-                                ClientFieldVariant::Link => {}
-                                ClientFieldVariant::ImperativelyLoadedField(_)
-                                | ClientFieldVariant::UserWritten(_) => {
-                                    merge_non_loadable_client_type(
-                                        parent_object_entity,
-                                        schema,
-                                        parent_map,
-                                        merge_traversal_state,
-                                        SelectionType::Scalar((
-                                            *parent_object_entity_name,
-                                            *newly_encountered_scalar_client_selectable_id,
-                                        )),
-                                        SelectionType::Scalar(
-                                            newly_encountered_scalar_client_selectable,
-                                        ),
-                                        encountered_client_type_map,
-                                        variable_context,
-                                        &scalar_field_selection.arguments,
-                                    )
-                                }
-                            },
-                        }
-
-                        merge_traversal_state.accessible_client_fields.insert(
-                            SelectionType::Scalar((
-                                *parent_object_entity_name,
-                                *newly_encountered_scalar_client_selectable_id,
-                            )),
+                        merge_scalar_client_field(
+                            schema,
+                            parent_map,
+                            parent_object_entity,
+                            merge_traversal_state,
+                            encountered_client_type_map,
+                            variable_context,
+                            scalar_field_selection,
+                            parent_object_entity_name,
+                            newly_encountered_scalar_client_selectable_id,
                         );
                     }
                 };
@@ -963,6 +894,95 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
     }
 
     select_typename_and_id_fields_in_merged_selection(schema, parent_map, parent_object_entity);
+}
+
+fn merge_scalar_client_field<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    parent_map: &mut BTreeMap<NormalizationKey, MergedServerSelection>,
+    parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
+    merge_traversal_state: &mut ScalarClientFieldTraversalState,
+    encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
+    variable_context: &VariableContext,
+    scalar_field_selection: &ValidatedScalarSelection,
+    parent_object_entity_name: &SchemaServerObjectEntityName,
+    newly_encountered_scalar_client_selectable_id: &ClientScalarSelectableName,
+) {
+    let newly_encountered_scalar_client_selectable = schema.client_field(
+        *parent_object_entity_name,
+        *newly_encountered_scalar_client_selectable_id,
+    );
+
+    // If the field is selected loadably or is imperative, we must note the refetch path,
+    // because this results in an artifact being generated.
+    match categorize_field_loadability(
+        newly_encountered_scalar_client_selectable,
+        &scalar_field_selection.scalar_selection_directive_set,
+    ) {
+        Some(Loadability::LoadablySelectedField(_loadable_variant)) => {
+            create_merged_selection_map_for_field_and_insert_into_global_map(
+                schema,
+                parent_object_entity,
+                newly_encountered_scalar_client_selectable.selection_set_for_parent_query(),
+                encountered_client_type_map,
+                DefinitionLocation::Client(SelectionType::Scalar((
+                    *parent_object_entity_name,
+                    *newly_encountered_scalar_client_selectable_id,
+                ))),
+                &initial_variable_context(&SelectionType::Scalar(
+                    newly_encountered_scalar_client_selectable,
+                )),
+            );
+
+            let state = encountered_client_type_map
+                .get_mut(&DefinitionLocation::Client(SelectionType::Scalar((
+                    *parent_object_entity_name,
+                    *newly_encountered_scalar_client_selectable_id,
+                ))))
+                .expect(
+                    "Expected field to exist when \
+                                                it is encountered loadably",
+                );
+            state.was_ever_selected_loadably = true;
+        }
+        Some(Loadability::ImperativelyLoadedField(variant)) => {
+            insert_imperative_field_into_refetch_paths(
+                schema,
+                encountered_client_type_map,
+                merge_traversal_state,
+                *newly_encountered_scalar_client_selectable_id,
+                newly_encountered_scalar_client_selectable,
+                *parent_object_entity_name,
+                parent_object_entity,
+                variant,
+            );
+        }
+        None => match newly_encountered_scalar_client_selectable.variant {
+            ClientFieldVariant::Link => {}
+            ClientFieldVariant::ImperativelyLoadedField(_) | ClientFieldVariant::UserWritten(_) => {
+                merge_non_loadable_client_type(
+                    parent_object_entity,
+                    schema,
+                    parent_map,
+                    merge_traversal_state,
+                    SelectionType::Scalar((
+                        *parent_object_entity_name,
+                        *newly_encountered_scalar_client_selectable_id,
+                    )),
+                    SelectionType::Scalar(newly_encountered_scalar_client_selectable),
+                    encountered_client_type_map,
+                    variable_context,
+                    &scalar_field_selection.arguments,
+                )
+            }
+        },
+    }
+
+    merge_traversal_state
+        .accessible_client_fields
+        .insert(SelectionType::Scalar((
+            *parent_object_entity_name,
+            *newly_encountered_scalar_client_selectable_id,
+        )));
 }
 
 #[allow(clippy::too_many_arguments)]
