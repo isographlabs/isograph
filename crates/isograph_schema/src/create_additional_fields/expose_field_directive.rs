@@ -1,12 +1,11 @@
 use common_lang_types::{
     ClientScalarSelectableName, Location, ObjectTypeAndFieldName, SchemaServerObjectEntityName,
-    SelectableName, Span, StringLiteralValue, WithLocation, WithSpan,
+    SelectableName, ServerObjectSelectableName, Span, StringLiteralValue, WithLocation, WithSpan,
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_lang_types::{
     DefinitionLocation, EmptyDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionType, SelectionTypeContainingSelections, ServerEntityName, ServerObjectSelectableId,
-    VariableDefinition,
+    SelectionType, SelectionTypeContainingSelections, ServerEntityName, VariableDefinition,
 };
 
 use serde::Deserialize;
@@ -78,11 +77,12 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let primary_field_name_selection_parts =
             path.map(|x| x.intern().into()).collect::<Vec<_>>();
 
-        let (_parent_object_entity_name, mutation_subfield_id) =
+        let (parent_object_entity_name, mutation_subfield_name) =
             self.parse_mutation_subfield_id(field, parent_object_entity_name)?;
 
         // TODO do not use mutation naming here
-        let mutation_field = self.server_object_selectable(mutation_subfield_id);
+        let mutation_field =
+            self.server_object_selectable(parent_object_entity_name, mutation_subfield_name);
         let payload_object_type_annotation = &mutation_field.target_object_entity;
         let payload_object_entity_name = *payload_object_type_annotation.inner();
 
@@ -298,8 +298,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &self,
         field_arg: &str,
         mutation_object_entity_name: SchemaServerObjectEntityName,
-    ) -> ProcessTypeDefinitionResult<(SchemaServerObjectEntityName, ServerObjectSelectableId)> {
-        let field_id = self
+    ) -> ProcessTypeDefinitionResult<(SchemaServerObjectEntityName, ServerObjectSelectableName)>
+    {
+        let parent_entity_name_and_mutation_subfield_name = self
             .server_entity_data
             .server_object_entity_extra_info
             .get(&mutation_object_entity_name)
@@ -328,7 +329,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 )
             })?;
 
-        Ok(*field_id)
+        Ok(*parent_entity_name_and_mutation_subfield_name)
     }
 }
 

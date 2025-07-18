@@ -80,11 +80,13 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                     )
                 }
                 DefinitionLocation::Server((
-                    _parent_object_entity_name,
-                    server_object_selectable_id,
+                    parent_object_entity_name,
+                    server_object_selectable_name,
                 )) => {
-                    let server_object_selectable =
-                        schema.server_object_selectable(server_object_selectable_id);
+                    let server_object_selectable = schema.server_object_selectable(
+                        parent_object_entity_name,
+                        server_object_selectable_name,
+                    );
                     let normalization_key = match server_object_selectable.object_selectable_variant
                     {
                         SchemaServerObjectSelectableVariant::LinkedField => NameAndArguments {
@@ -183,8 +185,9 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
 
             reader_artifact_import_name
         }
-        DefinitionLocation::Server((_parent_object_entity_name, server_field_id)) => {
-            let server_field = schema.server_object_selectable(server_field_id);
+        DefinitionLocation::Server((parent_object_entity_name, server_object_selectable_name)) => {
+            let server_field = schema
+                .server_object_selectable(parent_object_entity_name, server_object_selectable_name);
             match &server_field.object_selectable_variant {
                 SchemaServerObjectSelectableVariant::InlineFragment => {
                     let object = schema
@@ -714,11 +717,13 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                         // Do not recurse into selections of client pointers
                     }
                     DefinitionLocation::Server((
-                        _parent_object_entity_name,
-                        server_object_selectable_id,
+                        parent_object_entity_name,
+                        server_object_selectable_name,
                     )) => {
-                        let server_object_selectable =
-                            schema.server_object_selectable(server_object_selectable_id);
+                        let server_object_selectable = schema.server_object_selectable(
+                            parent_object_entity_name,
+                            server_object_selectable_name,
+                        );
                         let normalization_key = match server_object_selectable
                             .object_selectable_variant
                         {

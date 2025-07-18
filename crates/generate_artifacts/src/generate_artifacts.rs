@@ -148,11 +148,13 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
     {
         match encountered_field_id {
             DefinitionLocation::Server((
-                _parent_object_entity_name,
-                server_object_selectable_id,
+                parent_object_entity_name,
+                server_object_selectable_name,
             )) => {
-                let server_object_selectable =
-                    schema.server_object_selectable(*server_object_selectable_id);
+                let server_object_selectable = schema.server_object_selectable(
+                    *parent_object_entity_name,
+                    *server_object_selectable_name,
+                );
                 match &server_object_selectable.object_selectable_variant {
                     SchemaServerObjectSelectableVariant::LinkedField => {}
                     SchemaServerObjectSelectableVariant::InlineFragment => {
@@ -672,11 +674,12 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
         SelectionTypeContainingSelections::Object(linked_field) => {
             let field = match linked_field.associated_data {
                 DefinitionLocation::Server((
-                    _parent_object_entity_name,
-                    server_object_selectable_id,
-                )) => DefinitionLocation::Server(
-                    schema.server_object_selectable(server_object_selectable_id),
-                ),
+                    parent_object_entity_name,
+                    server_object_selectable_name,
+                )) => DefinitionLocation::Server(schema.server_object_selectable(
+                    parent_object_entity_name,
+                    server_object_selectable_name,
+                )),
                 DefinitionLocation::Client((parent_object_entity_name, client_pointer_name)) => {
                     DefinitionLocation::Client(
                         schema.client_pointer(parent_object_entity_name, client_pointer_name),

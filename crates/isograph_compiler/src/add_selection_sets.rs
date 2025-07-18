@@ -222,8 +222,11 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
             }
 
             let server_scalar_selectable_id = *server_selectable_id.as_scalar_result().map_err(
-                |(_parent_object_entity_name, object_selectable_id)| {
-                    let object_selectable = schema.server_object_selectable(*object_selectable_id);
+                |(parent_object_entity_name, server_object_selectable_name)| {
+                    let object_selectable = schema.server_object_selectable(
+                        *parent_object_entity_name,
+                        *server_object_selectable_name,
+                    );
                     let object = schema
                         .server_entity_data
                         .server_object_entity(*object_selectable.target_object_entity.inner());
@@ -310,7 +313,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
 
     let (associated_data, new_parent_object_entity_name) = match *location {
         DefinitionLocation::Server(server_selectable_id) => {
-            let (parent_object_entity_name, server_object_selectable_id) =
+            let (parent_object_entity_name, server_object_selectable_name) =
                 *server_selectable_id.as_object_result().map_err(
                     |(parent_object_entity_name, server_scalar_selectable_name)| {
                         let server_scalar_selectable = schema.server_scalar_selectable(
@@ -336,13 +339,13 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                         )]
                     },
                 )?;
-            let server_object_selectable =
-                schema.server_object_selectable(server_object_selectable_id);
+            let server_object_selectable = schema
+                .server_object_selectable(parent_object_entity_name, server_object_selectable_name);
 
             (
                 DefinitionLocation::Server((
                     parent_object_entity_name,
-                    server_object_selectable_id,
+                    server_object_selectable_name,
                 )),
                 *server_object_selectable.target_object_entity.inner(),
             )

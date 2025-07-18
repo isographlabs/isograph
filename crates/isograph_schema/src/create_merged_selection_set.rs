@@ -13,8 +13,7 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
     RefetchQueryIndex, ScalarSelection, ScalarSelectionDirectiveSet, SelectionFieldArgument,
-    SelectionType, SelectionTypeContainingSelections, ServerEntityName, ServerObjectSelectableId,
-    VariableDefinition,
+    SelectionType, SelectionTypeContainingSelections, ServerEntityName, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -36,7 +35,7 @@ pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
 // Maybe this should be FNVHashMap? We don't really need stable iteration order
 pub type FieldToCompletedMergeTraversalStateMap = BTreeMap<
     DefinitionLocation<
-        (SchemaServerObjectEntityName, ServerObjectSelectableId),
+        (SchemaServerObjectEntityName, ServerObjectSelectableName),
         ClientSelectableId,
     >,
     FieldTraversalResult,
@@ -416,7 +415,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     validated_selections: &[WithSpan<ValidatedSelection>],
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     root_field_id: DefinitionLocation<
-        (SchemaServerObjectEntityName, ServerObjectSelectableId),
+        (SchemaServerObjectEntityName, ServerObjectSelectableName),
         ClientSelectableId,
     >,
     variable_context: &VariableContext,
@@ -718,8 +717,8 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                         );
                     }
                     DefinitionLocation::Server((
-                        _parent_object_entity_name,
-                        server_object_selectable_id,
+                        field_parent_object_entity_name,
+                        field_object_selectable_name,
                     )) => {
                         merge_server_object_field(
                             schema,
@@ -731,7 +730,8 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             object_selection,
                             parent_object_entity_name,
                             object_selection_parent_object,
-                            server_object_selectable_id,
+                            field_parent_object_entity_name,
+                            field_object_selectable_name,
                         );
                     }
                 }
@@ -755,9 +755,13 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
     object_selection: &ValidatedObjectSelection,
     parent_object_entity_name: SchemaServerObjectEntityName,
     object_selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
-    server_object_selectable_id: ServerObjectSelectableId,
+    field_parent_object_entity_name: SchemaServerObjectEntityName,
+    field_server_object_selectable_name: ServerObjectSelectableName,
 ) {
-    let server_object_selectable = schema.server_object_selectable(server_object_selectable_id);
+    let server_object_selectable = schema.server_object_selectable(
+        field_parent_object_entity_name,
+        field_server_object_selectable_name,
+    );
 
     match &server_object_selectable.object_selectable_variant {
         SchemaServerObjectSelectableVariant::InlineFragment => {
@@ -820,8 +824,8 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         &object_selection.selection_set,
                         encountered_client_type_map,
                         DefinitionLocation::Server((
-                            parent_object_entity_name,
-                            server_object_selectable_id,
+                            field_parent_object_entity_name,
+                            field_server_object_selectable_name,
                         )),
                         &server_object_selectable.initial_variable_context(),
                     );

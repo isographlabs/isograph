@@ -116,10 +116,13 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
             SelectionType::Object(object_selection) => {
                 let field_argument_definitions = match object_selection.associated_data {
                     DefinitionLocation::Server((
-                        _parent_object_entity_name,
-                        object_selectable_id,
+                        parent_object_entity_name,
+                        server_object_selectable_name,
                     )) => schema
-                        .server_object_selectable(object_selectable_id)
+                        .server_object_selectable(
+                            parent_object_entity_name,
+                            server_object_selectable_name,
+                        )
                         .arguments
                         .iter()
                         .map(|x| &x.item)
