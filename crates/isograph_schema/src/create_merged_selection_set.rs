@@ -426,33 +426,30 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     match encountered_client_type_map.get_mut(&root_field_id) {
         Some(traversal_result) => traversal_result.clone(),
         None => {
-            let mut merge_traversal_state = ScalarClientFieldTraversalState::new();
-            let merged_selection_map = create_selection_map_with_merge_traversal_state(
-                schema,
-                parent_object_entity,
-                validated_selections,
-                &mut merge_traversal_state,
-                encountered_client_type_map,
-                variable_context,
-            );
+            let field_traversal_result = {
+                let mut merge_traversal_state = ScalarClientFieldTraversalState::new();
+                let merged_selection_map = create_selection_map_with_merge_traversal_state(
+                    schema,
+                    parent_object_entity,
+                    validated_selections,
+                    &mut merge_traversal_state,
+                    encountered_client_type_map,
+                    variable_context,
+                );
+
+                // TODO we don't always use this return value, so we shouldn't always clone above
+                FieldTraversalResult {
+                    traversal_state: merge_traversal_state,
+                    merged_selection_map,
+                    was_ever_selected_loadably: false,
+                }
+            };
 
             // N.B. encountered_client_type_map might actually have an item stored in root_object.id,
             // if we have some sort of recursion. That probably stack overflows right now.
-            encountered_client_type_map.insert(
-                root_field_id,
-                FieldTraversalResult {
-                    traversal_state: merge_traversal_state.clone(),
-                    merged_selection_map: merged_selection_map.clone(),
-                    was_ever_selected_loadably: false,
-                },
-            );
+            encountered_client_type_map.insert(root_field_id, field_traversal_result.clone());
 
-            // TODO we don't always use this return value, so we shouldn't always clone above
-            FieldTraversalResult {
-                traversal_state: merge_traversal_state,
-                merged_selection_map,
-                was_ever_selected_loadably: false,
-            }
+            field_traversal_result
         }
     }
 }
