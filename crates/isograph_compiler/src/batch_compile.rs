@@ -1,14 +1,14 @@
 use std::{path::PathBuf, str::Utf8Error};
 
 use crate::{
-    compiler_state::{compile, CompilerState, StandardSources},
+    compiler_state::{compile, CompilerState},
     source_files::SourceFiles,
     with_duration::WithDuration,
 };
 use colored::Colorize;
 use common_lang_types::{CurrentWorkingDirectory, WithLocation};
 use isograph_lang_parser::IsographLiteralParseError;
-use isograph_schema::{NetworkProtocol, ProcessClientFieldDeclarationError};
+use isograph_schema::{NetworkProtocol, ProcessClientFieldDeclarationError, StandardSources};
 use pretty_duration::pretty_duration;
 use thiserror::Error;
 use tracing::{error, info};

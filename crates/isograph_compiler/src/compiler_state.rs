@@ -1,16 +1,14 @@
 use std::{
-    collections::BTreeMap,
     error::Error,
     path::PathBuf,
     time::{Duration, Instant},
 };
 
-use common_lang_types::{CurrentWorkingDirectory, RelativePathToSourceFile, WithLocation};
+use common_lang_types::{CurrentWorkingDirectory, WithLocation};
 use generate_artifacts::get_artifact_path_and_content;
 use isograph_config::{create_config, CompilerConfig};
-use isograph_lang_types::SchemaSource;
-use isograph_schema::{validate_use_of_arguments, NetworkProtocol};
-use pico::{Database, SourceId};
+use isograph_schema::{validate_use_of_arguments, NetworkProtocol, StandardSources};
+use pico::Database;
 
 use crate::{
     batch_compile::{BatchCompileError, CompilationStats},
@@ -48,16 +46,6 @@ impl CompilerState {
         }
     }
 }
-
-// We're using this type to constrain the types of sources that we accept. i.e.
-// in theory, you can have a TNetworkProtocol with a different Source associated
-// type, but for now, we get a source + set of extensions, and have to restrict
-// TNetworkProtocol accordingly. Perhaps the config can have a generic, and
-// thus we can thread this further back, but that is not yet implemented.
-pub type StandardSources = (
-    SourceId<SchemaSource>,
-    BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
-);
 
 /// This the "workhorse" command of batch compilation.
 ///

@@ -1,7 +1,7 @@
 use colored::Colorize;
 use common_lang_types::CurrentWorkingDirectory;
 use isograph_config::CompilerConfig;
-use isograph_schema::NetworkProtocol;
+use isograph_schema::{NetworkProtocol, StandardSources};
 use notify::{
     event::{CreateKind, ModifyKind, RemoveKind, RenameMode},
     Error, EventKind, RecommendedWatcher, RecursiveMode,
@@ -15,7 +15,7 @@ use tracing::info;
 
 use crate::{
     batch_compile::print_result,
-    compiler_state::{compile, CompilerState, StandardSources},
+    compiler_state::{compile, CompilerState},
     source_files::SourceFiles,
     with_duration::WithDuration,
 };

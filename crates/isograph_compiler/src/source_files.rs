@@ -11,11 +11,11 @@ use common_lang_types::{
 use intern::Lookup;
 use isograph_config::{absolute_and_relative_paths, CompilerConfig};
 use isograph_lang_types::{IsoLiteralsSource, SchemaSource};
+use isograph_schema::StandardSources;
 use pico::{Database, SourceId};
 
 use crate::{
     batch_compile::BatchCompileError,
-    compiler_state::StandardSources,
     isograph_literals::{read_file, read_files_in_folder},
     watch::{ChangedFileKind, SourceEventKind, SourceFileEvent},
 };

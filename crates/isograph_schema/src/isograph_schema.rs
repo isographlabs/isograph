@@ -5,9 +5,9 @@ use std::{
 
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, JavascriptName, Location,
-    ObjectSelectableName, SelectableName, ServerObjectEntityName, ServerObjectSelectableName,
-    ServerScalarEntityName, ServerScalarIdSelectableName, ServerScalarSelectableName,
-    UnvalidatedTypeName, WithLocation,
+    ObjectSelectableName, RelativePathToSourceFile, SelectableName, ServerObjectEntityName,
+    ServerObjectSelectableName, ServerScalarEntityName, ServerScalarIdSelectableName,
+    ServerScalarSelectableName, UnvalidatedTypeName, WithLocation,
 };
 use graphql_lang_types::GraphQLNamedTypeAnnotation;
 use intern::string_key::Intern;
@@ -15,10 +15,11 @@ use intern::Lookup;
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDirectiveSet, DefinitionLocation, EmptyDirectiveSet,
-    ObjectSelection, ScalarSelection, SelectionType, SelectionTypeContainingSelections,
-    VariableDefinition, WithId,
+    ObjectSelection, ScalarSelection, SchemaSource, SelectionType,
+    SelectionTypeContainingSelections, VariableDefinition, WithId,
 };
 use lazy_static::lazy_static;
+use pico::SourceId;
 
 use crate::{
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
@@ -832,3 +833,13 @@ fn set_and_validate_id_field(
         }
     }
 }
+
+// We're using this type to constrain the types of sources that we accept. i.e.
+// in theory, you can have a TNetworkProtocol with a different Source associated
+// type, but for now, we get a source + set of extensions, and have to restrict
+// TNetworkProtocol accordingly. Perhaps the config can have a generic, and
+// thus we can thread this further back, but that is not yet implemented.
+pub type StandardSources = (
+    SourceId<SchemaSource>,
+    BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
+);
