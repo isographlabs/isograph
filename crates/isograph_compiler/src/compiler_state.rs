@@ -17,7 +17,7 @@ use crate::{
     write_artifacts::write_artifacts_to_disk,
 };
 
-const GC_DURATION: u64 = 60;
+const GC_DURATION_SECONDS: u64 = 60;
 
 pub struct CompilerState {
     pub db: Database,
@@ -40,7 +40,7 @@ impl CompilerState {
     }
 
     pub fn run_garbage_collection(&mut self) {
-        if self.last_gc_run.elapsed() >= Duration::from_secs(GC_DURATION) {
+        if self.last_gc_run.elapsed() >= Duration::from_secs(GC_DURATION_SECONDS) {
             self.db.run_garbage_collection();
             self.last_gc_run = Instant::now();
         }
