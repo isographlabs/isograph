@@ -426,24 +426,13 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     match encountered_client_type_map.get_mut(&root_field_id) {
         Some(traversal_result) => traversal_result.clone(),
         None => {
-            let field_traversal_result = {
-                let mut merge_traversal_state = ScalarClientFieldTraversalState::new();
-                let merged_selection_map = create_selection_map_with_merge_traversal_state(
-                    schema,
-                    parent_object_entity,
-                    validated_selections,
-                    &mut merge_traversal_state,
-                    encountered_client_type_map,
-                    variable_context,
-                );
-
-                // TODO we don't always use this return value, so we shouldn't always clone above
-                FieldTraversalResult {
-                    traversal_state: merge_traversal_state,
-                    merged_selection_map,
-                    was_ever_selected_loadably: false,
-                }
-            };
+            let field_traversal_result = create_field_traversal_result(
+                schema,
+                parent_object_entity,
+                validated_selections,
+                encountered_client_type_map,
+                variable_context,
+            );
 
             // N.B. encountered_client_type_map might actually have an item stored in root_object.id,
             // if we have some sort of recursion. That probably stack overflows right now.
@@ -451,6 +440,33 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
 
             field_traversal_result
         }
+    }
+}
+
+fn create_field_traversal_result<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
+    validated_selections: &[WithSpan<ValidatedSelection>],
+    encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
+    variable_context: &VariableContext,
+) -> FieldTraversalResult {
+    let mut traversal_state = ScalarClientFieldTraversalState::new();
+    let mut merged_selection_map = BTreeMap::new();
+
+    merge_validated_selections_into_selection_map(
+        schema,
+        &mut merged_selection_map,
+        parent_object_entity,
+        validated_selections,
+        &mut traversal_state,
+        encountered_client_type_map,
+        variable_context,
+    );
+
+    FieldTraversalResult {
+        traversal_state,
+        merged_selection_map,
+        was_ever_selected_loadably: false,
     }
 }
 
@@ -633,28 +649,6 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
             }
         })
         .collect::<Vec<_>>()
-}
-
-fn create_selection_map_with_merge_traversal_state<TNetworkProtocol: NetworkProtocol>(
-    schema: &Schema<TNetworkProtocol>,
-    parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
-    validated_selections: &[WithSpan<ValidatedSelection>],
-    merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
-    variable_context: &VariableContext,
-) -> MergedSelectionMap {
-    let mut merged_selection_map = BTreeMap::new();
-    merge_validated_selections_into_selection_map(
-        schema,
-        &mut merged_selection_map,
-        parent_object_entity,
-        validated_selections,
-        merge_traversal_state,
-        encountered_client_type_map,
-        variable_context,
-    );
-
-    merged_selection_map
 }
 
 fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtocol>(
