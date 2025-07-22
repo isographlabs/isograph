@@ -1,3 +1,5 @@
+use std::any::TypeId;
+
 use intern::InternSerdes;
 use intern::{intern_struct, InternId};
 use serde::{Deserialize, Serialize};
@@ -53,5 +55,11 @@ impl From<u64> for Key {
 impl From<HashId> for Key {
     fn from(value: HashId) -> Self {
         Self(value)
+    }
+}
+
+impl From<TypeId> for Key {
+    fn from(value: TypeId) -> Self {
+        todo!()
     }
 }

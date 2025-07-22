@@ -1,4 +1,8 @@
-use std::{any::Any, hash::Hash, num::NonZeroUsize};
+use std::{
+    any::{Any, TypeId},
+    hash::Hash,
+    num::NonZeroUsize,
+};
 
 use crate::{
     dependency::{Dependency, DependencyStack, NodeKind},
@@ -91,6 +95,11 @@ impl Database {
             "unexpected struct type. \
             This is indicative of a bug in Pico.",
         )
+    }
+
+    pub fn get_singleton<T: 'static>(&self) -> &T {
+        self.storage.get_source_node(TypeId::of::<T>());
+        todo!()
     }
 
     pub fn set<T: Source + DynEq>(&mut self, source: T) -> SourceId<T> {
