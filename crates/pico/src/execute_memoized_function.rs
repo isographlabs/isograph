@@ -7,7 +7,7 @@ use crate::{
     dyn_eq::DynEq,
     epoch::Epoch,
     intern::Key,
-    InnerFn,
+    InnerFn, KeyOrTypeId,
 };
 
 pub enum DidRecalculate {
@@ -174,8 +174,8 @@ fn any_dependency_changed(db: &Database, derived_node: &DerivedNode) -> bool {
         .iter()
         .filter(|dep| dep.time_verified_or_updated != db.storage.current_epoch)
         .any(|dependency| match dependency.node_to {
-            NodeKind::Source(key) => {
-                source_node_changed_since(db, key, dependency.time_verified_or_updated)
+            NodeKind::Source(key_or_type_id) => {
+                source_node_changed_since(db, key_or_type_id, dependency.time_verified_or_updated)
             }
             NodeKind::Derived(dep_node_id) => {
                 derived_node_changed_since(db, dep_node_id, dependency.time_verified_or_updated)
@@ -183,8 +183,8 @@ fn any_dependency_changed(db: &Database, derived_node: &DerivedNode) -> bool {
         })
 }
 
-fn source_node_changed_since(db: &Database, key: Key, since: Epoch) -> bool {
-    match db.storage.get_source_node(key) {
+fn source_node_changed_since(db: &Database, key_or_type_id: KeyOrTypeId, since: Epoch) -> bool {
+    match db.storage.get_source_node(key_or_type_id) {
         Some(source) => source.time_updated > since,
         None => panic!(
             "Source node not found. This may occur if \

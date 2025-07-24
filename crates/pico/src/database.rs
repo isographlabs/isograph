@@ -29,11 +29,17 @@ pub struct Database {
     pub(crate) retained_calls: DashMap<DerivedNodeId, usize>,
 }
 
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub(crate) enum KeyOrTypeId {
+    Key(Key),
+    TypeId(TypeId),
+}
+
 #[derive(Debug)]
 pub(crate) struct DatabaseStorage {
     pub(crate) param_id_to_index: DashMap<ParamId, Index<ParamId>>,
     pub(crate) derived_node_id_to_revision: DashMap<DerivedNodeId, DerivedNodeRevision>,
-    pub(crate) source_node_key_to_index: DashMap<Key, Index<SourceNode>>,
+    pub(crate) source_node_key_to_index: DashMap<KeyOrTypeId, Index<SourceNode>>,
 
     pub(crate) derived_nodes: BoxcarVec<DerivedNode>,
     pub(crate) source_nodes: BoxcarVec<Option<SourceNode>>,
@@ -83,23 +89,26 @@ impl Database {
     }
 
     pub fn get<T: 'static>(&self, id: SourceId<T>) -> &T {
-        let source_node = self.storage.get_source_node(id.key).expect(
+        self.get_impl(KeyOrTypeId::Key(id.key))
+    }
+
+    pub fn get_singleton<T: 'static>(&self) -> &T {
+        self.get_impl(KeyOrTypeId::TypeId(TypeId::of::<T>()))
+    }
+
+    fn get_impl<T: 'static>(&self, key_or_type_id: KeyOrTypeId) -> &T {
+        let source_node = self.storage.get_source_node(key_or_type_id).expect(
             "source node not found. SourceId should not be used \
             after the corresponding source node is removed.",
         );
         self.register_dependency_in_parent_memoized_fn(
-            NodeKind::Source(id.key),
+            NodeKind::Source(key_or_type_id),
             source_node.time_updated,
         );
         source_node.value.as_any().downcast_ref::<T>().expect(
             "unexpected struct type. \
             This is indicative of a bug in Pico.",
         )
-    }
-
-    pub fn get_singleton<T: 'static>(&self) -> &T {
-        self.storage.get_source_node(TypeId::of::<T>());
-        todo!()
     }
 
     pub fn set<T: Source + DynEq>(&mut self, source: T) -> SourceId<T> {
@@ -220,7 +229,7 @@ impl DatabaseStorage {
         Index::new(self.derived_nodes.push(derived_node))
     }
 
-    pub fn get_source_node(&self, key: Key) -> Option<&SourceNode> {
+    pub fn get_source_node(&self, key: KeyOrTypeId) -> Option<&SourceNode> {
         let index = self.source_node_key_to_index.get(&key)?;
         self.source_nodes
             .get(index.idx)
@@ -239,7 +248,10 @@ impl DatabaseStorage {
     /// the new source, increment the current epoch.
     pub fn set_source<T: Source + DynEq>(&mut self, source: T) -> SourceId<T> {
         let id = SourceId::new(&source);
-        match self.source_node_key_to_index.entry(id.key) {
+        match self
+            .source_node_key_to_index
+            .entry(KeyOrTypeId::Key(id.key))
+        {
             Entry::Occupied(occupied_entry) => {
                 let source_node = self
                     .source_nodes
@@ -277,7 +289,10 @@ impl DatabaseStorage {
     }
 
     pub fn remove_source<T>(&mut self, id: SourceId<T>) {
-        if let Some((_, index)) = self.source_node_key_to_index.remove(&id.key) {
+        if let Some((_, index)) = self
+            .source_node_key_to_index
+            .remove(&KeyOrTypeId::Key(id.key))
+        {
             self.current_epoch.increment();
             self.source_nodes
                 .get_mut(index.idx)

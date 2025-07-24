@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use crate::{derived_node::DerivedNodeId, epoch::Epoch, intern::Key};
+use crate::{derived_node::DerivedNodeId, epoch::Epoch, KeyOrTypeId};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Dependency {
@@ -10,7 +10,7 @@ pub struct Dependency {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum NodeKind {
-    Source(Key),
+    Source(KeyOrTypeId),
     Derived(DerivedNodeId),
 }
 
