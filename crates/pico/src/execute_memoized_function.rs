@@ -6,7 +6,6 @@ use crate::{
     derived_node::{DerivedNode, DerivedNodeId},
     dyn_eq::DynEq,
     epoch::Epoch,
-    intern::Key,
     InnerFn, KeyOrTypeId,
 };
 

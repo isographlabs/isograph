@@ -30,7 +30,7 @@ pub struct Database {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
-pub(crate) enum KeyOrTypeId {
+pub enum KeyOrTypeId {
     Key(Key),
     TypeId(TypeId),
 }
