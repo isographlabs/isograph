@@ -119,7 +119,11 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
     let mut encountered_output_types = HashSet::<ClientSelectableId>::new();
 
     // For each entrypoint, generate an entrypoint artifact and refetch artifacts
-    for (parent_object_entity_name, entrypoint_selectable_name) in schema.entrypoints.keys() {
+    for ((parent_object_entity_name, entrypoint_selectable_name), entrypoint) in
+        schema.entrypoints.iter()
+    {
+        let entrypoint_directive_set = entrypoint.directive_set;
+        // From here, we have the entrypoint directive set, and it needs to be passed down to entrypoint_file_content
         let entrypoint_path_and_content = generate_entrypoint_artifacts(
             schema,
             *parent_object_entity_name,
