@@ -22,7 +22,10 @@ export const FavoritePhraseLoader = iso(`
               { id: pet.id },
               {
                 onComplete: (data) => {
-                  console.log('Successfully loaded favorite phrase', data);
+                  console.log(
+                    'Successfully loaded favorite phrase and received this component',
+                    data,
+                  );
                 },
                 onError: () => {
                   console.log('Error when loading favorite phrase');
@@ -54,9 +57,12 @@ export const PetFavoritePhrase = iso(`
 `)(({ data }) => {
   const pet = data.pet;
   if (pet == null) return;
-  return (
+
+  return !!pet.favorite_phrase ? (
     <p>
       {pet.name} likes to say: &quot;{pet.favorite_phrase}&quot;
     </p>
+  ) : (
+    <p>{pet.name} has no favorite phrase!</p>
   );
 });
