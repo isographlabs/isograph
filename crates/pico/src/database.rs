@@ -8,7 +8,7 @@ use crate::{
     intern::{Key, ParamId},
     macro_fns::{get_param, init_param_vec, intern_borrowed_param, intern_owned_param},
     source::{Source, SourceId, SourceNode},
-    InnerFn, MemoRef,
+    InnerFn, MemoRef, Singleton,
 };
 use boxcar::Vec as BoxcarVec;
 use dashmap::{DashMap, Entry};
@@ -79,28 +79,45 @@ impl Database {
     }
 
     pub fn get<T: 'static>(&self, id: SourceId<T>) -> &T {
-        let source_node = self.storage.get_source_node(id.key).expect(
-            "source node not found. SourceId should not be used \
+        self.get_impl(id.key).expect(
+            "Source node not found in database. SourceId should not be used \
             after the corresponding source node is removed.",
-        );
+        )
+    }
+
+    pub fn get_singleton<T: 'static + Singleton>(&self) -> Option<&T> {
+        self.get_impl(T::get_singleton_key())
+    }
+
+    fn get_impl<T: 'static>(&self, key: Key) -> Option<&T> {
+        let source_node = self.storage.get_source_node(key)?;
+
         self.register_dependency_in_parent_memoized_fn(
-            NodeKind::Source(id.key),
+            NodeKind::Source(key),
             source_node.time_updated,
         );
-        source_node.value.as_any().downcast_ref::<T>().expect(
+        Some(source_node.value.as_any().downcast_ref::<T>().expect(
             "unexpected struct type. \
             This is indicative of a bug in Pico.",
-        )
+        ))
     }
 
     pub fn set<T: Source + DynEq>(&mut self, source: T) -> SourceId<T> {
         self.assert_empty_dependency_stack();
-        self.storage.set_source(source)
+        let source_id = SourceId::new(&source);
+        self.storage.set_source(source, source_id);
+        source_id
     }
 
     pub fn remove<T>(&mut self, id: SourceId<T>) {
         self.assert_empty_dependency_stack();
         self.storage.remove_source(id)
+    }
+
+    pub fn remove_singleton<T: Singleton + 'static>(&mut self) {
+        self.assert_empty_dependency_stack();
+        self.storage
+            .remove_source::<T>(T::get_singleton_key().into());
     }
 
     pub fn run_garbage_collection(&mut self) {
@@ -228,9 +245,8 @@ impl DatabaseStorage {
 
     /// Sets a source in the database. If there is an existing item and it does not equal
     /// the new source, increment the current epoch.
-    pub fn set_source<T: Source + DynEq>(&mut self, source: T) -> SourceId<T> {
-        let id = SourceId::new(&source);
-        match self.source_node_key_to_index.entry(id.key) {
+    fn set_source<T: DynEq>(&mut self, source: T, source_id: SourceId<T>) {
+        match self.source_node_key_to_index.entry(source_id.key) {
             Entry::Occupied(occupied_entry) => {
                 let source_node = self
                     .source_nodes
@@ -264,7 +280,6 @@ impl DatabaseStorage {
                 vacant_entry.insert(index);
             }
         }
-        id
     }
 
     pub fn remove_source<T>(&mut self, id: SourceId<T>) {

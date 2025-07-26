@@ -42,7 +42,7 @@ impl<T> From<SourceId<T>> for ParamId {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
-pub struct Key(HashId);
+pub struct Key(pub HashId);
 
 impl From<u64> for Key {
     fn from(value: u64) -> Self {
