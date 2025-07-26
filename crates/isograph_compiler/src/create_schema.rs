@@ -5,8 +5,8 @@ use std::{
 };
 
 use common_lang_types::{
-    CurrentWorkingDirectory, RelativePathToSourceFile, SelectableName, ServerObjectEntityName,
-    TextSource, UnvalidatedTypeName, VariableName, WithLocation,
+    RelativePathToSourceFile, SelectableName, ServerObjectEntityName, TextSource,
+    UnvalidatedTypeName, VariableName, WithLocation,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLInputValueDefinition, NameValuePair, RootOperationKind,
@@ -107,7 +107,7 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
         }
     }
 
-    let contains_iso = parse_iso_literals(db, iso_literals, config.current_working_directory)?;
+    let contains_iso = parse_iso_literals(db, iso_literals)?;
     let contains_iso_stats = contains_iso.stats();
 
     let (unprocessed_client_types, unprocessed_entrypoints) =
@@ -148,14 +148,11 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
 fn parse_iso_literals(
     db: &Database,
     iso_literals_sources: &HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>,
-    current_working_directory: CurrentWorkingDirectory,
 ) -> Result<ContainsIso, BatchCompileError> {
     let mut contains_iso = ContainsIso::default();
     let mut iso_literal_parse_errors = vec![];
     for (relative_path, iso_literals_source_id) in iso_literals_sources.iter() {
-        match parse_iso_literal_in_source(db, *iso_literals_source_id, current_working_directory)
-            .to_owned()
-        {
+        match parse_iso_literal_in_source(db, *iso_literals_source_id).to_owned() {
             Ok(iso_literals) => {
                 if !iso_literals.is_empty() {
                     contains_iso.insert(*relative_path, iso_literals);

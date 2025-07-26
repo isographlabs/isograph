@@ -1,3 +1,4 @@
+use pico::{Key, Singleton, Source};
 use string_key_newtype::{
     string_key_equality, string_key_newtype, string_key_newtype_no_display,
     string_key_one_way_conversion,
@@ -124,6 +125,21 @@ impl std::fmt::Display for CurrentWorkingDirectory {
 impl std::fmt::Debug for CurrentWorkingDirectory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "CurrentWorkingDirectory")
+    }
+}
+
+impl Singleton for CurrentWorkingDirectory {
+    fn get_singleton_key() -> Key {
+        use ::std::hash::{DefaultHasher, Hash, Hasher};
+        let mut s = DefaultHasher::new();
+        ::core::any::TypeId::of::<CurrentWorkingDirectory>().hash(&mut s);
+        s.finish().into()
+    }
+}
+
+impl Source for CurrentWorkingDirectory {
+    fn get_key(&self) -> Key {
+        CurrentWorkingDirectory::get_singleton_key()
     }
 }
 

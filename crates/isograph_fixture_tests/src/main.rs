@@ -1,13 +1,11 @@
-mod config_for_test;
-
 use std::{ffi::OsStr, fs, path::PathBuf};
 
 use clap::Parser;
-use common_lang_types::relative_path_from_absolute_and_working_directory;
-use config_for_test::isograph_config_for_tests;
-use intern::Lookup;
+use common_lang_types::{
+    relative_path_from_absolute_and_working_directory, CurrentWorkingDirectory,
+};
+use intern::{string_key::Intern, Lookup};
 use isograph_compiler::parse_iso_literals_in_file_content;
-use isograph_config::CompilerConfig;
 use lazy_static::lazy_static;
 use regex::Regex;
 
@@ -19,7 +17,8 @@ fn main() {
     }
 
     let current_dir = std::env::current_dir().expect("current_dir should exist");
-    let config = isograph_config_for_tests(&current_dir);
+
+    let current_working_directory = current_dir.to_str().unwrap().intern().into();
 
     for fixture_dir in args.dir {
         let canonicalized_folder = current_dir
@@ -33,7 +32,7 @@ fn main() {
             panic!("Expected {fixture_dir:?} to be a directory");
         }
 
-        generate_fixtures_for_files_in_folder(canonicalized_folder, &config);
+        generate_fixtures_for_files_in_folder(canonicalized_folder, current_working_directory);
     }
 }
 
@@ -51,7 +50,10 @@ lazy_static! {
 }
 const OUTPUT_SUFFIX: &str = r"output";
 
-fn generate_fixtures_for_files_in_folder(folder: PathBuf, config: &CompilerConfig) {
+fn generate_fixtures_for_files_in_folder(
+    folder: PathBuf,
+    current_working_directory: CurrentWorkingDirectory,
+) {
     for read_dir in folder.read_dir().expect("read_dir call failed") {
         match read_dir {
             Ok(entry) => {
@@ -68,7 +70,7 @@ fn generate_fixtures_for_files_in_folder(folder: PathBuf, config: &CompilerConfi
                 if let Some(capture) = INPUT_SUFFIX.captures(&path_as_str) {
                     let mut output_file = PathBuf::from(capture.get(1).unwrap().as_str());
                     output_file.set_extension(OUTPUT_SUFFIX);
-                    process_input_file(path, output_file, config);
+                    process_input_file(path, output_file, current_working_directory);
                 } else if path.extension() == Some(OsStr::new(OUTPUT_SUFFIX)) {
                     // Great, ignore it.
                 } else {
@@ -84,7 +86,11 @@ fn generate_fixtures_for_files_in_folder(folder: PathBuf, config: &CompilerConfi
     }
 }
 
-fn process_input_file(input_file: PathBuf, output_file: PathBuf, config: &CompilerConfig) {
+fn process_input_file(
+    input_file: PathBuf,
+    output_file: PathBuf,
+    current_working_directory: CurrentWorkingDirectory,
+) {
     let file_content = String::from_utf8(
         fs::read(input_file.clone())
             .unwrap_or_else(|_| panic!("Expected file {input_file:?} to be readable")),
@@ -97,7 +103,8 @@ fn process_input_file(input_file: PathBuf, output_file: PathBuf, config: &Compil
     // validate and generate artifacts, or something else entirely.
     //
     // So, we will need to make this a bit more flexible.
-    let results = generate_content_for_output_file(input_file, file_content, config);
+    let results =
+        generate_content_for_output_file(input_file, file_content, current_working_directory);
 
     fs::write(output_file.clone(), results)
         .unwrap_or_else(|_| panic!("Failed to write to {output_file:?}"));
@@ -106,18 +113,18 @@ fn process_input_file(input_file: PathBuf, output_file: PathBuf, config: &Compil
 fn generate_content_for_output_file(
     input_file: PathBuf,
     content: String,
-    config: &CompilerConfig,
+    current_working_directory: CurrentWorkingDirectory,
 ) -> String {
-    let canonicalized_root_path = &PathBuf::from(config.current_working_directory.lookup());
+    let canonicalized_root_path = &PathBuf::from(current_working_directory.lookup());
     let absolute_path = canonicalized_root_path.join(&input_file);
     let relative_path_to_source_file = relative_path_from_absolute_and_working_directory(
-        config.current_working_directory,
+        current_working_directory,
         &absolute_path,
     );
     match parse_iso_literals_in_file_content(
         relative_path_to_source_file,
         &content,
-        config.current_working_directory,
+        current_working_directory,
     ) {
         Ok(item) => {
             let item: Result<_, ()> = Ok(item);

@@ -22,9 +22,13 @@ use lsp_types::{
 };
 
 pub fn on_semantic_token_full_request(
-    state: &mut LSPState,
-    params: <SemanticTokensFullRequest as Request>::Params,
+    #[allow(unused)] state: &mut LSPState,
+    #[allow(unused)] params: <SemanticTokensFullRequest as Request>::Params,
 ) -> LSPRuntimeResult<<SemanticTokensFullRequest as Request>::Result> {
+    #[allow(unused)]
+    let current_working_directory = todo!();
+
+    #[allow(unreachable_code)]
     let SemanticTokensParams {
         text_document,
         work_done_progress_params: _,
@@ -58,7 +62,7 @@ pub fn on_semantic_token_full_request(
             diff_to_end_of_slice(&file_text[index_of_last_token..iso_literal_start_index]);
 
         let file_path = relative_path_from_absolute_and_working_directory(
-            state.config.current_working_directory,
+            current_working_directory,
             &PathBuf::from(text_document.uri.path()),
         );
         let text_source = TextSource {
@@ -67,7 +71,7 @@ pub fn on_semantic_token_full_request(
                 iso_literal_start_index as u32,
                 (iso_literal_start_index + iso_literal_text.len()) as u32,
             )),
-            current_working_directory: state.config.current_working_directory,
+            current_working_directory,
         };
         let iso_literal_extraction_result = parse_iso_literal(
             iso_literal_text,
