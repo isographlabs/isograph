@@ -2,12 +2,13 @@ import {
   createIsographEnvironment,
   createIsographStore,
   IsographEnvironmentProvider,
+  IsographOperation,
 } from '@isograph/react';
 import type { AppProps } from 'next/app';
 import { useMemo } from 'react';
 
 function makeNetworkRequest<T>(
-  queryText: string,
+  operation: IsographOperation,
   variables: unknown,
 ): Promise<T> {
   const promise = fetch('https://api.github.com/graphql', {
@@ -16,7 +17,7 @@ function makeNetworkRequest<T>(
       Authorization: 'Bearer ' + process.env.NEXT_PUBLIC_GITHUB_TOKEN,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ query: queryText, variables }),
+    body: JSON.stringify({ query: operation.text, variables }),
   }).then(async (response) => {
     const json = await response.json();
 

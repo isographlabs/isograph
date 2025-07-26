@@ -6,18 +6,21 @@ use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::RefetchQueryIndex;
 use isograph_schema::{
-    ImperativelyLoadedFieldArtifactInfo, NetworkProtocol, Schema, REFETCH_FIELD_NAME,
+    Format, ImperativelyLoadedFieldArtifactInfo, NetworkProtocol, Schema, REFETCH_FIELD_NAME,
 };
 
 use crate::{
     generate_artifacts::{NormalizationAstText, QUERY_TEXT},
     normalization_ast_text::generate_normalization_ast_text,
+    operation_text::{generate_operation_text, OperationText},
+    persisted_documents::PersistedDocuments,
 };
 
 #[derive(Debug)]
 pub(crate) struct ImperativelyLoadedEntrypointArtifactInfo {
     pub normalization_ast_text: NormalizationAstText,
     pub query_text: QueryText,
+    pub operation_text: OperationText,
     pub root_fetchable_field: ClientScalarSelectableName,
     pub root_fetchable_field_parent_object: ServerObjectEntityName,
     pub refetch_query_index: RefetchQueryIndex,
@@ -78,6 +81,7 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
             normalization_ast_text: normalization_ast,
             concrete_type,
             refetch_query_index,
+            operation_text,
             ..
         } = self;
         let ts_file_extension = file_extensions.ts();
@@ -97,7 +101,7 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
             {}kind: \"RefetchQuery\",\n\
             {}networkRequestInfo: {{\n\
             {}  kind: \"NetworkRequestInfo\",\n\
-            {}  queryText,\n\
+            {}  operation: {operation_text},\n\
             {}  normalizationAst,\n\
             {}}},\n\
             {}concreteType: \"{concrete_type}\",\n\
@@ -121,6 +125,7 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field<TNetworkProtocol: Netwo
     schema: &Schema<TNetworkProtocol>,
     imperatively_loaded_field_artifact_info: ImperativelyLoadedFieldArtifactInfo,
     file_extensions: GenerateFileExtensionsOption,
+    persisted_documents: &mut Option<PersistedDocuments>,
 ) -> Vec<ArtifactPathAndContent> {
     let ImperativelyLoadedFieldArtifactInfo {
         merged_selection_set,
@@ -139,6 +144,18 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field<TNetworkProtocol: Netwo
         &merged_selection_set,
         variable_definitions.iter(),
         &root_operation_name,
+        Format::Pretty,
+    );
+
+    let operation_text = generate_operation_text(
+        query_name,
+        schema,
+        &merged_selection_set,
+        variable_definitions.iter(),
+        &root_operation_name,
+        concrete_type,
+        persisted_documents,
+        1,
     );
 
     let normalization_ast_text =
@@ -147,6 +164,7 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field<TNetworkProtocol: Netwo
     ImperativelyLoadedEntrypointArtifactInfo {
         normalization_ast_text,
         query_text,
+        operation_text,
         root_fetchable_field,
         root_fetchable_field_parent_object: root_parent_object,
         refetch_query_index,
