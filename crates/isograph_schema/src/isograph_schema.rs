@@ -108,15 +108,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             "Int",
             "number".intern().into(),
         );
-        let null_type_id = add_schema_defined_scalar_type(
-            &mut scalars,
-            &mut defined_types,
-            // The Null type should never be printed, at least for GraphQL.
-            // TODO we should make this an Option and emit an error (or less
-            // ideally, panic) if this is printed.
-            "NullDoesNotExistIfThisIsPrintedThisIsABug",
-            "number".intern().into(),
-        );
 
         Self {
             server_scalar_selectables: HashMap::new(),
@@ -136,7 +127,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 int_type_id,
                 float_type_id,
                 boolean_type_id,
-                null_type_id,
             },
             fetchable_types: BTreeMap::new(),
         }
@@ -350,9 +340,6 @@ pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
     pub float_type_id: ServerScalarEntityName,
     pub boolean_type_id: ServerScalarEntityName,
     pub int_type_id: ServerScalarEntityName,
-    // TODO restructure UnionTypeAnnotation to not have a nullable field, but to instead
-    // include null in its variants.
-    pub null_type_id: ServerScalarEntityName,
 }
 
 impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
