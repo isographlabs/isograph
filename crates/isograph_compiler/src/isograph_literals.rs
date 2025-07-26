@@ -128,7 +128,6 @@ pub fn parse_iso_literals_in_file_content(
 pub fn parse_iso_literal_in_source(
     db: &Database,
     iso_literals_source_id: SourceId<IsoLiteralsSource>,
-    current_working_directory: CurrentWorkingDirectory,
 ) -> Result<
     Vec<(IsoLiteralExtractionResult, TextSource)>,
     Vec<WithLocation<IsographLiteralParseError>>,
@@ -137,7 +136,12 @@ pub fn parse_iso_literal_in_source(
         relative_path,
         content,
     } = db.get(iso_literals_source_id);
-    parse_iso_literals_in_file_content(*relative_path, content, current_working_directory)
+
+    let current_working_directory = db
+        .get_singleton::<CurrentWorkingDirectory>()
+        .expect("Expected CurrentWorkingDirectory to have been set");
+
+    parse_iso_literals_in_file_content(*relative_path, content, *current_working_directory)
 }
 
 #[allow(clippy::type_complexity)]

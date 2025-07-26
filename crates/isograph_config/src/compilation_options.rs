@@ -29,8 +29,6 @@ pub struct CompilerConfig {
 
     /// Various options that are of lesser importance
     pub options: CompilerConfigOptions,
-
-    pub current_working_directory: CurrentWorkingDirectory,
 }
 
 #[derive(Default, Debug, Clone)]
@@ -160,9 +158,7 @@ pub fn create_config(
 
     CompilerConfig {
         config_location: config_location.canonicalize().unwrap_or_else(|_| {
-            panic!(
-                "Unable to canonicalize config_file at {config_location:?}."
-            )
+            panic!("Unable to canonicalize config_file at {config_location:?}.")
         }),
         project_root: project_root_dir.canonicalize().unwrap_or_else(|_| {
             panic!(
@@ -202,15 +198,14 @@ pub fn create_config(
                         .canonicalize()
                         .unwrap_or_else(|_| {
                             panic!(
-                                "Unable to canonicalize schema extension path. Does {schema_extension:?} exist?"
+                                "Unable to canonicalize schema extension path. \
+                                Does {schema_extension:?} exist?"
                             )
                         }),
                 )
             })
             .collect(),
         options: create_options(config_parsed.options),
-
-        current_working_directory,
     }
 }
 

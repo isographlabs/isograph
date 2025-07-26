@@ -31,8 +31,10 @@ impl CompilerState {
         config_location: PathBuf,
         current_working_directory: CurrentWorkingDirectory,
     ) -> Self {
+        let mut db = Database::new();
+        db.set(current_working_directory);
         Self {
-            db: Database::new(),
+            db,
             config: create_config(config_location, current_working_directory),
             source_files: None,
             last_gc_run: Instant::now(),
