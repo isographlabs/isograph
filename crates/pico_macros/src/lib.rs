@@ -8,7 +8,7 @@ use proc_macro::TokenStream;
 
 #[proc_macro_attribute]
 pub fn memo(args: TokenStream, input: TokenStream) -> TokenStream {
-    memo_macro::memo(args, input)
+    memo_macro::memo_macro(args, input)
 }
 
 #[proc_macro_derive(Source, attributes(key))]
