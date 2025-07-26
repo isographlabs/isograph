@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, Data, DeriveInput, Error, Fields};
 
-pub(crate) fn source(item: TokenStream) -> TokenStream {
+pub(crate) fn source_macro(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
     let struct_name = input.ident.clone();
 
