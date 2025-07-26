@@ -52,7 +52,13 @@ const artifact: RefetchQueryNormalizationArtifact = {
   kind: "RefetchQuery",
   networkRequestInfo: {
     kind: "NetworkRequestInfo",
-    queryText,
+    operation: {
+      kind: "Operation",
+      documentId: null,
+      operationName: "Query__make_super",
+      operationKind: "Mutation",
+      text: queryText,
+    },
     normalizationAst,
   },
   concreteType: "Mutation",

@@ -40,6 +40,7 @@ pub struct CompilerConfigOptions {
     pub include_file_extensions_in_import_statements: GenerateFileExtensionsOption,
     pub module: JavascriptModule,
     pub generated_file_header: Option<GeneratedFileHeader>,
+    pub persisted_documents: Option<PersistedDocumentsOptions>,
 }
 
 #[derive(Default, Debug, Clone, Copy)]
@@ -96,6 +97,19 @@ pub enum JavascriptModule {
     CommonJs,
     #[default]
     EsModule,
+}
+
+#[derive(Debug, Clone)]
+pub struct PersistedDocumentsOptions {
+    pub file: Option<PathBuf>,
+    pub algorithm: PersistedDocumentsHashAlgorithm,
+}
+
+#[derive(Default, Debug, Clone, Copy)]
+pub enum PersistedDocumentsHashAlgorithm {
+    Md5,
+    #[default]
+    Sha256,
 }
 
 /// This struct is deserialized from an isograph.config.json file.
@@ -231,6 +245,8 @@ pub struct ConfigFileOptions {
     pub module: ConfigFileJavascriptModule,
     /// A string to generate, in a comment, at the top of every generated file.
     generated_file_header: Option<String>,
+    /// Persisted documents options
+    persisted_documents: Option<ConfigFilePersistedDocumentsOptions>,
 }
 
 #[derive(Deserialize, Debug, Clone, Copy, JsonSchema)]
@@ -258,6 +274,24 @@ pub enum ConfigFileJavascriptModule {
     EsModule,
 }
 
+#[derive(Deserialize, Default, JsonSchema, Debug)]
+#[serde(default, deny_unknown_fields)]
+pub struct ConfigFilePersistedDocumentsOptions {
+    /// The file name for the persisted documents
+    /// Defaults to `persisted_documents.json`
+    pub file: Option<PathBuf>,
+    /// The hashing algorithm used to compute document hashes.
+    pub algorithm: ConfigFilePersistedDocumentsHashAlgorithm,
+}
+
+#[derive(Deserialize, Default, Debug, Clone, Copy, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum ConfigFilePersistedDocumentsHashAlgorithm {
+    Md5,
+    #[default]
+    Sha256,
+}
+
 fn create_options(options: ConfigFileOptions) -> CompilerConfigOptions {
     if let Some(header) = options.generated_file_header.as_ref() {
         let line_count = header.lines().count();
@@ -276,6 +310,7 @@ fn create_options(options: ConfigFileOptions) -> CompilerConfigOptions {
         ),
         module: create_module(options.module),
         generated_file_header,
+        persisted_documents: create_persisted_documents(options.persisted_documents),
     }
 }
 
@@ -303,6 +338,23 @@ fn create_module(module: ConfigFileJavascriptModule) -> JavascriptModule {
         ConfigFileJavascriptModule::CommonJs => JavascriptModule::CommonJs,
         ConfigFileJavascriptModule::EsModule => JavascriptModule::EsModule,
     }
+}
+
+fn create_persisted_documents(
+    persisted_documents: Option<ConfigFilePersistedDocumentsOptions>,
+) -> Option<PersistedDocumentsOptions> {
+    persisted_documents.map(|options| {
+        let algorithm = match options.algorithm {
+            ConfigFilePersistedDocumentsHashAlgorithm::Md5 => PersistedDocumentsHashAlgorithm::Md5,
+            ConfigFilePersistedDocumentsHashAlgorithm::Sha256 => {
+                PersistedDocumentsHashAlgorithm::Sha256
+            }
+        };
+        PersistedDocumentsOptions {
+            file: options.file,
+            algorithm,
+        }
+    })
 }
 
 pub fn absolute_and_relative_paths(
