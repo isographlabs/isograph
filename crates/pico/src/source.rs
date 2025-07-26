@@ -9,6 +9,10 @@ pub trait Source {
     fn get_key(&self) -> Key;
 }
 
+pub trait Singleton: Source {
+    fn get_singleton_key() -> Key;
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct SourceId<T> {
     pub key: Key,
@@ -37,6 +41,15 @@ impl<T> SourceId<T> {
     pub fn new(source: &impl Source) -> Self {
         Self {
             key: source.get_key(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<T> From<Key> for SourceId<T> {
+    fn from(key: Key) -> Self {
+        Self {
+            key,
             phantom: PhantomData,
         }
     }

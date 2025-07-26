@@ -2,7 +2,7 @@
 macro_rules! u64_newtype {
     ($named:ident) => {
         #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Default)]
-        pub struct $named(u64);
+        pub struct $named(pub u64);
 
         impl std::fmt::Display for $named {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

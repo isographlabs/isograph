@@ -1,5 +1,5 @@
 mod memo_macro;
-mod singleton;
+mod singleton_macro;
 mod source_macro;
 
 extern crate proc_macro2;
@@ -18,5 +18,5 @@ pub fn source(input: TokenStream) -> TokenStream {
 
 #[proc_macro_derive(Singleton)]
 pub fn singleton(input: TokenStream) -> TokenStream {
-    singleton::singleton(input)
+    singleton_macro::singleton_macro(input)
 }
