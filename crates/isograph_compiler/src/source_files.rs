@@ -44,193 +44,199 @@ pub fn read_all_source_files(db: &mut Database) -> Result<SourceFiles, Box<dyn E
     })
 }
 
-impl SourceFiles {
-    pub fn read_updates(
-        &mut self,
-        db: &mut Database,
-        changes: &[SourceFileEvent],
-    ) -> Result<(), Box<dyn Error>> {
-        let errors = changes
-            .iter()
-            .filter_map(|(event, change_kind)| match change_kind {
-                ChangedFileKind::Config => {
-                    panic!(
-                        "Unexpected config file change. This is indicative of a bug in Isograph."
-                    );
-                }
-                ChangedFileKind::Schema => self.handle_update_schema(db, event).err(),
-                ChangedFileKind::SchemaExtension => {
-                    self.handle_update_schema_extensions(db, event).err()
-                }
-                ChangedFileKind::JavaScriptSourceFile => {
-                    self.handle_update_source_file(db, event).err()
-                }
-                ChangedFileKind::JavaScriptSourceFolder => {
-                    self.handle_update_source_folder(db, event).err()
-                }
-            })
-            .collect::<Vec<_>>();
-        if !errors.is_empty() {
-            Err(BatchCompileError::MultipleErrors { messages: errors }.into())
-        } else {
-            Ok(())
-        }
-    }
-
-    fn handle_update_schema(
-        &mut self,
-        db: &mut Database,
-        event_kind: &SourceEventKind,
-    ) -> Result<(), Box<dyn Error>> {
-        let schema = get_isograph_config(db).schema.clone();
-        match event_kind {
-            SourceEventKind::CreateOrModify(_) => {
-                self.sources.schema_source_id = read_schema(db, &schema)?;
+pub fn read_updates(
+    db: &mut Database,
+    source_files: &mut SourceFiles,
+    changes: &[SourceFileEvent],
+) -> Result<(), Box<dyn Error>> {
+    let errors = changes
+        .iter()
+        .filter_map(|(event, change_kind)| match change_kind {
+            ChangedFileKind::Config => {
+                panic!("Unexpected config file change. This is indicative of a bug in Isograph.");
             }
-            SourceEventKind::Rename((_, target_path)) => {
-                if schema.absolute_path != *target_path {
-                    return Err(Box::new(BatchCompileError::SchemaNotFound));
-                }
+            ChangedFileKind::Schema => handle_update_schema(db, source_files, event).err(),
+            ChangedFileKind::SchemaExtension => {
+                handle_update_schema_extensions(db, source_files, event).err()
             }
-            SourceEventKind::Remove(_) => return Err(Box::new(BatchCompileError::SchemaNotFound)),
-        }
+            ChangedFileKind::JavaScriptSourceFile => {
+                handle_update_source_file(db, source_files, event).err()
+            }
+            ChangedFileKind::JavaScriptSourceFolder => {
+                handle_update_source_folder(db, source_files, event).err()
+            }
+        })
+        .collect::<Vec<_>>();
+    if !errors.is_empty() {
+        Err(BatchCompileError::MultipleErrors { messages: errors }.into())
+    } else {
         Ok(())
     }
+}
 
-    fn handle_update_schema_extensions(
-        &mut self,
-        db: &mut Database,
-        event_kind: &SourceEventKind,
-    ) -> Result<(), Box<dyn Error>> {
-        match event_kind {
-            SourceEventKind::CreateOrModify(path) => {
-                self.create_or_update_schema_extension(db, path)?;
+fn handle_update_schema(
+    db: &mut Database,
+    source_files: &mut SourceFiles,
+    event_kind: &SourceEventKind,
+) -> Result<(), Box<dyn Error>> {
+    let schema = get_isograph_config(db).schema.clone();
+    match event_kind {
+        SourceEventKind::CreateOrModify(_) => {
+            source_files.sources.schema_source_id = read_schema(db, &schema)?;
+        }
+        SourceEventKind::Rename((_, target_path)) => {
+            if schema.absolute_path != *target_path {
+                return Err(Box::new(BatchCompileError::SchemaNotFound));
             }
-            SourceEventKind::Rename((source_path, target_path)) => {
-                if get_isograph_config(db)
-                    .schema_extensions
-                    .iter()
-                    .any(|x| x.absolute_path == *target_path)
-                {
-                    self.create_or_update_schema_extension(db, target_path)?;
-                } else {
-                    let interned_file_path = relative_path_from_absolute_and_working_directory(
-                        get_current_working_directory(db),
-                        source_path,
-                    );
-                    self.sources
-                        .schema_extension_sources
-                        .remove(&interned_file_path);
-                }
-            }
-            SourceEventKind::Remove(path) => {
+        }
+        SourceEventKind::Remove(_) => return Err(Box::new(BatchCompileError::SchemaNotFound)),
+    }
+    Ok(())
+}
+
+fn handle_update_schema_extensions(
+    db: &mut Database,
+    source_files: &mut SourceFiles,
+    event_kind: &SourceEventKind,
+) -> Result<(), Box<dyn Error>> {
+    match event_kind {
+        SourceEventKind::CreateOrModify(path) => {
+            create_or_update_schema_extension(db, source_files, path)?;
+        }
+        SourceEventKind::Rename((source_path, target_path)) => {
+            if get_isograph_config(db)
+                .schema_extensions
+                .iter()
+                .any(|x| x.absolute_path == *target_path)
+            {
+                create_or_update_schema_extension(db, source_files, target_path)?;
+            } else {
                 let interned_file_path = relative_path_from_absolute_and_working_directory(
                     get_current_working_directory(db),
-                    path,
+                    source_path,
                 );
-                self.sources
+                source_files
+                    .sources
                     .schema_extension_sources
                     .remove(&interned_file_path);
             }
         }
-        Ok(())
+        SourceEventKind::Remove(path) => {
+            let interned_file_path = relative_path_from_absolute_and_working_directory(
+                get_current_working_directory(db),
+                path,
+            );
+            source_files
+                .sources
+                .schema_extension_sources
+                .remove(&interned_file_path);
+        }
     }
+    Ok(())
+}
 
-    fn create_or_update_schema_extension(
-        &mut self,
-        db: &mut Database,
-        path: &Path,
-    ) -> Result<(), Box<dyn Error>> {
-        let absolute_and_relative =
-            absolute_and_relative_paths(get_current_working_directory(db), path.to_path_buf());
-        let schema_id = read_schema(db, &absolute_and_relative)?;
-        self.sources
-            .schema_extension_sources
-            .insert(absolute_and_relative.relative_path, schema_id);
-        Ok(())
-    }
+fn create_or_update_schema_extension(
+    db: &mut Database,
+    source_files: &mut SourceFiles,
+    path: &Path,
+) -> Result<(), Box<dyn Error>> {
+    let absolute_and_relative =
+        absolute_and_relative_paths(get_current_working_directory(db), path.to_path_buf());
+    let schema_id = read_schema(db, &absolute_and_relative)?;
+    source_files
+        .sources
+        .schema_extension_sources
+        .insert(absolute_and_relative.relative_path, schema_id);
+    Ok(())
+}
 
-    fn handle_update_source_file(
-        &mut self,
-        db: &mut Database,
-        event_kind: &SourceEventKind,
-    ) -> Result<(), Box<dyn Error>> {
-        match event_kind {
-            SourceEventKind::CreateOrModify(path) => {
-                self.create_or_update_iso_literals(db, path)?;
-            }
-            SourceEventKind::Rename((source_path, target_path)) => {
-                let source_file_path = relative_path_from_absolute_and_working_directory(
-                    get_current_working_directory(db),
-                    source_path,
-                );
-                if self.iso_literals.0.remove(&source_file_path).is_some() {
-                    self.create_or_update_iso_literals(db, target_path)?
-                }
-            }
-            SourceEventKind::Remove(path) => {
-                let interned_file_path = relative_path_from_absolute_and_working_directory(
-                    get_current_working_directory(db),
-                    path,
-                );
-                self.iso_literals.0.remove(&interned_file_path);
+fn handle_update_source_file(
+    db: &mut Database,
+    source_files: &mut SourceFiles,
+    event_kind: &SourceEventKind,
+) -> Result<(), Box<dyn Error>> {
+    match event_kind {
+        SourceEventKind::CreateOrModify(path) => {
+            create_or_update_iso_literals(db, source_files, path)?;
+        }
+        SourceEventKind::Rename((source_path, target_path)) => {
+            let source_file_path = relative_path_from_absolute_and_working_directory(
+                get_current_working_directory(db),
+                source_path,
+            );
+            if source_files
+                .iso_literals
+                .0
+                .remove(&source_file_path)
+                .is_some()
+            {
+                create_or_update_iso_literals(db, source_files, target_path)?
             }
         }
-        Ok(())
-    }
-
-    fn create_or_update_iso_literals(
-        &mut self,
-        db: &mut Database,
-        path: &Path,
-    ) -> Result<(), Box<dyn Error>> {
-        let (relative_path, content) =
-            read_file(path.to_path_buf(), get_current_working_directory(db))?;
-        let source_id = db.set(IsoLiteralsSource {
-            relative_path,
-            content,
-        });
-        self.iso_literals.0.insert(relative_path, source_id);
-        Ok(())
-    }
-
-    fn handle_update_source_folder(
-        &mut self,
-        db: &mut Database,
-        event_kind: &SourceEventKind,
-    ) -> Result<(), Box<dyn Error>> {
-        match event_kind {
-            SourceEventKind::CreateOrModify(folder) => {
-                read_iso_literals_from_folder(db, &mut self.iso_literals, folder)?;
-            }
-            SourceEventKind::Rename((source_path, target_path)) => {
-                self.remove_iso_literals_from_folder(
-                    source_path,
-                    get_current_working_directory(db),
-                );
-                read_iso_literals_from_folder(db, &mut self.iso_literals, target_path)?;
-            }
-            SourceEventKind::Remove(path) => {
-                self.remove_iso_literals_from_folder(path, get_current_working_directory(db));
-            }
+        SourceEventKind::Remove(path) => {
+            let interned_file_path = relative_path_from_absolute_and_working_directory(
+                get_current_working_directory(db),
+                path,
+            );
+            source_files.iso_literals.0.remove(&interned_file_path);
         }
-        Ok(())
     }
+    Ok(())
+}
 
-    fn remove_iso_literals_from_folder(
-        &mut self,
-        folder: &PathBuf,
-        current_working_directory: CurrentWorkingDirectory,
-    ) {
-        let relative_path =
-            pathdiff::diff_paths(folder, PathBuf::from(current_working_directory.lookup()))
-                .expect("Expected path to be diffable")
-                .to_string_lossy()
-                .to_string();
-        self.iso_literals
-            .0
-            .retain(|file_path, _| !file_path.to_string().starts_with(&relative_path));
+fn create_or_update_iso_literals(
+    db: &mut Database,
+    source_files: &mut SourceFiles,
+    path: &Path,
+) -> Result<(), Box<dyn Error>> {
+    let (relative_path, content) =
+        read_file(path.to_path_buf(), get_current_working_directory(db))?;
+    let source_id = db.set(IsoLiteralsSource {
+        relative_path,
+        content,
+    });
+    source_files.iso_literals.0.insert(relative_path, source_id);
+    Ok(())
+}
+
+fn handle_update_source_folder(
+    db: &mut Database,
+    source_files: &mut SourceFiles,
+    event_kind: &SourceEventKind,
+) -> Result<(), Box<dyn Error>> {
+    match event_kind {
+        SourceEventKind::CreateOrModify(folder) => {
+            read_iso_literals_from_folder(db, &mut source_files.iso_literals, folder)?;
+        }
+        SourceEventKind::Rename((source_path, target_path)) => {
+            remove_iso_literals_from_folder(
+                source_files,
+                source_path,
+                get_current_working_directory(db),
+            );
+            read_iso_literals_from_folder(db, &mut source_files.iso_literals, target_path)?;
+        }
+        SourceEventKind::Remove(path) => {
+            remove_iso_literals_from_folder(source_files, path, get_current_working_directory(db));
+        }
     }
+    Ok(())
+}
+
+fn remove_iso_literals_from_folder(
+    source_files: &mut SourceFiles,
+    folder: &PathBuf,
+    current_working_directory: CurrentWorkingDirectory,
+) {
+    let relative_path =
+        pathdiff::diff_paths(folder, PathBuf::from(current_working_directory.lookup()))
+            .expect("Expected path to be diffable")
+            .to_string_lossy()
+            .to_string();
+    source_files
+        .iso_literals
+        .0
+        .retain(|file_path, _| !file_path.to_string().starts_with(&relative_path));
 }
 
 pub fn read_schema(

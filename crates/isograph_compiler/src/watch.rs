@@ -17,7 +17,7 @@ use crate::{
     batch_compile::print_result,
     compiler_state::{compile, CompilerState},
     db_singletons::get_isograph_config,
-    source_files::read_all_source_files,
+    source_files::{read_all_source_files, read_updates},
     with_duration::WithDuration,
 };
 
@@ -64,7 +64,7 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol<Sources = St
                         info!("{}", "File changes detected. Starting to compile.".cyan());
                         WithDuration::new(|| {
                             if let Some(source_files) = state.source_files.as_mut() {
-                                source_files.read_updates(&mut state.db, &changes)?;
+                                read_updates(&mut state.db, source_files, &changes)?;
                                 compile::<TNetworkProtocol>(&state.db, source_files)
                             } else {
                                 let source_files = read_all_source_files(&mut state.db)?;
