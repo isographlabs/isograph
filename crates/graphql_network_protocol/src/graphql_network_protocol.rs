@@ -1,17 +1,15 @@
-use std::{collections::BTreeMap, error::Error};
+use std::error::Error;
 
-use common_lang_types::{
-    DirectiveName, QueryOperationName, QueryText, RelativePathToSourceFile, WithLocation,
-};
+use common_lang_types::{DirectiveName, QueryOperationName, QueryText, WithLocation};
 use graphql_lang_types::{from_graphql_directive, DeserializationError};
 use intern::string_key::Intern;
-use isograph_lang_types::SchemaSource;
 use isograph_schema::{
     CreateAdditionalFieldsError, ExposeAsFieldToInsert, MergedSelectionMap, NetworkProtocol,
-    ProcessTypeSystemDocumentOutcome, RootOperationName, Schema, ValidatedVariableDefinition,
+    ProcessTypeSystemDocumentOutcome, RootOperationName, Schema, StandardSources,
+    ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
-use pico::{Database, SourceId};
+use pico::Database;
 
 use crate::{
     parse_graphql_schema,
@@ -30,10 +28,7 @@ lazy_static! {
 pub struct GraphQLNetworkProtocol {}
 
 impl NetworkProtocol for GraphQLNetworkProtocol {
-    type Sources = (
-        SourceId<SchemaSource>,
-        BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
-    );
+    type Sources = StandardSources;
 
     type SchemaObjectAssociatedData = GraphQLSchemaObjectAssociatedData;
 
