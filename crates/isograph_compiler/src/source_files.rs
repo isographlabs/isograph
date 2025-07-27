@@ -226,7 +226,7 @@ fn remove_iso_literals_from_folder(
         .retain(|file_path, _| !file_path.to_string().starts_with(&relative_path));
 }
 
-pub fn read_schema(
+fn read_schema(
     db: &mut Database,
     schema_path: &AbsolutePathAndRelativePath,
 ) -> Result<SourceId<SchemaSource>, Box<dyn Error>> {
@@ -278,7 +278,7 @@ fn read_schema_file(path: &PathBuf) -> Result<String, BatchCompileError> {
     Ok(contents)
 }
 
-pub fn read_schema_extensions(
+fn read_schema_extensions(
     db: &mut Database,
 ) -> Result<BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>, Box<dyn Error>> {
     let config_schema_extensions = get_isograph_config(db).schema_extensions.clone();
@@ -290,16 +290,14 @@ pub fn read_schema_extensions(
     Ok(schema_extensions)
 }
 
-pub fn read_iso_literals_from_project_root(
-    db: &mut Database,
-) -> Result<IsoLiteralMap, Box<dyn Error>> {
+fn read_iso_literals_from_project_root(db: &mut Database) -> Result<IsoLiteralMap, Box<dyn Error>> {
     let project_root = get_isograph_config(db).project_root.clone();
     let mut iso_literals = IsoLiteralMap(HashMap::new());
     read_iso_literals_from_folder(db, &mut iso_literals, &project_root)?;
     Ok(iso_literals)
 }
 
-pub fn read_iso_literals_from_folder(
+fn read_iso_literals_from_folder(
     db: &mut Database,
     iso_literals: &mut IsoLiteralMap,
     folder: &Path,
