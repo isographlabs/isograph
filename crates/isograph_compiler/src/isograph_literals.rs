@@ -17,7 +17,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{batch_compile::BatchCompileError, create_schema::ContainsIso};
+use crate::{
+    batch_compile::BatchCompileError, create_schema::ContainsIso,
+    db_singletons::get_current_working_directory,
+};
 
 pub fn read_files_in_folder(
     folder: &Path,
@@ -137,11 +140,7 @@ pub fn parse_iso_literal_in_source(
         content,
     } = db.get(iso_literals_source_id);
 
-    let current_working_directory = db
-        .get_singleton::<CurrentWorkingDirectory>()
-        .expect("Expected CurrentWorkingDirectory to have been set");
-
-    parse_iso_literals_in_file_content(*relative_path, content, *current_working_directory)
+    parse_iso_literals_in_file_content(*relative_path, content, get_current_working_directory(db))
 }
 
 #[allow(clippy::type_complexity)]

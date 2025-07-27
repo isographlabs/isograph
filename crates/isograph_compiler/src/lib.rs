@@ -2,6 +2,7 @@ mod add_selection_sets;
 pub mod batch_compile;
 mod compiler_state;
 mod create_schema;
+mod db_singletons;
 mod isograph_literals;
 mod source_files;
 pub mod watch;

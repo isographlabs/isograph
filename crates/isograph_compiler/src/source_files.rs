@@ -16,6 +16,7 @@ use pico::{Database, SourceId};
 
 use crate::{
     batch_compile::BatchCompileError,
+    db_singletons::get_current_working_directory,
     isograph_literals::{read_file, read_files_in_folder},
     watch::{ChangedFileKind, SourceEventKind, SourceFileEvent},
 };
@@ -101,9 +102,6 @@ impl SourceFiles {
                 self.create_or_update_schema_extension(db, path)?;
             }
             SourceEventKind::Rename((source_path, target_path)) => {
-                let current_working_directory = *db
-                    .get_singleton::<CurrentWorkingDirectory>()
-                    .expect("Expected CurrentWorkingDirectory to have been set");
                 if config
                     .schema_extensions
                     .iter()
@@ -112,18 +110,15 @@ impl SourceFiles {
                     self.create_or_update_schema_extension(db, target_path)?;
                 } else {
                     let interned_file_path = relative_path_from_absolute_and_working_directory(
-                        current_working_directory,
+                        get_current_working_directory(db),
                         source_path,
                     );
                     self.sources.1.remove(&interned_file_path);
                 }
             }
             SourceEventKind::Remove(path) => {
-                let current_working_directory = *db
-                    .get_singleton::<CurrentWorkingDirectory>()
-                    .expect("Expected CurrentWorkingDirectory to have been set");
                 let interned_file_path = relative_path_from_absolute_and_working_directory(
-                    current_working_directory,
+                    get_current_working_directory(db),
                     path,
                 );
                 self.sources.1.remove(&interned_file_path);
@@ -137,11 +132,8 @@ impl SourceFiles {
         db: &mut Database,
         path: &Path,
     ) -> Result<(), Box<dyn Error>> {
-        let current_working_directory = *db
-            .get_singleton::<CurrentWorkingDirectory>()
-            .expect("Expected CurrentWorkingDirectory to have been set");
         let absolute_and_relative =
-            absolute_and_relative_paths(current_working_directory, path.to_path_buf());
+            absolute_and_relative_paths(get_current_working_directory(db), path.to_path_buf());
         let schema_id = read_schema(db, &absolute_and_relative)?;
         self.sources
             .1
@@ -159,11 +151,8 @@ impl SourceFiles {
                 self.create_or_update_iso_literals(db, path)?;
             }
             SourceEventKind::Rename((source_path, target_path)) => {
-                let current_working_directory = *db
-                    .get_singleton::<CurrentWorkingDirectory>()
-                    .expect("Expected CurrentWorkingDirectory to have been set");
                 let source_file_path = relative_path_from_absolute_and_working_directory(
-                    current_working_directory,
+                    get_current_working_directory(db),
                     source_path,
                 );
                 if self.iso_literals.remove(&source_file_path).is_some() {
@@ -171,11 +160,8 @@ impl SourceFiles {
                 }
             }
             SourceEventKind::Remove(path) => {
-                let current_working_directory = *db
-                    .get_singleton::<CurrentWorkingDirectory>()
-                    .expect("Expected CurrentWorkingDirectory to have been set");
                 let interned_file_path = relative_path_from_absolute_and_working_directory(
-                    current_working_directory,
+                    get_current_working_directory(db),
                     path,
                 );
                 self.iso_literals.remove(&interned_file_path);
@@ -189,10 +175,8 @@ impl SourceFiles {
         db: &mut Database,
         path: &Path,
     ) -> Result<(), Box<dyn Error>> {
-        let current_working_directory = *db
-            .get_singleton::<CurrentWorkingDirectory>()
-            .expect("Expected CurrentWorkingDirectory to have been set");
-        let (relative_path, content) = read_file(path.to_path_buf(), current_working_directory)?;
+        let (relative_path, content) =
+            read_file(path.to_path_buf(), get_current_working_directory(db))?;
         let source_id = db.set(IsoLiteralsSource {
             relative_path,
             content,
@@ -211,17 +195,14 @@ impl SourceFiles {
                 read_iso_literals_from_folder(db, &mut self.iso_literals, folder)?;
             }
             SourceEventKind::Rename((source_path, target_path)) => {
-                let current_working_directory = *db
-                    .get_singleton::<CurrentWorkingDirectory>()
-                    .expect("Expected CurrentWorkingDirectory to have been set");
-                self.remove_iso_literals_from_folder(source_path, current_working_directory);
+                self.remove_iso_literals_from_folder(
+                    source_path,
+                    get_current_working_directory(db),
+                );
                 read_iso_literals_from_folder(db, &mut self.iso_literals, target_path)?;
             }
             SourceEventKind::Remove(path) => {
-                let current_working_directory = *db
-                    .get_singleton::<CurrentWorkingDirectory>()
-                    .expect("Expected CurrentWorkingDirectory to have been set");
-                self.remove_iso_literals_from_folder(path, current_working_directory);
+                self.remove_iso_literals_from_folder(path, get_current_working_directory(db));
             }
         }
         Ok(())
@@ -247,13 +228,10 @@ pub fn read_schema(
     schema_path: &AbsolutePathAndRelativePath,
 ) -> Result<SourceId<SchemaSource>, Box<dyn Error>> {
     let content = read_schema_file(&schema_path.absolute_path)?;
-    let current_working_directory = *db
-        .get_singleton::<CurrentWorkingDirectory>()
-        .expect("Expected CurrentWorkingDirectory to have been set");
     let text_source = TextSource {
         relative_path_to_source_file: schema_path.relative_path,
         span: None,
-        current_working_directory,
+        current_working_directory: get_current_working_directory(db),
     };
     let schema_id = db.set(SchemaSource {
         relative_path: schema_path.relative_path,
@@ -323,10 +301,8 @@ pub fn read_iso_literals_from_folder(
     iso_literals: &mut HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>,
     folder: &Path,
 ) -> Result<(), Box<dyn Error>> {
-    let current_working_directory = *db
-        .get_singleton::<CurrentWorkingDirectory>()
-        .expect("Expected CurrentWorkingDirectory to have been set");
-    for (relative_path, content) in read_files_in_folder(folder, current_working_directory)? {
+    for (relative_path, content) in read_files_in_folder(folder, get_current_working_directory(db))?
+    {
         let source_id = db.set(IsoLiteralsSource {
             relative_path,
             content,
