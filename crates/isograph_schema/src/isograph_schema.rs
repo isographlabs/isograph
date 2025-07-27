@@ -826,7 +826,8 @@ fn set_and_validate_id_field(
 // type, but for now, we get a source + set of extensions, and have to restrict
 // TNetworkProtocol accordingly. Perhaps the config can have a generic, and
 // thus we can thread this further back, but that is not yet implemented.
-pub type StandardSources = (
-    SourceId<SchemaSource>,
-    BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
-);
+#[derive(Debug, Clone)]
+pub struct StandardSources {
+    pub schema_source_id: SourceId<SchemaSource>,
+    pub schema_extension_sources: BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
+}

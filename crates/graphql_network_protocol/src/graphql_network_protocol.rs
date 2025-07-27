@@ -36,7 +36,10 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         db: &Database,
         sources: &Self::Sources,
     ) -> Result<ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>, Box<dyn Error>> {
-        let (schema_source_id, schema_extension_sources) = sources;
+        let StandardSources {
+            schema_source_id,
+            schema_extension_sources,
+        } = sources;
 
         let (type_system_document, type_system_extension_documents) =
             parse_graphql_schema(db, *schema_source_id, schema_extension_sources).to_owned()?;

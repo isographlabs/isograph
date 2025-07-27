@@ -30,11 +30,14 @@ pub struct SourceFiles {
 impl SourceFiles {
     pub fn read_all(db: &mut Database) -> Result<Self, Box<dyn Error>> {
         let schema = get_isograph_config(db).schema.clone();
-        let schema = read_schema(db, &schema)?;
-        let schema_extensions = read_schema_extensions(db)?;
+        let schema_source_id = read_schema(db, &schema)?;
+        let schema_extension_sources = read_schema_extensions(db)?;
         let iso_literals = read_iso_literals_from_project_root(db)?;
         Ok(Self {
-            sources: (schema, schema_extensions),
+            sources: StandardSources {
+                schema_source_id,
+                schema_extension_sources,
+            },
             iso_literals,
         })
     }
@@ -79,7 +82,7 @@ impl SourceFiles {
         let schema = get_isograph_config(db).schema.clone();
         match event_kind {
             SourceEventKind::CreateOrModify(_) => {
-                self.sources.0 = read_schema(db, &schema)?;
+                self.sources.schema_source_id = read_schema(db, &schema)?;
             }
             SourceEventKind::Rename((_, target_path)) => {
                 if schema.absolute_path != *target_path {
@@ -112,7 +115,9 @@ impl SourceFiles {
                         get_current_working_directory(db),
                         source_path,
                     );
-                    self.sources.1.remove(&interned_file_path);
+                    self.sources
+                        .schema_extension_sources
+                        .remove(&interned_file_path);
                 }
             }
             SourceEventKind::Remove(path) => {
@@ -120,7 +125,9 @@ impl SourceFiles {
                     get_current_working_directory(db),
                     path,
                 );
-                self.sources.1.remove(&interned_file_path);
+                self.sources
+                    .schema_extension_sources
+                    .remove(&interned_file_path);
             }
         }
         Ok(())
@@ -135,7 +142,7 @@ impl SourceFiles {
             absolute_and_relative_paths(get_current_working_directory(db), path.to_path_buf());
         let schema_id = read_schema(db, &absolute_and_relative)?;
         self.sources
-            .1
+            .schema_extension_sources
             .insert(absolute_and_relative.relative_path, schema_id);
         Ok(())
     }
