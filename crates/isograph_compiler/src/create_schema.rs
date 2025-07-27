@@ -13,28 +13,27 @@ use graphql_lang_types::{
 };
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_parser::IsoLiteralExtractionResult;
-use isograph_lang_types::{
-    ConstantValue, IsoLiteralsSource, SelectionType, TypeAnnotation, VariableDefinition,
-};
+use isograph_lang_types::{ConstantValue, SelectionType, TypeAnnotation, VariableDefinition};
 use isograph_schema::{
     validate_entrypoints, CreateAdditionalFieldsError, FieldToInsert, NetworkProtocol,
     ProcessObjectTypeDefinitionOutcome, ProcessTypeSystemDocumentOutcome, RootOperationName,
     Schema, ServerEntityName, ServerObjectSelectable, ServerObjectSelectableVariant,
     ServerScalarSelectable,
 };
-use pico::{Database, SourceId};
+use pico::Database;
 
 use crate::{
     add_selection_sets::add_selection_sets_to_client_selectables,
     batch_compile::BatchCompileError,
     db_singletons::get_isograph_config,
     isograph_literals::{parse_iso_literal_in_source, process_iso_literals},
+    source_files::IsoLiteralMap,
 };
 
 pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
     db: &Database,
     sources: &TNetworkProtocol::Sources,
-    iso_literals: &HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>,
+    iso_literals: &IsoLiteralMap,
 ) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), Box<dyn Error>> {
     let config = get_isograph_config(db);
     let ProcessTypeSystemDocumentOutcome { scalars, objects } =
@@ -148,11 +147,11 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
 
 fn parse_iso_literals(
     db: &Database,
-    iso_literals_sources: &HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>,
+    iso_literals_sources: &IsoLiteralMap,
 ) -> Result<ContainsIso, BatchCompileError> {
     let mut contains_iso = ContainsIso::default();
     let mut iso_literal_parse_errors = vec![];
-    for (relative_path, iso_literals_source_id) in iso_literals_sources.iter() {
+    for (relative_path, iso_literals_source_id) in iso_literals_sources.0.iter() {
         match parse_iso_literal_in_source(db, *iso_literals_source_id).to_owned() {
             Ok(iso_literals) => {
                 if !iso_literals.is_empty() {

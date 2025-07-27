@@ -24,8 +24,11 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct SourceFiles {
     pub sources: StandardSources,
-    pub iso_literals: HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>,
+    pub iso_literals: IsoLiteralMap,
 }
+
+#[derive(Debug, Clone)]
+pub struct IsoLiteralMap(pub HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>);
 
 impl SourceFiles {
     pub fn read_all(db: &mut Database) -> Result<Self, Box<dyn Error>> {
@@ -161,7 +164,7 @@ impl SourceFiles {
                     get_current_working_directory(db),
                     source_path,
                 );
-                if self.iso_literals.remove(&source_file_path).is_some() {
+                if self.iso_literals.0.remove(&source_file_path).is_some() {
                     self.create_or_update_iso_literals(db, target_path)?
                 }
             }
@@ -170,7 +173,7 @@ impl SourceFiles {
                     get_current_working_directory(db),
                     path,
                 );
-                self.iso_literals.remove(&interned_file_path);
+                self.iso_literals.0.remove(&interned_file_path);
             }
         }
         Ok(())
@@ -187,7 +190,7 @@ impl SourceFiles {
             relative_path,
             content,
         });
-        self.iso_literals.insert(relative_path, source_id);
+        self.iso_literals.0.insert(relative_path, source_id);
         Ok(())
     }
 
@@ -225,6 +228,7 @@ impl SourceFiles {
                 .to_string_lossy()
                 .to_string();
         self.iso_literals
+            .0
             .retain(|file_path, _| !file_path.to_string().starts_with(&relative_path));
     }
 }
@@ -295,16 +299,16 @@ pub fn read_schema_extensions(
 
 pub fn read_iso_literals_from_project_root(
     db: &mut Database,
-) -> Result<HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>, Box<dyn Error>> {
+) -> Result<IsoLiteralMap, Box<dyn Error>> {
     let project_root = get_isograph_config(db).project_root.clone();
-    let mut iso_literals = HashMap::new();
+    let mut iso_literals = IsoLiteralMap(HashMap::new());
     read_iso_literals_from_folder(db, &mut iso_literals, &project_root)?;
     Ok(iso_literals)
 }
 
 pub fn read_iso_literals_from_folder(
     db: &mut Database,
-    iso_literals: &mut HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>,
+    iso_literals: &mut IsoLiteralMap,
     folder: &Path,
 ) -> Result<(), Box<dyn Error>> {
     for (relative_path, content) in read_files_in_folder(folder, get_current_working_directory(db))?
@@ -313,7 +317,7 @@ pub fn read_iso_literals_from_folder(
             relative_path,
             content,
         });
-        iso_literals.insert(relative_path, source_id);
+        iso_literals.0.insert(relative_path, source_id);
     }
     Ok(())
 }
