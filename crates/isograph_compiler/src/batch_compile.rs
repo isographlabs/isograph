@@ -2,7 +2,7 @@ use std::{path::PathBuf, str::Utf8Error};
 
 use crate::{
     compiler_state::{compile, CompilerState},
-    source_files::SourceFiles,
+    source_files::read_all_source_files,
     with_duration::WithDuration,
 };
 use colored::Colorize;
@@ -26,7 +26,7 @@ pub fn compile_and_print<TNetworkProtocol: NetworkProtocol<Sources = StandardSou
     info!("{}", "Starting to compile.".cyan());
     print_result(WithDuration::new(|| {
         let mut state = CompilerState::new(config_location, current_working_directory);
-        let sources = SourceFiles::read_all(&mut state.db)?;
+        let sources = read_all_source_files(&mut state.db)?;
         compile::<TNetworkProtocol>(&state.db, &sources)
     }))
 }

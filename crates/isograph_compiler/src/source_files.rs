@@ -30,21 +30,21 @@ pub struct SourceFiles {
 #[derive(Debug, Clone)]
 pub struct IsoLiteralMap(pub HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>);
 
-impl SourceFiles {
-    pub fn read_all(db: &mut Database) -> Result<Self, Box<dyn Error>> {
-        let schema = get_isograph_config(db).schema.clone();
-        let schema_source_id = read_schema(db, &schema)?;
-        let schema_extension_sources = read_schema_extensions(db)?;
-        let iso_literals = read_iso_literals_from_project_root(db)?;
-        Ok(Self {
-            sources: StandardSources {
-                schema_source_id,
-                schema_extension_sources,
-            },
-            iso_literals,
-        })
-    }
+pub fn read_all_source_files(db: &mut Database) -> Result<SourceFiles, Box<dyn Error>> {
+    let schema = get_isograph_config(db).schema.clone();
+    let schema_source_id = read_schema(db, &schema)?;
+    let schema_extension_sources = read_schema_extensions(db)?;
+    let iso_literals = read_iso_literals_from_project_root(db)?;
+    Ok(SourceFiles {
+        sources: StandardSources {
+            schema_source_id,
+            schema_extension_sources,
+        },
+        iso_literals,
+    })
+}
 
+impl SourceFiles {
     pub fn read_updates(
         &mut self,
         db: &mut Database,

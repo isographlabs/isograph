@@ -17,7 +17,7 @@ use crate::{
     batch_compile::print_result,
     compiler_state::{compile, CompilerState},
     db_singletons::get_isograph_config,
-    source_files::SourceFiles,
+    source_files::read_all_source_files,
     with_duration::WithDuration,
 };
 
@@ -35,7 +35,7 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol<Sources = St
 
     info!("{}", "Starting to compile.".cyan());
     let _ = print_result(WithDuration::new(|| {
-        let source_files = SourceFiles::read_all(&mut state.db)?;
+        let source_files = read_all_source_files(&mut state.db)?;
         let result = compile::<TNetworkProtocol>(&state.db, &source_files);
         state.source_files = Some(source_files);
         result
@@ -55,7 +55,7 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol<Sources = St
                         watcher.stop();
                         (rx, watcher) = create_debounced_file_watcher(&config);
                         WithDuration::new(|| {
-                            let source_files = SourceFiles::read_all(&mut state.db)?;
+                            let source_files = read_all_source_files(&mut state.db)?;
                             let result = compile::<TNetworkProtocol>(&state.db, &source_files);
                             state.source_files = Some(source_files);
                             result
@@ -67,7 +67,7 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol<Sources = St
                                 source_files.read_updates(&mut state.db, &changes)?;
                                 compile::<TNetworkProtocol>(&state.db, source_files)
                             } else {
-                                let source_files = SourceFiles::read_all(&mut state.db)?;
+                                let source_files = read_all_source_files(&mut state.db)?;
                                 let result = compile::<TNetworkProtocol>(&state.db, &source_files);
                                 state.source_files = Some(source_files);
                                 result
@@ -79,7 +79,7 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol<Sources = St
                             "Too many changes. Starting a full compilation.".cyan()
                         );
                         WithDuration::new(|| {
-                            let source_files = SourceFiles::read_all(&mut state.db)?;
+                            let source_files = read_all_source_files(&mut state.db)?;
                             let result = compile::<TNetworkProtocol>(&state.db, &source_files);
                             state.source_files = Some(source_files);
                             result
