@@ -38,6 +38,7 @@ where
         selection_map: &MergedSelectionMap,
         query_variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
         root_operation_name: &RootOperationName,
+        format: Format,
     ) -> QueryText;
 }
 
@@ -85,4 +86,10 @@ pub struct ExposeAsFieldToInsert {
     // e.g. Query or Mutation
     pub parent_object_name: ServerObjectEntityName,
     pub description: Option<DescriptionValue>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Format {
+    Pretty,
+    Compact,
 }

@@ -7,8 +7,9 @@ use graphql_lang_types::{from_graphql_directive, DeserializationError};
 use intern::string_key::Intern;
 use isograph_lang_types::SchemaSource;
 use isograph_schema::{
-    CreateAdditionalFieldsError, ExposeAsFieldToInsert, MergedSelectionMap, NetworkProtocol,
-    ProcessTypeSystemDocumentOutcome, RootOperationName, Schema, ValidatedVariableDefinition,
+    CreateAdditionalFieldsError, ExposeAsFieldToInsert, Format, MergedSelectionMap,
+    NetworkProtocol, ProcessTypeSystemDocumentOutcome, RootOperationName, Schema,
+    ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
 use pico::{Database, SourceId};
@@ -125,6 +126,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         selection_map: &MergedSelectionMap,
         query_variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
         root_operation_name: &RootOperationName,
+        format: Format,
     ) -> QueryText {
         generate_query_text(
             query_name,
@@ -132,6 +134,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             selection_map,
             query_variables,
             root_operation_name,
+            format,
         )
     }
 }

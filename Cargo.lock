@@ -756,12 +756,16 @@ version = "0.3.1"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
+ "hex",
  "intern",
  "isograph_config",
  "isograph_lang_types",
  "isograph_schema",
  "lazy_static",
+ "md-5",
  "pathdiff",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]
