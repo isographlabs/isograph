@@ -13,7 +13,7 @@ use pico::Database;
 use crate::{
     batch_compile::{BatchCompileError, CompilationStats},
     create_schema::create_schema,
-    db_singletons::{get_iso_literal_map, get_isograph_config, get_standard_sources},
+    db_singletons::get_isograph_config,
     write_artifacts::write_artifacts_to_disk,
 };
 
@@ -80,12 +80,8 @@ impl CompilerState {
 pub fn compile<TNetworkProtocol: NetworkProtocol<Sources = StandardSources>>(
     db: &Database,
 ) -> Result<CompilationStats, Box<dyn Error>> {
-    let standard_sources = get_standard_sources(db);
-    let iso_literal_map = get_iso_literal_map(db);
-
     // Create schema
-    let (isograph_schema, stats) =
-        create_schema::<TNetworkProtocol>(db, standard_sources, iso_literal_map)?;
+    let (isograph_schema, stats) = create_schema::<TNetworkProtocol>(db)?;
 
     validate_use_of_arguments(&isograph_schema).map_err(|messages| {
         Box::new(BatchCompileError::MultipleErrorsWithLocations {
