@@ -36,8 +36,8 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol<Sources = St
     info!("{}", "Starting to compile.".cyan());
     let _ = print_result(WithDuration::new(|| {
         read_all_source_files(&mut state.db)?;
-        let result = compile::<TNetworkProtocol>(&state.db);
-        result
+
+        compile::<TNetworkProtocol>(&state.db)
     }));
 
     while let Some(res) = rx.recv().await {
@@ -55,8 +55,8 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol<Sources = St
                         (rx, watcher) = create_debounced_file_watcher(&config);
                         WithDuration::new(|| {
                             read_all_source_files(&mut state.db)?;
-                            let result = compile::<TNetworkProtocol>(&state.db);
-                            result
+
+                            compile::<TNetworkProtocol>(&state.db)
                         })
                     } else if changes.len() < MAX_CHANGED_FILES {
                         info!("{}", "File changes detected. Starting to compile.".cyan());
@@ -71,8 +71,8 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol<Sources = St
                         );
                         WithDuration::new(|| {
                             read_all_source_files(&mut state.db)?;
-                            let result = compile::<TNetworkProtocol>(&state.db);
-                            result
+
+                            compile::<TNetworkProtocol>(&state.db)
                         })
                     };
                     let _ = print_result(result);
