@@ -86,7 +86,7 @@ pub fn compile<TNetworkProtocol: NetworkProtocol<Sources = StandardSources>>(
 ) -> Result<CompilationStats, Box<dyn Error>> {
     // Create schema
     let (isograph_schema, stats) =
-        create_schema::<TNetworkProtocol>(db, &source_files.sources, &source_files.iso_literals)?;
+        create_schema::<TNetworkProtocol>(db, &source_files.0, &source_files.1)?;
 
     validate_use_of_arguments(&isograph_schema).map_err(|messages| {
         Box::new(BatchCompileError::MultipleErrorsWithLocations {

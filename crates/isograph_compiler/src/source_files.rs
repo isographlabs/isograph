@@ -21,11 +21,7 @@ use crate::{
     watch::{ChangedFileKind, SourceEventKind, SourceFileEvent},
 };
 
-#[derive(Debug, Clone)]
-pub struct SourceFiles {
-    pub sources: StandardSources,
-    pub iso_literals: IsoLiteralMap,
-}
+pub type SourceFiles = (StandardSources, IsoLiteralMap);
 
 #[derive(Debug, Clone)]
 pub struct IsoLiteralMap(pub HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>);
@@ -35,13 +31,13 @@ pub fn read_all_source_files(db: &mut Database) -> Result<SourceFiles, Box<dyn E
     let schema_source_id = read_schema(db, &schema)?;
     let schema_extension_sources = read_schema_extensions(db)?;
     let iso_literals = read_iso_literals_from_project_root(db)?;
-    Ok(SourceFiles {
-        sources: StandardSources {
+    Ok((
+        StandardSources {
             schema_source_id,
             schema_extension_sources,
         },
         iso_literals,
-    })
+    ))
 }
 
 pub fn read_updates(
@@ -82,7 +78,7 @@ fn handle_update_schema(
     let schema = get_isograph_config(db).schema.clone();
     match event_kind {
         SourceEventKind::CreateOrModify(_) => {
-            source_files.sources.schema_source_id = read_schema(db, &schema)?;
+            source_files.0.schema_source_id = read_schema(db, &schema)?;
         }
         SourceEventKind::Rename((_, target_path)) => {
             if schema.absolute_path != *target_path {
@@ -116,7 +112,7 @@ fn handle_update_schema_extensions(
                     source_path,
                 );
                 source_files
-                    .sources
+                    .0
                     .schema_extension_sources
                     .remove(&interned_file_path);
             }
@@ -127,7 +123,7 @@ fn handle_update_schema_extensions(
                 path,
             );
             source_files
-                .sources
+                .0
                 .schema_extension_sources
                 .remove(&interned_file_path);
         }
@@ -144,7 +140,7 @@ fn create_or_update_schema_extension(
         absolute_and_relative_paths(get_current_working_directory(db), path.to_path_buf());
     let schema_id = read_schema(db, &absolute_and_relative)?;
     source_files
-        .sources
+        .0
         .schema_extension_sources
         .insert(absolute_and_relative.relative_path, schema_id);
     Ok(())
@@ -164,12 +160,7 @@ fn handle_update_source_file(
                 get_current_working_directory(db),
                 source_path,
             );
-            if source_files
-                .iso_literals
-                .0
-                .remove(&source_file_path)
-                .is_some()
-            {
+            if source_files.1 .0.remove(&source_file_path).is_some() {
                 create_or_update_iso_literals(db, source_files, target_path)?
             }
         }
@@ -178,7 +169,7 @@ fn handle_update_source_file(
                 get_current_working_directory(db),
                 path,
             );
-            source_files.iso_literals.0.remove(&interned_file_path);
+            source_files.1 .0.remove(&interned_file_path);
         }
     }
     Ok(())
@@ -195,7 +186,7 @@ fn create_or_update_iso_literals(
         relative_path,
         content,
     });
-    source_files.iso_literals.0.insert(relative_path, source_id);
+    source_files.1 .0.insert(relative_path, source_id);
     Ok(())
 }
 
@@ -206,7 +197,7 @@ fn handle_update_source_folder(
 ) -> Result<(), Box<dyn Error>> {
     match event_kind {
         SourceEventKind::CreateOrModify(folder) => {
-            read_iso_literals_from_folder(db, &mut source_files.iso_literals, folder)?;
+            read_iso_literals_from_folder(db, &mut source_files.1, folder)?;
         }
         SourceEventKind::Rename((source_path, target_path)) => {
             remove_iso_literals_from_folder(
@@ -214,7 +205,7 @@ fn handle_update_source_folder(
                 source_path,
                 get_current_working_directory(db),
             );
-            read_iso_literals_from_folder(db, &mut source_files.iso_literals, target_path)?;
+            read_iso_literals_from_folder(db, &mut source_files.1, target_path)?;
         }
         SourceEventKind::Remove(path) => {
             remove_iso_literals_from_folder(source_files, path, get_current_working_directory(db));
@@ -234,8 +225,8 @@ fn remove_iso_literals_from_folder(
             .to_string_lossy()
             .to_string();
     source_files
-        .iso_literals
-        .0
+        .1
+         .0
         .retain(|file_path, _| !file_path.to_string().starts_with(&relative_path));
 }
 
