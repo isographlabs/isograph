@@ -13,59 +13,68 @@ use isograph_config::absolute_and_relative_paths;
 use isograph_lang_types::{IsoLiteralsSource, SchemaSource};
 use isograph_schema::StandardSources;
 use pico::{Database, SourceId};
+use pico_macros::Singleton;
 
 use crate::{
     batch_compile::BatchCompileError,
-    db_singletons::{get_current_working_directory, get_isograph_config},
+    db_singletons::{
+        get_current_working_directory, get_iso_literal_map, get_isograph_config,
+        get_standard_sources,
+    },
     isograph_literals::{read_file, read_files_in_folder},
     watch::{ChangedFileKind, SourceEventKind, SourceFileEvent},
 };
 
-pub type SourceFiles = (StandardSources, IsoLiteralMap);
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Singleton, PartialEq, Eq)]
 pub struct IsoLiteralMap(pub HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>);
 
-pub fn read_all_source_files(db: &mut Database) -> Result<SourceFiles, Box<dyn Error>> {
+pub fn read_all_source_files(db: &mut Database) -> Result<(), Box<dyn Error>> {
     let schema = get_isograph_config(db).schema.clone();
     let schema_source_id = read_schema(db, &schema)?;
     let schema_extension_sources = read_schema_extensions(db)?;
-    let iso_literals = read_iso_literals_from_project_root(db)?;
-    Ok((
-        StandardSources {
-            schema_source_id,
-            schema_extension_sources,
-        },
-        iso_literals,
-    ))
+    let iso_literal_map = read_iso_literals_from_project_root(db)?;
+
+    db.set(StandardSources {
+        schema_source_id,
+        schema_extension_sources,
+    });
+    db.set(iso_literal_map);
+
+    Ok(())
 }
 
-pub fn read_updates(
-    db: &mut Database,
-    source_files: &mut SourceFiles,
-    changes: &[SourceFileEvent],
-) -> Result<(), Box<dyn Error>> {
+pub fn read_updates(db: &mut Database, changes: &[SourceFileEvent]) -> Result<(), Box<dyn Error>> {
+    let mut standard_sources = get_standard_sources(db).clone();
+    let mut iso_literal_map = get_iso_literal_map(db).clone();
+
     let errors = changes
         .iter()
         .filter_map(|(event, change_kind)| match change_kind {
             ChangedFileKind::Config => {
                 panic!("Unexpected config file change. This is indicative of a bug in Isograph.");
             }
-            ChangedFileKind::Schema => handle_update_schema(db, &mut source_files.0, event).err(),
+            ChangedFileKind::Schema => handle_update_schema(db, &mut standard_sources, event).err(),
             ChangedFileKind::SchemaExtension => {
-                handle_update_schema_extensions(db, &mut source_files.0, event).err()
+                handle_update_schema_extensions(db, &mut standard_sources, event).err()
             }
             ChangedFileKind::JavaScriptSourceFile => {
-                handle_update_source_file(db, &mut source_files.1, event).err()
+                handle_update_source_file(db, &mut iso_literal_map, event).err()
             }
             ChangedFileKind::JavaScriptSourceFolder => {
-                handle_update_source_folder(db, &mut source_files.1, event).err()
+                handle_update_source_folder(db, &mut iso_literal_map, event).err()
             }
         })
         .collect::<Vec<_>>();
     if !errors.is_empty() {
         Err(BatchCompileError::MultipleErrors { messages: errors }.into())
     } else {
+        // N.B. we set both of these, regardless of whether they've changed. But pico
+        // checks whether they've changed before invalidating, so this is okay. But, we
+        // should probably avoid calling db.set if the sources/iso literals haven't
+        // actually changed.
+        db.set(standard_sources);
+        db.set(iso_literal_map);
+
         Ok(())
     }
 }

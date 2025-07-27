@@ -13,8 +13,7 @@ use pico::Database;
 use crate::{
     batch_compile::{BatchCompileError, CompilationStats},
     create_schema::create_schema,
-    db_singletons::get_isograph_config,
-    source_files::SourceFiles,
+    db_singletons::{get_iso_literal_map, get_isograph_config, get_standard_sources},
     write_artifacts::write_artifacts_to_disk,
 };
 
@@ -22,7 +21,6 @@ const GC_DURATION_SECONDS: u64 = 60;
 
 pub struct CompilerState {
     pub db: Database,
-    pub source_files: Option<SourceFiles>,
     pub last_gc_run: Instant,
 }
 
@@ -36,7 +34,6 @@ impl CompilerState {
         db.set(create_config(config_location, current_working_directory));
         Self {
             db,
-            source_files: None,
             last_gc_run: Instant::now(),
         }
     }
@@ -82,11 +79,13 @@ impl CompilerState {
 /// of whether they belong in this function, or at all.
 pub fn compile<TNetworkProtocol: NetworkProtocol<Sources = StandardSources>>(
     db: &Database,
-    source_files: &SourceFiles,
 ) -> Result<CompilationStats, Box<dyn Error>> {
+    let standard_sources = get_standard_sources(db);
+    let iso_literal_map = get_iso_literal_map(db);
+
     // Create schema
     let (isograph_schema, stats) =
-        create_schema::<TNetworkProtocol>(db, &source_files.0, &source_files.1)?;
+        create_schema::<TNetworkProtocol>(db, standard_sources, iso_literal_map)?;
 
     validate_use_of_arguments(&isograph_schema).map_err(|messages| {
         Box::new(BatchCompileError::MultipleErrorsWithLocations {
