@@ -16,6 +16,7 @@ use tracing::info;
 use crate::{
     batch_compile::print_result,
     compiler_state::{compile, CompilerState},
+    db_singletons::get_isograph_config,
     source_files::SourceFiles,
     with_duration::WithDuration,
 };
@@ -26,13 +27,16 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol<Sources = St
     config_location: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(), Vec<Error>> {
-    let mut state = CompilerState::new(config_location, current_working_directory);
-    let (mut rx, mut watcher) = create_debounced_file_watcher(&state.config);
+    let mut state = CompilerState::new(config_location.clone(), current_working_directory);
+
+    let config = get_isograph_config(&state.db).clone();
+
+    let (mut rx, mut watcher) = create_debounced_file_watcher(&config);
 
     info!("{}", "Starting to compile.".cyan());
     let _ = print_result(WithDuration::new(|| {
-        let source_files = SourceFiles::read_all(&mut state.db, &state.config)?;
-        let result = compile::<TNetworkProtocol>(&state.db, &source_files, &state.config);
+        let source_files = SourceFiles::read_all(&mut state.db)?;
+        let result = compile::<TNetworkProtocol>(&state.db, &source_files);
         state.source_files = Some(source_files);
         result
     }));
@@ -40,25 +44,19 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol<Sources = St
     while let Some(res) = rx.recv().await {
         match res {
             Ok(events) => {
-                if let Some(changes) = categorize_and_filter_events(&events, &state.config) {
+                if let Some(changes) = categorize_and_filter_events(&events, &config) {
                     let result = if has_config_changes(&changes) {
                         info!(
                             "{}",
                             "Config change detected. Starting a full compilation.".cyan()
                         );
-                        state = CompilerState::new(
-                            state.config.config_location,
-                            current_working_directory,
-                        );
+                        state =
+                            CompilerState::new(config_location.clone(), current_working_directory);
                         watcher.stop();
-                        (rx, watcher) = create_debounced_file_watcher(&state.config);
+                        (rx, watcher) = create_debounced_file_watcher(&config);
                         WithDuration::new(|| {
-                            let source_files = SourceFiles::read_all(&mut state.db, &state.config)?;
-                            let result = compile::<TNetworkProtocol>(
-                                &state.db,
-                                &source_files,
-                                &state.config,
-                            );
+                            let source_files = SourceFiles::read_all(&mut state.db)?;
+                            let result = compile::<TNetworkProtocol>(&state.db, &source_files);
                             state.source_files = Some(source_files);
                             result
                         })
@@ -66,20 +64,11 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol<Sources = St
                         info!("{}", "File changes detected. Starting to compile.".cyan());
                         WithDuration::new(|| {
                             if let Some(source_files) = state.source_files.as_mut() {
-                                source_files.read_updates(
-                                    &mut state.db,
-                                    &state.config,
-                                    &changes,
-                                )?;
-                                compile::<TNetworkProtocol>(&state.db, source_files, &state.config)
+                                source_files.read_updates(&mut state.db, &changes)?;
+                                compile::<TNetworkProtocol>(&state.db, source_files)
                             } else {
-                                let source_files =
-                                    SourceFiles::read_all(&mut state.db, &state.config)?;
-                                let result = compile::<TNetworkProtocol>(
-                                    &state.db,
-                                    &source_files,
-                                    &state.config,
-                                );
+                                let source_files = SourceFiles::read_all(&mut state.db)?;
+                                let result = compile::<TNetworkProtocol>(&state.db, &source_files);
                                 state.source_files = Some(source_files);
                                 result
                             }
@@ -90,12 +79,8 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol<Sources = St
                             "Too many changes. Starting a full compilation.".cyan()
                         );
                         WithDuration::new(|| {
-                            let source_files = SourceFiles::read_all(&mut state.db, &state.config)?;
-                            let result = compile::<TNetworkProtocol>(
-                                &state.db,
-                                &source_files,
-                                &state.config,
-                            );
+                            let source_files = SourceFiles::read_all(&mut state.db)?;
+                            let result = compile::<TNetworkProtocol>(&state.db, &source_files);
                             state.source_files = Some(source_files);
                             result
                         })

@@ -6,13 +6,14 @@ use std::{
 
 use common_lang_types::{CurrentWorkingDirectory, WithLocation};
 use generate_artifacts::get_artifact_path_and_content;
-use isograph_config::{create_config, CompilerConfig};
+use isograph_config::create_config;
 use isograph_schema::{validate_use_of_arguments, NetworkProtocol, StandardSources};
 use pico::Database;
 
 use crate::{
     batch_compile::{BatchCompileError, CompilationStats},
     create_schema::create_schema,
+    db_singletons::get_isograph_config,
     source_files::SourceFiles,
     write_artifacts::write_artifacts_to_disk,
 };
@@ -21,7 +22,6 @@ const GC_DURATION_SECONDS: u64 = 60;
 
 pub struct CompilerState {
     pub db: Database,
-    pub config: CompilerConfig,
     pub source_files: Option<SourceFiles>,
     pub last_gc_run: Instant,
 }
@@ -33,9 +33,9 @@ impl CompilerState {
     ) -> Self {
         let mut db = Database::new();
         db.set(current_working_directory);
+        db.set(create_config(config_location, current_working_directory));
         Self {
             db,
-            config: create_config(config_location, current_working_directory),
             source_files: None,
             last_gc_run: Instant::now(),
         }
@@ -83,15 +83,10 @@ impl CompilerState {
 pub fn compile<TNetworkProtocol: NetworkProtocol<Sources = StandardSources>>(
     db: &Database,
     source_files: &SourceFiles,
-    config: &CompilerConfig,
 ) -> Result<CompilationStats, Box<dyn Error>> {
     // Create schema
-    let (isograph_schema, stats) = create_schema::<TNetworkProtocol>(
-        db,
-        &source_files.sources,
-        &source_files.iso_literals,
-        config,
-    )?;
+    let (isograph_schema, stats) =
+        create_schema::<TNetworkProtocol>(db, &source_files.sources, &source_files.iso_literals)?;
 
     validate_use_of_arguments(&isograph_schema).map_err(|messages| {
         Box::new(BatchCompileError::MultipleErrorsWithLocations {
@@ -108,6 +103,7 @@ pub fn compile<TNetworkProtocol: NetworkProtocol<Sources = StandardSources>>(
     // disk can be as fast as possible and we minimize the chance that changes to the file
     // system occur while we're writing and we get unpredictable results.
 
+    let config = get_isograph_config(db);
     let artifacts = get_artifact_path_and_content(&isograph_schema, config);
     let total_artifacts_written =
         write_artifacts_to_disk(artifacts, &config.artifact_directory.absolute_path)?;

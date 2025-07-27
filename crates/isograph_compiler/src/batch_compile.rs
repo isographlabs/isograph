@@ -26,8 +26,8 @@ pub fn compile_and_print<TNetworkProtocol: NetworkProtocol<Sources = StandardSou
     info!("{}", "Starting to compile.".cyan());
     print_result(WithDuration::new(|| {
         let mut state = CompilerState::new(config_location, current_working_directory);
-        let sources = SourceFiles::read_all(&mut state.db, &state.config)?;
-        compile::<TNetworkProtocol>(&state.db, &sources, &state.config)
+        let sources = SourceFiles::read_all(&mut state.db)?;
+        compile::<TNetworkProtocol>(&state.db, &sources)
     }))
 }
 

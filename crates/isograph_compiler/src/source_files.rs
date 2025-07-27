@@ -9,14 +9,14 @@ use common_lang_types::{
     CurrentWorkingDirectory, RelativePathToSourceFile, TextSource,
 };
 use intern::Lookup;
-use isograph_config::{absolute_and_relative_paths, CompilerConfig};
+use isograph_config::absolute_and_relative_paths;
 use isograph_lang_types::{IsoLiteralsSource, SchemaSource};
 use isograph_schema::StandardSources;
 use pico::{Database, SourceId};
 
 use crate::{
     batch_compile::BatchCompileError,
-    db_singletons::get_current_working_directory,
+    db_singletons::{get_current_working_directory, get_isograph_config},
     isograph_literals::{read_file, read_files_in_folder},
     watch::{ChangedFileKind, SourceEventKind, SourceFileEvent},
 };
@@ -28,10 +28,11 @@ pub struct SourceFiles {
 }
 
 impl SourceFiles {
-    pub fn read_all(db: &mut Database, config: &CompilerConfig) -> Result<Self, Box<dyn Error>> {
-        let schema = read_schema(db, &config.schema)?;
-        let schema_extensions = read_schema_extensions(db, config)?;
-        let iso_literals = read_iso_literals_from_project_root(db, config)?;
+    pub fn read_all(db: &mut Database) -> Result<Self, Box<dyn Error>> {
+        let schema = get_isograph_config(db).schema.clone();
+        let schema = read_schema(db, &schema)?;
+        let schema_extensions = read_schema_extensions(db)?;
+        let iso_literals = read_iso_literals_from_project_root(db)?;
         Ok(Self {
             sources: (schema, schema_extensions),
             iso_literals,
@@ -41,7 +42,6 @@ impl SourceFiles {
     pub fn read_updates(
         &mut self,
         db: &mut Database,
-        config: &CompilerConfig,
         changes: &[SourceFileEvent],
     ) -> Result<(), Box<dyn Error>> {
         let errors = changes
@@ -52,10 +52,10 @@ impl SourceFiles {
                         "Unexpected config file change. This is indicative of a bug in Isograph."
                     );
                 }
-                ChangedFileKind::Schema => self.handle_update_schema(db, config, event).err(),
-                ChangedFileKind::SchemaExtension => self
-                    .handle_update_schema_extensions(db, config, event)
-                    .err(),
+                ChangedFileKind::Schema => self.handle_update_schema(db, event).err(),
+                ChangedFileKind::SchemaExtension => {
+                    self.handle_update_schema_extensions(db, event).err()
+                }
                 ChangedFileKind::JavaScriptSourceFile => {
                     self.handle_update_source_file(db, event).err()
                 }
@@ -74,15 +74,15 @@ impl SourceFiles {
     fn handle_update_schema(
         &mut self,
         db: &mut Database,
-        config: &CompilerConfig,
         event_kind: &SourceEventKind,
     ) -> Result<(), Box<dyn Error>> {
+        let schema = get_isograph_config(db).schema.clone();
         match event_kind {
             SourceEventKind::CreateOrModify(_) => {
-                self.sources.0 = read_schema(db, &config.schema)?;
+                self.sources.0 = read_schema(db, &schema)?;
             }
             SourceEventKind::Rename((_, target_path)) => {
-                if config.schema.absolute_path != *target_path {
+                if schema.absolute_path != *target_path {
                     return Err(Box::new(BatchCompileError::SchemaNotFound));
                 }
             }
@@ -94,7 +94,6 @@ impl SourceFiles {
     fn handle_update_schema_extensions(
         &mut self,
         db: &mut Database,
-        config: &CompilerConfig,
         event_kind: &SourceEventKind,
     ) -> Result<(), Box<dyn Error>> {
         match event_kind {
@@ -102,7 +101,7 @@ impl SourceFiles {
                 self.create_or_update_schema_extension(db, path)?;
             }
             SourceEventKind::Rename((source_path, target_path)) => {
-                if config
+                if get_isograph_config(db)
                     .schema_extensions
                     .iter()
                     .any(|x| x.absolute_path == *target_path)
@@ -277,10 +276,10 @@ pub fn read_schema_file(path: &PathBuf) -> Result<String, BatchCompileError> {
 
 pub fn read_schema_extensions(
     db: &mut Database,
-    config: &CompilerConfig,
 ) -> Result<BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>, Box<dyn Error>> {
+    let config_schema_extensions = get_isograph_config(db).schema_extensions.clone();
     let mut schema_extensions = BTreeMap::new();
-    for schema_extension_path in config.schema_extensions.iter() {
+    for schema_extension_path in config_schema_extensions.iter() {
         let schema_extension = read_schema(db, schema_extension_path)?;
         schema_extensions.insert(schema_extension_path.relative_path, schema_extension);
     }
@@ -289,10 +288,10 @@ pub fn read_schema_extensions(
 
 pub fn read_iso_literals_from_project_root(
     db: &mut Database,
-    config: &CompilerConfig,
 ) -> Result<HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>, Box<dyn Error>> {
+    let project_root = get_isograph_config(db).project_root.clone();
     let mut iso_literals = HashMap::new();
-    read_iso_literals_from_folder(db, &mut iso_literals, &config.project_root)?;
+    read_iso_literals_from_folder(db, &mut iso_literals, &project_root)?;
     Ok(iso_literals)
 }
 

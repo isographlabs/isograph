@@ -1288,6 +1288,8 @@ dependencies = [
  "colorize",
  "common_lang_types",
  "intern",
+ "pico",
+ "pico_macros",
  "schemars",
  "serde",
  "serde_json",

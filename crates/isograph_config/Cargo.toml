@@ -13,6 +13,8 @@ path = "src/main.rs"
 [dependencies]
 common_lang_types = { path = "../common_lang_types" }
 intern = { path = "../../relay-crates/intern" }
+pico = { path = "../pico" }
+pico_macros = { path = "../pico_macros" }
 schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

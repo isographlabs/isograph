@@ -3,6 +3,7 @@ use common_lang_types::{
     CurrentWorkingDirectory, GeneratedFileHeader,
 };
 use intern::string_key::Intern;
+use pico_macros::Singleton;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use std::path::PathBuf;
@@ -14,7 +15,7 @@ use std::error::Error;
 
 /// This struct is the internal representation of the schema. It
 /// is a transformed version of IsographProjectConfig.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Singleton, Eq, PartialEq)]
 pub struct CompilerConfig {
     // The absolute path to the config file
     pub config_location: PathBuf,
@@ -31,7 +32,7 @@ pub struct CompilerConfig {
     pub options: CompilerConfigOptions,
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct CompilerConfigOptions {
     pub on_invalid_id_type: OptionalValidationLevel,
     pub no_babel_transform: bool,
@@ -40,7 +41,7 @@ pub struct CompilerConfigOptions {
     pub generated_file_header: Option<GeneratedFileHeader>,
 }
 
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GenerateFileExtensionsOption {
     IncludeExtensionsInFileImports,
     #[default]
@@ -56,7 +57,7 @@ impl GenerateFileExtensionsOption {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OptionalValidationLevel {
     /// If this validation error is encountered, it will be ignored
     Ignore,
@@ -89,7 +90,7 @@ impl Default for OptionalValidationLevel {
     }
 }
 
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JavascriptModule {
     CommonJs,
     #[default]

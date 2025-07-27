@@ -11,7 +11,7 @@ use common_lang_types::{
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLInputValueDefinition, NameValuePair, RootOperationKind,
 };
-use isograph_config::{CompilerConfig, CompilerConfigOptions};
+use isograph_config::CompilerConfigOptions;
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{
     ConstantValue, IsoLiteralsSource, SelectionType, TypeAnnotation, VariableDefinition,
@@ -27,6 +27,7 @@ use pico::{Database, SourceId};
 use crate::{
     add_selection_sets::add_selection_sets_to_client_selectables,
     batch_compile::BatchCompileError,
+    db_singletons::get_isograph_config,
     isograph_literals::{parse_iso_literal_in_source, process_iso_literals},
 };
 
@@ -34,8 +35,8 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
     db: &Database,
     sources: &TNetworkProtocol::Sources,
     iso_literals: &HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>,
-    config: &CompilerConfig,
 ) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), Box<dyn Error>> {
+    let config = get_isograph_config(db);
     let ProcessTypeSystemDocumentOutcome { scalars, objects } =
         TNetworkProtocol::parse_and_process_type_system_documents(db, sources)?;
 
