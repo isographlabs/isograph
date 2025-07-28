@@ -299,7 +299,7 @@ pub fn process_graphql_type_extension_document(
 pub(crate) type ProcessGraphqlTypeDefinitionResult<T> =
     Result<T, WithLocation<ProcessGraphqlTypeSystemDefinitionError>>;
 
-#[derive(Error, Eq, PartialEq, Debug)]
+#[derive(Error, Eq, PartialEq, Debug, Clone)]
 pub enum ProcessGraphqlTypeSystemDefinitionError {
     #[error("Duplicate schema definition")]
     DuplicateSchemaDefinition,

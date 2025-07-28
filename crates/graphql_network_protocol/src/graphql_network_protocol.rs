@@ -1,7 +1,6 @@
-use std::error::Error;
-
 use common_lang_types::{DirectiveName, QueryOperationName, QueryText, WithLocation};
 use graphql_lang_types::{from_graphql_directive, DeserializationError};
+use graphql_schema_parser::SchemaParseError;
 use intern::string_key::Intern;
 use isograph_compiler::get_standard_sources;
 use isograph_schema::{
@@ -11,6 +10,7 @@ use isograph_schema::{
 };
 use lazy_static::lazy_static;
 use pico::Database;
+use thiserror::Error;
 
 use crate::{
     parse_graphql_schema,
@@ -30,10 +30,14 @@ pub struct GraphQLNetworkProtocol {}
 
 impl NetworkProtocol for GraphQLNetworkProtocol {
     type SchemaObjectAssociatedData = GraphQLSchemaObjectAssociatedData;
+    type ParseAndProcessTypeSystemDocumentsError = ParseAndProcessGraphQLTypeSystemDocumentsError;
 
     fn parse_and_process_type_system_documents(
         db: &Database,
-    ) -> Result<ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>, Box<dyn Error>> {
+    ) -> Result<
+        ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>,
+        ParseAndProcessGraphQLTypeSystemDocumentsError,
+    > {
         let StandardSources {
             schema_source_id,
             schema_extension_sources,
@@ -103,11 +107,11 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     }
                 }
                 None => {
-                    return Err(Box::new(
+                    return Err(
                         ProcessGraphqlTypeSystemDefinitionError::AttemptedToExtendUndefinedType {
                             type_name: name,
                         },
-                    ));
+                    )?;
                 }
             }
         }
@@ -154,4 +158,31 @@ impl GraphQLSchemaOriginalDefinitionType {
             GraphQLSchemaOriginalDefinitionType::Union => "union",
         }
     }
+}
+
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub enum ParseAndProcessGraphQLTypeSystemDocumentsError {
+    #[error("{message}")]
+    SchemaParse {
+        #[from]
+        message: WithLocation<SchemaParseError>,
+    },
+
+    #[error("{message}")]
+    ProcessGraphQLTypeSystemDefinitionWithLocation {
+        #[from]
+        message: WithLocation<ProcessGraphqlTypeSystemDefinitionError>,
+    },
+
+    #[error("{message}")]
+    ProcessGraphQLTypeSystemDefinition {
+        #[from]
+        message: ProcessGraphqlTypeSystemDefinitionError,
+    },
+
+    #[error("{message}")]
+    CreateAdditionalFields {
+        #[from]
+        message: WithLocation<CreateAdditionalFieldsError>,
+    },
 }
