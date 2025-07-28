@@ -14,7 +14,10 @@ mod source;
 
 pub use database::*;
 pub use derived_node::*;
+pub use dyn_eq::*;
 pub use execute_memoized_function::*;
 pub use intern::*;
 pub use memo_ref::*;
 pub use source::*;
+pub use execute_memoized_function::execute_memoized_function;
+pub use retained_query::*;

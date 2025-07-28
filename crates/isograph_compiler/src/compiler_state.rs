@@ -8,6 +8,7 @@ use std::{
 use common_lang_types::{CurrentWorkingDirectory, WithLocation};
 use generate_artifacts::get_artifact_path_and_content;
 use isograph_config::create_config;
+use isograph_lang_types::IsographDatabase;
 use isograph_schema::{validate_use_of_arguments, NetworkProtocol};
 use pico::Database;
 
@@ -20,8 +21,9 @@ use crate::{
 
 const GC_DURATION_SECONDS: u64 = 60;
 
+
 pub struct CompilerState {
-    pub db: Database,
+    pub db: IsographDatabase,
     pub last_gc_run: Instant,
 }
 
@@ -30,7 +32,7 @@ impl CompilerState {
         config_location: PathBuf,
         current_working_directory: CurrentWorkingDirectory,
     ) -> Self {
-        let mut db = Database::new();
+        let mut db = IsographDatabase::new();
         db.set(current_working_directory);
         db.set(create_config(config_location, current_working_directory));
         Self {
@@ -79,7 +81,7 @@ impl CompilerState {
 /// These are less "core" to the overall mission, and thus invite the question
 /// of whether they belong in this function, or at all.
 pub fn compile<TNetworkProtocol: NetworkProtocol + 'static>(
-    db: &Database,
+    db: &IsographDatabase,
 ) -> Result<CompilationStats, Box<dyn Error>> {
     // Create schema
     let (unvalidated_isograph_schema, unprocessed_items) =
