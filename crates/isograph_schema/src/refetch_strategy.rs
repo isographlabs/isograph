@@ -76,7 +76,7 @@ pub fn generate_refetch_field_strategy<
     UseRefetchFieldRefetchStrategy {
         refetch_selection_set,
         root_fetchable_type_name,
-        generate_refetch_query: Box::new(GenerateRefetchQueryImpl { subfields }),
+        generate_refetch_query: GenerateRefetchQueryImpl { subfields },
     }
 }
 
@@ -103,23 +103,19 @@ pub struct UseRefetchFieldRefetchStrategy<
     ///
     /// A root_fetchable_type + a query name + variables + a MergedSelectionMap
     /// is enough to generate the query text, for example.
-    pub generate_refetch_query: Box<dyn GenerateRefetchQueryFn>,
-}
-
-pub trait GenerateRefetchQueryFn: Debug {
-    fn generate_refetch_query(
-        &self,
-        inner: MergedSelectionMap,
-    ) -> (MergedSelectionMap, BTreeSet<VariableName>);
+    ///
+    /// N.B. TODO consider make this a Box<dyn ...>. Why did we do that in the
+    /// first place?
+    pub generate_refetch_query: GenerateRefetchQueryImpl,
 }
 
 #[derive(Debug)]
-struct GenerateRefetchQueryImpl {
-    subfields: Vec<WrappedSelectionMapSelection>,
+pub struct GenerateRefetchQueryImpl {
+    pub subfields: Vec<WrappedSelectionMapSelection>,
 }
 
-impl GenerateRefetchQueryFn for GenerateRefetchQueryImpl {
-    fn generate_refetch_query(
+impl GenerateRefetchQueryImpl {
+    pub fn generate_refetch_query(
         &self,
         inner_selection_map: MergedSelectionMap,
     ) -> (MergedSelectionMap, BTreeSet<VariableName>) {
