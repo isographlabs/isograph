@@ -30,6 +30,7 @@ use crate::{
     source_files::IsoLiteralMap,
 };
 
+#[allow(clippy::type_complexity)]
 pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
     db: &Database,
 ) -> Result<
