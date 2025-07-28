@@ -21,6 +21,7 @@ use isograph_schema::{
     ServerScalarSelectable, UnprocessedClientFieldItem, UnprocessedClientPointerItem,
 };
 use pico::Database;
+use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
@@ -31,6 +32,7 @@ use crate::{
     source_files::IsoLiteralMap,
 };
 
+#[memo]
 #[allow(clippy::type_complexity)]
 pub fn create_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &Database,
@@ -438,7 +440,7 @@ fn convert_graphql_constant_value_to_isograph_constant_value(
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq, Eq, Clone)]
 pub enum CreateSchemaError<TNetworkProtocol: NetworkProtocol + 'static> {
     #[error("{message}")]
     ParseAndProcessTypeSystemDocument {

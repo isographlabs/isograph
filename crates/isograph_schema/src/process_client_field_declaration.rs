@@ -22,12 +22,15 @@ use crate::{
 
 pub type UnprocessedSelection = WithSpan<UnvalidatedSelection>;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnprocessedClientFieldItem {
     pub parent_object_entity_name: ServerObjectEntityName,
     pub client_field_name: ClientScalarSelectableName,
     pub reader_selection_set: Vec<UnprocessedSelection>,
     pub refetch_strategy: Option<RefetchStrategy<(), ()>>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnprocessedClientPointerItem {
     pub parent_object_entity_name: ServerObjectEntityName,
     pub client_object_selectable_name: ClientObjectSelectableName,

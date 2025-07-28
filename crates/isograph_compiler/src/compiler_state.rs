@@ -1,5 +1,6 @@
 use std::{
     error::Error,
+    ops::Deref,
     path::PathBuf,
     time::{Duration, Instant},
 };
@@ -81,7 +82,8 @@ pub fn compile<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &Database,
 ) -> Result<CompilationStats, Box<dyn Error>> {
     // Create schema
-    let (unvalidated_isograph_schema, unprocessed_items) = create_schema::<TNetworkProtocol>(db)?;
+    let (unvalidated_isograph_schema, unprocessed_items) =
+        create_schema::<TNetworkProtocol>(db).deref().clone()?;
     let (isograph_schema, stats) = process_iso_literals_for_schema::<TNetworkProtocol>(
         db,
         unvalidated_isograph_schema,
