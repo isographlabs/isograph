@@ -15,8 +15,8 @@ license = { workspace = true }
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-anyhow = { workspace = true }
 isograph_config = { path = "../isograph_config" }
+anyhow = { workspace = true }
 once_cell = { workspace = true }
 pathdiff = { workspace = true }
 regex = { workspace = true }
