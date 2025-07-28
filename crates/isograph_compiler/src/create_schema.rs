@@ -33,7 +33,6 @@ use crate::{
 pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
     db: &Database,
 ) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), Box<dyn Error>> {
-    let config = get_isograph_config(db);
     let ProcessTypeSystemDocumentOutcome { scalars, objects } =
         TNetworkProtocol::parse_and_process_type_system_documents(db)?;
 
@@ -86,7 +85,7 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
     process_field_queue(
         &mut unvalidated_isograph_schema,
         field_queue,
-        &config.options,
+        &get_isograph_config(db).options,
     )?;
 
     // Step one: we can create client selectables. However, we must create all
