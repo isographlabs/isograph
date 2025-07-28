@@ -10,6 +10,7 @@ mod with_duration;
 mod write_artifacts;
 
 pub use batch_compile::compile_and_print;
+pub use db_singletons::*;
 pub use isograph_literals::{
     extract_iso_literals_from_file_content, parse_iso_literals_in_file_content,
     IsoLiteralExtraction,

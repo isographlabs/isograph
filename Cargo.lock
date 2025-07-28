@@ -863,6 +863,7 @@ dependencies = [
  "graphql_lang_types",
  "graphql_schema_parser",
  "intern",
+ "isograph_compiler",
  "isograph_config",
  "isograph_lang_types",
  "isograph_schema",

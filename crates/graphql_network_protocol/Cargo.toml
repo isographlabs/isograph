@@ -9,6 +9,7 @@ common_lang_types = { path = "../common_lang_types" }
 graphql_lang_types = { path = "../graphql_lang_types" }
 graphql_schema_parser = { path = "../graphql_schema_parser" }
 intern = { path = "../../relay-crates/intern" }
+isograph_compiler = { path = "../isograph_compiler" }
 isograph_config = { path = "../isograph_config" }
 isograph_lang_types = { path = "../isograph_lang_types" }
 isograph_schema = { path = "../isograph_schema" }

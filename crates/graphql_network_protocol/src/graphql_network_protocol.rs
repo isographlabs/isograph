@@ -3,6 +3,7 @@ use std::error::Error;
 use common_lang_types::{DirectiveName, QueryOperationName, QueryText, WithLocation};
 use graphql_lang_types::{from_graphql_directive, DeserializationError};
 use intern::string_key::Intern;
+use isograph_compiler::get_standard_sources;
 use isograph_schema::{
     CreateAdditionalFieldsError, ExposeAsFieldToInsert, MergedSelectionMap, NetworkProtocol,
     ProcessTypeSystemDocumentOutcome, RootOperationName, Schema, StandardSources,
@@ -28,18 +29,15 @@ lazy_static! {
 pub struct GraphQLNetworkProtocol {}
 
 impl NetworkProtocol for GraphQLNetworkProtocol {
-    type Sources = StandardSources;
-
     type SchemaObjectAssociatedData = GraphQLSchemaObjectAssociatedData;
 
     fn parse_and_process_type_system_documents(
         db: &Database,
-        sources: &Self::Sources,
     ) -> Result<ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>, Box<dyn Error>> {
         let StandardSources {
             schema_source_id,
             schema_extension_sources,
-        } = sources;
+        } = get_standard_sources(db);
 
         let (type_system_document, type_system_extension_documents) =
             parse_graphql_schema(db, *schema_source_id, schema_extension_sources).to_owned()?;

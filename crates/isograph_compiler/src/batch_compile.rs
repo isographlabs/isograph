@@ -8,7 +8,7 @@ use crate::{
 use colored::Colorize;
 use common_lang_types::{CurrentWorkingDirectory, WithLocation};
 use isograph_lang_parser::IsographLiteralParseError;
-use isograph_schema::{NetworkProtocol, ProcessClientFieldDeclarationError, StandardSources};
+use isograph_schema::{NetworkProtocol, ProcessClientFieldDeclarationError};
 use pretty_duration::pretty_duration;
 use thiserror::Error;
 use tracing::{error, info};
@@ -19,7 +19,7 @@ pub struct CompilationStats {
     pub total_artifacts_written: usize,
 }
 
-pub fn compile_and_print<TNetworkProtocol: NetworkProtocol<Sources = StandardSources>>(
+pub fn compile_and_print<TNetworkProtocol: NetworkProtocol>(
     config_location: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(), Box<dyn std::error::Error>> {

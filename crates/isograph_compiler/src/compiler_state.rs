@@ -7,7 +7,7 @@ use std::{
 use common_lang_types::{CurrentWorkingDirectory, WithLocation};
 use generate_artifacts::get_artifact_path_and_content;
 use isograph_config::create_config;
-use isograph_schema::{validate_use_of_arguments, NetworkProtocol, StandardSources};
+use isograph_schema::{validate_use_of_arguments, NetworkProtocol};
 use pico::Database;
 
 use crate::{
@@ -77,7 +77,7 @@ impl CompilerState {
 ///
 /// These are less "core" to the overall mission, and thus invite the question
 /// of whether they belong in this function, or at all.
-pub fn compile<TNetworkProtocol: NetworkProtocol<Sources = StandardSources>>(
+pub fn compile<TNetworkProtocol: NetworkProtocol>(
     db: &Database,
 ) -> Result<CompilationStats, Box<dyn Error>> {
     // Create schema

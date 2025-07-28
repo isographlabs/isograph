@@ -1,7 +1,7 @@
 use colored::Colorize;
 use common_lang_types::CurrentWorkingDirectory;
 use isograph_config::CompilerConfig;
-use isograph_schema::{NetworkProtocol, StandardSources};
+use isograph_schema::NetworkProtocol;
 use notify::{
     event::{CreateKind, ModifyKind, RemoveKind, RenameMode},
     Error, EventKind, RecommendedWatcher, RecursiveMode,
@@ -23,7 +23,7 @@ use crate::{
 
 const MAX_CHANGED_FILES: usize = 100;
 
-pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol<Sources = StandardSources>>(
+pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
     config_location: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(), Vec<Error>> {

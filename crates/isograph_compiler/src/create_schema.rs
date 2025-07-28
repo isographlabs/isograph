@@ -18,26 +18,24 @@ use isograph_schema::{
     validate_entrypoints, CreateAdditionalFieldsError, FieldToInsert, NetworkProtocol,
     ProcessObjectTypeDefinitionOutcome, ProcessTypeSystemDocumentOutcome, RootOperationName,
     Schema, ServerEntityName, ServerObjectSelectable, ServerObjectSelectableVariant,
-    ServerScalarSelectable, StandardSources,
+    ServerScalarSelectable,
 };
 use pico::Database;
 
 use crate::{
     add_selection_sets::add_selection_sets_to_client_selectables,
     batch_compile::BatchCompileError,
-    db_singletons::{get_iso_literal_map, get_isograph_config, get_standard_sources},
+    db_singletons::{get_iso_literal_map, get_isograph_config},
     isograph_literals::{parse_iso_literal_in_source, process_iso_literals},
     source_files::IsoLiteralMap,
 };
 
-pub fn create_schema<TNetworkProtocol: NetworkProtocol<Sources = StandardSources>>(
+pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
     db: &Database,
 ) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), Box<dyn Error>> {
-    let standard_sources = get_standard_sources(db);
-
     let config = get_isograph_config(db);
     let ProcessTypeSystemDocumentOutcome { scalars, objects } =
-        TNetworkProtocol::parse_and_process_type_system_documents(db, standard_sources)?;
+        TNetworkProtocol::parse_and_process_type_system_documents(db)?;
 
     let mut unvalidated_isograph_schema = Schema::<TNetworkProtocol>::new();
     for (server_scalar_entity, name_location) in scalars {
