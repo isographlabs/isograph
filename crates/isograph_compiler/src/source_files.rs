@@ -44,8 +44,11 @@ pub fn read_all_source_files(db: &mut Database) -> Result<(), Box<dyn Error>> {
 }
 
 pub fn read_updates(db: &mut Database, changes: &[SourceFileEvent]) -> Result<(), Box<dyn Error>> {
+    // TODO: We can avoid using booleans and do this more cleanly, e.g. with Options
     let mut standard_sources = get_standard_sources(db).clone();
+    let mut standard_sources_modified = false;
     let mut iso_literal_map = get_iso_literal_map(db).clone();
+    let mut iso_literal_map_modified = false;
 
     let errors = changes
         .iter()
@@ -53,14 +56,20 @@ pub fn read_updates(db: &mut Database, changes: &[SourceFileEvent]) -> Result<()
             ChangedFileKind::Config => {
                 panic!("Unexpected config file change. This is indicative of a bug in Isograph.");
             }
-            ChangedFileKind::Schema => handle_update_schema(db, &mut standard_sources, event).err(),
+            ChangedFileKind::Schema => {
+                standard_sources_modified = true;
+                handle_update_schema(db, &mut standard_sources, event).err()
+            }
             ChangedFileKind::SchemaExtension => {
+                standard_sources_modified = true;
                 handle_update_schema_extensions(db, &mut standard_sources, event).err()
             }
             ChangedFileKind::JavaScriptSourceFile => {
+                iso_literal_map_modified = true;
                 handle_update_source_file(db, &mut iso_literal_map, event).err()
             }
             ChangedFileKind::JavaScriptSourceFolder => {
+                iso_literal_map_modified = true;
                 handle_update_source_folder(db, &mut iso_literal_map, event).err()
             }
         })
@@ -68,12 +77,12 @@ pub fn read_updates(db: &mut Database, changes: &[SourceFileEvent]) -> Result<()
     if !errors.is_empty() {
         Err(BatchCompileError::MultipleErrors { messages: errors }.into())
     } else {
-        // N.B. we set both of these, regardless of whether they've changed. But pico
-        // checks whether they've changed before invalidating, so this is okay. But, we
-        // should probably avoid calling db.set if the sources/iso literals haven't
-        // actually changed.
-        db.set(standard_sources);
-        db.set(iso_literal_map);
+        if standard_sources_modified {
+            db.set(standard_sources);
+        }
+        if iso_literal_map_modified {
+            db.set(iso_literal_map);
+        }
 
         Ok(())
     }
