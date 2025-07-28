@@ -19,7 +19,7 @@ pub struct CompilationStats {
     pub total_artifacts_written: usize,
 }
 
-pub fn compile_and_print<TNetworkProtocol: NetworkProtocol>(
+pub fn compile_and_print<TNetworkProtocol: NetworkProtocol + 'static>(
     config_location: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(), Box<dyn std::error::Error>> {

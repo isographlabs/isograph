@@ -77,7 +77,7 @@ impl CompilerState {
 ///
 /// These are less "core" to the overall mission, and thus invite the question
 /// of whether they belong in this function, or at all.
-pub fn compile<TNetworkProtocol: NetworkProtocol>(
+pub fn compile<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &Database,
 ) -> Result<CompilationStats, Box<dyn Error>> {
     // Create schema

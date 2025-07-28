@@ -23,7 +23,7 @@ use crate::{
 
 const MAX_CHANGED_FILES: usize = 100;
 
-pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
+pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol + 'static>(
     config_location: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(), Vec<Error>> {

@@ -21,6 +21,7 @@ use isograph_schema::{
     ServerScalarSelectable, UnprocessedClientFieldItem, UnprocessedClientPointerItem,
 };
 use pico::Database;
+use thiserror::Error;
 
 use crate::{
     add_selection_sets::add_selection_sets_to_client_selectables,
@@ -31,17 +32,18 @@ use crate::{
 };
 
 #[allow(clippy::type_complexity)]
-pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
+pub fn create_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &Database,
 ) -> Result<
     (
         Schema<TNetworkProtocol>,
         Vec<SelectionType<UnprocessedClientFieldItem, UnprocessedClientPointerItem>>,
     ),
-    Box<dyn Error>,
+    CreateSchemaError<TNetworkProtocol>,
 > {
     let ProcessTypeSystemDocumentOutcome { scalars, objects } =
-        TNetworkProtocol::parse_and_process_type_system_documents(db)?;
+        TNetworkProtocol::parse_and_process_type_system_documents(db)
+            .map_err(|e| CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e })?;
 
     let mut unvalidated_isograph_schema = Schema::<TNetworkProtocol>::new();
     for (server_scalar_entity, name_location) in scalars {
@@ -434,4 +436,18 @@ fn convert_graphql_constant_value_to_isograph_constant_value(
             ConstantValue::Object(converted_object)
         }
     }
+}
+
+#[derive(Error, Debug)]
+pub enum CreateSchemaError<TNetworkProtocol: NetworkProtocol + 'static> {
+    #[error("{message}")]
+    ParseAndProcessTypeSystemDocument {
+        message: TNetworkProtocol::ParseAndProcessTypeSystemDocumentsError,
+    },
+
+    #[error("{message}")]
+    CreateAdditionalFields {
+        #[from]
+        message: WithLocation<CreateAdditionalFieldsError>,
+    },
 }
