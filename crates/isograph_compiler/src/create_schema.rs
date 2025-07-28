@@ -18,7 +18,7 @@ use isograph_schema::{
     validate_entrypoints, CreateAdditionalFieldsError, FieldToInsert, NetworkProtocol,
     ProcessObjectTypeDefinitionOutcome, ProcessTypeSystemDocumentOutcome, RootOperationName,
     Schema, ServerEntityName, ServerObjectSelectable, ServerObjectSelectableVariant,
-    ServerScalarSelectable,
+    ServerScalarSelectable, UnprocessedClientFieldItem, UnprocessedClientPointerItem,
 };
 use pico::Database;
 
@@ -32,7 +32,13 @@ use crate::{
 
 pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
     db: &Database,
-) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), Box<dyn Error>> {
+) -> Result<
+    (
+        Schema<TNetworkProtocol>,
+        Vec<SelectionType<UnprocessedClientFieldItem, UnprocessedClientPointerItem>>,
+    ),
+    Box<dyn Error>,
+> {
     let ProcessTypeSystemDocumentOutcome { scalars, objects } =
         TNetworkProtocol::parse_and_process_type_system_documents(db)?;
 
@@ -104,6 +110,16 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol>(
         }
     }
 
+    Ok((unvalidated_isograph_schema, unprocessed_items))
+}
+
+pub fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol>(
+    db: &Database,
+    mut unvalidated_isograph_schema: Schema<TNetworkProtocol>,
+    mut unprocessed_items: Vec<
+        SelectionType<UnprocessedClientFieldItem, UnprocessedClientPointerItem>,
+    >,
+) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), Box<dyn Error>> {
     let iso_literal_map = get_iso_literal_map(db);
     let contains_iso = parse_iso_literals(db, iso_literal_map)?;
     let contains_iso_stats = contains_iso.stats();
