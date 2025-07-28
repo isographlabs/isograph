@@ -8,7 +8,7 @@ use isograph_lang_types::{impl_with_id, DefinitionLocation, SelectionType};
 
 use crate::{ClientSelectableId, NetworkProtocol, ServerSelectableId};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ServerScalarEntity<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<ServerScalarEntityName>,
@@ -20,7 +20,7 @@ type SelectableId = DefinitionLocation<ServerSelectableId, ClientSelectableId>;
 
 pub type ServerObjectEntityAvailableSelectables = BTreeMap<SelectableName, SelectableId>;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ServerObjectEntity<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: ServerObjectEntityName,

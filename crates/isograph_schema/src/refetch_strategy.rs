@@ -14,7 +14,7 @@ use crate::{
     WrappedSelectionMapSelection,
 };
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum RefetchStrategy<
     TSelectionTypeSelectionScalarFieldAssociatedData,
     TSelectionTypeSelectionLinkedFieldAssociatedData,
@@ -80,7 +80,7 @@ pub fn generate_refetch_field_strategy<
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct UseRefetchFieldRefetchStrategy<
     TSelectionTypeSelectionScalarFieldAssociatedData,
     TSelectionTypeSelectionLinkedFieldAssociatedData,
@@ -109,7 +109,7 @@ pub struct UseRefetchFieldRefetchStrategy<
     pub generate_refetch_query: GenerateRefetchQueryImpl,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct GenerateRefetchQueryImpl {
     pub subfields: Vec<WrappedSelectionMapSelection>,
 }

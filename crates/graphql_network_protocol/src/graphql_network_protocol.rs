@@ -132,12 +132,12 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct GraphQLSchemaObjectAssociatedData {
     pub original_definition_type: GraphQLSchemaOriginalDefinitionType,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum GraphQLSchemaOriginalDefinitionType {
     InputObject,
     Object,

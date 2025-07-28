@@ -36,11 +36,11 @@ lazy_static! {
     pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RootOperationName(pub String);
 
 /// The in-memory representation of a schema.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Schema<TNetworkProtocol: NetworkProtocol> {
     pub server_scalar_selectables: HashMap<
         (ServerObjectEntityName, ServerScalarSelectableName),
@@ -312,13 +312,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct ServerObjectEntityExtraInfo {
     pub selectables: ServerObjectEntityAvailableSelectables,
     pub id_field: Option<ServerScalarIdSelectableName>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
     // TODO consider combining these.
     pub server_objects: HashMap<ServerObjectEntityName, ServerObjectEntity<TNetworkProtocol>>,
@@ -756,7 +756,7 @@ fn add_schema_defined_scalar_type<TNetworkProtocol: NetworkProtocol>(
     typename.item
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 // This struct is indicative of poor data modeling.
 pub enum ServerObjectSelectableVariant {
     LinkedField,

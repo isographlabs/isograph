@@ -12,7 +12,7 @@ use thiserror::Error;
 
 use crate::{NetworkProtocol, Schema, ServerEntityName};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct EntrypointDeclarationInfo {
     pub iso_literal_text: IsoLiteralText,
     pub directive_set: EntrypointDirectiveSet,

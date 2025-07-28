@@ -8,7 +8,7 @@ use isograph_lang_types::{impl_with_target_id, SelectionType, TypeAnnotation, Va
 
 use crate::{NetworkProtocol, ServerEntityName, ServerObjectSelectableVariant};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: WithLocation<ServerScalarSelectableName>,
@@ -22,7 +22,7 @@ pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
 
 impl_with_target_id!(ServerScalarSelectable<TNetworkProtocol: NetworkProtocol>, ServerEntityName);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<DescriptionValue>,
     pub name: WithLocation<ServerObjectSelectableName>,

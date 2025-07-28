@@ -17,7 +17,7 @@ pub trait NetworkProtocol:
 where
     Self: Sized,
 {
-    type SchemaObjectAssociatedData: Debug;
+    type SchemaObjectAssociatedData: Debug + PartialEq + Eq + Clone;
 
     #[allow(clippy::type_complexity)]
     fn parse_and_process_type_system_documents(
