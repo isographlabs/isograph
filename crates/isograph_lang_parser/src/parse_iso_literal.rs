@@ -314,8 +314,6 @@ fn parse_client_pointer_declaration_inner(
 }
 
 // Note: for now, top-level selection sets are required
-//
-// TODO: perform some refactor to make type easier to read.
 fn parse_selection_set(
     tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
