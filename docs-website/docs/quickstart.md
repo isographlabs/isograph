@@ -2,7 +2,7 @@ import DataTypeSrc from './assets/data-type.png';
 
 # Quickstart guide
 
-In this quickstart guide, we will create a new NextJS project and add Isograph to it. Then we'll use the free and publicly available [Star Wars GraphQL API](https://studio.apollographql.com/public/star-wars-swapi/variant/current/home).
+In this quickstart guide, we will create a new NextJS project and add Isograph to it. Then we'll use the free and publicly available Star Wars GraphQL API.
 
 You can view the end result of following this quickstart guide in [this repository](https://github.com/isographlabs/quickstart).
 
@@ -137,16 +137,13 @@ function makeNetworkRequest<T>(
   queryText: string,
   variables: unknown,
 ): Promise<T> {
-  const promise = fetch(
-    'https://swapi-graphql.netlify.app/.netlify/functions/index',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ query: queryText, variables }),
+  const promise = fetch('https://graphql.org/graphql/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
     },
-  ).then(async (response) => {
+    body: JSON.stringify({ query: queryText, variables }),
+  }).then(async (response) => {
     const json = await response.json();
 
     if (response.ok) {
