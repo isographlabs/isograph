@@ -1,25 +1,36 @@
 use std::collections::HashMap;
 
+use common_lang_types::CurrentWorkingDirectory;
 use crossbeam::channel::Sender;
 use isograph_config::CompilerConfig;
 use lsp_server::Message;
 use lsp_types::Url;
+use pico::Database;
 
 use crate::lsp_runtime_error::LSPRuntimeResult;
 
 #[derive(Debug)]
 pub struct LSPState {
+    pub db: Database,
     open_docs: HashMap<Url, String>,
     sender: Sender<Message>,
-    pub config: CompilerConfig,
 }
 
 impl LSPState {
-    pub fn new(sender: Sender<Message>, config: CompilerConfig) -> Self {
+    pub fn new(
+        sender: Sender<Message>,
+        config: CompilerConfig,
+        current_working_directory: CurrentWorkingDirectory,
+    ) -> Self {
+        let mut db = Database::new();
+
+        db.set(current_working_directory);
+        db.set(config);
+
         LSPState {
+            db,
             open_docs: HashMap::new(),
             sender,
-            config,
         }
     }
 

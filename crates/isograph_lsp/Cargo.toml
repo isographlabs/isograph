@@ -11,6 +11,7 @@ isograph_compiler = { path = "../isograph_compiler" }
 isograph_lang_parser = { path = "../isograph_lang_parser" }
 isograph_lang_types = { path = "../isograph_lang_types" }
 isograph_config = { path = "../isograph_config" }
+pico = { path = "../pico" }
 log = { workspace = true, features = ["kv_unstable", "kv_unstable_std"] }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }

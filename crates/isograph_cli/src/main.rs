@@ -72,7 +72,7 @@ async fn start_language_server(
         current_working_directory,
     );
     info!("Starting language server");
-    if let Err(_e) = isograph_lsp::start_language_server(config).await {
+    if let Err(_e) = isograph_lsp::start_language_server(config, current_working_directory).await {
         error!(
             "{}",
             "Error encountered when running language server.".bright_red(),

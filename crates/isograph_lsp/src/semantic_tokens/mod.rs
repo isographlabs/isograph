@@ -14,7 +14,9 @@ use client_field::client_field_declaration_to_tokens;
 use common_lang_types::{relative_path_from_absolute_and_working_directory, Span, TextSource};
 use entrypoint::entrypoint_declaration_to_tokens;
 use intern::string_key::Intern;
-use isograph_compiler::{extract_iso_literals_from_file_content, IsoLiteralExtraction};
+use isograph_compiler::{
+    extract_iso_literals_from_file_content, get_current_working_directory, IsoLiteralExtraction,
+};
 use isograph_lang_parser::{parse_iso_literal, IsoLiteralExtractionResult};
 use lsp_types::{
     request::{Request, SemanticTokensFullRequest},
@@ -22,11 +24,10 @@ use lsp_types::{
 };
 
 pub fn on_semantic_token_full_request(
-    #[allow(unused)] state: &mut LSPState,
-    #[allow(unused)] params: <SemanticTokensFullRequest as Request>::Params,
+    state: &mut LSPState,
+    params: <SemanticTokensFullRequest as Request>::Params,
 ) -> LSPRuntimeResult<<SemanticTokensFullRequest as Request>::Result> {
-    #[allow(unused)]
-    let current_working_directory = todo!();
+    let current_working_directory = get_current_working_directory(&state.db);
 
     #[allow(unreachable_code)]
     let SemanticTokensParams {

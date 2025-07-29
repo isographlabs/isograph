@@ -13,6 +13,7 @@ use crate::{
         on_did_change_text_document, on_did_close_text_document, on_did_open_text_document,
     },
 };
+use common_lang_types::CurrentWorkingDirectory;
 use isograph_config::CompilerConfig;
 use lsp_server::{Connection, ErrorCode, Response, ResponseError};
 use lsp_types::request::SemanticTokensFullRequest;
@@ -50,9 +51,10 @@ pub async fn run(
     connection: Connection,
     config: CompilerConfig,
     _params: InitializeParams,
+    current_working_directory: CurrentWorkingDirectory,
 ) -> LSPProcessResult<()> {
     eprintln!("Running server loop");
-    let mut state = LSPState::new(connection.sender.clone(), config);
+    let mut state = LSPState::new(connection.sender.clone(), config, current_working_directory);
     while let Ok(message) = connection.receiver.recv() {
         match message {
             lsp_server::Message::Request(request) => {
