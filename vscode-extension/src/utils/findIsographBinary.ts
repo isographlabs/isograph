@@ -87,9 +87,8 @@ type IsographCompilerPackageInformation =
     };
 
 async function findIsographCompilerBinary(rootPath: string): Promise {
-  const isographCompilerDirectory = await findIsographCompilerDirectory(
-    rootPath,
-  );
+  const isographCompilerDirectory =
+    await findIsographCompilerDirectory(rootPath);
 
   if (!isographCompilerDirectory) {
     return { kind: 'packageNotFound' };
