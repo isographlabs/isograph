@@ -23,10 +23,17 @@ pub(crate) fn memo_macro(_args: TokenStream, item: TokenStream) -> TokenStream {
         .into();
     }
 
-    let db_arg = match &sig.inputs[0] {
-        FnArg::Typed(PatType { pat, .. }) => pat,
+    let (db_arg, db_type) = match &sig.inputs[0] {
+        FnArg::Typed(PatType { pat, ty, .. }) => {
+            let inner = match &**ty {
+                syn::Type::Reference(r) => &r.elem,
+                _ => ty,
+            };
+            (pat, inner)
+        }
         _ => unreachable!(),
     };
+
 
     let args = sig.inputs.iter().skip(1).map(|arg| match arg {
         FnArg::Typed(PatType { pat, ty, .. }) => (pat, ty),
@@ -65,7 +72,7 @@ pub(crate) fn memo_macro(_args: TokenStream, item: TokenStream) -> TokenStream {
     let mut new_sig = sig.clone();
     new_sig.output = ReturnType::Type(
         parse_quote!(->),
-        Box::new(parse_quote!(::pico::MemoRef<#return_type>)),
+        Box::new(parse_quote!(::pico::MemoRef<#return_type, #db_type>)),
     );
 
     let extract_parameters = args
@@ -117,12 +124,14 @@ pub(crate) fn memo_macro(_args: TokenStream, item: TokenStream) -> TokenStream {
     let output = quote! {
         #(#attrs)*
         #vis #new_sig {
+            use pico::Database;
+
             let mut param_ids = ::pico::macro_fns::init_param_vec();
             #(
                 #param_ids_blocks
             )*
             let derived_node_id = ::pico::DerivedNodeId::new(#fn_hash.into(), param_ids);
-            let did_recalculate = ::pico::macro_fns::execute_memoized_function(
+            let did_recalculate = ::pico::execute_memoized_function(
                 #db_arg,
                 derived_node_id,
                 ::pico::InnerFn::new(|#db_arg, derived_node_id| {
