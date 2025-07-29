@@ -8,13 +8,14 @@
 fnm install --resolve-engines
 fnm use --resolve-engines
 cd vscode-extension
-yarn
-yarn build-local
+npm install
+npm run build-local
 ```
 
 - Then, open up VSCode to the vscode-extension folder. The following step will not work if you open VSCode to a different folder.
+- Open `extension.ts`.
 - Open the Run & Debug sidebar (Cmd + Shift + D), and click Run and Debug.
-- This should open something named Extension Development Host. From here, open the folder containing the Isograph config, which should be at the root of your project.
+- You may need to select "VSCode extension development." This should open something named Extension Development Host. From here, open the folder containing the Isograph config, which should be at the root of your project.
 - Now, you should be able to see `Isograph` and `Isograph LSP Logs` in the output pane.
 
 ### Settings

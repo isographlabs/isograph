@@ -4,7 +4,7 @@ import * as semver from 'semver';
 import { OutputChannel, window, workspace } from 'vscode';
 import { getConfig } from '../config';
 
-async function exists(file: string): Promise<boolean> {
+async function exists(file: string): Promise {
   return fs
     .stat(file)
     .then(() => true)
@@ -14,31 +14,29 @@ async function exists(file: string): Promise<boolean> {
 // This is derived from the isograph-compiler npm package
 function getBinaryPathRelativeToPackage(): string | null {
   if (process.platform === 'darwin' && process.arch === 'x64') {
-    return path.join('macos-x64', 'isograph');
+    return path.join('artifacts', 'macos-x64', 'isograph_cli');
   }
 
   if (process.platform === 'darwin' && process.arch === 'arm64') {
-    return path.join('macos-arm64', 'isograph');
+    return path.join('artifacts', 'macos-arm64', 'isograph_cli');
   }
 
   if (process.platform === 'linux' && process.arch === 'x64') {
-    return path.join('linux-x64', 'isograph');
+    return path.join('artifacts', 'linux-x64', 'isograph_cli');
   }
 
   if (process.platform === 'linux' && process.arch === 'arm64') {
-    return path.join('linux-arm64', 'isograph');
+    return path.join('artifacts', 'linux-arm64', 'isograph_cli');
   }
 
   if (process.platform === 'win32' && process.arch === 'x64') {
-    return path.join('win-x64', 'isograph.exe');
+    return path.join('artifacts', 'win-x64', 'isograph_cli.exe');
   }
 
   return null;
 }
 
-async function findIsographCompilerDirectory(
-  rootPath: string,
-): Promise<string | null> {
+async function findIsographCompilerDirectory(rootPath: string): Promise {
   let counter = 0;
   let currentPath = rootPath;
 
@@ -55,7 +53,8 @@ async function findIsographCompilerDirectory(
     const possibleBinaryPath = path.join(
       currentPath,
       'node_modules',
-      'isograph-compiler',
+      '@isograph',
+      'compiler',
     );
 
     if (await exists(possibleBinaryPath)) {
@@ -87,11 +86,10 @@ type IsographCompilerPackageInformation =
       expectedRange: string;
     };
 
-async function findIsographCompilerBinary(
-  rootPath: string,
-): Promise<IsographCompilerPackageInformation> {
-  const isographCompilerDirectory =
-    await findIsographCompilerDirectory(rootPath);
+async function findIsographCompilerBinary(rootPath: string): Promise {
+  const isographCompilerDirectory = await findIsographCompilerDirectory(
+    rootPath,
+  );
 
   if (!isographCompilerDirectory) {
     return { kind: 'packageNotFound' };
@@ -158,7 +156,7 @@ type IsographCompilerBinary = {
 
 export async function findIsographBinaryWithWarnings(
   outputChannel: OutputChannel,
-): Promise<IsographCompilerBinary | null> {
+): Promise {
   const config = getConfig();
 
   let rootPath = workspace.rootPath || process.cwd();
