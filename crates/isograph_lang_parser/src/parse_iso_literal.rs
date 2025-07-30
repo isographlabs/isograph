@@ -54,7 +54,6 @@ pub fn parse_iso_literal(
                 definition_file_path,
                 const_export_name,
                 text_source,
-                discriminator.span,
             )?,
         )),
         "pointer" => Ok(IsoLiteralExtractionResult::ClientPointerDeclaration(
@@ -63,7 +62,6 @@ pub fn parse_iso_literal(
                 definition_file_path,
                 const_export_name,
                 text_source,
-                discriminator.span,
             )?,
         )),
         _ => Err(WithLocation::new(
@@ -129,14 +127,12 @@ fn parse_iso_client_field_declaration(
     definition_file_path: RelativePathToSourceFile,
     const_export_name: Option<&str>,
     text_source: TextSource,
-    field_keyword_span: Span,
 ) -> ParseResultWithLocation<WithSpan<ClientFieldDeclaration>> {
     let client_field_declaration = parse_client_field_declaration_inner(
         tokens,
         definition_file_path,
         const_export_name,
         text_source,
-        field_keyword_span,
     )
     .map_err(|with_span| with_span.to_with_location(text_source))?;
 
@@ -155,14 +151,13 @@ fn parse_client_field_declaration_inner(
     definition_file_path: RelativePathToSourceFile,
     const_export_name: Option<&str>,
     text_source: TextSource,
-    field_keyword_span: Span,
 ) -> ParseResultWithSpan<WithSpan<ClientFieldDeclaration>> {
     tokens.with_span(|tokens| {
         let parent_type = tokens
             .parse_string_key_type(IsographLangTokenKind::Identifier)
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
-        let dot = tokens
+        let _ = tokens
             .parse_token_of_kind(IsographLangTokenKind::Period)
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
@@ -208,8 +203,6 @@ fn parse_client_field_declaration_inner(
             client_field_directive_set,
             const_export_name: const_export_name.intern().into(),
             variable_definitions,
-            field_keyword: WithSpan::new((), field_keyword_span),
-            dot: dot.map(|_| ()),
         })
     })
 }
@@ -219,14 +212,12 @@ fn parse_iso_client_pointer_declaration(
     definition_file_path: RelativePathToSourceFile,
     const_export_name: Option<&str>,
     text_source: TextSource,
-    field_keyword_span: Span,
 ) -> ParseResultWithLocation<WithSpan<ClientPointerDeclaration>> {
     let client_pointer_declaration = parse_client_pointer_declaration_inner(
         tokens,
         definition_file_path,
         const_export_name,
         text_source,
-        field_keyword_span,
     )
     .map_err(|with_span| with_span.to_with_location(text_source))?;
 
@@ -262,14 +253,13 @@ fn parse_client_pointer_declaration_inner(
     definition_file_path: RelativePathToSourceFile,
     const_export_name: Option<&str>,
     text_source: TextSource,
-    pointer_keyword_span: Span,
 ) -> ParseResultWithSpan<WithSpan<ClientPointerDeclaration>> {
     tokens.with_span(|tokens| {
         let parent_type = tokens
             .parse_string_key_type(IsographLangTokenKind::Identifier)
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
-        let dot = tokens
+        let _dot = tokens
             .parse_token_of_kind(IsographLangTokenKind::Period)
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
@@ -307,8 +297,6 @@ fn parse_client_pointer_declaration_inner(
             definition_path: definition_file_path,
             const_export_name: const_export_name.intern().into(),
             variable_definitions,
-            pointer_keyword: WithSpan::new((), pointer_keyword_span),
-            dot: dot.map(|_| ()),
         })
     })
 }
