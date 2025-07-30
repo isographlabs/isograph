@@ -29,7 +29,6 @@ use crate::{
     batch_compile::BatchCompileError,
     db_singletons::{get_iso_literal_map, get_isograph_config},
     isograph_literals::{parse_iso_literal_in_source, process_iso_literals},
-    source_files::IsoLiteralMap,
 };
 
 #[memo]
@@ -125,8 +124,7 @@ pub fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol>(
         SelectionType<UnprocessedClientFieldItem, UnprocessedClientPointerItem>,
     >,
 ) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), Box<dyn Error>> {
-    let iso_literal_map = get_iso_literal_map(db);
-    let contains_iso = parse_iso_literals(db, iso_literal_map)?;
+    let contains_iso = parse_iso_literals(db)?;
     let contains_iso_stats = contains_iso.stats();
 
     let (unprocessed_client_types, unprocessed_entrypoints) =
@@ -164,13 +162,11 @@ pub fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol>(
     Ok((unvalidated_isograph_schema, contains_iso_stats))
 }
 
-fn parse_iso_literals(
-    db: &Database,
-    iso_literals_sources: &IsoLiteralMap,
-) -> Result<ContainsIso, BatchCompileError> {
+fn parse_iso_literals(db: &Database) -> Result<ContainsIso, BatchCompileError> {
+    let iso_literal_map = get_iso_literal_map(db);
     let mut contains_iso = ContainsIso::default();
     let mut iso_literal_parse_errors = vec![];
-    for (relative_path, iso_literals_source_id) in iso_literals_sources.0.iter() {
+    for (relative_path, iso_literals_source_id) in iso_literal_map.0.iter() {
         match parse_iso_literal_in_source(db, *iso_literals_source_id).to_owned() {
             Ok(iso_literals) => {
                 if !iso_literals.is_empty() {
