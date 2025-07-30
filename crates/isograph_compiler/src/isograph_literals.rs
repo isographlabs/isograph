@@ -18,7 +18,7 @@ use std::{
 };
 
 use crate::{
-    batch_compile::BatchCompileError, create_schema::ContainsIso,
+    batch_compile::BatchCompileError, create_schema::ParsedIsoLiteralsMap,
     db_singletons::get_current_working_directory,
 };
 
@@ -146,7 +146,7 @@ pub fn parse_iso_literal_in_source(
 #[allow(clippy::type_complexity)]
 pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
     schema: &mut Schema<TNetworkProtocol>,
-    contains_iso: ContainsIso,
+    contains_iso: ParsedIsoLiteralsMap,
 ) -> Result<
     (
         Vec<UnprocessedItem>,

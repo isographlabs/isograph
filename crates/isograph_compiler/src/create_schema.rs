@@ -162,9 +162,9 @@ pub fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol>(
     Ok((unvalidated_isograph_schema, contains_iso_stats))
 }
 
-fn parse_iso_literals(db: &Database) -> Result<ContainsIso, BatchCompileError> {
+fn parse_iso_literals(db: &Database) -> Result<ParsedIsoLiteralsMap, BatchCompileError> {
     let iso_literal_map = get_iso_literal_map(db);
-    let mut contains_iso = ContainsIso::default();
+    let mut contains_iso = ParsedIsoLiteralsMap::default();
     let mut iso_literal_parse_errors = vec![];
     for (relative_path, iso_literals_source_id) in iso_literal_map.0.iter() {
         match parse_iso_literal_in_source(db, *iso_literals_source_id).to_owned() {
@@ -186,11 +186,11 @@ fn parse_iso_literals(db: &Database) -> Result<ContainsIso, BatchCompileError> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
-pub struct ContainsIso {
+pub struct ParsedIsoLiteralsMap {
     pub files: HashMap<RelativePathToSourceFile, Vec<(IsoLiteralExtractionResult, TextSource)>>,
 }
 
-impl ContainsIso {
+impl ParsedIsoLiteralsMap {
     pub fn stats(&self) -> ContainsIsoStats {
         let mut client_field_count: usize = 0;
         let mut client_pointer_count: usize = 0;
@@ -216,7 +216,7 @@ impl ContainsIso {
     }
 }
 
-impl Deref for ContainsIso {
+impl Deref for ParsedIsoLiteralsMap {
     type Target = HashMap<RelativePathToSourceFile, Vec<(IsoLiteralExtractionResult, TextSource)>>;
 
     fn deref(&self) -> &Self::Target {
@@ -224,7 +224,7 @@ impl Deref for ContainsIso {
     }
 }
 
-impl DerefMut for ContainsIso {
+impl DerefMut for ParsedIsoLiteralsMap {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.files
     }
