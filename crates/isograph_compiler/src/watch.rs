@@ -44,6 +44,7 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol + 'static>(
                     );
                     state = CompilerState::new(config_location.clone(), current_working_directory)?;
                     watcher.stop();
+                    // TODO is this a bug? Will we continue to watch the old folders? I think so.
                     (rx, watcher) = create_debounced_file_watcher(&config);
                     WithDuration::new(|| compile::<TNetworkProtocol>(&state.db))
                 } else {
