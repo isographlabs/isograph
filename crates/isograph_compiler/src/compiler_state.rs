@@ -24,6 +24,7 @@ use crate::{
 
 const GC_DURATION_SECONDS: u64 = 60;
 
+#[derive(Debug)]
 pub struct CompilerState {
     pub db: Database,
     pub last_gc_run: Instant,

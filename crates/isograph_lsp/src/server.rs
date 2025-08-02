@@ -1,4 +1,4 @@
-use std::ops::ControlFlow;
+use std::{ops::ControlFlow, path::PathBuf};
 
 use crate::{
     lsp_notification_dispatch::LSPNotificationDispatch,
@@ -13,7 +13,8 @@ use crate::{
     },
 };
 use common_lang_types::CurrentWorkingDirectory;
-use isograph_config::CompilerConfig;
+use isograph_compiler::{BatchCompileError, CompilerState};
+use isograph_schema::NetworkProtocol;
 use lsp_server::{Connection, ErrorCode, ProtocolError, Response, ResponseError};
 use lsp_types::request::SemanticTokensFullRequest;
 use lsp_types::{
@@ -26,7 +27,9 @@ use thiserror::Error;
 
 /// Initializes an LSP connection, handling the `initialize` message and `initialized` notification
 /// handshake.
-pub fn initialize(connection: &Connection) -> LSPProcessResult<InitializeParams> {
+pub fn initialize<TNetworkProtocol: NetworkProtocol + 'static>(
+    connection: &Connection,
+) -> LSPProcessResult<InitializeParams, TNetworkProtocol> {
     let server_capabilities = ServerCapabilities {
         // Enable text document syncing so we can know when files are opened/changed/saved/closed
         text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
@@ -47,14 +50,16 @@ pub fn initialize(connection: &Connection) -> LSPProcessResult<InitializeParams>
 }
 
 /// Run the main server loop
-pub async fn run(
+pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
     connection: Connection,
-    config: CompilerConfig,
+    config_location: PathBuf,
     _params: InitializeParams,
     current_working_directory: CurrentWorkingDirectory,
-) -> LSPProcessResult<()> {
+) -> LSPProcessResult<(), TNetworkProtocol> {
+    let compiler_state = CompilerState::new(config_location.clone(), current_working_directory)?;
     eprintln!("Running server loop");
-    let mut state = LSPState::new(connection.sender.clone(), config, current_working_directory);
+    let mut state = LSPState::new(connection.sender.clone(), compiler_state);
+
     while let Ok(message) = connection.receiver.recv() {
         match message {
             lsp_server::Message::Request(request) => {
@@ -113,10 +118,11 @@ fn dispatch_request(request: lsp_server::Request, lsp_state: &mut LSPState) -> R
     }
 }
 
-pub(crate) type LSPProcessResult<T> = Result<T, LSPProcessError>;
+pub(crate) type LSPProcessResult<T, TNetworkProtocol> =
+    Result<T, LSPProcessError<TNetworkProtocol>>;
 
 #[derive(Debug, Error)]
-pub enum LSPProcessError {
+pub enum LSPProcessError<TNetworkProtocol: NetworkProtocol + 'static> {
     #[error("{error}")]
     Serde {
         #[from]
@@ -133,5 +139,11 @@ pub enum LSPProcessError {
     ProtocolError {
         #[from]
         error: ProtocolError,
+    },
+
+    #[error("{error}")]
+    BatchCompileError {
+        #[from]
+        error: BatchCompileError<TNetworkProtocol>,
     },
 }

@@ -6,7 +6,6 @@ use common_lang_types::CurrentWorkingDirectory;
 use graphql_network_protocol::GraphQLNetworkProtocol;
 use intern::string_key::Intern;
 use isograph_compiler::{compile_and_print, handle_watch_command};
-use isograph_config::create_config;
 use opt::{Command, CompileCommand, LspCommand, Opt};
 use std::io;
 use tracing::{error, info, level_filters::LevelFilter};
@@ -65,14 +64,16 @@ async fn start_language_server(
     lsp_command: LspCommand,
     current_working_directory: CurrentWorkingDirectory,
 ) {
-    let config = create_config(
-        lsp_command
-            .config
-            .unwrap_or("./isograph.config.json".into()),
-        current_working_directory,
-    );
+    let config_location = lsp_command
+        .config
+        .unwrap_or("./isograph.config.json".into());
     info!("Starting language server");
-    if let Err(_e) = isograph_lsp::start_language_server(config, current_working_directory).await {
+    if let Err(_e) = isograph_lsp::start_language_server::<GraphQLNetworkProtocol>(
+        config_location,
+        current_working_directory,
+    )
+    .await
+    {
         error!(
             "{}",
             "Error encountered when running language server.".bright_red(),

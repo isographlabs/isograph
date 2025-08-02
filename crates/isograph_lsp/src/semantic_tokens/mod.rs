@@ -27,7 +27,7 @@ pub fn on_semantic_token_full_request(
     state: &mut LSPState,
     params: <SemanticTokensFullRequest as Request>::Params,
 ) -> LSPRuntimeResult<<SemanticTokensFullRequest as Request>::Result> {
-    let current_working_directory = get_current_working_directory(&state.db);
+    let current_working_directory = get_current_working_directory(&state.compiler_state.db);
 
     #[allow(unreachable_code)]
     let SemanticTokensParams {
