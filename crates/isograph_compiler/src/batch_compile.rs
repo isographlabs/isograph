@@ -1,15 +1,14 @@
 use std::path::PathBuf;
 
 use crate::{
-    compiler_state::{compile, CompilerState},
+    compiler_state::{compile, BatchCompileError, CompilerState},
     source_files::initialize_sources,
     with_duration::WithDuration,
 };
 use colored::Colorize;
-use common_lang_types::{CurrentWorkingDirectory, WithLocation};
+use common_lang_types::CurrentWorkingDirectory;
 use isograph_schema::NetworkProtocol;
 use pretty_duration::pretty_duration;
-use thiserror::Error;
 use tracing::{error, info};
 
 pub struct CompilationStats {
@@ -21,7 +20,7 @@ pub struct CompilationStats {
 pub fn compile_and_print<TNetworkProtocol: NetworkProtocol + 'static>(
     config_location: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), BatchCompileError<TNetworkProtocol>> {
     info!("{}", "Starting to compile.".cyan());
     print_result(WithDuration::new(|| {
         let mut state = CompilerState::new(config_location, current_working_directory);
@@ -30,9 +29,9 @@ pub fn compile_and_print<TNetworkProtocol: NetworkProtocol + 'static>(
     }))
 }
 
-pub fn print_result(
-    result: WithDuration<Result<CompilationStats, Box<dyn std::error::Error>>>,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub fn print_result<TNetworkProtocol: NetworkProtocol + 'static>(
+    result: WithDuration<Result<CompilationStats, BatchCompileError<TNetworkProtocol>>>,
+) -> Result<(), BatchCompileError<TNetworkProtocol>> {
     let elapsed_time = result.elapsed_time;
     match result.item {
         Ok(stats) => {
@@ -59,18 +58,4 @@ pub fn print_result(
             Err(err)
         }
     }
-}
-
-#[derive(Error, Debug)]
-pub enum BatchCompileError {
-    #[error(
-        "{}",
-        messages.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{x}"));
-            output
-        })
-    )]
-    MultipleErrorsWithLocations {
-        messages: Vec<WithLocation<Box<dyn std::error::Error>>>,
-    },
 }

@@ -1,5 +1,4 @@
 use std::{
-    error::Error,
     ops::Deref,
     path::PathBuf,
     time::{Duration, Instant},
@@ -8,14 +7,19 @@ use std::{
 use common_lang_types::{CurrentWorkingDirectory, WithLocation};
 use generate_artifacts::get_artifact_path_and_content;
 use isograph_config::create_config;
-use isograph_schema::{validate_use_of_arguments, NetworkProtocol};
+use isograph_schema::{validate_use_of_arguments, NetworkProtocol, ValidateUseOfArgumentsError};
 use pico::Database;
+use thiserror::Error;
 
 use crate::{
-    batch_compile::{BatchCompileError, CompilationStats},
-    create_schema::{create_schema, process_iso_literals_for_schema},
+    batch_compile::CompilationStats,
+    create_schema::{
+        create_schema, process_iso_literals_for_schema, CreateSchemaError,
+        ProcessIsoLiteralsForSchemaError,
+    },
     db_singletons::get_isograph_config,
-    write_artifacts::write_artifacts_to_disk,
+    source_files::SourceError,
+    write_artifacts::{write_artifacts_to_disk, GenerateArtifactsError},
 };
 
 const GC_DURATION_SECONDS: u64 = 60;
@@ -80,7 +84,7 @@ impl CompilerState {
 /// of whether they belong in this function, or at all.
 pub fn compile<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &Database,
-) -> Result<CompilationStats, Box<dyn Error>> {
+) -> Result<CompilationStats, BatchCompileError<TNetworkProtocol>> {
     // Create schema
     let (unvalidated_isograph_schema, unprocessed_items) =
         create_schema::<TNetworkProtocol>(db).deref().clone()?;
@@ -90,16 +94,7 @@ pub fn compile<TNetworkProtocol: NetworkProtocol + 'static>(
         unprocessed_items,
     )?;
 
-    validate_use_of_arguments(&isograph_schema).map_err(|messages| {
-        Box::new(BatchCompileError::MultipleErrorsWithLocations {
-            messages: messages
-                .into_iter()
-                .map(|x| {
-                    WithLocation::new(Box::new(x.item) as Box<dyn std::error::Error>, x.location)
-                })
-                .collect(),
-        })
-    })?;
+    validate_use_of_arguments(&isograph_schema)?;
 
     // Note: we calculate all of the artifact paths and contents first, so that writing to
     // disk can be as fast as possible and we minimize the chance that changes to the file
@@ -115,4 +110,62 @@ pub fn compile<TNetworkProtocol: NetworkProtocol + 'static>(
         entrypoint_count: stats.entrypoint_count,
         total_artifacts_written,
     })
+}
+
+#[derive(Error, Debug)]
+pub enum BatchCompileError<TNetworkProtocol: NetworkProtocol + 'static> {
+    // TODO don't use this error variant
+    #[error(
+        "{}",
+        messages.iter().fold(String::new(), |mut output, x| {
+            output.push_str(&format!("\n\n{x}"));
+            output
+        })
+    )]
+    MultipleErrorsWithLocations {
+        messages: Vec<WithLocation<Box<dyn std::error::Error>>>,
+    },
+
+    #[error("{error}")]
+    CreateSchemaError {
+        #[from]
+        error: CreateSchemaError<TNetworkProtocol>,
+    },
+
+    #[error("{error}")]
+    ProcessIsoLiteralsForSchemaError {
+        #[from]
+        error: ProcessIsoLiteralsForSchemaError,
+    },
+
+    #[error("{error}")]
+    SourceError {
+        #[from]
+        error: SourceError,
+    },
+
+    #[error("{error}")]
+    GenerateArtifacts {
+        #[from]
+        error: GenerateArtifactsError,
+    },
+
+    #[error(
+        "{}",
+        messages.iter().fold(String::new(), |mut output, x| {
+            output.push_str(&format!("\n\n{x}"));
+            output
+        })
+    )]
+    ValidateUseOfArguments {
+        messages: Vec<WithLocation<ValidateUseOfArgumentsError>>,
+    },
+}
+
+impl<TNetworkProtocol: NetworkProtocol + 'static>
+    From<Vec<WithLocation<ValidateUseOfArgumentsError>>> for BatchCompileError<TNetworkProtocol>
+{
+    fn from(messages: Vec<WithLocation<ValidateUseOfArgumentsError>>) -> Self {
+        BatchCompileError::ValidateUseOfArguments { messages }
+    }
 }

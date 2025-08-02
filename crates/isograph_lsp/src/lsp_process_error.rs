@@ -1,7 +1,6 @@
 use std::io::Error as IOError;
 
 use crossbeam::channel::SendError;
-use isograph_compiler::batch_compile::BatchCompileError;
 use lsp_server::Message;
 use lsp_server::ProtocolError;
 use serde_json::Error as SerdeError;
@@ -22,14 +21,12 @@ macro_rules! extend_error {
 #[derive(Debug)]
 pub enum LSPProcessError {
     ProtocolError(ProtocolError),
-    BatchCompileError(BatchCompileError),
     IOError(IOError),
     SerdeError(SerdeError),
     JoinError(JoinError),
     SendError(SendError<Message>),
 }
 
-extend_error!(BatchCompileError);
 extend_error!(IOError);
 extend_error!(ProtocolError);
 extend_error!(SerdeError);
