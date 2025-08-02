@@ -114,18 +114,6 @@ pub fn compile<TNetworkProtocol: NetworkProtocol + 'static>(
 
 #[derive(Error, Debug)]
 pub enum BatchCompileError<TNetworkProtocol: NetworkProtocol + 'static> {
-    // TODO don't use this error variant
-    #[error(
-        "{}",
-        messages.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{x}"));
-            output
-        })
-    )]
-    MultipleErrorsWithLocations {
-        messages: Vec<WithLocation<Box<dyn std::error::Error>>>,
-    },
-
     #[error("{error}")]
     CreateSchemaError {
         #[from]
