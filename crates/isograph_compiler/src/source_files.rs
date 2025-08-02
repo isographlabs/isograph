@@ -28,7 +28,7 @@ use crate::{
 #[derive(Debug, Clone, Singleton, PartialEq, Eq)]
 pub struct IsoLiteralMap(pub HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>);
 
-pub fn read_all_source_files(db: &mut Database) -> Result<(), Box<dyn Error>> {
+pub fn initialize_sources(db: &mut Database) -> Result<(), Box<dyn Error>> {
     let schema = get_isograph_config(db).schema.clone();
     let schema_source_id = read_schema(db, &schema)?;
     let schema_extension_sources = read_schema_extensions(db)?;
@@ -43,7 +43,10 @@ pub fn read_all_source_files(db: &mut Database) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn read_updates(db: &mut Database, changes: &[SourceFileEvent]) -> Result<(), Box<dyn Error>> {
+pub fn update_sources(
+    db: &mut Database,
+    changes: &[SourceFileEvent],
+) -> Result<(), Box<dyn Error>> {
     // TODO: We can avoid using booleans and do this more cleanly, e.g. with Options
     let mut standard_sources = get_standard_sources(db).clone();
     let mut standard_sources_modified = false;

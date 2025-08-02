@@ -17,7 +17,7 @@ use crate::{
     batch_compile::print_result,
     compiler_state::{compile, CompilerState},
     db_singletons::get_isograph_config,
-    source_files::{read_all_source_files, read_updates},
+    source_files::{initialize_sources, update_sources},
     with_duration::WithDuration,
 };
 
@@ -29,14 +29,13 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol + 'static>(
 
     let config = get_isograph_config(&state.db).clone();
 
-    let (mut rx, mut watcher) = create_debounced_file_watcher(&config);
-
     info!("{}", "Starting to compile.".cyan());
     let _ = print_result(WithDuration::new(|| {
-        read_all_source_files(&mut state.db)?;
+        initialize_sources(&mut state.db)?;
         compile::<TNetworkProtocol>(&state.db)
     }));
 
+    let (mut rx, mut watcher) = create_debounced_file_watcher(&config);
     while let Some(res) = rx.recv().await {
         match res {
             Ok(events) => {
@@ -51,13 +50,13 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol + 'static>(
                         watcher.stop();
                         (rx, watcher) = create_debounced_file_watcher(&config);
                         WithDuration::new(|| {
-                            read_all_source_files(&mut state.db)?;
+                            initialize_sources(&mut state.db)?;
                             compile::<TNetworkProtocol>(&state.db)
                         })
                     } else {
                         info!("{}", "File changes detected. Starting to compile.".cyan());
                         WithDuration::new(|| {
-                            read_updates(&mut state.db, &changes)?;
+                            update_sources(&mut state.db, &changes)?;
                             compile::<TNetworkProtocol>(&state.db)
                         })
                     };
