@@ -239,7 +239,7 @@ fn create_debounced_file_watcher(
 
     let mut watcher = new_debouncer(
         // TODO control this with config
-        Duration::from_millis(500),
+        Duration::from_millis(100),
         None,
         move |result: DebounceEventResult| {
             let tx = tx.clone();
