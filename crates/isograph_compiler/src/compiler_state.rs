@@ -18,7 +18,7 @@ use crate::{
         ProcessIsoLiteralsForSchemaError,
     },
     db_singletons::get_isograph_config,
-    source_files::SourceError,
+    source_files::{initialize_sources, SourceError},
     write_artifacts::{write_artifacts_to_disk, GenerateArtifactsError},
 };
 
@@ -30,17 +30,18 @@ pub struct CompilerState {
 }
 
 impl CompilerState {
-    pub fn new(
+    pub fn new<TNetworkProtocol: NetworkProtocol + 'static>(
         config_location: PathBuf,
         current_working_directory: CurrentWorkingDirectory,
-    ) -> Self {
+    ) -> Result<Self, BatchCompileError<TNetworkProtocol>> {
         let mut db = Database::new();
         db.set(current_working_directory);
         db.set(create_config(config_location, current_working_directory));
-        Self {
+        initialize_sources(&mut db)?;
+        Ok(Self {
             db,
             last_gc_run: Instant::now(),
-        }
+        })
     }
 
     pub fn run_garbage_collection(&mut self) {
@@ -148,6 +149,15 @@ pub enum BatchCompileError<TNetworkProtocol: NetworkProtocol + 'static> {
     ValidateUseOfArguments {
         messages: Vec<WithLocation<ValidateUseOfArgumentsError>>,
     },
+
+    #[error(
+        "{}",
+        messages.iter().fold(String::new(), |mut output, x| {
+            output.push_str(&format!("\n\n{x}"));
+            output
+        })
+    )]
+    NotifyErrors { messages: Vec<notify::Error> },
 }
 
 impl<TNetworkProtocol: NetworkProtocol + 'static>
@@ -155,5 +165,13 @@ impl<TNetworkProtocol: NetworkProtocol + 'static>
 {
     fn from(messages: Vec<WithLocation<ValidateUseOfArgumentsError>>) -> Self {
         BatchCompileError::ValidateUseOfArguments { messages }
+    }
+}
+
+impl<TNetworkProtocol: NetworkProtocol + 'static> From<Vec<notify::Error>>
+    for BatchCompileError<TNetworkProtocol>
+{
+    fn from(messages: Vec<notify::Error>) -> Self {
+        BatchCompileError::NotifyErrors { messages }
     }
 }

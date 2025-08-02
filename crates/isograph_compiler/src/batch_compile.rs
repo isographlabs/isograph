@@ -2,7 +2,6 @@ use std::path::PathBuf;
 
 use crate::{
     compiler_state::{compile, BatchCompileError, CompilerState},
-    source_files::initialize_sources,
     with_duration::WithDuration,
 };
 use colored::Colorize;
@@ -22,11 +21,8 @@ pub fn compile_and_print<TNetworkProtocol: NetworkProtocol + 'static>(
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(), BatchCompileError<TNetworkProtocol>> {
     info!("{}", "Starting to compile.".cyan());
-    print_result(WithDuration::new(|| {
-        let mut state = CompilerState::new(config_location, current_working_directory);
-        initialize_sources(&mut state.db)?;
-        compile::<TNetworkProtocol>(&state.db)
-    }))
+    let state = CompilerState::new(config_location, current_working_directory)?;
+    print_result(WithDuration::new(|| compile::<TNetworkProtocol>(&state.db)))
 }
 
 pub fn print_result<TNetworkProtocol: NetworkProtocol + 'static>(

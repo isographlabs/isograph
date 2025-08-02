@@ -17,23 +17,21 @@ use crate::{
     batch_compile::print_result,
     compiler_state::{compile, CompilerState},
     db_singletons::get_isograph_config,
-    source_files::{initialize_sources, update_sources},
+    source_files::update_sources,
     with_duration::WithDuration,
+    BatchCompileError,
 };
 
 pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol + 'static>(
     config_location: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
-) -> Result<(), Vec<Error>> {
-    let mut state = CompilerState::new(config_location.clone(), current_working_directory);
+) -> Result<(), BatchCompileError<TNetworkProtocol>> {
+    let mut state = CompilerState::new(config_location.clone(), current_working_directory)?;
 
     let config = get_isograph_config(&state.db).clone();
 
     info!("{}", "Starting to compile.".cyan());
-    let _ = print_result(WithDuration::new(|| {
-        initialize_sources(&mut state.db)?;
-        compile::<TNetworkProtocol>(&state.db)
-    }));
+    let _ = print_result(WithDuration::new(|| compile::<TNetworkProtocol>(&state.db)));
 
     let (mut rx, mut watcher) = create_debounced_file_watcher(&config);
     while let Some(res) = rx.recv().await {
@@ -44,13 +42,10 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol + 'static>(
                         "{}",
                         "Config change detected. Starting a full compilation.".cyan()
                     );
-                    state = CompilerState::new(config_location.clone(), current_working_directory);
+                    state = CompilerState::new(config_location.clone(), current_working_directory)?;
                     watcher.stop();
                     (rx, watcher) = create_debounced_file_watcher(&config);
-                    WithDuration::new(|| {
-                        initialize_sources(&mut state.db)?;
-                        compile::<TNetworkProtocol>(&state.db)
-                    })
+                    WithDuration::new(|| compile::<TNetworkProtocol>(&state.db))
                 } else {
                     info!("{}", "File changes detected. Starting to compile.".cyan());
                     WithDuration::new(|| {
@@ -61,7 +56,7 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol + 'static>(
                 let _ = print_result(result);
                 state.run_garbage_collection();
             }
-            Err(errors) => return Err(errors),
+            Err(errors) => return Err(errors.into()),
         }
     }
     Ok(())
