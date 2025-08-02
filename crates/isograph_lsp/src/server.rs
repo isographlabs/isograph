@@ -1,5 +1,3 @@
-use std::{ops::ControlFlow, path::PathBuf};
-
 use crate::{
     lsp_notification_dispatch::LSPNotificationDispatch,
     lsp_request_dispatch::LSPRequestDispatch,
@@ -12,9 +10,15 @@ use crate::{
         on_did_change_text_document, on_did_close_text_document, on_did_open_text_document,
     },
 };
+use colored::Colorize;
 use common_lang_types::CurrentWorkingDirectory;
-use isograph_compiler::{BatchCompileError, CompilerState};
+use isograph_compiler::{
+    get_isograph_config, update_sources,
+    watch::{create_debounced_file_watcher, has_config_changes},
+    BatchCompileError, CompilerState, SourceError,
+};
 use isograph_schema::NetworkProtocol;
+use log::info;
 use lsp_server::{Connection, ErrorCode, ProtocolError, Response, ResponseError};
 use lsp_types::request::SemanticTokensFullRequest;
 use lsp_types::{
@@ -23,6 +27,7 @@ use lsp_types::{
     SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentSyncCapability,
     TextDocumentSyncKind, WorkDoneProgressOptions,
 };
+use std::{ops::ControlFlow, path::PathBuf};
 use thiserror::Error;
 
 /// Initializes an LSP connection, handling the `initialize` message and `initialized` notification
@@ -58,28 +63,65 @@ pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
 ) -> LSPProcessResult<(), TNetworkProtocol> {
     let compiler_state = CompilerState::new(config_location, current_working_directory)?;
     eprintln!("Running server loop");
-    let mut state = LSPState::new(connection.sender.clone(), compiler_state);
+    let mut lsp_state = LSPState::new(connection.sender.clone(), compiler_state);
 
-    let (tokio_sender, mut tokio_receiver) = tokio::sync::mpsc::channel(100);
+    let (tokio_sender, mut lsp_message_receiver) = tokio::sync::mpsc::channel(100);
     bridge_crossbeam_to_tokio(connection.receiver, tokio_sender);
 
-    while let Some(message) = tokio_receiver.recv().await {
-        match message {
-            lsp_server::Message::Request(request) => {
-                eprintln!("Received request: {request:?}");
-                let response = dispatch_request(request, &mut state);
-                eprintln!("Sending response: {response:?}");
-                state.send_message(response.into());
+    let config = get_isograph_config(&lsp_state.compiler_state.db).clone();
+
+    let (mut file_system_receiver, mut file_system_watcher) =
+        create_debounced_file_watcher(&config);
+
+    'all_messages: loop {
+        tokio::select! {
+            message = lsp_message_receiver.recv() => {
+                if let Some(lsp_message) = message {
+                    match lsp_message {
+                        lsp_server::Message::Request(request) => {
+                            eprintln!("Received request: {request:?}");
+                            let response = dispatch_request(request, &mut lsp_state);
+                            eprintln!("Sending response: {response:?}");
+                            lsp_state.send_message(response.into());
+                        }
+                        lsp_server::Message::Notification(notification) => {
+                            let _ = dispatch_notification(notification, &mut lsp_state);
+                        }
+                        lsp_server::Message::Response(response) => {
+                            eprintln!("Received response: {response:?}");
+                        }
+                    }
+                } else {
+                    // If any connection breaks, we can just end
+                    break 'all_messages;
+                }
             }
-            lsp_server::Message::Notification(notification) => {
-                let _ = dispatch_notification(notification, &mut state);
+            message = file_system_receiver.recv() => {
+                if let Some(Ok(changes)) = message {
+                    if has_config_changes(&changes) {
+                        info!(
+                            "{}",
+                            "Config change detected.".cyan()
+                        );
+                        let compiler_state = CompilerState::new(config_location, current_working_directory)?;
+                        lsp_state = LSPState::new(connection.sender.clone(), compiler_state);
+                        file_system_watcher.stop();
+                        // TODO is this a bug? Will we continue to watch the old folders? I think so.
+                        (file_system_receiver, file_system_watcher) = create_debounced_file_watcher(&config);
+                    } else {
+                        info!("{}", "File changes detected. Starting to compile.".cyan());
+                        update_sources(&mut lsp_state.compiler_state.db, &changes)?;
+                    };
+                    lsp_state.compiler_state.run_garbage_collection();
+                } else {
+                    // If any connection breaks or we have some file system errors, we can just end here.
+                    break 'all_messages;
+                }
             }
-            lsp_server::Message::Response(response) => {
-                eprintln!("Received response: {response:?}");
-            }
-        }
+        };
     }
 
+    // TODO provide a way to exit
     panic!("Client exited without proper shutdown sequence.")
 }
 
@@ -148,6 +190,12 @@ pub enum LSPProcessError<TNetworkProtocol: NetworkProtocol + 'static> {
     BatchCompileError {
         #[from]
         error: BatchCompileError<TNetworkProtocol>,
+    },
+
+    #[error("{error}")]
+    SourceError {
+        #[from]
+        error: SourceError,
     },
 }
 

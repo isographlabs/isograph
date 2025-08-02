@@ -1339,6 +1339,7 @@ dependencies = [
 name = "isograph_lsp"
 version = "0.3.1"
 dependencies = [
+ "colored",
  "common_lang_types",
  "crossbeam",
  "intern",

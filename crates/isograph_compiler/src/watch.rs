@@ -62,7 +62,7 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok(())
 }
 
-fn has_config_changes(changes: &[SourceFileEvent]) -> bool {
+pub fn has_config_changes(changes: &[SourceFileEvent]) -> bool {
     changes
         .iter()
         .any(|(_, changed_file_kind)| matches!(changed_file_kind, ChangedFileKind::Config))
@@ -220,7 +220,7 @@ fn categorize_changed_file_and_filter_changes_in_artifact_directory(
 
 // TODO reimplement this as create_debounced_file_watcher.map(...)
 #[allow(clippy::complexity)]
-fn create_debounced_file_watcher(
+pub fn create_debounced_file_watcher(
     config: &CompilerConfig,
 ) -> (
     Receiver<Result<Vec<(SourceEventKind, ChangedFileKind)>, Vec<Error>>>,

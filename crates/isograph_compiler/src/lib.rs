@@ -16,4 +16,5 @@ pub use isograph_literals::{
     extract_iso_literals_from_file_content, parse_iso_literals_in_file_content,
     IsoLiteralExtraction,
 };
+pub use source_files::*;
 pub use watch::handle_watch_command;

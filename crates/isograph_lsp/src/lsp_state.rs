@@ -7,6 +7,7 @@ use lsp_types::Url;
 
 use crate::lsp_runtime_error::LSPRuntimeResult;
 
+// TODO this struct doesn't need to exist
 #[derive(Debug)]
 pub struct LSPState {
     pub compiler_state: CompilerState,
@@ -23,6 +24,7 @@ impl LSPState {
         }
     }
 
+    // TODO store these in the db
     pub fn document_opened(&mut self, uri: &Url, text: &str) -> LSPRuntimeResult<()> {
         self.open_docs.insert(uri.to_owned(), text.to_owned());
         Ok(())
