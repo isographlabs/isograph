@@ -38,31 +38,28 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol + 'static>(
     let (mut rx, mut watcher) = create_debounced_file_watcher(&config);
     while let Some(res) = rx.recv().await {
         match res {
-            Ok(events) => {
-                if let Some(changes) = categorize_and_filter_events(&events, &config) {
-                    let result = if has_config_changes(&changes) {
-                        info!(
-                            "{}",
-                            "Config change detected. Starting a full compilation.".cyan()
-                        );
-                        state =
-                            CompilerState::new(config_location.clone(), current_working_directory);
-                        watcher.stop();
-                        (rx, watcher) = create_debounced_file_watcher(&config);
-                        WithDuration::new(|| {
-                            initialize_sources(&mut state.db)?;
-                            compile::<TNetworkProtocol>(&state.db)
-                        })
-                    } else {
-                        info!("{}", "File changes detected. Starting to compile.".cyan());
-                        WithDuration::new(|| {
-                            update_sources(&mut state.db, &changes)?;
-                            compile::<TNetworkProtocol>(&state.db)
-                        })
-                    };
-                    let _ = print_result(result);
-                    state.run_garbage_collection();
-                }
+            Ok(changes) => {
+                let result = if has_config_changes(&changes) {
+                    info!(
+                        "{}",
+                        "Config change detected. Starting a full compilation.".cyan()
+                    );
+                    state = CompilerState::new(config_location.clone(), current_working_directory);
+                    watcher.stop();
+                    (rx, watcher) = create_debounced_file_watcher(&config);
+                    WithDuration::new(|| {
+                        initialize_sources(&mut state.db)?;
+                        compile::<TNetworkProtocol>(&state.db)
+                    })
+                } else {
+                    info!("{}", "File changes detected. Starting to compile.".cyan());
+                    WithDuration::new(|| {
+                        update_sources(&mut state.db, &changes)?;
+                        compile::<TNetworkProtocol>(&state.db)
+                    })
+                };
+                let _ = print_result(result);
+                state.run_garbage_collection();
             }
             Err(errors) => return Err(errors),
         }
@@ -226,28 +223,35 @@ fn categorize_changed_file_and_filter_changes_in_artifact_directory(
     None
 }
 
+// TODO reimplement this as create_debounced_file_watcher.map(...)
 #[allow(clippy::complexity)]
 fn create_debounced_file_watcher(
     config: &CompilerConfig,
 ) -> (
-    Receiver<Result<Vec<DebouncedEvent>, Vec<Error>>>,
+    Receiver<Result<Vec<(SourceEventKind, ChangedFileKind)>, Vec<Error>>>,
     Debouncer<RecommendedWatcher, RecommendedCache>,
 ) {
-    let (tx, rx) = tokio::sync::mpsc::channel(1);
-    let rt = Handle::current();
+    let (sender, receiver) = tokio::sync::mpsc::channel(1);
+    let current_runtime = Handle::current();
+    let config_for_watcher = config.clone();
 
     let mut watcher = new_debouncer(
         // TODO control this with config
         Duration::from_millis(100),
         None,
         move |result: DebounceEventResult| {
-            let tx = tx.clone();
+            let events = result
+                .map(|events| categorize_and_filter_events(&events, &config_for_watcher))
+                .transpose();
 
-            rt.spawn(async move {
-                if let Err(e) = tx.send(result).await {
-                    println!("Error sending event result: {e:?}");
-                }
-            });
+            if let Some(events) = events {
+                let sender = sender.clone();
+                current_runtime.spawn(async move {
+                    if let Err(e) = sender.send(events).await {
+                        println!("Error sending event result: {e:?}");
+                    }
+                });
+            }
         },
     )
     .expect("Expected to be able to create debouncer");
@@ -267,7 +271,7 @@ fn create_debounced_file_watcher(
             .expect("Failing when watching schema extension");
     }
 
-    (rx, watcher)
+    (receiver, watcher)
 }
 
 #[derive(Debug, Clone)]
