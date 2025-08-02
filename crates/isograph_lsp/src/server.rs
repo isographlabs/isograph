@@ -56,7 +56,7 @@ pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
     _params: InitializeParams,
     current_working_directory: CurrentWorkingDirectory,
 ) -> LSPProcessResult<(), TNetworkProtocol> {
-    let compiler_state = CompilerState::new(config_location.clone(), current_working_directory)?;
+    let compiler_state = CompilerState::new(config_location, current_working_directory)?;
     eprintln!("Running server loop");
     let mut state = LSPState::new(connection.sender.clone(), compiler_state);
 
