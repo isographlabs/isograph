@@ -37,7 +37,7 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol + 'static>(
     while let Some(res) = rx.recv().await {
         match res {
             Ok(changes) => {
-                let result = if has_config_changes(&changes) {
+                if has_config_changes(&changes) {
                     info!(
                         "{}",
                         "Config change detected. Starting a full compilation.".cyan()
@@ -46,14 +46,11 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol + 'static>(
                     watcher.stop();
                     // TODO is this a bug? Will we continue to watch the old folders? I think so.
                     (rx, watcher) = create_debounced_file_watcher(&config);
-                    WithDuration::new(|| compile::<TNetworkProtocol>(&state.db))
                 } else {
                     info!("{}", "File changes detected. Starting to compile.".cyan());
-                    WithDuration::new(|| {
-                        update_sources(&mut state.db, &changes)?;
-                        compile::<TNetworkProtocol>(&state.db)
-                    })
+                    update_sources(&mut state.db, &changes)?;
                 };
+                let result = WithDuration::new(|| compile::<TNetworkProtocol>(&state.db));
                 let _ = print_result(result);
                 state.run_garbage_collection();
             }
