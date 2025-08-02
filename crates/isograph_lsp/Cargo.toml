@@ -12,6 +12,7 @@ isograph_lang_parser = { path = "../isograph_lang_parser" }
 isograph_lang_types = { path = "../isograph_lang_types" }
 isograph_config = { path = "../isograph_config" }
 pico = { path = "../pico" }
+crossbeam = { workspace = true }
 log = { workspace = true, features = ["kv_unstable", "kv_unstable_std"] }
 lsp-server = { workspace = true }
 lsp-types = { workspace = true }
@@ -20,5 +21,5 @@ serde_json = { workspace = true, features = [
   "float_roundtrip",
   "unbounded_depth",
 ] }
-crossbeam = { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util", "tracing"] }

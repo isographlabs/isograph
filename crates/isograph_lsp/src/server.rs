@@ -2,7 +2,6 @@ use std::ops::ControlFlow;
 
 use crate::{
     lsp_notification_dispatch::LSPNotificationDispatch,
-    lsp_process_error::LSPProcessResult,
     lsp_request_dispatch::LSPRequestDispatch,
     lsp_runtime_error::LSPRuntimeError,
     lsp_state::LSPState,
@@ -15,7 +14,7 @@ use crate::{
 };
 use common_lang_types::CurrentWorkingDirectory;
 use isograph_config::CompilerConfig;
-use lsp_server::{Connection, ErrorCode, Response, ResponseError};
+use lsp_server::{Connection, ErrorCode, ProtocolError, Response, ResponseError};
 use lsp_types::request::SemanticTokensFullRequest;
 use lsp_types::{
     notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument},
@@ -23,6 +22,7 @@ use lsp_types::{
     SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentSyncCapability,
     TextDocumentSyncKind, WorkDoneProgressOptions,
 };
+use thiserror::Error;
 
 /// Initializes an LSP connection, handling the `initialize` message and `initialized` notification
 /// handshake.
@@ -111,4 +111,27 @@ fn dispatch_request(request: lsp_server::Request, lsp_state: &mut LSPState) -> R
             }),
         },
     }
+}
+
+pub(crate) type LSPProcessResult<T> = Result<T, LSPProcessError>;
+
+#[derive(Debug, Error)]
+pub enum LSPProcessError {
+    #[error("{error}")]
+    Serde {
+        #[from]
+        error: serde_json::Error,
+    },
+
+    #[error("{error}")]
+    Io {
+        #[from]
+        error: std::io::Error,
+    },
+
+    #[error("{error}")]
+    ProtocolError {
+        #[from]
+        error: ProtocolError,
+    },
 }

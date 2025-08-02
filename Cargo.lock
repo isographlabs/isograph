@@ -1352,6 +1352,7 @@ dependencies = [
  "pico",
  "serde",
  "serde_json",
+ "thiserror",
  "tokio",
 ]
 
