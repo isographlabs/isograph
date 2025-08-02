@@ -1,7 +1,7 @@
 use std::{
     collections::{BTreeMap, HashMap},
-    error::Error,
     path::{Path, PathBuf},
+    str::Utf8Error,
 };
 
 use common_lang_types::{
@@ -14,21 +14,21 @@ use isograph_lang_types::{IsoLiteralsSource, SchemaSource};
 use isograph_schema::StandardSources;
 use pico::{Database, SourceId};
 use pico_macros::Singleton;
+use thiserror::Error;
 
 use crate::{
-    batch_compile::BatchCompileError,
     db_singletons::{
         get_current_working_directory, get_iso_literal_map, get_isograph_config,
         get_standard_sources,
     },
-    isograph_literals::{read_file, read_files_in_folder},
+    isograph_literals::{read_file, read_files_in_folder, ReadFileError},
     watch::{ChangedFileKind, SourceEventKind, SourceFileEvent},
 };
 
 #[derive(Debug, Clone, Singleton, PartialEq, Eq)]
 pub struct IsoLiteralMap(pub HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>);
 
-pub fn initialize_sources(db: &mut Database) -> Result<(), Box<dyn Error>> {
+pub fn initialize_sources(db: &mut Database) -> Result<(), SourceError> {
     let schema = get_isograph_config(db).schema.clone();
     let schema_source_id = read_schema(db, &schema)?;
     let schema_extension_sources = read_schema_extensions(db)?;
@@ -43,10 +43,7 @@ pub fn initialize_sources(db: &mut Database) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn update_sources(
-    db: &mut Database,
-    changes: &[SourceFileEvent],
-) -> Result<(), Box<dyn Error>> {
+pub fn update_sources(db: &mut Database, changes: &[SourceFileEvent]) -> Result<(), SourceError> {
     // TODO: We can avoid using booleans and do this more cleanly, e.g. with Options
     let mut standard_sources = get_standard_sources(db).clone();
     let mut standard_sources_modified = false;
@@ -78,7 +75,7 @@ pub fn update_sources(
         })
         .collect::<Vec<_>>();
     if !errors.is_empty() {
-        Err(BatchCompileError::MultipleErrors { messages: errors }.into())
+        Err(SourceError::MultipleErrors { messages: errors }.into())
     } else {
         if standard_sources_modified {
             db.set(standard_sources);
@@ -95,7 +92,7 @@ fn handle_update_schema(
     db: &mut Database,
     standard_sources: &mut StandardSources,
     event_kind: &SourceEventKind,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), SourceError> {
     let schema = get_isograph_config(db).schema.clone();
     match event_kind {
         SourceEventKind::CreateOrModify(_) => {
@@ -103,10 +100,10 @@ fn handle_update_schema(
         }
         SourceEventKind::Rename((_, target_path)) => {
             if schema.absolute_path != *target_path {
-                return Err(Box::new(BatchCompileError::SchemaNotFound));
+                return Err(SourceError::SchemaNotFound);
             }
         }
-        SourceEventKind::Remove(_) => return Err(Box::new(BatchCompileError::SchemaNotFound)),
+        SourceEventKind::Remove(_) => return Err(SourceError::SchemaNotFound),
     }
     Ok(())
 }
@@ -115,7 +112,7 @@ fn handle_update_schema_extensions(
     db: &mut Database,
     standard_sources: &mut StandardSources,
     event_kind: &SourceEventKind,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), SourceError> {
     match event_kind {
         SourceEventKind::CreateOrModify(path) => {
             create_or_update_schema_extension(db, standard_sources, path)?;
@@ -154,7 +151,7 @@ fn create_or_update_schema_extension(
     db: &mut Database,
     standard_sources: &mut StandardSources,
     path: &Path,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), SourceError> {
     let absolute_and_relative =
         absolute_and_relative_paths(get_current_working_directory(db), path.to_path_buf());
     let schema_id = read_schema(db, &absolute_and_relative)?;
@@ -168,7 +165,7 @@ fn handle_update_source_file(
     db: &mut Database,
     iso_literals: &mut IsoLiteralMap,
     event_kind: &SourceEventKind,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), SourceError> {
     match event_kind {
         SourceEventKind::CreateOrModify(path) => {
             create_or_update_iso_literals(db, iso_literals, path)?;
@@ -197,7 +194,7 @@ fn create_or_update_iso_literals(
     db: &mut Database,
     iso_literals: &mut IsoLiteralMap,
     path: &Path,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), SourceError> {
     let (relative_path, content) =
         read_file(path.to_path_buf(), get_current_working_directory(db))?;
     let source_id = db.set(IsoLiteralsSource {
@@ -212,7 +209,7 @@ fn handle_update_source_folder(
     db: &mut Database,
     iso_literals: &mut IsoLiteralMap,
     event_kind: &SourceEventKind,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), SourceError> {
     match event_kind {
         SourceEventKind::CreateOrModify(folder) => {
             read_iso_literals_from_folder(db, iso_literals, folder)?;
@@ -250,7 +247,7 @@ fn remove_iso_literals_from_folder(
 fn read_schema(
     db: &mut Database,
     schema_path: &AbsolutePathAndRelativePath,
-) -> Result<SourceId<SchemaSource>, Box<dyn Error>> {
+) -> Result<SourceId<SchemaSource>, SourceError> {
     let content = read_schema_file(&schema_path.absolute_path)?;
     let text_source = TextSource {
         relative_path_to_source_file: schema_path.relative_path,
@@ -265,32 +262,32 @@ fn read_schema(
     Ok(schema_id)
 }
 
-fn read_schema_file(path: &PathBuf) -> Result<String, BatchCompileError> {
+fn read_schema_file(path: &PathBuf) -> Result<String, SourceError> {
     let current_dir = std::env::current_dir().expect("current_dir should exist");
     let joined = current_dir.join(path);
     let canonicalized_existing_path =
         joined
             .canonicalize()
-            .map_err(|e| BatchCompileError::UnableToLoadSchema {
+            .map_err(|e| SourceError::UnableToLoadSchema {
                 path: joined,
                 message: e.to_string(),
             })?;
 
     if !canonicalized_existing_path.is_file() {
-        return Err(BatchCompileError::SchemaNotAFile {
+        return Err(SourceError::SchemaNotAFile {
             path: canonicalized_existing_path,
         });
     }
 
     let contents = std::fs::read(canonicalized_existing_path.clone()).map_err(|e| {
-        BatchCompileError::UnableToReadFile {
+        SourceError::UnableToReadFile {
             path: canonicalized_existing_path.clone(),
             message: e.to_string(),
         }
     })?;
 
     let contents = std::str::from_utf8(&contents)
-        .map_err(|e| BatchCompileError::UnableToConvertToString {
+        .map_err(|e| SourceError::UnableToConvertToString {
             path: canonicalized_existing_path.clone(),
             reason: e,
         })?
@@ -301,7 +298,7 @@ fn read_schema_file(path: &PathBuf) -> Result<String, BatchCompileError> {
 
 fn read_schema_extensions(
     db: &mut Database,
-) -> Result<BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>, Box<dyn Error>> {
+) -> Result<BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>, SourceError> {
     let config_schema_extensions = get_isograph_config(db).schema_extensions.clone();
     let mut schema_extensions = BTreeMap::new();
     for schema_extension_path in config_schema_extensions.iter() {
@@ -311,7 +308,7 @@ fn read_schema_extensions(
     Ok(schema_extensions)
 }
 
-fn read_iso_literals_from_project_root(db: &mut Database) -> Result<IsoLiteralMap, Box<dyn Error>> {
+fn read_iso_literals_from_project_root(db: &mut Database) -> Result<IsoLiteralMap, SourceError> {
     let project_root = get_isograph_config(db).project_root.clone();
     let mut iso_literals = IsoLiteralMap(HashMap::new());
     read_iso_literals_from_folder(db, &mut iso_literals, &project_root)?;
@@ -322,7 +319,7 @@ fn read_iso_literals_from_folder(
     db: &mut Database,
     iso_literals: &mut IsoLiteralMap,
     folder: &Path,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), SourceError> {
     for (relative_path, content) in read_files_in_folder(folder, get_current_working_directory(db))?
     {
         let source_id = db.set(IsoLiteralsSource {
@@ -332,4 +329,39 @@ fn read_iso_literals_from_folder(
         iso_literals.0.insert(relative_path, source_id);
     }
     Ok(())
+}
+
+#[derive(Debug, Error)]
+pub enum SourceError {
+    #[error("Unable to load schema file at path {path:?}.\nReason: {message}")]
+    UnableToLoadSchema { path: PathBuf, message: String },
+
+    #[error("Schema file not found. Cannot proceed without a schema.")]
+    SchemaNotFound,
+
+    #[error(
+        "Attempted to load the schema at the following path: {path:?}, but that is not a file."
+    )]
+    SchemaNotAFile { path: PathBuf },
+
+    #[error("Unable to read the file at the following path: {path:?}.\nReason: {message}")]
+    UnableToReadFile { path: PathBuf, message: String },
+
+    #[error("Unable to convert file {path:?} to utf8.\nDetailed reason: {reason}")]
+    UnableToConvertToString { path: PathBuf, reason: Utf8Error },
+
+    #[error(
+        "{}",
+        messages.iter().fold(String::new(), |mut output, x| {
+            output.push_str(&format!("\n\n{x}"));
+            output
+        })
+    )]
+    MultipleErrors { messages: Vec<SourceError> },
+
+    #[error("{error}")]
+    ReadFileError {
+        #[from]
+        error: ReadFileError,
+    },
 }

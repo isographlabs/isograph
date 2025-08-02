@@ -17,17 +17,16 @@ use std::{
     fs::{self, DirEntry},
     io,
     path::{Path, PathBuf},
+    str::Utf8Error,
 };
+use thiserror::Error;
 
-use crate::{
-    batch_compile::BatchCompileError, create_schema::ParsedIsoLiteralsMap,
-    db_singletons::get_current_working_directory,
-};
+use crate::{create_schema::ParsedIsoLiteralsMap, db_singletons::get_current_working_directory};
 
 pub fn read_files_in_folder(
     folder: &Path,
     current_working_directory: CurrentWorkingDirectory,
-) -> Result<Vec<(RelativePathToSourceFile, String)>, BatchCompileError> {
+) -> Result<Vec<(RelativePathToSourceFile, String)>, ReadFileError> {
     read_dir_recursive(folder)?
         .into_iter()
         .filter(|p| {
@@ -50,9 +49,9 @@ pub fn read_files_in_folder(
 pub fn read_file(
     path: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
-) -> Result<(RelativePathToSourceFile, String), BatchCompileError> {
+) -> Result<(RelativePathToSourceFile, String), ReadFileError> {
     // N.B. we have previously ensured that path is a file
-    let contents = std::fs::read(&path).map_err(|e| BatchCompileError::UnableToReadFile {
+    let contents = std::fs::read(&path).map_err(|e| ReadFileError::UnableToReadFile {
         path: path.clone(),
         message: e.to_string(),
     })?;
@@ -61,19 +60,31 @@ pub fn read_file(
         relative_path_from_absolute_and_working_directory(current_working_directory, &path);
 
     let contents = std::str::from_utf8(&contents)
-        .map_err(|e| BatchCompileError::UnableToConvertToString { path, reason: e })?
+        .map_err(|e| ReadFileError::UnableToConvertToString { path, reason: e })?
         .to_owned();
 
     Ok((relative_path, contents))
 }
 
-fn read_dir_recursive(root_js_path: &Path) -> Result<Vec<PathBuf>, BatchCompileError> {
+#[derive(Debug, Error)]
+pub enum ReadFileError {
+    #[error("Unable to read the file at the following path: {path:?}.\nReason: {message}")]
+    UnableToReadFile { path: PathBuf, message: String },
+
+    #[error("Unable to convert file {path:?} to utf8.\nDetailed reason: {reason}")]
+    UnableToConvertToString { path: PathBuf, reason: Utf8Error },
+
+    #[error("Unable to traverse directory.\nReason: {message}")]
+    UnableToTraverseDirectory { message: String },
+}
+
+fn read_dir_recursive(root_js_path: &Path) -> Result<Vec<PathBuf>, ReadFileError> {
     let mut paths = vec![];
 
     visit_dirs_skipping_isograph(root_js_path, &mut |dir_entry| {
         paths.push(dir_entry.path());
     })
-    .map_err(|e| BatchCompileError::UnableToTraverseDirectory {
+    .map_err(|e| ReadFileError::UnableToTraverseDirectory {
         message: e.to_string(),
     })?;
 
