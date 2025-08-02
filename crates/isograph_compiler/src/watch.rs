@@ -21,8 +21,6 @@ use crate::{
     with_duration::WithDuration,
 };
 
-const MAX_CHANGED_FILES: usize = 100;
-
 pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol + 'static>(
     config_location: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
@@ -56,19 +54,10 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol + 'static>(
                             read_all_source_files(&mut state.db)?;
                             compile::<TNetworkProtocol>(&state.db)
                         })
-                    } else if changes.len() < MAX_CHANGED_FILES {
+                    } else {
                         info!("{}", "File changes detected. Starting to compile.".cyan());
                         WithDuration::new(|| {
                             read_updates(&mut state.db, &changes)?;
-                            compile::<TNetworkProtocol>(&state.db)
-                        })
-                    } else {
-                        info!(
-                            "{}",
-                            "Too many changes. Starting a full compilation.".cyan()
-                        );
-                        WithDuration::new(|| {
-                            read_all_source_files(&mut state.db)?;
                             compile::<TNetworkProtocol>(&state.db)
                         })
                     };
