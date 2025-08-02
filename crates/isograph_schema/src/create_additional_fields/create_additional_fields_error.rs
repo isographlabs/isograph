@@ -66,9 +66,6 @@ pub enum CreateAdditionalFieldsError {
     #[error("Invalid field `{field_arg}` in @exposeField directive")]
     InvalidField { field_arg: String },
 
-    #[error("Invalid mutation field")]
-    InvalidMutationField,
-
     #[error(
         "Error when processing @exposeField directive on type `{primary_type_name}`. \
         The field `{mutation_object_name}.{mutation_field_name}` does not have argument `{field_name}`, \

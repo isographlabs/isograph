@@ -6,7 +6,9 @@ use isograph_lang_parser::{
     parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
 };
 use isograph_lang_types::{EntrypointDeclaration, IsoLiteralsSource, SelectionType};
-use isograph_schema::{NetworkProtocol, Schema, UnprocessedItem};
+use isograph_schema::{
+    NetworkProtocol, ProcessClientFieldDeclarationError, Schema, UnprocessedItem,
+};
 use lazy_static::lazy_static;
 use pico::{Database, SourceId};
 use pico_macros::memo;
@@ -152,7 +154,7 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
         Vec<UnprocessedItem>,
         Vec<(TextSource, WithSpan<EntrypointDeclaration>)>,
     ),
-    BatchCompileError,
+    Vec<WithLocation<ProcessClientFieldDeclarationError>>,
 > {
     let mut errors = vec![];
     let mut unprocess_client_field_items = vec![];
@@ -194,7 +196,7 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
     if errors.is_empty() {
         Ok((unprocess_client_field_items, unprocessed_entrypoints))
     } else {
-        Err(errors.into())
+        Err(errors)
     }
 }
 

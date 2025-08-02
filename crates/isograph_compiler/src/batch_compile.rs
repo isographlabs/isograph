@@ -7,8 +7,7 @@ use crate::{
 };
 use colored::Colorize;
 use common_lang_types::{CurrentWorkingDirectory, WithLocation};
-use isograph_lang_parser::IsographLiteralParseError;
-use isograph_schema::{NetworkProtocol, ProcessClientFieldDeclarationError};
+use isograph_schema::NetworkProtocol;
 use pretty_duration::pretty_duration;
 use thiserror::Error;
 use tracing::{error, info};
@@ -81,34 +80,6 @@ pub enum BatchCompileError {
     #[error("Unable to traverse directory.\nReason: {message}")]
     UnableToTraverseDirectory { message: String },
 
-    #[error(
-        "{}{}",
-        if messages.len() == 1 { "Unable to parse Isograph literal:" } else { "Unable to parse Isograph literals:" },
-        messages.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{x}"));
-            output
-        })
-    )]
-    UnableToParseIsographLiterals {
-        messages: Vec<WithLocation<IsographLiteralParseError>>,
-    },
-
-    #[error(
-        "{}{}",
-        if messages.len() == 1 {
-            "Error when processing a client field declaration:"
-        } else {
-            "Errors when processing client field declarations:"
-        },
-        messages.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{x}"));
-            output
-        })
-    )]
-    ErrorWhenProcessingClientFieldDeclaration {
-        messages: Vec<WithLocation<isograph_schema::ProcessClientFieldDeclarationError>>,
-    },
-
     #[error("Unable to convert file {path:?} to utf8.\nDetailed reason: {reason}")]
     UnableToConvertToString { path: PathBuf, reason: Utf8Error },
 
@@ -133,16 +104,4 @@ pub enum BatchCompileError {
     MultipleErrorsWithLocations {
         messages: Vec<WithLocation<Box<dyn std::error::Error>>>,
     },
-}
-
-impl From<Vec<WithLocation<IsographLiteralParseError>>> for BatchCompileError {
-    fn from(messages: Vec<WithLocation<IsographLiteralParseError>>) -> Self {
-        BatchCompileError::UnableToParseIsographLiterals { messages }
-    }
-}
-
-impl From<Vec<WithLocation<ProcessClientFieldDeclarationError>>> for BatchCompileError {
-    fn from(messages: Vec<WithLocation<ProcessClientFieldDeclarationError>>) -> Self {
-        BatchCompileError::ErrorWhenProcessingClientFieldDeclaration { messages }
-    }
 }

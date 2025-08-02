@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    error::Error,
     ops::{Deref, DerefMut},
 };
 
@@ -12,21 +11,21 @@ use graphql_lang_types::{
     GraphQLConstantValue, GraphQLInputValueDefinition, NameValuePair, RootOperationKind,
 };
 use isograph_config::CompilerConfigOptions;
-use isograph_lang_parser::IsoLiteralExtractionResult;
+use isograph_lang_parser::{IsoLiteralExtractionResult, IsographLiteralParseError};
 use isograph_lang_types::{ConstantValue, SelectionType, TypeAnnotation, VariableDefinition};
 use isograph_schema::{
     validate_entrypoints, CreateAdditionalFieldsError, FieldToInsert, NetworkProtocol,
-    ProcessObjectTypeDefinitionOutcome, ProcessTypeSystemDocumentOutcome, RootOperationName,
-    Schema, ServerEntityName, ServerObjectSelectable, ServerObjectSelectableVariant,
-    ServerScalarSelectable, UnprocessedClientFieldItem, UnprocessedClientPointerItem,
+    ProcessClientFieldDeclarationError, ProcessObjectTypeDefinitionOutcome,
+    ProcessTypeSystemDocumentOutcome, RootOperationName, Schema, ServerEntityName,
+    ServerObjectSelectable, ServerObjectSelectableVariant, ServerScalarSelectable,
+    UnprocessedClientFieldItem, UnprocessedClientPointerItem, ValidateEntrypointDeclarationError,
 };
 use pico::Database;
 use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
-    add_selection_sets::add_selection_sets_to_client_selectables,
-    batch_compile::BatchCompileError,
+    add_selection_sets::{add_selection_sets_to_client_selectables, AddSelectionSetsError},
     db_singletons::{get_iso_literal_map, get_isograph_config},
     isograph_literals::{parse_iso_literal_in_source, process_iso_literals},
 };
@@ -123,7 +122,7 @@ pub fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol>(
     mut unprocessed_items: Vec<
         SelectionType<UnprocessedClientFieldItem, UnprocessedClientPointerItem>,
     >,
-) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), Box<dyn Error>> {
+) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), ProcessIsoLiteralsForSchemaError> {
     let contains_iso = parse_iso_literals(db)?;
     let contains_iso_stats = contains_iso.stats();
 
@@ -133,16 +132,8 @@ pub fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol>(
 
     unvalidated_isograph_schema.add_link_fields()?;
 
-    unvalidated_isograph_schema.entrypoints = validate_entrypoints(
-        &unvalidated_isograph_schema,
-        unprocessed_entrypoints,
-    )
-    .map_err(|e| BatchCompileError::MultipleErrorsWithLocations {
-        messages: e
-            .into_iter()
-            .map(|x| WithLocation::new(Box::new(x.item) as Box<dyn std::error::Error>, x.location))
-            .collect(),
-    })?;
+    unvalidated_isograph_schema.entrypoints =
+        validate_entrypoints(&unvalidated_isograph_schema, unprocessed_entrypoints)?;
 
     // Step two: now, we can create the selection sets. Creating a selection set involves
     // looking up client selectables, to:
@@ -151,18 +142,96 @@ pub fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol>(
     // - to validate arguments (e.g. no missing arguments, etc.)
     // - validate loadability/updatability, and
     // - to store the selectable id,
-    add_selection_sets_to_client_selectables(&mut unvalidated_isograph_schema, unprocessed_items)
-        .map_err(|messages| BatchCompileError::MultipleErrorsWithLocations {
-        messages: messages
-            .into_iter()
-            .map(|x| WithLocation::new(Box::new(x.item) as Box<dyn std::error::Error>, x.location))
-            .collect(),
-    })?;
+    add_selection_sets_to_client_selectables(&mut unvalidated_isograph_schema, unprocessed_items)?;
 
     Ok((unvalidated_isograph_schema, contains_iso_stats))
 }
 
-fn parse_iso_literals(db: &Database) -> Result<ParsedIsoLiteralsMap, BatchCompileError> {
+#[derive(Debug, Error)]
+pub enum ProcessIsoLiteralsForSchemaError {
+    #[error(
+        "{}{}",
+        if messages.len() == 1 { "Unable to process Isograph literal:" } else { "Unable to process Isograph literals:" },
+        messages.iter().fold(String::new(), |mut output, x| {
+            output.push_str(&format!("\n\n{x}"));
+            output
+        })
+    )]
+    ProcessIsoLiterals {
+        messages: Vec<WithLocation<ProcessClientFieldDeclarationError>>,
+    },
+
+    #[error("{error}")]
+    ProcessTypeDefinition {
+        #[from]
+        error: WithLocation<CreateAdditionalFieldsError>,
+    },
+
+    #[error(
+        "{}",
+        messages.iter().fold(String::new(), |mut output, x| {
+            output.push_str(&format!("\n\n{x}"));
+            output
+        })
+    )]
+    AddSelectionSets {
+        messages: Vec<WithLocation<AddSelectionSetsError>>,
+    },
+
+    #[error(
+        "{}",
+        messages.iter().fold(String::new(), |mut output, x| {
+            output.push_str(&format!("\n\n{x}"));
+            output
+        })
+    )]
+    ParseIsoLiteral {
+        messages: Vec<WithLocation<IsographLiteralParseError>>,
+    },
+
+    #[error(
+        "{}",
+        messages.iter().fold(String::new(), |mut output, x| {
+            output.push_str(&format!("\n\n{x}"));
+            output
+        })
+    )]
+    ValidateEntrypointDeclaration {
+        messages: Vec<WithLocation<ValidateEntrypointDeclarationError>>,
+    },
+}
+
+impl From<Vec<WithLocation<ProcessClientFieldDeclarationError>>>
+    for ProcessIsoLiteralsForSchemaError
+{
+    fn from(messages: Vec<WithLocation<ProcessClientFieldDeclarationError>>) -> Self {
+        ProcessIsoLiteralsForSchemaError::ProcessIsoLiterals { messages }
+    }
+}
+
+impl From<Vec<WithLocation<IsographLiteralParseError>>> for ProcessIsoLiteralsForSchemaError {
+    fn from(messages: Vec<WithLocation<IsographLiteralParseError>>) -> Self {
+        ProcessIsoLiteralsForSchemaError::ParseIsoLiteral { messages }
+    }
+}
+
+impl From<Vec<WithLocation<ValidateEntrypointDeclarationError>>>
+    for ProcessIsoLiteralsForSchemaError
+{
+    fn from(messages: Vec<WithLocation<ValidateEntrypointDeclarationError>>) -> Self {
+        ProcessIsoLiteralsForSchemaError::ValidateEntrypointDeclaration { messages }
+    }
+}
+
+impl From<Vec<WithLocation<AddSelectionSetsError>>> for ProcessIsoLiteralsForSchemaError {
+    fn from(messages: Vec<WithLocation<AddSelectionSetsError>>) -> Self {
+        ProcessIsoLiteralsForSchemaError::AddSelectionSets { messages }
+    }
+}
+
+fn parse_iso_literals(
+    db: &Database,
+) -> Result<ParsedIsoLiteralsMap, Vec<WithLocation<IsographLiteralParseError>>> {
     let iso_literal_map = get_iso_literal_map(db);
     let mut contains_iso = ParsedIsoLiteralsMap::default();
     let mut iso_literal_parse_errors = vec![];
@@ -181,7 +250,7 @@ fn parse_iso_literals(db: &Database) -> Result<ParsedIsoLiteralsMap, BatchCompil
     if iso_literal_parse_errors.is_empty() {
         Ok(contains_iso)
     } else {
-        Err(iso_literal_parse_errors.into())
+        Err(iso_literal_parse_errors)
     }
 }
 
