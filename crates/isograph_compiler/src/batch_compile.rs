@@ -70,9 +70,6 @@ pub enum BatchCompileError {
     #[error("Schema file not found. Cannot proceed without a schema.")]
     SchemaNotFound,
 
-    #[error("The project root at the following path: \"{path:?}\", is not a directory.")]
-    ProjectRootNotADirectory { path: PathBuf },
-
     #[error("Unable to read the file at the following path: {path:?}.\nReason: {message}")]
     UnableToReadFile { path: PathBuf, message: String },
 
@@ -96,9 +93,6 @@ pub enum BatchCompileError {
         messages: Vec<WithLocation<IsographLiteralParseError>>,
     },
 
-    #[error("Error when doing additional schema processing.\nReason: {0}")]
-    UnableToCreateSchema(#[from] WithLocation<isograph_schema::CreateAdditionalFieldsError>),
-
     #[error(
         "{}{}",
         if messages.len() == 1 {
@@ -115,14 +109,8 @@ pub enum BatchCompileError {
         messages: Vec<WithLocation<isograph_schema::ProcessClientFieldDeclarationError>>,
     },
 
-    #[error("Unable to strip prefix.\nReason: {0}")]
-    UnableToStripPrefix(#[from] std::path::StripPrefixError),
-
     #[error("Unable to convert file {path:?} to utf8.\nDetailed reason: {reason}")]
     UnableToConvertToString { path: PathBuf, reason: Utf8Error },
-
-    #[error("The __refetch field was already defined. Isograph creates it automatically; you cannot create it.")]
-    DuplicateRefetchField,
 
     #[error(
         "{}",
