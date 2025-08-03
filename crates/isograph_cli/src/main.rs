@@ -37,7 +37,7 @@ async fn start_compiler(
 
     if compile_command.watch {
         match handle_watch_command::<GraphQLNetworkProtocol>(
-            config_location,
+            &config_location,
             current_working_directory,
         )
         .await
@@ -51,7 +51,7 @@ async fn start_compiler(
             }
         };
     } else if compile_and_print::<GraphQLNetworkProtocol>(
-        config_location,
+        &config_location,
         current_working_directory,
     )
     .is_err()
@@ -69,7 +69,7 @@ async fn start_language_server(
         .unwrap_or("./isograph.config.json".into());
     info!("Starting language server");
     if let Err(_e) = isograph_lsp::start_language_server::<GraphQLNetworkProtocol>(
-        config_location,
+        &config_location,
         current_working_directory,
     )
     .await

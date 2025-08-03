@@ -52,7 +52,7 @@ pub fn initialize<TNetworkProtocol: NetworkProtocol + 'static>(
 /// Run the main server loop
 pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
     connection: Connection,
-    config_location: PathBuf,
+    config_location: &PathBuf,
     _params: InitializeParams,
     current_working_directory: CurrentWorkingDirectory,
 ) -> LSPProcessResult<(), TNetworkProtocol> {

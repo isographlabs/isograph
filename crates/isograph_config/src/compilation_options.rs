@@ -122,10 +122,10 @@ pub struct IsographProjectConfig {
 }
 
 pub fn create_config(
-    config_location: PathBuf,
+    config_location: &PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> CompilerConfig {
-    let config_contents = match std::fs::read_to_string(&config_location) {
+    let config_contents = match std::fs::read_to_string(config_location) {
         Ok(contents) => contents,
         Err(_) => match config_location.to_str() {
             Some(loc) => {
@@ -140,9 +140,8 @@ pub fn create_config(
     let config_parsed: IsographProjectConfig = serde_json::from_str(&config_contents)
         .unwrap_or_else(|e| panic!("Error parsing config. Error: {e}"));
 
-    let mut config = config_location.clone();
-    config.pop();
-    let config_dir = config;
+    let mut config_dir = config_location.clone();
+    config_dir.pop();
 
     let artifact_dir = config_dir
         .join(

@@ -16,7 +16,7 @@ pub mod server;
 pub mod text_document;
 
 pub async fn start_language_server<TNetworkProtocol: NetworkProtocol + 'static>(
-    config_location: PathBuf,
+    config_location: &PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> LSPProcessResult<(), TNetworkProtocol> {
     let (connection, io_handles) = Connection::stdio();

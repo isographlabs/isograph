@@ -23,10 +23,10 @@ use crate::{
 };
 
 pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol + 'static>(
-    config_location: PathBuf,
+    config_location: &PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(), BatchCompileError<TNetworkProtocol>> {
-    let mut state = CompilerState::new(config_location.clone(), current_working_directory)?;
+    let mut state = CompilerState::new(config_location, current_working_directory)?;
 
     let config = get_isograph_config(&state.db).clone();
 
@@ -42,7 +42,7 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol + 'static>(
                         "{}",
                         "Config change detected. Starting a full compilation.".cyan()
                     );
-                    state = CompilerState::new(config_location.clone(), current_working_directory)?;
+                    state = CompilerState::new(config_location, current_working_directory)?;
                     watcher.stop();
                     // TODO is this a bug? Will we continue to watch the old folders? I think so.
                     (rx, watcher) = create_debounced_file_watcher(&config);

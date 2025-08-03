@@ -32,7 +32,7 @@ pub struct CompilerState {
 
 impl CompilerState {
     pub fn new<TNetworkProtocol: NetworkProtocol + 'static>(
-        config_location: PathBuf,
+        config_location: &PathBuf,
         current_working_directory: CurrentWorkingDirectory,
     ) -> Result<Self, BatchCompileError<TNetworkProtocol>> {
         let mut db = Database::new();

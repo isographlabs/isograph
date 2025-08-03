@@ -17,7 +17,7 @@ pub struct CompilationStats {
 }
 
 pub fn compile_and_print<TNetworkProtocol: NetworkProtocol + 'static>(
-    config_location: PathBuf,
+    config_location: &PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(), BatchCompileError<TNetworkProtocol>> {
     info!("{}", "Starting to compile.".cyan());
