@@ -60,7 +60,10 @@ pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
     eprintln!("Running server loop");
     let mut state = LSPState::new(connection.sender.clone(), compiler_state);
 
-    while let Ok(message) = connection.receiver.recv() {
+    let (tokio_sender, mut tokio_receiver) = tokio::sync::mpsc::channel(100);
+    bridge_crossbeam_to_tokio(connection.receiver, tokio_sender);
+
+    while let Some(message) = tokio_receiver.recv().await {
         match message {
             lsp_server::Message::Request(request) => {
                 eprintln!("Received request: {request:?}");
@@ -146,4 +149,18 @@ pub enum LSPProcessError<TNetworkProtocol: NetworkProtocol + 'static> {
         #[from]
         error: BatchCompileError<TNetworkProtocol>,
     },
+}
+
+fn bridge_crossbeam_to_tokio<T: Send + 'static>(
+    crossbeam_receiver: crossbeam::channel::Receiver<T>,
+    tokio_sender: tokio::sync::mpsc::Sender<T>,
+) {
+    std::thread::spawn(move || {
+        while let Ok(msg) = crossbeam_receiver.recv() {
+            // Use blocking_send since we're in a std::thread, not tokio task
+            if tokio_sender.blocking_send(msg).is_err() {
+                break;
+            }
+        }
+    });
 }
