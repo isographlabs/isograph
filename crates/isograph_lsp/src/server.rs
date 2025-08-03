@@ -123,8 +123,8 @@ pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
                     } else {
                         info!("{}", "File changes detected. Starting to compile.".cyan());
                         update_sources(&mut lsp_state.compiler_state.db, &changes)?;
+                        lsp_state.compiler_state.run_garbage_collection();
                     };
-                    lsp_state.compiler_state.run_garbage_collection();
                 } else {
                     // If any connection breaks or we have some file system errors, we can just end here.
                     break 'all_messages;
