@@ -33,8 +33,9 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol + 'static>(
     info!("{}", "Starting to compile.".cyan());
     let _ = print_result(WithDuration::new(|| compile::<TNetworkProtocol>(&state.db)));
 
-    let (mut rx, mut watcher) = create_debounced_file_watcher(&config);
-    while let Some(res) = rx.recv().await {
+    let (mut file_system_receiver, mut file_system_watcher) =
+        create_debounced_file_watcher(&config);
+    while let Some(res) = file_system_receiver.recv().await {
         match res {
             Ok(changes) => {
                 if has_config_changes(&changes) {
@@ -43,9 +44,10 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol + 'static>(
                         "Config change detected. Starting a full compilation.".cyan()
                     );
                     state = CompilerState::new(config_location, current_working_directory)?;
-                    watcher.stop();
+                    file_system_watcher.stop();
                     // TODO is this a bug? Will we continue to watch the old folders? I think so.
-                    (rx, watcher) = create_debounced_file_watcher(&config);
+                    (file_system_receiver, file_system_watcher) =
+                        create_debounced_file_watcher(&config);
                 } else {
                     info!("{}", "File changes detected. Starting to compile.".cyan());
                     update_sources(&mut state.db, &changes)?;
