@@ -18,7 +18,7 @@ use isograph_compiler::{
     BatchCompileError, CompilerState, SourceError,
 };
 use isograph_schema::NetworkProtocol;
-use log::info;
+use log::{info, warn};
 use lsp_server::{Connection, ErrorCode, ProtocolError, Response, ResponseError};
 use lsp_types::request::SemanticTokensFullRequest;
 use lsp_types::{
@@ -108,6 +108,18 @@ pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
                         file_system_watcher.stop();
                         // TODO is this a bug? Will we continue to watch the old folders? I think so.
                         (file_system_receiver, file_system_watcher) = create_debounced_file_watcher(&config);
+
+                        // TODO this is a temporary expedient. We need a good way to copy the old DB state to the
+                        // new DB. Namely, there's an open files hash map that needs to be transferred over.
+                        //
+                        // That will probably be a bit more easily solved when we have a db macro.
+                        warn!("Shutting down language server. This is not currently supported");
+                        // Wrapping this in if true, because otherwise, cargo complains that the above code
+                        // is useless! And that's true. But this is a temporary expedient, because we
+                        // don't actually want to break here.
+                        if true {
+                            break 'all_messages;
+                        }
                     } else {
                         info!("{}", "File changes detected. Starting to compile.".cyan());
                         update_sources(&mut lsp_state.compiler_state.db, &changes)?;
