@@ -121,8 +121,7 @@ pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
         };
     }
 
-    // TODO provide a way to exit
-    panic!("Client exited without proper shutdown sequence.")
+    Ok(())
 }
 
 fn dispatch_notification(
