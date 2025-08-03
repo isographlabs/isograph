@@ -75,7 +75,7 @@ pub fn update_sources(db: &mut Database, changes: &[SourceFileEvent]) -> Result<
         })
         .collect::<Vec<_>>();
     if !errors.is_empty() {
-        Err(SourceError::MultipleErrors { messages: errors }.into())
+        Err(SourceError::MultipleErrors { messages: errors })
     } else {
         if standard_sources_modified {
             db.set(standard_sources);

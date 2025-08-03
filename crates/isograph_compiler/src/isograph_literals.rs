@@ -66,6 +66,7 @@ pub fn read_file(
     Ok((relative_path, contents))
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, Error)]
 pub enum ReadFileError {
     #[error("Unable to read the file at the following path: {path:?}.\nReason: {message}")]
