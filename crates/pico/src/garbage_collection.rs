@@ -7,10 +7,10 @@ use tracing::debug;
 use crate::{
     dependency::{Dependency, NodeKind},
     index::Index,
-    DatabaseStorage, DerivedNode, DerivedNodeId, DerivedNodeRevision, ParamId,
+    Database, DerivedNode, DerivedNodeId, DerivedNodeRevision, InternalStorage, ParamId,
 };
 
-impl DatabaseStorage {
+impl<Db: Database> InternalStorage<Db> {
     /// Run garbage collection, retaining retained_derived_node_ids (which represent
     /// top level function calls) and everything reachable from them.
     ///

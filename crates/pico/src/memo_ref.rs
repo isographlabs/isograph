@@ -2,19 +2,36 @@ use std::{marker::PhantomData, ops::Deref};
 
 use intern::InternId;
 
-use crate::{Database, DerivedNodeId, ParamId};
+use crate::{DatabaseDyn, DerivedNodeId, ParamId};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct MemoRef<T> {
-    pub(crate) db: *const Database,
+    pub(crate) db: *const dyn DatabaseDyn,
     pub(crate) derived_node_id: DerivedNodeId,
     phantom: PhantomData<T>,
 }
 
+impl<T> Copy for MemoRef<T> {}
+
+impl<T> Clone for MemoRef<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T> PartialEq for MemoRef<T> {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::eq(self.db, other.db) && self.derived_node_id == other.derived_node_id
+    }
+}
+
+impl<T> Eq for MemoRef<T> {}
+
+#[allow(clippy::unnecessary_cast)]
 impl<T: 'static + Clone> MemoRef<T> {
-    pub fn new(db: &Database, derived_node_id: DerivedNodeId) -> Self {
+    pub fn new(db: &dyn DatabaseDyn, derived_node_id: DerivedNodeId) -> Self {
         Self {
-            db,
+            db: db as *const _ as *const dyn DatabaseDyn,
             derived_node_id,
             phantom: PhantomData,
         }
@@ -35,14 +52,12 @@ impl<T> From<MemoRef<T>> for ParamId {
 impl<T: 'static> Deref for MemoRef<T> {
     type Target = T;
 
-    fn deref(&self) -> &Self::Target {
-        // SAFETY: `db` must outlive `MemoRef`
+    fn deref(&self) -> &T {
+        // SAFETY: Database outlives this MemoRef
         let db = unsafe { &*self.db };
-        db.storage
-            .get_derived_node(self.derived_node_id)
+        db.get_storage_dyn()
+            .get_value_as_any(self.derived_node_id)
             .unwrap()
-            .value
-            .as_any()
             .downcast_ref::<T>()
             .unwrap()
     }

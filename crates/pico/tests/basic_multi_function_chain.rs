@@ -3,13 +3,18 @@ use std::sync::{
     LazyLock, Mutex,
 };
 
-use pico::{Database, SourceId};
-use pico_macros::{memo, Source};
+use pico::{Database, SourceId, Storage};
+use pico_macros::{memo, Db, Source};
 
 static FIRST_LETTER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static CAPITALIZED_LETTER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 static RUN_SERIALLY: LazyLock<Mutex<()>> = LazyLock::new(Mutex::default);
+
+#[derive(Db, Default)]
+struct TestDatabase {
+    pub storage: Storage<Self>,
+}
 
 #[test]
 fn multi_function_chain() {
@@ -17,7 +22,7 @@ fn multi_function_chain() {
     FIRST_LETTER_COUNTER.store(0, Ordering::SeqCst);
     CAPITALIZED_LETTER_COUNTER.store(0, Ordering::SeqCst);
 
-    let mut db = Database::default();
+    let mut db = TestDatabase::default();
 
     let input_id = db.set(Input {
         key: "key",
@@ -44,7 +49,7 @@ fn multi_function_chain_with_irrelevant_change() {
     FIRST_LETTER_COUNTER.store(0, Ordering::SeqCst);
     CAPITALIZED_LETTER_COUNTER.store(0, Ordering::SeqCst);
 
-    let mut db = Database::default();
+    let mut db = TestDatabase::default();
 
     let id = db.set(Input {
         key: "key",
@@ -73,14 +78,14 @@ struct Input {
 }
 
 #[memo]
-fn first_letter(db: &Database, input_id: SourceId<Input>) -> char {
+fn first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
     FIRST_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     let input = db.get(input_id);
     input.value.chars().next().unwrap()
 }
 
 #[memo]
-fn capitalized_first_letter(db: &Database, input_id: SourceId<Input>) -> char {
+fn capitalized_first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
     CAPITALIZED_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     let first = first_letter(db, input_id);
     first.to_ascii_uppercase()

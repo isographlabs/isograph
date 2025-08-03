@@ -1,13 +1,12 @@
 use dashmap::Entry;
 
 use crate::{
-    database::Database,
     dependency::{NodeKind, TrackedDependencies},
     derived_node::{DerivedNode, DerivedNodeId},
     dyn_eq::DynEq,
     epoch::Epoch,
     intern::Key,
-    InnerFn,
+    Database, InnerFn,
 };
 
 pub enum DidRecalculate {
@@ -55,72 +54,71 @@ pub enum DidRecalculate {
 /// After this function is called, we guarantee that a [`DerivedNode`]
 /// (with a value identical to what we would get if we actually invoked the
 /// function) is present in the [`Database`].
-impl Database {
-    pub(crate) fn execute_memoized_function(
-        &self,
-        derived_node_id: DerivedNodeId,
-        inner_fn: InnerFn,
-    ) -> DidRecalculate {
-        if self.dependency_stack.is_empty() {
-            // This is the outermost call to a memoized function. Keep track of all top_level_calls
-            // for the purposes of later garbage collection. (Note that we also cannot update the LRU
-            // cache right now, as that would require a mutable reference to the Database, which we do
-            // not have.)
-            self.top_level_calls.push(derived_node_id);
-        }
+pub fn execute_memoized_function<Db: Database>(
+    db: &Db,
+    derived_node_id: DerivedNodeId,
+    inner_fn: InnerFn<Db>,
+) -> DidRecalculate {
+    if db.get_storage().dependency_stack.is_empty() {
+        // This is the outermost call to a memoized function. Keep track of all top_level_calls
+        // for the purposes of later garbage collection. (Note that we also cannot update the LRU
+        // cache right now, as that would require a mutable reference to the Database, which we do
+        // not have.)
+        db.get_storage().top_level_calls.push(derived_node_id);
+    }
 
-        let (time_updated, did_recalculate) =
-            if let Some(derived_node) = self.storage.get_derived_node(derived_node_id) {
-                if self.storage.node_verified_in_current_epoch(derived_node_id) {
+    let (time_updated, did_recalculate) =
+        if let Some(derived_node) = db.get_storage().internal.get_derived_node(derived_node_id) {
+            if db
+                .get_storage()
+                .internal
+                .node_verified_in_current_epoch(derived_node_id)
+            {
+                (
+                    db.get_storage().internal.current_epoch,
+                    DidRecalculate::ReusedMemoizedValue,
+                )
+            } else {
+                db.get_storage()
+                    .internal
+                    .verify_derived_node(derived_node_id);
+                if any_dependency_changed(db, derived_node) {
+                    update_derived_node(db, derived_node_id, derived_node.value.as_ref(), inner_fn)
+                } else {
                     (
-                        self.storage.current_epoch,
+                        db.get_storage().internal.current_epoch,
                         DidRecalculate::ReusedMemoizedValue,
                     )
-                } else {
-                    self.storage.verify_derived_node(derived_node_id);
-                    if any_dependency_changed(self, derived_node) {
-                        update_derived_node(
-                            self,
-                            derived_node_id,
-                            derived_node.value.as_ref(),
-                            inner_fn,
-                        )
-                    } else {
-                        (
-                            self.storage.current_epoch,
-                            DidRecalculate::ReusedMemoizedValue,
-                        )
-                    }
                 }
-            } else {
-                create_derived_node(self, derived_node_id, inner_fn)
-            };
-        self.register_dependency_in_parent_memoized_fn(
-            NodeKind::Derived(derived_node_id),
-            time_updated,
-        );
-        did_recalculate
-    }
+            }
+        } else {
+            create_derived_node(db, derived_node_id, inner_fn)
+        };
+    db.get_storage().register_dependency_in_parent_memoized_fn(
+        NodeKind::Derived(derived_node_id),
+        time_updated,
+    );
+    did_recalculate
 }
 
-fn create_derived_node(
-    db: &Database,
+fn create_derived_node<Db: Database>(
+    db: &Db,
     derived_node_id: DerivedNodeId,
-    inner_fn: InnerFn,
+    inner_fn: InnerFn<Db>,
 ) -> (Epoch, DidRecalculate) {
     let (value, tracked_dependencies) =
         invoke_with_dependency_tracking(db, derived_node_id, inner_fn).expect(
             "InnerFn call cannot fail for a new derived node. This is indicative of a bug in Pico.",
         );
-    let index = db.storage.insert_derived_node(DerivedNode {
+    let index = db.get_storage().internal.insert_derived_node(DerivedNode {
         dependencies: tracked_dependencies.dependencies,
         inner_fn,
         value,
     });
-    db.storage.insert_derived_node_revision(
+    db.get_storage().internal.insert_derived_node_revision(
         derived_node_id,
         tracked_dependencies.max_time_updated,
-        db.storage.current_epoch,
+        db.get_storage().internal.current_epoch,
         index,
     );
     (
@@ -129,16 +127,17 @@ fn create_derived_node(
     )
 }
 
-fn update_derived_node(
-    db: &Database,
+fn update_derived_node<Db: Database>(
+    db: &Db,
     derived_node_id: DerivedNodeId,
     prev_value: &dyn DynEq,
-    inner_fn: InnerFn,
+    inner_fn: InnerFn<Db>,
 ) -> (Epoch, DidRecalculate) {
     match invoke_with_dependency_tracking(db, derived_node_id, inner_fn) {
         Some((value, tracked_dependencies)) => {
             let mut occupied = if let Entry::Occupied(occupied) = db
-                .storage
+                .get_storage()
+                .internal
                 .derived_node_id_to_revision
                 .entry(derived_node_id)
             {
@@ -154,7 +153,7 @@ fn update_derived_node(
                 DidRecalculate::ReusedMemoizedValue
             };
 
-            let index = db.storage.insert_derived_node(DerivedNode {
+            let index = db.get_storage().internal.insert_derived_node(DerivedNode {
                 dependencies: tracked_dependencies.dependencies,
                 inner_fn,
                 value,
@@ -168,11 +167,11 @@ fn update_derived_node(
     }
 }
 
-fn any_dependency_changed(db: &Database, derived_node: &DerivedNode) -> bool {
+fn any_dependency_changed<Db: Database>(db: &Db, derived_node: &DerivedNode<Db>) -> bool {
     derived_node
         .dependencies
         .iter()
-        .filter(|dep| dep.time_verified_or_updated != db.storage.current_epoch)
+        .filter(|dep| dep.time_verified_or_updated != db.get_storage().internal.current_epoch)
         .any(|dependency| match dependency.node_to {
             NodeKind::Source(key) => {
                 source_node_changed_since(db, key, dependency.time_verified_or_updated)
@@ -183,8 +182,8 @@ fn any_dependency_changed(db: &Database, derived_node: &DerivedNode) -> bool {
         })
 }
 
-fn source_node_changed_since(db: &Database, key: Key, since: Epoch) -> bool {
-    match db.storage.get_source_node(key) {
+fn source_node_changed_since<Db: Database>(db: &Db, key: Key, since: Epoch) -> bool {
+    match db.get_storage().internal.get_source_node(key) {
         Some(source) => source.time_updated > since,
         None => panic!(
             "Source node not found. This may occur if \
@@ -193,32 +192,41 @@ fn source_node_changed_since(db: &Database, key: Key, since: Epoch) -> bool {
     }
 }
 
-fn derived_node_changed_since(db: &Database, derived_node_id: DerivedNodeId, since: Epoch) -> bool {
-    let inner_fn = if let Some(derived_node) = db.storage.get_derived_node(derived_node_id) {
-        if let Some(rev) = db.storage.get_derived_node_revision(derived_node_id) {
-            if rev.time_updated > since {
+fn derived_node_changed_since<Db: Database>(
+    db: &Db,
+    derived_node_id: DerivedNodeId,
+    since: Epoch,
+) -> bool {
+    let inner_fn =
+        if let Some(derived_node) = db.get_storage().internal.get_derived_node(derived_node_id) {
+            if let Some(rev) = db
+                .get_storage()
+                .internal
+                .get_derived_node_revision(derived_node_id)
+            {
+                if rev.time_updated > since {
+                    return true;
+                }
+            } else {
                 return true;
             }
+            derived_node.inner_fn
         } else {
             return true;
-        }
-        derived_node.inner_fn
-    } else {
-        return true;
-    };
-    let did_recalculate = db.execute_memoized_function(derived_node_id, inner_fn);
+        };
+    let did_recalculate = execute_memoized_function(db, derived_node_id, inner_fn);
     matches!(
         did_recalculate,
         DidRecalculate::Recalculated | DidRecalculate::Error
     )
 }
 
-fn invoke_with_dependency_tracking(
-    db: &Database,
+fn invoke_with_dependency_tracking<Db: Database>(
+    db: &Db,
     derived_node_id: DerivedNodeId,
-    inner_fn: InnerFn,
+    inner_fn: InnerFn<Db>,
 ) -> Option<(Box<dyn DynEq>, TrackedDependencies)> {
-    let guard = db.dependency_stack.enter(derived_node_id);
+    let guard = db.get_storage().dependency_stack.enter(derived_node_id);
     let result = inner_fn.0(db, derived_node_id);
     let dependencies = guard.release();
     Some((result?, dependencies))

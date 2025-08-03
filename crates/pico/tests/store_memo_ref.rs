@@ -1,14 +1,19 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use pico::{Database, MemoRef, SourceId};
-use pico_macros::{memo, Source};
+use pico::{Database, MemoRef, SourceId, Storage};
+use pico_macros::{memo, Db, Source};
 
 static FIRST_LETTER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static FIRST_LETTER_AS_MEMO_REF_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
+#[derive(Db, Default)]
+struct TestDatabase {
+    pub storage: Storage<Self>,
+}
+
 #[test]
 fn store_memo_ref() {
-    let mut db = Database::default();
+    let mut db = TestDatabase::default();
 
     let id = db.set(Input {
         key: "key",
@@ -37,14 +42,14 @@ struct Input {
 }
 
 #[memo]
-fn first_letter(db: &Database, input_id: SourceId<Input>) -> char {
+fn first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
     FIRST_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     let input = db.get(input_id);
     input.value.chars().next().unwrap()
 }
 
 #[memo]
-fn first_letter_as_memo_ref(db: &Database, input_id: SourceId<Input>) -> MemoRef<char> {
+fn first_letter_as_memo_ref(db: &TestDatabase, input_id: SourceId<Input>) -> MemoRef<char> {
     FIRST_LETTER_AS_MEMO_REF_COUNTER.fetch_add(1, Ordering::SeqCst);
     first_letter(db, input_id)
 }

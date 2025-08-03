@@ -1,13 +1,18 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use pico::{Database, SourceId};
-use pico_macros::{memo, Source};
+use pico::{Database, SourceId, Storage};
+use pico_macros::{memo, Db, Source};
 
 static RETURN_VALUE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
+#[derive(Db, Default)]
+struct TestDatabase {
+    pub storage: Storage<Self>,
+}
+
 #[test]
 fn arg_reference() {
-    let mut db = Database::default();
+    let mut db = TestDatabase::default();
 
     let input_id = db.set(Input {
         key: "input",
@@ -39,7 +44,7 @@ impl Clone for ReturnValue {
 }
 
 #[memo]
-fn first_letter(db: &Database, input_id: SourceId<Input>) -> ReturnValue {
+fn first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> ReturnValue {
     let input = db.get(input_id);
     ReturnValue(input.value.chars().next().unwrap())
 }

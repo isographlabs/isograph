@@ -6,40 +6,39 @@ use std::{
 use dashmap::Entry;
 use tinyvec::ArrayVec;
 
-use crate::{index::Index, Database, DerivedNodeId, DidRecalculate, InnerFn, ParamId};
+use crate::{index::Index, Database, ParamId};
 
 pub fn init_param_vec() -> ArrayVec<[ParamId; 8]> {
     ArrayVec::<[ParamId; 8]>::default()
 }
 
-pub fn intern_borrowed_param<T: Hash + Clone + 'static>(db: &Database, param: &T) -> ParamId {
+pub fn intern_borrowed_param<Db: Database, T: Hash + Clone + 'static>(
+    db: &Db,
+    param: &T,
+) -> ParamId {
     let param_id = hash(param).into();
-    if let Entry::Vacant(v) = db.storage.param_id_to_index.entry(param_id) {
-        let idx = db.storage.params.push(Box::new(param.clone()));
+    if let Entry::Vacant(v) = db.get_storage().internal.param_id_to_index.entry(param_id) {
+        let idx = db
+            .get_storage()
+            .internal
+            .params
+            .push(Box::new(param.clone()));
         v.insert(Index::new(idx));
     }
     param_id
 }
 
-pub fn intern_owned_param<T: Hash + Clone + 'static>(db: &Database, param: T) -> ParamId {
+pub fn intern_owned_param<Db: Database, T: Hash + Clone + 'static>(db: &Db, param: T) -> ParamId {
     let param_id = hash(&param).into();
-    if let Entry::Vacant(v) = db.storage.param_id_to_index.entry(param_id) {
-        let idx = db.storage.params.push(Box::new(param));
+    if let Entry::Vacant(v) = db.get_storage().internal.param_id_to_index.entry(param_id) {
+        let idx = db.get_storage().internal.params.push(Box::new(param));
         v.insert(Index::new(idx));
     }
     param_id
 }
 
-pub fn get_param(db: &Database, param_id: ParamId) -> Option<&Box<dyn Any>> {
-    db.storage.get_param(param_id)
-}
-
-pub fn execute_memoized_function(
-    db: &Database,
-    derived_node_id: DerivedNodeId,
-    inner_fn: InnerFn,
-) -> DidRecalculate {
-    db.execute_memoized_function(derived_node_id, inner_fn)
+pub fn get_param<Db: Database>(db: &Db, param_id: ParamId) -> Option<&Box<dyn Any>> {
+    db.get_storage().internal.get_param(param_id)
 }
 
 pub fn hash<T: Hash + 'static>(value: &T) -> u64 {

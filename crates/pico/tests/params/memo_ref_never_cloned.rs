@@ -1,13 +1,18 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use pico::{Database, MemoRef};
-use pico_macros::memo;
+use pico::{MemoRef, Storage};
+use pico_macros::{memo, Db};
 
 static OUTPUT_CLONE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
+#[derive(Db, Default)]
+struct TestDatabase {
+    pub storage: Storage<Self>,
+}
+
 #[test]
 fn memo_ref_never_cloned() {
-    let db = Database::default();
+    let db = TestDatabase::default();
 
     let output = get_output(&db);
 
@@ -29,9 +34,9 @@ impl Clone for Output {
 }
 
 #[memo]
-fn get_output(_db: &Database) -> Output {
+fn get_output(_db: &TestDatabase) -> Output {
     Output {}
 }
 
 #[memo]
-fn consume_output(db: &Database, _output: MemoRef<Output>) {}
+fn consume_output(db: &TestDatabase, _output: MemoRef<Output>) {}

@@ -1,9 +1,14 @@
-use pico::{Database, SourceId};
-use pico_macros::{memo, Source};
+use pico::{Database, SourceId, Storage};
+use pico_macros::{memo, Db, Source};
+
+#[derive(Db, Default)]
+struct TestDatabase {
+    pub storage: Storage<Self>,
+}
 
 #[test]
 fn same_source_key() {
-    let mut db = Database::default();
+    let mut db = TestDatabase::default();
 
     let input_a = db.set(InputA {
         key: "source",
@@ -33,11 +38,11 @@ struct InputB {
 }
 
 #[memo]
-fn memoized_a(db: &Database, input: SourceId<InputA>) -> char {
+fn memoized_a(db: &TestDatabase, input: SourceId<InputA>) -> char {
     db.get(input).value.chars().next().unwrap()
 }
 
 #[memo]
-fn memoized_b(db: &Database, input: SourceId<InputB>) -> char {
+fn memoized_b(db: &TestDatabase, input: SourceId<InputB>) -> char {
     db.get(input).value.chars().next().unwrap()
 }

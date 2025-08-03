@@ -35,21 +35,30 @@ impl From<ParamId> for DerivedNodeId {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
-pub struct InnerFn(pub fn(&Database, DerivedNodeId) -> Option<Box<dyn DynEq>>);
-impl InnerFn {
-    pub fn new(inner_fn: fn(&Database, DerivedNodeId) -> Option<Box<dyn DynEq>>) -> Self {
+#[derive(Debug)]
+pub struct InnerFn<Db: Database>(pub fn(&Db, DerivedNodeId) -> Option<Box<dyn DynEq>>);
+
+impl<Db: Database> InnerFn<Db> {
+    pub fn new(inner_fn: fn(&Db, DerivedNodeId) -> Option<Box<dyn DynEq>>) -> Self {
         InnerFn(inner_fn)
     }
 }
 
-pub struct DerivedNode {
+impl<Db: Database> Clone for InnerFn<Db> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<Db: Database> Copy for InnerFn<Db> {}
+
+pub struct DerivedNode<Db: Database> {
     pub dependencies: Vec<Dependency>,
-    pub inner_fn: InnerFn,
+    pub inner_fn: InnerFn<Db>,
     pub value: Box<dyn DynEq>,
 }
 
-impl fmt::Debug for DerivedNode {
+impl<Db: Database> fmt::Debug for DerivedNode<Db> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("DerivedNode")
             .field("dependencies", &self.dependencies)

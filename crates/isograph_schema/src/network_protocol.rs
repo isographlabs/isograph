@@ -5,7 +5,7 @@ use common_lang_types::{
     ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation, RootOperationKind};
-use pico::Database;
+use isograph_lang_types::IsographDatabase;
 
 use crate::{
     ExposeFieldDirective, MergedSelectionMap, RootOperationName, Schema, ServerObjectEntity,
@@ -22,7 +22,7 @@ where
 
     #[allow(clippy::type_complexity)]
     fn parse_and_process_type_system_documents(
-        db: &Database,
+        db: &IsographDatabase,
     ) -> Result<ProcessTypeSystemDocumentOutcome<Self>, Self::ParseAndProcessTypeSystemDocumentsError>;
 
     fn generate_query_text<'a>(

@@ -1,13 +1,18 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use pico::Database;
-use pico_macros::{memo, Singleton};
+use pico::{Database, Storage};
+use pico_macros::{memo, Db, Singleton};
 
 static FIRST_LETTER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
+#[derive(Db, Default)]
+struct TestDatabase {
+    pub storage: Storage<Self>,
+}
+
 #[test]
 fn singleton() {
-    let mut db = Database::default();
+    let mut db = TestDatabase::default();
 
     assert_eq!(db.get_singleton::<Input>(), None);
 
@@ -38,7 +43,7 @@ struct Input {
 }
 
 #[memo]
-fn first_letter(db: &Database) -> char {
+fn first_letter(db: &TestDatabase) -> char {
     FIRST_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     let input = db
         .get_singleton::<Input>()

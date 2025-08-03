@@ -1,18 +1,23 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use pico::{Database, SourceId};
-use pico_macros::{memo, Source};
+use pico::{Database, SourceId, Storage};
+use pico_macros::{memo, Db, Source};
 
 static FIRST_LETTER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static CAPITALIZED_LETTER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static UNCHANGED_SUBTREE: AtomicUsize = AtomicUsize::new(0);
+
+#[derive(Db, Default)]
+struct TestDatabase {
+    pub storage: Storage<Self>,
+}
 
 #[test]
 fn side_chain() {
     FIRST_LETTER_COUNTER.store(0, Ordering::SeqCst);
     CAPITALIZED_LETTER_COUNTER.store(0, Ordering::SeqCst);
 
-    let mut db = Database::default();
+    let mut db = TestDatabase::default();
 
     let input_id = db.set(Input {
         key: "key",
@@ -46,14 +51,14 @@ struct Input {
 }
 
 #[memo]
-fn first_letter(db: &Database, input_id: SourceId<Input>) -> char {
+fn first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
     FIRST_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     let input = db.get(input_id);
     input.value.chars().next().unwrap()
 }
 
 #[memo]
-fn capitalized_first_letter(db: &Database, input_id: SourceId<Input>) -> char {
+fn capitalized_first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
     CAPITALIZED_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     unchanged_subtree(db);
     let first = first_letter(db, input_id);
@@ -61,7 +66,7 @@ fn capitalized_first_letter(db: &Database, input_id: SourceId<Input>) -> char {
 }
 
 #[memo]
-fn unchanged_subtree(_db: &Database) -> &'static str {
+fn unchanged_subtree(_db: &TestDatabase) -> &'static str {
     UNCHANGED_SUBTREE.fetch_add(1, Ordering::SeqCst);
     "this function should not be re-executed, \
     even if a parent has been re-executed"
