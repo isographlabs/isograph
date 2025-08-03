@@ -5,12 +5,14 @@ use common_lang_types::{
 use isograph_lang_parser::{
     parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
 };
-use isograph_lang_types::{EntrypointDeclaration, IsoLiteralsSource, SelectionType};
+use isograph_lang_types::{
+    EntrypointDeclaration, IsoLiteralsSource, IsographDatabase, SelectionType,
+};
 use isograph_schema::{
     NetworkProtocol, ProcessClientFieldDeclarationError, Schema, UnprocessedItem,
 };
 use lazy_static::lazy_static;
-use pico::{Database, SourceId};
+use pico::SourceId;
 use pico_macros::memo;
 use regex::Regex;
 use std::{
@@ -143,7 +145,7 @@ pub fn parse_iso_literals_in_file_content(
 #[allow(clippy::type_complexity)]
 #[memo]
 pub fn parse_iso_literal_in_source(
-    db: &Database,
+    db: &IsographDatabase,
     iso_literals_source_id: SourceId<IsoLiteralsSource>,
 ) -> Result<
     Vec<(IsoLiteralExtractionResult, TextSource)>,

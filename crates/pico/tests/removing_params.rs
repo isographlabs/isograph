@@ -1,10 +1,15 @@
-use pico::{Database, SourceId};
-use pico_macros::{memo, Source};
+use pico::{Database, SourceId, Storage};
+use pico_macros::{memo, Db, Source};
+
+#[derive(Db, Default)]
+struct TestDatabase {
+    pub storage: Storage<Self>,
+}
 
 #[test]
 #[should_panic]
 fn removing_direct_param_causes_panic() {
-    let mut db = Database::default();
+    let mut db = TestDatabase::default();
 
     let input_id = db.set(Input {
         key: "key",
@@ -19,7 +24,7 @@ fn removing_direct_param_causes_panic() {
 #[test]
 #[should_panic]
 fn removing_indirect_param_causes_panic() {
-    let mut db = Database::default();
+    let mut db = TestDatabase::default();
 
     let input_id = db.set(Input {
         key: "key",
@@ -43,13 +48,13 @@ struct Input {
 }
 
 #[memo]
-fn first_letter(db: &Database, input_id: SourceId<Input>) -> char {
+fn first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
     let input = db.get(input_id);
     input.value.chars().next().unwrap()
 }
 
 #[memo]
-fn capitalized_first_letter(db: &Database, input_id: SourceId<Input>) -> char {
+fn capitalized_first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
     let first = first_letter(db, input_id);
     first.to_ascii_uppercase()
 }

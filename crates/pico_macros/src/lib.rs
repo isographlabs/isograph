@@ -1,3 +1,4 @@
+mod db_macro;
 mod memo_macro;
 mod singleton_macro;
 mod source_macro;
@@ -19,4 +20,9 @@ pub fn source(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(Singleton)]
 pub fn singleton(input: TokenStream) -> TokenStream {
     singleton_macro::singleton_macro(input)
+}
+
+#[proc_macro_derive(Db)]
+pub fn db(input: TokenStream) -> TokenStream {
+    db_macro::db_macro(input)
 }

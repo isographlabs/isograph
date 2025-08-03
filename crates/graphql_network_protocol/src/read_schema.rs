@@ -3,14 +3,14 @@ use std::collections::BTreeMap;
 use common_lang_types::{RelativePathToSourceFile, WithLocation};
 use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDocument};
 use graphql_schema_parser::{parse_schema, parse_schema_extensions, SchemaParseError};
-use isograph_lang_types::SchemaSource;
-use pico::{Database, MemoRef, SourceId};
+use isograph_lang_types::{IsographDatabase, SchemaSource};
+use pico::{MemoRef, SourceId};
 use pico_macros::memo;
 
 #[allow(clippy::type_complexity)]
 #[memo]
 pub fn parse_graphql_schema(
-    db: &Database,
+    db: &IsographDatabase,
     schema_source_id: SourceId<SchemaSource>,
     schema_extension_sources: &BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
 ) -> Result<
@@ -41,7 +41,7 @@ pub fn parse_graphql_schema(
 
 #[memo]
 pub fn parse_schema_extensions_file(
-    db: &Database,
+    db: &IsographDatabase,
     schema_extension_source_id: SourceId<SchemaSource>,
 ) -> Result<MemoRef<GraphQLTypeSystemExtensionDocument>, WithLocation<SchemaParseError>> {
     let SchemaSource {

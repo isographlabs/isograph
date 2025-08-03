@@ -1,13 +1,18 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use pico::{Database, SourceId};
-use pico_macros::{memo, Source};
+use pico::{Database, SourceId, Storage};
+use pico_macros::{memo, Db, Source};
 
 static FIRST_LETTER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
+#[derive(Db, Default)]
+struct TestDatabase {
+    pub storage: Storage<Self>,
+}
+
 #[test]
 fn basic() {
-    let mut db = Database::default();
+    let mut db = TestDatabase::default();
 
     let input_id = db.set(Input {
         key: "key",
@@ -34,7 +39,7 @@ struct Input {
 }
 
 #[memo]
-fn first_letter(db: &Database, input_id: SourceId<Input>) -> char {
+fn first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
     FIRST_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     let input = db.get(input_id);
     input.value.chars().next().unwrap()

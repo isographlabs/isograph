@@ -3,12 +3,17 @@ use std::sync::{
     LazyLock, Mutex,
 };
 
-use pico::{Database, SourceId};
-use pico_macros::{memo, Source};
+use pico::{Database, SourceId, Storage};
+use pico_macros::{memo, Db, Source};
 
 static FIRST_LETTER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static PARAM_CLONE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static RUN_SERIALLY: LazyLock<Mutex<()>> = LazyLock::new(Mutex::default);
+
+#[derive(Db, Default)]
+struct TestDatabase {
+    pub storage: Storage<Self>,
+}
 
 #[test]
 fn owned_param() {
@@ -16,7 +21,7 @@ fn owned_param() {
     FIRST_LETTER_COUNTER.store(0, Ordering::SeqCst);
     PARAM_CLONE_COUNTER.store(0, Ordering::SeqCst);
 
-    let mut db = Database::default();
+    let mut db = TestDatabase::default();
 
     let input_id = db.set(Input {
         key: "key",
@@ -48,7 +53,7 @@ fn borrowed_param() {
     FIRST_LETTER_COUNTER.store(0, Ordering::SeqCst);
     PARAM_CLONE_COUNTER.store(0, Ordering::SeqCst);
 
-    let mut db = Database::default();
+    let mut db = TestDatabase::default();
 
     let input_id = db.set(Input {
         key: "key",
@@ -93,14 +98,14 @@ impl Clone for Param {
 }
 
 #[memo]
-fn accepts_owned_param(db: &Database, input_id: SourceId<Input>, _param: Param) -> char {
+fn accepts_owned_param(db: &TestDatabase, input_id: SourceId<Input>, _param: Param) -> char {
     FIRST_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     let input = db.get(input_id);
     input.value.chars().next().unwrap()
 }
 
 #[memo]
-fn accepts_borrowed_param(db: &Database, input_id: SourceId<Input>, _param: &Param) -> char {
+fn accepts_borrowed_param(db: &TestDatabase, input_id: SourceId<Input>, _param: &Param) -> char {
     FIRST_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     let input = db.get(input_id);
     input.value.chars().next().unwrap()

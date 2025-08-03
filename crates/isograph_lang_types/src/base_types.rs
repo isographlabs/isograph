@@ -4,6 +4,13 @@ use std::fmt::Display;
 
 use common_lang_types::{SelectableName, UnvalidatedTypeName};
 use intern::Lookup;
+use pico::Storage;
+use pico_macros::Db;
+
+#[derive(Default, Debug, Db)]
+pub struct IsographDatabase {
+    pub storage: Storage<Self>,
+}
 
 /// Distinguishes between server-defined items and locally-defined items.
 ///

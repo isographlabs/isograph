@@ -4,6 +4,7 @@ use crate::{
     dependency::{Dependency, DependencyStack, NodeKind},
     dyn_eq::DynEq,
     epoch::Epoch,
+    execute_memoized_function,
     index::Index,
     intern::{Key, ParamId},
     macro_fns::{get_param, init_param_vec, intern_borrowed_param, intern_owned_param},
@@ -16,22 +17,49 @@ use lru::LruCache;
 
 use crate::derived_node::{DerivedNode, DerivedNodeId, DerivedNodeRevision};
 
+pub trait DatabaseDyn {
+    fn get_storage_dyn(&self) -> &dyn StorageDyn;
+}
+pub trait Database: DatabaseDyn + Sized {
+    fn get_storage(&self) -> &Storage<Self>;
+    fn get<T: 'static>(&self, id: SourceId<T>) -> &T;
+    fn get_singleton<T: 'static + Singleton>(&self) -> Option<&T>;
+    fn intern<T: Clone + Hash + DynEq + 'static>(&self, value: T) -> MemoRef<T>;
+    fn intern_ref<T: Clone + Hash + DynEq + 'static>(&self, value: &T) -> MemoRef<T>;
+    fn set<T: Source + DynEq>(&mut self, source: T) -> SourceId<T>;
+    fn remove<T>(&mut self, id: SourceId<T>);
+    fn remove_singleton<T: Singleton + 'static>(&mut self);
+    fn run_garbage_collection(&mut self);
+}
+
+pub trait StorageDyn {
+    fn get_value_as_any(&self, id: DerivedNodeId) -> Option<&dyn Any>;
+}
+
 #[derive(Debug)]
-pub struct Database {
+pub struct Storage<Db: Database> {
     pub(crate) dependency_stack: DependencyStack,
-    pub(crate) storage: DatabaseStorage,
+    pub(crate) internal: InternalStorage<Db>,
     pub(crate) top_level_calls: BoxcarVec<DerivedNodeId>,
     pub(crate) top_level_call_lru_cache: LruCache<DerivedNodeId, ()>,
     pub(crate) retained_calls: DashMap<DerivedNodeId, usize>,
 }
 
+impl<Db: Database> StorageDyn for Storage<Db> {
+    fn get_value_as_any(&self, id: DerivedNodeId) -> Option<&dyn Any> {
+        self.internal
+            .get_derived_node(id)
+            .map(|node| node.value.as_any())
+    }
+}
+
 #[derive(Debug)]
-pub(crate) struct DatabaseStorage {
+pub(crate) struct InternalStorage<Db: Database> {
     pub(crate) param_id_to_index: DashMap<ParamId, Index<ParamId>>,
     pub(crate) derived_node_id_to_revision: DashMap<DerivedNodeId, DerivedNodeRevision>,
     pub(crate) source_node_key_to_index: DashMap<Key, Index<SourceNode>>,
 
-    pub(crate) derived_nodes: BoxcarVec<DerivedNode>,
+    pub(crate) derived_nodes: BoxcarVec<DerivedNode<Db>>,
     pub(crate) source_nodes: BoxcarVec<Option<SourceNode>>,
     pub(crate) params: BoxcarVec<Box<dyn Any>>,
     pub(crate) current_epoch: Epoch,
@@ -39,15 +67,15 @@ pub(crate) struct DatabaseStorage {
 
 static DEFAULT_CAPACITY: usize = 10_000;
 
-impl Database {
+impl<Db: Database> Storage<Db> {
     pub fn new() -> Self {
-        Database::new_with_capacity(DEFAULT_CAPACITY.try_into().unwrap())
+        Storage::new_with_capacity(DEFAULT_CAPACITY.try_into().unwrap())
     }
 
     pub fn new_with_capacity(capacity: NonZeroUsize) -> Self {
         Self {
             dependency_stack: DependencyStack::new(),
-            storage: DatabaseStorage {
+            internal: InternalStorage {
                 param_id_to_index: DashMap::new(),
                 derived_node_id_to_revision: DashMap::new(),
                 source_node_key_to_index: DashMap::new(),
@@ -72,7 +100,7 @@ impl Database {
         self.dependency_stack.push_if_not_empty(
             Dependency {
                 node_to: node,
-                time_verified_or_updated: self.storage.current_epoch,
+                time_verified_or_updated: self.internal.current_epoch,
             },
             time_updated,
         );
@@ -90,7 +118,7 @@ impl Database {
     }
 
     fn get_impl<T: 'static>(&self, key: Key) -> Option<&T> {
-        let source_node = self.storage.get_source_node(key)?;
+        let source_node = self.internal.get_source_node(key)?;
 
         self.register_dependency_in_parent_memoized_fn(
             NodeKind::Source(key),
@@ -105,18 +133,18 @@ impl Database {
     pub fn set<T: Source + DynEq>(&mut self, source: T) -> SourceId<T> {
         self.assert_empty_dependency_stack();
         let source_id = SourceId::new(&source);
-        self.storage.set_source(source, source_id);
+        self.internal.set_source(source, source_id);
         source_id
     }
 
     pub fn remove<T>(&mut self, id: SourceId<T>) {
         self.assert_empty_dependency_stack();
-        self.storage.remove_source(id)
+        self.internal.remove_source(id)
     }
 
     pub fn remove_singleton<T: Singleton + 'static>(&mut self) {
         self.assert_empty_dependency_stack();
-        self.storage
+        self.internal
             .remove_source::<T>(T::get_singleton_key().into());
     }
 
@@ -141,7 +169,7 @@ impl Database {
             .map(|(k, _v)| *k)
             .chain(self.retained_calls.iter().map(|ref_multi| *ref_multi.key()));
 
-        self.storage
+        self.internal
             .run_garbage_collection(retained_derived_node_ids);
     }
 
@@ -151,19 +179,9 @@ impl Database {
             "Cannot modify database while a memoized function is being invoked."
         );
     }
-
-    pub fn intern<T: Clone + Hash + DynEq + 'static>(&self, value: T) -> MemoRef<T> {
-        let param_id = intern_owned_param(self, value);
-        intern_from_param(self, param_id)
-    }
-
-    pub fn intern_ref<T: Clone + Hash + DynEq + 'static>(&self, value: &T) -> MemoRef<T> {
-        let param_id = intern_borrowed_param(self, value);
-        intern_from_param(self, param_id)
-    }
 }
 
-impl DatabaseStorage {
+impl<Db: Database> InternalStorage<Db> {
     pub(crate) fn get_param(&self, param_id: ParamId) -> Option<&Box<dyn Any>> {
         let index = self.param_id_to_index.get(&param_id)?;
         Some(self.params.get(index.idx).expect(
@@ -172,7 +190,10 @@ impl DatabaseStorage {
         ))
     }
 
-    pub(crate) fn get_derived_node(&self, derived_node_id: DerivedNodeId) -> Option<&DerivedNode> {
+    pub(crate) fn get_derived_node(
+        &self,
+        derived_node_id: DerivedNodeId,
+    ) -> Option<&DerivedNode<Db>> {
         let index = self
             .derived_node_id_to_revision
             .get(&derived_node_id)?
@@ -224,7 +245,10 @@ impl DatabaseStorage {
         );
     }
 
-    pub(crate) fn insert_derived_node(&self, derived_node: DerivedNode) -> Index<DerivedNodeId> {
+    pub(crate) fn insert_derived_node(
+        &self,
+        derived_node: DerivedNode<Db>,
+    ) -> Index<DerivedNodeId> {
         Index::new(self.derived_nodes.push(derived_node))
     }
 
@@ -296,17 +320,31 @@ impl DatabaseStorage {
     }
 }
 
-impl Default for Database {
+impl<Db: Database> Default for Storage<Db> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-fn intern_from_param<T: Clone + DynEq>(db: &Database, param_id: ParamId) -> MemoRef<T> {
+pub fn intern<Db: Database, T: Clone + Hash + DynEq + 'static>(db: &Db, value: T) -> MemoRef<T> {
+    let param_id = intern_owned_param(db, value);
+    intern_from_param(db, param_id)
+}
+
+pub fn intern_ref<Db: Database, T: Clone + Hash + DynEq + 'static>(
+    db: &Db,
+    value: &T,
+) -> MemoRef<T> {
+    let param_id = intern_borrowed_param(db, value);
+    intern_from_param(db, param_id)
+}
+
+fn intern_from_param<Db: Database, T: Clone + DynEq>(db: &Db, param_id: ParamId) -> MemoRef<T> {
     let mut param_ids = init_param_vec();
     param_ids.push(param_id);
     let derived_node_id = DerivedNodeId::new(param_id.inner().into(), param_ids);
-    db.execute_memoized_function(
+    execute_memoized_function(
+        db,
         derived_node_id,
         InnerFn::new(|db, derived_node_id| {
             let param = get_param(db, derived_node_id.params[0])?

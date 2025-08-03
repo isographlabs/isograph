@@ -42,35 +42,41 @@ impl std::ops::Drop for RetainedQuery {
     }
 }
 
-impl Database {
-    pub fn retain<T>(&self, memo_ref: MemoRef<T>) -> RetainedQuery {
-        debug_assert!(std::ptr::eq(self, memo_ref.db));
-        match self.retained_calls.entry(memo_ref.derived_node_id) {
-            Entry::Occupied(mut occupied_entry) => {
-                (*occupied_entry.get_mut()) += 1;
-            }
-            Entry::Vacant(vacant_entry) => {
-                vacant_entry.insert(1);
-            }
-        };
-        RetainedQuery {
-            derived_node_id: memo_ref.derived_node_id,
-            cleared: false,
+pub fn retain<Db: Database, T>(db: &Db, memo_ref: MemoRef<T>) -> RetainedQuery {
+    debug_assert!(std::ptr::eq(db, memo_ref.db as *const _));
+    match db
+        .get_storage()
+        .retained_calls
+        .entry(memo_ref.derived_node_id)
+    {
+        Entry::Occupied(mut occupied_entry) => {
+            (*occupied_entry.get_mut()) += 1;
         }
+        Entry::Vacant(vacant_entry) => {
+            vacant_entry.insert(1);
+        }
+    };
+    RetainedQuery {
+        derived_node_id: memo_ref.derived_node_id,
+        cleared: false,
     }
+}
 
-    pub fn clear_retain(&self, mut retained_query: RetainedQuery) {
-        match self.retained_calls.entry(retained_query.derived_node_id) {
-            Entry::Occupied(mut occupied_entry) => {
-                (*occupied_entry.get_mut()) -= 1;
-                if occupied_entry.get() == &0 {
-                    occupied_entry.remove();
-                }
-            }
-            Entry::Vacant(_) => {
-                panic!("RetainedQuery not found in database. This is indicative of a bug in Pico.")
+pub fn clear_retain<Db: Database>(db: &Db, mut retained_query: RetainedQuery) {
+    match db
+        .get_storage()
+        .retained_calls
+        .entry(retained_query.derived_node_id)
+    {
+        Entry::Occupied(mut occupied_entry) => {
+            (*occupied_entry.get_mut()) -= 1;
+            if occupied_entry.get() == &0 {
+                occupied_entry.remove();
             }
         }
-        retained_query.cleared = true;
+        Entry::Vacant(_) => {
+            panic!("RetainedQuery not found in database. This is indicative of a bug in Pico.")
+        }
     }
+    retained_query.cleared = true;
 }

@@ -3,13 +3,13 @@ use graphql_lang_types::{from_graphql_directive, DeserializationError};
 use graphql_schema_parser::SchemaParseError;
 use intern::string_key::Intern;
 use isograph_compiler::get_standard_sources;
+use isograph_lang_types::IsographDatabase;
 use isograph_schema::{
     CreateAdditionalFieldsError, ExposeAsFieldToInsert, MergedSelectionMap, NetworkProtocol,
     ProcessTypeSystemDocumentOutcome, RootOperationName, Schema, StandardSources,
     ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
-use pico::Database;
 use thiserror::Error;
 
 use crate::{
@@ -33,7 +33,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
     type ParseAndProcessTypeSystemDocumentsError = ParseAndProcessGraphQLTypeSystemDocumentsError;
 
     fn parse_and_process_type_system_documents(
-        db: &Database,
+        db: &IsographDatabase,
     ) -> Result<
         ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>,
         ParseAndProcessGraphQLTypeSystemDocumentsError,

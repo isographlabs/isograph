@@ -12,7 +12,9 @@ use graphql_lang_types::{
 };
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_parser::{IsoLiteralExtractionResult, IsographLiteralParseError};
-use isograph_lang_types::{ConstantValue, SelectionType, TypeAnnotation, VariableDefinition};
+use isograph_lang_types::{
+    ConstantValue, IsographDatabase, SelectionType, TypeAnnotation, VariableDefinition,
+};
 use isograph_schema::{
     validate_entrypoints, CreateAdditionalFieldsError, FieldToInsert, NetworkProtocol,
     ProcessClientFieldDeclarationError, ProcessObjectTypeDefinitionOutcome,
@@ -20,7 +22,6 @@ use isograph_schema::{
     ServerObjectSelectable, ServerObjectSelectableVariant, ServerScalarSelectable,
     UnprocessedClientFieldItem, UnprocessedClientPointerItem, ValidateEntrypointDeclarationError,
 };
-use pico::Database;
 use pico_macros::memo;
 use thiserror::Error;
 
@@ -33,7 +34,7 @@ use crate::{
 #[memo]
 #[allow(clippy::type_complexity)]
 pub fn create_schema<TNetworkProtocol: NetworkProtocol + 'static>(
-    db: &Database,
+    db: &IsographDatabase,
 ) -> Result<
     (
         Schema<TNetworkProtocol>,
@@ -117,7 +118,7 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 pub fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol>(
-    db: &Database,
+    db: &IsographDatabase,
     mut unvalidated_isograph_schema: Schema<TNetworkProtocol>,
     mut unprocessed_items: Vec<
         SelectionType<UnprocessedClientFieldItem, UnprocessedClientPointerItem>,
@@ -230,7 +231,7 @@ impl From<Vec<WithLocation<AddSelectionSetsError>>> for ProcessIsoLiteralsForSch
 }
 
 fn parse_iso_literals(
-    db: &Database,
+    db: &IsographDatabase,
 ) -> Result<ParsedIsoLiteralsMap, Vec<WithLocation<IsographLiteralParseError>>> {
     let iso_literal_map = get_iso_literal_map(db);
     let mut contains_iso = ParsedIsoLiteralsMap::default();
