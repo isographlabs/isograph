@@ -233,6 +233,8 @@ impl From<Vec<WithLocation<AddSelectionSetsError>>> for ProcessIsoLiteralsForSch
 fn parse_iso_literals(
     db: &IsographDatabase,
 ) -> Result<ParsedIsoLiteralsMap, Vec<WithLocation<IsographLiteralParseError>>> {
+    // TODO we are not checking the open file map here. This will probably be fixed when we
+    // fully rewrite everything to be incremental.
     let iso_literal_map = get_iso_literal_map(db);
     let mut contains_iso = ParsedIsoLiteralsMap::default();
     let mut iso_literal_parse_errors = vec![];
