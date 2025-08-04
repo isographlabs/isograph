@@ -85,6 +85,7 @@ pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
                             lsp_state.send_message(response.into());
                         }
                         lsp_server::Message::Notification(notification) => {
+                            eprintln!("\nReceived notification: {}", notification.method);
                             let _ = dispatch_notification(notification, &mut lsp_state);
                         }
                         lsp_server::Message::Response(response) => {
