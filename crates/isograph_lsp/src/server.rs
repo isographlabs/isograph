@@ -79,7 +79,7 @@ pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
                 if let Some(lsp_message) = message {
                     match lsp_message {
                         lsp_server::Message::Request(request) => {
-                            eprintln!("Received request: {request:?}");
+                            eprintln!("\nReceived request: {}", request.method);
                             let response = dispatch_request(request, &mut lsp_state);
                             eprintln!("Sending response: {response:?}");
                             lsp_state.send_message(response.into());
