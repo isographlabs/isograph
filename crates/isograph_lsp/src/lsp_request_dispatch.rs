@@ -144,7 +144,7 @@ mod test {
                 })
                 .unwrap(),
             },
-            &mut state,
+            &state,
         );
         let dispatch = || {
             dispatch
