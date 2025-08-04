@@ -26,7 +26,7 @@ use thiserror::Error;
 
 use crate::{
     create_schema::ParsedIsoLiteralsMap, db_singletons::get_current_working_directory,
-    get_open_file,
+    get_iso_literal_map, get_open_file,
 };
 
 pub fn read_files_in_folder(
@@ -162,6 +162,18 @@ pub fn parse_iso_literal_in_source(
     } = memo_ref.deref();
 
     parse_iso_literals_in_file_content(*relative_path, content, get_current_working_directory(db))
+}
+
+#[memo]
+pub fn read_iso_literals_source_from_relative_path(
+    db: &IsographDatabase,
+    relative_path_to_source_file: RelativePathToSourceFile,
+) -> Option<IsoLiteralsSource> {
+    let map = get_iso_literal_map(db);
+
+    let iso_literals_source_id = map.0.get(&relative_path_to_source_file)?;
+
+    Some(read_iso_literals_source(db, *iso_literals_source_id).to_owned())
 }
 
 /// We should (probably) never directly read SourceId<IsoLiteralsSource>, since if we do so,
