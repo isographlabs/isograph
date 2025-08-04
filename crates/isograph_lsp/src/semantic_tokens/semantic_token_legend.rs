@@ -41,72 +41,28 @@ pub(crate) fn semantic_token_legend() -> SemanticTokensLegend {
     }
 }
 
-pub(crate) fn semantic_token_type_namespace() -> u32 {
-    0
-}
-pub(crate) fn semantic_token_type_type() -> u32 {
-    1
-}
-pub(crate) fn semantic_token_type_class() -> u32 {
-    2
-}
-pub(crate) fn semantic_token_type_enum() -> u32 {
-    3
-}
-pub(crate) fn semantic_token_type_interface() -> u32 {
-    4
-}
-pub(crate) fn semantic_token_type_struct() -> u32 {
-    5
-}
-pub(crate) fn semantic_token_type_type_parameter() -> u32 {
-    6
-}
-pub(crate) fn semantic_token_type_parameter() -> u32 {
-    7
-}
-pub(crate) fn semantic_token_type_variable() -> u32 {
-    8
-}
-pub(crate) fn semantic_token_type_property() -> u32 {
-    9
-}
-pub(crate) fn semantic_token_type_enum_member() -> u32 {
-    10
-}
-pub(crate) fn semantic_token_type_event() -> u32 {
-    11
-}
-pub(crate) fn semantic_token_type_function() -> u32 {
-    12
-}
-pub(crate) fn semantic_token_type_method() -> u32 {
-    13
-}
-pub(crate) fn semantic_token_type_macro() -> u32 {
-    14
-}
-pub(crate) fn semantic_token_type_keyword() -> u32 {
-    15
-}
-pub(crate) fn semantic_token_type_modifier() -> u32 {
-    16
-}
-pub(crate) fn semantic_token_type_comment() -> u32 {
-    17
-}
-pub(crate) fn semantic_token_type_string() -> u32 {
-    18
-}
-pub(crate) fn semantic_token_type_number() -> u32 {
-    19
-}
-pub(crate) fn semantic_token_type_regexp() -> u32 {
-    20
-}
-pub(crate) fn semantic_token_type_operator() -> u32 {
-    21
-}
-pub(crate) fn semantic_token_type_decorator() -> u32 {
-    22
-}
+pub struct SemanticToken(pub u32);
+
+pub const NAMESPACE: SemanticToken = SemanticToken(0);
+pub const TYPE_TYPE: SemanticToken = SemanticToken(1);
+pub const TYPE_CLASS: SemanticToken = SemanticToken(2);
+pub const TYPE_ENUM: SemanticToken = SemanticToken(3);
+pub const TYPE_INTERFACE: SemanticToken = SemanticToken(4);
+pub const TYPE_STRUCT: SemanticToken = SemanticToken(5);
+pub const TYPE_TYPE_PARAMETER: SemanticToken = SemanticToken(6);
+pub const TYPE_PARAMETER: SemanticToken = SemanticToken(7);
+pub const TYPE_VARIABLE: SemanticToken = SemanticToken(8);
+pub const TYPE_PROPERTY: SemanticToken = SemanticToken(9);
+pub const TYPE_ENUM_MEMBER: SemanticToken = SemanticToken(10);
+pub const TYPE_EVENT: SemanticToken = SemanticToken(11);
+pub const TYPE_FUNCTION: SemanticToken = SemanticToken(12);
+pub const TYPE_METHOD: SemanticToken = SemanticToken(13);
+pub const TYPE_MACRO: SemanticToken = SemanticToken(14);
+pub const TYPE_KEYWORD: SemanticToken = SemanticToken(15);
+pub const TYPE_MODIFIER: SemanticToken = SemanticToken(16);
+pub const TYPE_COMMENT: SemanticToken = SemanticToken(17);
+pub const TYPE_STRING: SemanticToken = SemanticToken(18);
+pub const TYPE_NUMBER: SemanticToken = SemanticToken(19);
+pub const TYPE_REGEXP: SemanticToken = SemanticToken(20);
+pub const TYPE_OPERATOR: SemanticToken = SemanticToken(21);
+pub const TYPE_DECORATOR: SemanticToken = SemanticToken(22);
