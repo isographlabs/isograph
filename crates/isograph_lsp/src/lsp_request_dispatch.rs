@@ -128,7 +128,7 @@ mod test {
 
     #[test]
     fn calls_first_matching_request_handler() {
-        let mut state: AtomicI32 = AtomicI32::new(0);
+        let state: AtomicI32 = AtomicI32::new(0);
         let dispatch = LSPRequestDispatch::new(
             lsp_server::Request {
                 id: "id".to_string().into(),
