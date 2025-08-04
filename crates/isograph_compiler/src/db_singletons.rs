@@ -1,8 +1,9 @@
-use common_lang_types::CurrentWorkingDirectory;
+use common_lang_types::{CurrentWorkingDirectory, RelativePathToSourceFile};
 use isograph_config::CompilerConfig;
-use isograph_lang_types::{IsographDatabase, OpenFileMap};
+use isograph_lang_types::{IsographDatabase, OpenFileMap, OpenFileSource};
 use isograph_schema::StandardSources;
-use pico::Database;
+use pico::{Database, SourceId};
+use pico_macros::memo;
 
 use crate::source_files::IsoLiteralMap;
 
@@ -31,4 +32,13 @@ pub fn get_iso_literal_map(db: &IsographDatabase) -> &IsoLiteralMap {
 pub fn get_open_file_map(db: &IsographDatabase) -> &OpenFileMap {
     db.get_singleton::<OpenFileMap>()
         .expect("Expected OpenFileMap to have been set")
+}
+
+#[memo]
+pub fn get_open_file(
+    db: &IsographDatabase,
+    file: RelativePathToSourceFile,
+) -> Option<SourceId<OpenFileSource>> {
+    let file_map = get_open_file_map(db);
+    file_map.0.get(&file).cloned()
 }

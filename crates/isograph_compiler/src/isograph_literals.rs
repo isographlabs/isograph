@@ -18,12 +18,16 @@ use regex::Regex;
 use std::{
     fs::{self, DirEntry},
     io,
+    ops::Deref,
     path::{Path, PathBuf},
     str::Utf8Error,
 };
 use thiserror::Error;
 
-use crate::{create_schema::ParsedIsoLiteralsMap, db_singletons::get_current_working_directory};
+use crate::{
+    create_schema::ParsedIsoLiteralsMap, db_singletons::get_current_working_directory,
+    get_open_file,
+};
 
 pub fn read_files_in_folder(
     folder: &Path,
@@ -151,12 +155,36 @@ pub fn parse_iso_literal_in_source(
     Vec<(IsoLiteralExtractionResult, TextSource)>,
     Vec<WithLocation<IsographLiteralParseError>>,
 > {
+    let memo_ref = read_iso_literals_source(db, iso_literals_source_id);
+    let IsoLiteralsSource {
+        relative_path,
+        content,
+    } = memo_ref.deref();
+
+    parse_iso_literals_in_file_content(*relative_path, content, get_current_working_directory(db))
+}
+
+/// We should (probably) never directly read SourceId<IsoLiteralsSource>, since if we do so,
+/// we will ignore open files.
+#[memo]
+pub fn read_iso_literals_source(
+    db: &IsographDatabase,
+    iso_literals_source_id: SourceId<IsoLiteralsSource>,
+) -> IsoLiteralsSource {
     let IsoLiteralsSource {
         relative_path,
         content,
     } = db.get(iso_literals_source_id);
 
-    parse_iso_literals_in_file_content(*relative_path, content, get_current_working_directory(db))
+    let open_file = get_open_file(db, *relative_path).to_owned();
+
+    // Use the open file's content, if it exists, otherwise use the content of the file from the file system
+    let content = open_file.map(|x| &db.get(x).content).unwrap_or(content);
+
+    IsoLiteralsSource {
+        relative_path: *relative_path,
+        content: content.clone(),
+    }
 }
 
 #[allow(clippy::type_complexity)]
