@@ -1,6 +1,6 @@
 use common_lang_types::CurrentWorkingDirectory;
 use isograph_config::CompilerConfig;
-use isograph_lang_types::IsographDatabase;
+use isograph_lang_types::{IsographDatabase, OpenFileMap};
 use isograph_schema::StandardSources;
 use pico::Database;
 
@@ -26,4 +26,9 @@ pub fn get_standard_sources(db: &IsographDatabase) -> &StandardSources {
 pub fn get_iso_literal_map(db: &IsographDatabase) -> &IsoLiteralMap {
     db.get_singleton::<IsoLiteralMap>()
         .expect("Expected IsoLiteralMap to have been set")
+}
+
+pub fn get_open_file_map(db: &IsographDatabase) -> &OpenFileMap {
+    db.get_singleton::<OpenFileMap>()
+        .expect("Expected OpenFileMap to have been set")
 }

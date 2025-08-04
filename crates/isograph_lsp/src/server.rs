@@ -2,7 +2,6 @@ use crate::{
     lsp_notification_dispatch::LSPNotificationDispatch,
     lsp_request_dispatch::LSPRequestDispatch,
     lsp_runtime_error::LSPRuntimeError,
-    lsp_state::LSPState,
     semantic_tokens::{
         on_semantic_token_full_request, semantic_token_legend::semantic_token_legend,
     },
@@ -61,14 +60,14 @@ pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
     _params: InitializeParams,
     current_working_directory: CurrentWorkingDirectory,
 ) -> LSPProcessResult<(), TNetworkProtocol> {
-    let compiler_state = CompilerState::new(config_location, current_working_directory)?;
+    let mut compiler_state = CompilerState::new(config_location, current_working_directory)?;
+
     eprintln!("Running server loop");
-    let mut lsp_state = LSPState::new(connection.sender.clone(), compiler_state);
 
     let (tokio_sender, mut lsp_message_receiver) = tokio::sync::mpsc::channel(100);
     bridge_crossbeam_to_tokio(connection.receiver, tokio_sender);
 
-    let config = get_isograph_config(&lsp_state.compiler_state.db).clone();
+    let config = get_isograph_config(&compiler_state.db).clone();
 
     let (mut file_system_receiver, mut file_system_watcher) =
         create_debounced_file_watcher(&config);
@@ -80,13 +79,13 @@ pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
                     match lsp_message {
                         lsp_server::Message::Request(request) => {
                             eprintln!("\nReceived request: {}", request.method);
-                            let response = dispatch_request(request, &mut lsp_state);
+                            let response = dispatch_request(request, &compiler_state);
                             eprintln!("Sending response: {response:?}");
-                            lsp_state.send_message(response.into());
+                            connection.sender.send(response.into()).unwrap();
                         }
                         lsp_server::Message::Notification(notification) => {
                             eprintln!("\nReceived notification: {}", notification.method);
-                            let _ = dispatch_notification(notification, &mut lsp_state);
+                            let _ = dispatch_notification(notification, &mut compiler_state);
                         }
                         lsp_server::Message::Response(response) => {
                             eprintln!("Received response: {response:?}");
@@ -104,8 +103,7 @@ pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
                             "{}",
                             "Config change detected.".cyan()
                         );
-                        let compiler_state = CompilerState::new(config_location, current_working_directory)?;
-                        lsp_state = LSPState::new(connection.sender.clone(), compiler_state);
+                        compiler_state = CompilerState::new(config_location, current_working_directory)?;
                         file_system_watcher.stop();
                         // TODO is this a bug? Will we continue to watch the old folders? I think so.
                         (file_system_receiver, file_system_watcher) = create_debounced_file_watcher(&config);
@@ -123,8 +121,8 @@ pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
                         }
                     } else {
                         info!("{}", "File changes detected. Starting to compile.".cyan());
-                        update_sources(&mut lsp_state.compiler_state.db, &changes)?;
-                        lsp_state.compiler_state.run_garbage_collection();
+                        update_sources(&mut compiler_state.db, &changes)?;
+                        compiler_state.run_garbage_collection();
                     };
                 } else {
                     // If any connection breaks or we have some file system errors, we can just end here.
@@ -139,9 +137,9 @@ pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
 
 fn dispatch_notification(
     notification: lsp_server::Notification,
-    lsp_state: &mut LSPState,
+    compiler_state: &mut CompilerState,
 ) -> ControlFlow<Option<LSPRuntimeError>, ()> {
-    LSPNotificationDispatch::new(notification, lsp_state)
+    LSPNotificationDispatch::new(notification, compiler_state)
         .on_notification_sync::<DidOpenTextDocument>(on_did_open_text_document)?
         .on_notification_sync::<DidCloseTextDocument>(on_did_close_text_document)?
         .on_notification_sync::<DidChangeTextDocument>(on_did_change_text_document)?
@@ -149,11 +147,11 @@ fn dispatch_notification(
 
     ControlFlow::Continue(())
 }
-fn dispatch_request(request: lsp_server::Request, lsp_state: &mut LSPState) -> Response {
+fn dispatch_request(request: lsp_server::Request, compiler_state: &CompilerState) -> Response {
     // Returns ControlFlow::Break(ServerResponse) if the request
     // was handled, ControlFlow::Continue(Request) otherwise.
     let get_response = || {
-        let request = LSPRequestDispatch::new(request, lsp_state)
+        let request = LSPRequestDispatch::new(request, compiler_state)
             .on_request_sync::<SemanticTokensFullRequest>(on_semantic_token_full_request)?
             .request();
 

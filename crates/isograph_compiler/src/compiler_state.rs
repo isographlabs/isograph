@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     ops::Deref,
     path::PathBuf,
     time::{Duration, Instant},
@@ -7,7 +8,7 @@ use std::{
 use common_lang_types::{CurrentWorkingDirectory, WithLocation};
 use generate_artifacts::get_artifact_path_and_content;
 use isograph_config::create_config;
-use isograph_lang_types::IsographDatabase;
+use isograph_lang_types::{IsographDatabase, OpenFileMap};
 use isograph_schema::{validate_use_of_arguments, NetworkProtocol, ValidateUseOfArgumentsError};
 use pico::Database;
 use thiserror::Error;
@@ -39,6 +40,7 @@ impl CompilerState {
         let mut db = IsographDatabase::default();
         db.set(current_working_directory);
         db.set(create_config(config_location, current_working_directory));
+        db.set(OpenFileMap(HashMap::new()));
         initialize_sources(&mut db)?;
         Ok(Self {
             db,

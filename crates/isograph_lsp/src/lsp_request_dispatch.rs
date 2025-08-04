@@ -17,11 +17,11 @@ use crate::lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult};
 
 pub struct LSPRequestDispatch<'state, TState> {
     request: lsp_server::Request,
-    state: &'state mut TState,
+    state: &'state TState,
 }
 
 impl<'state, TState> LSPRequestDispatch<'state, TState> {
-    pub fn new(request: lsp_server::Request, state: &'state mut TState) -> Self {
+    pub fn new(request: lsp_server::Request, state: &'state TState) -> Self {
         LSPRequestDispatch { request, state }
     }
 
@@ -32,7 +32,7 @@ impl<'state, TState> LSPRequestDispatch<'state, TState> {
     /// cause LSPRequestDispatch to execute the first matching handler, if any.
     pub fn on_request_sync<TRequest: Request>(
         self,
-        handler: fn(&mut TState, TRequest::Params) -> LSPRuntimeResult<TRequest::Result>,
+        handler: fn(&TState, TRequest::Params) -> LSPRuntimeResult<TRequest::Result>,
     ) -> ControlFlow<Response, Self> {
         if self.request.method == TRequest::METHOD {
             match extract_request_params::<TRequest>(self.request) {
@@ -158,7 +158,7 @@ mod test {
     }
 
     fn hover_handler(
-        state: &mut AtomicI32,
+        state: &AtomicI32,
         _params: <HoverRequest as Request>::Params,
     ) -> LSPRuntimeResult<<HoverRequest as Request>::Result> {
         state.store(1, Ordering::Relaxed);
@@ -167,7 +167,7 @@ mod test {
     }
 
     fn goto_definition_handler(
-        state: &mut AtomicI32,
+        state: &AtomicI32,
         _params: <GotoDefinition as Request>::Params,
     ) -> LSPRuntimeResult<<GotoDefinition as Request>::Result> {
         state.store(2, Ordering::Relaxed);
