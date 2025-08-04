@@ -12,9 +12,10 @@ use crate::{
 use colored::Colorize;
 use common_lang_types::CurrentWorkingDirectory;
 use isograph_compiler::{
+    batch_compile::BatchCompileError,
     get_isograph_config, update_sources,
     watch::{create_debounced_file_watcher, has_config_changes},
-    BatchCompileError, CompilerState, SourceError,
+    CompilerState, SourceError,
 };
 use isograph_schema::NetworkProtocol;
 use log::{info, warn};

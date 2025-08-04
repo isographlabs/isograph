@@ -14,12 +14,11 @@ use tokio::{runtime::Handle, sync::mpsc::Receiver};
 use tracing::info;
 
 use crate::{
-    batch_compile::print_result,
-    compiler_state::{compile, CompilerState},
+    batch_compile::{compile, print_result, BatchCompileError},
+    compiler_state::CompilerState,
     db_singletons::get_isograph_config,
     source_files::update_sources,
     with_duration::WithDuration,
-    BatchCompileError,
 };
 
 pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol + 'static>(
