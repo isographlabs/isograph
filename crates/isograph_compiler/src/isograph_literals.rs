@@ -164,6 +164,30 @@ pub fn parse_iso_literal_in_source(
     parse_iso_literals_in_file_content(*relative_path, content, get_current_working_directory(db))
 }
 
+#[allow(clippy::type_complexity)]
+#[memo]
+pub fn parse_iso_literal_in_relative_file(
+    db: &IsographDatabase,
+    relative_path_to_source_file: RelativePathToSourceFile,
+) -> Option<
+    Result<
+        Vec<(IsoLiteralExtractionResult, TextSource)>,
+        Vec<WithLocation<IsographLiteralParseError>>,
+    >,
+> {
+    let memo_ref = read_iso_literals_source_from_relative_path(db, relative_path_to_source_file);
+    let IsoLiteralsSource {
+        relative_path,
+        content,
+    } = memo_ref.to_owned()?;
+
+    Some(parse_iso_literals_in_file_content(
+        relative_path,
+        &content,
+        get_current_working_directory(db),
+    ))
+}
+
 #[memo]
 pub fn read_iso_literals_source_from_relative_path(
     db: &IsographDatabase,
