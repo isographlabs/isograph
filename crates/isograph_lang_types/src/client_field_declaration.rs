@@ -10,8 +10,8 @@ use serde::Deserialize;
 use std::fmt::Debug;
 
 use crate::{
-    ClientFieldDirectiveSet, IsographFieldDirective, ObjectSelectionDirectiveSet,
-    ScalarSelectionDirectiveSet, SelectionType,
+    ClientFieldDirectiveSet, IsographFieldDirective, IsographSemanticToken,
+    ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionType,
 };
 
 pub type UnvalidatedSelection = SelectionTypeContainingSelections<(), ()>;
@@ -25,10 +25,11 @@ pub struct ClientFieldDeclaration {
     pub client_field_name: WithSpan<ClientScalarSelectableName>,
     pub description: Option<WithSpan<DescriptionValue>>,
     pub selection_set: Vec<WithSpan<UnvalidatedSelection>>,
-    // TODO remove, or put on a generic
     pub client_field_directive_set: ClientFieldDirectiveSet,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: RelativePathToSourceFile,
+
+    pub semantic_tokens: Vec<WithSpan<IsographSemanticToken>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
@@ -42,6 +43,8 @@ pub struct ClientPointerDeclaration {
     pub selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: RelativePathToSourceFile,
+
+    pub semantic_tokens: Vec<WithSpan<IsographSemanticToken>>,
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Default, Hash)]

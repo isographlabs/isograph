@@ -1,6 +1,7 @@
 use crate::IsographLangTokenKind;
 use common_lang_types::{Span, WithSpan};
 use intern::string_key::{Intern, StringKey};
+use isograph_lang_types::IsographSemanticToken;
 use logos::Logos;
 use thiserror::Error;
 
@@ -163,6 +164,10 @@ impl<'source> PeekableLexer<'source> {
 
     pub fn white_space_span(&self) -> Span {
         Span::new(self.end_index_of_last_parsed_token, self.peek().span.start)
+    }
+
+    pub fn semantic_tokens(&self) -> Vec<WithSpan<IsographSemanticToken>> {
+        vec![]
     }
 }
 

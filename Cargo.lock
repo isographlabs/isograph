@@ -1329,6 +1329,7 @@ dependencies = [
  "common_lang_types",
  "graphql_lang_types",
  "intern",
+ "lsp-types",
  "pico",
  "pico_macros",
  "serde",

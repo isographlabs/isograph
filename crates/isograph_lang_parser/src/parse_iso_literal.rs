@@ -108,6 +108,7 @@ fn parse_iso_entrypoint_declaration(
                 entrypoint_keyword: WithSpan::new((), entrypoint_keyword),
                 dot: dot.map(|_| ()),
                 entrypoint_directive_set,
+                semantic_tokens: tokens.semantic_tokens(),
             })
         })
         .map_err(|with_span: WithSpan<_>| with_span.to_with_location(text_source))?;
@@ -203,6 +204,8 @@ fn parse_client_field_declaration_inner(
             client_field_directive_set,
             const_export_name: const_export_name.intern().into(),
             variable_definitions,
+
+            semantic_tokens: tokens.semantic_tokens(),
         })
     })
 }
@@ -297,6 +300,8 @@ fn parse_client_pointer_declaration_inner(
             definition_path: definition_file_path,
             const_export_name: const_export_name.intern().into(),
             variable_definitions,
+
+            semantic_tokens: tokens.semantic_tokens(),
         })
     })
 }

@@ -1,5 +1,3 @@
-pub(crate) mod semantic_token_legend;
-
 use crate::lsp_runtime_error::LSPRuntimeResult;
 use isograph_compiler::CompilerState;
 use lsp_types::request::{Request, SemanticTokensFullRequest};

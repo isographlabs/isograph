@@ -2,7 +2,7 @@ use common_lang_types::{
     IsoLiteralText, ServerScalarSelectableName, UnvalidatedTypeName, WithSpan,
 };
 
-use crate::entrypoint_directive_set::EntrypointDirectiveSet;
+use crate::{entrypoint_directive_set::EntrypointDirectiveSet, IsographSemanticToken};
 
 // TODO should this be ObjectTypeAndFieldNames?
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -17,4 +17,6 @@ pub struct EntrypointDeclaration {
     pub dot: WithSpan<()>,
     pub iso_literal_text: IsoLiteralText,
     pub entrypoint_directive_set: EntrypointDirectiveSet,
+
+    pub semantic_tokens: Vec<WithSpan<IsographSemanticToken>>,
 }

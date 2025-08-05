@@ -1,8 +1,6 @@
-#![allow(unused)]
-
 use lsp_types::{SemanticTokenModifier, SemanticTokenType, SemanticTokensLegend};
 
-pub(crate) fn semantic_token_legend() -> SemanticTokensLegend {
+pub fn semantic_token_legend() -> SemanticTokensLegend {
     SemanticTokensLegend {
         token_types: vec![
             SemanticTokenType::NAMESPACE,
@@ -41,6 +39,7 @@ pub(crate) fn semantic_token_legend() -> SemanticTokensLegend {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct IsographSemanticToken(pub u32);
 
 pub const NAMESPACE: IsographSemanticToken = IsographSemanticToken(0);
