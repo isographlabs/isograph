@@ -812,21 +812,3 @@ fn from_control_flow<T, E>(control_flow: impl FnOnce() -> ControlFlow<T, E>) -> 
         ControlFlow::Continue(e) => Err(e),
     }
 }
-
-#[cfg(test)]
-mod test {
-    use crate::{IsographLangTokenKind, PeekableLexer};
-
-    #[test]
-    fn parse_literal_tests() {
-        let source = "\"Description\" Query.foo { bar, baz, }";
-        let mut lexer = PeekableLexer::new(source);
-
-        loop {
-            let token = lexer.parse_token();
-            if token.item == IsographLangTokenKind::EndOfFile {
-                break;
-            }
-        }
-    }
-}

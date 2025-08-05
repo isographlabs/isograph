@@ -39,7 +39,7 @@ impl<'source> PeekableLexer<'source> {
     }
 
     /// Get the next token (and advance)
-    pub fn parse_token(&mut self) -> WithSpan<IsographLangTokenKind> {
+    fn parse_token(&mut self) -> WithSpan<IsographLangTokenKind> {
         let kind = self
             .lexer
             .next()
