@@ -55,11 +55,13 @@ impl<'source> PeekableLexer<'source> {
         self.end_index_of_last_parsed_token = self.current.span.end;
         let span = self.lexer_span();
 
-        self.semantic_tokens
-            .push(WithSpan::new(isograph_semantic_token, span));
-
         // TODO why does self.current = ... not work here?
-        std::mem::replace(&mut self.current, WithSpan::new(kind, span))
+        let parsed_token = std::mem::replace(&mut self.current, WithSpan::new(kind, span));
+
+        self.semantic_tokens
+            .push(WithSpan::new(isograph_semantic_token, parsed_token.span));
+
+        parsed_token
     }
 
     pub fn peek(&self) -> WithSpan<IsographLangTokenKind> {
