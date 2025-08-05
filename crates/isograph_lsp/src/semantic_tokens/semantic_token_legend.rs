@@ -41,28 +41,28 @@ pub(crate) fn semantic_token_legend() -> SemanticTokensLegend {
     }
 }
 
-pub struct SemanticToken(pub u32);
+pub struct IsographSemanticToken(pub u32);
 
-pub const NAMESPACE: SemanticToken = SemanticToken(0);
-pub const TYPE_TYPE: SemanticToken = SemanticToken(1);
-pub const TYPE_CLASS: SemanticToken = SemanticToken(2);
-pub const TYPE_ENUM: SemanticToken = SemanticToken(3);
-pub const TYPE_INTERFACE: SemanticToken = SemanticToken(4);
-pub const TYPE_STRUCT: SemanticToken = SemanticToken(5);
-pub const TYPE_TYPE_PARAMETER: SemanticToken = SemanticToken(6);
-pub const TYPE_PARAMETER: SemanticToken = SemanticToken(7);
-pub const TYPE_VARIABLE: SemanticToken = SemanticToken(8);
-pub const TYPE_PROPERTY: SemanticToken = SemanticToken(9);
-pub const TYPE_ENUM_MEMBER: SemanticToken = SemanticToken(10);
-pub const TYPE_EVENT: SemanticToken = SemanticToken(11);
-pub const TYPE_FUNCTION: SemanticToken = SemanticToken(12);
-pub const TYPE_METHOD: SemanticToken = SemanticToken(13);
-pub const TYPE_MACRO: SemanticToken = SemanticToken(14);
-pub const TYPE_KEYWORD: SemanticToken = SemanticToken(15);
-pub const TYPE_MODIFIER: SemanticToken = SemanticToken(16);
-pub const TYPE_COMMENT: SemanticToken = SemanticToken(17);
-pub const TYPE_STRING: SemanticToken = SemanticToken(18);
-pub const TYPE_NUMBER: SemanticToken = SemanticToken(19);
-pub const TYPE_REGEXP: SemanticToken = SemanticToken(20);
-pub const TYPE_OPERATOR: SemanticToken = SemanticToken(21);
-pub const TYPE_DECORATOR: SemanticToken = SemanticToken(22);
+pub const NAMESPACE: IsographSemanticToken = IsographSemanticToken(0);
+pub const TYPE_TYPE: IsographSemanticToken = IsographSemanticToken(1);
+pub const TYPE_CLASS: IsographSemanticToken = IsographSemanticToken(2);
+pub const TYPE_ENUM: IsographSemanticToken = IsographSemanticToken(3);
+pub const TYPE_INTERFACE: IsographSemanticToken = IsographSemanticToken(4);
+pub const TYPE_STRUCT: IsographSemanticToken = IsographSemanticToken(5);
+pub const TYPE_TYPE_PARAMETER: IsographSemanticToken = IsographSemanticToken(6);
+pub const TYPE_PARAMETER: IsographSemanticToken = IsographSemanticToken(7);
+pub const TYPE_VARIABLE: IsographSemanticToken = IsographSemanticToken(8);
+pub const TYPE_PROPERTY: IsographSemanticToken = IsographSemanticToken(9);
+pub const TYPE_ENUM_MEMBER: IsographSemanticToken = IsographSemanticToken(10);
+pub const TYPE_EVENT: IsographSemanticToken = IsographSemanticToken(11);
+pub const TYPE_FUNCTION: IsographSemanticToken = IsographSemanticToken(12);
+pub const TYPE_METHOD: IsographSemanticToken = IsographSemanticToken(13);
+pub const TYPE_MACRO: IsographSemanticToken = IsographSemanticToken(14);
+pub const TYPE_KEYWORD: IsographSemanticToken = IsographSemanticToken(15);
+pub const TYPE_MODIFIER: IsographSemanticToken = IsographSemanticToken(16);
+pub const TYPE_COMMENT: IsographSemanticToken = IsographSemanticToken(17);
+pub const TYPE_STRING: IsographSemanticToken = IsographSemanticToken(18);
+pub const TYPE_NUMBER: IsographSemanticToken = IsographSemanticToken(19);
+pub const TYPE_REGEXP: IsographSemanticToken = IsographSemanticToken(20);
+pub const TYPE_OPERATOR: IsographSemanticToken = IsographSemanticToken(21);
+pub const TYPE_DECORATOR: IsographSemanticToken = IsographSemanticToken(22);
