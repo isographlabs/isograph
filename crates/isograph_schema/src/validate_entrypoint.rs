@@ -32,7 +32,7 @@ pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol>(
         EntrypointDeclarationInfo,
     > = HashMap::new();
     for (text_source, entrypoint_declaration) in entrypoint_declarations {
-        match validate_entrypoint_type_and_field(schema, text_source, entrypoint_declaration) {
+        match validate_entrypoint_type_and_field(schema, text_source, &entrypoint_declaration) {
             Ok(client_field_id) => {
                 let new_entrypoint = EntrypointDeclarationInfo {
                     iso_literal_text: entrypoint_declaration.item.iso_literal_text,
@@ -78,7 +78,7 @@ pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol>(
 fn validate_entrypoint_type_and_field<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     text_source: TextSource,
-    entrypoint_declaration: WithSpan<EntrypointDeclaration>,
+    entrypoint_declaration: &WithSpan<EntrypointDeclaration>,
 ) -> Result<ClientScalarSelectableName, WithLocation<ValidateEntrypointDeclarationError>> {
     let parent_object_entity_name = validate_parent_object_entity_name(
         schema,

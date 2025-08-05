@@ -5,7 +5,7 @@ use common_lang_types::{
 use crate::entrypoint_directive_set::EntrypointDirectiveSet;
 
 // TODO should this be ObjectTypeAndFieldNames?
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct EntrypointDeclaration {
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     // N.B. there is no reason this can't be a server field name /shrug
