@@ -53,6 +53,10 @@ impl<'source> PeekableLexer<'source> {
             .unwrap_or(IsographLangTokenKind::EndOfFile);
 
         self.end_index_of_last_parsed_token = self.current.span.end;
+        // TODO this seems buggy — the span is inclusive on both sides,
+        // but it should be exclusive on the right, so we should probably
+        // do self.end_index_of_last_parsed_token = self.current.span.end + 1
+        // or something!
         let span = self.lexer_span();
 
         // TODO why does self.current = ... not work here?
