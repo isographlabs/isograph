@@ -1,7 +1,7 @@
 use crate::IsographLangTokenKind;
 use common_lang_types::{Span, WithSpan};
 use intern::string_key::{Intern, StringKey};
-use isograph_lang_types::{IsographSemanticToken, ST_COMMENT};
+use isograph_lang_types::{semantic_token_legend, IsographSemanticToken};
 use logos::Logos;
 use thiserror::Error;
 
@@ -36,7 +36,7 @@ impl<'source> PeekableLexer<'source> {
         };
 
         // Advance to the first real token before doing any work
-        parser.parse_token(ST_COMMENT);
+        parser.parse_token(semantic_token_legend::ST_COMMENT);
         // When parsing, we placed a semantic token on the stack.
         parser.semantic_tokens.pop();
         parser
@@ -81,7 +81,7 @@ impl<'source> PeekableLexer<'source> {
         if self.reached_eof() {
             None
         } else {
-            let next_token = self.parse_token(ST_COMMENT);
+            let next_token = self.parse_token(semantic_token_legend::ST_COMMENT);
             Some(Span::new(next_token.span.start, self.source.len() as u32))
         }
     }

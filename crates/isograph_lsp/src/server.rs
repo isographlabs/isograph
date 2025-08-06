@@ -15,7 +15,7 @@ use isograph_compiler::{
     watch::{create_debounced_file_watcher, has_config_changes},
     CompilerState, SourceError,
 };
-use isograph_lang_types::semantic_token_legend;
+use isograph_lang_types::semantic_token_legend::semantic_token_legend;
 use isograph_schema::NetworkProtocol;
 use log::{info, warn};
 use lsp_server::{Connection, ErrorCode, ProtocolError, Response, ResponseError};
