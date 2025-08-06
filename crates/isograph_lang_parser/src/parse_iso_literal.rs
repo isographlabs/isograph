@@ -37,7 +37,7 @@ pub fn parse_iso_literal(
 ) -> Result<IsoLiteralExtractionResult, WithLocation<IsographLiteralParseError>> {
     let mut tokens = PeekableLexer::new(iso_literal_text);
     let discriminator = tokens
-        .parse_source_of_kind(IsographLangTokenKind::Identifier, ST_TYPE)
+        .parse_source_of_kind(IsographLangTokenKind::Identifier, ST_KEYWORD)
         .map_err(|with_span| with_span.map(IsographLiteralParseError::from))
         .map_err(|err| err.to_with_location(text_source))?;
     match discriminator.item {
@@ -524,7 +524,7 @@ fn parse_optional_arguments(
     text_source: TextSource,
 ) -> ParseResultWithSpan<Vec<WithLocation<SelectionFieldArgument>>> {
     if tokens
-        .parse_token_of_kind(IsographLangTokenKind::OpenParen, ST_KEYWORD)
+        .parse_token_of_kind(IsographLangTokenKind::OpenParen, ST_OPERATOR)
         .is_ok()
     {
         let arguments = parse_delimited_list(
