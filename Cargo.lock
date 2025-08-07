@@ -1353,6 +1353,7 @@ dependencies = [
  "lsp-server",
  "lsp-types",
  "pico",
+ "pico_macros",
  "serde",
  "serde_json",
  "thiserror",

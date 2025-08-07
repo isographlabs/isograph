@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use crate::{
-    lsp_runtime_error::LSPRuntimeResult,
+    lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult},
     row_col_offset::{rcd_to_end_of_slice, RowColDiff},
 };
 use common_lang_types::{relative_path_from_absolute_and_working_directory, Span, WithSpan};
@@ -10,20 +10,29 @@ use isograph_compiler::{
     read_iso_literals_source_from_relative_path, CompilerState,
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
-use isograph_lang_types::IsographSemanticToken;
+use isograph_lang_types::{IsographDatabase, IsographSemanticToken};
 use lsp_types::{
     request::{Request, SemanticTokensFullRequest},
     SemanticToken as LspSemanticToken, SemanticTokens as LspSemanticTokens,
-    SemanticTokensResult as LspSemanticTokensResult,
+    SemanticTokensResult as LspSemanticTokensResult, Url,
 };
+use pico_macros::memo;
 
 pub fn on_semantic_token_full_request(
     compiler_state: &CompilerState,
     params: <SemanticTokensFullRequest as Request>::Params,
 ) -> LSPRuntimeResult<<SemanticTokensFullRequest as Request>::Result> {
     let uri = params.text_document.uri;
-
     let db = &compiler_state.db;
+
+    get_semantic_tokens(db, uri).to_owned()
+}
+
+#[memo]
+fn get_semantic_tokens(
+    db: &IsographDatabase,
+    uri: Url,
+) -> Result<Option<LspSemanticTokensResult>, LSPRuntimeError> {
     let current_working_directory = get_current_working_directory(db);
 
     let relative_path_to_source_file = relative_path_from_absolute_and_working_directory(
