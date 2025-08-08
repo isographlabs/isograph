@@ -56,7 +56,7 @@ fn get_semantic_tokens(
 
         // Track how many characters we've processed in the entire file.
         // This accumulates across all isograph literals to maintain proper positioning.
-        let mut processed_until = 0 as usize;
+        let mut processed_until = 0_usize;
 
         let lsp_semantic_tokens = parsed_iso_literals
             .iter()
@@ -149,16 +149,18 @@ fn convert_isograph_semantic_token_to_lsp_semantic_token(
         token_type: isograph_semantic_token.item.0,
         token_modifiers_bitset: 0,
     };
+    if isograph_semantic_token.item.0 == 17 {
+        eprintln!("GOT IT {:#?}", token);
+    }
     token
 }
 
 fn get_isograph_semantic_tokens(
     result: &IsoLiteralExtractionResult,
 ) -> &Vec<WithSpan<IsographSemanticToken>> {
-    let semantic_tokens = match result {
+    (match result {
         IsoLiteralExtractionResult::ClientPointerDeclaration(s) => &s.item.semantic_tokens,
         IsoLiteralExtractionResult::ClientFieldDeclaration(s) => &s.item.semantic_tokens,
         IsoLiteralExtractionResult::EntrypointDeclaration(s) => &s.item.semantic_tokens,
-    };
-    semantic_tokens
+    }) as _
 }
