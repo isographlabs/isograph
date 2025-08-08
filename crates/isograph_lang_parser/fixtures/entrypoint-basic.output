@@ -42,6 +42,44 @@ Ok(
                         entrypoint_directive_set: None(
                             EmptyDirectiveSet,
                         ),
+                        semantic_tokens: [
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    15,
+                                ),
+                                span: Span {
+                                    start: 0,
+                                    end: 10,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    2,
+                                ),
+                                span: Span {
+                                    start: 11,
+                                    end: 15,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    21,
+                                ),
+                                span: Span {
+                                    start: 15,
+                                    end: 16,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    13,
+                                ),
+                                span: Span {
+                                    start: 16,
+                                    end: 20,
+                                },
+                            },
+                        ],
                     },
                     span: Span {
                         start: 11,

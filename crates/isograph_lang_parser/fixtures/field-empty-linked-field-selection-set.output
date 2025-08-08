@@ -77,20 +77,89 @@ Ok(
                         definition_path: RelativePathToSourceFile(
                             "crates/isograph_lang_parser/fixtures/field-empty-linked-field-selection-set.input.js",
                         ),
-                        field_keyword: WithSpan {
-                            item: (),
-                            span: Span {
-                                start: 3,
-                                end: 8,
+                        semantic_tokens: [
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    15,
+                                ),
+                                span: Span {
+                                    start: 3,
+                                    end: 8,
+                                },
                             },
-                        },
-                        dot: WithSpan {
-                            item: (),
-                            span: Span {
-                                start: 13,
-                                end: 14,
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    2,
+                                ),
+                                span: Span {
+                                    start: 9,
+                                    end: 13,
+                                },
                             },
-                        },
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    21,
+                                ),
+                                span: Span {
+                                    start: 13,
+                                    end: 14,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    13,
+                                ),
+                                span: Span {
+                                    start: 14,
+                                    end: 18,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    21,
+                                ),
+                                span: Span {
+                                    start: 19,
+                                    end: 20,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    9,
+                                ),
+                                span: Span {
+                                    start: 25,
+                                    end: 31,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    21,
+                                ),
+                                span: Span {
+                                    start: 32,
+                                    end: 33,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    21,
+                                ),
+                                span: Span {
+                                    start: 33,
+                                    end: 34,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    21,
+                                ),
+                                span: Span {
+                                    start: 37,
+                                    end: 38,
+                                },
+                            },
+                        ],
                     },
                     span: Span {
                         start: 9,

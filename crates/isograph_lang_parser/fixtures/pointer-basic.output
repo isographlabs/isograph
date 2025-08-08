@@ -171,20 +171,125 @@ Ok(
                         definition_path: RelativePathToSourceFile(
                             "crates/isograph_lang_parser/fixtures/pointer-basic.input.js",
                         ),
-                        pointer_keyword: WithSpan {
-                            item: (),
-                            span: Span {
-                                start: 3,
-                                end: 10,
+                        semantic_tokens: [
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    15,
+                                ),
+                                span: Span {
+                                    start: 3,
+                                    end: 10,
+                                },
                             },
-                        },
-                        dot: WithSpan {
-                            item: (),
-                            span: Span {
-                                start: 15,
-                                end: 16,
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    2,
+                                ),
+                                span: Span {
+                                    start: 11,
+                                    end: 15,
+                                },
                             },
-                        },
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    21,
+                                ),
+                                span: Span {
+                                    start: 15,
+                                    end: 16,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    13,
+                                ),
+                                span: Span {
+                                    start: 16,
+                                    end: 26,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    15,
+                                ),
+                                span: Span {
+                                    start: 27,
+                                    end: 29,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    1,
+                                ),
+                                span: Span {
+                                    start: 30,
+                                    end: 34,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    21,
+                                ),
+                                span: Span {
+                                    start: 35,
+                                    end: 36,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    9,
+                                ),
+                                span: Span {
+                                    start: 41,
+                                    end: 48,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    21,
+                                ),
+                                span: Span {
+                                    start: 49,
+                                    end: 50,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    9,
+                                ),
+                                span: Span {
+                                    start: 57,
+                                    end: 59,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    9,
+                                ),
+                                span: Span {
+                                    start: 66,
+                                    end: 75,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    21,
+                                ),
+                                span: Span {
+                                    start: 80,
+                                    end: 81,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken(
+                                    21,
+                                ),
+                                span: Span {
+                                    start: 84,
+                                    end: 85,
+                                },
+                            },
+                        ],
                     },
                     span: Span {
                         start: 11,
