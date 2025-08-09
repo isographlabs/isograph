@@ -149,9 +149,6 @@ fn convert_isograph_semantic_token_to_lsp_semantic_token(
         token_type: isograph_semantic_token.item.0,
         token_modifiers_bitset: 0,
     };
-    if isograph_semantic_token.item.0 == 17 {
-        eprintln!("GOT IT {:#?}", token);
-    }
     token
 }
 
