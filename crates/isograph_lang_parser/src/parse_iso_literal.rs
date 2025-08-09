@@ -10,10 +10,12 @@ use graphql_lang_types::{
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
     from_isograph_field_directives, semantic_token_legend, ClientFieldDeclaration,
-    ClientPointerDeclaration, ConstantValue, EntrypointDeclaration, IsographFieldDirective,
-    NonConstantValue, ObjectSelection, ScalarSelection, SelectionFieldArgument,
-    SelectionTypeContainingSelections, UnvalidatedSelection, VariableDefinition,
+    ClientPointerDeclaration, ConstantValue, EntrypointDeclaration, IsographDatabase,
+    IsographFieldDirective, NonConstantValue, ObjectSelection, ScalarSelection,
+    SelectionFieldArgument, SelectionTypeContainingSelections, UnvalidatedSelection,
+    VariableDefinition,
 };
+use pico_macros::memo;
 use std::{collections::HashSet, ops::ControlFlow};
 
 use crate::{
@@ -28,13 +30,15 @@ pub enum IsoLiteralExtractionResult {
     EntrypointDeclaration(WithSpan<EntrypointDeclaration>),
 }
 
+#[memo]
 pub fn parse_iso_literal(
-    iso_literal_text: &str,
+    db: &IsographDatabase,
+    iso_literal_text: String,
     definition_file_path: RelativePathToSourceFile,
-    const_export_name: Option<&str>,
+    const_export_name: Option<String>,
     text_source: TextSource,
 ) -> Result<IsoLiteralExtractionResult, WithLocation<IsographLiteralParseError>> {
-    let mut tokens = PeekableLexer::new(iso_literal_text);
+    let mut tokens = PeekableLexer::new(&iso_literal_text);
     let discriminator = tokens
         .parse_source_of_kind(
             IsographLangTokenKind::Identifier,
@@ -48,14 +52,14 @@ pub fn parse_iso_literal(
                 &mut tokens,
                 text_source,
                 discriminator.span,
-                iso_literal_text.intern().into(),
+                (&iso_literal_text).intern().into(),
             )?,
         )),
         "field" => Ok(IsoLiteralExtractionResult::ClientFieldDeclaration(
             parse_iso_client_field_declaration(
                 &mut tokens,
                 definition_file_path,
-                const_export_name,
+                const_export_name.as_deref(),
                 text_source,
             )?,
         )),
@@ -63,7 +67,7 @@ pub fn parse_iso_literal(
             parse_iso_client_pointer_declaration(
                 &mut tokens,
                 definition_file_path,
-                const_export_name,
+                const_export_name.as_deref(),
                 text_source,
             )?,
         )),

@@ -118,6 +118,7 @@ fn visit_dirs_skipping_isograph(dir: &Path, cb: &mut dyn FnMut(&DirEntry)) -> io
 // both valid and invalid iso literals.
 #[allow(clippy::type_complexity)]
 pub fn parse_iso_literals_in_file_content(
+    db: &IsographDatabase,
     relative_path_to_source_file: RelativePathToSourceFile,
     file_content: &str,
     current_working_directory: CurrentWorkingDirectory,
@@ -130,6 +131,7 @@ pub fn parse_iso_literals_in_file_content(
 
     for iso_literal_extraction in extract_iso_literals_from_file_content(file_content) {
         match process_iso_literal_extraction(
+            db,
             iso_literal_extraction,
             relative_path_to_source_file,
             current_working_directory,
@@ -161,7 +163,12 @@ pub fn parse_iso_literal_in_source(
         content,
     } = memo_ref.deref();
 
-    parse_iso_literals_in_file_content(*relative_path, content, get_current_working_directory(db))
+    parse_iso_literals_in_file_content(
+        db,
+        *relative_path,
+        content,
+        get_current_working_directory(db),
+    )
 }
 
 #[allow(clippy::type_complexity)]
@@ -182,6 +189,7 @@ pub fn parse_iso_literal_in_relative_file(
     } = memo_ref.to_owned()?;
 
     Some(parse_iso_literals_in_file_content(
+        db,
         relative_path,
         &content,
         get_current_working_directory(db),
@@ -279,6 +287,7 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
 }
 
 fn process_iso_literal_extraction(
+    db: &IsographDatabase,
     iso_literal_extraction: IsoLiteralExtraction<'_>,
     relative_path_to_source_file: RelativePathToSourceFile,
     current_working_directory: CurrentWorkingDirectory,
@@ -307,11 +316,13 @@ fn process_iso_literal_extraction(
     }
 
     let iso_literal_extraction_result = parse_iso_literal(
-        iso_literal_text,
+        db,
+        iso_literal_text.to_string(),
         relative_path_to_source_file,
-        const_export_name,
+        const_export_name.map(|x| x.to_string()),
         text_source,
-    )?;
+    )
+    .to_owned()?;
 
     let is_client_field_declaration = matches!(
         &iso_literal_extraction_result,

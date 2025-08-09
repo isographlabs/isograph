@@ -6,11 +6,14 @@ use common_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_compiler::parse_iso_literals_in_file_content;
+use isograph_lang_types::IsographDatabase;
 use lazy_static::lazy_static;
 use regex::Regex;
 
 fn main() {
     let args = FixtureOpt::parse();
+
+    let db = IsographDatabase::default();
 
     if args.dir.is_empty() {
         panic!("At least one directory must be provided.");
@@ -32,7 +35,7 @@ fn main() {
             panic!("Expected {fixture_dir:?} to be a directory");
         }
 
-        generate_fixtures_for_files_in_folder(canonicalized_folder, current_working_directory);
+        generate_fixtures_for_files_in_folder(&db, canonicalized_folder, current_working_directory);
     }
 }
 
@@ -51,6 +54,7 @@ lazy_static! {
 const OUTPUT_SUFFIX: &str = r"output";
 
 fn generate_fixtures_for_files_in_folder(
+    db: &IsographDatabase,
     folder: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) {
@@ -70,7 +74,7 @@ fn generate_fixtures_for_files_in_folder(
                 if let Some(capture) = INPUT_SUFFIX.captures(&path_as_str) {
                     let mut output_file = PathBuf::from(capture.get(1).unwrap().as_str());
                     output_file.set_extension(OUTPUT_SUFFIX);
-                    process_input_file(path, output_file, current_working_directory);
+                    process_input_file(db, path, output_file, current_working_directory);
                 } else if path.extension() == Some(OsStr::new(OUTPUT_SUFFIX)) {
                     // Great, ignore it.
                 } else {
@@ -87,6 +91,7 @@ fn generate_fixtures_for_files_in_folder(
 }
 
 fn process_input_file(
+    db: &IsographDatabase,
     input_file: PathBuf,
     output_file: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
@@ -104,13 +109,14 @@ fn process_input_file(
     //
     // So, we will need to make this a bit more flexible.
     let results =
-        generate_content_for_output_file(input_file, file_content, current_working_directory);
+        generate_content_for_output_file(db, input_file, file_content, current_working_directory);
 
     fs::write(output_file.clone(), results)
         .unwrap_or_else(|_| panic!("Failed to write to {output_file:?}"));
 }
 
 fn generate_content_for_output_file(
+    db: &IsographDatabase,
     input_file: PathBuf,
     content: String,
     current_working_directory: CurrentWorkingDirectory,
@@ -122,6 +128,7 @@ fn generate_content_for_output_file(
         &absolute_path,
     );
     match parse_iso_literals_in_file_content(
+        db,
         relative_path_to_source_file,
         &content,
         current_working_directory,

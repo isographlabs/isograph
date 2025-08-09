@@ -1306,6 +1306,7 @@ dependencies = [
  "intern",
  "isograph_compiler",
  "isograph_config",
+ "isograph_lang_types",
  "lazy_static",
  "regex",
 ]
@@ -1319,6 +1320,8 @@ dependencies = [
  "intern",
  "isograph_lang_types",
  "logos",
+ "pico",
+ "pico_macros",
  "thiserror",
 ]
 
