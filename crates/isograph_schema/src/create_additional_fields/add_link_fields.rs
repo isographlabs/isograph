@@ -34,7 +34,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         type_name: object.name,
                     },
                     refetch_strategy: None,
-                    output_format: std::marker::PhantomData,
+                    network_protocol: std::marker::PhantomData,
                 },
             );
 

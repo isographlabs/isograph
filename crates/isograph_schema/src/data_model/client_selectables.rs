@@ -44,7 +44,7 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub type_and_field: ObjectTypeAndFieldName,
 
     pub parent_object_entity_name: ServerObjectEntityName,
-    pub output_format: PhantomData<TNetworkProtocol>,
+    pub network_protocol: PhantomData<TNetworkProtocol>,
 }
 
 /// The struct formally known as a client pointer, and declared with the pointer keyword
@@ -66,6 +66,6 @@ pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
 
     pub parent_object_name: ServerObjectEntityName,
 
-    pub output_format: PhantomData<TNetworkProtocol>,
+    pub network_protocol: PhantomData<TNetworkProtocol>,
     pub info: UserWrittenClientPointerInfo,
 }

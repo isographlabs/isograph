@@ -746,7 +746,7 @@ fn add_schema_defined_scalar_type<TNetworkProtocol: NetworkProtocol>(
             description: None,
             name: typename,
             javascript_name,
-            output_format: std::marker::PhantomData,
+            network_protocol: std::marker::PhantomData,
         },
     );
     defined_types.insert(

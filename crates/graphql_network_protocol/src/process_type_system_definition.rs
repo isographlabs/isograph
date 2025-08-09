@@ -332,7 +332,7 @@ fn process_object_type_definition(
         description: object_type_definition.description.map(|d| d.item),
         name: object_type_definition.name.item,
         concrete_type,
-        output_associated_data: associated_data,
+        network_protocol_associated_data: associated_data,
     };
 
     let mut fields_to_insert: Vec<_> = object_type_definition
@@ -424,7 +424,7 @@ fn process_scalar_definition(
         description: scalar_type_definition.description,
         name: scalar_type_definition.name,
         javascript_name: *STRING_JAVASCRIPT_TYPE,
-        output_format: std::marker::PhantomData,
+        network_protocol: std::marker::PhantomData,
     }
 }
 

@@ -13,7 +13,7 @@ pub struct ServerScalarEntity<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<ServerScalarEntityName>,
     pub javascript_name: JavascriptName,
-    pub output_format: PhantomData<TNetworkProtocol>,
+    pub network_protocol: PhantomData<TNetworkProtocol>,
 }
 
 type SelectableId = DefinitionLocation<ServerSelectableId, ClientSelectableId>;
@@ -27,7 +27,7 @@ pub struct ServerObjectEntity<TNetworkProtocol: NetworkProtocol> {
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<ServerObjectEntityName>,
 
-    pub output_associated_data: TNetworkProtocol::SchemaObjectAssociatedData,
+    pub network_protocol_associated_data: TNetworkProtocol::SchemaObjectAssociatedData,
 }
 
 impl_with_id!(ServerObjectEntity<TNetworkProtocol: NetworkProtocol>, ServerObjectEntityName);

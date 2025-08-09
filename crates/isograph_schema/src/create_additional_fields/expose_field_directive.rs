@@ -224,7 +224,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             },
             parent_object_entity_name: maybe_abstract_parent_object_entity_name,
             refetch_strategy: None,
-            output_format: std::marker::PhantomData,
+            network_protocol: std::marker::PhantomData,
         };
         self.client_scalar_selectables.insert(
             (

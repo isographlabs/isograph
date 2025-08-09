@@ -233,7 +233,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
                 parent_object_entity_name,
                 refetch_strategy: None,
-                output_format: std::marker::PhantomData,
+                network_protocol: std::marker::PhantomData,
             },
         );
 
@@ -369,7 +369,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 parent_object_name,
                 refetch_strategy,
                 target_object_entity_name: to_object_name,
-                output_format: std::marker::PhantomData,
+                network_protocol: std::marker::PhantomData,
 
                 info: UserWrittenClientPointerInfo {
                     const_export_name: client_pointer_declaration.item.const_export_name,
