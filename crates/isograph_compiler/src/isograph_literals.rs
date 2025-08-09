@@ -348,7 +348,7 @@ pub struct IsoLiteralExtraction<'a> {
 
 pub fn extract_iso_literals_from_file_content(
     content: &str,
-) -> impl Iterator<Item = IsoLiteralExtraction> + '_ {
+) -> impl Iterator<Item = IsoLiteralExtraction<'_>> + '_ {
     EXTRACT_ISO_LITERAL
         .captures_iter(content)
         .flat_map(|captures| {

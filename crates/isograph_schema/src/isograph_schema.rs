@@ -365,9 +365,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     }
 
     pub fn server_selectable(
-        &self,
+        &'_ self,
         server_selectable_id: ServerSelectableId,
-    ) -> ServerSelectable<TNetworkProtocol> {
+    ) -> ServerSelectable<'_, TNetworkProtocol> {
         match server_selectable_id {
             SelectionType::Scalar((parent_object_entity_name, server_scalar_selectable_name)) => {
                 SelectionType::Scalar(self.server_scalar_selectable(
@@ -515,7 +515,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn object_selectable(
         &self,
         field_id: ObjectSelectableId,
-    ) -> ObjectSelectable<TNetworkProtocol> {
+    ) -> ObjectSelectable<'_, TNetworkProtocol> {
         match field_id {
             DefinitionLocation::Server((
                 parent_object_entity_name,
@@ -622,7 +622,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
             .expect("Expected scalar to exist")
     }
 
-    pub fn server_entity(&self, type_id: ServerEntityName) -> ServerEntity<TNetworkProtocol> {
+    pub fn server_entity(&self, type_id: ServerEntityName) -> ServerEntity<'_, TNetworkProtocol> {
         match type_id {
             ServerEntityName::Object(object_entity_name) => {
                 ServerEntity::Object(self.server_object_entity(object_entity_name))

@@ -217,7 +217,10 @@ export function iso(isographLiteralText: string):
 
 fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-) -> Vec<(ClientSelectable<TNetworkProtocol>, ClientFieldDirectiveSet)> {
+) -> Vec<(
+    ClientSelectable<'_, TNetworkProtocol>,
+    ClientFieldDirectiveSet,
+)> {
     let mut client_types = schema
         .user_written_client_types()
         .map(|x| (x.1, x.2))
