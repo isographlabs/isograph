@@ -86,10 +86,13 @@ fn get_semantic_tokens(
                 let output_tokens = get_isograph_semantic_tokens(iso_literal_extraction)
                     .iter()
                     .enumerate()
-                    .map(move |(index, current_semantic_token)| {
+                    .flat_map(move |(index, current_semantic_token)| {
                         let content_between_semantic_tokens = &iso_literal_content
                             [(last_semantic_token_span.end as usize)
                                 ..(current_semantic_token.span.start as usize)];
+
+                        let token_content =
+                            &iso_literal_content[current_semantic_token.span.as_usize_range()];
 
                         let token = convert_isograph_semantic_token_to_lsp_semantic_token(
                             if index == 0 {
@@ -99,6 +102,7 @@ fn get_semantic_tokens(
                             },
                             content_between_semantic_tokens,
                             current_semantic_token,
+                            token_content,
                             last_semantic_token_span,
                         );
 
@@ -123,33 +127,56 @@ fn get_semantic_tokens(
     Ok(None)
 }
 
-fn convert_isograph_semantic_token_to_lsp_semantic_token(
+fn convert_isograph_semantic_token_to_lsp_semantic_token<'a>(
     rcd_offset: RowColDiff,
-    content_between_semantic_tokens: &str,
-    isograph_semantic_token: &WithSpan<IsographSemanticToken>,
+    content_between_semantic_tokens: &'a str,
+    isograph_semantic_token: &'a WithSpan<IsographSemanticToken>,
+    token_content: &'a str,
     last_semantic_token_span: Span,
-) -> LspSemanticToken {
+) -> impl Iterator<Item = LspSemanticToken> + 'a {
     let rcd_for_content_before_semantic_token =
         rcd_offset + rcd_to_end_of_slice(content_between_semantic_tokens);
 
-    let delta_line = rcd_for_content_before_semantic_token.delta_line();
-    let has_line_break = delta_line > 0;
+    let lines = token_content.split('\n');
 
-    let token = LspSemanticToken {
-        delta_line,
+    lines.enumerate().map(move |(line_number, text_in_line)| {
+        let is_first_line = line_number == 0;
+
+        // Here, we are keeping track of how many lines we need to skip. For the initial line of
+        // this token, we may need to skip lines (depending on how many lines breaks
+        // there were before the start of the current token). On subsequent lines, we need to
+        // skip one line.
+        let delta_line = if is_first_line {
+            rcd_for_content_before_semantic_token.delta_line()
+        } else {
+            1
+        };
+        let has_line_break = delta_line > 0;
+
         // LSP delta_start is relative to line start if there's a line break,
-        // otherwise it's relative to the end of the previous token
-        delta_start: rcd_for_content_before_semantic_token.delta_start()
-            + if has_line_break {
-                0
-            } else {
-                last_semantic_token_span.len()
-            },
-        length: isograph_semantic_token.span.len(),
-        token_type: isograph_semantic_token.item.0,
-        token_modifiers_bitset: 0,
-    };
-    token
+        // otherwise it's relative to the end of the previous token. So, on the initial line, we
+        // check whether there was a line break since the last token, and account for that.
+        // On subsequent lines, there is always a line break, so delta_start == 0.
+        // TODO clean this up
+        let delta_start = if is_first_line {
+            rcd_for_content_before_semantic_token.delta_start()
+                + if has_line_break {
+                    0
+                } else {
+                    last_semantic_token_span.len()
+                }
+        } else {
+            0
+        };
+
+        LspSemanticToken {
+            delta_line,
+            delta_start,
+            length: text_in_line.len() as u32,
+            token_type: isograph_semantic_token.item.0,
+            token_modifiers_bitset: 0,
+        }
+    })
 }
 
 fn get_isograph_semantic_tokens(
