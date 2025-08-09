@@ -1,4 +1,5 @@
 use crate::{
+    goto_definition::on_goto_definition,
     lsp_notification_dispatch::LSPNotificationDispatch,
     lsp_request_dispatch::LSPRequestDispatch,
     lsp_runtime_error::LSPRuntimeError,
@@ -19,13 +20,14 @@ use isograph_lang_types::semantic_token_legend::semantic_token_legend;
 use isograph_schema::NetworkProtocol;
 use log::{info, warn};
 use lsp_server::{Connection, ErrorCode, ProtocolError, Response, ResponseError};
-use lsp_types::request::SemanticTokensFullRequest;
 use lsp_types::{
     notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument},
+    request::GotoDefinition,
     InitializeParams, SemanticTokensFullOptions, SemanticTokensOptions,
     SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentSyncCapability,
     TextDocumentSyncKind, WorkDoneProgressOptions,
 };
+use lsp_types::{request::SemanticTokensFullRequest, OneOf};
 use std::{ops::ControlFlow, path::PathBuf};
 use thiserror::Error;
 
@@ -45,6 +47,7 @@ pub fn initialize<TNetworkProtocol: NetworkProtocol + 'static>(
                 full: Some(SemanticTokensFullOptions::Bool(true)),
             },
         )),
+        definition_provider: Some(OneOf::Left(true)),
         ..Default::default()
     };
     let server_capabilities = serde_json::to_value(server_capabilities)?;
@@ -153,6 +156,7 @@ fn dispatch_request(request: lsp_server::Request, compiler_state: &CompilerState
     let get_response = || {
         let request = LSPRequestDispatch::new(request, compiler_state)
             .on_request_sync::<SemanticTokensFullRequest>(on_semantic_token_full_request)?
+            .on_request_sync::<GotoDefinition>(on_goto_definition)?
             .request();
 
         // If we have gotten here, we have not handled the request
