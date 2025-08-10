@@ -71,6 +71,10 @@ impl Span {
             end: other.start,
         }
     }
+
+    pub fn contains(&self, other: Span) -> bool {
+        self.start >= other.start && self.end <= other.end
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
