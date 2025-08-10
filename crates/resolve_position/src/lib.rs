@@ -253,12 +253,14 @@ mod test {
 
         let result = item.resolve((), Span::new(0, 4));
 
-        assert!(matches!(
-            result,
-            // TODO assert that the child's ChildParent is the parent, not another child.
-            // That value is boxed, so it can't be done in a single matches! statement.
-            ControlFlow::Break(TestResolvedNode::Child(_))
-        ));
+        match result {
+            ControlFlow::Break(TestResolvedNode::Child(child)) => {
+                assert!(matches!(*child.parent, ChildParent::Parent(_)));
+            }
+            _ => {
+                panic!("Unexpected variant")
+            }
+        };
     }
 
     #[test]
@@ -277,11 +279,13 @@ mod test {
 
         let result = item.resolve((), Span::new(0, 2));
 
-        assert!(matches!(
-            result,
-            // TODO assert that the child's ChildParent is the child, not a parent.
-            // That value is boxed, so it can't be done in a single matches! statement.
-            ControlFlow::Break(TestResolvedNode::Child(_))
-        ));
+        match result {
+            ControlFlow::Break(TestResolvedNode::Child(child)) => {
+                assert!(matches!(*child.parent, ChildParent::Child(_)));
+            }
+            _ => {
+                panic!("Unexpected variant")
+            }
+        };
     }
 }
