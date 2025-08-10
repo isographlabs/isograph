@@ -65,7 +65,7 @@ impl Span {
         self.end - self.start
     }
 
-    pub fn span_between(&self, other: &Span) -> Span {
+    pub fn span_between(&self, other: Span) -> Span {
         Span {
             start: self.end,
             end: other.start,

@@ -18,9 +18,9 @@ impl<TValue> GraphQLTypeAnnotation<TValue> {
         }
     }
 
-    pub fn span(&self) -> &Span {
+    pub fn span(&self) -> Span {
         match self {
-            GraphQLTypeAnnotation::Named(named) => &named.0.span,
+            GraphQLTypeAnnotation::Named(named) => named.0.span,
             GraphQLTypeAnnotation::List(list) => list.0.span(),
             GraphQLTypeAnnotation::NonNull(non_null) => non_null.span(),
         }
@@ -111,9 +111,9 @@ impl<TValue> GraphQLNonNullTypeAnnotation<TValue> {
         }
     }
 
-    pub fn span(&self) -> &Span {
+    pub fn span(&self) -> Span {
         match self {
-            GraphQLNonNullTypeAnnotation::Named(named) => &named.0.span,
+            GraphQLNonNullTypeAnnotation::Named(named) => named.0.span,
             GraphQLNonNullTypeAnnotation::List(list) => list.0.span(),
         }
     }

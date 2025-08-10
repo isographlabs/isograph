@@ -104,11 +104,11 @@ enum IsographTransformError {
     SubstitutionsNotAllowedInIsoFragments,
 }
 
-fn show_error(span: &Span, err: &IsographTransformError) -> Result<(), anyhow::Error> {
+fn show_error(span: Span, err: &IsographTransformError) -> Result<(), anyhow::Error> {
     let msg = IsographTransformError::to_string(err);
 
     HANDLER.with(|handler| {
-        handler.struct_span_err(*span, &msg).emit();
+        handler.struct_span_err(span, &msg).emit();
     });
     bail!(msg)
 }
@@ -394,7 +394,7 @@ impl Fold for IsoLiteralCompilerVisitor<'_> {
                                 return build_expr;
                             }
                             Err(err) => {
-                                let _ = show_error(span, &err);
+                                let _ = show_error(*span, &err);
                                 // On error, we keep the same expression and fail showing the error
                                 return expr;
                             }
@@ -416,7 +416,7 @@ impl Fold for IsoLiteralCompilerVisitor<'_> {
                                     return build_expr;
                                 }
                                 Err(err) => {
-                                    let _ = show_error(child_span, &err);
+                                    let _ = show_error(*child_span, &err);
                                     // On error, we keep the same expression and fail showing the error
                                     return expr;
                                 }

@@ -108,7 +108,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 },
                 Location::new(
                     text_source,
-                    *client_pointer_declaration.item.target_type.span(),
+                    client_pointer_declaration.item.target_type.span(),
                 ),
             ))?;
 
@@ -138,7 +138,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         },
                         Location::new(
                             text_source,
-                            *client_pointer_declaration.item.target_type.span(),
+                            client_pointer_declaration.item.target_type.span(),
                         ),
                     ));
                 }
@@ -320,7 +320,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 ProcessClientFieldDeclarationError::ClientPointerTargetTypeHasNoId {
                     target_type_name: *client_pointer_declaration.item.target_type.inner(),
                 },
-                *client_pointer_declaration.item.target_type.span(),
+                client_pointer_declaration.item.target_type.span(),
             )),
             Some(_) => {
                 // Assume that if we have an id field, this implements Node
