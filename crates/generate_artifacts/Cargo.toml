@@ -13,3 +13,9 @@ isograph_config = { path = "../isograph_config" }
 isograph_lang_types = { path = "../isograph_lang_types" }
 intern = { path = "../../relay-crates/intern" }
 common_lang_types = { path = "../common_lang_types" }
+indexmap = { workspace = true }
+md-5 = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

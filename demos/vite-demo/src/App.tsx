@@ -2,12 +2,13 @@ import {
   createIsographEnvironment,
   createIsographStore,
   IsographEnvironmentProvider,
+  IsographOperation,
 } from '@isograph/react';
 import { Suspense, useMemo } from 'react';
 import HomePageRoute from './components/HomePageRoute';
 
 function makeNetworkRequest<T>(
-  queryText: string,
+  operation: IsographOperation,
   variables: unknown,
 ): Promise<T> {
   const promise = fetch('https://graphqlpokemon.favware.tech/v8', {
@@ -15,7 +16,7 @@ function makeNetworkRequest<T>(
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ query: queryText, variables }),
+    body: JSON.stringify({ query: operation.text, variables }),
   }).then(async (response) => {
     const json = await response.json();
 
@@ -47,6 +48,7 @@ export default function App() {
     () =>
       createIsographEnvironment(
         createIsographStore(),
+        // @ts-expect-error network function and environment should be generated
         makeNetworkRequest,
         null,
         typeof window != 'undefined' ? console.log : null,

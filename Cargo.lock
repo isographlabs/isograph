@@ -466,7 +466,7 @@ name = "common"
 version = "0.0.0"
 dependencies = [
  "colored",
- "indexmap 2.7.1",
+ "indexmap 2.10.0",
  "intern",
  "log",
  "lsp-types",
@@ -756,12 +756,18 @@ version = "0.3.1"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
+ "hex",
+ "indexmap 2.10.0",
  "intern",
  "isograph_config",
  "isograph_lang_types",
  "isograph_schema",
  "lazy_static",
+ "md-5",
  "pathdiff",
+ "serde",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]
@@ -1131,9 +1137,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.7.1"
+version = "2.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c9c992b02b5b4c94ea26e32fe5bccb7aa7d9f390ab5c1221ff895bc7ea8b652"
+checksum = "fe4cd85333e22411419a0bcae1297d25e58c9443848b11dc6a86fefe8c78a661"
 dependencies = [
  "arbitrary",
  "equivalent",
@@ -1178,7 +1184,7 @@ dependencies = [
  "bincode",
  "fnv",
  "hashbrown 0.12.3",
- "indexmap 2.7.1",
+ "indexmap 2.10.0",
  "once_cell",
  "parking_lot",
  "rand",
@@ -2805,7 +2811,7 @@ checksum = "660badfe2eed8b6213ec9dcd71aa0786f8fb46ffa012e0313bcba1fe4a9a5c73"
 dependencies = [
  "better_scoped_tls",
  "bitflags 2.9.0",
- "indexmap 2.7.1",
+ "indexmap 2.10.0",
  "once_cell",
  "phf",
  "rustc-hash",
@@ -2852,7 +2858,7 @@ version = "0.127.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "15d40abfc4f3a7bfdf54d11ac705cc9dd0836c48bf085b359143b4d40b50cb31"
 dependencies = [
- "indexmap 2.7.1",
+ "indexmap 2.10.0",
  "num_cpus",
  "once_cell",
  "rustc-hash",

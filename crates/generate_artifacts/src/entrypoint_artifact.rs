@@ -10,7 +10,7 @@ use isograph_schema::{
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
     get_reachable_variables, initial_variable_context, ClientScalarOrObjectSelectable,
-    ClientScalarSelectable, FieldToCompletedMergeTraversalStateMap, FieldTraversalResult,
+    ClientScalarSelectable, FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, Format,
     MergedSelectionMap, NetworkProtocol, RootOperationName, RootRefetchedPath,
     ScalarClientFieldTraversalState, Schema, ServerObjectEntity, ValidatedVariableDefinition,
     WrappedSelectionMapSelection,
@@ -24,6 +24,8 @@ use crate::{
     },
     imperatively_loaded_fields::get_artifact_for_imperatively_loaded_field,
     normalization_ast_text::generate_normalization_ast_text,
+    operation_text::{generate_operation_text, OperationText},
+    persisted_documents::PersistedDocuments,
 };
 
 #[derive(Debug)]
@@ -31,6 +33,7 @@ struct EntrypointArtifactInfo<'schema, TNetworkProtocol: NetworkProtocol> {
     query_name: QueryOperationName,
     parent_type: &'schema ServerObjectEntity<TNetworkProtocol>,
     query_text: QueryText,
+    operation_text: OperationText,
     normalization_ast_text: NormalizationAstText,
     refetch_query_artifact_import: RefetchQueryArtifactImport,
     concrete_type: ServerObjectEntityName,
@@ -42,6 +45,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     entrypoint_scalar_selectable_name: ClientScalarSelectableName,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     file_extensions: GenerateFileExtensionsOption,
+    persisted_documents: &mut Option<PersistedDocuments>,
 ) -> Vec<ArtifactPathAndContent> {
     let entrypoint =
         schema.client_field(parent_object_entity_name, entrypoint_scalar_selectable_name);
@@ -76,6 +80,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
             .map(|variable_definition| &variable_definition.item),
         &schema.find_mutation(),
         file_extensions,
+        persisted_documents,
     )
 }
 
@@ -89,9 +94,10 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     merged_selection_map: &MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,
     encountered_client_type_map: &FieldToCompletedMergeTraversalStateMap,
-    variable_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
+    variable_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + Clone + 'a,
     default_root_operation: &Option<(&ServerObjectEntityName, &RootOperationName)>,
     file_extensions: GenerateFileExtensionsOption,
+    persisted_documents: &mut Option<PersistedDocuments>,
 ) -> Vec<ArtifactPathAndContent> {
     let query_name = entrypoint.name.into();
     // TODO when we do not call generate_entrypoint_artifact extraneously,
@@ -121,8 +127,9 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         query_name,
         schema,
         merged_selection_map,
-        variable_definitions,
+        variable_definitions.clone(),
         root_operation_name,
+        Format::Pretty,
     );
     let refetch_paths_with_variables = traversal_state
         .refetch_paths
@@ -188,8 +195,20 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         },
     );
 
+    let operation_text = generate_operation_text(
+        query_name,
+        schema,
+        merged_selection_map,
+        variable_definitions,
+        root_operation_name,
+        concrete_type.name,
+        persisted_documents,
+        1,
+    );
+
     let mut paths_and_contents = EntrypointArtifactInfo {
         query_text,
+        operation_text,
         query_name,
         parent_type: parent_object,
         normalization_ast_text,
@@ -214,6 +233,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
             schema,
             artifact_info,
             file_extensions,
+            persisted_documents,
         ))
     }
 
@@ -278,6 +298,7 @@ impl<TNetworkProtocol: NetworkProtocol> EntrypointArtifactInfo<'_, TNetworkProto
             query_name,
             parent_type,
             query_text,
+            operation_text,
             normalization_ast_text,
             refetch_query_artifact_import,
             concrete_type,
@@ -288,6 +309,7 @@ impl<TNetworkProtocol: NetworkProtocol> EntrypointArtifactInfo<'_, TNetworkProto
         let entrypoint_file_content = entrypoint_file_content(
             file_extensions,
             query_name,
+            operation_text,
             parent_type,
             refetch_query_artifact_import,
             concrete_type,
@@ -333,6 +355,7 @@ impl<TNetworkProtocol: NetworkProtocol> EntrypointArtifactInfo<'_, TNetworkProto
 fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
     file_extensions: GenerateFileExtensionsOption,
     query_name: &QueryOperationName,
+    operation_text: &OperationText,
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
     refetch_query_artifact_import: &RefetchQueryArtifactImport,
     concrete_type: &ServerObjectEntityName,
@@ -363,7 +386,7 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
         {indent}kind: \"Entrypoint\",\n\
         {indent}networkRequestInfo: {{\n\
         {indent}  kind: \"NetworkRequestInfo\",\n\
-        {indent}  queryText,\n\
+        {indent}  operation: {operation_text},\n\
         {indent}  normalizationAst,\n\
         {indent}}},\n\
         {indent}concreteType: \"{concrete_type}\",\n\

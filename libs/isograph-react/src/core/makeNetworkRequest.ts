@@ -126,7 +126,7 @@ export function makeNetworkRequest<
   // This should be an observable, not a promise
   const promise = Promise.all([
     environment.networkFunction(
-      artifact.networkRequestInfo.queryText,
+      artifact.networkRequestInfo.operation,
       variables,
     ),
     loadNormalizationAst(artifact.networkRequestInfo.normalizationAst),
