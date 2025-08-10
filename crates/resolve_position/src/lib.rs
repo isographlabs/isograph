@@ -213,7 +213,7 @@ mod test {
     fn resolve_no_children_inside() {
         let item = WithSpan::new(Parent { children: vec![] }, Span::new(0, 10));
 
-        let result = dbg!(item.resolve((), Span::new(0, 0)));
+        let result = item.resolve((), Span::new(0, 0));
 
         assert!(matches!(
             result,
