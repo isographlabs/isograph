@@ -89,11 +89,11 @@ pub trait ResolvePosition: Sized {
     where
         Self: 'a;
 
-    fn resolve<'a>(
+    fn resolve<'a, IntoParent: Into<Self::Parent<'a>>>(
         &'a self,
-        parent: Self::Parent<'a>,
+        into_parent: IntoParent,
         position: Span,
-    ) -> ControlFlow<Self::ResolvedNode<'a>, Self::Parent<'a>>;
+    ) -> ControlFlow<Self::ResolvedNode<'a>, IntoParent>;
 
     fn path<'a>(&'a self, parent: Self::Parent<'a>) -> Path<&'a Self, Self::Parent<'a>> {
         Path {
@@ -158,15 +158,20 @@ mod test {
 
         type ResolvedNode<'a> = TestResolvedNode<'a>;
 
-        fn resolve<'a>(
+        fn resolve<'a, IntoParent: Into<Self::Parent<'a>>>(
             &'a self,
-            parent: Self::Parent<'a>,
+            into_parent: IntoParent,
             position: Span,
-        ) -> ControlFlow<Self::ResolvedNode<'a>, Self::Parent<'a>> {
+        ) -> ControlFlow<Self::ResolvedNode<'a>, IntoParent> {
             if !self.span.contains(position) {
-                return ControlFlow::Continue(parent);
+                return ControlFlow::Continue(into_parent);
             }
+
             // After here, we should only return ControlFlow::Break
+            // (Note that we cannot return ControlFlow::Continue, since we no longer have a
+            // value of type IntoParent)
+
+            let parent = into_parent.into();
 
             let parent_path = self.path(parent);
 
@@ -185,27 +190,34 @@ mod test {
 
         type ResolvedNode<'a> = TestResolvedNode<'a>;
 
-        fn resolve<'a>(
+        fn resolve<'a, IntoParent: Into<Self::Parent<'a>>>(
             &'a self,
-            mut parent: Self::Parent<'a>,
+            mut into_parent: IntoParent,
             position: Span,
-        ) -> ControlFlow<Self::ResolvedNode<'a>, Self::Parent<'a>> {
+        ) -> ControlFlow<Self::ResolvedNode<'a>, IntoParent> {
             if !self.span.contains(position) {
-                return ControlFlow::Continue(parent);
+                return ControlFlow::Continue(into_parent);
             }
+
             // After here, we should only return ControlFlow::Break
+            // (Note that we cannot return ControlFlow::Continue, since we no longer have a
+            // value of type IntoParent)
 
-            let child_path = self.path(parent);
+            let parent = into_parent.into();
 
-            let mut child_parent = Box::new(ChildParent::Child(child_path));
+            let mut child_path = self.path(parent);
 
             for child in self.item.children.iter() {
-                child_parent = child.resolve(child_parent, position)?;
+                child_path = child.resolve(child_path, position)?;
             }
 
-            return ControlFlow::Break(Self::ResolvedNode::Child(
-                self.path(child_parent.unwrap_child().parent),
-            ));
+            return ControlFlow::Break(Self::ResolvedNode::Child(self.path(child_path.parent)));
+        }
+    }
+
+    impl<'a> From<ChildPath<'a>> for Box<ChildParent<'a>> {
+        fn from(value: ChildPath<'a>) -> Self {
+            Box::new(ChildParent::Child(value))
         }
     }
 
