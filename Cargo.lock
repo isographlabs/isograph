@@ -2093,6 +2093,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "resolve_position"
+version = "0.3.1"
+dependencies = [
+ "common_lang_types",
+]
+
+[[package]]
 name = "rkyv"
 version = "0.7.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
