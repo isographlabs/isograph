@@ -1,3 +1,5 @@
+use std::ops::ControlFlow;
+
 use common_lang_types::Span;
 
 /// This module defines a trait [`ResolvePosition`], which is used to convert a
@@ -80,17 +82,194 @@ pub struct Path<Inner, Parent> {
 }
 
 pub trait ResolvePosition: Sized {
-    type Parent;
+    type Parent<'a>
+    where
+        Self: 'a;
     type ResolvedNode<'a>
     where
         Self: 'a;
 
-    fn resolve<'a>(&'a self, parent: Self::Parent, position: Span) -> Self::ResolvedNode<'a>;
-    fn contains(&self, position: Span) -> bool;
-    fn path(&self, parent: Self::Parent) -> Path<&Self, Self::Parent> {
+    fn resolve<'a>(
+        &'a self,
+        parent: Self::Parent<'a>,
+        position: Span,
+    ) -> ControlFlow<Self::ResolvedNode<'a>, Self::Parent<'a>>;
+
+    fn path<'a>(&'a self, parent: Self::Parent<'a>) -> Path<&'a Self, Self::Parent<'a>> {
         Path {
             inner: self,
             parent,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #![allow(unused)]
+
+    use std::ops::ControlFlow;
+
+    use crate::{Path, ResolvePosition};
+    use common_lang_types::{Span, WithSpan};
+
+    #[derive(Debug)]
+    enum TestResolvedNode<'a> {
+        Parent(ParentPath<'a>),
+        Child(ChildPath<'a>),
+        SelfContained(SelfContainedPath<'a>),
+    }
+
+    #[derive(Debug)]
+    struct Parent {
+        children: Vec<WithSpan<Child>>,
+    }
+
+    #[derive(Debug)]
+    struct Child {
+        children: Vec<WithSpan<Child>>,
+    }
+
+    type ParentPath<'a> = Path<&'a WithSpan<Parent>, ()>;
+
+    #[derive(Debug)]
+    enum ChildParent<'a> {
+        Parent(ParentPath<'a>),
+        Child(ChildPath<'a>),
+    }
+
+    impl<'a> ChildParent<'a> {
+        fn unwrap_child(self) -> ChildPath<'a> {
+            match self {
+                ChildParent::Parent(path) => panic!("Unexpected parent"),
+                ChildParent::Child(path) => path,
+            }
+        }
+    }
+
+    type ChildPath<'a> = Path<&'a WithSpan<Child>, Box<ChildParent<'a>>>;
+
+    #[derive(Debug)]
+    struct SelfContained {}
+
+    type SelfContainedPath<'a> = Path<&'a WithSpan<SelfContained>, ()>;
+
+    impl ResolvePosition for WithSpan<Parent> {
+        type Parent<'a> = ();
+
+        type ResolvedNode<'a> = TestResolvedNode<'a>;
+
+        fn resolve<'a>(
+            &'a self,
+            parent: Self::Parent<'a>,
+            position: Span,
+        ) -> ControlFlow<Self::ResolvedNode<'a>, Self::Parent<'a>> {
+            if !self.span.contains(position) {
+                return ControlFlow::Continue(parent);
+            }
+            // After here, we should only return ControlFlow::Break
+
+            let parent_path = self.path(parent);
+
+            let mut child_parent = Box::new(ChildParent::Parent(parent_path));
+
+            for child in self.item.children.iter() {
+                child_parent = child.resolve(child_parent, position)?;
+            }
+
+            return ControlFlow::Break(Self::ResolvedNode::Parent(self.path(parent)));
+        }
+    }
+
+    impl ResolvePosition for WithSpan<Child> {
+        type Parent<'a> = Box<ChildParent<'a>>;
+
+        type ResolvedNode<'a> = TestResolvedNode<'a>;
+
+        fn resolve<'a>(
+            &'a self,
+            mut parent: Self::Parent<'a>,
+            position: Span,
+        ) -> ControlFlow<Self::ResolvedNode<'a>, Self::Parent<'a>> {
+            if !self.span.contains(position) {
+                return ControlFlow::Continue(parent);
+            }
+            // After here, we should only return ControlFlow::Break
+
+            let child_path = self.path(parent);
+
+            let mut child_parent = Box::new(ChildParent::Child(child_path));
+
+            for child in self.item.children.iter() {
+                child_parent = child.resolve(child_parent, position)?;
+            }
+
+            return ControlFlow::Break(Self::ResolvedNode::Child(
+                self.path(child_parent.unwrap_child().parent),
+            ));
+        }
+    }
+
+    #[test]
+    fn resolve_no_children_inside() {
+        let item = WithSpan::new(Parent { children: vec![] }, Span::new(0, 10));
+
+        let result = dbg!(item.resolve((), Span::new(0, 0)));
+
+        assert!(matches!(
+            result,
+            ControlFlow::Break(TestResolvedNode::Parent(_))
+        ));
+    }
+
+    #[test]
+    fn resolve_outside() {
+        let item = WithSpan::new(Parent { children: vec![] }, Span::new(0, 10));
+
+        let result = item.resolve((), Span::new(100, 100));
+
+        assert!(matches!(result, ControlFlow::Continue(_)));
+    }
+
+    #[test]
+    fn resolve_parent_with_children() {
+        let item = WithSpan::new(
+            Parent {
+                children: vec![WithSpan::new(Child { children: vec![] }, Span::new(0, 5))],
+            },
+            Span::new(0, 10),
+        );
+
+        let result = item.resolve((), Span::new(0, 4));
+
+        assert!(matches!(
+            result,
+            // TODO assert that the child's ChildParent is the parent, not another child.
+            // That value is boxed, so it can't be done in a single matches! statement.
+            ControlFlow::Break(TestResolvedNode::Child(_))
+        ));
+    }
+
+    #[test]
+    fn resolve_parent_with_nested_children() {
+        let item = WithSpan::new(
+            Parent {
+                children: vec![WithSpan::new(
+                    Child {
+                        children: vec![WithSpan::new(Child { children: vec![] }, Span::new(0, 3))],
+                    },
+                    Span::new(0, 5),
+                )],
+            },
+            Span::new(0, 10),
+        );
+
+        let result = item.resolve((), Span::new(0, 2));
+
+        assert!(matches!(
+            result,
+            // TODO assert that the child's ChildParent is the child, not a parent.
+            // That value is boxed, so it can't be done in a single matches! statement.
+            ControlFlow::Break(TestResolvedNode::Child(_))
+        ));
     }
 }
