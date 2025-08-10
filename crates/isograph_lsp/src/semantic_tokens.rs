@@ -5,11 +5,11 @@ use common_lang_types::{
     relative_path_from_absolute_and_working_directory, Span, TextSource, WithSpan,
 };
 use isograph_compiler::{
-    get_current_working_directory, parse_iso_literal_in_relative_file,
+    get_current_working_directory, parse_iso_literals_in_file_content_and_return_all,
     read_iso_literals_source_from_relative_path, CompilerState,
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
-use isograph_lang_types::{IsographDatabase, IsographSemanticToken};
+use isograph_lang_types::{IsoLiteralsSource, IsographDatabase, IsographSemanticToken};
 use lsp_types::{
     request::{Request, SemanticTokensFullRequest},
     SemanticToken as LspSemanticToken, SemanticTokens as LspSemanticTokens,
@@ -57,30 +57,44 @@ fn get_semantic_tokens(
         &uri.to_file_path().expect("Expected file path to be valid."),
     );
 
-    let memo_ref = parse_iso_literal_in_relative_file(db, relative_path_to_source_file);
-    let parse_result = memo_ref.deref();
+    let memo_ref = read_iso_literals_source_from_relative_path(db, relative_path_to_source_file);
+    let IsoLiteralsSource {
+        relative_path,
+        content,
+    } = match memo_ref.to_owned() {
+        Some(s) => s,
+        // Is this the correct behavior?
+        None => return Ok(None),
+    };
 
-    if let Some(Ok(parsed_iso_literals)) = parse_result {
-        // TODO call this earlier, pass it as a param to parse_iso_literal_in_relative_file
-        let page_content_memo_ref =
-            read_iso_literals_source_from_relative_path(db, relative_path_to_source_file);
-        let page_content: &str = &page_content_memo_ref
-            .deref()
-            .as_ref()
-            .expect("Expected source to exist")
-            .content;
+    let parse_results = parse_iso_literals_in_file_content_and_return_all(
+        db,
+        relative_path,
+        &content,
+        get_current_working_directory(db),
+    );
 
-        let absolute_tokens =
-            concatenate_and_absolutize_relative_tokens(parsed_iso_literals, page_content);
-        let lsp_tokens = convert_absolute_token_to_lsp_token(absolute_tokens, page_content);
+    // TODO call this earlier, pass it as a param to parse_iso_literal_in_relative_file
+    let page_content_memo_ref =
+        read_iso_literals_source_from_relative_path(db, relative_path_to_source_file);
+    let page_content: &str = &page_content_memo_ref
+        .deref()
+        .as_ref()
+        .expect("Expected source to exist")
+        .content;
 
-        return Ok(Some(LspSemanticTokensResult::Tokens(LspSemanticTokens {
-            result_id: None,
-            data: lsp_tokens.collect(),
-        })));
-    }
+    let absolute_tokens = concatenate_and_absolutize_relative_tokens(
+        parse_results
+            .iter()
+            .filter_map(|parse_result| parse_result.as_ref().ok()),
+        page_content,
+    );
+    let lsp_tokens = convert_absolute_token_to_lsp_token(absolute_tokens, page_content);
 
-    Ok(None)
+    return Ok(Some(LspSemanticTokensResult::Tokens(LspSemanticTokens {
+        result_id: None,
+        data: lsp_tokens.collect(),
+    })));
 }
 
 #[derive(Debug)]
@@ -91,26 +105,20 @@ struct AbsoluteIsographSemanticToken {
 }
 
 fn concatenate_and_absolutize_relative_tokens<'a>(
-    parsed_iso_literals: &'a [(IsoLiteralExtractionResult, TextSource)],
+    parsed_iso_literals: impl Iterator<Item = &'a (IsoLiteralExtractionResult, TextSource)> + 'a,
     page_content: &'a str,
 ) -> impl Iterator<Item = AbsoluteIsographSemanticToken> + 'a {
-    parsed_iso_literals
-        .iter()
-        .flat_map(move |(extraction, text_source)| {
-            let iso_literal_extraction_span = text_source
-                .span
-                .expect("Expected span to exist. This is indicative of a bug in Isograph.");
+    parsed_iso_literals.flat_map(move |(extraction, text_source)| {
+        let iso_literal_extraction_span = text_source
+            .span
+            .expect("Expected span to exist. This is indicative of a bug in Isograph.");
 
-            get_isograph_semantic_tokens(extraction)
-                .iter()
-                .flat_map(move |relative_token| {
-                    absolutize_relative_token(
-                        page_content,
-                        iso_literal_extraction_span,
-                        relative_token,
-                    )
-                })
-        })
+        get_isograph_semantic_tokens(extraction)
+            .iter()
+            .flat_map(move |relative_token| {
+                absolutize_relative_token(page_content, iso_literal_extraction_span, relative_token)
+            })
+    })
 }
 
 fn absolutize_relative_token<'a>(
@@ -166,11 +174,11 @@ fn convert_absolute_token_to_lsp_token<'a>(
 fn get_isograph_semantic_tokens(
     result: &IsoLiteralExtractionResult,
 ) -> &[WithSpan<IsographSemanticToken>] {
-    (match result {
+    match result {
         IsoLiteralExtractionResult::ClientPointerDeclaration(s) => &s.item.semantic_tokens,
         IsoLiteralExtractionResult::ClientFieldDeclaration(s) => &s.item.semantic_tokens,
         IsoLiteralExtractionResult::EntrypointDeclaration(s) => &s.item.semantic_tokens,
-    }) as _
+    }
 }
 
 fn delta_line_delta_start(text: &str) -> (u32, u32) {

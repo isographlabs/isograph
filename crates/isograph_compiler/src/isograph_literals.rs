@@ -148,6 +148,27 @@ pub fn parse_iso_literals_in_file_content(
     }
 }
 
+// TODO this (and the previous function) smell
+#[allow(clippy::type_complexity)]
+pub fn parse_iso_literals_in_file_content_and_return_all(
+    db: &IsographDatabase,
+    relative_path_to_source_file: RelativePathToSourceFile,
+    file_content: &str,
+    current_working_directory: CurrentWorkingDirectory,
+) -> Vec<Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>>>
+{
+    extract_iso_literals_from_file_content(file_content)
+        .map(|iso_literal_extraction| {
+            process_iso_literal_extraction(
+                db,
+                iso_literal_extraction,
+                relative_path_to_source_file,
+                current_working_directory,
+            )
+        })
+        .collect()
+}
+
 #[allow(clippy::type_complexity)]
 #[memo]
 pub fn parse_iso_literal_in_source(
