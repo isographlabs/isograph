@@ -73,7 +73,7 @@ impl Span {
     }
 
     pub fn contains(&self, other: Span) -> bool {
-        self.start >= other.start && self.end <= other.end
+        self.start <= other.start && self.end >= other.end
     }
 }
 
