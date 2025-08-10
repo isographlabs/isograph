@@ -18,7 +18,7 @@ use common_lang_types::Span;
 /// with the cursor sitting atop of `id`. In this case, we would construct a
 /// data structure roughly akin to:
 ///
-/// ```
+/// ```txt
 /// ResolvedNode::ScalarSelectableName(ScalarSelectableNamePath {
 ///   inner: &WithSpan<ScalarSelectableName>,
 ///   parent: ClientScalarSelectionPath {
