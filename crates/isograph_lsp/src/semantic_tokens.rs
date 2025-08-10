@@ -1,10 +1,9 @@
 use std::ops::Deref;
 
-use crate::{
-    lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult},
-    row_col_offset::{rcd_to_end_of_slice, RowColDiff},
+use crate::lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult};
+use common_lang_types::{
+    relative_path_from_absolute_and_working_directory, Span, TextSource, WithSpan,
 };
-use common_lang_types::{relative_path_from_absolute_and_working_directory, Span, WithSpan};
 use isograph_compiler::{
     get_current_working_directory, parse_iso_literal_in_relative_file,
     read_iso_literals_source_from_relative_path, CompilerState,
@@ -28,6 +27,24 @@ pub fn on_semantic_token_full_request(
     get_semantic_tokens(db, uri).to_owned()
 }
 
+/// Overall algorithm:
+/// - for each parsed iso literal, convert the semantic tokens (whose span is relative to the
+///   iso literal text) to absolute tokens (whose span is relative to the file), and
+///   concatenate those
+///   - Throughout this, we have to split multi-line tokens into multiple absolute tokens.
+/// - then go through each absolute semantic token and produce an LspSemanticToken by
+///   making them relative to the previous one.
+///
+/// This is somewhat inefficient, as we are iterating over the content in the page at least
+/// twice (once when parsing, another time when calculating line breaks.) It would be better
+/// to produce lsp semantic tokens at parse time, and then either mutate the first token or
+/// insert a token with zero-length, which acts solely to make the delta line/delta start
+/// of the lsp semantic tokens accurate.
+///
+/// Note that we should produce LspSemanticTokens that are accurately placed when parsing,
+/// as that implies that if you move the iso literal around (e.g. by typing stuff before it),
+/// we cannot reuse that cached value (as the output changes.) (We already can't reuse the
+/// cached value, but that is a bug.) See https://github.com/isographlabs/isograph/issues/548
 #[memo]
 fn get_semantic_tokens(
     db: &IsographDatabase,
@@ -45,146 +62,126 @@ fn get_semantic_tokens(
 
     if let Some(Ok(parsed_iso_literals)) = parse_result {
         // TODO call this earlier, pass it as a param to parse_iso_literal_in_relative_file
-        let memo_ref =
+        let page_content_memo_ref =
             read_iso_literals_source_from_relative_path(db, relative_path_to_source_file);
-
-        let page_content: &str = &memo_ref
+        let page_content: &str = &page_content_memo_ref
             .deref()
             .as_ref()
             .expect("Expected source to exist")
             .content;
 
-        // Track how many characters we've processed in the entire file.
-        // This accumulates across all isograph literals to maintain proper positioning.
-        let mut processed_until = 0_usize;
-
-        let lsp_semantic_tokens = parsed_iso_literals
-            .iter()
-            .flat_map(|(iso_literal_extraction, text_source)| {
-                let iso_literal_extraction_span = text_source
-                    .span
-                    .expect("Expected span to exist. This is indicative of a bug in Isograph.");
-                let iso_literal_extraction_span_start = iso_literal_extraction_span.start as usize;
-                let iso_literal_extraction_span_end = iso_literal_extraction_span.end as usize;
-
-                let iso_literal_content = &page_content
-                    [iso_literal_extraction_span_start..iso_literal_extraction_span_end];
-
-                // Track the span of the previous semantic token within this isograph literal.
-                // LSP semantic tokens use relative positioning, so we need the previous token's
-                // end position to calculate the delta for the next token.
-                let mut last_semantic_token_span = Span::new(0, 0);
-
-                // During the first iteration, we need to offset by the unprocessed content
-                // before this isograph literal, but after the last processed isograph literal.
-                let initial_rcd_offset = {
-                    let unprocessed_content_before_isograph_literal =
-                        &page_content[processed_until..iso_literal_extraction_span_start];
-                    rcd_to_end_of_slice(unprocessed_content_before_isograph_literal)
-                };
-
-                let output_tokens = get_isograph_semantic_tokens(iso_literal_extraction)
-                    .iter()
-                    .enumerate()
-                    .flat_map(move |(index, current_semantic_token)| {
-                        let content_between_semantic_tokens = &iso_literal_content
-                            [(last_semantic_token_span.end as usize)
-                                ..(current_semantic_token.span.start as usize)];
-
-                        let token_content =
-                            &iso_literal_content[current_semantic_token.span.as_usize_range()];
-
-                        let token = convert_isograph_semantic_token_to_lsp_semantic_token(
-                            if index == 0 {
-                                initial_rcd_offset
-                            } else {
-                                RowColDiff::default()
-                            },
-                            content_between_semantic_tokens,
-                            current_semantic_token,
-                            token_content,
-                            last_semantic_token_span,
-                        );
-
-                        last_semantic_token_span = current_semantic_token.span;
-
-                        token
-                    });
-
-                processed_until =
-                    iso_literal_extraction_span_start + (last_semantic_token_span.end as usize);
-
-                output_tokens
-            })
-            .collect();
+        let absolute_tokens =
+            concatenate_and_absolutize_relative_tokens(parsed_iso_literals, page_content);
+        let lsp_tokens = convert_absolute_token_to_lsp_token(absolute_tokens, page_content);
 
         return Ok(Some(LspSemanticTokensResult::Tokens(LspSemanticTokens {
             result_id: None,
-            data: lsp_semantic_tokens,
+            data: lsp_tokens.collect(),
         })));
     }
 
     Ok(None)
 }
 
-fn convert_isograph_semantic_token_to_lsp_semantic_token<'a>(
-    rcd_offset: RowColDiff,
-    content_between_semantic_tokens: &'a str,
-    isograph_semantic_token: &'a WithSpan<IsographSemanticToken>,
-    token_content: &'a str,
-    last_semantic_token_span: Span,
+#[derive(Debug)]
+struct AbsoluteIsographSemanticToken {
+    absolute_char_start: u32,
+    len: u32,
+    semantic_token: IsographSemanticToken,
+}
+
+fn concatenate_and_absolutize_relative_tokens<'a>(
+    parsed_iso_literals: &'a [(IsoLiteralExtractionResult, TextSource)],
+    page_content: &'a str,
+) -> impl Iterator<Item = AbsoluteIsographSemanticToken> + 'a {
+    parsed_iso_literals
+        .iter()
+        .flat_map(move |(extraction, text_source)| {
+            let iso_literal_extraction_span = text_source
+                .span
+                .expect("Expected span to exist. This is indicative of a bug in Isograph.");
+
+            get_isograph_semantic_tokens(extraction)
+                .iter()
+                .flat_map(move |relative_token| {
+                    absolutize_relative_token(
+                        page_content,
+                        iso_literal_extraction_span,
+                        relative_token,
+                    )
+                })
+        })
+}
+
+fn absolutize_relative_token<'a>(
+    page_content: &'a str,
+    iso_literal_extraction_span: Span,
+    relative_token: &'a WithSpan<IsographSemanticToken>,
+) -> impl Iterator<Item = AbsoluteIsographSemanticToken> + 'a {
+    let span_content = &page_content[(iso_literal_extraction_span.start as usize
+        + relative_token.span.start as usize)
+        ..(iso_literal_extraction_span.start as usize + relative_token.span.end as usize)];
+
+    // Note the split inclusive here. This makes it so that the lines include the
+    // line break, i.e. 'foo\nbar' -> 'foo\n', 'bar'
+    span_content
+        .split_inclusive('\n')
+        .scan(0, move |iterated_so_far_within_token, line_text| {
+            let token = AbsoluteIsographSemanticToken {
+                absolute_char_start: iso_literal_extraction_span.start
+                    + relative_token.span.start
+                    + *iterated_so_far_within_token,
+                len: line_text.len() as u32,
+                semantic_token: relative_token.item,
+            };
+            *iterated_so_far_within_token += line_text.len() as u32;
+            Some(token)
+        })
+}
+
+fn convert_absolute_token_to_lsp_token<'a>(
+    absolute_tokens: impl Iterator<Item = AbsoluteIsographSemanticToken> + 'a,
+    page_content: &'a str,
 ) -> impl Iterator<Item = LspSemanticToken> + 'a {
-    let rcd_for_content_before_semantic_token =
-        rcd_offset + rcd_to_end_of_slice(content_between_semantic_tokens);
+    absolute_tokens.scan(0, |last_token_start, absolute_token| {
+        let new_token_start = absolute_token.absolute_char_start;
+        let in_between_content =
+            &page_content[(*last_token_start as usize)..(new_token_start as usize)];
 
-    let lines = token_content.split('\n');
+        let (delta_line, delta_start) = delta_line_delta_start(in_between_content);
 
-    lines.enumerate().map(move |(line_number, text_in_line)| {
-        let is_first_line = line_number == 0;
-
-        // Here, we are keeping track of how many lines we need to skip. For the initial line of
-        // this token, we may need to skip lines (depending on how many lines breaks
-        // there were before the start of the current token). On subsequent lines, we need to
-        // skip one line.
-        let delta_line = if is_first_line {
-            rcd_for_content_before_semantic_token.delta_line()
-        } else {
-            1
-        };
-        let has_line_break = delta_line > 0;
-
-        // LSP delta_start is relative to line start if there's a line break,
-        // otherwise it's relative to the end of the previous token. So, on the initial line, we
-        // check whether there was a line break since the last token, and account for that.
-        // On subsequent lines, there is always a line break, so delta_start == 0.
-        // TODO clean this up
-        let delta_start = if is_first_line {
-            rcd_for_content_before_semantic_token.delta_start()
-                + if has_line_break {
-                    0
-                } else {
-                    last_semantic_token_span.len()
-                }
-        } else {
-            0
-        };
-
-        LspSemanticToken {
+        let token = LspSemanticToken {
             delta_line,
             delta_start,
-            length: text_in_line.len() as u32,
-            token_type: isograph_semantic_token.item.0,
+            length: absolute_token.len,
+            token_type: absolute_token.semantic_token.0,
             token_modifiers_bitset: 0,
-        }
+        };
+
+        *last_token_start = absolute_token.absolute_char_start;
+        Some(token)
     })
 }
 
 fn get_isograph_semantic_tokens(
     result: &IsoLiteralExtractionResult,
-) -> &Vec<WithSpan<IsographSemanticToken>> {
+) -> &[WithSpan<IsographSemanticToken>] {
     (match result {
         IsoLiteralExtractionResult::ClientPointerDeclaration(s) => &s.item.semantic_tokens,
         IsoLiteralExtractionResult::ClientFieldDeclaration(s) => &s.item.semantic_tokens,
         IsoLiteralExtractionResult::EntrypointDeclaration(s) => &s.item.semantic_tokens,
     }) as _
+}
+
+fn delta_line_delta_start(text: &str) -> (u32, u32) {
+    let mut last_line_break_index = 0;
+    let mut line_break_count = 0;
+    for (index, char) in text.chars().enumerate() {
+        if char == '\n' {
+            line_break_count += 1;
+            last_line_break_index = index as u32 + 1;
+        }
+    }
+
+    (line_break_count, text.len() as u32 - last_line_break_index)
 }

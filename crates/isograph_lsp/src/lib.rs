@@ -9,7 +9,6 @@ use crate::server::LSPProcessResult;
 pub mod lsp_notification_dispatch;
 mod lsp_request_dispatch;
 pub mod lsp_runtime_error;
-mod row_col_offset;
 mod semantic_tokens;
 pub mod server;
 pub mod text_document;

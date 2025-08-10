@@ -36,6 +36,8 @@ pub fn parse_iso_literal(
     iso_literal_text: String,
     definition_file_path: RelativePathToSourceFile,
     const_export_name: Option<String>,
+    // TODO we should not pass the text source here! Whenever the iso literal
+    // moves around the page, we break memoization, due to this parameter.
     text_source: TextSource,
 ) -> Result<IsoLiteralExtractionResult, WithLocation<IsographLiteralParseError>> {
     let mut tokens = PeekableLexer::new(&iso_literal_text);
