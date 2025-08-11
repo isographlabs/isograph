@@ -83,10 +83,13 @@ pub trait ResolvePosition: Sized {
     /// self.field.span.contains(position) before calling .resolve().
     fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: Span) -> Self::ResolvedNode<'a>;
 
-    fn path<'a>(&'a self, parent: Self::Parent<'a>) -> Path<&'a Self, Self::Parent<'a>> {
+    fn path<'a, TParent: From<Self::Parent<'a>>>(
+        &'a self,
+        parent: Self::Parent<'a>,
+    ) -> Path<&'a Self, TParent> {
         Path {
             inner: self,
-            parent,
+            parent: parent.into(),
         }
     }
 }
@@ -144,8 +147,8 @@ mod test {
         ) -> Self::ResolvedNode<'a> {
             for child in self.children.iter() {
                 if child.span.contains(position) {
-                    let child_parent = Box::new(ChildParent::Parent(self.path(parent)));
-                    return child.item.resolve(child_parent, position);
+                    let parent = <Child as ResolvePosition>::Parent::Parent(self.path(parent));
+                    return child.item.resolve(parent, position);
                 }
             }
 
@@ -154,7 +157,7 @@ mod test {
     }
 
     impl ResolvePosition for Child {
-        type Parent<'a> = Box<ChildParent<'a>>;
+        type Parent<'a> = ChildParent<'a>;
 
         type ResolvedNode<'a> = TestResolvedNode<'a>;
 
@@ -165,8 +168,8 @@ mod test {
         ) -> Self::ResolvedNode<'a> {
             for child in self.children.iter() {
                 if child.span.contains(position) {
-                    let child_parent = Box::new(ChildParent::Child(self.path(parent)));
-                    return child.item.resolve(child_parent, position);
+                    let parent = <Child as ResolvePosition>::Parent::Child(self.path(parent));
+                    return child.item.resolve(parent, position);
                 }
             }
 
