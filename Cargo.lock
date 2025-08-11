@@ -1323,6 +1323,8 @@ dependencies = [
  "logos",
  "pico",
  "pico_macros",
+ "resolve_position",
+ "resolve_position_macros",
  "thiserror",
 ]
 
@@ -1336,6 +1338,8 @@ dependencies = [
  "lsp-types",
  "pico",
  "pico_macros",
+ "resolve_position",
+ "resolve_position_macros",
  "serde",
  "thiserror",
 ]
@@ -1358,6 +1362,7 @@ dependencies = [
  "lsp-types",
  "pico",
  "pico_macros",
+ "resolve_position",
  "serde",
  "serde_json",
  "thiserror",
@@ -2098,6 +2103,15 @@ name = "resolve_position"
 version = "0.3.1"
 dependencies = [
  "common_lang_types",
+]
+
+[[package]]
+name = "resolve_position_macros"
+version = "0.3.1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.98",
 ]
 
 [[package]]

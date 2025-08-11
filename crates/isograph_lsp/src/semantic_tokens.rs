@@ -170,7 +170,7 @@ fn get_isograph_semantic_tokens(
     }
 }
 
-fn delta_line_delta_start(text: &str) -> (u32, u32) {
+pub fn delta_line_delta_start(text: &str) -> (u32, u32) {
     let mut last_line_break_index = 0;
     let mut line_break_count = 0;
     for (index, char) in text.chars().enumerate() {

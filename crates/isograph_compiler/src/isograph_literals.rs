@@ -281,7 +281,7 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn process_iso_literal_extraction(
+pub fn process_iso_literal_extraction(
     db: &IsographDatabase,
     iso_literal_extraction: &IsoLiteralExtraction,
     relative_path_to_source_file: RelativePathToSourceFile,
