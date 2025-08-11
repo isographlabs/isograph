@@ -109,6 +109,7 @@ export function useUpdatableDisposableState<
   useEffect(() => {
     return function disposeAllRemainingItems() {
       for (const undisposedICI of undisposedICIs.current) {
+        undisposedICIs.current.delete(undisposedICI);
         undisposedICI.cleanup();
       }
     };
