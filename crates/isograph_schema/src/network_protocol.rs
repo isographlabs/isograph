@@ -1,8 +1,8 @@
 use std::{error::Error, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
-    DescriptionValue, Location, QueryOperationName, QueryText, ServerObjectEntityName,
-    ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
+    DescriptionValue, Location, QueryExtraInfo, QueryOperationName, QueryText,
+    ServerObjectEntityName, ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation, RootOperationKind};
 use isograph_lang_types::IsographDatabase;
@@ -31,7 +31,15 @@ where
         selection_map: &MergedSelectionMap,
         query_variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
         root_operation_name: &RootOperationName,
+        format: Format,
     ) -> QueryText;
+
+    // TODO: include `QueryText` to incrementally adopt persisted documents
+    fn generate_query_extra_info(
+        query_name: QueryOperationName,
+        operation_name: ServerObjectEntityName,
+        indentation_level: u8,
+    ) -> QueryExtraInfo;
 }
 
 pub struct ProcessTypeSystemDocumentOutcome<TNetworkProtocol: NetworkProtocol> {
@@ -78,4 +86,10 @@ pub struct ExposeAsFieldToInsert {
     // e.g. Query or Mutation
     pub parent_object_name: ServerObjectEntityName,
     pub description: Option<DescriptionValue>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Format {
+    Pretty,
+    Compact,
 }
