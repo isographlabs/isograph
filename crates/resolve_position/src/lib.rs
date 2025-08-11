@@ -59,7 +59,7 @@ use common_lang_types::Span;
 /// The actual logic lives in the implementation of `ResolvePosition::resolve`
 /// for each AST node. The implementation must behave as follows:
 /// - It must check whether each subnode contains the position, most often by
-///   calling `field.span.contains(positio)`. When the child node containing the
+///   calling `field.span.contains(position)`. When the child node containing the
 ///   position is discovered, it must return the result of calling `.resolve()`
 ///   on that child.
 /// - If no child contains the position, then the node must assume that it is
