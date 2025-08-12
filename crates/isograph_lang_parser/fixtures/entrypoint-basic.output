@@ -5,8 +5,10 @@ Ok(
                 WithSpan {
                     item: EntrypointDeclaration {
                         parent_type: WithSpan {
-                            item: UnvalidatedTypeName(
-                                "Type",
+                            item: ParentType(
+                                UnvalidatedTypeName(
+                                    "Type",
+                                ),
                             ),
                             span: Span {
                                 start: 11,

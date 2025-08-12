@@ -8,8 +8,10 @@ Ok(
                             "BasicField",
                         ),
                         parent_type: WithSpan {
-                            item: UnvalidatedTypeName(
-                                "Type",
+                            item: ParentType(
+                                UnvalidatedTypeName(
+                                    "Type",
+                                ),
                             ),
                             span: Span {
                                 start: 9,
@@ -27,8 +29,10 @@ Ok(
                         },
                         description: Some(
                             WithSpan {
-                                item: DescriptionValue(
-                                    "Look, a multi-line description.\n\nVery cool.",
+                                item: Description(
+                                    DescriptionValue(
+                                        "Look, a multi-line description.\n\nVery cool.",
+                                    ),
                                 ),
                                 span: Span {
                                     start: 21,

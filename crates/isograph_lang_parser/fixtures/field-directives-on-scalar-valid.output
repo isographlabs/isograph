@@ -8,8 +8,10 @@ Ok(
                             "BasicField",
                         ),
                         parent_type: WithSpan {
-                            item: UnvalidatedTypeName(
-                                "Type",
+                            item: ParentType(
+                                UnvalidatedTypeName(
+                                    "Type",
+                                ),
                             ),
                             span: Span {
                                 start: 9,
@@ -192,8 +194,10 @@ Ok(
                             "BasicField2",
                         ),
                         parent_type: WithSpan {
-                            item: UnvalidatedTypeName(
-                                "Type",
+                            item: ParentType(
+                                UnvalidatedTypeName(
+                                    "Type",
+                                ),
                             ),
                             span: Span {
                                 start: 9,
@@ -421,8 +425,10 @@ Ok(
                             "BasicField3",
                         ),
                         parent_type: WithSpan {
-                            item: UnvalidatedTypeName(
-                                "Type",
+                            item: ParentType(
+                                UnvalidatedTypeName(
+                                    "Type",
+                                ),
                             ),
                             span: Span {
                                 start: 9,
@@ -650,8 +656,10 @@ Ok(
                             "updatable",
                         ),
                         parent_type: WithSpan {
-                            item: UnvalidatedTypeName(
-                                "Type",
+                            item: ParentType(
+                                UnvalidatedTypeName(
+                                    "Type",
+                                ),
                             ),
                             span: Span {
                                 start: 9,

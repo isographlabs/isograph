@@ -9,8 +9,10 @@ Ok(
                             "pointer",
                         ),
                         parent_type: WithSpan {
-                            item: UnvalidatedTypeName(
-                                "User",
+                            item: ParentType(
+                                UnvalidatedTypeName(
+                                    "User",
+                                ),
                             ),
                             span: Span {
                                 start: 11,
