@@ -96,20 +96,13 @@ fn process_input_file(
     output_file: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) {
-    let file_content = String::from_utf8(
-        fs::read(input_file.clone())
-            .unwrap_or_else(|_| panic!("Expected file {input_file:?} to be readable")),
-    )
-    .unwrap_or_else(|_| panic!("Content cannot be turned into string (path: {input_file:?})"));
-
     // N.B. for now, we are just parsing and printing those results.
     // But, we actually want to either just parse iso literals, or
     // parse the GraphQL schema, or parse and validate, or parse and
     // validate and generate artifacts, or something else entirely.
     //
     // So, we will need to make this a bit more flexible.
-    let results =
-        generate_content_for_output_file(db, input_file, file_content, current_working_directory);
+    let results = generate_content_for_output_file(db, input_file, current_working_directory);
 
     fs::write(output_file.clone(), results)
         .unwrap_or_else(|_| panic!("Failed to write to {output_file:?}"));
@@ -118,7 +111,6 @@ fn process_input_file(
 fn generate_content_for_output_file(
     db: &IsographDatabase,
     input_file: PathBuf,
-    content: String,
     current_working_directory: CurrentWorkingDirectory,
 ) -> String {
     let canonicalized_root_path = &PathBuf::from(current_working_directory.lookup());
@@ -130,7 +122,6 @@ fn generate_content_for_output_file(
     match parse_iso_literals_in_file_content(
         db,
         relative_path_to_source_file,
-        &content,
         current_working_directory,
     ) {
         Ok(item) => {

@@ -9,7 +9,7 @@ use isograph_compiler::{
     read_iso_literals_source_from_relative_path, CompilerState,
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
-use isograph_lang_types::{IsoLiteralsSource, IsographDatabase, IsographSemanticToken};
+use isograph_lang_types::{IsographDatabase, IsographSemanticToken};
 use lsp_types::{
     request::{Request, SemanticTokensFullRequest},
     SemanticToken as LspSemanticToken, SemanticTokens as LspSemanticTokens,
@@ -57,20 +57,9 @@ fn get_semantic_tokens(
         &uri.to_file_path().expect("Expected file path to be valid."),
     );
 
-    let memo_ref = read_iso_literals_source_from_relative_path(db, relative_path_to_source_file);
-    let IsoLiteralsSource {
-        relative_path,
-        content,
-    } = match memo_ref.to_owned() {
-        Some(s) => s,
-        // Is this the correct behavior?
-        None => return Ok(None),
-    };
-
     let parse_results = parse_iso_literals_in_file_content_and_return_all(
         db,
-        relative_path,
-        &content,
+        relative_path_to_source_file,
         get_current_working_directory(db),
     );
 
