@@ -9,6 +9,7 @@ mod refetch_query_index;
 mod selection_directive_set;
 pub mod semantic_token_legend;
 mod source_types;
+mod string_key_wrappers;
 mod with_id;
 mod with_target_entity_id;
 
@@ -23,5 +24,6 @@ pub use refetch_query_index::*;
 pub use selection_directive_set::*;
 pub use semantic_token_legend::IsographSemanticToken;
 pub use source_types::*;
+pub use string_key_wrappers::*;
 pub use with_id::*;
 pub use with_target_entity_id::*;

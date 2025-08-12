@@ -1,16 +1,16 @@
 use std::{collections::BTreeMap, marker::PhantomData};
 
 use common_lang_types::{
-    DescriptionValue, JavascriptName, SelectableName, ServerObjectEntityName,
-    ServerScalarEntityName, WithLocation, WithSpan,
+    JavascriptName, SelectableName, ServerObjectEntityName, ServerScalarEntityName, WithLocation,
+    WithSpan,
 };
-use isograph_lang_types::{impl_with_id, DefinitionLocation, SelectionType};
+use isograph_lang_types::{impl_with_id, DefinitionLocation, Description, SelectionType};
 
 use crate::{ClientSelectableId, NetworkProtocol, ServerSelectableId};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ServerScalarEntity<TNetworkProtocol: NetworkProtocol> {
-    pub description: Option<WithSpan<DescriptionValue>>,
+    pub description: Option<WithSpan<Description>>,
     pub name: WithLocation<ServerScalarEntityName>,
     pub javascript_name: JavascriptName,
     pub network_protocol: PhantomData<TNetworkProtocol>,
@@ -22,7 +22,7 @@ pub type ServerObjectEntityAvailableSelectables = BTreeMap<SelectableName, Selec
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ServerObjectEntity<TNetworkProtocol: NetworkProtocol> {
-    pub description: Option<DescriptionValue>,
+    pub description: Option<Description>,
     pub name: ServerObjectEntityName,
     /// Some if the object is concrete; None otherwise.
     pub concrete_type: Option<ServerObjectEntityName>,

@@ -1,9 +1,9 @@
 use common_lang_types::{
-    ClientObjectSelectableName, DescriptionValue, ObjectSelectableName, ServerObjectEntityName,
+    ClientObjectSelectableName, ObjectSelectableName, ServerObjectEntityName,
     ServerObjectSelectableName,
 };
 use impl_base_types_macro::impl_for_definition_location;
-use isograph_lang_types::{DefinitionLocation, TypeAnnotation};
+use isograph_lang_types::{DefinitionLocation, Description, TypeAnnotation};
 
 use crate::{ClientObjectSelectable, NetworkProtocol, ServerObjectSelectable};
 
@@ -19,7 +19,7 @@ pub type ObjectSelectableId = DefinitionLocation<
 
 #[impl_for_definition_location]
 pub trait ClientOrServerObjectSelectable {
-    fn description(&self) -> Option<DescriptionValue>;
+    fn description(&self) -> Option<Description>;
     fn name(&self) -> ObjectSelectableName;
     fn parent_object_entity_name(&self) -> ServerObjectEntityName;
     fn target_object_entity_name(&self) -> TypeAnnotation<ServerObjectEntityName>;
@@ -28,7 +28,7 @@ pub trait ClientOrServerObjectSelectable {
 impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
     for &ClientObjectSelectable<TNetworkProtocol>
 {
-    fn description(&self) -> Option<DescriptionValue> {
+    fn description(&self) -> Option<Description> {
         self.description
     }
 
@@ -48,7 +48,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
 impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
     for &ServerObjectSelectable<TNetworkProtocol>
 {
-    fn description(&self) -> Option<DescriptionValue> {
+    fn description(&self) -> Option<Description> {
         self.description
     }
 

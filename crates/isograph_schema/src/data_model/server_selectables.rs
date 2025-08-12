@@ -1,16 +1,18 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use common_lang_types::{
-    DescriptionValue, ServerObjectEntityName, ServerObjectSelectableName, ServerScalarEntityName,
+    ServerObjectEntityName, ServerObjectSelectableName, ServerScalarEntityName,
     ServerScalarSelectableName, WithLocation,
 };
-use isograph_lang_types::{impl_with_target_id, SelectionType, TypeAnnotation, VariableDefinition};
+use isograph_lang_types::{
+    impl_with_target_id, Description, SelectionType, TypeAnnotation, VariableDefinition,
+};
 
 use crate::{NetworkProtocol, ServerEntityName, ServerObjectSelectableVariant};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
-    pub description: Option<DescriptionValue>,
+    pub description: Option<Description>,
     pub name: WithLocation<ServerScalarSelectableName>,
 
     pub target_scalar_entity: TypeAnnotation<ServerScalarEntityName>,
@@ -24,7 +26,7 @@ impl_with_target_id!(ServerScalarSelectable<TNetworkProtocol: NetworkProtocol>, 
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
-    pub description: Option<DescriptionValue>,
+    pub description: Option<Description>,
     pub name: WithLocation<ServerObjectSelectableName>,
 
     pub target_object_entity: TypeAnnotation<ServerObjectEntityName>,

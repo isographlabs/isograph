@@ -1,7 +1,7 @@
 use common_lang_types::{
     derive_display, ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent,
-    ClientScalarSelectableName, DescriptionValue, Location, ObjectTypeAndFieldName,
-    SelectableNameOrAlias, ServerObjectEntityName, Span, WithLocation, WithSpan,
+    ClientScalarSelectableName, Location, ObjectTypeAndFieldName, SelectableNameOrAlias,
+    ServerObjectEntityName, Span, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
@@ -11,10 +11,10 @@ use intern::{string_key::Intern, Lookup};
 use core::panic;
 use isograph_config::CompilerConfig;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldDirectiveSet, DefinitionLocation, EmptyDirectiveSet,
-    NonConstantValue, ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, TypeAnnotation,
-    UnionVariant, VariableDefinition,
+    ArgumentKeyAndValue, ClientFieldDirectiveSet, DefinitionLocation, Description,
+    EmptyDirectiveSet, NonConstantValue, ObjectSelectionDirectiveSet, ScalarSelection,
+    ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionType,
+    SelectionTypeContainingSelections, TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
     accessible_client_fields, description, inline_fragment_reader_selection_set,
@@ -1046,7 +1046,7 @@ pub(crate) fn generate_parameters<'a, TNetworkProtocol: NetworkProtocol>(
 }
 
 fn write_optional_description(
-    description: Option<DescriptionValue>,
+    description: Option<Description>,
     query_type_declaration: &mut String,
     indentation_level: u8,
 ) {

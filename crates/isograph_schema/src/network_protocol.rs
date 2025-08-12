@@ -1,11 +1,11 @@
 use std::{error::Error, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
-    DescriptionValue, Location, QueryOperationName, QueryText, ServerObjectEntityName,
-    ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
+    Location, QueryOperationName, QueryText, ServerObjectEntityName, ServerSelectableName,
+    UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation, RootOperationKind};
-use isograph_lang_types::IsographDatabase;
+use isograph_lang_types::{Description, IsographDatabase};
 
 use crate::{
     ExposeFieldDirective, MergedSelectionMap, RootOperationName, Schema, ServerObjectEntity,
@@ -54,7 +54,7 @@ pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol>
 
 #[derive(Debug)]
 pub struct FieldToInsert {
-    pub description: Option<WithSpan<DescriptionValue>>,
+    pub description: Option<WithSpan<Description>>,
     pub name: WithLocation<ServerSelectableName>,
     pub type_: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     pub arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
@@ -77,5 +77,5 @@ pub struct ExposeAsFieldToInsert {
     pub expose_field_directive: ExposeFieldDirective,
     // e.g. Query or Mutation
     pub parent_object_name: ServerObjectEntityName,
-    pub description: Option<DescriptionValue>,
+    pub description: Option<Description>,
 }

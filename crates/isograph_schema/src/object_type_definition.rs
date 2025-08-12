@@ -1,14 +1,13 @@
-use common_lang_types::{
-    DescriptionValue, GraphQLInterfaceTypeName, ServerObjectEntityName, WithLocation, WithSpan,
-};
+use common_lang_types::{GraphQLInterfaceTypeName, ServerObjectEntityName, WithLocation, WithSpan};
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition,
     GraphQLInputObjectTypeDefinition, GraphQLInterfaceTypeDefinition, GraphQLObjectTypeDefinition,
 };
+use isograph_lang_types::Description;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct IsographObjectTypeDefinition {
-    pub description: Option<WithSpan<DescriptionValue>>,
+    pub description: Option<WithSpan<Description>>,
     pub name: WithLocation<ServerObjectEntityName>,
     // maybe this should be Vec<WithSpan<IsographObjectTypeName>>>
     pub interfaces: Vec<WithLocation<GraphQLInterfaceTypeName>>,
@@ -23,7 +22,9 @@ pub struct IsographObjectTypeDefinition {
 impl From<GraphQLObjectTypeDefinition> for IsographObjectTypeDefinition {
     fn from(object_type_definition: GraphQLObjectTypeDefinition) -> Self {
         IsographObjectTypeDefinition {
-            description: object_type_definition.description,
+            description: object_type_definition
+                .description
+                .map(|with_span| with_span.map(|dv| dv.into())),
             name: object_type_definition.name.map(|x| x.into()),
             interfaces: object_type_definition.interfaces,
             directives: object_type_definition.directives,
@@ -35,7 +36,9 @@ impl From<GraphQLObjectTypeDefinition> for IsographObjectTypeDefinition {
 impl From<GraphQLInterfaceTypeDefinition> for IsographObjectTypeDefinition {
     fn from(value: GraphQLInterfaceTypeDefinition) -> Self {
         Self {
-            description: value.description,
+            description: value
+                .description
+                .map(|with_span| with_span.map(|dv| dv.into())),
             name: value.name.map(|x| x.into()),
             interfaces: value.interfaces,
             directives: value.directives,
@@ -49,7 +52,9 @@ impl From<GraphQLInterfaceTypeDefinition> for IsographObjectTypeDefinition {
 impl From<GraphQLInputObjectTypeDefinition> for IsographObjectTypeDefinition {
     fn from(value: GraphQLInputObjectTypeDefinition) -> Self {
         Self {
-            description: value.description,
+            description: value
+                .description
+                .map(|with_span| with_span.map(|dv| dv.into())),
             name: value.name.map(|x| x.into()),
             interfaces: vec![],
             directives: value.directives,

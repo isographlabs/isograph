@@ -1,8 +1,8 @@
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, ConstExportName, DescriptionValue,
-    EnumLiteralValue, FieldArgumentName, RelativePathToSourceFile, ScalarSelectableName,
-    SelectableAlias, SelectableNameOrAlias, ServerObjectSelectableName, StringLiteralValue,
-    UnvalidatedTypeName, ValueKeyName, VariableName, WithLocation, WithSpan,
+    ClientObjectSelectableName, ClientScalarSelectableName, ConstExportName, EnumLiteralValue,
+    FieldArgumentName, RelativePathToSourceFile, ScalarSelectableName, SelectableAlias,
+    SelectableNameOrAlias, ServerObjectSelectableName, StringLiteralValue, UnvalidatedTypeName,
+    ValueKeyName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{FloatValue, GraphQLTypeAnnotation, NameValuePair};
 use intern::string_key::Lookup;
@@ -10,8 +10,8 @@ use serde::Deserialize;
 use std::fmt::Debug;
 
 use crate::{
-    ClientFieldDirectiveSet, IsographFieldDirective, IsographSemanticToken,
-    ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionType,
+    string_key_wrappers::Description, ClientFieldDirectiveSet, IsographFieldDirective,
+    IsographSemanticToken, ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionType,
 };
 
 pub type UnvalidatedSelection = SelectionTypeContainingSelections<(), ()>;
@@ -23,7 +23,7 @@ pub struct ClientFieldDeclaration {
     pub const_export_name: ConstExportName,
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub client_field_name: WithSpan<ClientScalarSelectableName>,
-    pub description: Option<WithSpan<DescriptionValue>>,
+    pub description: Option<WithSpan<Description>>,
     pub selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     pub client_field_directive_set: ClientFieldDirectiveSet,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
@@ -39,7 +39,7 @@ pub struct ClientPointerDeclaration {
     pub parent_type: WithSpan<UnvalidatedTypeName>,
     pub target_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     pub client_pointer_name: WithSpan<ClientObjectSelectableName>,
-    pub description: Option<WithSpan<DescriptionValue>>,
+    pub description: Option<WithSpan<Description>>,
     pub selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: RelativePathToSourceFile,
