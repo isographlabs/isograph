@@ -8,8 +8,8 @@ use common_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientFieldDirectiveSet, ClientPointerDeclaration,
-    DefinitionLocation, DeserializationError, NonConstantValue, SelectionType, TypeAnnotation,
-    UnvalidatedSelection, VariableDefinition,
+    DefinitionLocation, DeserializationError, NonConstantValue, ParentType, SelectionType,
+    TypeAnnotation, UnvalidatedSelection, VariableDefinition,
 };
 
 use thiserror::Error;
@@ -104,7 +104,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .get(client_pointer_declaration.item.target_type.inner())
             .ok_or(WithLocation::new(
                 ProcessClientFieldDeclarationError::ParentTypeNotDefined {
-                    parent_type_name: *client_pointer_declaration.item.target_type.inner(),
+                    parent_type_name: ParentType(
+                        *client_pointer_declaration.item.target_type.inner(),
+                    ),
                 },
                 Location::new(
                     text_source,
@@ -421,9 +423,7 @@ type ProcessClientFieldDeclarationResult<T> =
 #[derive(Error, Eq, PartialEq, Debug)]
 pub enum ProcessClientFieldDeclarationError {
     #[error("`{parent_type_name}` is not a type that has been defined.")]
-    ParentTypeNotDefined {
-        parent_type_name: UnvalidatedTypeName,
-    },
+    ParentTypeNotDefined { parent_type_name: ParentType },
 
     #[error("Directive {directive_name} is not supported on client pointers.")]
     DirectiveNotSupportedOnClientPointer {

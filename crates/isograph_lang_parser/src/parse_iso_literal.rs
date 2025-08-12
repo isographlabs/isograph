@@ -11,7 +11,7 @@ use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
     from_isograph_field_directives, semantic_token_legend, ClientFieldDeclaration,
     ClientPointerDeclaration, ConstantValue, EntrypointDeclaration, IsographDatabase,
-    IsographFieldDirective, NonConstantValue, ObjectSelection, ScalarSelection,
+    IsographFieldDirective, NonConstantValue, ObjectSelection, ParentType, ScalarSelection,
     SelectionFieldArgument, SelectionTypeContainingSelections, UnvalidatedSelection,
     VariableDefinition,
 };
@@ -93,6 +93,7 @@ fn parse_iso_entrypoint_declaration(
                     IsographLangTokenKind::Identifier,
                     semantic_token_legend::ST_CLASS,
                 )
+                .map(|with_span| with_span.map(ParentType))
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
             let dot = tokens
                 .parse_token_of_kind(
@@ -177,6 +178,7 @@ fn parse_client_field_declaration_inner(
                 IsographLangTokenKind::Identifier,
                 semantic_token_legend::ST_CLASS,
             )
+            .map(|with_span| with_span.map(ParentType))
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
         let _ = tokens
@@ -293,6 +295,7 @@ fn parse_client_pointer_declaration_inner(
                 IsographLangTokenKind::Identifier,
                 semantic_token_legend::ST_CLASS,
             )
+            .map(|with_span| with_span.map(ParentType))
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
         let _dot = tokens

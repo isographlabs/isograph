@@ -11,7 +11,8 @@ use std::fmt::Debug;
 
 use crate::{
     string_key_wrappers::Description, ClientFieldDirectiveSet, IsographFieldDirective,
-    IsographSemanticToken, ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionType,
+    IsographSemanticToken, ObjectSelectionDirectiveSet, ParentType, ScalarSelectionDirectiveSet,
+    SelectionType,
 };
 
 pub type UnvalidatedSelection = SelectionTypeContainingSelections<(), ()>;
@@ -21,7 +22,7 @@ pub type UnvalidatedScalarFieldSelection = ScalarSelection<()>;
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct ClientFieldDeclaration {
     pub const_export_name: ConstExportName,
-    pub parent_type: WithSpan<UnvalidatedTypeName>,
+    pub parent_type: WithSpan<ParentType>,
     pub client_field_name: WithSpan<ClientScalarSelectableName>,
     pub description: Option<WithSpan<Description>>,
     pub selection_set: Vec<WithSpan<UnvalidatedSelection>>,
@@ -36,7 +37,7 @@ pub struct ClientFieldDeclaration {
 pub struct ClientPointerDeclaration {
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub const_export_name: ConstExportName,
-    pub parent_type: WithSpan<UnvalidatedTypeName>,
+    pub parent_type: WithSpan<ParentType>,
     pub target_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     pub client_pointer_name: WithSpan<ClientObjectSelectableName>,
     pub description: Option<WithSpan<Description>>,

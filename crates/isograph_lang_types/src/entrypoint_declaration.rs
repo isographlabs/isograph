@@ -1,13 +1,11 @@
-use common_lang_types::{
-    IsoLiteralText, ServerScalarSelectableName, UnvalidatedTypeName, WithSpan,
-};
+use common_lang_types::{IsoLiteralText, ServerScalarSelectableName, WithSpan};
 
-use crate::{entrypoint_directive_set::EntrypointDirectiveSet, IsographSemanticToken};
+use crate::{entrypoint_directive_set::EntrypointDirectiveSet, IsographSemanticToken, ParentType};
 
 // TODO should this be ObjectTypeAndFieldNames?
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct EntrypointDeclaration {
-    pub parent_type: WithSpan<UnvalidatedTypeName>,
+    pub parent_type: WithSpan<ParentType>,
     // N.B. there is no reason this can't be a server field name /shrug
     pub client_field_name: WithSpan<ServerScalarSelectableName>,
 

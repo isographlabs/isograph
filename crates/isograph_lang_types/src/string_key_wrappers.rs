@@ -1,4 +1,4 @@
-use common_lang_types::DescriptionValue;
+use common_lang_types::{DescriptionValue, UnvalidatedTypeName};
 
 macro_rules! define_wrapper {
     ($struct_name:ident, $inner:ident) => {
@@ -18,7 +18,14 @@ macro_rules! define_wrapper {
                 &self.0
             }
         }
+
+        impl std::fmt::Display for $struct_name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                self.0.fmt(f)
+            }
+        }
     };
 }
 
 define_wrapper!(Description, DescriptionValue);
+define_wrapper!(ParentType, UnvalidatedTypeName);

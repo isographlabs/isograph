@@ -5,7 +5,7 @@ use common_lang_types::{
     ServerScalarSelectableName, TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use isograph_lang_types::{
-    DefinitionLocation, EntrypointDeclaration, EntrypointDirectiveSet, SelectionType,
+    DefinitionLocation, EntrypointDeclaration, EntrypointDirectiveSet, ParentType, SelectionType,
 };
 
 use thiserror::Error;
@@ -97,7 +97,7 @@ fn validate_entrypoint_type_and_field<TNetworkProtocol: NetworkProtocol>(
 
 fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    parent_type: WithSpan<UnvalidatedTypeName>,
+    parent_type: WithSpan<ParentType>,
     text_source: TextSource,
 ) -> Result<ServerObjectEntityName, WithLocation<ValidateEntrypointDeclarationError>> {
     let parent_type_id = schema
@@ -200,9 +200,7 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
 #[derive(Error, Eq, PartialEq, Debug, Clone)]
 pub enum ValidateEntrypointDeclarationError {
     #[error("`{parent_type_name}` is not a type that has been defined.")]
-    ParentTypeNotDefined {
-        parent_type_name: UnvalidatedTypeName,
-    },
+    ParentTypeNotDefined { parent_type_name: ParentType },
 
     #[error("Invalid parent type. `{parent_type_name}` is a {parent_type}, but it should be an object or interface.")]
     InvalidParentType {
@@ -214,7 +212,7 @@ pub enum ValidateEntrypointDeclarationError {
         "The type `{parent_type_name}` is not fetchable. The following types are fetchable: {fetchable_types}.",
     )]
     NonFetchableParentType {
-        parent_type_name: UnvalidatedTypeName,
+        parent_type_name: ParentType,
         fetchable_types: String,
     },
 
