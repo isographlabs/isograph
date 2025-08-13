@@ -6,20 +6,17 @@ pub(crate) fn resolve_position_macro(item: TokenStream) -> TokenStream {
     let mut input = parse_macro_input!(item as syn::DeriveInput);
     let struct_name = input.ident.clone();
 
-    let ResolvePositionArgs {
-        parent_type,
-        resolved_node,
-    } = match deluxe::extract_attributes(&mut input) {
+    let resolve_position_args = match deluxe::extract_attributes(&mut input) {
         Ok(resolve_position_args) => resolve_position_args,
         Err(e) => return e.into_compile_error().into(),
     };
 
     match input.data {
         syn::Data::Struct(data_struct) => {
-            handle_data_struct(struct_name, parent_type, resolved_node, data_struct)
+            handle_data_struct(struct_name, resolve_position_args, data_struct)
         }
         syn::Data::Enum(data_enum) => {
-            handle_data_enum(struct_name, parent_type, resolved_node, data_enum)
+            handle_data_enum(struct_name, resolve_position_args, data_enum)
         }
         _ => Error::new(input.span(), "This derive only works on structs")
             .to_compile_error()
@@ -29,10 +26,15 @@ pub(crate) fn resolve_position_macro(item: TokenStream) -> TokenStream {
 
 fn handle_data_struct(
     struct_name: syn::Ident,
-    parent_type: syn::Type,
-    resolved_node: syn::Type,
+    resolve_position_args: ResolvePositionArgs,
     data_struct: syn::DataStruct,
 ) -> TokenStream {
+    let ResolvePositionArgs {
+        parent_type,
+        resolved_node,
+        self_type_generics,
+    } = resolve_position_args;
+
     let attributes_to_resolve = data_struct
         .fields
         .iter()
@@ -59,7 +61,7 @@ fn handle_data_struct(
         });
 
     let output = quote! {
-        impl ::resolve_position::ResolvePosition for #struct_name {
+        impl ::resolve_position::ResolvePosition for #struct_name #self_type_generics {
             type Parent<'a> = #parent_type;
             type ResolvedNode<'a> = #resolved_node;
 
@@ -80,10 +82,15 @@ fn handle_data_struct(
 
 fn handle_data_enum(
     enum_name: syn::Ident,
-    parent_type: syn::Type,
-    resolved_node: syn::Type,
+    resolve_position_args: ResolvePositionArgs,
     data_enum: syn::DataEnum,
 ) -> TokenStream {
+    let ResolvePositionArgs {
+        parent_type,
+        resolved_node,
+        self_type_generics,
+    } = resolve_position_args;
+
     let match_arms = data_enum.variants.iter().map(|variant| {
         let variant_name = &variant.ident;
 
@@ -106,7 +113,7 @@ fn handle_data_enum(
     });
 
     let output = quote! {
-        impl ::resolve_position::ResolvePosition for #enum_name {
+        impl ::resolve_position::ResolvePosition for #enum_name #self_type_generics {
             type Parent<'a> = #parent_type;
             type ResolvedNode<'a> = #resolved_node;
 
@@ -130,6 +137,7 @@ fn handle_data_enum(
 struct ResolvePositionArgs {
     parent_type: syn::Type,
     resolved_node: syn::Type,
+    self_type_generics: Option<syn::AngleBracketedGenericArguments>,
 }
 
 struct ResolveFieldInfo<'a> {

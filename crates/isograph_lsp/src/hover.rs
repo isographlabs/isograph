@@ -53,6 +53,8 @@ pub fn on_hover(
                     IsographResolvedNode::EntrypointDeclaration(_) => "entrypoint decl".to_string(),
                     IsographResolvedNode::ParentType(_) => "parent type".to_string(),
                     IsographResolvedNode::Description(_) => "description".to_string(),
+                    IsographResolvedNode::ScalarSelection(_) => "scalar field".to_string(),
+                    IsographResolvedNode::ObjectSelection(_) => "linked field".to_string(),
                 });
             }
             None

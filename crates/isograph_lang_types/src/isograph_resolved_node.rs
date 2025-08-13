@@ -1,6 +1,6 @@
 use crate::{
     ClientFieldDeclarationPath, ClientPointerDeclarationPath, DescriptionPath,
-    EntrypointDeclarationPath, ParentTypePath,
+    EntrypointDeclarationPath, ObjectSelectionPath, ParentTypePath, ScalarSelectionPath,
 };
 
 #[derive(Debug)]
@@ -10,4 +10,6 @@ pub enum IsographResolvedNode<'a> {
     Description(DescriptionPath<'a>),
     ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
     ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
+    ScalarSelection(ScalarSelectionPath<'a, ()>),
+    ObjectSelection(ObjectSelectionPath<'a, (), ()>),
 }
