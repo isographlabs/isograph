@@ -48,7 +48,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let parent_type_id = self
             .server_entity_data
             .defined_entities
-            .get(&client_field_declaration.item.parent_type.item)
+            .get(&client_field_declaration.item.parent_type.item.0)
             .ok_or(WithLocation::new(
                 ProcessClientFieldDeclarationError::ParentTypeNotDefined {
                     parent_type_name: client_field_declaration.item.parent_type.item,
@@ -87,7 +87,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let parent_type_id = self
             .server_entity_data
             .defined_entities
-            .get(&client_pointer_declaration.item.parent_type.item)
+            .get(&client_pointer_declaration.item.parent_type.item.0)
             .ok_or(WithLocation::new(
                 ProcessClientFieldDeclarationError::ParentTypeNotDefined {
                     parent_type_name: client_pointer_declaration.item.parent_type.item,

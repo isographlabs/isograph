@@ -6,24 +6,29 @@ use common_lang_types::{
 };
 use graphql_lang_types::{FloatValue, GraphQLTypeAnnotation, NameValuePair};
 use intern::string_key::Lookup;
+use resolve_position::Path;
+use resolve_position_macros::ResolvePosition;
 use serde::Deserialize;
 use std::fmt::Debug;
 
 use crate::{
-    string_key_wrappers::Description, ClientFieldDirectiveSet, IsographFieldDirective,
-    IsographSemanticToken, ObjectSelectionDirectiveSet, ParentType, ScalarSelectionDirectiveSet,
-    SelectionType,
+    isograph_resolved_node::IsographResolvedNode, string_key_wrappers::Description,
+    ClientFieldDirectiveSet, IsographFieldDirective, IsographSemanticToken,
+    ObjectSelectionDirectiveSet, ParentType, ScalarSelectionDirectiveSet, SelectionType,
 };
 
 pub type UnvalidatedSelection = SelectionTypeContainingSelections<(), ()>;
 
 pub type UnvalidatedScalarFieldSelection = ScalarSelection<()>;
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
+#[resolve_position(parent_type=(), resolved_node=IsographResolvedNode<'a>)]
 pub struct ClientFieldDeclaration {
     pub const_export_name: ConstExportName,
+    #[resolve_field]
     pub parent_type: WithSpan<ParentType>,
     pub client_field_name: WithSpan<ClientScalarSelectableName>,
+    #[resolve_field]
     pub description: Option<WithSpan<Description>>,
     pub selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     pub client_field_directive_set: ClientFieldDirectiveSet,
@@ -33,13 +38,18 @@ pub struct ClientFieldDeclaration {
     pub semantic_tokens: Vec<WithSpan<IsographSemanticToken>>,
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
+pub type ClientFieldDeclarationPath<'a> = Path<&'a ClientFieldDeclaration, ()>;
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
+#[resolve_position(parent_type=(), resolved_node=IsographResolvedNode<'a>)]
 pub struct ClientPointerDeclaration {
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub const_export_name: ConstExportName,
+    #[resolve_field]
     pub parent_type: WithSpan<ParentType>,
     pub target_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     pub client_pointer_name: WithSpan<ClientObjectSelectableName>,
+    #[resolve_field]
     pub description: Option<WithSpan<Description>>,
     pub selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
@@ -47,6 +57,8 @@ pub struct ClientPointerDeclaration {
 
     pub semantic_tokens: Vec<WithSpan<IsographSemanticToken>>,
 }
+
+pub type ClientPointerDeclarationPath<'a> = Path<&'a ClientPointerDeclaration, ()>;
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Default, Hash)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

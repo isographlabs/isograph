@@ -43,6 +43,7 @@ pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol>(
                         .item
                         .parent_type
                         .item
+                        .0
                         .unchecked_conversion(),
                     client_field_id,
                 )) {
@@ -103,7 +104,7 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
     let parent_type_id = schema
         .server_entity_data
         .defined_entities
-        .get(&parent_type.item)
+        .get(&parent_type.item.0)
         .ok_or(WithLocation::new(
             ValidateEntrypointDeclarationError::ParentTypeNotDefined {
                 parent_type_name: parent_type.item,

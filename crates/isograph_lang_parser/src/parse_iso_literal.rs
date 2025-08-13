@@ -11,11 +11,12 @@ use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
     from_isograph_field_directives, semantic_token_legend, ClientFieldDeclaration,
     ClientPointerDeclaration, ConstantValue, EntrypointDeclaration, IsographDatabase,
-    IsographFieldDirective, NonConstantValue, ObjectSelection, ParentType, ScalarSelection,
-    SelectionFieldArgument, SelectionTypeContainingSelections, UnvalidatedSelection,
-    VariableDefinition,
+    IsographFieldDirective, IsographResolvedNode, NonConstantValue, ObjectSelection, ParentType,
+    ScalarSelection, SelectionFieldArgument, SelectionTypeContainingSelections,
+    UnvalidatedSelection, VariableDefinition,
 };
 use pico_macros::memo;
+use resolve_position_macros::ResolvePosition;
 use std::{collections::HashSet, ops::ControlFlow};
 
 use crate::{
@@ -23,7 +24,8 @@ use crate::{
     ParseResultWithLocation, ParseResultWithSpan, PeekableLexer,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type=(), resolved_node=IsographResolvedNode<'a>)]
 pub enum IsoLiteralExtractionResult {
     ClientPointerDeclaration(WithSpan<ClientPointerDeclaration>),
     ClientFieldDeclaration(WithSpan<ClientFieldDeclaration>),
