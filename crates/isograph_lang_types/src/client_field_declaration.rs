@@ -1,8 +1,7 @@
 use common_lang_types::{
-    ClientObjectSelectableName, ConstExportName, EnumLiteralValue, FieldArgumentName,
-    RelativePathToSourceFile, ScalarSelectableName, SelectableAlias, SelectableNameOrAlias,
-    ServerObjectSelectableName, StringLiteralValue, UnvalidatedTypeName, ValueKeyName,
-    VariableName, WithLocation, WithSpan,
+    ConstExportName, EnumLiteralValue, FieldArgumentName, RelativePathToSourceFile,
+    ScalarSelectableName, SelectableAlias, SelectableNameOrAlias, ServerObjectSelectableName,
+    StringLiteralValue, UnvalidatedTypeName, ValueKeyName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{FloatValue, GraphQLTypeAnnotation, NameValuePair};
 use intern::string_key::Lookup;
@@ -14,8 +13,8 @@ use std::fmt::Debug;
 use crate::{
     isograph_resolved_node::IsographResolvedNode, string_key_wrappers::Description,
     ClientFieldDirectiveSet, IsographFieldDirective, IsographSemanticToken,
-    ObjectSelectionDirectiveSet, ParentType, ScalarSelectableNameWrapper,
-    ScalarSelectionDirectiveSet, SelectionType,
+    ObjectSelectableNameWrapper, ObjectSelectionDirectiveSet, ParentType,
+    ScalarSelectableNameWrapper, ScalarSelectionDirectiveSet, SelectionType,
 };
 
 pub type UnvalidatedSelection = SelectionTypeContainingSelections<(), ()>;
@@ -51,7 +50,8 @@ pub struct ClientPointerDeclaration {
     #[resolve_field]
     pub parent_type: WithSpan<ParentType>,
     pub target_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
-    pub client_pointer_name: WithSpan<ClientObjectSelectableName>,
+    #[resolve_field]
+    pub client_pointer_name: WithSpan<ObjectSelectableNameWrapper>,
     #[resolve_field]
     pub description: Option<WithSpan<Description>>,
     #[resolve_field]

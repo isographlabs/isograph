@@ -58,6 +58,9 @@ pub fn on_hover(
                     IsographResolvedNode::ScalarSelectableNameWrapper(_) => {
                         "name of entrypoint or client field".to_string()
                     }
+                    IsographResolvedNode::ObjectSelectableNameWrapper(_) => {
+                        "name of pointer".to_string()
+                    }
                 });
             }
             None

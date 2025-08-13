@@ -344,10 +344,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         }?;
 
         self.client_object_selectables.insert(
-            (parent_object_name, client_object_selectable_name),
+            (parent_object_name, *client_object_selectable_name),
             ClientObjectSelectable {
                 description: client_pointer_declaration.item.description.map(|x| x.item),
-                name: client_object_selectable_name,
+                name: *client_object_selectable_name,
                 reader_selection_set: vec![],
 
                 variable_definitions: client_pointer_declaration
@@ -359,13 +359,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                             &self.server_entity_data.defined_entities,
                             variable_definition,
                             parent_object.name,
-                            client_pointer_name.into(),
+                            client_pointer_name.0.into(),
                         )
                     })
                     .collect::<Result<_, _>>()?,
                 type_and_field: ObjectTypeAndFieldName {
                     type_name: parent_object.name,
-                    field_name: client_object_selectable_name.into(),
+                    field_name: client_object_selectable_name.0.into(),
                 },
 
                 parent_object_name,
@@ -387,10 +387,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .or_default()
             .selectables
             .insert(
-                client_pointer_name.into(),
+                client_pointer_name.0.into(),
                 DefinitionLocation::Client(SelectionType::Object((
                     parent_object_name,
-                    client_object_selectable_name,
+                    *client_object_selectable_name,
                 ))),
             )
             .is_some()
@@ -402,14 +402,14 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             return Err(WithSpan::new(
                 ProcessClientFieldDeclarationError::ParentAlreadyHasField {
                     parent_type_name: parent_object.name,
-                    client_field_name: client_pointer_name.into(),
+                    client_field_name: client_pointer_name.0.into(),
                 },
                 client_pointer_name_span,
             ));
         }
 
         Ok(UnprocessedClientPointerItem {
-            client_object_selectable_name: client_pointer_name,
+            client_object_selectable_name: *client_pointer_name,
             parent_object_entity_name: parent_object_name,
             reader_selection_set: unprocessed_fields,
             refetch_selection_set: vec![id_selection()],

@@ -337,7 +337,7 @@ fn parse_client_pointer_declaration_inner(
         Ok(ClientPointerDeclaration {
             directives,
             parent_type,
-            client_pointer_name,
+            client_pointer_name: client_pointer_name.map(|x| x.into()),
             target_type,
             description,
             selection_set,
