@@ -122,7 +122,6 @@ pub struct ObjectSelection<TScalar, TLinked> {
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
     pub object_selection_directive_set: ObjectSelectionDirectiveSet,
 }
-// TODO impl_with_target_id!(ObjectSelection)
 
 impl<TScalarField, TLinkedField> ObjectSelection<TScalarField, TLinkedField> {
     pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
