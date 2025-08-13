@@ -49,6 +49,8 @@ pub struct ClientPointerDeclaration {
     pub const_export_name: ConstExportName,
     #[resolve_field]
     pub parent_type: WithSpan<ParentType>,
+    // TODO this should be WithSpan<GraphQLAnnotation<ParentType>>, and we need to
+    // impl<T: ResolvePosition> ResolvePosition for GraphQLTypeAnnotation<T>?
     pub target_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     #[resolve_field]
     pub client_pointer_name: WithSpan<ObjectSelectableNameWrapper>,
