@@ -30,6 +30,7 @@ pub struct ClientFieldDeclaration {
     pub client_field_name: WithSpan<ClientScalarSelectableName>,
     #[resolve_field]
     pub description: Option<WithSpan<Description>>,
+    #[resolve_field]
     pub selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     pub client_field_directive_set: ClientFieldDirectiveSet,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
@@ -51,6 +52,7 @@ pub struct ClientPointerDeclaration {
     pub client_pointer_name: WithSpan<ClientObjectSelectableName>,
     #[resolve_field]
     pub description: Option<WithSpan<Description>>,
+    #[resolve_field]
     pub selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: RelativePathToSourceFile,
@@ -97,7 +99,7 @@ impl<TScalarField, TLinkedField> SelectionTypeContainingSelections<TScalarField,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
-#[resolve_position(parent_type=(), resolved_node=IsographResolvedNode<'a>, self_type_generics=<()>)]
+#[resolve_position(parent_type=SelectionParentType<'a>, resolved_node=IsographResolvedNode<'a>, self_type_generics=<()>)]
 pub struct ScalarSelection<TScalarField> {
     pub name: WithLocation<ScalarSelectableName>,
     pub reader_alias: Option<WithLocation<SelectableAlias>>,
@@ -106,7 +108,8 @@ pub struct ScalarSelection<TScalarField> {
     pub scalar_selection_directive_set: ScalarSelectionDirectiveSet,
 }
 
-pub type ScalarSelectionPath<'a, TScalarField> = Path<&'a ScalarSelection<TScalarField>, ()>;
+pub type ScalarSelectionPath<'a, TScalarField> =
+    Path<&'a ScalarSelection<TScalarField>, SelectionParentType<'a>>;
 
 impl<TScalarField> ScalarSelection<TScalarField> {
     pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
@@ -117,7 +120,7 @@ impl<TScalarField> ScalarSelection<TScalarField> {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
-#[resolve_position(parent_type=(), resolved_node=IsographResolvedNode<'a>, self_type_generics=<(), ()>)]
+#[resolve_position(parent_type=SelectionParentType<'a>, resolved_node=IsographResolvedNode<'a>, self_type_generics=<(), ()>)]
 pub struct ObjectSelection<TScalar, TLinked> {
     pub name: WithLocation<ServerObjectSelectableName>,
     pub reader_alias: Option<WithLocation<SelectableAlias>>,
@@ -128,7 +131,15 @@ pub struct ObjectSelection<TScalar, TLinked> {
 }
 
 pub type ObjectSelectionPath<'a, TScalarField, TLinkedField> =
-    Path<&'a ObjectSelection<TScalarField, TLinkedField>, ()>;
+    Path<&'a ObjectSelection<TScalarField, TLinkedField>, SelectionParentType<'a>>;
+
+#[derive(Debug)]
+pub enum SelectionParentType<'a> {
+    ScalarSelection(Box<ScalarSelectionPath<'a, ()>>),
+    ObjectSelection(Box<ObjectSelectionPath<'a, (), ()>>),
+    ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
+    ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
+}
 
 impl<TScalarField, TLinkedField> ObjectSelection<TScalarField, TLinkedField> {
     pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {

@@ -6,6 +6,9 @@ use common_lang_types::{SelectableName, UnvalidatedTypeName};
 use intern::Lookup;
 use pico::Storage;
 use pico_macros::Db;
+use resolve_position::ResolvePosition;
+
+use crate::{ScalarSelection, UnvalidatedSelection};
 
 #[derive(Default, Debug, Db)]
 pub struct IsographDatabase {
@@ -164,6 +167,39 @@ impl<TScalar, TObject> SelectionType<TScalar, TObject> {
         match self {
             SelectionType::Scalar(s) => Err(s),
             SelectionType::Object(o) => Ok(o),
+        }
+    }
+}
+
+// A blanket impl for SelectionType for ResolvedNode. Note that this will not work
+// in all circumstances, but because it requires that the Parent associated type
+// for both TScalar and TObject are the same. That will probably usually be the case,
+// but it's not guaranteed. For example, if an entrypoint declaration
+// `entrypoint Query.Foo` treated `Foo` as a scalar field selection (i.e. objects were
+// disallowed there), then ScalarFieldSelection's Parent would be a larger enum than
+// ObjectFieldSelection.
+//
+// That's not the case right now, but it may come up. And in that case, we can
+// (probably) manually impl SelectionType for specific concrete types.
+impl ResolvePosition for UnvalidatedSelection {
+    type Parent<'a>
+        = <ScalarSelection<()> as ResolvePosition>::Parent<'a>
+    where
+        Self: 'a;
+
+    type ResolvedNode<'a>
+        = <ScalarSelection<()> as ResolvePosition>::ResolvedNode<'a>
+    where
+        Self: 'a;
+
+    fn resolve<'a>(
+        &'a self,
+        parent: Self::Parent<'a>,
+        position: common_lang_types::Span,
+    ) -> Self::ResolvedNode<'a> {
+        match self {
+            SelectionType::Scalar(scalar) => scalar.resolve(parent, position),
+            SelectionType::Object(object) => object.resolve(parent, position),
         }
     }
 }
