@@ -104,7 +104,6 @@ pub struct ScalarSelection<TScalarField> {
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
     pub scalar_selection_directive_set: ScalarSelectionDirectiveSet,
 }
-// TODO impl_with_target_id!(ScalarSelection)
 
 impl<TScalarField> ScalarSelection<TScalarField> {
     pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
