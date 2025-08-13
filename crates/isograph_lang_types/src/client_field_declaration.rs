@@ -12,9 +12,9 @@ use std::fmt::Debug;
 
 use crate::{
     isograph_resolved_node::IsographResolvedNode, string_key_wrappers::Description,
-    ClientFieldDirectiveSet, IsographFieldDirective, IsographSemanticToken,
-    ObjectSelectableNameWrapper, ObjectSelectionDirectiveSet, ParentType,
-    ScalarSelectableNameWrapper, ScalarSelectionDirectiveSet, SelectionType,
+    ClientFieldDirectiveSet, ClientObjectSelectableNameWrapper, ClientScalarSelectableNameWrapper,
+    IsographFieldDirective, IsographSemanticToken, ObjectSelectionDirectiveSet,
+    ScalarSelectionDirectiveSet, SelectionType, ServerObjectEntityNameWrapper,
 };
 
 pub type UnvalidatedSelection = SelectionTypeContainingSelections<(), ()>;
@@ -26,9 +26,9 @@ pub type UnvalidatedScalarFieldSelection = ScalarSelection<()>;
 pub struct ClientFieldDeclaration {
     pub const_export_name: ConstExportName,
     #[resolve_field]
-    pub parent_type: WithSpan<ParentType>,
+    pub parent_type: WithSpan<ServerObjectEntityNameWrapper>,
     #[resolve_field]
-    pub client_field_name: WithSpan<ScalarSelectableNameWrapper>,
+    pub client_field_name: WithSpan<ClientScalarSelectableNameWrapper>,
     #[resolve_field]
     pub description: Option<WithSpan<Description>>,
     #[resolve_field]
@@ -48,12 +48,12 @@ pub struct ClientPointerDeclaration {
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub const_export_name: ConstExportName,
     #[resolve_field]
-    pub parent_type: WithSpan<ParentType>,
+    pub parent_type: WithSpan<ServerObjectEntityNameWrapper>,
     // TODO this should be WithSpan<GraphQLAnnotation<ParentType>>, and we need to
     // impl<T: ResolvePosition> ResolvePosition for GraphQLTypeAnnotation<T>?
     pub target_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     #[resolve_field]
-    pub client_pointer_name: WithSpan<ObjectSelectableNameWrapper>,
+    pub client_pointer_name: WithSpan<ClientObjectSelectableNameWrapper>,
     #[resolve_field]
     pub description: Option<WithSpan<Description>>,
     #[resolve_field]
@@ -105,9 +105,12 @@ impl<TScalarField, TLinkedField> SelectionTypeContainingSelections<TScalarField,
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
 #[resolve_position(parent_type=SelectionParentType<'a>, resolved_node=IsographResolvedNode<'a>, self_type_generics=<()>)]
 pub struct ScalarSelection<TScalarField> {
+    // TODO make this WithSpan instead of WithLocation
     pub name: WithLocation<ScalarSelectableName>,
+    // TODO make this WithSpan instead of WithLocation
     pub reader_alias: Option<WithLocation<SelectableAlias>>,
     pub associated_data: TScalarField,
+    // TODO make this WithSpan instead of WithLocation
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
     pub scalar_selection_directive_set: ScalarSelectionDirectiveSet,
 }
@@ -126,10 +129,13 @@ impl<TScalarField> ScalarSelection<TScalarField> {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
 #[resolve_position(parent_type=SelectionParentType<'a>, resolved_node=IsographResolvedNode<'a>, self_type_generics=<(), ()>)]
 pub struct ObjectSelection<TScalar, TLinked> {
+    // TODO make this WithSpan instead of WithLocation
     pub name: WithLocation<ServerObjectSelectableName>,
+    // TODO make this WithSpan instead of WithLocation
     pub reader_alias: Option<WithLocation<SelectableAlias>>,
     pub associated_data: TLinked,
     pub selection_set: Vec<WithSpan<SelectionTypeContainingSelections<TScalar, TLinked>>>,
+    // TODO make this WithSpan instead of WithLocation
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
     pub object_selection_directive_set: ObjectSelectionDirectiveSet,
 }

@@ -4,7 +4,7 @@ use resolve_position_macros::ResolvePosition;
 
 use crate::{
     entrypoint_directive_set::EntrypointDirectiveSet, IsographResolvedNode, IsographSemanticToken,
-    ParentType,
+    ServerObjectEntityNameWrapper,
 };
 
 // TODO should this be ObjectTypeAndFieldNames?
@@ -12,7 +12,7 @@ use crate::{
 #[resolve_position(parent_type=(), resolved_node=IsographResolvedNode<'a>)]
 pub struct EntrypointDeclaration {
     #[resolve_field]
-    pub parent_type: WithSpan<ParentType>,
+    pub parent_type: WithSpan<ServerObjectEntityNameWrapper>,
     // N.B. there is no reason this can't be a server field name /shrug
     pub client_field_name: WithSpan<ServerScalarSelectableName>,
 

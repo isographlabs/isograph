@@ -51,14 +51,16 @@ pub fn on_hover(
                     }
                     IsographResolvedNode::ClientPointerDeclaration(_) => "pointer".to_string(),
                     IsographResolvedNode::EntrypointDeclaration(_) => "entrypoint decl".to_string(),
-                    IsographResolvedNode::ParentType(_) => "parent type".to_string(),
+                    IsographResolvedNode::ServerObjectEntityNameWrapper(_) => {
+                        "parent type".to_string()
+                    }
                     IsographResolvedNode::Description(_) => "description".to_string(),
                     IsographResolvedNode::ScalarSelection(_) => "scalar field".to_string(),
                     IsographResolvedNode::ObjectSelection(_) => "linked field".to_string(),
-                    IsographResolvedNode::ScalarSelectableNameWrapper(_) => {
+                    IsographResolvedNode::ClientScalarSelectableNameWrapper(_) => {
                         "name of entrypoint or client field".to_string()
                     }
-                    IsographResolvedNode::ObjectSelectableNameWrapper(_) => {
+                    IsographResolvedNode::ClientObjectSelectableNameWrapper(_) => {
                         "name of pointer".to_string()
                     }
                 });

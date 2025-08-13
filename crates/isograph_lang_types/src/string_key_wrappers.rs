@@ -58,40 +58,40 @@ pub enum DescriptionParent<'a> {
 }
 
 define_wrapper!(
-    ParentType,
+    ServerObjectEntityNameWrapper,
     common_lang_types::UnvalidatedTypeName,
-    ParentTypeParent<'a>,
-    ParentTypePath
+    ServerObjectEntityNameWrapperParent<'a>,
+    ServerObjectEntityNameWrapperPath
 );
 
 #[derive(Debug)]
-pub enum ParentTypeParent<'a> {
+pub enum ServerObjectEntityNameWrapperParent<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
     ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
 }
 
 define_wrapper!(
-    ScalarSelectableNameWrapper,
+    ClientScalarSelectableNameWrapper,
     common_lang_types::ClientScalarSelectableName,
-    ScalarSelectableNameWrapperParent<'a>,
-    ScalarSelectableNameWrapperPath
+    ClientScalarSelectableNameWrapperParent<'a>,
+    ClientScalarSelectableNameWrapperPath
 );
 
 #[derive(Debug)]
-pub enum ScalarSelectableNameWrapperParent<'a> {
+pub enum ClientScalarSelectableNameWrapperParent<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
 }
 
 define_wrapper!(
-    ObjectSelectableNameWrapper,
+    ClientObjectSelectableNameWrapper,
     common_lang_types::ClientObjectSelectableName,
-    ObjectSelectableNameWrapperParent<'a>,
-    ObjectSelectableNameWrapperPath
+    ClientObjectSelectableNameWrapperParent<'a>,
+    ClientObjectSelectableNameWrapperPath
 );
 
 #[derive(Debug)]
-pub enum ObjectSelectableNameWrapperParent<'a> {
+pub enum ClientObjectSelectableNameWrapperParent<'a> {
     ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
 }
