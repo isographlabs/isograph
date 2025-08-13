@@ -1,8 +1,8 @@
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, ConstExportName, EnumLiteralValue,
-    FieldArgumentName, RelativePathToSourceFile, ScalarSelectableName, SelectableAlias,
-    SelectableNameOrAlias, ServerObjectSelectableName, StringLiteralValue, UnvalidatedTypeName,
-    ValueKeyName, VariableName, WithLocation, WithSpan,
+    ClientObjectSelectableName, ConstExportName, EnumLiteralValue, FieldArgumentName,
+    RelativePathToSourceFile, ScalarSelectableName, SelectableAlias, SelectableNameOrAlias,
+    ServerObjectSelectableName, StringLiteralValue, UnvalidatedTypeName, ValueKeyName,
+    VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{FloatValue, GraphQLTypeAnnotation, NameValuePair};
 use intern::string_key::Lookup;
@@ -14,7 +14,8 @@ use std::fmt::Debug;
 use crate::{
     isograph_resolved_node::IsographResolvedNode, string_key_wrappers::Description,
     ClientFieldDirectiveSet, IsographFieldDirective, IsographSemanticToken,
-    ObjectSelectionDirectiveSet, ParentType, ScalarSelectionDirectiveSet, SelectionType,
+    ObjectSelectionDirectiveSet, ParentType, ScalarSelectableNameWrapper,
+    ScalarSelectionDirectiveSet, SelectionType,
 };
 
 pub type UnvalidatedSelection = SelectionTypeContainingSelections<(), ()>;
@@ -27,7 +28,8 @@ pub struct ClientFieldDeclaration {
     pub const_export_name: ConstExportName,
     #[resolve_field]
     pub parent_type: WithSpan<ParentType>,
-    pub client_field_name: WithSpan<ClientScalarSelectableName>,
+    #[resolve_field]
+    pub client_field_name: WithSpan<ScalarSelectableNameWrapper>,
     #[resolve_field]
     pub description: Option<WithSpan<Description>>,
     #[resolve_field]

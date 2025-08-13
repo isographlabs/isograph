@@ -228,7 +228,7 @@ fn parse_client_field_declaration_inner(
 
         Ok(ClientFieldDeclaration {
             parent_type,
-            client_field_name,
+            client_field_name: client_field_name.map(|x| x.into()),
             description,
             selection_set,
             definition_path: definition_file_path,

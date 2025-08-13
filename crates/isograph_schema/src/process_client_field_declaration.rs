@@ -188,10 +188,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .or_default()
             .selectables
             .insert(
-                client_field_name.into(),
+                client_field_name.0.into(),
                 DefinitionLocation::Client(SelectionType::Scalar((
                     parent_object_entity_name,
-                    client_scalar_selectable_name,
+                    client_scalar_selectable_name.0,
                 ))),
             )
             .is_some()
@@ -200,7 +200,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             return Err(WithSpan::new(
                 ProcessClientFieldDeclarationError::ParentAlreadyHasField {
                     parent_type_name: object.name,
-                    client_field_name: client_field_name.into(),
+                    client_field_name: client_field_name.0.into(),
                 },
                 client_field_name_span,
             ));
@@ -209,10 +209,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let variant = get_client_variant(&client_field_declaration.item);
 
         self.client_scalar_selectables.insert(
-            (object.name, client_scalar_selectable_name),
+            (object.name, client_scalar_selectable_name.0),
             ClientScalarSelectable {
                 description: client_field_declaration.item.description.map(|x| x.item),
-                name: client_scalar_selectable_name,
+                name: client_scalar_selectable_name.0,
                 reader_selection_set: vec![],
                 variant,
                 variable_definitions: client_field_declaration
@@ -224,13 +224,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                             &self.server_entity_data.defined_entities,
                             variable_definition,
                             object.name,
-                            client_field_name.into(),
+                            client_field_name.0.into(),
                         )
                     })
                     .collect::<Result<_, _>>()?,
                 type_and_field: ObjectTypeAndFieldName {
                     type_name: object.name,
-                    field_name: client_scalar_selectable_name.into(),
+                    field_name: client_scalar_selectable_name.0.into(),
                 },
 
                 parent_object_entity_name,
@@ -267,7 +267,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         Ok(UnprocessedClientFieldItem {
             parent_object_entity_name,
-            client_field_name: client_scalar_selectable_name,
+            client_field_name: *client_scalar_selectable_name,
             reader_selection_set: selections,
             refetch_strategy,
         })

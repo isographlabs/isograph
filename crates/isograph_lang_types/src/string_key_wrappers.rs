@@ -70,3 +70,16 @@ pub enum ParentTypeParent<'a> {
     ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
     ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
 }
+
+define_wrapper!(
+    ScalarSelectableNameWrapper,
+    common_lang_types::ClientScalarSelectableName,
+    ScalarSelectableNameWrapperParent<'a>,
+    ScalarSelectableNameWrapperPath
+);
+
+#[derive(Debug)]
+pub enum ScalarSelectableNameWrapperParent<'a> {
+    EntrypointDeclaration(EntrypointDeclarationPath<'a>),
+    ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
+}

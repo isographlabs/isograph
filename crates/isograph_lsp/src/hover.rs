@@ -55,6 +55,9 @@ pub fn on_hover(
                     IsographResolvedNode::Description(_) => "description".to_string(),
                     IsographResolvedNode::ScalarSelection(_) => "scalar field".to_string(),
                     IsographResolvedNode::ObjectSelection(_) => "linked field".to_string(),
+                    IsographResolvedNode::ScalarSelectableNameWrapper(_) => {
+                        "name of entrypoint or client field".to_string()
+                    }
                 });
             }
             None
