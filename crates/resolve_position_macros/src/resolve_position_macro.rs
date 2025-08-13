@@ -3,12 +3,15 @@ use quote::quote;
 use syn::{parse_macro_input, spanned::Spanned, Error};
 
 pub(crate) fn resolve_position_macro(item: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(item as syn::DeriveInput);
+    let mut input = parse_macro_input!(item as syn::DeriveInput);
     let struct_name = input.ident.clone();
 
-    let (parent_type, resolved_node) = match extract_resolve_position_args(&input) {
-        Ok(args) => args,
-        Err(err) => return err.into(),
+    let ResolvePositionArgs {
+        parent_type,
+        resolved_node,
+    } = match deluxe::extract_attributes(&mut input) {
+        Ok(resolve_position_args) => resolve_position_args,
+        Err(e) => return e.into_compile_error().into(),
     };
 
     match input.data {
@@ -122,52 +125,11 @@ fn handle_data_enum(
     output.into()
 }
 
-fn extract_resolve_position_args(
-    input: &syn::DeriveInput,
-) -> Result<(syn::Type, syn::Type), proc_macro2::TokenStream> {
-    let mut parent_type = None;
-    let mut resolved_node = None;
-
-    for attr in &input.attrs {
-        if attr.path().is_ident("resolve_position") {
-            attr.parse_nested_meta(|meta| {
-                if meta.path.is_ident("parent_type") {
-                    let value = meta.value()?;
-                    parent_type = Some(value.parse::<syn::Type>()?);
-                } else if meta.path.is_ident("resolved_node") {
-                    let value = meta.value()?;
-                    resolved_node = Some(value.parse::<syn::Type>()?);
-                } else {
-                    return Err(meta.error(format!(
-                        "Unknown attribute '{}'. Expected 'parent_type' or 'resolved_node'",
-                        meta.path
-                            .get_ident()
-                            .map(|i| i.to_string())
-                            .unwrap_or_else(|| "unknown".to_string())
-                    )));
-                }
-                Ok(())
-            })
-            .map_err(|e| e.to_compile_error())?;
-        }
-    }
-
-    let parent_type = parent_type.ok_or_else(|| {
-        Error::new(
-            input.span(),
-            "Missing required attribute: #[resolve_position(parent_type = ..., resolved_node = ...)]"
-        ).to_compile_error()
-    })?;
-
-    let resolved_node = resolved_node.ok_or_else(|| {
-        Error::new(
-            input.span(),
-            "Missing required attribute: #[resolve_position(resolved_node = ...)]",
-        )
-        .to_compile_error()
-    })?;
-
-    Ok((parent_type, resolved_node))
+#[derive(deluxe::ExtractAttributes)]
+#[deluxe(attributes(resolve_position))]
+struct ResolvePositionArgs {
+    parent_type: syn::Type,
+    resolved_node: syn::Type,
 }
 
 struct ResolveFieldInfo<'a> {
