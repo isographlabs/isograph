@@ -146,7 +146,6 @@ pub type ObjectSelectionPath<'a, TScalarField, TLinkedField> =
 
 #[derive(Debug)]
 pub enum SelectionParentType<'a> {
-    ScalarSelection(Box<ScalarSelectionPath<'a, ()>>),
     ObjectSelection(Box<ObjectSelectionPath<'a, (), ()>>),
     ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
     ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
