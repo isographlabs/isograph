@@ -83,13 +83,13 @@ pub trait ResolvePosition: Sized {
     /// self.field.span.contains(position) before calling .resolve().
     fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: Span) -> Self::ResolvedNode<'a>;
 
-    fn path<'a, TParent: From<Self::Parent<'a>>>(
+    fn path<'a>(
         &'a self,
         parent: Self::Parent<'a>,
-    ) -> PositionResolutionPath<&'a Self, TParent> {
+    ) -> PositionResolutionPath<&'a Self, Self::Parent<'a>> {
         PositionResolutionPath {
             inner: self,
-            parent: parent.into(),
+            parent,
         }
     }
 }
