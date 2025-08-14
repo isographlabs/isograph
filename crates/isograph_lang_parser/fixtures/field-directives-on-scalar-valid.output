@@ -8,7 +8,7 @@ Ok(
                             "BasicField",
                         ),
                         parent_type: WithSpan {
-                            item: ParentType(
+                            item: ServerObjectEntityNameWrapper(
                                 UnvalidatedTypeName(
                                     "Type",
                                 ),
@@ -19,8 +19,10 @@ Ok(
                             },
                         },
                         client_field_name: WithSpan {
-                            item: ClientScalarSelectableName(
-                                "Name",
+                            item: ClientScalarSelectableNameWrapper(
+                                ClientScalarSelectableName(
+                                    "Name",
+                                ),
                             ),
                             span: Span {
                                 start: 14,
@@ -194,7 +196,7 @@ Ok(
                             "BasicField2",
                         ),
                         parent_type: WithSpan {
-                            item: ParentType(
+                            item: ServerObjectEntityNameWrapper(
                                 UnvalidatedTypeName(
                                     "Type",
                                 ),
@@ -205,8 +207,10 @@ Ok(
                             },
                         },
                         client_field_name: WithSpan {
-                            item: ClientScalarSelectableName(
-                                "Name",
+                            item: ClientScalarSelectableNameWrapper(
+                                ClientScalarSelectableName(
+                                    "Name",
+                                ),
                             ),
                             span: Span {
                                 start: 14,
@@ -425,7 +429,7 @@ Ok(
                             "BasicField3",
                         ),
                         parent_type: WithSpan {
-                            item: ParentType(
+                            item: ServerObjectEntityNameWrapper(
                                 UnvalidatedTypeName(
                                     "Type",
                                 ),
@@ -436,8 +440,10 @@ Ok(
                             },
                         },
                         client_field_name: WithSpan {
-                            item: ClientScalarSelectableName(
-                                "Name",
+                            item: ClientScalarSelectableNameWrapper(
+                                ClientScalarSelectableName(
+                                    "Name",
+                                ),
                             ),
                             span: Span {
                                 start: 14,
@@ -656,7 +662,7 @@ Ok(
                             "updatable",
                         ),
                         parent_type: WithSpan {
-                            item: ParentType(
+                            item: ServerObjectEntityNameWrapper(
                                 UnvalidatedTypeName(
                                     "Type",
                                 ),
@@ -667,8 +673,10 @@ Ok(
                             },
                         },
                         client_field_name: WithSpan {
-                            item: ClientScalarSelectableName(
-                                "Name",
+                            item: ClientScalarSelectableNameWrapper(
+                                ClientScalarSelectableName(
+                                    "Name",
+                                ),
                             ),
                             span: Span {
                                 start: 14,

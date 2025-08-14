@@ -100,7 +100,7 @@ Ok(
                             "pointer",
                         ),
                         parent_type: WithSpan {
-                            item: ParentType(
+                            item: ServerObjectEntityNameWrapper(
                                 UnvalidatedTypeName(
                                     "User",
                                 ),
@@ -124,8 +124,10 @@ Ok(
                             ),
                         ),
                         client_pointer_name: WithSpan {
-                            item: ClientObjectSelectableName(
-                                "bestFriend",
+                            item: ClientObjectSelectableNameWrapper(
+                                ClientObjectSelectableName(
+                                    "bestFriend",
+                                ),
                             ),
                             span: Span {
                                 start: 16,

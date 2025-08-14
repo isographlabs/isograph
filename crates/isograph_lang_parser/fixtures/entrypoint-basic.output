@@ -5,7 +5,7 @@ Ok(
                 WithSpan {
                     item: EntrypointDeclaration {
                         parent_type: WithSpan {
-                            item: ParentType(
+                            item: ServerObjectEntityNameWrapper(
                                 UnvalidatedTypeName(
                                     "Type",
                                 ),
