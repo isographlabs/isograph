@@ -7,7 +7,7 @@ use logos::{Lexer, Logos};
 #[derive(Logos, Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum IsographLangTokenKind {
     // TODO don't skip comments and whitespace, since we want to auto-format etc
-    #[regex(r"[ \t\r\n\f\ufeff]+|#[^\n\r]*", logos::skip)]
+    #[regex(r"[ \t\r\n\f\ufeff]+", logos::skip)]
     #[error]
     Error,
 
