@@ -84,7 +84,10 @@ export function createAndStartLanguageClient(
     try {
       const textEdits: TextEdit[] = await client.sendRequest('textDocument/formatting', {
         textDocument: TextDocumentIdentifier.create(event.document.uri.toString()),
-        options: {} as FormattingOptions
+        options: {
+          tabSize: 2,
+          insertSpaces: true,
+        } as FormattingOptions
       });
       const edit = new WorkspaceEdit();
       edit.set(event.document.uri, textEdits);
