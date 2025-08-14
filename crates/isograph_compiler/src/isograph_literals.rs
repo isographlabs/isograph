@@ -339,7 +339,7 @@ lazy_static! {
         Regex::new(r"(// )?(export const ([^ ]+) =\s+)?iso(\()?`([^`]+)`(\))?(\()?").unwrap();
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct IsoLiteralExtraction {
     pub const_export_name: Option<String>,
     pub iso_literal_text: String,
