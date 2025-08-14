@@ -13,14 +13,17 @@ command = [
 	"cargo", "build",
 	"--color", "always",
 ]
+watch = ["crates"]
 need_stdout = false
 
 [jobs.watch-libs]
 command = ["pnpm", "compile-libs"]
+watch = ["libs"]
 need_stdout = true
 
 [jobs.check]
 command = ["cargo", "check", "--color", "always"]
+watch = ["crates"]
 need_stdout = false
 
 [jobs.check-all]
@@ -122,7 +125,8 @@ b = "job:build"
 
 [jobs.build-swc]
 command = [
-	"cargo", "build", "-p", "swc_isograph_plugin", "--release", "--target", "wasm32-wasip1", 
+	"cargo", "build", "-p", "swc_isograph_plugin", "--release", "--target", "wasm32-wasip1",
 	"--color", "always",
 ]
+watch = ["crates"]
 need_stdout = false
