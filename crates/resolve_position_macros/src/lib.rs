@@ -1,3 +1,4 @@
+mod map_generics;
 mod resolve_position_macro;
 
 use proc_macro::TokenStream;
