@@ -1,9 +1,12 @@
 import { iso } from '@iso';
 
 export const HomePage = iso(`
-  field Query.HomePage @component {
-    # Gets the first 150 pokemon, take is higher because there are alternative forms
-    # returned and the offset skips a bunch of other Pokemon that aren't in the first 150
+  field Query.HomePage @component 
+  """
+  Gets the first 150 pokemon, take is higher because there are alternative forms
+  returned and the offset skips a bunch of other Pokemon that aren't in the first 150
+  """
+  {
     getAllPokemon(take: 232, offset: 93) {
       key
       forme
