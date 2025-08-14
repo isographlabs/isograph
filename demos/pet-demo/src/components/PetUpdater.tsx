@@ -15,7 +15,7 @@ export const PetUpdater = iso(`
     potential_new_best_friends {
       id
       name
-    },
+    }
 
     set_pet_tagline
     tagline @updatable

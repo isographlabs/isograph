@@ -33,7 +33,7 @@ export const PetCheckinsCard = iso(`
 
 export const CheckinDisplay = iso(`
   field Checkin.CheckinDisplay @component {
-    location,
+    location
     time
     make_super
   }
