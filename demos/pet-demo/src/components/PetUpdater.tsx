@@ -1,7 +1,6 @@
 import { iso } from '@iso';
 import { Box, Button, Input, MenuItem, Select } from '@mui/material';
 import React, { useState } from 'react';
-import { getAllJSDocTagsOfKind } from 'typescript';
 import { PetId } from './routes';
 
 export const PetUpdater = iso(`
