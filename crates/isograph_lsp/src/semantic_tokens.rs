@@ -152,7 +152,7 @@ fn convert_absolute_token_to_lsp_token<'a>(
             delta_line,
             delta_start,
             length: absolute_token.len,
-            token_type: absolute_token.semantic_token.0,
+            token_type: absolute_token.semantic_token.lsp_semantic_token.0,
             token_modifiers_bitset: 0,
         };
 

@@ -40,28 +40,133 @@ pub fn semantic_token_legend() -> SemanticTokensLegend {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Hash)]
-pub struct IsographSemanticToken(pub u32);
+pub struct LspSemanticToken(pub u32);
 
-pub const ST_NAMESPACE: IsographSemanticToken = IsographSemanticToken(0);
-pub const ST_TYPE: IsographSemanticToken = IsographSemanticToken(1);
-pub const ST_CLASS: IsographSemanticToken = IsographSemanticToken(2);
-pub const ST_ENUM: IsographSemanticToken = IsographSemanticToken(3);
-pub const ST_INTERFACE: IsographSemanticToken = IsographSemanticToken(4);
-pub const ST_STRUCT: IsographSemanticToken = IsographSemanticToken(5);
-pub const ST_TYPE_PARAMETER: IsographSemanticToken = IsographSemanticToken(6);
-pub const ST_PARAMETER: IsographSemanticToken = IsographSemanticToken(7);
-pub const ST_VARIABLE: IsographSemanticToken = IsographSemanticToken(8);
-pub const ST_PROPERTY: IsographSemanticToken = IsographSemanticToken(9);
-pub const ST_ENUM_MEMBER: IsographSemanticToken = IsographSemanticToken(10);
-pub const ST_EVENT: IsographSemanticToken = IsographSemanticToken(11);
-pub const ST_FUNCTION: IsographSemanticToken = IsographSemanticToken(12);
-pub const ST_METHOD: IsographSemanticToken = IsographSemanticToken(13);
-pub const ST_MACRO: IsographSemanticToken = IsographSemanticToken(14);
-pub const ST_KEYWORD: IsographSemanticToken = IsographSemanticToken(15);
-pub const ST_MODIFIER: IsographSemanticToken = IsographSemanticToken(16);
-pub const ST_COMMENT: IsographSemanticToken = IsographSemanticToken(17);
-pub const ST_STRING: IsographSemanticToken = IsographSemanticToken(18);
-pub const ST_NUMBER: IsographSemanticToken = IsographSemanticToken(19);
-pub const ST_REGEXP: IsographSemanticToken = IsographSemanticToken(20);
-pub const ST_OPERATOR: IsographSemanticToken = IsographSemanticToken(21);
-pub const ST_DECORATOR: IsographSemanticToken = IsographSemanticToken(22);
+#[allow(unused)]
+const LSP_ST_NAMESPACE: LspSemanticToken = LspSemanticToken(0);
+const LSP_ST_TYPE: LspSemanticToken = LspSemanticToken(1);
+const LSP_ST_CLASS: LspSemanticToken = LspSemanticToken(2);
+#[allow(unused)]
+const LSP_ST_ENUM: LspSemanticToken = LspSemanticToken(3);
+#[allow(unused)]
+const LSP_ST_INTERFACE: LspSemanticToken = LspSemanticToken(4);
+#[allow(unused)]
+const LSP_ST_STRUCT: LspSemanticToken = LspSemanticToken(5);
+#[allow(unused)]
+const LSP_ST_TYPE_PARAMETER: LspSemanticToken = LspSemanticToken(6);
+const LSP_ST_PARAMETER: LspSemanticToken = LspSemanticToken(7);
+const LSP_ST_VARIABLE: LspSemanticToken = LspSemanticToken(8);
+const LSP_ST_PROPERTY: LspSemanticToken = LspSemanticToken(9);
+#[allow(unused)]
+const LSP_ST_ENUM_MEMBER: LspSemanticToken = LspSemanticToken(10);
+#[allow(unused)]
+const LSP_ST_EVENT: LspSemanticToken = LspSemanticToken(11);
+#[allow(unused)]
+const LSP_ST_FUNCTION: LspSemanticToken = LspSemanticToken(12);
+const LSP_ST_METHOD: LspSemanticToken = LspSemanticToken(13);
+#[allow(unused)]
+const LSP_ST_MACRO: LspSemanticToken = LspSemanticToken(14);
+const LSP_ST_KEYWORD: LspSemanticToken = LspSemanticToken(15);
+#[allow(unused)]
+const LSP_ST_MODIFIER: LspSemanticToken = LspSemanticToken(16);
+const LSP_ST_COMMENT: LspSemanticToken = LspSemanticToken(17);
+const LSP_ST_STRING: LspSemanticToken = LspSemanticToken(18);
+const LSP_ST_NUMBER: LspSemanticToken = LspSemanticToken(19);
+#[allow(unused)]
+const LSP_ST_REGEXP: LspSemanticToken = LspSemanticToken(20);
+const LSP_ST_OPERATOR: LspSemanticToken = LspSemanticToken(21);
+const LSP_ST_DECORATOR: LspSemanticToken = LspSemanticToken(22);
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Hash)]
+pub struct IsographSemanticToken {
+    pub lsp_semantic_token: LspSemanticToken,
+}
+
+pub const ST_KEYWORD: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_KEYWORD,
+};
+pub const ST_SERVER_OBJECT_TYPE: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_CLASS,
+};
+pub const ST_DOT: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_OPERATOR,
+};
+
+/// Selectable names used outside of selection sets, in "definition-like" locations,
+/// which is to say, used in entrypoints as well.
+pub const ST_CLIENT_SELECTABLE_NAME: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_METHOD,
+};
+
+// {}
+pub const ST_OPEN_BRACE: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_OPERATOR,
+};
+pub const ST_CLOSE_BRACE: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_OPERATOR,
+};
+// ()
+pub const ST_OPEN_PAREN: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_OPERATOR,
+};
+pub const ST_CLOSE_PAREN: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_OPERATOR,
+};
+// []
+pub const ST_OPEN_BRACKET: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_OPERATOR,
+};
+pub const ST_CLOSE_BRACKET: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_OPERATOR,
+};
+
+pub const ST_COMMA: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_OPERATOR,
+};
+// TODO split this up
+pub const ST_SELECTION_NAME_OR_ALIAS: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_PROPERTY,
+};
+pub const ST_COLON: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_OPERATOR,
+};
+
+pub const ST_DIRECTIVE_AT: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_DECORATOR,
+};
+pub const ST_DIRECTIVE: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_DECORATOR,
+};
+
+pub const ST_ARGUMENT_NAME: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_PARAMETER,
+};
+
+pub const ST_VARIABLE_DOLLAR: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_VARIABLE,
+};
+pub const ST_VARIABLE: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_VARIABLE,
+};
+pub const ST_VARIABLE_EQUALS: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_OPERATOR,
+};
+
+pub const ST_STRING_LITERAL: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_STRING,
+};
+pub const ST_NUMBER_LITERAL: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_NUMBER,
+};
+
+pub const ST_OBJECT_LITERAL_KEY: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_PROPERTY,
+};
+
+pub const ST_TYPE_ANNOTATION: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_TYPE,
+};
+
+pub const ST_COMMENT: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_COMMENT,
+};
