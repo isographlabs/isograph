@@ -66,7 +66,7 @@ use common_lang_types::Span;
 ///   the leaf node and returns its own variant of `ResolvedNode`.
 
 #[derive(Debug)]
-pub struct Path<Inner, Parent> {
+pub struct PositionResolutionPath<Inner, Parent> {
     pub inner: Inner,
     pub parent: Parent,
 }
@@ -86,8 +86,8 @@ pub trait ResolvePosition: Sized {
     fn path<'a, TParent: From<Self::Parent<'a>>>(
         &'a self,
         parent: Self::Parent<'a>,
-    ) -> Path<&'a Self, TParent> {
-        Path {
+    ) -> PositionResolutionPath<&'a Self, TParent> {
+        PositionResolutionPath {
             inner: self,
             parent: parent.into(),
         }
@@ -100,7 +100,7 @@ mod test {
 
     use std::ops::ControlFlow;
 
-    use crate::{Path, ResolvePosition};
+    use crate::{PositionResolutionPath, ResolvePosition};
     use common_lang_types::{Span, WithSpan};
 
     #[derive(Debug)]
@@ -120,7 +120,7 @@ mod test {
         children: Vec<WithSpan<Child>>,
     }
 
-    type ParentPath<'a> = Path<&'a Parent, ()>;
+    type ParentPath<'a> = PositionResolutionPath<&'a Parent, ()>;
 
     #[derive(Debug)]
     enum ChildParent<'a> {
@@ -128,12 +128,12 @@ mod test {
         Child(ChildPath<'a>),
     }
 
-    type ChildPath<'a> = Path<&'a Child, Box<ChildParent<'a>>>;
+    type ChildPath<'a> = PositionResolutionPath<&'a Child, Box<ChildParent<'a>>>;
 
     #[derive(Debug)]
     struct SelfContained {}
 
-    type SelfContainedPath<'a> = Path<&'a WithSpan<SelfContained>, ()>;
+    type SelfContainedPath<'a> = PositionResolutionPath<&'a WithSpan<SelfContained>, ()>;
 
     impl ResolvePosition for Parent {
         type Parent<'a> = ();

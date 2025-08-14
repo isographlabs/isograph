@@ -5,7 +5,7 @@ use common_lang_types::{
 };
 use graphql_lang_types::{FloatValue, GraphQLTypeAnnotation, NameValuePair};
 use intern::string_key::Lookup;
-use resolve_position::Path;
+use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
 use serde::Deserialize;
 use std::fmt::Debug;
@@ -40,7 +40,7 @@ pub struct ClientFieldDeclaration {
     pub semantic_tokens: Vec<WithSpan<IsographSemanticToken>>,
 }
 
-pub type ClientFieldDeclarationPath<'a> = Path<&'a ClientFieldDeclaration, ()>;
+pub type ClientFieldDeclarationPath<'a> = PositionResolutionPath<&'a ClientFieldDeclaration, ()>;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
 #[resolve_position(parent_type=(), resolved_node=IsographResolvedNode<'a>)]
@@ -64,7 +64,8 @@ pub struct ClientPointerDeclaration {
     pub semantic_tokens: Vec<WithSpan<IsographSemanticToken>>,
 }
 
-pub type ClientPointerDeclarationPath<'a> = Path<&'a ClientPointerDeclaration, ()>;
+pub type ClientPointerDeclarationPath<'a> =
+    PositionResolutionPath<&'a ClientPointerDeclaration, ()>;
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Default, Hash)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -116,7 +117,7 @@ pub struct ScalarSelection<TScalarField> {
 }
 
 pub type ScalarSelectionPath<'a, TScalarField> =
-    Path<&'a ScalarSelection<TScalarField>, SelectionParentType<'a>>;
+    PositionResolutionPath<&'a ScalarSelection<TScalarField>, SelectionParentType<'a>>;
 
 impl<TScalarField> ScalarSelection<TScalarField> {
     pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
@@ -141,8 +142,10 @@ pub struct ObjectSelection<TScalar, TLinked> {
     pub object_selection_directive_set: ObjectSelectionDirectiveSet,
 }
 
-pub type ObjectSelectionPath<'a, TScalarField, TLinkedField> =
-    Path<&'a ObjectSelection<TScalarField, TLinkedField>, SelectionParentType<'a>>;
+pub type ObjectSelectionPath<'a, TScalarField, TLinkedField> = PositionResolutionPath<
+    &'a ObjectSelection<TScalarField, TLinkedField>,
+    SelectionParentType<'a>,
+>;
 
 #[derive(Debug)]
 pub enum SelectionParentType<'a> {

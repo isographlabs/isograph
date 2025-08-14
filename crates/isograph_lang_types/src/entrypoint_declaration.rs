@@ -1,5 +1,5 @@
 use common_lang_types::{IsoLiteralText, ServerScalarSelectableName, WithSpan};
-use resolve_position::Path;
+use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
 
 use crate::{
@@ -26,4 +26,4 @@ pub struct EntrypointDeclaration {
     pub semantic_tokens: Vec<WithSpan<IsographSemanticToken>>,
 }
 
-pub type EntrypointDeclarationPath<'a> = Path<&'a EntrypointDeclaration, ()>;
+pub type EntrypointDeclarationPath<'a> = PositionResolutionPath<&'a EntrypointDeclaration, ()>;

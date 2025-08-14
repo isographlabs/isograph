@@ -39,7 +39,8 @@ macro_rules! define_wrapper {
             }
         }
 
-        pub type $path_type<'a> = ::resolve_position::Path<&'a $struct_name, $parent_type>;
+        pub type $path_type<'a> =
+            ::resolve_position::PositionResolutionPath<&'a $struct_name, $parent_type>;
     };
 }
 
