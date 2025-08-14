@@ -134,6 +134,7 @@ pub struct ObjectSelection<TScalar, TLinked> {
     // TODO make this WithSpan instead of WithLocation
     pub reader_alias: Option<WithLocation<SelectableAlias>>,
     pub associated_data: TLinked,
+    #[resolve_field]
     pub selection_set: Vec<WithSpan<SelectionTypeContainingSelections<TScalar, TLinked>>>,
     // TODO make this WithSpan instead of WithLocation
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
