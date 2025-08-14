@@ -1,4 +1,5 @@
 use crate::{
+    format::on_format,
     hover::on_hover,
     lsp_notification_dispatch::LSPNotificationDispatch,
     lsp_request_dispatch::LSPRequestDispatch,
@@ -22,7 +23,8 @@ use log::{info, warn};
 use lsp_server::{Connection, ErrorCode, ProtocolError, Response, ResponseError};
 use lsp_types::{
     notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument},
-    InitializeParams, SemanticTokensFullOptions, SemanticTokensOptions,
+    request::Formatting,
+    InitializeParams, OneOf, SemanticTokensFullOptions, SemanticTokensOptions,
     SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentSyncCapability,
     TextDocumentSyncKind, WorkDoneProgressOptions,
 };
@@ -50,10 +52,12 @@ pub fn initialize<TNetworkProtocol: NetworkProtocol + 'static>(
             },
         )),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
+        document_formatting_provider: Some(OneOf::Left(true)),
         ..Default::default()
     };
     let server_capabilities = serde_json::to_value(server_capabilities)?;
     let params = connection.initialize(server_capabilities)?;
+
     let params: InitializeParams = serde_json::from_value(params)?;
     Ok(params)
 }
@@ -162,6 +166,7 @@ fn dispatch_request(request: lsp_server::Request, compiler_state: &CompilerState
         let request = LSPRequestDispatch::new(request, compiler_state)
             .on_request_sync::<SemanticTokensFullRequest>(on_semantic_token_full_request)?
             .on_request_sync::<HoverRequest>(on_hover)?
+            .on_request_sync::<Formatting>(on_format)?
             .request();
 
         // If we have gotten here, we have not handled the request
