@@ -11,8 +11,8 @@ use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
     from_isograph_field_directives, semantic_token_legend, ClientFieldDeclaration,
     ClientPointerDeclaration, ConstantValue, EntrypointDeclaration, IsographDatabase,
-    IsographFieldDirective, IsographResolvedNode, NonConstantValue, ObjectSelection,
-    ScalarSelection, SelectionFieldArgument, SelectionTypeContainingSelections,
+    IsographFieldDirective, IsographResolvedNode, IsographSemanticToken, NonConstantValue,
+    ObjectSelection, ScalarSelection, SelectionFieldArgument, SelectionTypeContainingSelections,
     ServerObjectEntityNameWrapper, UnvalidatedSelection, VariableDefinition,
 };
 use pico_macros::memo;
@@ -30,6 +30,16 @@ pub enum IsoLiteralExtractionResult {
     ClientPointerDeclaration(WithSpan<ClientPointerDeclaration>),
     ClientFieldDeclaration(WithSpan<ClientFieldDeclaration>),
     EntrypointDeclaration(WithSpan<EntrypointDeclaration>),
+}
+
+impl IsoLiteralExtractionResult {
+    pub fn get_isograph_semantic_tokens(&self) -> &[WithSpan<IsographSemanticToken>] {
+        match self {
+            IsoLiteralExtractionResult::ClientPointerDeclaration(s) => &s.item.semantic_tokens,
+            IsoLiteralExtractionResult::ClientFieldDeclaration(s) => &s.item.semantic_tokens,
+            IsoLiteralExtractionResult::EntrypointDeclaration(s) => &s.item.semantic_tokens,
+        }
+    }
 }
 
 #[memo]

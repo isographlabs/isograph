@@ -102,7 +102,8 @@ fn concatenate_and_absolutize_relative_tokens<'a>(
             .span
             .expect("Expected span to exist. This is indicative of a bug in Isograph.");
 
-        get_isograph_semantic_tokens(extraction)
+        extraction
+            .get_isograph_semantic_tokens()
             .iter()
             .flat_map(move |relative_token| {
                 absolutize_relative_token(page_content, iso_literal_extraction_span, relative_token)
@@ -158,16 +159,6 @@ fn convert_absolute_token_to_lsp_token<'a>(
         *last_token_start = absolute_token.absolute_char_start;
         Some(token)
     })
-}
-
-fn get_isograph_semantic_tokens(
-    result: &IsoLiteralExtractionResult,
-) -> &[WithSpan<IsographSemanticToken>] {
-    match result {
-        IsoLiteralExtractionResult::ClientPointerDeclaration(s) => &s.item.semantic_tokens,
-        IsoLiteralExtractionResult::ClientFieldDeclaration(s) => &s.item.semantic_tokens,
-        IsoLiteralExtractionResult::EntrypointDeclaration(s) => &s.item.semantic_tokens,
-    }
 }
 
 pub fn delta_line_delta_start(text: &str) -> (u32, u32) {
