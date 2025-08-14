@@ -103,7 +103,7 @@ fn concatenate_and_absolutize_relative_tokens<'a>(
             .expect("Expected span to exist. This is indicative of a bug in Isograph.");
 
         extraction
-            .get_isograph_semantic_tokens()
+            .semantic_tokens()
             .iter()
             .flat_map(move |relative_token| {
                 absolutize_relative_token(page_content, iso_literal_extraction_span, relative_token)

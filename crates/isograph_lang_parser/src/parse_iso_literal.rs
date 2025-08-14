@@ -33,7 +33,7 @@ pub enum IsoLiteralExtractionResult {
 }
 
 impl IsoLiteralExtractionResult {
-    pub fn get_isograph_semantic_tokens(&self) -> &[WithSpan<IsographSemanticToken>] {
+    pub fn semantic_tokens(&self) -> &[WithSpan<IsographSemanticToken>] {
         match self {
             IsoLiteralExtractionResult::ClientPointerDeclaration(s) => &s.item.semantic_tokens,
             IsoLiteralExtractionResult::ClientFieldDeclaration(s) => &s.item.semantic_tokens,
