@@ -77,17 +77,17 @@ export function createAndStartLanguageClient(
     )}`,
   );
 
-  // VSCode does not automatically ask the Isograph language server to format tsx
+  // VSCode does not automatically ask the Isograph language server to format tsx (etc)
   // documents, opting to use the built-in formatter. This is a hack that allows us
   // to get the language server to format documents.
-  workspace.onDidSaveTextDocument(async (document) => {
+  workspace.onWillSaveTextDocument(async (event) => {
     try {
       const textEdits: TextEdit[] = await client.sendRequest('textDocument/formatting', {
-        textDocument: TextDocumentIdentifier.create(document.uri.toString()),
+        textDocument: TextDocumentIdentifier.create(event.document.uri.toString()),
         options: {} as FormattingOptions
       });
       const edit = new WorkspaceEdit();
-      edit.set(document.uri, textEdits);
+      edit.set(event.document.uri, textEdits);
       workspace.applyEdit(edit);
     } catch {}
   });
