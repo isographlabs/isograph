@@ -1,6 +1,5 @@
 use common_lang_types::{
     ConstExportName, EnumLiteralValue, FieldArgumentName, RelativePathToSourceFile,
-    ScalarSelectableName, SelectableAlias, SelectableNameOrAlias, ServerObjectSelectableName,
     StringLiteralValue, UnvalidatedTypeName, ValueKeyName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{FloatValue, GraphQLTypeAnnotation, NameValuePair};
@@ -13,13 +12,9 @@ use std::fmt::Debug;
 use crate::{
     isograph_resolved_node::IsographResolvedNode, string_key_wrappers::Description,
     ClientFieldDirectiveSet, ClientObjectSelectableNameWrapper, ClientScalarSelectableNameWrapper,
-    IsographFieldDirective, IsographSemanticToken, ObjectSelectionDirectiveSet,
-    ScalarSelectionDirectiveSet, SelectionType, ServerObjectEntityNameWrapper,
+    IsographFieldDirective, IsographSemanticToken, ServerObjectEntityNameWrapper,
+    UnvalidatedSelection,
 };
-
-pub type UnvalidatedSelection = SelectionTypeContainingSelections<(), ()>;
-
-pub type UnvalidatedScalarFieldSelection = ScalarSelection<()>;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
 #[resolve_position(parent_type=(), resolved_node=IsographResolvedNode<'a>)]
@@ -74,92 +69,6 @@ pub struct LoadableDirectiveParameters {
     complete_selection_set: bool,
     #[serde(default)]
     pub lazy_load_artifact: bool,
-}
-
-pub type SelectionTypeContainingSelections<TScalarField, TLinkedField> =
-    SelectionType<ScalarSelection<TScalarField>, ObjectSelection<TScalarField, TLinkedField>>;
-
-impl<TScalarField, TLinkedField> SelectionTypeContainingSelections<TScalarField, TLinkedField> {
-    pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
-        match self {
-            SelectionTypeContainingSelections::Scalar(scalar_field) => scalar_field.name_or_alias(),
-            SelectionTypeContainingSelections::Object(linked_field) => linked_field.name_or_alias(),
-        }
-    }
-
-    pub fn variables<'a>(&'a self) -> impl Iterator<Item = VariableName> + 'a {
-        let get_variable = |x: &'a WithLocation<SelectionFieldArgument>| match x.item.value.item {
-            NonConstantValue::Variable(v) => Some(v),
-            _ => None,
-        };
-        match self {
-            SelectionTypeContainingSelections::Scalar(scalar_field) => {
-                scalar_field.arguments.iter().flat_map(get_variable)
-            }
-            SelectionTypeContainingSelections::Object(linked_field) => {
-                linked_field.arguments.iter().flat_map(get_variable)
-            }
-        }
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
-#[resolve_position(parent_type=SelectionParentType<'a>, resolved_node=IsographResolvedNode<'a>, self_type_generics=<()>)]
-pub struct ScalarSelection<TScalarField> {
-    // TODO make this WithSpan instead of WithLocation
-    pub name: WithLocation<ScalarSelectableName>,
-    // TODO make this WithSpan instead of WithLocation
-    pub reader_alias: Option<WithLocation<SelectableAlias>>,
-    pub associated_data: TScalarField,
-    // TODO make this WithSpan instead of WithLocation
-    pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
-    pub scalar_selection_directive_set: ScalarSelectionDirectiveSet,
-}
-
-pub type ScalarSelectionPath<'a, TScalarField> =
-    PositionResolutionPath<&'a ScalarSelection<TScalarField>, SelectionParentType<'a>>;
-
-impl<TScalarField> ScalarSelection<TScalarField> {
-    pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
-        self.reader_alias
-            .map(|item| item.map(SelectableNameOrAlias::from))
-            .unwrap_or_else(|| self.name.map(SelectableNameOrAlias::from))
-    }
-}
-
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
-#[resolve_position(parent_type=SelectionParentType<'a>, resolved_node=IsographResolvedNode<'a>, self_type_generics=<(), ()>)]
-pub struct ObjectSelection<TScalar, TLinked> {
-    // TODO make this WithSpan instead of WithLocation
-    pub name: WithLocation<ServerObjectSelectableName>,
-    // TODO make this WithSpan instead of WithLocation
-    pub reader_alias: Option<WithLocation<SelectableAlias>>,
-    pub associated_data: TLinked,
-    #[resolve_field]
-    pub selection_set: Vec<WithSpan<SelectionTypeContainingSelections<TScalar, TLinked>>>,
-    // TODO make this WithSpan instead of WithLocation
-    pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
-    pub object_selection_directive_set: ObjectSelectionDirectiveSet,
-}
-
-pub type ObjectSelectionPath<'a, TScalarField, TLinkedField> = PositionResolutionPath<
-    &'a ObjectSelection<TScalarField, TLinkedField>,
-    SelectionParentType<'a>,
->;
-
-#[derive(Debug)]
-pub enum SelectionParentType<'a> {
-    ObjectSelection(Box<ObjectSelectionPath<'a, (), ()>>),
-    ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
-    ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
-}
-
-impl<TScalarField, TLinkedField> ObjectSelection<TScalarField, TLinkedField> {
-    pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
-        self.reader_alias
-            .map(|item| item.map(SelectableNameOrAlias::from))
-            .unwrap_or_else(|| self.name.map(SelectableNameOrAlias::from))
-    }
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
