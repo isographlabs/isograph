@@ -15,3 +15,4 @@ pub use db_singletons::*;
 pub use isograph_literals::*;
 pub use source_files::*;
 pub use watch::handle_watch_command;
+pub use with_duration::*;

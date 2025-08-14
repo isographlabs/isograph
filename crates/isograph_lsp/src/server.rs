@@ -14,7 +14,7 @@ use isograph_compiler::{
     batch_compile::BatchCompileError,
     get_isograph_config, update_sources,
     watch::{create_debounced_file_watcher, has_config_changes},
-    CompilerState, SourceError,
+    CompilerState, SourceError, WithDuration,
 };
 use isograph_lang_types::semantic_token_legend::semantic_token_legend;
 use isograph_schema::NetworkProtocol;
@@ -81,21 +81,24 @@ pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
         tokio::select! {
             message = lsp_message_receiver.recv() => {
                 if let Some(lsp_message) = message {
-                    match lsp_message {
-                        lsp_server::Message::Request(request) => {
-                            eprintln!("\nReceived request: {}", request.method);
-                            let response = dispatch_request(request, &compiler_state);
-                            eprintln!("Sending response: {response:?}");
-                            connection.sender.send(response.into()).unwrap();
+                    let duration = WithDuration::new(|| {
+                        match lsp_message {
+                            lsp_server::Message::Request(request) => {
+                                eprintln!("\nReceived request: {}", request.method);
+                                let response = dispatch_request(request, &compiler_state);
+                                eprintln!("Sending response: {response:?}");
+                                connection.sender.send(response.into()).unwrap();
+                            }
+                            lsp_server::Message::Notification(notification) => {
+                                eprintln!("\nReceived notification: {}", notification.method);
+                                let _ = dispatch_notification(notification, &mut compiler_state);
+                            }
+                            lsp_server::Message::Response(response) => {
+                                eprintln!("\nReceived response: {response:?}");
+                            }
                         }
-                        lsp_server::Message::Notification(notification) => {
-                            eprintln!("\nReceived notification: {}", notification.method);
-                            let _ = dispatch_notification(notification, &mut compiler_state);
-                        }
-                        lsp_server::Message::Response(response) => {
-                            eprintln!("Received response: {response:?}");
-                        }
-                    }
+                    });
+                    eprintln!("Processing took {}ms.", duration.elapsed_time.as_millis());
                 } else {
                     // If any connection breaks, we can just end
                     break 'all_messages;
