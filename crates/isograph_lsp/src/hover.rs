@@ -6,7 +6,10 @@ use isograph_compiler::{
     process_iso_literal_extraction, read_iso_literals_source_from_relative_path, CompilerState,
     IsoLiteralExtraction,
 };
-use isograph_lang_types::{IsographDatabase, IsographResolvedNode};
+use isograph_lang_types::{
+    get_path_to_root_from_object, get_path_to_root_from_scalar, IsographDatabase,
+    IsographResolvedNode,
+};
 use lsp_types::{
     request::{HoverRequest, Request},
     Hover, HoverContents, MarkupContent, MarkupKind, Position, Url,
@@ -55,8 +58,12 @@ pub fn on_hover(
                         "parent type".to_string()
                     }
                     IsographResolvedNode::Description(_) => "description".to_string(),
-                    IsographResolvedNode::ScalarSelection(_) => "scalar field".to_string(),
-                    IsographResolvedNode::ObjectSelection(_) => "linked field".to_string(),
+                    IsographResolvedNode::ScalarSelection(scalar_path) => {
+                        get_path_to_root_from_scalar(&scalar_path).join(" -> ")
+                    }
+                    IsographResolvedNode::ObjectSelection(object_path) => {
+                        get_path_to_root_from_object(&object_path).join(" -> ")
+                    }
                     IsographResolvedNode::ClientScalarSelectableNameWrapper(_) => {
                         "name of entrypoint or client field".to_string()
                     }
