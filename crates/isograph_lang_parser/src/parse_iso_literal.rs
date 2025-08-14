@@ -458,7 +458,7 @@ fn parse_delimited_list<'a, TResult>(
     }
 }
 
-fn parse_line_break_or_close_curly(tokens: &mut PeekableLexer<'_>) -> ParseResultWithSpan<()> {
+fn parse_line_break(tokens: &mut PeekableLexer<'_>) -> ParseResultWithSpan<()> {
     if tokens.source(tokens.white_space_span()).contains('\n') {
         Ok(())
     } else {
@@ -485,7 +485,7 @@ fn parse_selection(
         // If we encounter a selection set, we are parsing a linked field. Otherwise, a scalar field.
         let selection_set = parse_optional_selection_set(tokens, text_source)?;
 
-        parse_line_break_or_close_curly(tokens)?;
+        parse_line_break(tokens)?;
 
         let selection = match selection_set {
             Some(selection_set) => {
