@@ -1,4 +1,10 @@
+pub mod line_behavior;
+
 use lsp_types::{SemanticTokenModifier, SemanticTokenType, SemanticTokensLegend};
+
+use crate::semantic_token_legend::line_behavior::{
+    EndsLineBehavior, InlineBehavior, LineBehavior, SpaceAfter, SpaceBefore, StartsNewLineBehavior,
+};
 
 pub fn semantic_token_legend() -> SemanticTokensLegend {
     SemanticTokensLegend {
@@ -80,93 +86,224 @@ const LSP_ST_DECORATOR: LspSemanticToken = LspSemanticToken(22);
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct IsographSemanticToken {
     pub lsp_semantic_token: LspSemanticToken,
+    pub line_behavior: LineBehavior,
+    pub indent_change: IndentChange,
 }
 
 pub const ST_KEYWORD: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_KEYWORD,
+    line_behavior: LineBehavior::StartsNewLine(StartsNewLineBehavior {
+        space_after: SpaceAfter(true),
+    }),
+    indent_change: IndentChange::Same,
 };
 pub const ST_SERVER_OBJECT_TYPE: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_CLASS,
+    line_behavior: LineBehavior::Inline(InlineBehavior {
+        space_before: SpaceBefore(true),
+        space_after: SpaceAfter(true),
+    }),
+    indent_change: IndentChange::Same,
 };
 pub const ST_DOT: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_OPERATOR,
+    line_behavior: LineBehavior::Inline(InlineBehavior {
+        space_before: SpaceBefore(false),
+        space_after: SpaceAfter(false),
+    }),
+    indent_change: IndentChange::Same,
+};
+pub const ST_TO: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_KEYWORD,
+    line_behavior: LineBehavior::Inline(InlineBehavior {
+        space_before: SpaceBefore(true),
+        space_after: SpaceAfter(true),
+    }),
+    indent_change: IndentChange::Same,
 };
 
 /// Selectable names used outside of selection sets, in "definition-like" locations,
 /// which is to say, used in entrypoints as well.
 pub const ST_CLIENT_SELECTABLE_NAME: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_METHOD,
+    line_behavior: LineBehavior::Inline(InlineBehavior {
+        space_before: SpaceBefore(true),
+        space_after: SpaceAfter(true),
+    }),
+    indent_change: IndentChange::Same,
 };
 
 // {}
 pub const ST_OPEN_BRACE: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_OPERATOR,
+    line_behavior: LineBehavior::EndsLine(EndsLineBehavior {
+        space_before: SpaceBefore(true),
+    }),
+    indent_change: IndentChange::Indent,
 };
 pub const ST_CLOSE_BRACE: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_OPERATOR,
+    line_behavior: LineBehavior::IsOwnLine,
+    indent_change: IndentChange::Dedent,
 };
 // ()
 pub const ST_OPEN_PAREN: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_OPERATOR,
+    line_behavior: LineBehavior::EndsLine(EndsLineBehavior {
+        space_before: SpaceBefore(false),
+    }),
+    indent_change: IndentChange::Indent,
 };
 pub const ST_CLOSE_PAREN: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_OPERATOR,
+    line_behavior: LineBehavior::StartsNewLine(StartsNewLineBehavior {
+        space_after: SpaceAfter(false),
+    }),
+    indent_change: IndentChange::Dedent,
 };
-// []
-pub const ST_OPEN_BRACKET: IsographSemanticToken = IsographSemanticToken {
-    lsp_semantic_token: LSP_ST_OPERATOR,
-};
-pub const ST_CLOSE_BRACKET: IsographSemanticToken = IsographSemanticToken {
-    lsp_semantic_token: LSP_ST_OPERATOR,
-};
+// Brackets are only used as part of GraphQL literals, where they're treated
+// as types
+// // []
+// pub const ST_OPEN_BRACKET: IsographSemanticToken = IsographSemanticToken {
+//     lsp_semantic_token: LSP_ST_OPERATOR,
+//     line_behavior: LineBehavior::EndsLine(EndsLineBehavior {
+//         space_before: SpaceBefore(false),
+//     }),
+// };
+// pub const ST_CLOSE_BRACKET: IsographSemanticToken = IsographSemanticToken {
+//     lsp_semantic_token: LSP_ST_OPERATOR,
+//     line_behavior: LineBehavior::StartsNewLine(StartsNewLineBehavior {
+//         space_after: SpaceAfter(false),
+//     }),
+// };
 
 pub const ST_COMMA: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_OPERATOR,
+    line_behavior: LineBehavior::EndsLine(EndsLineBehavior {
+        space_before: SpaceBefore(false),
+    }),
+    indent_change: IndentChange::Same,
 };
 // TODO split this up
 pub const ST_SELECTION_NAME_OR_ALIAS: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_PROPERTY,
+    line_behavior: LineBehavior::StartsNewLine(StartsNewLineBehavior {
+        space_after: SpaceAfter(true),
+    }),
+    indent_change: IndentChange::Same,
 };
 pub const ST_COLON: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_OPERATOR,
+    line_behavior: LineBehavior::Inline(InlineBehavior {
+        space_before: SpaceBefore(false),
+        space_after: SpaceAfter(true),
+    }),
+    indent_change: IndentChange::Same,
+};
+pub const ST_SELECTION_NAME_OR_ALIAS_POST_COLON: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_PROPERTY,
+    line_behavior: LineBehavior::Inline(InlineBehavior {
+        space_before: SpaceBefore(true),
+        space_after: SpaceAfter(true),
+    }),
+    indent_change: IndentChange::Same,
 };
 
 pub const ST_DIRECTIVE_AT: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_DECORATOR,
+    line_behavior: LineBehavior::Inline(InlineBehavior {
+        space_before: SpaceBefore(true),
+        space_after: SpaceAfter(false),
+    }),
+    indent_change: IndentChange::Same,
 };
 pub const ST_DIRECTIVE: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_DECORATOR,
+    line_behavior: LineBehavior::Inline(InlineBehavior {
+        space_before: SpaceBefore(false),
+        space_after: SpaceAfter(true),
+    }),
+    indent_change: IndentChange::Same,
 };
 
 pub const ST_ARGUMENT_NAME: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_PARAMETER,
+    line_behavior: LineBehavior::Inline(InlineBehavior {
+        space_before: SpaceBefore(false),
+        space_after: SpaceAfter(false),
+    }),
+    indent_change: IndentChange::Same,
 };
 
 pub const ST_VARIABLE_DOLLAR: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_VARIABLE,
+    line_behavior: LineBehavior::Inline(InlineBehavior {
+        space_before: SpaceBefore(true),
+        space_after: SpaceAfter(false),
+    }),
+    indent_change: IndentChange::Same,
 };
 pub const ST_VARIABLE: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_VARIABLE,
+    line_behavior: LineBehavior::Inline(InlineBehavior {
+        space_before: SpaceBefore(false),
+        space_after: SpaceAfter(false),
+    }),
+    indent_change: IndentChange::Same,
 };
 pub const ST_VARIABLE_EQUALS: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_OPERATOR,
+    line_behavior: LineBehavior::Inline(InlineBehavior {
+        space_before: SpaceBefore(true),
+        space_after: SpaceAfter(true),
+    }),
+    indent_change: IndentChange::Same,
 };
 
 pub const ST_STRING_LITERAL: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_STRING,
+    line_behavior: LineBehavior::Inline(InlineBehavior {
+        space_before: SpaceBefore(false),
+        space_after: SpaceAfter(false),
+    }),
+    indent_change: IndentChange::Same,
 };
 pub const ST_NUMBER_LITERAL: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_NUMBER,
+    line_behavior: LineBehavior::Inline(InlineBehavior {
+        space_before: SpaceBefore(false),
+        space_after: SpaceAfter(false),
+    }),
+    indent_change: IndentChange::Same,
 };
 
 pub const ST_OBJECT_LITERAL_KEY: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_PROPERTY,
+    line_behavior: LineBehavior::StartsNewLine(StartsNewLineBehavior {
+        space_after: SpaceAfter(false),
+    }),
+    indent_change: IndentChange::Same,
 };
 
+// TODO have spaces
 pub const ST_TYPE_ANNOTATION: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_TYPE,
+    line_behavior: LineBehavior::Inline(InlineBehavior {
+        space_before: SpaceBefore(true),
+        space_after: SpaceAfter(true),
+    }),
+    indent_change: IndentChange::Same,
 };
 
 pub const ST_COMMENT: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_COMMENT,
+    line_behavior: LineBehavior::IsOwnLine,
+    indent_change: IndentChange::Same,
 };
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Hash)]
+pub enum IndentChange {
+    Indent,
+    Dedent,
+    Same,
+}

@@ -29,6 +29,7 @@ pub use refetch_query_index::*;
 pub use selection::*;
 pub use selection_argument::*;
 pub use selection_directive_set::*;
+pub use semantic_token_legend::line_behavior::*;
 pub use semantic_token_legend::IsographSemanticToken;
 pub use source_types::*;
 pub use string_key_wrappers::*;

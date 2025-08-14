@@ -275,7 +275,7 @@ fn parse_client_pointer_target_type(
     let keyword = tokens
         .parse_source_of_kind(
             IsographLangTokenKind::Identifier,
-            semantic_token_legend::ST_KEYWORD,
+            semantic_token_legend::ST_TO,
         )
         .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
@@ -552,7 +552,7 @@ fn parse_optional_alias_and_field_name(
             tokens
                 .parse_string_key_type(
                     IsographLangTokenKind::Identifier,
-                    semantic_token_legend::ST_SELECTION_NAME_OR_ALIAS,
+                    semantic_token_legend::ST_SELECTION_NAME_OR_ALIAS_POST_COLON,
                 )
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?,
             Some(field_name_or_alias),
