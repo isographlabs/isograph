@@ -21,11 +21,11 @@ impl<'a> VisitMut for GenericReplacer<'a> {
                     let ident = &type_path.path.segments[0].ident;
 
                     // If we have a mapping for this identifier, replace the entire type
-                    if let Some(replacement) = self.generics_map.get(ident) {
-                        if let syn::GenericArgument::Type(replacement_type) = replacement {
-                            *inner_type = replacement_type.clone();
-                            return; // Don't recurse into the replacement
-                        }
+                    if let Some(syn::GenericArgument::Type(replacement_type)) =
+                        self.generics_map.get(ident)
+                    {
+                        *inner_type = replacement_type.clone();
+                        return; // Don't recurse into the replacement
                     }
                 }
 
@@ -72,10 +72,10 @@ pub(crate) fn validate_and_map_generics(
     let struct_generics = input_generics
         .params
         .iter()
-        .filter_map(|param| match param {
-            syn::GenericParam::Type(type_param) => Some(type_param.ident.clone()),
-            syn::GenericParam::Lifetime(lifetime_def) => Some(lifetime_def.lifetime.ident.clone()),
-            syn::GenericParam::Const(const_param) => Some(const_param.ident.clone()),
+        .map(|param| match param {
+            syn::GenericParam::Type(type_param) => type_param.ident.clone(),
+            syn::GenericParam::Lifetime(lifetime_def) => lifetime_def.lifetime.ident.clone(),
+            syn::GenericParam::Const(const_param) => const_param.ident.clone(),
         })
         .collect::<Vec<_>>();
 
@@ -112,8 +112,7 @@ pub(crate) fn validate_and_map_generics(
         .zip(
             self_type_generics
                 .expect("Expected self type generics to not be empty at this point")
-                .args
-                .into_iter(),
+                .args,
         )
         .collect())
 }

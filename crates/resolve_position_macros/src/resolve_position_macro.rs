@@ -186,7 +186,7 @@ fn get_resolve_field_info(
                 if let syn::PathArguments::AngleBracketed(args) = &last_segment.arguments {
                     if let Some(syn::GenericArgument::Type(inner_type)) = args.args.first() {
                         return Ok(Some(ResolveFieldInfo {
-                            inner_type: replace_generics_in_type(inner_type.clone(), &generics_map),
+                            inner_type: replace_generics_in_type(inner_type.clone(), generics_map),
                             field_name,
                             is_iter: false,
                         }));
@@ -216,7 +216,7 @@ fn get_resolve_field_info(
                                         return Ok(Some(ResolveFieldInfo {
                                             inner_type: replace_generics_in_type(
                                                 inner_type.clone(),
-                                                &generics_map,
+                                                generics_map,
                                             ),
                                             field_name,
                                             is_iter: true,
