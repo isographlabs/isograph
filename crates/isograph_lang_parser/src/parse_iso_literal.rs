@@ -458,19 +458,12 @@ fn parse_delimited_list<'a, TResult>(
     }
 }
 
-fn parse_comma_line_break_or_curly(tokens: &mut PeekableLexer<'_>) -> ParseResultWithSpan<()> {
-    let comma = tokens.parse_token_of_kind(
-        IsographLangTokenKind::Comma,
-        semantic_token_legend::ST_COMMA,
-    );
-    if comma.is_ok()
-        || tokens.source(tokens.white_space_span()).contains('\n')
-        || matches!(tokens.peek().item, IsographLangTokenKind::CloseBrace)
-    {
+fn parse_line_break_or_close_curly(tokens: &mut PeekableLexer<'_>) -> ParseResultWithSpan<()> {
+    if tokens.source(tokens.white_space_span()).contains('\n') {
         Ok(())
     } else {
         Err(WithSpan::new(
-            IsographLiteralParseError::ExpectedCommaOrLineBreak,
+            IsographLiteralParseError::ExpectedLineBreak,
             tokens.peek().span,
         ))
     }
@@ -492,7 +485,7 @@ fn parse_selection(
         // If we encounter a selection set, we are parsing a linked field. Otherwise, a scalar field.
         let selection_set = parse_optional_selection_set(tokens, text_source)?;
 
-        parse_comma_line_break_or_curly(tokens)?;
+        parse_line_break_or_close_curly(tokens)?;
 
         let selection = match selection_set {
             Some(selection_set) => {

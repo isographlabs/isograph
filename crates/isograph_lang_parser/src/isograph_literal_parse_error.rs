@@ -50,8 +50,8 @@ pub enum IsographLiteralParseError {
     #[error("Descriptions are currently disallowed")]
     DescriptionsAreDisallowed,
 
-    #[error("Expected a comma, linebreak or closing curly brace")]
-    ExpectedCommaOrLineBreak,
+    #[error("Expected a linebreak")]
+    ExpectedLineBreak,
 
     #[error(
         "Selection sets are required. If you do not want to \

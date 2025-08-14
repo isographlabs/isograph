@@ -2,6 +2,8 @@ use std::fmt;
 
 use logos::{Lexer, Logos};
 
+// TODO support line breaks as separate tokens
+
 #[derive(Logos, Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum IsographLangTokenKind {
     // TODO don't skip comments and whitespace, since we want to auto-format etc
