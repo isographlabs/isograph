@@ -34,7 +34,7 @@ function compileTag(t, path, config) {
       }
     } else {
       throw new Error(
-        "Invalid iso tag usage. Expected 'entrypoint' or 'field'.",
+        "Invalid iso tag usage. Expected 'entrypoint', 'field' or 'pointer'.",
       );
     }
   }
