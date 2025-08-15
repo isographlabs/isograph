@@ -115,7 +115,7 @@ fn find_iso_literal_extraction_under_cursor<'a>(
 ) -> Option<(IsoLiteralExtraction, u32)> {
     let mut last_iteration_end_line_count = 0;
     let mut last_iteration_end_char_count = 0;
-    let max_prev_span_end = 0;
+    let mut max_prev_span_end = 0;
     for extract_item in extracted_items {
         let iso_literal_start_index = extract_item.iso_literal_start_index;
         let iso_literal_end_index = iso_literal_start_index + extract_item.iso_literal_text.len();
@@ -168,6 +168,8 @@ fn find_iso_literal_extraction_under_cursor<'a>(
 
         last_iteration_end_line_count = end_line_count;
         last_iteration_end_char_count = end_char_count;
+        max_prev_span_end =
+            extract_item.iso_literal_start_index + extract_item.iso_literal_text.len();
     }
 
     None
