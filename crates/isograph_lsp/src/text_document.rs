@@ -1,6 +1,6 @@
 use common_lang_types::relative_path_from_absolute_and_working_directory;
 use isograph_compiler::{get_current_working_directory, get_open_file_map, CompilerState};
-use isograph_schema::OpenFileSource;
+use isograph_schema::{NetworkProtocol, OpenFileSource};
 use lsp_types::{
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification,
@@ -11,7 +11,7 @@ use pico::Database;
 
 use crate::lsp_runtime_error::LSPRuntimeResult;
 
-pub fn on_did_open_text_document<TNetworkProtocol: isograph_schema::NetworkProtocol>(
+pub fn on_did_open_text_document<TNetworkProtocol: NetworkProtocol>(
     compiler_state: &mut CompilerState<TNetworkProtocol>,
     params: <DidOpenTextDocument as Notification>::Params,
 ) -> LSPRuntimeResult<()> {
@@ -43,7 +43,7 @@ pub fn on_did_open_text_document<TNetworkProtocol: isograph_schema::NetworkProto
 }
 
 #[allow(clippy::unnecessary_wraps)]
-pub fn on_did_close_text_document<TNetworkProtocol: isograph_schema::NetworkProtocol>(
+pub fn on_did_close_text_document<TNetworkProtocol: NetworkProtocol>(
     compiler_state: &mut CompilerState<TNetworkProtocol>,
     params: <DidCloseTextDocument as Notification>::Params,
 ) -> LSPRuntimeResult<()> {
@@ -71,7 +71,7 @@ pub fn on_did_close_text_document<TNetworkProtocol: isograph_schema::NetworkProt
     Ok(())
 }
 
-pub fn on_did_change_text_document<TNetworkProtocol: isograph_schema::NetworkProtocol>(
+pub fn on_did_change_text_document<TNetworkProtocol: NetworkProtocol>(
     compiler_state: &mut CompilerState<TNetworkProtocol>,
     params: <DidChangeTextDocument as Notification>::Params,
 ) -> LSPRuntimeResult<()> {

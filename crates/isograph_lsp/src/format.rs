@@ -12,7 +12,7 @@ use isograph_compiler::{
 use isograph_lang_types::{
     semantic_token_legend::IndentChange, InlineBehavior, LineBehavior, SpaceAfter, SpaceBefore,
 };
-use isograph_schema::IsographDatabase;
+use isograph_schema::{IsographDatabase, NetworkProtocol};
 use lsp_types::{
     request::{Formatting, Request},
     Position, Range, TextEdit,
@@ -21,7 +21,7 @@ use pico_macros::memo;
 
 use crate::lsp_runtime_error::LSPRuntimeResult;
 
-pub fn on_format<TNetworkProtocol: isograph_schema::NetworkProtocol>(
+pub fn on_format<TNetworkProtocol: NetworkProtocol>(
     compiler_state: &CompilerState<TNetworkProtocol>,
     params: <Formatting as Request>::Params,
 ) -> LSPRuntimeResult<<Formatting as Request>::Result> {
@@ -98,7 +98,7 @@ fn char_index_to_position(content: &str, char_index: usize) -> Position {
 }
 
 #[memo]
-fn format_extraction<TNetworkProtocol: isograph_schema::NetworkProtocol>(
+fn format_extraction<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     extraction: &IsoLiteralExtraction,
     relative_path_to_source_file: RelativePathToSourceFile,

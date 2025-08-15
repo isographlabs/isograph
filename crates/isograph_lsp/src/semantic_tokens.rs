@@ -10,7 +10,7 @@ use isograph_compiler::{
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::IsographSemanticToken;
-use isograph_schema::IsographDatabase;
+use isograph_schema::{IsographDatabase, NetworkProtocol};
 use lsp_types::{
     request::{Request, SemanticTokensFullRequest},
     SemanticToken as LspSemanticToken, SemanticTokens as LspSemanticTokens,
@@ -18,7 +18,7 @@ use lsp_types::{
 };
 use pico_macros::memo;
 
-pub fn on_semantic_token_full_request<TNetworkProtocol: isograph_schema::NetworkProtocol>(
+pub fn on_semantic_token_full_request<TNetworkProtocol: NetworkProtocol>(
     compiler_state: &CompilerState<TNetworkProtocol>,
     params: <SemanticTokensFullRequest as Request>::Params,
 ) -> LSPRuntimeResult<<SemanticTokensFullRequest as Request>::Result> {
@@ -47,7 +47,7 @@ pub fn on_semantic_token_full_request<TNetworkProtocol: isograph_schema::Network
 /// we cannot reuse that cached value (as the output changes.) (We already can't reuse the
 /// cached value, but that is a bug.) See https://github.com/isographlabs/isograph/issues/548
 #[memo]
-fn get_semantic_tokens<TNetworkProtocol: isograph_schema::NetworkProtocol>(
+fn get_semantic_tokens<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     uri: Url,
 ) -> Result<Option<LspSemanticTokensResult>, LSPRuntimeError> {

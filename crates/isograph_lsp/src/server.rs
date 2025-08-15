@@ -148,7 +148,7 @@ pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok(())
 }
 
-fn dispatch_notification<TNetworkProtocol: isograph_schema::NetworkProtocol>(
+fn dispatch_notification<TNetworkProtocol: NetworkProtocol>(
     notification: lsp_server::Notification,
     compiler_state: &mut CompilerState<TNetworkProtocol>,
 ) -> ControlFlow<Option<LSPRuntimeError>, ()> {
@@ -160,7 +160,7 @@ fn dispatch_notification<TNetworkProtocol: isograph_schema::NetworkProtocol>(
 
     ControlFlow::Continue(())
 }
-fn dispatch_request<TNetworkProtocol: isograph_schema::NetworkProtocol>(
+fn dispatch_request<TNetworkProtocol: NetworkProtocol>(
     request: lsp_server::Request,
     compiler_state: &CompilerState<TNetworkProtocol>,
 ) -> Response {
