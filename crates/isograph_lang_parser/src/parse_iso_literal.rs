@@ -721,7 +721,7 @@ fn parse_non_constant_value(
             let bool_or_null = tokens
                 .parse_source_of_kind(
                     IsographLangTokenKind::Identifier,
-                    semantic_token_legend::ST_VARIABLE,
+                    semantic_token_legend::ST_BOOL_OR_NULL,
                 )
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 

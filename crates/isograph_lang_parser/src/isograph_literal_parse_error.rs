@@ -73,7 +73,7 @@ pub enum IsographLiteralParseError {
         name_or_alias: SelectableNameOrAlias,
     },
 
-    #[error("Expected a boolean value (true or false).")]
+    #[error("Expected a boolean value (true or false), or null")]
     ExpectedBoolean,
 
     #[error("Expected delimited `{delimiter} or `{closing_token}`")]

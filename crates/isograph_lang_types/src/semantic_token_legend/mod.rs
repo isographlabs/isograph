@@ -157,7 +157,7 @@ pub const ST_OPEN_PAREN: IsographSemanticToken = IsographSemanticToken {
 pub const ST_CLOSE_PAREN: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_OPERATOR,
     line_behavior: LineBehavior::StartsNewLine(StartsNewLineBehavior {
-        space_after: SpaceAfter(false),
+        space_after: SpaceAfter(true),
     }),
     indent_change: IndentChange::Dedent,
 };
@@ -228,9 +228,8 @@ pub const ST_DIRECTIVE: IsographSemanticToken = IsographSemanticToken {
 
 pub const ST_ARGUMENT_NAME: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_PARAMETER,
-    line_behavior: LineBehavior::Inline(InlineBehavior {
-        space_before: SpaceBefore(false),
-        space_after: SpaceAfter(false),
+    line_behavior: LineBehavior::StartsNewLine(StartsNewLineBehavior {
+        space_after: SpaceAfter(true),
     }),
     indent_change: IndentChange::Same,
 };
@@ -263,16 +262,24 @@ pub const ST_VARIABLE_EQUALS: IsographSemanticToken = IsographSemanticToken {
 pub const ST_STRING_LITERAL: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_STRING,
     line_behavior: LineBehavior::Inline(InlineBehavior {
-        space_before: SpaceBefore(false),
-        space_after: SpaceAfter(false),
+        space_before: SpaceBefore(true),
+        space_after: SpaceAfter(true),
     }),
     indent_change: IndentChange::Same,
 };
 pub const ST_NUMBER_LITERAL: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_NUMBER,
     line_behavior: LineBehavior::Inline(InlineBehavior {
-        space_before: SpaceBefore(false),
-        space_after: SpaceAfter(false),
+        space_before: SpaceBefore(true),
+        space_after: SpaceAfter(true),
+    }),
+    indent_change: IndentChange::Same,
+};
+pub const ST_BOOL_OR_NULL: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_VARIABLE,
+    line_behavior: LineBehavior::Inline(InlineBehavior {
+        space_before: SpaceBefore(true),
+        space_after: SpaceAfter(true),
     }),
     indent_change: IndentChange::Same,
 };
@@ -280,7 +287,7 @@ pub const ST_NUMBER_LITERAL: IsographSemanticToken = IsographSemanticToken {
 pub const ST_OBJECT_LITERAL_KEY: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_PROPERTY,
     line_behavior: LineBehavior::StartsNewLine(StartsNewLineBehavior {
-        space_after: SpaceAfter(false),
+        space_after: SpaceAfter(true),
     }),
     indent_change: IndentChange::Same,
 };
