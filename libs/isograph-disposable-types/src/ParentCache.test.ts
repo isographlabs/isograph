@@ -1,5 +1,5 @@
-import { ItemCleanupPair } from '@isograph/disposable-types';
 import { assert, describe, expect, test, vi } from 'vitest';
+import { ItemCleanupPair } from '.';
 import { CacheItem } from './CacheItem';
 import { ParentCache } from './ParentCache';
 

@@ -1,8 +1,7 @@
 'use strict';
 
-import { ItemCleanupPair } from '@isograph/disposable-types';
+import { ItemCleanupPair, ParentCache } from '@isograph/disposable-types';
 import { useEffect, useRef, useState } from 'react';
-import { ParentCache } from './ParentCache';
 
 /**
  * useCachedResponsivePrecommitValue<T>

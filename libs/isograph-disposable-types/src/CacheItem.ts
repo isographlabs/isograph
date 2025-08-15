@@ -1,8 +1,4 @@
-import {
-  CleanupFn,
-  Factory,
-  ItemCleanupPair,
-} from '@isograph/disposable-types';
+import { CleanupFn, Factory, ItemCleanupPair } from '.';
 
 const DEFAULT_TEMPORARY_RETAIN_TIME = 5000;
 
