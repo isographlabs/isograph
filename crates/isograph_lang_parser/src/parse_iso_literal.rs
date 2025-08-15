@@ -10,12 +10,11 @@ use graphql_lang_types::{
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
     from_isograph_field_directives, semantic_token_legend, ClientFieldDeclaration,
-    ClientPointerDeclaration, ConstantValue, EntrypointDeclaration, IsographDatabase,
-    IsographFieldDirective, IsographResolvedNode, IsographSemanticToken, NonConstantValue,
-    ObjectSelection, ScalarSelection, SelectionFieldArgument, SelectionTypeContainingSelections,
+    ClientPointerDeclaration, ConstantValue, EntrypointDeclaration, IsographFieldDirective,
+    IsographResolvedNode, IsographSemanticToken, NonConstantValue, ObjectSelection,
+    ScalarSelection, SelectionFieldArgument, SelectionTypeContainingSelections,
     ServerObjectEntityNameWrapper, UnvalidatedSelection, VariableDefinition,
 };
-use pico_macros::memo;
 use resolve_position_macros::ResolvePosition;
 use std::{collections::HashSet, ops::ControlFlow};
 
@@ -42,9 +41,7 @@ impl IsoLiteralExtractionResult {
     }
 }
 
-#[memo]
 pub fn parse_iso_literal(
-    db: &IsographDatabase,
     iso_literal_text: String,
     definition_file_path: RelativePathToSourceFile,
     const_export_name: Option<String>,

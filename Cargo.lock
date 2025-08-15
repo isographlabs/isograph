@@ -1368,8 +1368,6 @@ dependencies = [
  "intern",
  "isograph_lang_types",
  "logos",
- "pico",
- "pico_macros",
  "resolve_position",
  "resolve_position_macros",
  "thiserror",

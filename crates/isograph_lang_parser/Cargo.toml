@@ -9,8 +9,6 @@ common_lang_types = { path = "../common_lang_types" }
 isograph_lang_types = { path = "../isograph_lang_types" }
 intern = { path = "../../relay-crates/intern" }
 graphql_lang_types = { path = "../graphql_lang_types" }
-pico = { path = "../pico" }
-pico_macros = { path = "../pico_macros" }
 resolve_position = { path = "../resolve_position" }
 resolve_position_macros = { path = "../resolve_position_macros" }
 logos = { workspace = true }
