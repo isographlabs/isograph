@@ -19,7 +19,7 @@ use resolve_position::ResolvePosition;
 
 use crate::{lsp_runtime_error::LSPRuntimeResult, semantic_tokens::delta_line_delta_start};
 
-pub fn on_hover<TNetworkProtocol: NetworkProtocol>(
+pub fn on_hover<TNetworkProtocol: NetworkProtocol + 'static + 'static>(
     compiler_state: &CompilerState<TNetworkProtocol>,
     params: <HoverRequest as Request>::Params,
 ) -> LSPRuntimeResult<<HoverRequest as Request>::Result> {
@@ -84,7 +84,9 @@ pub fn on_hover<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn get_iso_literal_extraction_from_text_position_params<TNetworkProtocol: NetworkProtocol>(
+pub fn get_iso_literal_extraction_from_text_position_params<
+    TNetworkProtocol: NetworkProtocol + 'static,
+>(
     db: &IsographDatabase<TNetworkProtocol>,
     url: Url,
     line_char: LineChar,

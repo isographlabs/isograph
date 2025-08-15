@@ -29,7 +29,7 @@ use crate::{
 #[derive(Debug, Clone, Singleton, PartialEq, Eq)]
 pub struct IsoLiteralMap(pub HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>);
 
-pub fn initialize_sources<TNetworkProtocol: NetworkProtocol>(
+pub fn initialize_sources<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &mut IsographDatabase<TNetworkProtocol>,
 ) -> Result<(), SourceError> {
     let schema = get_isograph_config(db).schema.clone();
@@ -46,7 +46,7 @@ pub fn initialize_sources<TNetworkProtocol: NetworkProtocol>(
     Ok(())
 }
 
-pub fn update_sources<TNetworkProtocol: NetworkProtocol>(
+pub fn update_sources<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     changes: &[SourceFileEvent],
 ) -> Result<(), SourceError> {
@@ -94,7 +94,7 @@ pub fn update_sources<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn handle_update_schema<TNetworkProtocol: NetworkProtocol>(
+fn handle_update_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     standard_sources: &mut StandardSources,
     event_kind: &SourceEventKind,
@@ -114,7 +114,7 @@ fn handle_update_schema<TNetworkProtocol: NetworkProtocol>(
     Ok(())
 }
 
-fn handle_update_schema_extensions<TNetworkProtocol: NetworkProtocol>(
+fn handle_update_schema_extensions<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     standard_sources: &mut StandardSources,
     event_kind: &SourceEventKind,
@@ -153,7 +153,7 @@ fn handle_update_schema_extensions<TNetworkProtocol: NetworkProtocol>(
     Ok(())
 }
 
-fn create_or_update_schema_extension<TNetworkProtocol: NetworkProtocol>(
+fn create_or_update_schema_extension<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     standard_sources: &mut StandardSources,
     path: &Path,
@@ -167,7 +167,7 @@ fn create_or_update_schema_extension<TNetworkProtocol: NetworkProtocol>(
     Ok(())
 }
 
-fn handle_update_source_file<TNetworkProtocol: NetworkProtocol>(
+fn handle_update_source_file<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     iso_literals: &mut IsoLiteralMap,
     event_kind: &SourceEventKind,
@@ -196,7 +196,7 @@ fn handle_update_source_file<TNetworkProtocol: NetworkProtocol>(
     Ok(())
 }
 
-fn create_or_update_iso_literals<TNetworkProtocol: NetworkProtocol>(
+fn create_or_update_iso_literals<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     iso_literals: &mut IsoLiteralMap,
     path: &Path,
@@ -211,7 +211,7 @@ fn create_or_update_iso_literals<TNetworkProtocol: NetworkProtocol>(
     Ok(())
 }
 
-fn handle_update_source_folder<TNetworkProtocol: NetworkProtocol>(
+fn handle_update_source_folder<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     iso_literals: &mut IsoLiteralMap,
     event_kind: &SourceEventKind,
@@ -250,7 +250,7 @@ fn remove_iso_literals_from_folder(
         .retain(|file_path, _| !file_path.to_string().starts_with(&relative_path));
 }
 
-fn read_schema<TNetworkProtocol: NetworkProtocol>(
+fn read_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     schema_path: &AbsolutePathAndRelativePath,
 ) -> Result<SourceId<SchemaSource>, SourceError> {
@@ -302,7 +302,7 @@ fn read_schema_file(path: &PathBuf) -> Result<String, SourceError> {
     Ok(contents)
 }
 
-fn read_schema_extensions<TNetworkProtocol: NetworkProtocol>(
+fn read_schema_extensions<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &mut IsographDatabase<TNetworkProtocol>,
 ) -> Result<BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>, SourceError> {
     let config_schema_extensions = get_isograph_config(db).schema_extensions.clone();
@@ -314,7 +314,7 @@ fn read_schema_extensions<TNetworkProtocol: NetworkProtocol>(
     Ok(schema_extensions)
 }
 
-fn read_iso_literals_from_project_root<TNetworkProtocol: NetworkProtocol>(
+fn read_iso_literals_from_project_root<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &mut IsographDatabase<TNetworkProtocol>,
 ) -> Result<IsoLiteralMap, SourceError> {
     let project_root = get_isograph_config(db).project_root.clone();
@@ -323,7 +323,7 @@ fn read_iso_literals_from_project_root<TNetworkProtocol: NetworkProtocol>(
     Ok(iso_literals)
 }
 
-fn read_iso_literals_from_folder<TNetworkProtocol: NetworkProtocol>(
+fn read_iso_literals_from_folder<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     iso_literals: &mut IsoLiteralMap,
     folder: &Path,

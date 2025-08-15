@@ -115,7 +115,7 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok((unvalidated_isograph_schema, unprocessed_items))
 }
 
-pub fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol>(
+pub fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     mut unvalidated_isograph_schema: Schema<TNetworkProtocol>,
     mut unprocessed_items: Vec<
@@ -228,7 +228,7 @@ impl From<Vec<WithLocation<AddSelectionSetsError>>> for ProcessIsoLiteralsForSch
     }
 }
 
-fn parse_iso_literals<TNetworkProtocol: NetworkProtocol>(
+fn parse_iso_literals<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<ParsedIsoLiteralsMap, Vec<WithLocation<IsographLiteralParseError>>> {
     // TODO we are not checking the open file map here. This will probably be fixed when we
@@ -315,7 +315,7 @@ pub struct ContainsIsoStats {
 /// - insert it into to the parent object's encountered_fields
 /// - append it to schema.server_fields
 /// - if it is an id field, modify the parent object
-fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
+fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &mut Schema<TNetworkProtocol>,
     field_queue: HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
     options: &CompilerConfigOptions,

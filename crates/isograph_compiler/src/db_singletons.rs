@@ -10,35 +10,35 @@ use crate::source_files::IsoLiteralMap;
 
 // TODO find a good place for this file to live
 
-pub fn get_current_working_directory<TNetworkProtocol: NetworkProtocol>(
+pub fn get_current_working_directory<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> CurrentWorkingDirectory {
     *db.get_singleton::<CurrentWorkingDirectory>()
         .expect("Expected CurrentWorkingDirectory to have been set")
 }
 
-pub fn get_isograph_config<TNetworkProtocol: NetworkProtocol>(
+pub fn get_isograph_config<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> &CompilerConfig {
     db.get_singleton::<CompilerConfig>()
         .expect("Expected CompilerConfig to have been set")
 }
 
-pub fn get_standard_sources<TNetworkProtocol: NetworkProtocol>(
+pub fn get_standard_sources<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> &StandardSources {
     db.get_singleton::<StandardSources>()
         .expect("Expected StandardSources to have been set")
 }
 
-pub fn get_iso_literal_map<TNetworkProtocol: NetworkProtocol>(
+pub fn get_iso_literal_map<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> &IsoLiteralMap {
     db.get_singleton::<IsoLiteralMap>()
         .expect("Expected IsoLiteralMap to have been set")
 }
 
-pub fn get_open_file_map<TNetworkProtocol: NetworkProtocol>(
+pub fn get_open_file_map<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> &OpenFileMap {
     db.get_singleton::<OpenFileMap>()
@@ -46,7 +46,7 @@ pub fn get_open_file_map<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn get_open_file<TNetworkProtocol: NetworkProtocol>(
+pub fn get_open_file<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     file: RelativePathToSourceFile,
 ) -> Option<SourceId<OpenFileSource>> {

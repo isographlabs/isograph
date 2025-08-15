@@ -11,6 +11,7 @@ mod write_artifacts;
 
 pub use batch_compile::compile_and_print;
 pub use compiler_state::*;
+pub use create_schema::*;
 pub use db_singletons::*;
 pub use isograph_literals::*;
 pub use source_files::*;

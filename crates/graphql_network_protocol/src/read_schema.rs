@@ -9,7 +9,7 @@ use pico_macros::memo;
 
 #[allow(clippy::type_complexity)]
 #[memo]
-pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol>(
+pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema_source_id: SourceId<SchemaSource>,
     schema_extension_sources: &BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
@@ -40,7 +40,7 @@ pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn parse_schema_extensions_file<TNetworkProtocol: NetworkProtocol>(
+pub fn parse_schema_extensions_file<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema_extension_source_id: SourceId<SchemaSource>,
 ) -> Result<MemoRef<GraphQLTypeSystemExtensionDocument>, WithLocation<SchemaParseError>> {

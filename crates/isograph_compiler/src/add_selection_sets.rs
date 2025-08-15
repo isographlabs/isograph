@@ -16,7 +16,9 @@ use thiserror::Error;
 pub type ValidateAddSelectionSetsResultWithMultipleErrors<T> =
     Result<T, Vec<WithLocation<AddSelectionSetsError>>>;
 
-pub(crate) fn add_selection_sets_to_client_selectables<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn add_selection_sets_to_client_selectables<
+    TNetworkProtocol: NetworkProtocol + 'static,
+>(
     schema: &mut Schema<TNetworkProtocol>,
     unprocessed_items: Vec<UnprocessedItem>,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
@@ -48,7 +50,7 @@ pub(crate) fn add_selection_sets_to_client_selectables<TNetworkProtocol: Network
 
 // TODO we should not be mutating items in the schema. Instead, we should be creating
 // new items (the refetch and reader selection sets).
-fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
+fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &mut Schema<TNetworkProtocol>,
     unprocessed_item: UnprocessedClientFieldItem,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
@@ -89,7 +91,7 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
 
 // TODO we should not be mutating items in the schema. Instead, we should be creating
 // new items (the refetch and reader selection sets).
-fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol>(
+fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &mut Schema<TNetworkProtocol>,
     unprocessed_item: UnprocessedClientPointerItem,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
@@ -125,7 +127,7 @@ fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol>(
 ///   as scalars, etc)
 /// - validate loadability/selectability (e.g. client fields cannot be selected updatably), and
 /// - include the selectable id in the associated data
-fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol>(
+fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     parent_object: &ServerObjectEntity<TNetworkProtocol>,
@@ -143,7 +145,7 @@ fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol>(
     }))
 }
 
-fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
+fn get_validated_selection<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     with_span: WithSpan<UnvalidatedSelection>,
     selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
@@ -173,7 +175,7 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
     })
 }
 
-fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
+fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
     selection_parent_object_name: ServerObjectEntityName,
@@ -278,7 +280,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
     })
 }
 
-fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
+fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
     selection_parent_object_name: ServerObjectEntityName,
@@ -395,7 +397,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     })
 }
 
-fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol>(
+fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     refetch_strategy: Option<RefetchStrategy<(), ()>>,
     parent_object: &ServerObjectEntity<TNetworkProtocol>,
