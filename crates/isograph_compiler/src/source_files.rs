@@ -10,7 +10,9 @@ use common_lang_types::{
 };
 use intern::Lookup;
 use isograph_config::absolute_and_relative_paths;
-use isograph_schema::{IsoLiteralsSource, IsographDatabase, SchemaSource, StandardSources};
+use isograph_schema::{
+    IsoLiteralsSource, IsographDatabase, NetworkProtocol, SchemaSource, StandardSources,
+};
 use pico::{Database, SourceId};
 use pico_macros::Singleton;
 use thiserror::Error;
@@ -27,7 +29,9 @@ use crate::{
 #[derive(Debug, Clone, Singleton, PartialEq, Eq)]
 pub struct IsoLiteralMap(pub HashMap<RelativePathToSourceFile, SourceId<IsoLiteralsSource>>);
 
-pub fn initialize_sources(db: &mut IsographDatabase) -> Result<(), SourceError> {
+pub fn initialize_sources<TNetworkProtocol: NetworkProtocol>(
+    db: &mut IsographDatabase<TNetworkProtocol>,
+) -> Result<(), SourceError> {
     let schema = get_isograph_config(db).schema.clone();
     let schema_source_id = read_schema(db, &schema)?;
     let schema_extension_sources = read_schema_extensions(db)?;
@@ -42,8 +46,8 @@ pub fn initialize_sources(db: &mut IsographDatabase) -> Result<(), SourceError> 
     Ok(())
 }
 
-pub fn update_sources(
-    db: &mut IsographDatabase,
+pub fn update_sources<TNetworkProtocol: NetworkProtocol>(
+    db: &mut IsographDatabase<TNetworkProtocol>,
     changes: &[SourceFileEvent],
 ) -> Result<(), SourceError> {
     // TODO: We can avoid using booleans and do this more cleanly, e.g. with Options
@@ -90,8 +94,8 @@ pub fn update_sources(
     }
 }
 
-fn handle_update_schema(
-    db: &mut IsographDatabase,
+fn handle_update_schema<TNetworkProtocol: NetworkProtocol>(
+    db: &mut IsographDatabase<TNetworkProtocol>,
     standard_sources: &mut StandardSources,
     event_kind: &SourceEventKind,
 ) -> Result<(), SourceError> {
@@ -110,8 +114,8 @@ fn handle_update_schema(
     Ok(())
 }
 
-fn handle_update_schema_extensions(
-    db: &mut IsographDatabase,
+fn handle_update_schema_extensions<TNetworkProtocol: NetworkProtocol>(
+    db: &mut IsographDatabase<TNetworkProtocol>,
     standard_sources: &mut StandardSources,
     event_kind: &SourceEventKind,
 ) -> Result<(), SourceError> {
@@ -149,8 +153,8 @@ fn handle_update_schema_extensions(
     Ok(())
 }
 
-fn create_or_update_schema_extension(
-    db: &mut IsographDatabase,
+fn create_or_update_schema_extension<TNetworkProtocol: NetworkProtocol>(
+    db: &mut IsographDatabase<TNetworkProtocol>,
     standard_sources: &mut StandardSources,
     path: &Path,
 ) -> Result<(), SourceError> {
@@ -163,8 +167,8 @@ fn create_or_update_schema_extension(
     Ok(())
 }
 
-fn handle_update_source_file(
-    db: &mut IsographDatabase,
+fn handle_update_source_file<TNetworkProtocol: NetworkProtocol>(
+    db: &mut IsographDatabase<TNetworkProtocol>,
     iso_literals: &mut IsoLiteralMap,
     event_kind: &SourceEventKind,
 ) -> Result<(), SourceError> {
@@ -192,8 +196,8 @@ fn handle_update_source_file(
     Ok(())
 }
 
-fn create_or_update_iso_literals(
-    db: &mut IsographDatabase,
+fn create_or_update_iso_literals<TNetworkProtocol: NetworkProtocol>(
+    db: &mut IsographDatabase<TNetworkProtocol>,
     iso_literals: &mut IsoLiteralMap,
     path: &Path,
 ) -> Result<(), SourceError> {
@@ -207,8 +211,8 @@ fn create_or_update_iso_literals(
     Ok(())
 }
 
-fn handle_update_source_folder(
-    db: &mut IsographDatabase,
+fn handle_update_source_folder<TNetworkProtocol: NetworkProtocol>(
+    db: &mut IsographDatabase<TNetworkProtocol>,
     iso_literals: &mut IsoLiteralMap,
     event_kind: &SourceEventKind,
 ) -> Result<(), SourceError> {
@@ -246,8 +250,8 @@ fn remove_iso_literals_from_folder(
         .retain(|file_path, _| !file_path.to_string().starts_with(&relative_path));
 }
 
-fn read_schema(
-    db: &mut IsographDatabase,
+fn read_schema<TNetworkProtocol: NetworkProtocol>(
+    db: &mut IsographDatabase<TNetworkProtocol>,
     schema_path: &AbsolutePathAndRelativePath,
 ) -> Result<SourceId<SchemaSource>, SourceError> {
     let content = read_schema_file(&schema_path.absolute_path)?;
@@ -298,8 +302,8 @@ fn read_schema_file(path: &PathBuf) -> Result<String, SourceError> {
     Ok(contents)
 }
 
-fn read_schema_extensions(
-    db: &mut IsographDatabase,
+fn read_schema_extensions<TNetworkProtocol: NetworkProtocol>(
+    db: &mut IsographDatabase<TNetworkProtocol>,
 ) -> Result<BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>, SourceError> {
     let config_schema_extensions = get_isograph_config(db).schema_extensions.clone();
     let mut schema_extensions = BTreeMap::new();
@@ -310,8 +314,8 @@ fn read_schema_extensions(
     Ok(schema_extensions)
 }
 
-fn read_iso_literals_from_project_root(
-    db: &mut IsographDatabase,
+fn read_iso_literals_from_project_root<TNetworkProtocol: NetworkProtocol>(
+    db: &mut IsographDatabase<TNetworkProtocol>,
 ) -> Result<IsoLiteralMap, SourceError> {
     let project_root = get_isograph_config(db).project_root.clone();
     let mut iso_literals = IsoLiteralMap(HashMap::new());
@@ -319,8 +323,8 @@ fn read_iso_literals_from_project_root(
     Ok(iso_literals)
 }
 
-fn read_iso_literals_from_folder(
-    db: &mut IsographDatabase,
+fn read_iso_literals_from_folder<TNetworkProtocol: NetworkProtocol>(
+    db: &mut IsographDatabase<TNetworkProtocol>,
     iso_literals: &mut IsoLiteralMap,
     folder: &Path,
 ) -> Result<(), SourceError> {

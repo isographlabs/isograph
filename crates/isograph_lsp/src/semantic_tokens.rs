@@ -18,8 +18,8 @@ use lsp_types::{
 };
 use pico_macros::memo;
 
-pub fn on_semantic_token_full_request(
-    compiler_state: &CompilerState,
+pub fn on_semantic_token_full_request<TNetworkProtocol: isograph_schema::NetworkProtocol>(
+    compiler_state: &CompilerState<TNetworkProtocol>,
     params: <SemanticTokensFullRequest as Request>::Params,
 ) -> LSPRuntimeResult<<SemanticTokensFullRequest as Request>::Result> {
     let uri = params.text_document.uri;
@@ -47,8 +47,8 @@ pub fn on_semantic_token_full_request(
 /// we cannot reuse that cached value (as the output changes.) (We already can't reuse the
 /// cached value, but that is a bug.) See https://github.com/isographlabs/isograph/issues/548
 #[memo]
-fn get_semantic_tokens(
-    db: &IsographDatabase,
+fn get_semantic_tokens<TNetworkProtocol: isograph_schema::NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
     uri: Url,
 ) -> Result<Option<LspSemanticTokensResult>, LSPRuntimeError> {
     let current_working_directory = get_current_working_directory(db);

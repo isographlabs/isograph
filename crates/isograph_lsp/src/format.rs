@@ -21,8 +21,8 @@ use pico_macros::memo;
 
 use crate::lsp_runtime_error::LSPRuntimeResult;
 
-pub fn on_format(
-    compiler_state: &CompilerState,
+pub fn on_format<TNetworkProtocol: isograph_schema::NetworkProtocol>(
+    compiler_state: &CompilerState<TNetworkProtocol>,
     params: <Formatting as Request>::Params,
 ) -> LSPRuntimeResult<<Formatting as Request>::Result> {
     let db = &compiler_state.db;
@@ -98,8 +98,8 @@ fn char_index_to_position(content: &str, char_index: usize) -> Position {
 }
 
 #[memo]
-fn format_extraction(
-    db: &IsographDatabase,
+fn format_extraction<TNetworkProtocol: isograph_schema::NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
     extraction: &IsoLiteralExtraction,
     relative_path_to_source_file: RelativePathToSourceFile,
     current_working_directory: CurrentWorkingDirectory,

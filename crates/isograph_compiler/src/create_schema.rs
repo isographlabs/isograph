@@ -32,7 +32,7 @@ use crate::{
 #[memo]
 #[allow(clippy::type_complexity)]
 pub fn create_schema<TNetworkProtocol: NetworkProtocol + 'static>(
-    db: &IsographDatabase,
+    db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
     (
         Schema<TNetworkProtocol>,
@@ -116,7 +116,7 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 pub fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase,
+    db: &IsographDatabase<TNetworkProtocol>,
     mut unvalidated_isograph_schema: Schema<TNetworkProtocol>,
     mut unprocessed_items: Vec<
         SelectionType<UnprocessedClientFieldItem, UnprocessedClientPointerItem>,
@@ -228,8 +228,8 @@ impl From<Vec<WithLocation<AddSelectionSetsError>>> for ProcessIsoLiteralsForSch
     }
 }
 
-fn parse_iso_literals(
-    db: &IsographDatabase,
+fn parse_iso_literals<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<ParsedIsoLiteralsMap, Vec<WithLocation<IsographLiteralParseError>>> {
     // TODO we are not checking the open file map here. This will probably be fixed when we
     // fully rewrite everything to be incremental.

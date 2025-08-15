@@ -1,12 +1,18 @@
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    marker::PhantomData,
+};
 
 use common_lang_types::{RelativePathToSourceFile, TextSource};
 use pico::{SourceId, Storage};
 use pico_macros::{Db, Singleton, Source};
 
+use crate::NetworkProtocol;
+
 #[derive(Default, Debug, Db)]
-pub struct IsographDatabase {
+pub struct IsographDatabase<TNetworkProtocol: NetworkProtocol> {
     pub storage: Storage<Self>,
+    phantom_data: PhantomData<TNetworkProtocol>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Source)]

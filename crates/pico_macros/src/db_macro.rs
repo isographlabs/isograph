@@ -5,9 +5,10 @@ use syn::{parse_macro_input, DeriveInput};
 pub(crate) fn db_macro(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
     let struct_name = input.ident.clone();
+    let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
 
     let output = quote! {
-        impl ::pico::Database for #struct_name {
+        impl #impl_generics ::pico::Database for #struct_name #type_generics #where_clause {
             fn get_storage(&self) -> &::pico::Storage<Self> {
                 &self.storage
             }
@@ -45,7 +46,7 @@ pub(crate) fn db_macro(item: TokenStream) -> TokenStream {
             }
         }
 
-        impl ::pico::DatabaseDyn for #struct_name {
+        impl #impl_generics ::pico::DatabaseDyn for #struct_name #type_generics #where_clause {
             fn get_storage_dyn(&self) -> &dyn ::pico::StorageDyn {
                 use ::pico::Database;
                 self.get_storage()

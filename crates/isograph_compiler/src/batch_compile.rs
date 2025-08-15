@@ -99,16 +99,13 @@ pub fn print_result<TNetworkProtocol: NetworkProtocol + 'static>(
 /// These are less "core" to the overall mission, and thus invite the question
 /// of whether they belong in this function, or at all.
 pub fn compile<TNetworkProtocol: NetworkProtocol + 'static>(
-    db: &IsographDatabase,
+    db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<CompilationStats, BatchCompileError<TNetworkProtocol>> {
     // Create schema
     let (unvalidated_isograph_schema, unprocessed_items) =
         create_schema::<TNetworkProtocol>(db).deref().clone()?;
-    let (isograph_schema, stats) = process_iso_literals_for_schema::<TNetworkProtocol>(
-        db,
-        unvalidated_isograph_schema,
-        unprocessed_items,
-    )?;
+    let (isograph_schema, stats) =
+        process_iso_literals_for_schema(db, unvalidated_isograph_schema, unprocessed_items)?;
 
     validate_use_of_arguments(&isograph_schema)?;
 

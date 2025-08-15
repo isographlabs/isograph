@@ -1350,6 +1350,7 @@ version = "0.3.1"
 dependencies = [
  "clap 4.5.31",
  "common_lang_types",
+ "graphql_network_protocol",
  "intern",
  "isograph_compiler",
  "isograph_config",

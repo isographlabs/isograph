@@ -116,8 +116,8 @@ fn visit_dirs_skipping_isograph(dir: &Path, cb: &mut dyn FnMut(&DirEntry)) -> io
 // TODO this should return a Vec of Results, since a file can contain
 // both valid and invalid iso literals.
 #[allow(clippy::type_complexity)]
-pub fn parse_iso_literals_in_file_content(
-    db: &IsographDatabase,
+pub fn parse_iso_literals_in_file_content<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
     relative_path_to_source_file: RelativePathToSourceFile,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<
@@ -152,8 +152,8 @@ pub fn parse_iso_literals_in_file_content(
 
 // TODO this (and the previous function) smell
 #[allow(clippy::type_complexity)]
-pub fn parse_iso_literals_in_file_content_and_return_all(
-    db: &IsographDatabase,
+pub fn parse_iso_literals_in_file_content_and_return_all<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
     relative_path_to_source_file: RelativePathToSourceFile,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Vec<Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>>>
@@ -174,8 +174,8 @@ pub fn parse_iso_literals_in_file_content_and_return_all(
 
 #[allow(clippy::type_complexity)]
 #[memo]
-pub fn parse_iso_literal_in_source(
-    db: &IsographDatabase,
+pub fn parse_iso_literal_in_source<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
     iso_literals_source_id: SourceId<IsoLiteralsSource>,
 ) -> Result<
     Vec<(IsoLiteralExtractionResult, TextSource)>,
@@ -191,8 +191,8 @@ pub fn parse_iso_literal_in_source(
 }
 
 #[memo]
-pub fn read_iso_literals_source_from_relative_path(
-    db: &IsographDatabase,
+pub fn read_iso_literals_source_from_relative_path<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
     relative_path_to_source_file: RelativePathToSourceFile,
 ) -> Option<IsoLiteralsSource> {
     let map = get_iso_literal_map(db);
@@ -205,8 +205,8 @@ pub fn read_iso_literals_source_from_relative_path(
 /// We should (probably) never directly read SourceId<IsoLiteralsSource>, since if we do so,
 /// we will ignore open files.
 #[memo]
-pub fn read_iso_literals_source(
-    db: &IsographDatabase,
+pub fn read_iso_literals_source<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
     iso_literals_source_id: SourceId<IsoLiteralsSource>,
 ) -> IsoLiteralsSource {
     let IsoLiteralsSource {
@@ -280,8 +280,8 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-pub fn process_iso_literal_extraction(
-    db: &IsographDatabase,
+pub fn process_iso_literal_extraction<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
     iso_literal_extraction: &IsoLiteralExtraction,
     relative_path_to_source_file: RelativePathToSourceFile,
     current_working_directory: CurrentWorkingDirectory,
@@ -353,8 +353,8 @@ pub struct IsoLiteralExtraction {
 }
 
 #[memo]
-pub fn extract_iso_literals_from_file_content(
-    db: &IsographDatabase,
+pub fn extract_iso_literals_from_file_content<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
     relative_path_to_source_file: RelativePathToSourceFile,
 ) -> Vec<IsoLiteralExtraction> {
     let memo_ref = read_iso_literals_source_from_relative_path(db, relative_path_to_source_file);
@@ -389,8 +389,8 @@ pub fn extract_iso_literals_from_file_content(
 }
 
 #[memo]
-pub fn memoized_parse_iso_literal(
-    db: &IsographDatabase,
+pub fn memoized_parse_iso_literal<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
     iso_literal_text: String,
     definition_file_path: RelativePathToSourceFile,
     const_export_name: Option<String>,

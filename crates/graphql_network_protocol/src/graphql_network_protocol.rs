@@ -33,7 +33,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
     type ParseAndProcessTypeSystemDocumentsError = ParseAndProcessGraphQLTypeSystemDocumentsError;
 
     fn parse_and_process_type_system_documents(
-        db: &IsographDatabase,
+        db: &IsographDatabase<Self>,
     ) -> Result<
         ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>,
         ParseAndProcessGraphQLTypeSystemDocumentsError,

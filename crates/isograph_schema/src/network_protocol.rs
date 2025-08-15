@@ -22,7 +22,7 @@ where
 
     #[allow(clippy::type_complexity)]
     fn parse_and_process_type_system_documents(
-        db: &IsographDatabase,
+        db: &IsographDatabase<Self>,
     ) -> Result<ProcessTypeSystemDocumentOutcome<Self>, Self::ParseAndProcessTypeSystemDocumentsError>;
 
     fn generate_query_text<'a>(

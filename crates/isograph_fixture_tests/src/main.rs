@@ -4,6 +4,7 @@ use clap::Parser;
 use common_lang_types::{
     relative_path_from_absolute_and_working_directory, CurrentWorkingDirectory,
 };
+use graphql_network_protocol::GraphQLNetworkProtocol;
 use intern::{string_key::Intern, Lookup};
 use isograph_compiler::{parse_iso_literals_in_file_content, IsoLiteralMap};
 use isograph_schema::{IsoLiteralsSource, IsographDatabase, OpenFileMap};
@@ -14,7 +15,7 @@ use regex::Regex;
 fn main() {
     let args = FixtureOpt::parse();
 
-    let mut db = IsographDatabase::default();
+    let mut db: IsographDatabase<GraphQLNetworkProtocol> = IsographDatabase::default();
 
     if args.dir.is_empty() {
         panic!("At least one directory must be provided.");
@@ -59,7 +60,7 @@ lazy_static! {
 const OUTPUT_SUFFIX: &str = r"output";
 
 fn generate_fixtures_for_files_in_folder(
-    db: &mut IsographDatabase,
+    db: &mut IsographDatabase<GraphQLNetworkProtocol>,
     folder: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) {
@@ -96,7 +97,7 @@ fn generate_fixtures_for_files_in_folder(
 }
 
 fn process_input_file(
-    db: &mut IsographDatabase,
+    db: &mut IsographDatabase<GraphQLNetworkProtocol>,
     input_file: PathBuf,
     output_file: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
@@ -134,7 +135,7 @@ fn process_input_file(
 }
 
 fn generate_content_for_output_file(
-    db: &IsographDatabase,
+    db: &IsographDatabase<GraphQLNetworkProtocol>,
     input_file: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> String {

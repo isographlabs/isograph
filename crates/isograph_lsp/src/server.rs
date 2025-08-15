@@ -69,7 +69,8 @@ pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
     _params: InitializeParams,
     current_working_directory: CurrentWorkingDirectory,
 ) -> LSPProcessResult<(), TNetworkProtocol> {
-    let mut compiler_state = CompilerState::new(config_location, current_working_directory)?;
+    let mut compiler_state: CompilerState<TNetworkProtocol> =
+        CompilerState::new(config_location, current_working_directory)?;
 
     eprintln!("Running server loop");
 
@@ -147,9 +148,9 @@ pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok(())
 }
 
-fn dispatch_notification(
+fn dispatch_notification<TNetworkProtocol: isograph_schema::NetworkProtocol>(
     notification: lsp_server::Notification,
-    compiler_state: &mut CompilerState,
+    compiler_state: &mut CompilerState<TNetworkProtocol>,
 ) -> ControlFlow<Option<LSPRuntimeError>, ()> {
     LSPNotificationDispatch::new(notification, compiler_state)
         .on_notification_sync::<DidOpenTextDocument>(on_did_open_text_document)?
@@ -159,7 +160,10 @@ fn dispatch_notification(
 
     ControlFlow::Continue(())
 }
-fn dispatch_request(request: lsp_server::Request, compiler_state: &CompilerState) -> Response {
+fn dispatch_request<TNetworkProtocol: isograph_schema::NetworkProtocol>(
+    request: lsp_server::Request,
+    compiler_state: &CompilerState<TNetworkProtocol>,
+) -> Response {
     // Returns ControlFlow::Break(ServerResponse) if the request
     // was handled, ControlFlow::Continue(Request) otherwise.
     let get_response = || {
