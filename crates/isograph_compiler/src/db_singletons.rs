@@ -1,7 +1,6 @@
 use common_lang_types::{CurrentWorkingDirectory, RelativePathToSourceFile};
 use isograph_config::CompilerConfig;
-use isograph_lang_types::{IsographDatabase, OpenFileMap, OpenFileSource};
-use isograph_schema::StandardSources;
+use isograph_schema::{IsographDatabase, OpenFileMap, OpenFileSource, StandardSources};
 use pico::{Database, SourceId};
 use pico_macros::memo;
 

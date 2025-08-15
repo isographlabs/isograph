@@ -6,8 +6,7 @@ use std::{
 
 use common_lang_types::CurrentWorkingDirectory;
 use isograph_config::create_config;
-use isograph_lang_types::{IsographDatabase, OpenFileMap};
-use isograph_schema::NetworkProtocol;
+use isograph_schema::{IsographDatabase, NetworkProtocol, OpenFileMap};
 use pico::Database;
 
 use crate::{batch_compile::BatchCompileError, source_files::initialize_sources};

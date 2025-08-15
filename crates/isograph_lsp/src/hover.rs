@@ -7,9 +7,9 @@ use isograph_compiler::{
     IsoLiteralExtraction,
 };
 use isograph_lang_types::{
-    get_path_to_root_from_object, get_path_to_root_from_scalar, IsographDatabase,
-    IsographResolvedNode,
+    get_path_to_root_from_object, get_path_to_root_from_scalar, IsographResolvedNode,
 };
+use isograph_schema::IsographDatabase;
 use lsp_types::{
     request::{HoverRequest, Request},
     Hover, HoverContents, MarkupContent, MarkupKind, Position, Url,

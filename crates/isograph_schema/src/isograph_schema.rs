@@ -5,9 +5,9 @@ use std::{
 
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, JavascriptName, Location,
-    ObjectSelectableName, RelativePathToSourceFile, SelectableName, ServerObjectEntityName,
-    ServerObjectSelectableName, ServerScalarEntityName, ServerScalarIdSelectableName,
-    ServerScalarSelectableName, UnvalidatedTypeName, WithLocation,
+    ObjectSelectableName, SelectableName, ServerObjectEntityName, ServerObjectSelectableName,
+    ServerScalarEntityName, ServerScalarIdSelectableName, ServerScalarSelectableName,
+    UnvalidatedTypeName, WithLocation,
 };
 use graphql_lang_types::GraphQLNamedTypeAnnotation;
 use intern::string_key::Intern;
@@ -15,12 +15,10 @@ use intern::Lookup;
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDirectiveSet, DefinitionLocation, EmptyDirectiveSet,
-    ObjectSelection, ScalarSelection, SchemaSource, SelectionType,
-    SelectionTypeContainingSelections, VariableDefinition, WithId,
+    ObjectSelection, ScalarSelection, SelectionType, SelectionTypeContainingSelections,
+    VariableDefinition, WithId,
 };
 use lazy_static::lazy_static;
-use pico::SourceId;
-use pico_macros::Singleton;
 
 use crate::{
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
@@ -820,17 +818,4 @@ fn set_and_validate_id_field(
             Ok(())
         }
     }
-}
-
-// We're using this type to constrain the types of sources that we accept. i.e.
-// in theory, you can have a TNetworkProtocol with a different Source associated
-// type, but for now, we get a source + set of extensions, and have to restrict
-// TNetworkProtocol accordingly. Perhaps the config can have a generic, and
-// thus we can thread this further back, but that is not yet implemented.
-#[derive(Debug, Clone, Singleton, PartialEq, Eq)]
-pub struct StandardSources {
-    // TODO we should just store this as a singleton, and not have it in standard sources.
-    // Or perhaps, we store the schema source directly here.
-    pub schema_source_id: SourceId<SchemaSource>,
-    pub schema_extension_sources: BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
 }

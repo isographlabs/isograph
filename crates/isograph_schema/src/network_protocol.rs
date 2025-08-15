@@ -5,11 +5,11 @@ use common_lang_types::{
     UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation, RootOperationKind};
-use isograph_lang_types::{Description, IsographDatabase};
+use isograph_lang_types::Description;
 
 use crate::{
-    ExposeFieldDirective, MergedSelectionMap, RootOperationName, Schema, ServerObjectEntity,
-    ServerScalarEntity, ValidatedVariableDefinition,
+    isograph_database::IsographDatabase, ExposeFieldDirective, MergedSelectionMap,
+    RootOperationName, Schema, ServerObjectEntity, ServerScalarEntity, ValidatedVariableDefinition,
 };
 
 pub trait NetworkProtocol:

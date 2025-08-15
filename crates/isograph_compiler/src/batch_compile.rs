@@ -14,8 +14,9 @@ use crate::{
 use colored::Colorize;
 use common_lang_types::{CurrentWorkingDirectory, WithLocation};
 use generate_artifacts::get_artifact_path_and_content;
-use isograph_lang_types::IsographDatabase;
-use isograph_schema::{validate_use_of_arguments, NetworkProtocol, ValidateUseOfArgumentsError};
+use isograph_schema::{
+    validate_use_of_arguments, IsographDatabase, NetworkProtocol, ValidateUseOfArgumentsError,
+};
 use pretty_duration::pretty_duration;
 use thiserror::Error;
 use tracing::{error, info};

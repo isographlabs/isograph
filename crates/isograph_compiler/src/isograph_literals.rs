@@ -5,11 +5,10 @@ use common_lang_types::{
 use isograph_lang_parser::{
     parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
 };
-use isograph_lang_types::{
-    EntrypointDeclaration, IsoLiteralsSource, IsographDatabase, SelectionType,
-};
+use isograph_lang_types::{EntrypointDeclaration, SelectionType};
 use isograph_schema::{
-    NetworkProtocol, ProcessClientFieldDeclarationError, Schema, UnprocessedItem,
+    IsoLiteralsSource, IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError,
+    Schema, UnprocessedItem,
 };
 use lazy_static::lazy_static;
 use pico::SourceId;

@@ -1,6 +1,6 @@
 use common_lang_types::relative_path_from_absolute_and_working_directory;
 use isograph_compiler::{get_current_working_directory, get_open_file_map, CompilerState};
-use isograph_lang_types::OpenFileSource;
+use isograph_schema::OpenFileSource;
 use lsp_types::{
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification,

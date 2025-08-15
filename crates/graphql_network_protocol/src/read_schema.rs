@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use common_lang_types::{RelativePathToSourceFile, WithLocation};
 use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDocument};
 use graphql_schema_parser::{parse_schema, parse_schema_extensions, SchemaParseError};
-use isograph_lang_types::{IsographDatabase, SchemaSource};
+use isograph_schema::{IsographDatabase, SchemaSource};
 use pico::{MemoRef, SourceId};
 use pico_macros::memo;
 

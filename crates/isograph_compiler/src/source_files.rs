@@ -10,8 +10,7 @@ use common_lang_types::{
 };
 use intern::Lookup;
 use isograph_config::absolute_and_relative_paths;
-use isograph_lang_types::{IsoLiteralsSource, IsographDatabase, SchemaSource};
-use isograph_schema::StandardSources;
+use isograph_schema::{IsoLiteralsSource, IsographDatabase, SchemaSource, StandardSources};
 use pico::{Database, SourceId};
 use pico_macros::Singleton;
 use thiserror::Error;

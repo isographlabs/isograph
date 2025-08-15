@@ -6,7 +6,7 @@ use common_lang_types::{
 };
 use intern::{string_key::Intern, Lookup};
 use isograph_compiler::{parse_iso_literals_in_file_content, IsoLiteralMap};
-use isograph_lang_types::{IsoLiteralsSource, IsographDatabase, OpenFileMap};
+use isograph_schema::{IsoLiteralsSource, IsographDatabase, OpenFileMap};
 use lazy_static::lazy_static;
 use pico::Database;
 use regex::Regex;

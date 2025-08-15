@@ -9,7 +9,8 @@ use isograph_compiler::{
     read_iso_literals_source_from_relative_path, CompilerState,
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
-use isograph_lang_types::{IsographDatabase, IsographSemanticToken};
+use isograph_lang_types::IsographSemanticToken;
+use isograph_schema::IsographDatabase;
 use lsp_types::{
     request::{Request, SemanticTokensFullRequest},
     SemanticToken as LspSemanticToken, SemanticTokens as LspSemanticTokens,

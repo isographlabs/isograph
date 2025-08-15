@@ -10,9 +10,9 @@ use isograph_compiler::{
     IsoLiteralExtraction,
 };
 use isograph_lang_types::{
-    semantic_token_legend::IndentChange, InlineBehavior, IsographDatabase, LineBehavior,
-    SpaceAfter, SpaceBefore,
+    semantic_token_legend::IndentChange, InlineBehavior, LineBehavior, SpaceAfter, SpaceBefore,
 };
+use isograph_schema::IsographDatabase;
 use lsp_types::{
     request::{Formatting, Request},
     Position, Range, TextEdit,

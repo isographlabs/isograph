@@ -3,7 +3,7 @@ use graphql_lang_types::{from_graphql_directive, DeserializationError};
 use graphql_schema_parser::SchemaParseError;
 use intern::string_key::Intern;
 use isograph_compiler::get_standard_sources;
-use isograph_lang_types::IsographDatabase;
+use isograph_schema::IsographDatabase;
 use isograph_schema::{
     CreateAdditionalFieldsError, ExposeAsFieldToInsert, MergedSelectionMap, NetworkProtocol,
     ProcessTypeSystemDocumentOutcome, RootOperationName, Schema, StandardSources,
