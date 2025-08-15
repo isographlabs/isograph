@@ -1,7 +1,7 @@
 
 set -e
 
-rm -rf ./out
+rimraf ./out
 npm run build
 
 cd ./out

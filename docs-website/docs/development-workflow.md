@@ -121,7 +121,7 @@ pnpm i
 ### Build the Isograph JavaScript libraries for use in demos
 
 :::warn
-If you are on Windows, you need to use a linux-based terminal, or else `pnpm watch-libs` will not work, because `rm` is not a command. As a temporary workaround, you can search-and-replace `rm -rf dist/* && ` with an empty string.
+If you are on Windows, you need to use a linux-based terminal, or else `pnpm watch-libs` will not work, because `rm` is not a command. As a temporary workaround, you can search-and-replace `rimraf dist/* && ` with an empty string.
 :::
 
 ```sh
