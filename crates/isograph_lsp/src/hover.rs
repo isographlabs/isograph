@@ -211,7 +211,8 @@ fn get_index_of_line_char(source: &str, line_char: LineChar) -> u32 {
         }
 
         if remaining_line_breaks == 0 {
-            return index as u32 + line_char.character;
+            // Why were we off by one to begin with? This is a bad fix!
+            return index as u32 + line_char.character + 1;
         }
     }
 
