@@ -1,4 +1,3 @@
-import { ItemCleanupPair } from '@isograph/disposable-types';
 import {
   afterEach,
   assert,
@@ -8,6 +7,7 @@ import {
   test,
   vi,
 } from 'vitest';
+import { ItemCleanupPair } from '.';
 import {
   CacheItem,
   CacheItemState,

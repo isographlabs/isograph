@@ -1,8 +1,7 @@
-import { ItemCleanupPair } from '@isograph/disposable-types';
+import { ItemCleanupPair, ParentCache } from '@isograph/disposable-types';
 import React, { useEffect, useState } from 'react';
 import { create } from 'react-test-renderer';
 import { describe, expect, test, vi } from 'vitest';
-import { ParentCache } from './ParentCache';
 import { useLazyDisposableState } from './useLazyDisposableState';
 
 function createCache<T>(value: T) {
