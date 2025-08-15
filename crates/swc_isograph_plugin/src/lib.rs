@@ -26,7 +26,7 @@ use thiserror::Error;
 use tracing::debug;
 
 static OPERATION_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\s*(entrypoint|field)\s*([^\.\s]+)\.([^\s\(]+)").unwrap());
+    Lazy::new(|| Regex::new(r"\s*(entrypoint|field|pointer)\s*([^\.\s]+)\.([^\s\(]+)").unwrap());
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -88,7 +88,7 @@ pub fn compile_iso_literal_visitor<'a>(
 
 #[derive(Error, Clone, Debug, Eq, PartialEq)]
 enum IsographTransformError {
-    #[error("Invalid iso tag usage. Expected 'entrypoint' or 'field'.")]
+    #[error("Invalid iso tag usage. Expected 'entrypoint', 'field' or 'pointer'.")]
     InvalidIsoKeyword,
 
     #[error("Invalid iso tag usage. The iso function should be passed exactly one argument.")]
@@ -162,7 +162,7 @@ impl From<&str> for ArtifactType {
     fn from(s: &str) -> Self {
         match s {
             "entrypoint" => Self::Entrypoint,
-            "field" => Self::Field,
+            "field" | "pointer" => Self::Field,
             _ => {
                 panic!("Regex will not produce this case. This is indicative of a bug in Isograph.")
             }
