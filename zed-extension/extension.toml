@@ -12,3 +12,8 @@ repository = "https://github.com/XiNiHa/isograph"
 # TODO: switch to some valid commit
 rev = "tree-sitter"
 path = "tree-sitter"
+
+[language_servers.isograph]
+name = "Isograph"
+language = "Isograph"
+languages = ["JavaScript", "JSX", "TypeScript", "TSX"]
