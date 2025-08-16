@@ -1,6 +1,7 @@
-import { ParentCache } from '@isograph/react-disposable-state';
+import { ParentCache } from '@isograph/disposable-types';
 import { IsographEntrypoint } from './entrypoint';
 import {
+  ExtractStartUpdate,
   FragmentReference,
   Variables,
   type StableIdForFragmentReference,
@@ -9,7 +10,7 @@ import {
 import { RetainedQuery } from './garbageCollection';
 import { LogFunction, WrappedLogFunction } from './logging';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
-import { WithEncounteredRecords } from './read';
+import { NetworkRequestReaderOptions, WithEncounteredRecords } from './read';
 import type { ReaderAst, StartUpdate } from './reader';
 
 export type ComponentOrFieldName = string;
@@ -50,11 +51,12 @@ export type Subscriptions = Set<Subscription>;
 // Should this be a map?
 export type CacheMap<T> = { [index: string]: ParentCache<T> };
 
-export type IsographEnvironment = {
+export type IsographEnvironment<TComponent = unknown> = {
   readonly store: IsographStore;
   readonly networkFunction: IsographNetworkFunction;
+  readonly componentFunction: IsographComponentFunction<TComponent>;
   readonly missingFieldHandler: MissingFieldHandler | null;
-  readonly componentCache: FieldCache<React.FC<any>>;
+  readonly componentCache: FieldCache<TComponent>;
   readonly eagerReaderCache: FieldCache<StartUpdate<any> | undefined>;
   readonly subscriptions: Subscriptions;
   // N.B. this must be <any, any>, but all *usages* of this should go through
@@ -83,6 +85,17 @@ export type IsographNetworkFunction = (
   queryText: string,
   variables: Variables,
 ) => Promise<any>;
+
+export type IsographComponentFunction<
+  TComponent,
+  TReadFromStore extends UnknownTReadFromStore = any,
+> = (
+  environment: IsographEnvironment,
+  componentName: string,
+  fragmentReference: FragmentReference<TReadFromStore, any>,
+  networkRequestOptions: NetworkRequestReaderOptions,
+  startUpdate: ExtractStartUpdate<TReadFromStore>,
+) => TComponent;
 
 export type Link = {
   readonly __link: DataId;
@@ -125,18 +138,20 @@ export type IsographStore = {
 };
 
 const DEFAULT_GC_BUFFER_SIZE = 10;
-export function createIsographEnvironment(
+export function createIsographEnvironment<TComponent>(
   store: IsographStore,
   networkFunction: IsographNetworkFunction,
+  componentFunction: IsographComponentFunction<TComponent>,
   missingFieldHandler?: MissingFieldHandler | null,
   logFunction?: LogFunction | null,
-): IsographEnvironment {
+): IsographEnvironment<TComponent> {
   logFunction?.({
     kind: 'EnvironmentCreated',
   });
   return {
     store,
     networkFunction,
+    componentFunction,
     missingFieldHandler: missingFieldHandler ?? null,
     componentCache: {},
     eagerReaderCache: {},

@@ -30,14 +30,14 @@ export {
   ROOT_ID,
   type DataId,
   type DataTypeValue,
-  type IsographEnvironment,
+  type IsographEnvironment as RawIsographEnvironment,
   type IsographNetworkFunction,
   type IsographStore,
   type MissingFieldHandler,
   type Link,
   type StoreRecord,
   type CacheMap,
-  createIsographEnvironment,
+  createIsographEnvironment as createRawIsographEnvironment,
   createIsographStore,
   type FieldCache,
   type Subscriptions,
@@ -127,6 +127,10 @@ export {
   type RequiredShouldFetch,
 } from './core/check';
 
+export {
+  IsographReactEnvironment as IsographEnvironment,
+  createIsographReactEnvironment as createIsographEnvironment,
+} from './react/IsographReactEnvironment';
 export {
   IsographEnvironmentProvider,
   useIsographEnvironment,

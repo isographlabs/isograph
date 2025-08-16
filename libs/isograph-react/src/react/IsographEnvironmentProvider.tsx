@@ -1,12 +1,12 @@
 import * as React from 'react';
 import { createContext, ReactNode, useContext } from 'react';
-import { type IsographEnvironment } from '../core/IsographEnvironment';
+import { IsographReactEnvironment } from './IsographReactEnvironment';
 
 export const IsographEnvironmentContext =
-  createContext<IsographEnvironment | null>(null);
+  createContext<IsographReactEnvironment | null>(null);
 
 export type IsographEnvironmentProviderProps = {
-  readonly environment: IsographEnvironment;
+  readonly environment: IsographReactEnvironment;
   readonly children: ReactNode;
 };
 
@@ -21,7 +21,7 @@ export function IsographEnvironmentProvider({
   );
 }
 
-export function useIsographEnvironment(): IsographEnvironment {
+export function useIsographEnvironment(): IsographReactEnvironment {
   const context = useContext(IsographEnvironmentContext);
   if (context == null) {
     throw new Error(

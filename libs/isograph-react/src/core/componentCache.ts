@@ -1,55 +1,27 @@
-import { useReadAndSubscribe } from '../react/useReadAndSubscribe';
 import {
   FragmentReference,
   stableIdForFragmentReference,
 } from './FragmentReference';
 import { IsographEnvironment } from './IsographEnvironment';
-import { logMessage } from './logging';
-import { readPromise } from './PromiseWrapper';
 import { NetworkRequestReaderOptions } from './read';
 import { createStartUpdate } from './startUpdate';
 
-export function getOrCreateCachedComponent(
-  environment: IsographEnvironment,
+export function getOrCreateCachedComponent<TComponent>(
+  environment: IsographEnvironment<TComponent>,
   componentName: string,
   fragmentReference: FragmentReference<any, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
-): React.FC<any> {
+): TComponent {
   // We create startUpdate outside of component to make it stable
   const startUpdate = createStartUpdate(environment, fragmentReference);
 
   return (environment.componentCache[
     stableIdForFragmentReference(fragmentReference, componentName)
-  ] ??= (() => {
-    function Component(additionalRuntimeProps: { [key: string]: any }) {
-      const readerWithRefetchQueries = readPromise(
-        fragmentReference.readerWithRefetchQueries,
-      );
-
-      const data = useReadAndSubscribe(
-        fragmentReference,
-        networkRequestOptions,
-        readerWithRefetchQueries.readerArtifact.readerAst,
-      );
-
-      logMessage(environment, () => ({
-        kind: 'ComponentRerendered',
-        componentName,
-        rootLink: fragmentReference.root,
-      }));
-
-      return readerWithRefetchQueries.readerArtifact.resolver(
-        {
-          data,
-          parameters: fragmentReference.variables,
-          startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
-            ? startUpdate
-            : undefined,
-        },
-        additionalRuntimeProps,
-      );
-    }
-    Component.displayName = `${componentName} (id: ${fragmentReference.root}) @component`;
-    return Component;
-  })());
+  ] ??= environment.componentFunction(
+    environment,
+    componentName,
+    fragmentReference,
+    networkRequestOptions,
+    startUpdate,
+  ));
 }

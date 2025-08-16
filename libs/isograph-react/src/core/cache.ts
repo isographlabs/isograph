@@ -2,7 +2,9 @@ import {
   Factory,
   ItemCleanupPair,
   ParentCache,
-} from '@isograph/react-disposable-state';
+} from '@isograph/disposable-types';
+import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
+import { FetchOptions } from './check';
 import {
   IsographEntrypoint,
   NormalizationInlineFragment,
@@ -12,9 +14,7 @@ import {
   type NormalizationAst,
   type NormalizationAstLoader,
   type NormalizationAstNodes,
-} from '../core/entrypoint';
-import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
-import { FetchOptions } from './check';
+} from './entrypoint';
 import {
   ExtractParameters,
   FragmentReference,
