@@ -1,0 +1,163 @@
+==================
+Number
+==================
+
+field Type.Name {
+  args(arg1: 123)
+}
+
+---
+
+(source_file
+  (client_field_declaration
+    (field_name
+      (identifier)
+      (identifier))
+    (selection_set
+      (field
+        (identifier)
+        (arguments
+          (argument
+            (identifier)
+            (integer)))))))
+
+==================
+String
+==================
+
+field Type.Name {
+  args(arg1: "string literal")
+}
+
+---
+
+(source_file
+  (client_field_declaration
+    (field_name
+      (identifier)
+      (identifier))
+    (selection_set
+      (field
+        (identifier)
+        (arguments
+          (argument
+            (identifier)
+            (string)))))))
+
+==================
+Boolean
+==================
+
+field Type.Name {
+  args(arg1: true)
+}
+
+---
+
+(source_file
+  (client_field_declaration
+    (field_name
+      (identifier)
+      (identifier))
+    (selection_set
+      (field
+        (identifier)
+        (arguments
+          (argument
+            (identifier)
+            (boolean)))))))
+
+==================
+Null
+==================
+
+field Type.Name {
+  args(arg1: null)
+}
+
+---
+
+(source_file
+  (client_field_declaration
+    (field_name
+      (identifier)
+      (identifier))
+    (selection_set
+      (field
+        (identifier)
+        (arguments
+          (argument
+            (identifier)
+            (null)))))))
+
+==================
+Variable
+==================
+
+field Type.Name {
+  args(arg1: $var)
+}
+
+---
+
+(source_file
+  (client_field_declaration
+    (field_name
+      (identifier)
+      (identifier))
+    (selection_set
+      (field
+        (identifier)
+        (arguments
+          (argument
+            (identifier)
+            (variable
+              (identifier))))))))
+
+==================
+Object
+==================
+
+field Type.Name {
+  args(arg1: { foo: "bar" })
+}
+
+---
+
+(source_file
+  (client_field_declaration
+    (field_name
+      (identifier)
+      (identifier))
+    (selection_set
+      (field
+        (identifier)
+        (arguments
+          (argument
+            (identifier)
+            (object
+              (object_field
+                (identifier)
+                (string)))))))))
+
+==================
+Enum
+:error
+==================
+
+field Type.Name {
+  args(arg1: ENUM)
+}
+
+---
+
+==================
+Array
+:error
+==================
+
+field Type.Name {
+  args(arg1: [])
+}
+
+---

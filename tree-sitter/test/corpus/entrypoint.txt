@@ -1,0 +1,41 @@
+==================
+Basic
+==================
+
+entrypoint Type.Name
+
+---
+
+(source_file
+  (entrypoint_declaration
+    (field_name
+      (identifier)
+      (identifier))))
+
+==================
+With Directives
+==================
+
+entrypoint Type.Name @foo
+
+---
+
+(source_file
+  (entrypoint_declaration
+    (field_name
+      (identifier)
+      (identifier))
+    (directives
+      (directive
+        (identifier)))))
+
+==================
+With Selection Set
+:error
+==================
+
+entrypoint Type.Name {
+  wat
+}
+
+---
