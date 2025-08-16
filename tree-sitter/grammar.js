@@ -1,0 +1,112 @@
+/**
+ * @file Isograph grammar for tree-sitter
+ * @author Isograph Labs
+ * @license MIT
+ */
+
+/// <reference types="tree-sitter-cli/dsl" />
+// @ts-check
+
+module.exports = grammar({
+  name: 'isograph',
+
+  rules: {
+    source_file: ($) => $.document,
+    document: ($) =>
+      choice(
+        $.entrypoint_declaration,
+        $.client_field_declaration,
+        $.client_pointer_declaration,
+      ),
+    entrypoint_declaration: ($) =>
+      seq('entrypoint', $.field_name, optional($.directives)),
+    client_field_declaration: ($) =>
+      seq(
+        'field',
+        $.field_name,
+        optional($.variable_definitions),
+        optional($.directives),
+        optional($.description),
+        $.selection_set,
+      ),
+    client_pointer_declaration: ($) =>
+      seq(
+        'pointer',
+        $.field_name,
+        'to',
+        $.type_annotation,
+        optional($.variable_definitions),
+        optional($.directives),
+        optional($.description),
+        $.selection_set,
+      ),
+    field_name: ($) => seq($.identifier, '.', $.identifier),
+    default_value: ($) => seq('=', $.non_constant_value),
+    variable_definitions: ($) => seq('(', commaSep($.variable_definition), ')'),
+    variable_definition: ($) =>
+      seq($.variable, ':', $.type_annotation, optional($.default_value)),
+    selection_set: ($) => seq('{', repeat($.field), '}'),
+    field: ($) =>
+      seq(
+        optional($.alias),
+        $.identifier,
+        optional($.arguments),
+        optional($.directives),
+        optional($.selection_set),
+      ),
+    alias: ($) => seq($.identifier, ':'),
+    arguments: ($) => seq('(', commaSep($.argument), ')'),
+    argument: ($) => seq($.identifier, ':', $.non_constant_value),
+    non_constant_value: ($) =>
+      choice($.variable, $.string, $.integer, $.object, $.null, $.boolean),
+    variable: ($) => seq('$', $.identifier),
+    string: ($) =>
+      seq(
+        '"',
+        choice($.escaped_character, $.escaped_unicode, $.string_characters),
+        '"',
+      ),
+    block_string: () =>
+      seq('"""', choice('\\"""', /[\u0009\u000A\u000D\u0020-\uFFFF]/), '"""'),
+    integer: () => /-?(0|[1-9][0-9]*)/,
+    boolean: () => choice('true', 'false'),
+    null: () => 'null',
+    object: ($) => seq('{', commaSep($.object_field), '}'),
+    object_field: ($) => seq($.identifier, ':', $.non_constant_value),
+    escaped_character: () => /\\["\\/bfnrt]/,
+    escaped_unicode: () => /\\u[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]"/,
+    line_terminator: () => /\n|\r|\r\n/,
+    string_characters: () => /[\u0009\u0020\u0021\u0023-\u005B\u005D-\uFFFF]+/,
+    directives: ($) => repeat1($.directive),
+    directive: ($) => seq('@', $.identifier, optional($.arguments)),
+    type_annotation: ($) =>
+      choice(
+        seq($.identifier, optional('!')),
+        seq('[', $.type_annotation, ']', optional('!')),
+      ),
+    identifier: () => /[a-zA-Z_][a-zA-Z0-9_]*/,
+    description: ($) => choice($.string, $.block_string),
+  },
+});
+
+/**
+ * Creates a rule to match one or more of the rules separated by a comma
+ *
+ * @param {Rule} rule
+ *
+ * @returns {SeqRule}
+ */
+function commaSep1(rule) {
+  return seq(rule, repeat(seq(',', rule)));
+}
+
+/**
+ * Creates a rule to optionally match one or more of the rules separated by a comma
+ *
+ * @param {Rule} rule
+ *
+ * @returns {ChoiceRule}
+ */
+function commaSep(rule) {
+  return optional(commaSep1(rule));
+}
