@@ -1,0 +1,10 @@
+{
+  "lsp": {
+    "isograph": {
+      "settings": {
+        "rootDirectory": "./demos/pet-demo",
+        "pathToIso": "scripts/start-debug-cli.js"
+      }
+    }
+  }
+}
