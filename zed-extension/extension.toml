@@ -10,3 +10,8 @@ repository = "https://github.com/isographlabs/isograph"
 repository = "https://github.com/isographlabs/isograph"
 rev = "b365b0880e3b0008f27ac10ba1d346a2b2fcbe00"
 path = "tree-sitter"
+
+[language_servers.isograph]
+name = "Isograph"
+language = "Isograph"
+languages = ["JavaScript", "JSX", "TypeScript", "TSX"]
