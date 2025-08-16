@@ -2,3 +2,4 @@ packages:
   - 'libs/*'
   - 'demos/*'
   - 'docs-website'
+  - 'tree-sitter'
