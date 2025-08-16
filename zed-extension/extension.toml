@@ -1,0 +1,12 @@
+id = "isograph"
+name = "Isograph"
+version = "0.0.1"
+schema_version = 1
+authors = ["Isograph Labs"]
+description = "Language support for Isograph"
+repository = "https://github.com/isographlabs/isograph"
+
+[grammars.isograph]
+repository = "https://github.com/isographlabs/isograph"
+rev = "b365b0880e3b0008f27ac10ba1d346a2b2fcbe00"
+path = "tree-sitter"
