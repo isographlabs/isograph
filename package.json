@@ -19,6 +19,7 @@
     "build-compiler": "cargo build --color=always",
     "build-swc": "cargo build -p swc_isograph_plugin --release --target wasm32-wasip1 && cd ./libs/isograph-swc-plugin && pnpm prepack",
     "compile-libs": "turbo compile-libs --log-order=grouped",
+    "watch-libs": "turbo watch compile-libs",
     "cross": "cross build",
     "build-json-schema": "./target/debug/build_json_schema",
     "watch-pet-demo": "turbo watch iso --filter=// --filter=pet-demo",
