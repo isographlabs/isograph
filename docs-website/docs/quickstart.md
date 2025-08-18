@@ -280,7 +280,10 @@ function nonNullable<T>(value: T): value is NonNullable<T> {
   return value != null;
 }
 
-function toSorted<T>(arr: T[], comparator: (a: T, b: T) => number): T[] {
+function toSorted<T>(
+  arr: readonly T[],
+  comparator: (a: T, b: T) => number,
+): T[] {
   const sorted = [...arr];
   sorted.sort(comparator);
   return sorted;
@@ -428,7 +431,10 @@ function nonNullable<T>(value: T): value is NonNullable<T> {
   return value != null;
 }
 
-function toSorted<T>(arr: T[], comparator: (a: T, b: T) => number): T[] {
+function toSorted<T>(
+  arr: readonly T[],
+  comparator: (a: T, b: T) => number,
+): T[] {
   const sorted = [...arr];
   sorted.sort(comparator);
   return sorted;
