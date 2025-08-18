@@ -177,117 +177,250 @@ Ok(
                         ),
                         semantic_tokens: [
                             WithSpan {
-                                item: IsographSemanticToken(
-                                    15,
-                                ),
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        15,
+                                    ),
+                                    line_behavior: StartsNewLine(
+                                        StartsNewLineBehavior {
+                                            space_after: SpaceAfter(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Same,
+                                },
                                 span: Span {
                                     start: 3,
                                     end: 10,
                                 },
                             },
                             WithSpan {
-                                item: IsographSemanticToken(
-                                    2,
-                                ),
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        2,
+                                    ),
+                                    line_behavior: Inline(
+                                        InlineBehavior {
+                                            space_before: SpaceBefore(
+                                                true,
+                                            ),
+                                            space_after: SpaceAfter(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Same,
+                                },
                                 span: Span {
                                     start: 11,
                                     end: 15,
                                 },
                             },
                             WithSpan {
-                                item: IsographSemanticToken(
-                                    21,
-                                ),
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        21,
+                                    ),
+                                    line_behavior: Inline(
+                                        InlineBehavior {
+                                            space_before: SpaceBefore(
+                                                false,
+                                            ),
+                                            space_after: SpaceAfter(
+                                                false,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Same,
+                                },
                                 span: Span {
                                     start: 15,
                                     end: 16,
                                 },
                             },
                             WithSpan {
-                                item: IsographSemanticToken(
-                                    13,
-                                ),
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        13,
+                                    ),
+                                    line_behavior: Inline(
+                                        InlineBehavior {
+                                            space_before: SpaceBefore(
+                                                true,
+                                            ),
+                                            space_after: SpaceAfter(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Same,
+                                },
                                 span: Span {
                                     start: 16,
                                     end: 26,
                                 },
                             },
                             WithSpan {
-                                item: IsographSemanticToken(
-                                    15,
-                                ),
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        15,
+                                    ),
+                                    line_behavior: Inline(
+                                        InlineBehavior {
+                                            space_before: SpaceBefore(
+                                                true,
+                                            ),
+                                            space_after: SpaceAfter(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Same,
+                                },
                                 span: Span {
                                     start: 27,
                                     end: 29,
                                 },
                             },
                             WithSpan {
-                                item: IsographSemanticToken(
-                                    1,
-                                ),
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        1,
+                                    ),
+                                    line_behavior: Inline(
+                                        InlineBehavior {
+                                            space_before: SpaceBefore(
+                                                true,
+                                            ),
+                                            space_after: SpaceAfter(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Same,
+                                },
                                 span: Span {
                                     start: 30,
                                     end: 34,
                                 },
                             },
                             WithSpan {
-                                item: IsographSemanticToken(
-                                    21,
-                                ),
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        21,
+                                    ),
+                                    line_behavior: EndsLine(
+                                        EndsLineBehavior {
+                                            space_before: SpaceBefore(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Indent,
+                                },
                                 span: Span {
                                     start: 35,
                                     end: 36,
                                 },
                             },
                             WithSpan {
-                                item: IsographSemanticToken(
-                                    9,
-                                ),
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        9,
+                                    ),
+                                    line_behavior: StartsNewLine(
+                                        StartsNewLineBehavior {
+                                            space_after: SpaceAfter(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Same,
+                                },
                                 span: Span {
                                     start: 41,
                                     end: 48,
                                 },
                             },
                             WithSpan {
-                                item: IsographSemanticToken(
-                                    21,
-                                ),
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        21,
+                                    ),
+                                    line_behavior: EndsLine(
+                                        EndsLineBehavior {
+                                            space_before: SpaceBefore(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Indent,
+                                },
                                 span: Span {
                                     start: 49,
                                     end: 50,
                                 },
                             },
                             WithSpan {
-                                item: IsographSemanticToken(
-                                    9,
-                                ),
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        9,
+                                    ),
+                                    line_behavior: StartsNewLine(
+                                        StartsNewLineBehavior {
+                                            space_after: SpaceAfter(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Same,
+                                },
                                 span: Span {
                                     start: 57,
                                     end: 59,
                                 },
                             },
                             WithSpan {
-                                item: IsographSemanticToken(
-                                    9,
-                                ),
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        9,
+                                    ),
+                                    line_behavior: StartsNewLine(
+                                        StartsNewLineBehavior {
+                                            space_after: SpaceAfter(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Same,
+                                },
                                 span: Span {
                                     start: 66,
                                     end: 75,
                                 },
                             },
                             WithSpan {
-                                item: IsographSemanticToken(
-                                    21,
-                                ),
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        21,
+                                    ),
+                                    line_behavior: IsOwnLine,
+                                    indent_change: Dedent,
+                                },
                                 span: Span {
                                     start: 80,
                                     end: 81,
                                 },
                             },
                             WithSpan {
-                                item: IsographSemanticToken(
-                                    21,
-                                ),
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        21,
+                                    ),
+                                    line_behavior: IsOwnLine,
+                                    indent_change: Dedent,
+                                },
                                 span: Span {
                                     start: 84,
                                     end: 85,
