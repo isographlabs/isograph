@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import { createSchema } from 'graphql-yoga';
 import {
   getAdItem,
@@ -8,7 +9,9 @@ import {
   newsfeedResolvers,
 } from './newsfeed.js';
 
-const schemaContents = fs.readFileSync('./schema.graphql').toString();
+const schemaContents = fs
+  .readFileSync(path.resolve(import.meta.dirname, '../schema.graphql'))
+  .toString();
 
 const picturesTogether = [
   [

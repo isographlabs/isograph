@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "tsc": "tsc -b",
-    "iso": "cross-env ../../target/debug/isograph_cli --config ./isograph.config.json",
+    "iso": "cross-env ISO_PRINT_ABSOLUTE_FILEPATH=1 ../../target/debug/isograph_cli --config ./isograph.config.json",
     "iso-watch": "cross-env ../../target/debug/isograph_cli --config ./isograph.config.json --watch"
   },
   "dependencies": {
