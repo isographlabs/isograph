@@ -19,7 +19,8 @@ In a newly-created empty directory, run:
 ```sh
 npx create-next-app@latest . \
   --ts --eslint --no-app --src-dir \
-  --no-tailwind --import-alias "@/*"
+  --no-tailwind --import-alias "@/*" \
+  --no-turbopack
 ```
 
 This will install a NextJS app in this folder. Run it with `npm run dev`.
