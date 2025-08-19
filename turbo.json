@@ -1,11 +1,19 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
+    "iso": {
+      "cache": false,
+      "dependsOn": ["//#build-compiler"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
     "compile-libs": {
       "dependsOn": ["^compile-libs"],
       "outputs": ["dist/**"]
     },
-    "//#build": {
+    "//#build-compiler": {
       "inputs": ["crates/**", "relay-crates/**", "Cargo.*"],
       "outputs": ["**/release/isograph_cli*", "**/debug/isograph_cli*"]
     },
