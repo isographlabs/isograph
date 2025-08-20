@@ -39,48 +39,47 @@ pub fn on_hover<TNetworkProtocol: NetworkProtocol + 'static + 'static>(
         params.text_document_position_params.position.into(),
     )
     .to_owned();
+    let (extraction, offset) = match extraction_option {
+        Some(e) => e,
+        None => return Ok(None),
+    };
 
-    Ok(extraction_option
-        .and_then(|(extraction, offset)| {
-            if let Ok((result, _text_source)) = process_iso_literal_extraction(
-                db,
-                &extraction,
-                relative_path_to_source_file,
-                current_working_directory,
-            ) {
-                return Some(match result.resolve((), Span::new(offset, offset)) {
-                    IsographResolvedNode::ClientFieldDeclaration(_) => {
-                        "Client field decl".to_string()
-                    }
-                    IsographResolvedNode::ClientPointerDeclaration(_) => "pointer".to_string(),
-                    IsographResolvedNode::EntrypointDeclaration(_) => "entrypoint decl".to_string(),
-                    IsographResolvedNode::ServerObjectEntityNameWrapper(_) => {
-                        "parent type".to_string()
-                    }
-                    IsographResolvedNode::Description(_) => "description".to_string(),
-                    IsographResolvedNode::ScalarSelection(scalar_path) => {
-                        get_path_to_root_from_scalar(&scalar_path).join(" -> ")
-                    }
-                    IsographResolvedNode::ObjectSelection(object_path) => {
-                        get_path_to_root_from_object(&object_path).join(" -> ")
-                    }
-                    IsographResolvedNode::ClientScalarSelectableNameWrapper(_) => {
-                        "name of entrypoint or client field".to_string()
-                    }
-                    IsographResolvedNode::ClientObjectSelectableNameWrapper(_) => {
-                        "name of pointer".to_string()
-                    }
-                });
+    let hover_markup = if let Ok((result, _text_source)) = process_iso_literal_extraction(
+        db,
+        &extraction,
+        relative_path_to_source_file,
+        current_working_directory,
+    ) {
+        Some(match result.resolve((), Span::new(offset, offset)) {
+            IsographResolvedNode::ClientFieldDeclaration(_) => "Client field decl".to_string(),
+            IsographResolvedNode::ClientPointerDeclaration(_) => "pointer".to_string(),
+            IsographResolvedNode::EntrypointDeclaration(_) => "entrypoint decl".to_string(),
+            IsographResolvedNode::ServerObjectEntityNameWrapper(_) => "parent type".to_string(),
+            IsographResolvedNode::Description(_) => "description".to_string(),
+            IsographResolvedNode::ScalarSelection(scalar_path) => {
+                get_path_to_root_from_scalar(&scalar_path).join(" -> ")
             }
-            None
+            IsographResolvedNode::ObjectSelection(object_path) => {
+                get_path_to_root_from_object(&object_path).join(" -> ")
+            }
+            IsographResolvedNode::ClientScalarSelectableNameWrapper(_) => {
+                "name of entrypoint or client field".to_string()
+            }
+            IsographResolvedNode::ClientObjectSelectableNameWrapper(_) => {
+                "name of pointer".to_string()
+            }
         })
-        .map(|markup| Hover {
-            contents: HoverContents::Markup(MarkupContent {
-                kind: MarkupKind::PlainText,
-                value: markup,
-            }),
-            range: None,
-        }))
+    } else {
+        None
+    };
+
+    Ok(hover_markup.map(|markup| Hover {
+        contents: HoverContents::Markup(MarkupContent {
+            kind: MarkupKind::PlainText,
+            value: markup,
+        }),
+        range: None,
+    }))
 }
 
 #[memo]
