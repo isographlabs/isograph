@@ -15,6 +15,16 @@ pub struct Opt {
 pub enum Command {
     Compile(CompileCommand),
     Lsp(LspCommand),
+    GenerateConfig(GenerateConfig),
+}
+
+#[derive(Debug, Args)]
+pub struct GenerateConfig {
+    #[arg(long, short)]
+    pub schema: PathBuf,
+
+    #[arg(long, short)]
+    pub project_root: Option<PathBuf>,
 }
 
 /// Compile

@@ -23,6 +23,9 @@ async fn main() {
         Command::Lsp(lsp_command) => {
             start_language_server(lsp_command, current_working_directory()).await;
         }
+        Command::GenerateConfig(config) => {
+            eprintln!("{:?}", config);
+        }
     }
 }
 
