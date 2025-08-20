@@ -9,13 +9,14 @@ use crate::{
     get_isograph_config,
     with_duration::WithDuration,
     write_artifacts::{write_artifacts_to_disk, GenerateArtifactsError},
-    SourceError,
+    ContainsIsoStats, SourceError,
 };
 use colored::Colorize;
 use common_lang_types::{CurrentWorkingDirectory, WithLocation};
 use generate_artifacts::get_artifact_path_and_content;
 use isograph_schema::{
-    validate_use_of_arguments, IsographDatabase, NetworkProtocol, ValidateUseOfArgumentsError,
+    validate_use_of_arguments, IsographDatabase, NetworkProtocol, Schema,
+    ValidateUseOfArgumentsError,
 };
 use pretty_duration::pretty_duration;
 use thiserror::Error;
@@ -101,13 +102,7 @@ pub fn print_result<TNetworkProtocol: NetworkProtocol + 'static>(
 pub fn compile<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<CompilationStats, BatchCompileError<TNetworkProtocol>> {
-    // Create schema
-    let (unvalidated_isograph_schema, unprocessed_items) =
-        create_schema::<TNetworkProtocol>(db).deref().clone()?;
-    let (isograph_schema, stats) =
-        process_iso_literals_for_schema(db, unvalidated_isograph_schema, unprocessed_items)?;
-
-    validate_use_of_arguments(&isograph_schema)?;
+    let (isograph_schema, stats) = get_validated_schema(db)?;
 
     // Note: we calculate all of the artifact paths and contents first, so that writing to
     // disk can be as fast as possible and we minimize the chance that changes to the file
@@ -123,6 +118,17 @@ pub fn compile<TNetworkProtocol: NetworkProtocol + 'static>(
         entrypoint_count: stats.entrypoint_count,
         total_artifacts_written,
     })
+}
+
+pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), BatchCompileError<TNetworkProtocol>> {
+    let (unvalidated_isograph_schema, unprocessed_items) =
+        create_schema::<TNetworkProtocol>(db).deref().clone()?;
+    let (isograph_schema, stats) =
+        process_iso_literals_for_schema(db, unvalidated_isograph_schema, unprocessed_items)?;
+    validate_use_of_arguments(&isograph_schema)?;
+    Ok((isograph_schema, stats))
 }
 
 #[derive(Error, Debug)]
