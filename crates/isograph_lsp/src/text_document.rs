@@ -9,7 +9,7 @@ use lsp_types::{
 };
 use pico::Database;
 
-use crate::lsp_runtime_error::LSPRuntimeResult;
+use crate::{lsp_runtime_error::LSPRuntimeResult, uri_file_path_ext::UriFilePathExt};
 
 pub fn on_did_open_text_document<TNetworkProtocol: NetworkProtocol + 'static>(
     compiler_state: &mut CompilerState<TNetworkProtocol>,

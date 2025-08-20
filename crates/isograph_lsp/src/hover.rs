@@ -12,12 +12,15 @@ use isograph_lang_types::{
 use isograph_schema::{IsographDatabase, NetworkProtocol};
 use lsp_types::{
     request::{HoverRequest, Request},
-    Hover, HoverContents, MarkupContent, MarkupKind, Position, Url,
+    Hover, HoverContents, MarkupContent, MarkupKind, Position, Uri,
 };
 use pico_macros::memo;
 use resolve_position::ResolvePosition;
 
-use crate::{lsp_runtime_error::LSPRuntimeResult, semantic_tokens::delta_line_delta_start};
+use crate::{
+    lsp_runtime_error::LSPRuntimeResult, semantic_tokens::delta_line_delta_start,
+    uri_file_path_ext::UriFilePathExt,
+};
 
 pub fn on_hover<TNetworkProtocol: NetworkProtocol + 'static>(
     compiler_state: &CompilerState<TNetworkProtocol>,
@@ -87,7 +90,7 @@ pub fn get_iso_literal_extraction_from_text_position_params<
     TNetworkProtocol: NetworkProtocol + 'static,
 >(
     db: &IsographDatabase<TNetworkProtocol>,
-    url: Url,
+    url: Uri,
     line_char: LineChar,
 ) -> Option<(IsoLiteralExtraction, u32)> {
     let current_working_directory = get_current_working_directory(db);

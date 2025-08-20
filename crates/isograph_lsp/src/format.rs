@@ -19,7 +19,7 @@ use lsp_types::{
 };
 use pico_macros::memo;
 
-use crate::lsp_runtime_error::LSPRuntimeResult;
+use crate::{lsp_runtime_error::LSPRuntimeResult, uri_file_path_ext::UriFilePathExt};
 
 pub fn on_format<TNetworkProtocol: NetworkProtocol + 'static>(
     compiler_state: &CompilerState<TNetworkProtocol>,

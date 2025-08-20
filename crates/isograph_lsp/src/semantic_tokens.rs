@@ -1,6 +1,9 @@
 use std::ops::Deref;
 
-use crate::lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult};
+use crate::{
+    lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult},
+    uri_file_path_ext::UriFilePathExt,
+};
 use common_lang_types::{
     relative_path_from_absolute_and_working_directory, Span, TextSource, WithSpan,
 };
@@ -14,7 +17,7 @@ use isograph_schema::{IsographDatabase, NetworkProtocol};
 use lsp_types::{
     request::{Request, SemanticTokensFullRequest},
     SemanticToken as LspSemanticToken, SemanticTokens as LspSemanticTokens,
-    SemanticTokensResult as LspSemanticTokensResult, Url,
+    SemanticTokensResult as LspSemanticTokensResult, Uri,
 };
 use pico_macros::memo;
 
@@ -49,7 +52,7 @@ pub fn on_semantic_token_full_request<TNetworkProtocol: NetworkProtocol + 'stati
 #[memo]
 fn get_semantic_tokens<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
-    uri: Url,
+    uri: Uri,
 ) -> Result<Option<LspSemanticTokensResult>, LSPRuntimeError> {
     let current_working_directory = get_current_working_directory(db);
 
