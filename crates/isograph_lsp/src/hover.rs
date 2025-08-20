@@ -19,7 +19,7 @@ use resolve_position::ResolvePosition;
 
 use crate::{lsp_runtime_error::LSPRuntimeResult, semantic_tokens::delta_line_delta_start};
 
-pub fn on_hover<TNetworkProtocol: NetworkProtocol + 'static + 'static>(
+pub fn on_hover<TNetworkProtocol: NetworkProtocol + 'static>(
     compiler_state: &CompilerState<TNetworkProtocol>,
     params: <HoverRequest as Request>::Params,
 ) -> LSPRuntimeResult<<HoverRequest as Request>::Result> {
