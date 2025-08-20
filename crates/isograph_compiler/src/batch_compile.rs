@@ -122,7 +122,8 @@ pub fn compile<TNetworkProtocol: NetworkProtocol + 'static>(
 
 pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), BatchCompileError<TNetworkProtocol>> {
+) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), GetValidatedSchemaError<TNetworkProtocol>>
+{
     let (unvalidated_isograph_schema, unprocessed_items) =
         create_schema::<TNetworkProtocol>(db).deref().clone()?;
     let (isograph_schema, stats) =
@@ -133,18 +134,6 @@ pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol + 'static>(
 
 #[derive(Error, Debug)]
 pub enum BatchCompileError<TNetworkProtocol: NetworkProtocol + 'static> {
-    #[error("{error}")]
-    CreateSchemaError {
-        #[from]
-        error: CreateSchemaError<TNetworkProtocol>,
-    },
-
-    #[error("{error}")]
-    ProcessIsoLiteralsForSchemaError {
-        #[from]
-        error: ProcessIsoLiteralsForSchemaError,
-    },
-
     #[error("{error}")]
     SourceError {
         #[from]
@@ -164,26 +153,13 @@ pub enum BatchCompileError<TNetworkProtocol: NetworkProtocol + 'static> {
             output
         })
     )]
-    ValidateUseOfArguments {
-        messages: Vec<WithLocation<ValidateUseOfArgumentsError>>,
-    },
-
-    #[error(
-        "{}",
-        messages.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{x}"));
-            output
-        })
-    )]
     NotifyErrors { messages: Vec<notify::Error> },
-}
 
-impl<TNetworkProtocol: NetworkProtocol + 'static>
-    From<Vec<WithLocation<ValidateUseOfArgumentsError>>> for BatchCompileError<TNetworkProtocol>
-{
-    fn from(messages: Vec<WithLocation<ValidateUseOfArgumentsError>>) -> Self {
-        BatchCompileError::ValidateUseOfArguments { messages }
-    }
+    #[error("{error}")]
+    GetValidatedSchemaError {
+        #[from]
+        error: GetValidatedSchemaError<TNetworkProtocol>,
+    },
 }
 
 impl<TNetworkProtocol: NetworkProtocol + 'static> From<Vec<notify::Error>>
@@ -191,5 +167,40 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> From<Vec<notify::Error>>
 {
     fn from(messages: Vec<notify::Error>) -> Self {
         BatchCompileError::NotifyErrors { messages }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum GetValidatedSchemaError<TNetworkProtocol: NetworkProtocol + 'static> {
+    #[error(
+        "{}",
+        messages.iter().fold(String::new(), |mut output, x| {
+            output.push_str(&format!("\n\n{x}"));
+            output
+        })
+    )]
+    ValidateUseOfArguments {
+        messages: Vec<WithLocation<ValidateUseOfArgumentsError>>,
+    },
+
+    #[error("{error}")]
+    CreateSchemaError {
+        #[from]
+        error: CreateSchemaError<TNetworkProtocol>,
+    },
+
+    #[error("{error}")]
+    ProcessIsoLiteralsForSchemaError {
+        #[from]
+        error: ProcessIsoLiteralsForSchemaError,
+    },
+}
+
+impl<TNetworkProtocol: NetworkProtocol + 'static>
+    From<Vec<WithLocation<ValidateUseOfArgumentsError>>>
+    for GetValidatedSchemaError<TNetworkProtocol>
+{
+    fn from(messages: Vec<WithLocation<ValidateUseOfArgumentsError>>) -> Self {
+        GetValidatedSchemaError::ValidateUseOfArguments { messages }
     }
 }
