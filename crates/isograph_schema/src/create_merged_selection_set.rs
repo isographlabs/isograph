@@ -783,17 +783,6 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             newly_encountered_client_object_selectable_id,
                         );
 
-                        let parent_object_entity_id = *newly_encountered_client_object_selectable
-                            .target_object_entity_name()
-                            .inner();
-                        let parent_object = schema
-                            .server_entity_data
-                            .server_object_entity(parent_object_entity_id)
-                            .expect(
-                                "Expected entity to exist. \
-                                      This is indicative of a bug in Isograph.",
-                            );
-
                         insert_client_pointer_into_refetch_paths(
                             schema,
                             parent_map,
@@ -801,8 +790,6 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             merge_traversal_state,
                             newly_encountered_client_object_selectable_id,
                             newly_encountered_client_object_selectable,
-                            parent_object_entity_id,
-                            parent_object,
                             object_selection,
                             variable_context,
                         );
@@ -929,7 +916,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         &object_selection.selection_set,
                         encountered_client_type_map,
                         DefinitionLocation::Server((
-                            parent_object_entity_name,
+                            field_parent_object_entity_name,
                             field_server_object_selectable_name,
                         )),
                         &server_object_selectable.initial_variable_context(),
@@ -1218,11 +1205,22 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     newly_encountered_client_object_selectable_name: ClientObjectSelectableName,
     newly_encountered_client_object_selectable: &ClientObjectSelectable<TNetworkProtocol>,
-    parent_object_entity_name: ServerObjectEntityName,
-    parent_type: &ServerObjectEntity<TNetworkProtocol>,
     object_selection: &ValidatedObjectSelection,
     variable_context: &VariableContext,
 ) {
+    let parent_object_entity_id = *newly_encountered_client_object_selectable
+        .target_object_entity_name
+        .inner();
+    let parent_type = schema
+        .server_entity_data
+        .server_object_entity(parent_object_entity_id)
+        .expect("Expected entity to exist. \
+                     This is indicative of a bug in Isograph.");
+
+    let parent_object_entity_name = ClientOrServerObjectSelectable::parent_object_entity_name(
+        &newly_encountered_client_object_selectable,
+    );
+
     let name_and_arguments = create_transformed_name_and_arguments(
         object_selection.name.item.into(),
         &object_selection.arguments,
