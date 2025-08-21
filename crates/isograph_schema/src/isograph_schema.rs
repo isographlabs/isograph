@@ -24,7 +24,7 @@ use crate::{
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectableId,
     EntrypointDeclarationInfo, NetworkProtocol, NormalizationKey, ObjectSelectable,
-    ObjectSelectableId, ServerEntity, ServerEntityName, ServerObjectEntity,
+    ObjectSelectableId, ScalarSelectable, ServerEntity, ServerEntityName, ServerObjectEntity,
     ServerObjectEntityAvailableSelectables, ServerObjectSelectable, ServerScalarEntity,
     ServerScalarSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
 };
@@ -570,6 +570,26 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 client_object_selectable_name,
             )) => self
                 .client_pointer(parent_object_entity_name, client_object_selectable_name)
+                .map(DefinitionLocation::Client),
+        }
+    }
+
+    pub fn scalar_selectable(
+        &self,
+        field_id: ScalarSelectableId,
+    ) -> Option<ScalarSelectable<'_, TNetworkProtocol>> {
+        match field_id {
+            DefinitionLocation::Server((
+                parent_object_entity_name,
+                server_scalar_selectable_name,
+            )) => self
+                .server_scalar_selectable(parent_object_entity_name, server_scalar_selectable_name)
+                .map(DefinitionLocation::Server),
+            DefinitionLocation::Client((
+                parent_object_entity_name,
+                client_scalar_selectable_name,
+            )) => self
+                .client_field(parent_object_entity_name, client_scalar_selectable_name)
                 .map(DefinitionLocation::Client),
         }
     }
