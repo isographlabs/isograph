@@ -91,6 +91,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let mutation_field_payload_type_name = self
             .server_entity_data
             .server_object_entity(payload_object_entity_name)
+            .expect(
+                "Expected object entity to exist. \
+                This is indicative of a bug in Isograph.",
+            )
             .name;
 
         let client_field_scalar_selection_name =
@@ -156,7 +160,12 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let mutation_field_client_field_name =
             client_field_scalar_selection_name.unchecked_conversion();
 
-        let top_level_schema_field_concrete_type = payload_object_entity.concrete_type;
+        let top_level_schema_field_concrete_type = payload_object_entity
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            )
+            .concrete_type;
         let primary_field_concrete_type = maybe_abstract_parent_object_entity.concrete_type;
 
         let top_level_schema_field_arguments = mutation_field_arguments
@@ -189,6 +198,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                             self.server_entity_data
                                 .server_object_entity(
                                     *server_object_selectable.target_object_entity.inner(),
+                                )
+                                .expect(
+                                    "Expected entity to exist. \
+                                    This is indicative of a bug in Isograph.",
                                 )
                                 .name,
                         )

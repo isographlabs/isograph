@@ -50,6 +50,10 @@ fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
         GraphQLNonNullTypeAnnotation::List(_) => {
             let actual = schema_data
                 .server_scalar_entity(*scalar_literal_name)
+                .expect(
+                    "Expected entity to exist. \
+                    This is indicative of a bug in Isograph.",
+                )
                 .name
                 .item;
 
@@ -68,6 +72,10 @@ fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                 }
                 let actual = schema_data
                     .server_scalar_entity(*scalar_literal_name)
+                    .expect(
+                        "Expected entity to exist. \
+                        This is indicative of a bug in Isograph.",
+                    )
                     .name
                     .item;
 
@@ -81,6 +89,10 @@ fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             SelectionType::Object(_) => {
                 let actual = schema_data
                     .server_scalar_entity(*scalar_literal_name)
+                    .expect(
+                        "Expected entity to exist. \
+                        This is indicative of a bug in Isograph.",
+                    )
                     .name
                     .item;
 
@@ -501,11 +513,19 @@ fn id_annotation_to_typename_annotation<TNetworkProtocol: NetworkProtocol>(
     type_.clone().map(|type_id| match type_id {
         SelectionType::Scalar(scalar_entity_name) => schema_data
             .server_scalar_entity(scalar_entity_name)
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            )
             .name
             .item
             .into(),
         SelectionType::Object(object_entity_name) => schema_data
             .server_object_entity(object_entity_name)
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            )
             .name
             .into(),
     })
@@ -523,6 +543,10 @@ fn enum_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                 enum_type.clone().map(|_| {
                     schema_data
                         .server_object_entity(object_entity_name)
+                        .expect(
+                            "Expected entity to exist. \
+                            This is indicative of a bug in Isograph.",
+                        )
                         .name
                         .into()
                 }),

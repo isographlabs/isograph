@@ -60,7 +60,11 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol + 'st
     );
     let parent_object = schema
         .server_entity_data
-        .server_object_entity(client_field.parent_object_entity_name);
+        .server_object_entity(client_field.parent_object_entity_name)
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        );
 
     let new_selection_set = get_validated_selection_set(
         schema,
@@ -101,7 +105,11 @@ fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol + '
     );
     let parent_object = schema
         .server_entity_data
-        .server_object_entity(client_pointer.parent_object_name);
+        .server_object_entity(client_pointer.parent_object_name)
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        );
 
     let new_selection_set = get_validated_selection_set(
         schema,
@@ -230,7 +238,11 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                     );
                     let object = schema
                         .server_entity_data
-                        .server_object_entity(*object_selectable.target_object_entity.inner());
+                        .server_object_entity(*object_selectable.target_object_entity.inner())
+                        .expect(
+                            "Expected entity to exist. \
+                            This is indicative of a bug in Isograph.",
+                        );
 
                     WithLocation::new(
                         AddSelectionSetsError::SelectionTypeSelectionFieldIsNotScalar {
@@ -321,9 +333,15 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                             *parent_object_entity_name,
                             *server_scalar_selectable_name,
                         );
-                        let server_scalar = schema.server_entity_data.server_scalar_entity(
-                            *server_scalar_selectable.target_scalar_entity.inner(),
-                        );
+                        let server_scalar = schema
+                            .server_entity_data
+                            .server_scalar_entity(
+                                *server_scalar_selectable.target_scalar_entity.inner(),
+                            )
+                            .expect(
+                                "Expected entity to exist. \
+                                This is indicative of a bug in Isograph.",
+                            );
 
                         vec![WithLocation::new(
                             AddSelectionSetsError::SelectionTypeSelectionFieldIsScalar {
@@ -379,7 +397,11 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol + 'static>(
 
     let new_parent_object = schema
         .server_entity_data
-        .server_object_entity(new_parent_object_entity_name);
+        .server_object_entity(new_parent_object_entity_name)
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        );
 
     Ok(ObjectSelection {
         name: object_selection.name,

@@ -105,9 +105,14 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                         }
                         .normalization_key(),
                         ServerObjectSelectableVariant::InlineFragment => {
-                            let target_object_entity =
-                                schema.server_entity_data.server_object_entity(
+                            let target_object_entity = schema
+                                .server_entity_data
+                                .server_object_entity(
                                     *server_object_selectable.target_object_entity.inner(),
+                                )
+                                .expect(
+                                    "Expected entity to exist. \
+                                    This is indicative of a bug in Isograph.",
                                 );
                             NormalizationKey::InlineFragment(target_object_entity.name)
                         }
@@ -192,7 +197,11 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
                 ServerObjectSelectableVariant::InlineFragment => {
                     let object = schema
                         .server_entity_data
-                        .server_object_entity(server_field.parent_object_name);
+                        .server_object_entity(server_field.parent_object_name)
+                        .expect(
+                            "Expected entity to exist. \
+                            This is indicative of a bug in Isograph.",
+                        );
 
                     let type_and_field = ObjectTypeAndFieldName {
                         field_name: linked_field.name.item.into(),
@@ -741,9 +750,14 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                                 }
                                 .normalization_key(),
                                 ServerObjectSelectableVariant::InlineFragment => {
-                                    let target_object_entity =
-                                        schema.server_entity_data.server_object_entity(
+                                    let target_object_entity = schema
+                                        .server_entity_data
+                                        .server_object_entity(
                                             *server_object_selectable.target_object_entity.inner(),
+                                        )
+                                        .expect(
+                                            "Expected entity to exist. \
+                                            This is indicative of a bug in Isograph.",
                                         );
                                     NormalizationKey::InlineFragment(target_object_entity.name)
                                 }

@@ -54,7 +54,11 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
         schema,
         schema
             .server_entity_data
-            .server_object_entity(entrypoint.parent_object_entity_name),
+            .server_object_entity(entrypoint.parent_object_entity_name)
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            ),
         entrypoint.selection_set_for_parent_query(),
         encountered_client_type_map,
         DefinitionLocation::Client(SelectionType::Scalar((
@@ -116,7 +120,11 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
 
     let parent_object = schema
         .server_entity_data
-        .server_object_entity(entrypoint.parent_object_entity_name);
+        .server_object_entity(entrypoint.parent_object_entity_name)
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        );
     let query_text = TNetworkProtocol::generate_query_text(
         query_name,
         schema,
@@ -168,25 +176,31 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     let normalization_ast_text =
         generate_normalization_ast_text(schema, merged_selection_map.values(), 1);
 
-    let concrete_type = schema.server_entity_data.server_object_entity(
-        if schema
-            .fetchable_types
-            .contains_key(&entrypoint.parent_object_entity_name)
-        {
-            entrypoint.parent_object_entity_name
-        } else {
-            *default_root_operation
-                .map(|(operation_id, _)| operation_id)
-                .unwrap_or_else(|| {
-                    schema
-                        .fetchable_types
-                        .iter()
-                        .next()
-                        .expect("Expected at least one fetchable type to exist")
-                        .0
-                })
-        },
-    );
+    let concrete_type = schema
+        .server_entity_data
+        .server_object_entity(
+            if schema
+                .fetchable_types
+                .contains_key(&entrypoint.parent_object_entity_name)
+            {
+                entrypoint.parent_object_entity_name
+            } else {
+                *default_root_operation
+                    .map(|(operation_id, _)| operation_id)
+                    .unwrap_or_else(|| {
+                        schema
+                            .fetchable_types
+                            .iter()
+                            .next()
+                            .expect("Expected at least one fetchable type to exist")
+                            .0
+                    })
+            },
+        )
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        );
 
     let mut paths_and_contents = EntrypointArtifactInfo {
         query_text,

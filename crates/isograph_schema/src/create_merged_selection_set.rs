@@ -535,6 +535,10 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
         let refetch_field_parent_type_name = schema
             .server_entity_data
             .server_object_entity(refetch_field_parent_object_entity_name)
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            )
             .name;
         // This could be Pet
         subfields_or_inline_fragments.insert(
@@ -561,6 +565,10 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
     let root_parent_object = schema
         .server_entity_data
         .server_object_entity(entrypoint.parent_object_entity_name)
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        )
         .name;
 
     let root_operation_name = schema
@@ -588,6 +596,10 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
         concrete_type: schema
             .server_entity_data
             .server_object_entity(root_object_entity_name)
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            )
             .name,
     }
 }
@@ -725,7 +737,10 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             variable_context,
                             object_selection,
                             parent_object_entity_name,
-                            object_selection_parent_object,
+                            object_selection_parent_object.expect(
+                                "Expected entity to exist. \
+                                This is indicative of a bug in Isograph.",
+                            ),
                             field_parent_object_entity_name,
                             field_object_selectable_name,
                         );
@@ -791,7 +806,11 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                 MergedServerSelection::InlineFragment(existing_inline_fragment) => {
                     let object_selection_parent_object = schema
                         .server_entity_data
-                        .server_object_entity(parent_object_entity_name);
+                        .server_object_entity(parent_object_entity_name)
+                        .expect(
+                            "Expected entity to exist. \
+                            This is indicative of a bug in Isograph.",
+                        );
 
                     let reader_selection_set =
                         inline_fragment_reader_selection_set(schema, server_object_selectable);
@@ -855,6 +874,10 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                                 .object_selectable(object_selection.associated_data)
                                 .target_object_entity_name()
                                 .inner(),
+                        )
+                        .expect(
+                            "Expected entity to exist. \
+                            This is indicative of a bug in Isograph.",
                         )
                         .concrete_type,
                     name: object_selection.name.item,

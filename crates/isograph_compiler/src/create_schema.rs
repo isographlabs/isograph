@@ -325,7 +325,11 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
         for server_field_to_insert in field_definitions_to_insert.into_iter() {
             let parent_object_entity = schema
                 .server_entity_data
-                .server_object_entity(parent_object_entity_name);
+                .server_object_entity(parent_object_entity_name)
+                .expect(
+                    "Expected entity to exist. \
+                    This is indicative of a bug in Isograph.",
+                );
 
             let target_entity_type_name = server_field_to_insert.item.type_.inner();
 

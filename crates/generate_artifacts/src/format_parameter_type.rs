@@ -77,6 +77,10 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
         ServerEntityName::Scalar(scalar_entity_name) => schema
             .server_entity_data
             .server_scalar_entity(scalar_entity_name)
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            )
             .javascript_name
             .to_string(),
     }

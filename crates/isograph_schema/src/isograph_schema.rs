@@ -161,7 +161,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     ) -> Result<WithId<&ServerObjectEntity<TNetworkProtocol>>, CreateAdditionalFieldsError> {
         let mut current_entity = self
             .server_entity_data
-            .server_object_entity(root_object_name);
+            .server_object_entity(root_object_name)
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            );
         let mut current_selectables = &self
             .server_entity_data
             .server_object_entity_extra_info
@@ -207,7 +211,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
                         current_entity = self
                             .server_entity_data
-                            .server_object_entity(*target_object_entity_name);
+                            .server_object_entity(*target_object_entity_name)
+                            .expect(
+                                "Expected entity to exist. \
+                                This is indicative of a bug in Isograph.",
+                            );
                         current_selectables = &self
                             .server_entity_data
                             .server_object_entity_extra_info
@@ -238,7 +246,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     ) -> Result<Vec<&ServerObjectSelectable<TNetworkProtocol>>, CreateAdditionalFieldsError> {
         let mut current_entity = self
             .server_entity_data
-            .server_object_entity(root_object_name);
+            .server_object_entity(root_object_name)
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            );
 
         let mut current_selectables = &self
             .server_entity_data
@@ -285,7 +297,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
                         current_entity = self
                             .server_entity_data
-                            .server_object_entity(*target_object_entity_name);
+                            .server_object_entity(*target_object_entity_name)
+                            .expect(
+                                "Expected entity to exist. \
+                                This is indicative of a bug in Isograph.",
+                            );
                         current_selectables = &self
                             .server_entity_data
                             .server_object_entity_extra_info
@@ -415,7 +431,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         {
             let parent_object = self
                 .server_entity_data
-                .server_object_entity(parent_object_entity_name);
+                .server_object_entity(parent_object_entity_name)
+                .expect(
+                    "Expected entity to exist. \
+                    This is indicative of a bug in Isograph.",
+                );
             return Err(CreateAdditionalFieldsError::DuplicateField {
                 field_name: server_scalar_selectable.name.item.into(),
                 parent_type: parent_object.name,
@@ -469,7 +489,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         {
             let parent_object = self
                 .server_entity_data
-                .server_object_entity(parent_object_entity_name);
+                .server_object_entity(parent_object_entity_name)
+                .expect(
+                    "Expected entity to exist. \
+                    This is indicative of a bug in Isograph.",
+                );
             return Err(CreateAdditionalFieldsError::DuplicateField {
                 field_name: next_object_name.item.into(),
                 parent_type: parent_object.name,
@@ -614,30 +638,29 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
     pub fn server_scalar_entity(
         &self,
         scalar_entity_name: ServerScalarEntityName,
-    ) -> &ServerScalarEntity<TNetworkProtocol> {
-        self.server_scalars
-            .get(&scalar_entity_name)
-            .expect("Expected scalar to exist")
+    ) -> Option<&ServerScalarEntity<TNetworkProtocol>> {
+        self.server_scalars.get(&scalar_entity_name)
     }
 
-    pub fn server_entity(&self, type_id: ServerEntityName) -> ServerEntity<'_, TNetworkProtocol> {
+    pub fn server_entity(
+        &self,
+        type_id: ServerEntityName,
+    ) -> Option<ServerEntity<'_, TNetworkProtocol>> {
         match type_id {
-            ServerEntityName::Object(object_entity_name) => {
-                ServerEntity::Object(self.server_object_entity(object_entity_name))
-            }
-            ServerEntityName::Scalar(scalar_entity_name) => {
-                ServerEntity::Scalar(self.server_scalar_entity(scalar_entity_name))
-            }
+            ServerEntityName::Object(object_entity_name) => self
+                .server_object_entity(object_entity_name)
+                .map(ServerEntity::Object),
+            ServerEntityName::Scalar(scalar_entity_name) => self
+                .server_scalar_entity(scalar_entity_name)
+                .map(ServerEntity::Scalar),
         }
     }
 
     pub fn server_object_entity(
         &self,
         object_entity_name: ServerObjectEntityName,
-    ) -> &ServerObjectEntity<TNetworkProtocol> {
-        self.server_objects
-            .get(&object_entity_name)
-            .expect("Expected object to exist")
+    ) -> Option<&ServerObjectEntity<TNetworkProtocol>> {
+        self.server_objects.get(&object_entity_name)
     }
 
     // TODO this function should not exist
