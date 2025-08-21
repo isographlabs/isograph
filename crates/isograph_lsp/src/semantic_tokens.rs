@@ -8,8 +8,8 @@ use common_lang_types::{
     relative_path_from_absolute_and_working_directory, Span, TextSource, WithSpan,
 };
 use isograph_compiler::{
-    get_current_working_directory, parse_iso_literals_in_file_content_and_return_all,
-    read_iso_literals_source_from_relative_path, CompilerState,
+    parse_iso_literals_in_file_content_and_return_all, read_iso_literals_source_from_relative_path,
+    CompilerState,
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::IsographSemanticToken;
@@ -54,7 +54,7 @@ fn get_semantic_tokens<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     uri: Uri,
 ) -> Result<Option<LspSemanticTokensResult>, LSPRuntimeError> {
-    let current_working_directory = get_current_working_directory(db);
+    let current_working_directory = db.get_current_working_directory();
 
     let relative_path_to_source_file = relative_path_from_absolute_and_working_directory(
         current_working_directory,
@@ -64,7 +64,7 @@ fn get_semantic_tokens<TNetworkProtocol: NetworkProtocol + 'static>(
     let parse_results = parse_iso_literals_in_file_content_and_return_all(
         db,
         relative_path_to_source_file,
-        get_current_working_directory(db),
+        db.get_current_working_directory(),
     );
 
     // TODO call this earlier, pass it as a param to parse_iso_literal_in_relative_file

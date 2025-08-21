@@ -25,7 +25,7 @@ use thiserror::Error;
 
 use crate::{
     add_selection_sets::{add_selection_sets_to_client_selectables, AddSelectionSetsError},
-    db_singletons::{get_iso_literal_map, get_isograph_config},
+    get_iso_literal_map,
     isograph_literals::{parse_iso_literal_in_source, process_iso_literals},
 };
 
@@ -93,7 +93,7 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     process_field_queue(
         &mut unvalidated_isograph_schema,
         field_queue,
-        &get_isograph_config(db).options,
+        &db.get_isograph_config().options,
     )?;
 
     // Step one: we can create client selectables. However, we must create all

@@ -2,7 +2,6 @@ use common_lang_types::{DirectiveName, QueryOperationName, QueryText, WithLocati
 use graphql_lang_types::{from_graphql_directive, DeserializationError};
 use graphql_schema_parser::SchemaParseError;
 use intern::string_key::Intern;
-use isograph_compiler::get_standard_sources;
 use isograph_schema::IsographDatabase;
 use isograph_schema::{
     CreateAdditionalFieldsError, ExposeAsFieldToInsert, MergedSelectionMap, NetworkProtocol,
@@ -41,7 +40,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         let StandardSources {
             schema_source_id,
             schema_extension_sources,
-        } = get_standard_sources(db);
+        } = db.get_standard_sources();
 
         let (type_system_document, type_system_extension_documents) =
             parse_graphql_schema(db, *schema_source_id, schema_extension_sources).to_owned()?;

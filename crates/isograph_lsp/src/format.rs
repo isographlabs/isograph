@@ -5,9 +5,8 @@ use common_lang_types::{
     RelativePathToSourceFile,
 };
 use isograph_compiler::{
-    extract_iso_literals_from_file_content, get_current_working_directory,
-    process_iso_literal_extraction, read_iso_literals_source_from_relative_path, CompilerState,
-    IsoLiteralExtraction,
+    extract_iso_literals_from_file_content, process_iso_literal_extraction,
+    read_iso_literals_source_from_relative_path, CompilerState, IsoLiteralExtraction,
 };
 use isograph_lang_types::{
     semantic_token_legend::IndentChange, InlineBehavior, LineBehavior, SpaceAfter, SpaceBefore,
@@ -28,7 +27,7 @@ pub fn on_format<TNetworkProtocol: NetworkProtocol + 'static>(
     let db = &compiler_state.db;
     let url = params.text_document.uri;
 
-    let current_working_directory = get_current_working_directory(db);
+    let current_working_directory = db.get_current_working_directory();
 
     let relative_path_to_source_file = relative_path_from_absolute_and_working_directory(
         current_working_directory,

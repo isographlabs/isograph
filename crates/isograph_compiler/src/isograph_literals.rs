@@ -7,8 +7,8 @@ use isograph_lang_parser::{
 };
 use isograph_lang_types::{EntrypointDeclaration, SelectionType};
 use isograph_schema::{
-    IsoLiteralsSource, IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError,
-    Schema, UnprocessedItem,
+    get_open_file, IsoLiteralsSource, IsographDatabase, NetworkProtocol,
+    ProcessClientFieldDeclarationError, Schema, UnprocessedItem,
 };
 use lazy_static::lazy_static;
 use pico::SourceId;
@@ -23,10 +23,7 @@ use std::{
 };
 use thiserror::Error;
 
-use crate::{
-    create_schema::ParsedIsoLiteralsMap, db_singletons::get_current_working_directory,
-    get_iso_literal_map, get_open_file,
-};
+use crate::{create_schema::ParsedIsoLiteralsMap, get_iso_literal_map};
 
 pub fn read_files_in_folder(
     folder: &Path,
@@ -189,7 +186,7 @@ pub fn parse_iso_literal_in_source<TNetworkProtocol: NetworkProtocol + 'static>(
         content: _,
     } = memo_ref.deref();
 
-    parse_iso_literals_in_file_content(db, *relative_path, get_current_working_directory(db))
+    parse_iso_literals_in_file_content(db, *relative_path, db.get_current_working_directory())
 }
 
 #[memo]

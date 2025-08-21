@@ -2,9 +2,8 @@ use std::ops::Deref;
 
 use common_lang_types::{relative_path_from_absolute_and_working_directory, Span};
 use isograph_compiler::{
-    extract_iso_literals_from_file_content, get_current_working_directory,
-    process_iso_literal_extraction, read_iso_literals_source_from_relative_path, CompilerState,
-    IsoLiteralExtraction,
+    extract_iso_literals_from_file_content, process_iso_literal_extraction,
+    read_iso_literals_source_from_relative_path, CompilerState, IsoLiteralExtraction,
 };
 use isograph_lang_types::{
     get_path_to_root_from_object, get_path_to_root_from_scalar, IsographResolvedNode,
@@ -29,7 +28,7 @@ pub fn on_hover<TNetworkProtocol: NetworkProtocol + 'static>(
     let db = &compiler_state.db;
     let url = params.text_document_position_params.text_document.uri;
 
-    let current_working_directory = get_current_working_directory(db);
+    let current_working_directory = db.get_current_working_directory();
 
     let relative_path_to_source_file = relative_path_from_absolute_and_working_directory(
         current_working_directory,
@@ -93,7 +92,7 @@ pub fn get_iso_literal_extraction_from_text_position_params<
     url: Uri,
     line_char: LineChar,
 ) -> Option<(IsoLiteralExtraction, u32)> {
-    let current_working_directory = get_current_working_directory(db);
+    let current_working_directory = db.get_current_working_directory();
 
     let relative_path_to_source_file = relative_path_from_absolute_and_working_directory(
         current_working_directory,
