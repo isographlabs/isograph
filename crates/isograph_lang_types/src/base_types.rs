@@ -48,6 +48,13 @@ impl<TServer, TClient> DefinitionLocation<TServer, TClient> {
             DefinitionLocation::Client(c) => Ok(c),
         }
     }
+
+    pub fn variant_name(&self) -> &'static str {
+        match self {
+            DefinitionLocation::Server(_) => "Server",
+            DefinitionLocation::Client(_) => "Client",
+        }
+    }
 }
 
 impl<TServerObject, TServerScalar, TClientObject, TClientScalar>
