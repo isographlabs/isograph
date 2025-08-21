@@ -106,7 +106,7 @@ pub fn compile<TNetworkProtocol: NetworkProtocol + 'static>(
     // system occur while we're writing and we get unpredictable results.
 
     let config = db.get_isograph_config();
-    let artifacts = get_artifact_path_and_content(&isograph_schema, config);
+    let artifacts = get_artifact_path_and_content(isograph_schema, config);
     let total_artifacts_written =
         write_artifacts_to_disk(artifacts, &config.artifact_directory.absolute_path)?;
 
