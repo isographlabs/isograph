@@ -26,8 +26,20 @@ pub fn on_hover<TNetworkProtocol: NetworkProtocol + 'static>(
     params: <HoverRequest as Request>::Params,
 ) -> LSPRuntimeResult<<HoverRequest as Request>::Result> {
     let db = &compiler_state.db;
-    let url = params.text_document_position_params.text_document.uri;
+    on_hover_impl(
+        db,
+        params.text_document_position_params.text_document.uri,
+        params.text_document_position_params.position,
+    )
+    .to_owned()
+}
 
+#[memo]
+fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    url: Uri,
+    position: Position,
+) -> LSPRuntimeResult<<HoverRequest as Request>::Result> {
     let current_working_directory = db.get_current_working_directory();
 
     let relative_path_to_source_file = relative_path_from_absolute_and_working_directory(
@@ -35,12 +47,8 @@ pub fn on_hover<TNetworkProtocol: NetworkProtocol + 'static>(
         &url.to_file_path().expect("Expected file path to be valid."),
     );
 
-    let extraction_option = get_iso_literal_extraction_from_text_position_params(
-        db,
-        url,
-        params.text_document_position_params.position.into(),
-    )
-    .to_owned();
+    let extraction_option =
+        get_iso_literal_extraction_from_text_position_params(db, url, position.into()).to_owned();
     let (extraction, offset) = match extraction_option {
         Some(e) => e,
         None => return Ok(None),
