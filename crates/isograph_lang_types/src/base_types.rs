@@ -21,28 +21,28 @@ pub enum DefinitionLocation<TServer, TClient> {
 }
 
 impl<TServer, TClient> DefinitionLocation<TServer, TClient> {
-    pub fn as_server(&self) -> Option<&TServer> {
+    pub fn as_server(self) -> Option<TServer> {
         match self {
             DefinitionLocation::Server(s) => Some(s),
             DefinitionLocation::Client(_) => None,
         }
     }
 
-    pub fn as_server_result(&self) -> Result<&TServer, &TClient> {
+    pub fn as_server_result(self) -> Result<TServer, TClient> {
         match self {
             DefinitionLocation::Server(s) => Ok(s),
             DefinitionLocation::Client(c) => Err(c),
         }
     }
 
-    pub fn as_client(&self) -> Option<&TClient> {
+    pub fn as_client(self) -> Option<TClient> {
         match self {
             DefinitionLocation::Server(_) => None,
             DefinitionLocation::Client(c) => Some(c),
         }
     }
 
-    pub fn as_client_result(&self) -> Result<&TClient, &TServer> {
+    pub fn as_client_result(self) -> Result<TClient, TServer> {
         match self {
             DefinitionLocation::Server(s) => Err(s),
             DefinitionLocation::Client(c) => Ok(c),

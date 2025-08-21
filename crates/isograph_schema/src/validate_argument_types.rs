@@ -428,7 +428,7 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
         .selectables
         .iter()
         .filter_map(|(field_name, field_type)| {
-            let iso_type_annotation = match field_type.as_server()? {
+            let iso_type_annotation = match field_type.as_server().as_ref()? {
                 SelectionType::Scalar((
                     parent_object_entity_name,
                     scalar_scalar_selectable_name,
