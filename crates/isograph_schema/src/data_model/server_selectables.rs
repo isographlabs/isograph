@@ -43,3 +43,8 @@ pub type ServerSelectableId = SelectionType<
     (ServerObjectEntityName, ServerScalarSelectableName),
     (ServerObjectEntityName, ServerObjectSelectableName),
 >;
+
+pub type ServerSelectable<'a, TNetworkProtocol> = SelectionType<
+    &'a ServerScalarSelectable<TNetworkProtocol>,
+    &'a ServerObjectSelectable<TNetworkProtocol>,
+>;
