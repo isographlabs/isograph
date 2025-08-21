@@ -57,6 +57,35 @@ impl<TServer, TClient> DefinitionLocation<TServer, TClient> {
     }
 }
 
+impl<TServerScalar, TServerObject, TClientScalar, TClientObject>
+    DefinitionLocation<
+        SelectionType<TServerScalar, TServerObject>,
+        SelectionType<TClientScalar, TClientObject>,
+    >
+{
+    pub fn as_scalar(&self) -> Option<DefinitionLocation<&TServerScalar, &TClientScalar>> {
+        match self {
+            DefinitionLocation::Server(server) => {
+                Some(DefinitionLocation::Server(server.as_scalar()?))
+            }
+            DefinitionLocation::Client(client) => {
+                Some(DefinitionLocation::Client(client.as_scalar()?))
+            }
+        }
+    }
+
+    pub fn as_object(&self) -> Option<DefinitionLocation<&TServerObject, &TClientObject>> {
+        match self {
+            DefinitionLocation::Server(server) => {
+                Some(DefinitionLocation::Server(server.as_object()?))
+            }
+            DefinitionLocation::Client(client) => {
+                Some(DefinitionLocation::Client(client.as_object()?))
+            }
+        }
+    }
+}
+
 impl<TServerObject, TServerScalar, TClientObject, TClientScalar>
     DefinitionLocation<
         SelectionType<TServerScalar, TServerObject>,
