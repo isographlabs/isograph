@@ -23,10 +23,10 @@ use lazy_static::lazy_static;
 use crate::{
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectableId,
-    EntrypointDeclarationInfo, NetworkProtocol, NormalizationKey, ObjectSelectableId, ServerEntity,
-    ServerEntityName, ServerObjectEntity, ServerObjectEntityAvailableSelectables,
-    ServerObjectSelectable, ServerScalarEntity, ServerScalarSelectable, ServerSelectableId,
-    UseRefetchFieldRefetchStrategy,
+    EntrypointDeclarationInfo, NetworkProtocol, NormalizationKey, ObjectSelectable,
+    ObjectSelectableId, ServerEntity, ServerEntityName, ServerObjectEntity,
+    ServerObjectEntityAvailableSelectables, ServerObjectSelectable, ServerScalarEntity,
+    ServerScalarSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
 };
 
 lazy_static! {
@@ -557,12 +557,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn object_selectable(
         &self,
         field_id: ObjectSelectableId,
-    ) -> Option<
-        DefinitionLocation<
-            &ServerObjectSelectable<TNetworkProtocol>,
-            &ClientObjectSelectable<TNetworkProtocol>,
-        >,
-    > {
+    ) -> Option<ObjectSelectable<'_, TNetworkProtocol>> {
         match field_id {
             DefinitionLocation::Server((
                 parent_object_entity_name,

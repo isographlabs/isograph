@@ -12,6 +12,11 @@ pub type ObjectSelectableId = DefinitionLocation<
     (ServerObjectEntityName, ClientObjectSelectableName),
 >;
 
+pub type ObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
+    &'a ServerObjectSelectable<TNetworkProtocol>,
+    &'a ClientObjectSelectable<TNetworkProtocol>,
+>;
+
 #[impl_for_definition_location]
 pub trait ClientOrServerObjectSelectable {
     fn description(&self) -> Option<Description>;
