@@ -31,7 +31,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
     }
 
     fn parent_type_name(&self) -> ServerObjectEntityName {
-        self.parent_object_name
+        self.parent_object_entity_name
     }
 
     fn arguments(&self) -> &[WithLocation<VariableDefinition<ServerEntityName>>] {

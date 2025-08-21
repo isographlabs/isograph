@@ -120,7 +120,7 @@ fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol + '
         );
     let parent_object = schema
         .server_entity_data
-        .server_object_entity(client_pointer.parent_object_name)
+        .server_object_entity(client_pointer.parent_object_entity_name)
         .expect(
             "Expected entity to exist. \
             This is indicative of a bug in Isograph.",
@@ -130,7 +130,7 @@ fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol + '
         schema,
         unprocessed_item.reader_selection_set,
         parent_object,
-        client_pointer.parent_object_name,
+        client_pointer.parent_object_entity_name,
         &client_pointer,
     )?;
 

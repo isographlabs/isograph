@@ -388,7 +388,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     field_name: client_object_selectable_name.0.into(),
                 },
 
-                parent_object_name,
+                parent_object_entity_name: parent_object_name,
                 refetch_strategy,
                 target_object_entity_name: to_object_name,
                 network_protocol: std::marker::PhantomData,

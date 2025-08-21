@@ -167,7 +167,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
 
     let parent_object_entity = schema
         .server_entity_data
-        .server_object_entity(server_object_selectable.parent_object_name)
+        .server_object_entity(server_object_selectable.parent_object_entity_name)
         .expect(
             "Expected entity to exist. \
             This is indicative of a bug in Isograph.",

@@ -491,7 +491,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &mut self,
         server_object_selectable: ServerObjectSelectable<TNetworkProtocol>,
     ) -> CreateAdditionalFieldsResult<()> {
-        let parent_object_entity_name = server_object_selectable.parent_object_name;
+        let parent_object_entity_name = server_object_selectable.parent_object_entity_name;
         let next_object_name = server_object_selectable.name;
 
         if self
@@ -661,7 +661,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             })
             .chain(self.client_object_selectables.values().map(|pointer| {
                 (
-                    SelectionType::Object((pointer.parent_object_name, pointer.name)),
+                    SelectionType::Object((pointer.parent_object_entity_name, pointer.name)),
                     SelectionType::Object(pointer),
                     ClientFieldDirectiveSet::None(EmptyDirectiveSet {}),
                 )

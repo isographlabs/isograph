@@ -37,7 +37,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
     }
 
     fn parent_object_entity_name(&self) -> ServerObjectEntityName {
-        self.parent_object_name
+        self.parent_object_entity_name
     }
 
     fn target_object_entity_name(&self) -> TypeAnnotation<ServerObjectEntityName> {
@@ -57,7 +57,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
     }
 
     fn parent_object_entity_name(&self) -> ServerObjectEntityName {
-        self.parent_object_name
+        self.parent_object_entity_name
     }
 
     fn target_object_entity_name(&self) -> TypeAnnotation<ServerObjectEntityName> {
