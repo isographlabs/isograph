@@ -7,11 +7,6 @@ use isograph_lang_types::{DefinitionLocation, Description, TypeAnnotation};
 
 use crate::{ClientObjectSelectable, NetworkProtocol, ServerObjectSelectable};
 
-pub type ObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
-    &'a ServerObjectSelectable<TNetworkProtocol>,
-    &'a ClientObjectSelectable<TNetworkProtocol>,
->;
-
 pub type ObjectSelectableId = DefinitionLocation<
     (ServerObjectEntityName, ServerObjectSelectableName),
     (ServerObjectEntityName, ClientObjectSelectableName),

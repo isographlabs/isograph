@@ -151,10 +151,15 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 parent_object_entity_name,
                 server_object_selectable_name,
             )) => {
-                let server_object_selectable = schema.server_object_selectable(
-                    *parent_object_entity_name,
-                    *server_object_selectable_name,
-                );
+                let server_object_selectable = schema
+                    .server_object_selectable(
+                        *parent_object_entity_name,
+                        *server_object_selectable_name,
+                    )
+                    .expect(
+                        "Expected selectable to exist. \
+                        This is indicative of a bug in Isograph.",
+                    );
                 match &server_object_selectable.object_selectable_variant {
                     ServerObjectSelectableVariant::LinkedField => {}
                     ServerObjectSelectableVariant::InlineFragment => {
@@ -173,8 +178,12 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 parent_object_entity_name,
                 client_object_selectable_id,
             ))) => {
-                let client_object_selectable =
-                    schema.client_pointer(*parent_object_entity_name, *client_object_selectable_id);
+                let client_object_selectable = schema
+                    .client_pointer(*parent_object_entity_name, *client_object_selectable_id)
+                    .expect(
+                        "Expected selectable to exist. \
+                        This is indicative of a bug in Isograph.",
+                    );
                 path_and_contents.extend(generate_eager_reader_artifacts(
                     schema,
                     &SelectionType::Object(client_object_selectable),
@@ -195,8 +204,12 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 parent_object_entity_name,
                 client_scalar_selectable_name,
             ))) => {
-                let client_scalar_selectable =
-                    schema.client_field(*parent_object_entity_name, *client_scalar_selectable_name);
+                let client_scalar_selectable = schema
+                    .client_field(*parent_object_entity_name, *client_scalar_selectable_name)
+                    .expect(
+                        "Expected selectable to exist. \
+                        This is indicative of a bug in Isograph.",
+                    );
 
                 match &client_scalar_selectable.variant {
                     ClientFieldVariant::Link => (),
@@ -357,7 +370,10 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
     }
 
     for output_type_id in encountered_output_types {
-        let client_type = schema.client_type(output_type_id);
+        let client_type = schema.client_type(output_type_id).expect(
+            "Expected selectable to exist. \
+            This is indicative of a bug in Isograph.",
+        );
 
         let artifact_path_and_content = match client_type {
             SelectionType::Object(client_pointer) => {
@@ -631,10 +647,15 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     parent_object_entity_name,
                     server_scalar_selectable_name,
                 )) => {
-                    let field = schema.server_scalar_selectable(
-                        parent_object_entity_name,
-                        server_scalar_selectable_name,
-                    );
+                    let field = schema
+                        .server_scalar_selectable(
+                            parent_object_entity_name,
+                            server_scalar_selectable_name,
+                        )
+                        .expect(
+                            "Expected selectable to exist. \
+                            This is indicative of a bug in Isograph.",
+                        );
 
                     write_optional_description(
                         field.description,
@@ -686,16 +707,22 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 DefinitionLocation::Server((
                     parent_object_entity_name,
                     server_object_selectable_name,
-                )) => DefinitionLocation::Server(schema.server_object_selectable(
-                    parent_object_entity_name,
-                    server_object_selectable_name,
-                )),
-                DefinitionLocation::Client((parent_object_entity_name, client_pointer_name)) => {
-                    DefinitionLocation::Client(
-                        schema.client_pointer(parent_object_entity_name, client_pointer_name),
+                )) => schema
+                    .server_object_selectable(
+                        parent_object_entity_name,
+                        server_object_selectable_name,
                     )
+                    .map(DefinitionLocation::Server),
+                DefinitionLocation::Client((parent_object_entity_name, client_pointer_name)) => {
+                    schema
+                        .client_pointer(parent_object_entity_name, client_pointer_name)
+                        .map(DefinitionLocation::Client)
                 }
-            };
+            }
+            .expect(
+                "Expected selectable to exist. \
+                This is indicative of a bug in Isograph.",
+            );
 
             write_optional_description(
                 description(&field),
@@ -750,7 +777,12 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
     parent_object_entity_name: ServerObjectEntityName,
     client_field_name: ClientScalarSelectableName,
 ) {
-    let client_field = schema.client_field(parent_object_entity_name, client_field_name);
+    let client_field = schema
+        .client_field(parent_object_entity_name, client_field_name)
+        .expect(
+            "Expected selectable to exist. \
+            This is indicative of a bug in Isograph.",
+        );
     write_optional_description(
         client_field.description,
         query_type_declaration,
@@ -836,10 +868,15 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     parent_object_entity_name,
                     server_scalar_selectable_name,
                 )) => {
-                    let field = schema.server_scalar_selectable(
-                        parent_object_entity_name,
-                        server_scalar_selectable_name,
-                    );
+                    let field = schema
+                        .server_scalar_selectable(
+                            parent_object_entity_name,
+                            server_scalar_selectable_name,
+                        )
+                        .expect(
+                            "Expected selectable to exist. \
+                            This is indicative of a bug in Isograph.",
+                        );
 
                     write_optional_description(
                         field.description,
@@ -904,7 +941,12 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             }
         }
         SelectionTypeContainingSelections::Object(linked_field) => {
-            let field = schema.object_selectable(linked_field.associated_data);
+            let field = schema
+                .object_selectable(linked_field.associated_data)
+                .expect(
+                    "Expected selectable to exist. \
+                    This is indicative of a bug in Isograph.",
+                );
 
             write_optional_description(
                 description(&field),

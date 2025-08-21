@@ -43,8 +43,12 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     file_extensions: GenerateFileExtensionsOption,
 ) -> Vec<ArtifactPathAndContent> {
-    let entrypoint =
-        schema.client_field(parent_object_entity_name, entrypoint_scalar_selectable_name);
+    let entrypoint = schema
+        .client_field(parent_object_entity_name, entrypoint_scalar_selectable_name)
+        .expect(
+            "Expected selectable to exist. \
+            This is indicative of a bug in Isograph.",
+        );
 
     let FieldTraversalResult {
         traversal_state,
