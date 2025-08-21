@@ -1398,8 +1398,10 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
                     .get(&"__typename".intern().into())
                     .expect("Expected __typename to exist")
                     .as_server()
+                    .as_ref()
                     .expect("Expected __typename to be server field")
                     .as_scalar()
+                    .as_ref()
                     .expect("Expected __typename to be scalar"),
             ),
             name: WithLocation::new("__typename".intern().into(), Location::generated()),
@@ -1416,8 +1418,10 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
                     .get(&(*LINK_FIELD_NAME).into())
                     .expect("Expected link to exist")
                     .as_client()
+                    .as_ref()
                     .expect("Expected link to be client field")
                     .as_scalar()
+                    .as_ref()
                     .expect("Expected link to be scalar field"),
             ),
             scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),

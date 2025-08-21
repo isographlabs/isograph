@@ -63,7 +63,7 @@ impl<TServerScalar, TServerObject, TClientScalar, TClientObject>
         SelectionType<TClientScalar, TClientObject>,
     >
 {
-    pub fn as_scalar(&self) -> Option<DefinitionLocation<&TServerScalar, &TClientScalar>> {
+    pub fn as_scalar(self) -> Option<DefinitionLocation<TServerScalar, TClientScalar>> {
         match self {
             DefinitionLocation::Server(server) => {
                 Some(DefinitionLocation::Server(server.as_scalar()?))
@@ -74,7 +74,7 @@ impl<TServerScalar, TServerObject, TClientScalar, TClientObject>
         }
     }
 
-    pub fn as_object(&self) -> Option<DefinitionLocation<&TServerObject, &TClientObject>> {
+    pub fn as_object(self) -> Option<DefinitionLocation<TServerObject, TClientObject>> {
         match self {
             DefinitionLocation::Server(server) => {
                 Some(DefinitionLocation::Server(server.as_object()?))
@@ -171,28 +171,35 @@ impl<T0: Into<UnvalidatedTypeName>, T1: Into<UnvalidatedTypeName>> From<Selectio
 }
 
 impl<TScalar, TObject> SelectionType<TScalar, TObject> {
-    pub fn as_scalar(&self) -> Option<&TScalar> {
+    pub fn as_ref(&self) -> SelectionType<&TScalar, &TObject> {
+        match self {
+            SelectionType::Scalar(s) => SelectionType::Scalar(s),
+            SelectionType::Object(o) => SelectionType::Object(o),
+        }
+    }
+
+    pub fn as_scalar(self) -> Option<TScalar> {
         match self {
             SelectionType::Scalar(s) => Some(s),
             SelectionType::Object(_) => None,
         }
     }
 
-    pub fn as_scalar_result(&self) -> Result<&TScalar, &TObject> {
+    pub fn as_scalar_result(self) -> Result<TScalar, TObject> {
         match self {
             SelectionType::Scalar(s) => Ok(s),
             SelectionType::Object(o) => Err(o),
         }
     }
 
-    pub fn as_object(&self) -> Option<&TObject> {
+    pub fn as_object(self) -> Option<TObject> {
         match self {
             SelectionType::Scalar(_) => None,
             SelectionType::Object(o) => Some(o),
         }
     }
 
-    pub fn as_object_result(&self) -> Result<&TObject, &TScalar> {
+    pub fn as_object_result(self) -> Result<TObject, TScalar> {
         match self {
             SelectionType::Scalar(s) => Err(s),
             SelectionType::Object(o) => Ok(o),
