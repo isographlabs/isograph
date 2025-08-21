@@ -146,7 +146,7 @@ pub fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol + 'stat
     Ok((unvalidated_isograph_schema, contains_iso_stats))
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum ProcessIsoLiteralsForSchemaError {
     #[error(
         "{}{}",
@@ -300,6 +300,7 @@ impl DerefMut for ParsedIsoLiteralsMap {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ContainsIsoStats {
     pub client_field_count: usize,
     pub entrypoint_count: usize,

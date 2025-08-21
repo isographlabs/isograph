@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{ops::Deref, path::PathBuf};
 
 use crate::{
     compiler_state::CompilerState,
@@ -95,7 +95,11 @@ pub fn print_result<TNetworkProtocol: NetworkProtocol + 'static>(
 pub fn compile<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<CompilationStats, BatchCompileError<TNetworkProtocol>> {
-    let (isograph_schema, stats) = get_validated_schema(db)?;
+    let validated_schema = get_validated_schema(db);
+    let (isograph_schema, stats) = match validated_schema.deref() {
+        Ok((schema, stats)) => (schema, stats),
+        Err(e) => return Err(e.clone().into()),
+    };
 
     // Note: we calculate all of the artifact paths and contents first, so that writing to
     // disk can be as fast as possible and we minimize the chance that changes to the file

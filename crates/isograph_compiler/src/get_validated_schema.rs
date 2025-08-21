@@ -5,6 +5,7 @@ use isograph_schema::{
     validate_use_of_arguments, IsographDatabase, NetworkProtocol, Schema,
     ValidateUseOfArgumentsError,
 };
+use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
@@ -12,6 +13,7 @@ use crate::{
     ProcessIsoLiteralsForSchemaError,
 };
 
+#[memo]
 pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), GetValidatedSchemaError<TNetworkProtocol>>
@@ -24,7 +26,7 @@ pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok((isograph_schema, stats))
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq, Eq, Clone)]
 pub enum GetValidatedSchemaError<TNetworkProtocol: NetworkProtocol + 'static> {
     #[error(
         "{}",
