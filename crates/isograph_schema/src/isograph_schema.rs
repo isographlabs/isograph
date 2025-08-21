@@ -613,7 +613,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .get_mut(&(parent_object_entity_name, client_object_selectable_name))
     }
 
-    pub fn selectable(&mut self, id: SelectableId) -> Option<Selectable<'_, TNetworkProtocol>> {
+    pub fn selectable(&self, id: SelectableId) -> Option<Selectable<'_, TNetworkProtocol>> {
         match id {
             DefinitionLocation::Server(server_selectable_id) => Some(DefinitionLocation::Server(
                 self.server_selectable(server_selectable_id)?,
