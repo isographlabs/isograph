@@ -24,9 +24,9 @@ use crate::{
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectableId,
     EntrypointDeclarationInfo, NetworkProtocol, NormalizationKey, ObjectSelectable,
-    ObjectSelectableId, ScalarSelectable, ServerEntity, ServerEntityName, ServerObjectEntity,
-    ServerObjectEntityAvailableSelectables, ServerObjectSelectable, ServerScalarEntity,
-    ServerScalarSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
+    ObjectSelectableId, ScalarSelectable, Selectable, SelectableId, ServerEntity, ServerEntityName,
+    ServerObjectEntity, ServerObjectEntityAvailableSelectables, ServerObjectSelectable,
+    ServerScalarEntity, ServerScalarSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
 };
 
 lazy_static! {
@@ -611,6 +611,17 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     ) -> Option<&mut ClientObjectSelectable<TNetworkProtocol>> {
         self.client_object_selectables
             .get_mut(&(parent_object_entity_name, client_object_selectable_name))
+    }
+
+    pub fn selectable(&mut self, id: SelectableId) -> Option<Selectable<'_, TNetworkProtocol>> {
+        match id {
+            DefinitionLocation::Server(server_selectable_id) => Some(DefinitionLocation::Server(
+                self.server_selectable(server_selectable_id)?,
+            )),
+            DefinitionLocation::Client(client_selectable_id) => Some(DefinitionLocation::Client(
+                self.client_type(client_selectable_id)?,
+            )),
+        }
     }
 
     pub fn client_type(

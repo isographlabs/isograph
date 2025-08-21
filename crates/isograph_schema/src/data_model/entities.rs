@@ -16,7 +16,7 @@ pub struct ServerScalarEntity<TNetworkProtocol: NetworkProtocol> {
     pub network_protocol: PhantomData<TNetworkProtocol>,
 }
 
-type SelectableId = DefinitionLocation<ServerSelectableId, ClientSelectableId>;
+pub type SelectableId = DefinitionLocation<ServerSelectableId, ClientSelectableId>;
 
 pub type ServerObjectEntityAvailableSelectables = BTreeMap<SelectableName, SelectableId>;
 
