@@ -131,10 +131,8 @@ pub fn get_parent_and_selectable_for_selection_parent<
 > {
     match selection_parent {
         SelectionParentType::ObjectSelection(object_selection_path) => {
-            let (_, object_selectable) = get_parent_and_selectable_for_object_path(
-                &object_selection_path,
-                validated_schema,
-            )?;
+            let (_, object_selectable) =
+                get_parent_and_selectable_for_object_path(object_selection_path, validated_schema)?;
 
             let object_parent_entity_name = *object_selectable.target_object_entity_name().inner();
 
@@ -142,26 +140,18 @@ pub fn get_parent_and_selectable_for_selection_parent<
                 validated_schema,
                 // HACK - we should clean up our use of ServerObjectEntityNameWrapper etc
                 UnvalidatedTypeName::from(object_parent_entity_name).into(),
-                selectable_name.into(),
+                selectable_name,
             )
         }
         SelectionParentType::ClientFieldDeclaration(client_field_declaration_path) => {
             let parent_type_name = client_field_declaration_path.inner.parent_type.item;
 
-            parent_object_entity_and_selectable(
-                validated_schema,
-                parent_type_name,
-                selectable_name.into(),
-            )
+            parent_object_entity_and_selectable(validated_schema, parent_type_name, selectable_name)
         }
         SelectionParentType::ClientPointerDeclaration(client_pointer_declaration_path) => {
             let parent_type_name = client_pointer_declaration_path.inner.parent_type.item;
 
-            parent_object_entity_and_selectable(
-                validated_schema,
-                parent_type_name,
-                selectable_name.into(),
-            )
+            parent_object_entity_and_selectable(validated_schema, parent_type_name, selectable_name)
         }
     }
 }
@@ -191,10 +181,10 @@ pub fn parent_object_entity_and_selectable<'a, TNetworkProtocol: NetworkProtocol
             This is indicative of a bug in Isograph.",
         );
 
-    let selectable_id = extra_info.selectables.get(&selectable_name.into()).ok_or(
+    let selectable_id = extra_info.selectables.get(&selectable_name).ok_or(
         GetParentAndSelectableError::FieldMustExist {
             parent_type_name,
-            field_name: selectable_name.into(),
+            field_name: selectable_name,
         },
     )?;
 

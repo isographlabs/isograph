@@ -81,7 +81,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 {
                     Some(hover_text_for_selectable(
                         selectable.variant_name(),
-                        selectable.name().into(),
+                        selectable.name(),
                         selectable.description(),
                         selectable.arguments(),
                         parent_object.name,
@@ -99,7 +99,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 ) {
                     Some(hover_text_for_selectable(
                         selectable.variant_name(),
-                        selectable.name().into(),
+                        selectable.name(),
                         selectable.description(),
                         selectable.arguments(),
                         parent_object.name,
@@ -276,10 +276,10 @@ fn hover_text_for_selectable(
 ) -> String {
     let parent_description = parent_description
         .map(|x| x.to_string())
-        .unwrap_or_else(|| "".to_string());
+        .unwrap_or_default();
     let selectable_description = selectable_description
         .map(|x| x.to_string())
-        .unwrap_or_else(|| "".to_string());
+        .unwrap_or_default();
 
     let argument_string = if selectable_arguments.is_empty() {
         "".to_string()
