@@ -1,14 +1,14 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use common_lang_types::{
-    ServerObjectEntityName, ServerObjectSelectableName, ServerScalarEntityName,
+    SelectableName, ServerObjectEntityName, ServerObjectSelectableName, ServerScalarEntityName,
     ServerScalarSelectableName, WithLocation,
 };
 use isograph_lang_types::{
     impl_with_target_id, Description, SelectionType, TypeAnnotation, VariableDefinition,
 };
 
-use crate::{NetworkProtocol, ServerEntityName, ServerObjectSelectableVariant};
+use crate::{NetworkProtocol, SelectableTrait, ServerEntityName, ServerObjectSelectableVariant};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
@@ -20,6 +20,26 @@ pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub parent_object_entity_name: ServerObjectEntityName,
     pub arguments: Vec<WithLocation<VariableDefinition<ServerEntityName>>>,
     pub phantom_data: PhantomData<TNetworkProtocol>,
+}
+
+impl<TNetworkProtocol: NetworkProtocol + 'static> SelectableTrait
+    for ServerScalarSelectable<TNetworkProtocol>
+{
+    fn description(&self) -> Option<Description> {
+        self.description
+    }
+
+    fn name(&self) -> SelectableName {
+        self.name.item.into()
+    }
+
+    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
+        self.parent_object_entity_name
+    }
+
+    fn arguments(&self) -> Vec<&VariableDefinition<ServerEntityName>> {
+        self.arguments.iter().map(|x| &x.item).collect()
+    }
 }
 
 impl_with_target_id!(ServerScalarSelectable<TNetworkProtocol: NetworkProtocol>, ServerEntityName);
@@ -36,6 +56,26 @@ pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub parent_object_entity_name: ServerObjectEntityName,
     pub arguments: Vec<WithLocation<VariableDefinition<ServerEntityName>>>,
     pub phantom_data: PhantomData<TNetworkProtocol>,
+}
+
+impl<TNetworkProtocol: NetworkProtocol + 'static> SelectableTrait
+    for ServerObjectSelectable<TNetworkProtocol>
+{
+    fn description(&self) -> Option<Description> {
+        self.description
+    }
+
+    fn name(&self) -> SelectableName {
+        self.name.item.into()
+    }
+
+    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
+        self.parent_object_entity_name
+    }
+
+    fn arguments(&self) -> Vec<&VariableDefinition<ServerEntityName>> {
+        self.arguments.iter().map(|x| &x.item).collect()
+    }
 }
 
 // TODO rename

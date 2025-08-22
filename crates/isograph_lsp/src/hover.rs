@@ -10,7 +10,7 @@ use isograph_compiler::{
 use isograph_lang_types::{Description, IsographResolvedNode};
 use isograph_schema::{
     get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
-    ClientOrServerObjectSelectable, IsographDatabase, NetworkProtocol, SelectableTrait,
+    IsographDatabase, NetworkProtocol, SelectableTrait,
 };
 use lsp_types::{
     request::{HoverRequest, Request},
