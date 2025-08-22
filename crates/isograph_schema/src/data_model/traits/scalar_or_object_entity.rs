@@ -138,30 +138,38 @@ pub fn get_parent_and_selectable_for_selection_parent<
 
             let object_parent_entity_name = *object_selectable.target_object_entity_name().inner();
 
-            parent_and_scalar_selectable(
+            parent_object_entity_and_selectable(
                 validated_schema,
-                selectable_name.into(),
                 // HACK - we should clean up our use of ServerObjectEntityNameWrapper etc
                 UnvalidatedTypeName::from(object_parent_entity_name).into(),
+                selectable_name.into(),
             )
         }
         SelectionParentType::ClientFieldDeclaration(client_field_declaration_path) => {
             let parent_type_name = client_field_declaration_path.inner.parent_type.item;
 
-            parent_and_scalar_selectable(validated_schema, selectable_name.into(), parent_type_name)
+            parent_object_entity_and_selectable(
+                validated_schema,
+                parent_type_name,
+                selectable_name.into(),
+            )
         }
         SelectionParentType::ClientPointerDeclaration(client_pointer_declaration_path) => {
             let parent_type_name = client_pointer_declaration_path.inner.parent_type.item;
 
-            parent_and_scalar_selectable(validated_schema, selectable_name.into(), parent_type_name)
+            parent_object_entity_and_selectable(
+                validated_schema,
+                parent_type_name,
+                selectable_name.into(),
+            )
         }
     }
 }
 
-fn parent_and_scalar_selectable<'a, TNetworkProtocol: NetworkProtocol + 'static>(
+fn parent_object_entity_and_selectable<'a, TNetworkProtocol: NetworkProtocol + 'static>(
     validated_schema: &'a Schema<TNetworkProtocol>,
-    selectable_name: SelectableName,
     parent_type_name: ServerObjectEntityNameWrapper,
+    selectable_name: SelectableName,
 ) -> Result<
     (
         &'a ServerObjectEntity<TNetworkProtocol>,
