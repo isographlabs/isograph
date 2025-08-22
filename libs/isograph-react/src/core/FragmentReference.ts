@@ -1,5 +1,5 @@
-import { ReaderWithRefetchQueries } from '../core/entrypoint';
 import { stableCopy } from './cache';
+import { ReaderWithRefetchQueries } from './entrypoint';
 import { type Link } from './IsographEnvironment';
 import { PromiseWrapper } from './PromiseWrapper';
 import type { StartUpdate } from './reader';
