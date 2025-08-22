@@ -7,10 +7,10 @@ use isograph_compiler::{
     extract_iso_literals_from_file_content, get_validated_schema, process_iso_literal_extraction,
     read_iso_literals_source_from_relative_path, CompilerState, IsoLiteralExtraction,
 };
-use isograph_lang_types::{Description, IsographResolvedNode};
+use isograph_lang_types::{Description, IsographResolvedNode, VariableDefinition};
 use isograph_schema::{
     get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
-    IsographDatabase, NetworkProtocol, SelectableTrait,
+    IsographDatabase, NetworkProtocol, SelectableTrait, ServerEntityName,
 };
 use lsp_types::{
     request::{HoverRequest, Request},
@@ -83,6 +83,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                         selectable.variant_name(),
                         selectable.name().into(),
                         selectable.description(),
+                        selectable.arguments(),
                         parent_object.name,
                         parent_object.description,
                     ))
@@ -100,6 +101,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                         selectable.variant_name(),
                         selectable.name().into(),
                         selectable.description(),
+                        selectable.arguments(),
                         parent_object.name,
                         parent_object.description,
                     ))
@@ -268,6 +270,7 @@ fn hover_text_for_selectable(
     server_or_client: &'static str,
     selectable_name: SelectableName,
     selectable_description: Option<Description>,
+    selectable_arguments: Vec<&VariableDefinition<ServerEntityName>>,
     parent_type_name: ServerObjectEntityName,
     parent_description: Option<Description>,
 ) -> String {
@@ -278,8 +281,21 @@ fn hover_text_for_selectable(
         .map(|x| x.to_string())
         .unwrap_or_else(|| "".to_string());
 
+    let argument_string = if selectable_arguments.is_empty() {
+        "".to_string()
+    } else {
+        let mut s = "\nArguments:".to_string();
+        for arg in selectable_arguments {
+            s.push_str(&format!("\n- {}: `{}`", arg.name.item, arg.type_));
+            // TODO display default values
+        }
+        s.push('\n');
+        s
+    };
+
     format!(
         "{server_or_client} field **{selectable_name}**\n\
+        {argument_string}\
         \n\
         {selectable_description}\n\
         \n\
