@@ -1,5 +1,5 @@
 use common_lang_types::{SelectableName, ServerObjectEntityName};
-use impl_base_types_macro::impl_for_definition_location;
+use impl_base_types_macro::{impl_for_definition_location, impl_for_selection_type};
 use isograph_lang_types::{DefinitionLocation, Description, VariableDefinition};
 
 use crate::{ClientSelectable, ServerEntityName, ServerSelectable};
@@ -10,6 +10,7 @@ pub type Selectable<'a, TNetworkProtocol> = DefinitionLocation<
 >;
 
 #[impl_for_definition_location]
+#[impl_for_selection_type]
 pub trait SelectableTrait {
     fn description(&self) -> Option<Description>;
     fn name(&self) -> SelectableName;

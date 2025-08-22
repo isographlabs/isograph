@@ -166,7 +166,7 @@ pub fn get_parent_and_selectable_for_selection_parent<
     }
 }
 
-fn parent_object_entity_and_selectable<'a, TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn parent_object_entity_and_selectable<'a, TNetworkProtocol: NetworkProtocol + 'static>(
     validated_schema: &'a Schema<TNetworkProtocol>,
     parent_type_name: ServerObjectEntityNameWrapper,
     selectable_name: SelectableName,
