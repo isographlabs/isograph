@@ -8,6 +8,9 @@ import { type LoadableField } from '../core/reader';
 import { useClientSideDefer } from '../loadable-hooks/useClientSideDefer';
 import { useResult } from './useResult';
 
+// TODO
+// - LoadableFieldRenderer, which works for @loadable fields that are components,
+//   i.e. just renders the resulting component
 export function LoadableFieldReader<
   TReadFromStore extends UnknownTReadFromStore,
   TResult,
