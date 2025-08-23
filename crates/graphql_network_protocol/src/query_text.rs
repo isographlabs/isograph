@@ -2,8 +2,8 @@ use common_lang_types::{QueryOperationName, QueryText, UnvalidatedTypeName};
 use graphql_lang_types::GraphQLTypeAnnotation;
 use isograph_lang_types::{ArgumentKeyAndValue, NonConstantValue};
 use isograph_schema::{
-    MergedSelectionMap, MergedServerSelection, RootOperationName, ServerScalarOrObjectEntity,
-    ValidatedVariableDefinition,
+    Format, MergedSelectionMap, MergedServerSelection, RootOperationName,
+    ServerScalarOrObjectEntity, ValidatedVariableDefinition,
 };
 
 use crate::ValidatedGraphqlSchema;
@@ -14,16 +14,20 @@ pub(crate) fn generate_query_text<'a>(
     selection_map: &MergedSelectionMap,
     query_variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
     root_operation_name: &RootOperationName,
+    format: Format,
 ) -> QueryText {
     let mut query_text = String::new();
 
     let variable_text = write_variables_to_string(schema, query_variables);
-
     query_text.push_str(&format!(
-        "{} {}{} {{\\\n",
+        "{} {}{} {{",
         root_operation_name.0, query_name, variable_text
     ));
-    write_selections_for_query_text(&mut query_text, selection_map.values(), 1);
+    match format {
+        Format::Pretty => query_text.push_str("\\\n"),
+        Format::Compact => query_text.push(' '),
+    }
+    write_selections_for_query_text(&mut query_text, selection_map.values(), 1, format);
     query_text.push('}');
     QueryText(query_text)
 }
@@ -77,50 +81,53 @@ fn write_selections_for_query_text<'a>(
     query_text: &mut String,
     items: impl Iterator<Item = &'a MergedServerSelection> + 'a,
     indentation_level: u8,
+    format: Format,
 ) {
+    let (new_line, indent) = match format {
+        Format::Pretty => ("\\\n", &"  ".repeat(indentation_level as usize).to_string()),
+        Format::Compact => (" ", &"".to_string()),
+    };
     for item in items {
         match &item {
             MergedServerSelection::ScalarField(scalar_field) => {
-                query_text.push_str(&"  ".repeat(indentation_level as usize).to_string());
+                query_text.push_str(indent);
                 if let Some(alias) = scalar_field.normalization_alias() {
                     query_text.push_str(&format!("{alias}: "));
                 }
                 let name = scalar_field.name;
                 let arguments = get_serialized_arguments_for_query_text(&scalar_field.arguments);
-                query_text.push_str(&format!("{name}{arguments},\\\n"));
+                query_text.push_str(&format!("{name}{arguments},{new_line}"));
             }
             MergedServerSelection::LinkedField(linked_field) => {
-                query_text.push_str(&"  ".repeat(indentation_level as usize).to_string());
+                query_text.push_str(indent);
                 if let Some(alias) = linked_field.normalization_alias() {
                     // This is bad, alias is WithLocation
                     query_text.push_str(&format!("{alias}: "));
                 }
                 let name = linked_field.name;
                 let arguments = get_serialized_arguments_for_query_text(&linked_field.arguments);
-                query_text.push_str(&format!("{name}{arguments} {{\\\n"));
+                query_text.push_str(&format!("{name}{arguments} {{{new_line}"));
                 write_selections_for_query_text(
                     query_text,
                     linked_field.selection_map.values(),
                     indentation_level + 1,
+                    format,
                 );
-                query_text.push_str(&format!(
-                    "{}}},\\\n",
-                    "  ".repeat(indentation_level as usize)
-                ));
+                query_text.push_str(&format!("{indent}}},{new_line}"));
             }
             MergedServerSelection::InlineFragment(inline_fragment) => {
-                query_text.push_str(&"  ".repeat(indentation_level as usize).to_string());
+                query_text.push_str(indent);
                 query_text.push_str(&format!(
-                    "... on {} {{\\\n",
-                    inline_fragment.type_to_refine_to
+                    "... on {} {{{}",
+                    inline_fragment.type_to_refine_to, new_line,
                 ));
                 write_selections_for_query_text(
                     query_text,
                     inline_fragment.selection_map.values(),
                     indentation_level + 1,
+                    format,
                 );
-                query_text.push_str(&"  ".repeat(indentation_level as usize).to_string());
-                query_text.push_str("},\\\n")
+                query_text.push_str(&format!("{indent}}},{new_line}"));
             }
         }
     }

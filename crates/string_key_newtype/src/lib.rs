@@ -1,8 +1,6 @@
 #[macro_export]
 macro_rules! string_key_newtype {
     ($named:ident) => {
-        // TODO serialize, deserialize
-
         #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
         pub struct $named(pub(crate) intern::string_key::StringKey);
 
@@ -22,6 +20,16 @@ macro_rules! string_key_newtype {
         impl From<intern::string_key::StringKey> for $named {
             fn from(other: intern::string_key::StringKey) -> Self {
                 Self(other)
+            }
+        }
+
+        impl serde::Serialize for $named {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                use intern::Lookup;
+                serializer.serialize_str(self.lookup())
             }
         }
 
@@ -73,6 +81,16 @@ macro_rules! string_key_newtype_no_display {
         impl From<intern::string_key::StringKey> for $named {
             fn from(other: intern::string_key::StringKey) -> Self {
                 Self(other)
+            }
+        }
+
+        impl serde::Serialize for $named {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer,
+            {
+                use intern::Lookup;
+                serializer.serialize_str(self.lookup())
             }
         }
 

@@ -42,6 +42,7 @@ use crate::{
     format_parameter_type::format_parameter_type,
     import_statements::{LinkImports, ParamTypeImports, UpdatableImports},
     iso_overload_file::build_iso_overload_artifact,
+    persisted_documents::PersistedDocuments,
     refetch_reader_artifact::{
         generate_refetch_output_type_artifact, generate_refetch_reader_artifact,
     },
@@ -71,6 +72,8 @@ lazy_static! {
     pub static ref RESOLVER_READER_FILE_NAME: ArtifactFileName =
         "resolver_reader.ts".intern().into();
     pub static ref RESOLVER_READER: ArtifactFilePrefix = "resolver_reader".intern().into();
+    pub static ref PERSISTED_DOCUMENT_FILE_NAME: ArtifactFileName =
+        "persisted_documents.json".intern().into();
 }
 
 /// Get all artifacts according to the following scheme:
@@ -117,6 +120,15 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
     let mut encountered_client_type_map = BTreeMap::new();
     let mut path_and_contents = vec![];
     let mut encountered_output_types = HashSet::<ClientSelectableId>::new();
+    let mut persisted_documents =
+        config
+            .options
+            .persisted_documents
+            .as_ref()
+            .map(|options| PersistedDocuments {
+                options,
+                documents: BTreeMap::new(),
+            });
 
     // For each entrypoint, generate an entrypoint artifact and refetch artifacts
     for (parent_object_entity_name, entrypoint_selectable_name) in schema.entrypoints.keys() {
@@ -126,6 +138,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
             *entrypoint_selectable_name,
             &mut encountered_client_type_map,
             config.options.include_file_extensions_in_import_statements,
+            &mut persisted_documents,
         );
         path_and_contents.extend(entrypoint_path_and_content);
 
@@ -322,6 +335,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                     variable_definitions_iter,
                                     &schema.find_query(),
                                     config.options.include_file_extensions_in_import_statements,
+                                    &mut persisted_documents,
                                 ),
                             );
                         }
@@ -418,6 +432,9 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
         config.options.include_file_extensions_in_import_statements,
         config.options.no_babel_transform,
     ));
+
+    path_and_contents
+        .push(persisted_documents.map_or(PersistedDocuments::empty(), |pd| pd.path_and_content()));
 
     path_and_contents
 }
