@@ -44,6 +44,7 @@ impl<TScalarField, TLinkedField> SelectionTypeContainingSelections<TScalarField,
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
 #[resolve_position(parent_type=SelectionParentType<'a>, resolved_node=IsographResolvedNode<'a>, self_type_generics=<()>)]
+// TODO remove type parameter
 pub struct ScalarSelection<TScalarField> {
     // TODO make this WithSpan instead of WithLocation
     pub name: WithLocation<ScalarSelectableName>,
@@ -55,8 +56,8 @@ pub struct ScalarSelection<TScalarField> {
     pub scalar_selection_directive_set: ScalarSelectionDirectiveSet,
 }
 
-pub type ScalarSelectionPath<'a, TScalarField> =
-    PositionResolutionPath<&'a ScalarSelection<TScalarField>, SelectionParentType<'a>>;
+pub type ScalarSelectionPath<'a> =
+    PositionResolutionPath<&'a ScalarSelection<()>, SelectionParentType<'a>>;
 
 impl<TScalarField> ScalarSelection<TScalarField> {
     pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
@@ -68,6 +69,7 @@ impl<TScalarField> ScalarSelection<TScalarField> {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
 #[resolve_position(parent_type=SelectionParentType<'a>, resolved_node=IsographResolvedNode<'a>, self_type_generics=<(), ()>)]
+// TODO remove the type parameters
 pub struct ObjectSelection<TScalar, TLinked> {
     // TODO make this WithSpan instead of WithLocation
     pub name: WithLocation<ServerObjectSelectableName>,
@@ -81,14 +83,12 @@ pub struct ObjectSelection<TScalar, TLinked> {
     pub object_selection_directive_set: ObjectSelectionDirectiveSet,
 }
 
-pub type ObjectSelectionPath<'a, TScalarField, TLinkedField> = PositionResolutionPath<
-    &'a ObjectSelection<TScalarField, TLinkedField>,
-    SelectionParentType<'a>,
->;
+pub type ObjectSelectionPath<'a> =
+    PositionResolutionPath<&'a ObjectSelection<(), ()>, SelectionParentType<'a>>;
 
 #[derive(Debug)]
 pub enum SelectionParentType<'a> {
-    ObjectSelection(Box<ObjectSelectionPath<'a, (), ()>>),
+    ObjectSelection(Box<ObjectSelectionPath<'a>>),
     ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
     ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
 }

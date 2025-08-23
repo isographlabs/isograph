@@ -64,7 +64,7 @@ pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     // Why is this not calculated when needed?
     pub type_and_field: ObjectTypeAndFieldName,
 
-    pub parent_object_name: ServerObjectEntityName,
+    pub parent_object_entity_name: ServerObjectEntityName,
 
     pub network_protocol: PhantomData<TNetworkProtocol>,
     pub info: UserWrittenClientPointerInfo,

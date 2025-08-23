@@ -3,9 +3,10 @@ use std::{
     marker::PhantomData,
 };
 
-use common_lang_types::{RelativePathToSourceFile, TextSource};
-use pico::{SourceId, Storage};
-use pico_macros::{Db, Singleton, Source};
+use common_lang_types::{CurrentWorkingDirectory, RelativePathToSourceFile, TextSource};
+use isograph_config::CompilerConfig;
+use pico::{Database, SourceId, Storage};
+use pico_macros::{memo, Db, Singleton, Source};
 
 use crate::NetworkProtocol;
 
@@ -52,4 +53,36 @@ pub struct StandardSources {
     // Or perhaps, we store the schema source directly here.
     pub schema_source_id: SourceId<SchemaSource>,
     pub schema_extension_sources: BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
+}
+
+impl<TNetworkProtocol: NetworkProtocol + 'static> IsographDatabase<TNetworkProtocol> {
+    pub fn get_current_working_directory(&self) -> CurrentWorkingDirectory {
+        *self
+            .get_singleton::<CurrentWorkingDirectory>()
+            .expect("Expected CurrentWorkingDirectory to have been set")
+    }
+
+    pub fn get_isograph_config(&self) -> &CompilerConfig {
+        self.get_singleton::<CompilerConfig>()
+            .expect("Expected CompilerConfig to have been set")
+    }
+
+    pub fn get_standard_sources(&self) -> &StandardSources {
+        self.get_singleton::<StandardSources>()
+            .expect("Expected StandardSources to have been set")
+    }
+
+    pub fn get_open_file_map(&self) -> &OpenFileMap {
+        self.get_singleton::<OpenFileMap>()
+            .expect("Expected OpenFileMap to have been set")
+    }
+}
+
+#[memo]
+pub fn get_open_file<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    file: RelativePathToSourceFile,
+) -> Option<SourceId<OpenFileSource>> {
+    let file_map = db.get_open_file_map();
+    file_map.0.get(&file).cloned()
 }

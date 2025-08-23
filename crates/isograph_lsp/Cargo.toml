@@ -27,3 +27,4 @@ serde_json = { workspace = true, features = [
 ] }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util", "tracing"] }
+url = { workspace = true }

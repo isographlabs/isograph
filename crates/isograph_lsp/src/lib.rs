@@ -14,6 +14,7 @@ pub mod lsp_runtime_error;
 mod semantic_tokens;
 pub mod server;
 pub mod text_document;
+mod uri_file_path_ext;
 
 pub async fn start_language_server<TNetworkProtocol: NetworkProtocol + 'static>(
     config_location: &PathBuf,

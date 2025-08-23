@@ -13,7 +13,7 @@ use colored::Colorize;
 use common_lang_types::CurrentWorkingDirectory;
 use isograph_compiler::{
     batch_compile::BatchCompileError,
-    get_isograph_config, update_sources,
+    update_sources,
     watch::{create_debounced_file_watcher, has_config_changes},
     CompilerState, SourceError, WithDuration,
 };
@@ -77,7 +77,7 @@ pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
     let (tokio_sender, mut lsp_message_receiver) = tokio::sync::mpsc::channel(100);
     bridge_crossbeam_to_tokio(connection.receiver, tokio_sender);
 
-    let config = get_isograph_config(&compiler_state.db).clone();
+    let config = compiler_state.db.get_isograph_config().clone();
 
     let (mut file_system_receiver, mut file_system_watcher) =
         create_debounced_file_watcher(&config);

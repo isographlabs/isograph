@@ -126,6 +126,10 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
                                 schema
                                     .server_entity_data
                                     .server_object_entity(*object_entity_name)
+                                    .expect(
+                                        "Expected entity to exist. \
+                                            This is indicative of a bug in Isograph.",
+                                    )
                                     .name
                                     .to_string()
                             })
@@ -142,6 +146,10 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
             let scalar_name = schema
                 .server_entity_data
                 .server_scalar_entity(*scalar_entity_name)
+                .expect(
+                    "Expected entity to exist. \
+                    This is indicative of a bug in Isograph.",
+                )
                 .name;
             Err(WithLocation::new(
                 ValidateEntrypointDeclarationError::InvalidParentType {
@@ -162,7 +170,11 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
 ) -> Result<ClientScalarSelectableName, WithLocation<ValidateEntrypointDeclarationError>> {
     let parent_object = schema
         .server_entity_data
-        .server_object_entity(parent_object_name);
+        .server_object_entity(parent_object_name)
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        );
 
     match schema
         .server_entity_data

@@ -7,14 +7,14 @@ use isograph_lang_types::{DefinitionLocation, Description, TypeAnnotation};
 
 use crate::{ClientObjectSelectable, NetworkProtocol, ServerObjectSelectable};
 
-pub type ObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
-    &'a ServerObjectSelectable<TNetworkProtocol>,
-    &'a ClientObjectSelectable<TNetworkProtocol>,
->;
-
 pub type ObjectSelectableId = DefinitionLocation<
     (ServerObjectEntityName, ServerObjectSelectableName),
     (ServerObjectEntityName, ClientObjectSelectableName),
+>;
+
+pub type ObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
+    &'a ServerObjectSelectable<TNetworkProtocol>,
+    &'a ClientObjectSelectable<TNetworkProtocol>,
 >;
 
 #[impl_for_definition_location]
@@ -37,7 +37,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
     }
 
     fn parent_object_entity_name(&self) -> ServerObjectEntityName {
-        self.parent_object_name
+        self.parent_object_entity_name
     }
 
     fn target_object_entity_name(&self) -> TypeAnnotation<ServerObjectEntityName> {
@@ -57,7 +57,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
     }
 
     fn parent_object_entity_name(&self) -> ServerObjectEntityName {
-        self.parent_object_name
+        self.parent_object_entity_name
     }
 
     fn target_object_entity_name(&self) -> TypeAnnotation<ServerObjectEntityName> {

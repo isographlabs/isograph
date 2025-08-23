@@ -472,10 +472,10 @@ name = "common"
 version = "0.0.0"
 dependencies = [
  "colored",
- "indexmap 2.7.1",
+ "indexmap 2.10.0",
  "intern",
  "log",
- "lsp-types",
+ "lsp-types 0.94.1",
  "md-5",
  "rayon",
  "serde",
@@ -751,6 +751,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fluent-uri"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17c704e9dbe1ddd863da1e6ff3567795087b1eb201ce80d8fa81162e1516500d"
+dependencies = [
+ "bitflags 1.3.2",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -803,12 +812,18 @@ version = "0.3.1"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
+ "hex",
+ "indexmap 2.10.0",
  "intern",
  "isograph_config",
  "isograph_lang_types",
  "isograph_schema",
  "lazy_static",
+ "md-5",
  "pathdiff",
+ "serde",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]
@@ -1178,9 +1193,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.7.1"
+version = "2.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c9c992b02b5b4c94ea26e32fe5bccb7aa7d9f390ab5c1221ff895bc7ea8b652"
+checksum = "fe4cd85333e22411419a0bcae1297d25e58c9443848b11dc6a86fefe8c78a661"
 dependencies = [
  "arbitrary",
  "equivalent",
@@ -1225,7 +1240,7 @@ dependencies = [
  "bincode",
  "fnv",
  "hashbrown 0.12.3",
- "indexmap 2.7.1",
+ "indexmap 2.10.0",
  "once_cell",
  "parking_lot",
  "rand",
@@ -1382,7 +1397,7 @@ dependencies = [
  "common_lang_types",
  "graphql_lang_types",
  "intern",
- "lsp-types",
+ "lsp-types 0.97.0",
  "resolve_position",
  "resolve_position_macros",
  "serde",
@@ -1404,7 +1419,7 @@ dependencies = [
  "isograph_schema",
  "log",
  "lsp-server",
- "lsp-types",
+ "lsp-types 0.97.0",
  "pico",
  "pico_macros",
  "resolve_position",
@@ -1412,6 +1427,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
+ "url",
 ]
 
 [[package]]
@@ -1587,6 +1603,19 @@ dependencies = [
  "serde_json",
  "serde_repr",
  "url",
+]
+
+[[package]]
+name = "lsp-types"
+version = "0.97.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53353550a17c04ac46c585feb189c2db82154fc84b79c7a66c96c2c644f66071"
+dependencies = [
+ "bitflags 1.3.2",
+ "fluent-uri",
+ "serde",
+ "serde_json",
+ "serde_repr",
 ]
 
 [[package]]
@@ -2592,23 +2621,22 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
 name = "strum"
-version = "0.25.0"
+version = "0.27.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "290d54ea6f91c969195bdbcd7442c8c2a2ba87da8bf60a7ee86a235d4bc1e125"
+checksum = "af23d6f6c1a224baef9d3f61e287d2761385a5b88fdab4eb4c6f11aeb54c4bcf"
 dependencies = [
  "strum_macros",
 ]
 
 [[package]]
 name = "strum_macros"
-version = "0.25.3"
+version = "0.27.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23dc1fa9ac9c169a78ba62f0b841814b7abae11bdd047b9c58f893439e309ea0"
+checksum = "7695ce3845ea4b33927c055a39dc438a45b059f7c1b3d91d38d10355fb8cbca7"
 dependencies = [
- "heck 0.4.1",
+ "heck 0.5.0",
  "proc-macro2",
  "quote",
- "rustversion",
  "syn 2.0.98",
 ]
 
@@ -2876,7 +2904,7 @@ checksum = "660badfe2eed8b6213ec9dcd71aa0786f8fb46ffa012e0313bcba1fe4a9a5c73"
 dependencies = [
  "better_scoped_tls",
  "bitflags 2.9.0",
- "indexmap 2.7.1",
+ "indexmap 2.10.0",
  "once_cell",
  "phf",
  "rustc-hash",
@@ -2923,7 +2951,7 @@ version = "0.127.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "15d40abfc4f3a7bfdf54d11ac705cc9dd0836c48bf085b359143b4d40b50cb31"
 dependencies = [
- "indexmap 2.7.1",
+ "indexmap 2.10.0",
  "num_cpus",
  "once_cell",
  "rustc-hash",
@@ -3339,7 +3367,7 @@ version = "0.19.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b5bb770da30e5cbfde35a2d7b9b8a2c4b8ef89548a7a6aeab5c9a576e3e7421"
 dependencies = [
- "indexmap 2.7.1",
+ "indexmap 2.10.0",
  "toml_datetime",
  "winnow",
 ]

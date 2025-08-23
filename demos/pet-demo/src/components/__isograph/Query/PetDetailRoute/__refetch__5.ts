@@ -61,7 +61,10 @@ const artifact: RefetchQueryNormalizationArtifact = {
   kind: "RefetchQuery",
   networkRequestInfo: {
     kind: "NetworkRequestInfo",
-    queryText,
+    operation: {
+      kind: "Operation",
+      text: queryText,
+    },
     normalizationAst,
   },
   concreteType: "Query",

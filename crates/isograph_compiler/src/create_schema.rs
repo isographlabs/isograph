@@ -25,7 +25,7 @@ use thiserror::Error;
 
 use crate::{
     add_selection_sets::{add_selection_sets_to_client_selectables, AddSelectionSetsError},
-    db_singletons::{get_iso_literal_map, get_isograph_config},
+    get_iso_literal_map,
     isograph_literals::{parse_iso_literal_in_source, process_iso_literals},
 };
 
@@ -93,7 +93,7 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     process_field_queue(
         &mut unvalidated_isograph_schema,
         field_queue,
-        &get_isograph_config(db).options,
+        &db.get_isograph_config().options,
     )?;
 
     // Step one: we can create client selectables. However, we must create all
@@ -146,7 +146,7 @@ pub fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol + 'stat
     Ok((unvalidated_isograph_schema, contains_iso_stats))
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum ProcessIsoLiteralsForSchemaError {
     #[error(
         "{}{}",
@@ -300,6 +300,7 @@ impl DerefMut for ParsedIsoLiteralsMap {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ContainsIsoStats {
     pub client_field_count: usize,
     pub entrypoint_count: usize,
@@ -324,7 +325,11 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
         for server_field_to_insert in field_definitions_to_insert.into_iter() {
             let parent_object_entity = schema
                 .server_entity_data
-                .server_object_entity(parent_object_entity_name);
+                .server_object_entity(parent_object_entity_name)
+                .expect(
+                    "Expected entity to exist. \
+                    This is indicative of a bug in Isograph.",
+                );
 
             let target_entity_type_name = server_field_to_insert.item.type_.inner();
 
@@ -393,7 +398,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
                                 server_field_to_insert.item.type_.clone(),
                             )
                             .map(&mut |_| *object_entity_name),
-                            parent_object_name: parent_object_entity_name,
+                            parent_object_entity_name,
                             arguments,
                             phantom_data: std::marker::PhantomData,
                             object_selectable_variant:

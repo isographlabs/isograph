@@ -12,23 +12,21 @@ pub enum IsographResolvedNode<'a> {
     Description(DescriptionPath<'a>),
     ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
     ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
-    ScalarSelection(ScalarSelectionPath<'a, ()>),
-    ObjectSelection(ObjectSelectionPath<'a, (), ()>),
+    ScalarSelection(ScalarSelectionPath<'a>),
+    ObjectSelection(ObjectSelectionPath<'a>),
     ClientScalarSelectableNameWrapper(ClientScalarSelectableNameWrapperPath<'a>),
     ClientObjectSelectableNameWrapper(ClientObjectSelectableNameWrapperPath<'a>),
 }
 
 // TODO remove this, this is just a demonstration.
-pub fn get_path_to_root_from_scalar<'a>(scalar_path: &ScalarSelectionPath<'a, ()>) -> Vec<String> {
+pub fn get_path_to_root_from_scalar<'a>(scalar_path: &ScalarSelectionPath<'a>) -> Vec<String> {
     let mut string_vec = vec![scalar_path.inner.name.item.to_string()];
     get_path_using_selection_parent(&scalar_path.parent, &mut string_vec);
     string_vec.reverse();
     string_vec
 }
 
-pub fn get_path_to_root_from_object<'a>(
-    object_path: &ObjectSelectionPath<'a, (), ()>,
-) -> Vec<String> {
+pub fn get_path_to_root_from_object<'a>(object_path: &ObjectSelectionPath<'a>) -> Vec<String> {
     let mut string_vec = vec![object_path.inner.name.item.to_string()];
     get_path_using_selection_parent(&object_path.parent, &mut string_vec);
     string_vec.reverse();

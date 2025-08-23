@@ -1,3 +1,5 @@
+use serde::Serialize;
+
 #[macro_export]
 macro_rules! derive_display {
     ($type:ident) => {
@@ -9,6 +11,10 @@ macro_rules! derive_display {
     };
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct QueryText(pub String);
 derive_display!(QueryText);
+
+#[derive(Debug, Serialize)]
+pub struct QueryExtraInfo(pub String);
+derive_display!(QueryExtraInfo);

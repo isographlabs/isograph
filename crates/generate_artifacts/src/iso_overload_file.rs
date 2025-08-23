@@ -255,7 +255,12 @@ fn sorted_entrypoints<TNetworkProtocol: NetworkProtocol>(
         .map(
             |((parent_object_entity_name, client_field_name), entrypoint_declaration_info)| {
                 (
-                    schema.client_field(*parent_object_entity_name, *client_field_name),
+                    schema
+                        .client_field(*parent_object_entity_name, *client_field_name)
+                        .expect(
+                            "Expected selectable to exist. \
+                            This is indicative of a bug in Isograph.",
+                        ),
                     entrypoint_declaration_info,
                 )
             },

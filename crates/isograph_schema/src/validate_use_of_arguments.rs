@@ -81,6 +81,10 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                             parent_object_entity_name,
                             server_scalar_selectable_name,
                         )
+                        .expect(
+                            "Expected selectable to exist. \
+                            This is indicative of a bug in Isograph.",
+                        )
                         .arguments
                         .iter()
                         .map(|x| &x.item)
@@ -90,6 +94,10 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         client_selectable_name,
                     )) => schema
                         .client_field(parent_object_entity_name, client_selectable_name)
+                        .expect(
+                            "Expected selectable to exist. \
+                            This is indicative of a bug in Isograph.",
+                        )
                         .variable_definitions
                         .iter()
                         .map(|x| &x.item)
@@ -123,6 +131,10 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                             parent_object_entity_name,
                             server_object_selectable_name,
                         )
+                        .expect(
+                            "Expected selectable to exist. \
+                            This is indicative of a bug in Isograph.",
+                        )
                         .arguments
                         .iter()
                         .map(|x| &x.item)
@@ -132,6 +144,10 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         client_object_selectable_name,
                     )) => schema
                         .client_pointer(parent_object_entity_name, client_object_selectable_name)
+                        .expect(
+                            "Expected selectable to exist. \
+                            This is indicative of a bug in Isograph.",
+                        )
                         .variable_definitions
                         .iter()
                         .map(|x| &x.item)

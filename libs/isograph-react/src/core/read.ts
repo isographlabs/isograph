@@ -30,9 +30,9 @@ import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
 import {
   getPromiseState,
+  NOT_SET,
   PromiseWrapper,
   readPromise,
-  Result,
   wrapPromise,
   wrapResolvedValue,
 } from './PromiseWrapper';
@@ -104,12 +104,8 @@ export function readButDoNotEvaluate<
       // promise results in an infinite loop (including re-issuing the query until the
       // process OOM's or something.) Hence, we throw an error.
 
-      // TODO investigate why we cannot check against NOT_SET here and we have to cast
-      const result = fragmentReference.networkRequest.result as Result<
-        any,
-        any
-      >;
-      if (result.kind === 'Err') {
+      const result = fragmentReference.networkRequest.result;
+      if (result !== NOT_SET && result.kind === 'Err') {
         throw new Error('NetworkError', { cause: result.error });
       }
 

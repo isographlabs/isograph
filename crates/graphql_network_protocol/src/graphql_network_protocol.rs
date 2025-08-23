@@ -1,12 +1,14 @@
-use common_lang_types::{DirectiveName, QueryOperationName, QueryText, WithLocation};
+use common_lang_types::{
+    DirectiveName, QueryExtraInfo, QueryOperationName, QueryText, ServerObjectEntityName,
+    WithLocation,
+};
 use graphql_lang_types::{from_graphql_directive, DeserializationError};
 use graphql_schema_parser::SchemaParseError;
 use intern::string_key::Intern;
-use isograph_compiler::get_standard_sources;
 use isograph_schema::IsographDatabase;
 use isograph_schema::{
-    CreateAdditionalFieldsError, ExposeAsFieldToInsert, MergedSelectionMap, NetworkProtocol,
-    ProcessTypeSystemDocumentOutcome, RootOperationName, Schema, StandardSources,
+    CreateAdditionalFieldsError, ExposeAsFieldToInsert, Format, MergedSelectionMap,
+    NetworkProtocol, ProcessTypeSystemDocumentOutcome, RootOperationName, Schema, StandardSources,
     ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -41,7 +43,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         let StandardSources {
             schema_source_id,
             schema_extension_sources,
-        } = get_standard_sources(db);
+        } = db.get_standard_sources();
 
         let (type_system_document, type_system_extension_documents) =
             parse_graphql_schema(db, *schema_source_id, schema_extension_sources).to_owned()?;
@@ -125,6 +127,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         selection_map: &MergedSelectionMap,
         query_variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
         root_operation_name: &RootOperationName,
+        format: Format,
     ) -> QueryText {
         generate_query_text(
             query_name,
@@ -132,7 +135,23 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             selection_map,
             query_variables,
             root_operation_name,
+            format,
         )
+    }
+
+    fn generate_query_extra_info(
+        query_name: QueryOperationName,
+        operation_name: ServerObjectEntityName,
+        indentation_level: u8,
+    ) -> QueryExtraInfo {
+        let indent = "  ".repeat((indentation_level + 1) as usize);
+        QueryExtraInfo(format!(
+            "{{\n\
+            {indent}  kind: \"PersistedOperationExtraInfo\",\n\
+            {indent}  operationName: \"{query_name}\",\n\
+            {indent}  operationKind: \"{operation_name}\",\n\
+            {indent}}}"
+        ))
     }
 }
 

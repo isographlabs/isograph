@@ -40,7 +40,11 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
     let user_written_component_variant = info.client_field_directive_set;
     let parent_object_entity = schema
         .server_entity_data
-        .server_object_entity(client_selectable.parent_object_entity_name());
+        .server_object_entity(client_selectable.parent_object_entity_name())
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        );
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         schema,
@@ -163,11 +167,19 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
 
     let parent_object_entity = schema
         .server_entity_data
-        .server_object_entity(server_object_selectable.parent_object_name);
+        .server_object_entity(server_object_selectable.parent_object_entity_name)
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        );
 
     let concrete_type = schema
         .server_entity_data
         .server_object_entity(*server_object_selectable.target_object_entity.inner())
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        )
         .name;
 
     let (reader_ast, reader_imports) = generate_reader_ast(
@@ -225,7 +237,11 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     let ts_file_extension = file_extensions.ts();
     let parent_type = schema
         .server_entity_data
-        .server_object_entity(client_scalar_selectable.parent_object_entity_name());
+        .server_object_entity(client_scalar_selectable.parent_object_entity_name())
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        );
 
     let mut param_type_imports = BTreeSet::new();
     let mut loadable_fields = BTreeSet::new();
@@ -335,7 +351,11 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
 ) -> ArtifactPathAndContent {
     let parent_type = schema
         .server_entity_data
-        .server_object_entity(client_field.parent_object_entity_name());
+        .server_object_entity(client_field.parent_object_entity_name())
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        );
 
     let function_import_statement =
         generate_function_import_statement(config, info, file_extensions);

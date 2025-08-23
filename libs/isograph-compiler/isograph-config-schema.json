@@ -117,6 +117,51 @@
               "$ref": "#/definitions/ConfigFileOptionalValidationLevel"
             }
           ]
+        },
+        "persisted_documents": {
+          "description": "Persisted documents options",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ConfigFilePersistedDocumentsOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ConfigFilePersistedDocumentsHashAlgorithm": {
+      "type": "string",
+      "enum": [
+        "md5",
+        "sha256"
+      ]
+    },
+    "ConfigFilePersistedDocumentsOptions": {
+      "type": "object",
+      "properties": {
+        "algorithm": {
+          "description": "The hashing algorithm used to compute document hashes.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ConfigFilePersistedDocumentsHashAlgorithm"
+            }
+          ]
+        },
+        "file": {
+          "description": "The file name for the persisted documents Defaults to `persisted_documents.json`",
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "include_extra_info": {
+          "description": "Include extra info to the operation text",
+          "default": false,
+          "type": "boolean"
         }
       },
       "additionalProperties": false

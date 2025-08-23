@@ -65,6 +65,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 let scalar_name = self
                     .server_entity_data
                     .server_scalar_entity(*scalar_entity_name)
+                    .expect(
+                        "Expected entity to exist. \
+                        This is indicative of a bug in Isograph.",
+                    )
                     .name;
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
@@ -134,6 +138,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     let scalar_name = self
                         .server_entity_data
                         .server_scalar_entity(*scalar_entity_name)
+                        .expect(
+                            "Expected entity to exist. \
+                            This is indicative of a bug in Isograph.",
+                        )
                         .name;
                     return Err(WithLocation::new(
                         ProcessClientFieldDeclarationError::ClientPointerInvalidTargetType {
@@ -150,6 +158,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 let scalar_name = self
                     .server_entity_data
                     .server_scalar_entity(*scalar_entity_name)
+                    .expect(
+                        "Expected entity to exist. \
+                        This is indicative of a bug in Isograph.",
+                    )
                     .name;
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
@@ -283,10 +295,18 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let query_id = self.query_id();
         let to_object = self
             .server_entity_data
-            .server_object_entity(*to_object_name.inner());
+            .server_object_entity(*to_object_name.inner())
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            );
         let parent_object = self
             .server_entity_data
-            .server_object_entity(parent_object_name);
+            .server_object_entity(parent_object_name)
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            );
         let client_pointer_pointer_name_ws = client_pointer_declaration.item.client_pointer_name;
         let client_pointer_name = client_pointer_pointer_name_ws.item;
         let client_pointer_name_span = client_pointer_pointer_name_ws.span;
@@ -369,7 +389,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     field_name: client_object_selectable_name.0.into(),
                 },
 
-                parent_object_name,
+                parent_object_entity_name: parent_object_name,
                 refetch_strategy,
                 target_object_entity_name: to_object_name,
                 network_protocol: std::marker::PhantomData,
@@ -398,7 +418,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         {
             let parent_object = self
                 .server_entity_data
-                .server_object_entity(parent_object_name);
+                .server_object_entity(parent_object_name)
+                .expect(
+                    "Expected entity to exist. \
+                    This is indicative of a bug in Isograph.",
+                );
             // Did not insert, so this object already has a field with the same name :(
             return Err(WithSpan::new(
                 ProcessClientFieldDeclarationError::ParentAlreadyHasField {
@@ -421,7 +445,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 type ProcessClientFieldDeclarationResult<T> =
     Result<T, WithSpan<ProcessClientFieldDeclarationError>>;
 
-#[derive(Error, Eq, PartialEq, Debug)]
+#[derive(Error, Eq, PartialEq, Debug, Clone)]
 pub enum ProcessClientFieldDeclarationError {
     #[error("`{parent_type_name}` is not a type that has been defined.")]
     ParentTypeNotDefined {
