@@ -1,34 +1,30 @@
-use common_lang_types::{
-    ArtifactPathAndContent, ClientScalarSelectableName, ObjectTypeAndFieldName, QueryOperationName,
-    QueryText, ServerObjectEntityName, VariableName,
-};
-use isograph_config::GenerateFileExtensionsOption;
-use isograph_lang_types::{DefinitionLocation, ScalarSelectionDirectiveSet, SelectionType};
-
-use isograph_schema::{
-    create_merged_selection_map_for_field_and_insert_into_global_map,
-    current_target_merged_selections, get_imperatively_loaded_artifact_info,
-    get_reachable_variables, initial_variable_context, ClientScalarOrObjectSelectable,
-    FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, Format, MergedSelectionMap,
-    NetworkProtocol, RootOperationName, RootRefetchedPath, ScalarClientFieldTraversalState, Schema,
-    ServerObjectEntity, ValidatedVariableDefinition, WrappedSelectionMapSelection,
-};
-use isograph_schema::{ClientScalarSelectable, NormalizationKey};
-use std::collections::BTreeSet;
-
-use crate::generate_artifacts::ENTRYPOINT_FILE_NAME;
-use crate::generate_artifacts::NORMALIZATION_AST_FILE_NAME;
-use crate::generate_artifacts::QUERY_TEXT_FILE_NAME;
 use crate::{
     generate_artifacts::{
-        NormalizationAstText, RefetchQueryArtifactImport, NORMALIZATION_AST, QUERY_TEXT,
-        RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
+        NormalizationAstText, RefetchQueryArtifactImport, ENTRYPOINT_FILE_NAME, NORMALIZATION_AST,
+        NORMALIZATION_AST_FILE_NAME, QUERY_TEXT, QUERY_TEXT_FILE_NAME, RESOLVER_OUTPUT_TYPE,
+        RESOLVER_PARAM_TYPE, RESOLVER_READER,
     },
     imperatively_loaded_fields::get_artifact_for_imperatively_loaded_field,
     normalization_ast_text::generate_normalization_ast_text,
     operation_text::{generate_operation_text, OperationText},
     persisted_documents::PersistedDocuments,
 };
+use common_lang_types::{
+    ArtifactPathAndContent, ClientScalarSelectableName, ObjectTypeAndFieldName, QueryOperationName,
+    QueryText, ServerObjectEntityName, VariableName,
+};
+use isograph_config::GenerateFileExtensionsOption;
+use isograph_lang_types::{DefinitionLocation, ScalarSelectionDirectiveSet, SelectionType};
+use isograph_schema::{
+    create_merged_selection_map_for_field_and_insert_into_global_map,
+    current_target_merged_selections, get_imperatively_loaded_artifact_info,
+    get_reachable_variables, initial_variable_context, ClientScalarOrObjectSelectable,
+    ClientScalarSelectable, FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, Format,
+    MergedSelectionMap, NetworkProtocol, NormalizationKey, RootOperationName, RootRefetchedPath,
+    ScalarClientFieldTraversalState, Schema, ServerObjectEntity, ValidatedVariableDefinition,
+    WrappedSelectionMapSelection,
+};
+use std::collections::BTreeSet;
 
 #[derive(Debug)]
 struct EntrypointArtifactInfo<'schema, TNetworkProtocol: NetworkProtocol> {
