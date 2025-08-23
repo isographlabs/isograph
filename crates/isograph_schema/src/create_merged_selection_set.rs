@@ -1135,14 +1135,14 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     newly_encountered_scalar_client_selectable_name: ClientScalarSelectableName,
-    newly_encountered_scalar_client_selectable: &ClientScalarSelectable<TNetworkProtocol>,
+    newly_encountered_client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     variant: &ImperativelyLoadedFieldVariant,
 ) {
     let path = PathToRefetchField {
         linked_fields: merge_traversal_state.traversal_path.clone(),
-        field_name: SelectionType::Scalar(newly_encountered_scalar_client_selectable.name),
+        field_name: SelectionType::Scalar(newly_encountered_client_scalar_selectable.name),
     };
 
     let info = PathToRefetchFieldInfo {
@@ -1150,7 +1150,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
         imperatively_loaded_field_variant: variant.clone(),
         extra_selections: BTreeMap::new(),
         client_selectable_id: SelectionType::Scalar((
-            newly_encountered_scalar_client_selectable.parent_object_entity_name,
+            newly_encountered_client_scalar_selectable.parent_object_entity_name,
             newly_encountered_scalar_client_selectable_name,
         )),
     };
@@ -1161,7 +1161,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
             ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
         ),
         RootRefetchedPath {
-            field_name: newly_encountered_scalar_client_selectable.name.into(),
+            field_name: newly_encountered_client_scalar_selectable.name.into(),
             path_to_refetch_field_info: info,
         },
     );
@@ -1170,7 +1170,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
     create_merged_selection_map_for_field_and_insert_into_global_map(
         schema,
         parent_object_entity,
-        newly_encountered_scalar_client_selectable
+        newly_encountered_client_scalar_selectable
             .refetch_strategy
             .as_ref()
             .expect(
@@ -1184,7 +1184,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
             newly_encountered_scalar_client_selectable_name,
         ))),
         &initial_variable_context(&SelectionType::Scalar(
-            newly_encountered_scalar_client_selectable,
+            newly_encountered_client_scalar_selectable,
         )),
     );
 }
