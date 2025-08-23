@@ -15,6 +15,7 @@ colored = "2.0.4"
 colorize = "0.1.0"
 crossbeam = "0.8"
 dashmap = "6.0.1"
+deluxe = "0.5.0"
 hex = "0.4.3"
 indexmap = "2.10.0"
 lazy_static = "1.4"
@@ -22,7 +23,7 @@ log = { version = "0.4.17", features = ["kv_unstable", "kv_unstable_std"] }
 logos = "0.12"
 lru = "0.13"
 lsp-server = "0.7.2"
-lsp-types = "0.94.1"
+lsp-types = "0.97.0"
 md-5 = "0.10.6"
 notify = "7.0.0"
 notify-debouncer-full = "0.4.0"
@@ -38,7 +39,7 @@ serde = "1.0.197"
 serde_derive = "1.0.197"
 serde_json = "1.0.108"
 sha2 = "0.10.8"
-strum = { version = "0.25.0", features = ["derive"] }
+strum = { version = "0.27.0", features = ["derive"] }
 swc_atoms = "0.6.5"
 swc_core = "0.90.6"
 swc_ecma_parser = "0.143.3"
@@ -52,6 +53,7 @@ tinyvec = "1.8.1"
 tokio = { version = "1.35.0", features = ["full"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+url = { version = "2.0.0", features = ["serde"] }
 
 [profile.release.package.swc_isograph_plugin]
 codegen-units = 1

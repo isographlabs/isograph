@@ -10,12 +10,12 @@ use graphql_lang_types::{
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
     from_isograph_field_directives, semantic_token_legend, ClientFieldDeclaration,
-    ClientPointerDeclaration, ConstantValue, EntrypointDeclaration, IsographDatabase,
-    IsographFieldDirective, NonConstantValue, ObjectSelection, ScalarSelection,
-    SelectionFieldArgument, SelectionTypeContainingSelections, UnvalidatedSelection,
-    VariableDefinition,
+    ClientPointerDeclaration, ConstantValue, EntrypointDeclaration, IsographFieldDirective,
+    IsographResolvedNode, IsographSemanticToken, NonConstantValue, ObjectSelection,
+    ScalarSelection, SelectionFieldArgument, SelectionTypeContainingSelections,
+    ServerObjectEntityNameWrapper, UnvalidatedSelection, VariableDefinition,
 };
-use pico_macros::memo;
+use resolve_position_macros::ResolvePosition;
 use std::{collections::HashSet, ops::ControlFlow};
 
 use crate::{
@@ -23,16 +23,25 @@ use crate::{
     ParseResultWithLocation, ParseResultWithSpan, PeekableLexer,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type=(), resolved_node=IsographResolvedNode<'a>)]
 pub enum IsoLiteralExtractionResult {
     ClientPointerDeclaration(WithSpan<ClientPointerDeclaration>),
     ClientFieldDeclaration(WithSpan<ClientFieldDeclaration>),
     EntrypointDeclaration(WithSpan<EntrypointDeclaration>),
 }
 
-#[memo]
+impl IsoLiteralExtractionResult {
+    pub fn semantic_tokens(&self) -> &[WithSpan<IsographSemanticToken>] {
+        match self {
+            IsoLiteralExtractionResult::ClientPointerDeclaration(s) => &s.item.semantic_tokens,
+            IsoLiteralExtractionResult::ClientFieldDeclaration(s) => &s.item.semantic_tokens,
+            IsoLiteralExtractionResult::EntrypointDeclaration(s) => &s.item.semantic_tokens,
+        }
+    }
+}
+
 pub fn parse_iso_literal(
-    db: &IsographDatabase,
     iso_literal_text: String,
     definition_file_path: RelativePathToSourceFile,
     const_export_name: Option<String>,
@@ -91,19 +100,17 @@ fn parse_iso_entrypoint_declaration(
             let parent_type = tokens
                 .parse_string_key_type(
                     IsographLangTokenKind::Identifier,
-                    semantic_token_legend::ST_CLASS,
+                    semantic_token_legend::ST_SERVER_OBJECT_TYPE,
                 )
+                .map(|with_span| with_span.map(ServerObjectEntityNameWrapper))
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
             let dot = tokens
-                .parse_token_of_kind(
-                    IsographLangTokenKind::Period,
-                    semantic_token_legend::ST_OPERATOR,
-                )
+                .parse_token_of_kind(IsographLangTokenKind::Period, semantic_token_legend::ST_DOT)
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
             let client_field_name = tokens
                 .parse_string_key_type(
                     IsographLangTokenKind::Identifier,
-                    semantic_token_legend::ST_METHOD,
+                    semantic_token_legend::ST_CLIENT_SELECTABLE_NAME,
                 )
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
@@ -175,21 +182,19 @@ fn parse_client_field_declaration_inner(
         let parent_type = tokens
             .parse_string_key_type(
                 IsographLangTokenKind::Identifier,
-                semantic_token_legend::ST_CLASS,
+                semantic_token_legend::ST_SERVER_OBJECT_TYPE,
             )
+            .map(|with_span| with_span.map(ServerObjectEntityNameWrapper))
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
         let _ = tokens
-            .parse_token_of_kind(
-                IsographLangTokenKind::Period,
-                semantic_token_legend::ST_OPERATOR,
-            )
+            .parse_token_of_kind(IsographLangTokenKind::Period, semantic_token_legend::ST_DOT)
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
         let client_field_name: WithSpan<ClientScalarSelectableName> = tokens
             .parse_string_key_type(
                 IsographLangTokenKind::Identifier,
-                semantic_token_legend::ST_METHOD,
+                semantic_token_legend::ST_CLIENT_SELECTABLE_NAME,
             )
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
@@ -224,7 +229,7 @@ fn parse_client_field_declaration_inner(
 
         Ok(ClientFieldDeclaration {
             parent_type,
-            client_field_name,
+            client_field_name: client_field_name.map(|x| x.into()),
             description,
             selection_set,
             definition_path: definition_file_path,
@@ -267,7 +272,7 @@ fn parse_client_pointer_target_type(
     let keyword = tokens
         .parse_source_of_kind(
             IsographLangTokenKind::Identifier,
-            semantic_token_legend::ST_KEYWORD,
+            semantic_token_legend::ST_TO,
         )
         .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
@@ -291,21 +296,19 @@ fn parse_client_pointer_declaration_inner(
         let parent_type = tokens
             .parse_string_key_type(
                 IsographLangTokenKind::Identifier,
-                semantic_token_legend::ST_CLASS,
+                semantic_token_legend::ST_SERVER_OBJECT_TYPE,
             )
+            .map(|with_span| with_span.map(ServerObjectEntityNameWrapper))
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
         let _dot = tokens
-            .parse_token_of_kind(
-                IsographLangTokenKind::Period,
-                semantic_token_legend::ST_OPERATOR,
-            )
+            .parse_token_of_kind(IsographLangTokenKind::Period, semantic_token_legend::ST_DOT)
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
         let client_pointer_name: WithSpan<ClientObjectSelectableName> = tokens
             .parse_string_key_type(
                 IsographLangTokenKind::Identifier,
-                semantic_token_legend::ST_METHOD,
+                semantic_token_legend::ST_CLIENT_SELECTABLE_NAME,
             )
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
@@ -332,7 +335,7 @@ fn parse_client_pointer_declaration_inner(
         Ok(ClientPointerDeclaration {
             directives,
             parent_type,
-            client_pointer_name,
+            client_pointer_name: client_pointer_name.map(|x| x.into()),
             target_type,
             description,
             selection_set,
@@ -368,7 +371,7 @@ fn parse_optional_selection_set(
     let open_brace: Result<WithSpan<IsographLangTokenKind>, WithSpan<crate::LowLevelParseError>> =
         tokens.parse_token_of_kind(
             IsographLangTokenKind::OpenBrace,
-            semantic_token_legend::ST_OPERATOR,
+            semantic_token_legend::ST_OPEN_BRACE,
         );
     if open_brace.is_err() {
         return Ok(None);
@@ -379,7 +382,7 @@ fn parse_optional_selection_set(
     while tokens
         .parse_token_of_kind(
             IsographLangTokenKind::CloseBrace,
-            semantic_token_legend::ST_OPERATOR,
+            semantic_token_legend::ST_CLOSE_BRACE,
         )
         .is_err()
     {
@@ -409,13 +412,14 @@ fn parse_delimited_list<'a, TResult>(
     tokens: &mut PeekableLexer<'a>,
     parse_item: impl Fn(&mut PeekableLexer<'a>) -> ParseResultWithSpan<TResult> + 'a,
     delimiter: IsographLangTokenKind,
+    delimiter_isograph_semantic_token: IsographSemanticToken,
     closing_token: IsographLangTokenKind,
+    closing_isograph_semantic_token: IsographSemanticToken,
 ) -> ParseResultWithSpan<WithSpan<Vec<TResult>>> {
     let mut items = vec![];
 
     // Handle empty list case
-    if let Ok(end_span) =
-        tokens.parse_token_of_kind(closing_token, semantic_token_legend::ST_OPERATOR)
+    if let Ok(end_span) = tokens.parse_token_of_kind(closing_token, closing_isograph_semantic_token)
     {
         return Ok(end_span.map(|_| items));
     }
@@ -424,13 +428,13 @@ fn parse_delimited_list<'a, TResult>(
         items.push(parse_item(tokens)?);
 
         if let Ok(end_span) =
-            tokens.parse_token_of_kind(closing_token, semantic_token_legend::ST_OPERATOR)
+            tokens.parse_token_of_kind(closing_token, closing_isograph_semantic_token)
         {
             return Ok(end_span.map(|_| items));
         }
 
         if tokens
-            .parse_token_of_kind(delimiter, semantic_token_legend::ST_OPERATOR)
+            .parse_token_of_kind(delimiter, delimiter_isograph_semantic_token)
             .is_err()
         {
             return Err(WithSpan::new(
@@ -444,26 +448,19 @@ fn parse_delimited_list<'a, TResult>(
 
         // Check if the next token is the closing token (allows for trailing delimiter)
         if let Ok(end_span) =
-            tokens.parse_token_of_kind(closing_token, semantic_token_legend::ST_OPERATOR)
+            tokens.parse_token_of_kind(closing_token, closing_isograph_semantic_token)
         {
             return Ok(end_span.map(|_| items));
         }
     }
 }
 
-fn parse_comma_line_break_or_curly(tokens: &mut PeekableLexer<'_>) -> ParseResultWithSpan<()> {
-    let comma = tokens.parse_token_of_kind(
-        IsographLangTokenKind::Comma,
-        semantic_token_legend::ST_OPERATOR,
-    );
-    if comma.is_ok()
-        || tokens.source(tokens.white_space_span()).contains('\n')
-        || matches!(tokens.peek().item, IsographLangTokenKind::CloseBrace)
-    {
+fn parse_line_break(tokens: &mut PeekableLexer<'_>) -> ParseResultWithSpan<()> {
+    if tokens.source(tokens.white_space_span()).contains('\n') {
         Ok(())
     } else {
         Err(WithSpan::new(
-            IsographLiteralParseError::ExpectedCommaOrLineBreak,
+            IsographLiteralParseError::ExpectedLineBreak,
             tokens.peek().span,
         ))
     }
@@ -485,7 +482,7 @@ fn parse_selection(
         // If we encounter a selection set, we are parsing a linked field. Otherwise, a scalar field.
         let selection_set = parse_optional_selection_set(tokens, text_source)?;
 
-        parse_comma_line_break_or_curly(tokens)?;
+        parse_line_break(tokens)?;
 
         let selection = match selection_set {
             Some(selection_set) => {
@@ -540,19 +537,19 @@ fn parse_optional_alias_and_field_name(
     let field_name_or_alias = tokens
         .parse_string_key_type::<StringKey>(
             IsographLangTokenKind::Identifier,
-            semantic_token_legend::ST_PROPERTY,
+            semantic_token_legend::ST_SELECTION_NAME_OR_ALIAS,
         )
         .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
     let colon = tokens.parse_token_of_kind(
         IsographLangTokenKind::Colon,
-        semantic_token_legend::ST_OPERATOR,
+        semantic_token_legend::ST_COLON,
     );
     let (field_name, alias) = if colon.is_ok() {
         (
             tokens
                 .parse_string_key_type(
                     IsographLangTokenKind::Identifier,
-                    semantic_token_legend::ST_PROPERTY,
+                    semantic_token_legend::ST_SELECTION_NAME_OR_ALIAS_POST_COLON,
                 )
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?,
             Some(field_name_or_alias),
@@ -570,12 +567,12 @@ fn parse_directives(
     let mut directives = vec![];
     while let Ok(token) = tokens.parse_token_of_kind(
         IsographLangTokenKind::At,
-        semantic_token_legend::ST_DECORATOR,
+        semantic_token_legend::ST_DIRECTIVE_AT,
     ) {
         let name = tokens
             .parse_string_key_type(
                 IsographLangTokenKind::Identifier,
-                semantic_token_legend::ST_DECORATOR,
+                semantic_token_legend::ST_DIRECTIVE,
             )
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
         let directive_span = Span::join(token.span, name.span);
@@ -597,7 +594,7 @@ fn parse_optional_arguments(
     if tokens
         .parse_token_of_kind(
             IsographLangTokenKind::OpenParen,
-            semantic_token_legend::ST_OPERATOR,
+            semantic_token_legend::ST_OPEN_PAREN,
         )
         .is_ok()
     {
@@ -605,7 +602,9 @@ fn parse_optional_arguments(
             tokens,
             move |tokens| parse_argument(tokens, text_source),
             IsographLangTokenKind::Comma,
+            semantic_token_legend::ST_COMMA,
             IsographLangTokenKind::CloseParen,
+            semantic_token_legend::ST_CLOSE_PAREN,
         )?
         .item;
 
@@ -623,13 +622,13 @@ fn parse_argument(
         let name = tokens
             .parse_string_key_type(
                 IsographLangTokenKind::Identifier,
-                semantic_token_legend::ST_PARAMETER,
+                semantic_token_legend::ST_ARGUMENT_NAME,
             )
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
         tokens
             .parse_token_of_kind(
                 IsographLangTokenKind::Colon,
-                semantic_token_legend::ST_OPERATOR,
+                semantic_token_legend::ST_COLON,
             )
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
         let value = parse_non_constant_value(tokens, text_source)?.to_with_location(text_source);
@@ -647,7 +646,7 @@ fn parse_non_constant_value(
             let _dollar_sign = tokens
                 .parse_token_of_kind(
                     IsographLangTokenKind::Dollar,
-                    semantic_token_legend::ST_VARIABLE,
+                    semantic_token_legend::ST_VARIABLE_DOLLAR,
                 )
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
             let name = tokens
@@ -663,7 +662,7 @@ fn parse_non_constant_value(
             let string = tokens
                 .parse_source_of_kind(
                     IsographLangTokenKind::StringLiteral,
-                    semantic_token_legend::ST_STRING,
+                    semantic_token_legend::ST_STRING_LITERAL,
                 )
                 .map(|parsed_str| {
                     parsed_str.map(|source_with_quotes| {
@@ -681,7 +680,7 @@ fn parse_non_constant_value(
             let number = tokens
                 .parse_source_of_kind(
                     IsographLangTokenKind::IntegerLiteral,
-                    semantic_token_legend::ST_NUMBER,
+                    semantic_token_legend::ST_NUMBER_LITERAL,
                 )
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
             Ok(number.map(|number| {
@@ -693,7 +692,7 @@ fn parse_non_constant_value(
             let open = tokens
                 .parse_token_of_kind(
                     IsographLangTokenKind::OpenBrace,
-                    semantic_token_legend::ST_OPERATOR,
+                    semantic_token_legend::ST_OPEN_BRACE,
                 )
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
@@ -701,7 +700,9 @@ fn parse_non_constant_value(
                 tokens,
                 move |tokens| parse_object_entry(tokens, text_source),
                 IsographLangTokenKind::Comma,
+                semantic_token_legend::ST_COMMA,
                 IsographLangTokenKind::CloseBrace,
+                semantic_token_legend::ST_CLOSE_BRACE,
             )?;
 
             Ok(WithSpan::new(
@@ -717,7 +718,7 @@ fn parse_non_constant_value(
             let bool_or_null = tokens
                 .parse_source_of_kind(
                     IsographLangTokenKind::Identifier,
-                    semantic_token_legend::ST_VARIABLE,
+                    semantic_token_legend::ST_BOOL_OR_NULL,
                 )
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
@@ -749,7 +750,7 @@ fn parse_object_entry(
     let name = tokens
         .parse_string_key_type(
             IsographLangTokenKind::Identifier,
-            semantic_token_legend::ST_PROPERTY,
+            semantic_token_legend::ST_OBJECT_LITERAL_KEY,
         )
         .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?
         .to_with_location(text_source);
@@ -757,7 +758,7 @@ fn parse_object_entry(
     tokens
         .parse_token_of_kind(
             IsographLangTokenKind::Colon,
-            semantic_token_legend::ST_OPERATOR,
+            semantic_token_legend::ST_COLON,
         )
         .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
@@ -773,7 +774,7 @@ fn parse_variable_definitions(
     if tokens
         .parse_token_of_kind(
             IsographLangTokenKind::OpenParen,
-            semantic_token_legend::ST_OPERATOR,
+            semantic_token_legend::ST_OPEN_PAREN,
         )
         .is_ok()
     {
@@ -781,7 +782,9 @@ fn parse_variable_definitions(
             tokens,
             move |item| parse_variable_definition(item, text_source),
             IsographLangTokenKind::Comma,
+            semantic_token_legend::ST_COMMA,
             IsographLangTokenKind::CloseParen,
+            semantic_token_legend::ST_CLOSE_PAREN,
         )?
         .item;
 
@@ -799,20 +802,20 @@ fn parse_variable_definition(
         let _dollar = tokens
             .parse_token_of_kind(
                 IsographLangTokenKind::Dollar,
-                semantic_token_legend::ST_VARIABLE,
+                semantic_token_legend::ST_VARIABLE_DOLLAR,
             )
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
         let name = tokens
             .parse_string_key_type(
                 IsographLangTokenKind::Identifier,
-                semantic_token_legend::ST_OPERATOR,
+                semantic_token_legend::ST_VARIABLE,
             )
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?
             .to_with_location(text_source);
         tokens
             .parse_token_of_kind(
                 IsographLangTokenKind::Colon,
-                semantic_token_legend::ST_OPERATOR,
+                semantic_token_legend::ST_COLON,
             )
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
         let type_ = parse_type_annotation(tokens)?;
@@ -835,7 +838,7 @@ fn parse_optional_default_value(
     if tokens
         .parse_token_of_kind(
             IsographLangTokenKind::Equals,
-            semantic_token_legend::ST_OPERATOR,
+            semantic_token_legend::ST_VARIABLE_EQUALS,
         )
         .is_ok()
     {
@@ -863,14 +866,14 @@ fn parse_type_annotation(
             let type_ = tokens
                 .parse_string_key_type(
                     IsographLangTokenKind::Identifier,
-                    semantic_token_legend::ST_TYPE,
+                    semantic_token_legend::ST_TYPE_ANNOTATION,
                 )
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
             let is_non_null = tokens
                 .parse_token_of_kind(
                     IsographLangTokenKind::Exclamation,
-                    semantic_token_legend::ST_TYPE,
+                    semantic_token_legend::ST_TYPE_ANNOTATION,
                 )
                 .is_ok();
             if is_non_null {
@@ -889,7 +892,7 @@ fn parse_type_annotation(
             tokens
                 .parse_token_of_kind(
                     IsographLangTokenKind::OpenBracket,
-                    semantic_token_legend::ST_TYPE,
+                    semantic_token_legend::ST_TYPE_ANNOTATION,
                 )
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
@@ -897,13 +900,13 @@ fn parse_type_annotation(
             tokens
                 .parse_token_of_kind(
                     IsographLangTokenKind::CloseBracket,
-                    semantic_token_legend::ST_TYPE,
+                    semantic_token_legend::ST_TYPE_ANNOTATION,
                 )
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
             let is_non_null = tokens
                 .parse_token_of_kind(
                     IsographLangTokenKind::Exclamation,
-                    semantic_token_legend::ST_TYPE,
+                    semantic_token_legend::ST_TYPE_ANNOTATION,
                 )
                 .is_ok();
 

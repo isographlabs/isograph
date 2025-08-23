@@ -8,7 +8,7 @@
   "author": "Isograph Labs",
   "license": "MIT",
   "scripts": {
-    "compile-libs": "rm -rf dist/* && tsc -p tsconfig.pkg.json",
+    "compile-libs": "rimraf dist/* && tsc -p tsconfig.pkg.json",
     "compile-watch": "tsc -p tsconfig.pkg.json --watch",
     "test": "vitest run",
     "test-watch": "vitest watch",
@@ -16,8 +16,7 @@
     "prepack": "pnpm run test && pnpm run compile-libs",
     "tsc": "tsc",
     "tsc-force": "tsc --build --clean && tsc --build --force",
-    "iso": "cross-env ../../target/debug/isograph_cli --config ./isograph.config.json",
-    "iso-watch": "cross-env ../../target/debug/isograph_cli --config ./isograph.config.json --watch"
+    "iso": "cross-env ISO_PRINT_ABSOLUTE_FILEPATH=1 ../../target/debug/isograph_cli --config ./isograph.config.json"
   },
   "dependencies": {
     "@isograph/disposable-types": "*",

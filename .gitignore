@@ -20,3 +20,5 @@ artifacts
 
 **/.turbo/**
 **/swc_isograph_plugin.wasm
+
+**/.claude/**

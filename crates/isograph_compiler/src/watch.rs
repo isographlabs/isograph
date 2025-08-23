@@ -16,7 +16,6 @@ use tracing::info;
 use crate::{
     batch_compile::{compile, print_result, BatchCompileError},
     compiler_state::CompilerState,
-    db_singletons::get_isograph_config,
     source_files::update_sources,
     with_duration::WithDuration,
 };
@@ -27,7 +26,7 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol + 'static>(
 ) -> Result<(), BatchCompileError<TNetworkProtocol>> {
     let mut state = CompilerState::new(config_location, current_working_directory)?;
 
-    let config = get_isograph_config(&state.db).clone();
+    let config = state.db.get_isograph_config().clone();
 
     info!("{}", "Starting to compile.".cyan());
     let _ = print_result(WithDuration::new(|| compile::<TNetworkProtocol>(&state.db)));

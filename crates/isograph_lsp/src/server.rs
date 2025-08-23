@@ -1,4 +1,6 @@
 use crate::{
+    format::on_format,
+    hover::on_hover,
     lsp_notification_dispatch::LSPNotificationDispatch,
     lsp_request_dispatch::LSPRequestDispatch,
     lsp_runtime_error::LSPRuntimeError,
@@ -11,20 +13,24 @@ use colored::Colorize;
 use common_lang_types::CurrentWorkingDirectory;
 use isograph_compiler::{
     batch_compile::BatchCompileError,
-    get_isograph_config, update_sources,
+    update_sources,
     watch::{create_debounced_file_watcher, has_config_changes},
-    CompilerState, SourceError,
+    CompilerState, SourceError, WithDuration,
 };
 use isograph_lang_types::semantic_token_legend::semantic_token_legend;
 use isograph_schema::NetworkProtocol;
 use log::{info, warn};
 use lsp_server::{Connection, ErrorCode, ProtocolError, Response, ResponseError};
-use lsp_types::request::SemanticTokensFullRequest;
 use lsp_types::{
     notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument},
-    InitializeParams, SemanticTokensFullOptions, SemanticTokensOptions,
+    request::Formatting,
+    InitializeParams, OneOf, SemanticTokensFullOptions, SemanticTokensOptions,
     SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentSyncCapability,
     TextDocumentSyncKind, WorkDoneProgressOptions,
+};
+use lsp_types::{
+    request::{HoverRequest, SemanticTokensFullRequest},
+    HoverProviderCapability,
 };
 use std::{ops::ControlFlow, path::PathBuf};
 use thiserror::Error;
@@ -45,10 +51,13 @@ pub fn initialize<TNetworkProtocol: NetworkProtocol + 'static>(
                 full: Some(SemanticTokensFullOptions::Bool(true)),
             },
         )),
+        hover_provider: Some(HoverProviderCapability::Simple(true)),
+        document_formatting_provider: Some(OneOf::Left(true)),
         ..Default::default()
     };
     let server_capabilities = serde_json::to_value(server_capabilities)?;
     let params = connection.initialize(server_capabilities)?;
+
     let params: InitializeParams = serde_json::from_value(params)?;
     Ok(params)
 }
@@ -60,14 +69,15 @@ pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
     _params: InitializeParams,
     current_working_directory: CurrentWorkingDirectory,
 ) -> LSPProcessResult<(), TNetworkProtocol> {
-    let mut compiler_state = CompilerState::new(config_location, current_working_directory)?;
+    let mut compiler_state: CompilerState<TNetworkProtocol> =
+        CompilerState::new(config_location, current_working_directory)?;
 
     eprintln!("Running server loop");
 
     let (tokio_sender, mut lsp_message_receiver) = tokio::sync::mpsc::channel(100);
     bridge_crossbeam_to_tokio(connection.receiver, tokio_sender);
 
-    let config = get_isograph_config(&compiler_state.db).clone();
+    let config = compiler_state.db.get_isograph_config().clone();
 
     let (mut file_system_receiver, mut file_system_watcher) =
         create_debounced_file_watcher(&config);
@@ -76,21 +86,24 @@ pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
         tokio::select! {
             message = lsp_message_receiver.recv() => {
                 if let Some(lsp_message) = message {
-                    match lsp_message {
-                        lsp_server::Message::Request(request) => {
-                            eprintln!("\nReceived request: {}", request.method);
-                            let response = dispatch_request(request, &compiler_state);
-                            eprintln!("Sending response: {response:?}");
-                            connection.sender.send(response.into()).unwrap();
+                    let duration = WithDuration::new(|| {
+                        match lsp_message {
+                            lsp_server::Message::Request(request) => {
+                                eprintln!("\nReceived request: {}", request.method);
+                                let response = dispatch_request(request, &compiler_state);
+                                eprintln!("Sending response: {response:?}");
+                                connection.sender.send(response.into()).unwrap();
+                            }
+                            lsp_server::Message::Notification(notification) => {
+                                eprintln!("\nReceived notification: {}", notification.method);
+                                let _ = dispatch_notification(notification, &mut compiler_state);
+                            }
+                            lsp_server::Message::Response(response) => {
+                                eprintln!("\nReceived response: {response:?}");
+                            }
                         }
-                        lsp_server::Message::Notification(notification) => {
-                            eprintln!("\nReceived notification: {}", notification.method);
-                            let _ = dispatch_notification(notification, &mut compiler_state);
-                        }
-                        lsp_server::Message::Response(response) => {
-                            eprintln!("Received response: {response:?}");
-                        }
-                    }
+                    });
+                    eprintln!("Processing took {}ms.", duration.elapsed_time.as_millis());
                 } else {
                     // If any connection breaks, we can just end
                     break 'all_messages;
@@ -135,9 +148,9 @@ pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok(())
 }
 
-fn dispatch_notification(
+fn dispatch_notification<TNetworkProtocol: NetworkProtocol + 'static>(
     notification: lsp_server::Notification,
-    compiler_state: &mut CompilerState,
+    compiler_state: &mut CompilerState<TNetworkProtocol>,
 ) -> ControlFlow<Option<LSPRuntimeError>, ()> {
     LSPNotificationDispatch::new(notification, compiler_state)
         .on_notification_sync::<DidOpenTextDocument>(on_did_open_text_document)?
@@ -147,12 +160,17 @@ fn dispatch_notification(
 
     ControlFlow::Continue(())
 }
-fn dispatch_request(request: lsp_server::Request, compiler_state: &CompilerState) -> Response {
+fn dispatch_request<TNetworkProtocol: NetworkProtocol + 'static>(
+    request: lsp_server::Request,
+    compiler_state: &CompilerState<TNetworkProtocol>,
+) -> Response {
     // Returns ControlFlow::Break(ServerResponse) if the request
     // was handled, ControlFlow::Continue(Request) otherwise.
     let get_response = || {
         let request = LSPRequestDispatch::new(request, compiler_state)
             .on_request_sync::<SemanticTokensFullRequest>(on_semantic_token_full_request)?
+            .on_request_sync::<HoverRequest>(on_hover)?
+            .on_request_sync::<Formatting>(on_format)?
             .request();
 
         // If we have gotten here, we have not handled the request

@@ -50,7 +50,13 @@ fn write_variables_to_string<'a>(
         // TODO can we consume the variables here?
         let x: GraphQLTypeAnnotation<UnvalidatedTypeName> =
             variable.type_.clone().map(|input_type_id| {
-                let schema_input_type = schema.server_entity_data.server_entity(input_type_id);
+                let schema_input_type = schema
+                    .server_entity_data
+                    .server_entity(input_type_id)
+                    .expect(
+                        "Expected entity to exist. \
+                        This is indicative of a bug in Isograph.",
+                    );
                 schema_input_type.name().into()
             });
         // TODO this is dangerous, since variable.item.name is a WithLocation, which impl's Display.

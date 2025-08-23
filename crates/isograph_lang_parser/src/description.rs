@@ -3,17 +3,17 @@ use std::collections::VecDeque;
 use intern::string_key::Intern;
 
 use common_lang_types::{DescriptionValue, WithSpan};
-use isograph_lang_types::semantic_token_legend;
+use isograph_lang_types::{semantic_token_legend, Description};
 
 use crate::{IsographLangTokenKind, PeekableLexer};
 
 pub(crate) fn parse_optional_description(
     tokens: &mut PeekableLexer,
-) -> Option<WithSpan<DescriptionValue>> {
+) -> Option<WithSpan<Description>> {
     parse_single_line_description(tokens).or_else(|| parse_multiline_description(tokens))
 }
 
-fn parse_multiline_description(tokens: &mut PeekableLexer) -> Option<WithSpan<DescriptionValue>> {
+fn parse_multiline_description(tokens: &mut PeekableLexer) -> Option<WithSpan<Description>> {
     tokens
         .parse_source_of_kind(
             IsographLangTokenKind::BlockStringLiteral,
@@ -24,9 +24,12 @@ fn parse_multiline_description(tokens: &mut PeekableLexer) -> Option<WithSpan<De
                 .map(|unparsed_text| clean_block_string_literal(unparsed_text).intern().into())
         })
         .ok()
+        .map(|with_span| {
+            with_span.map(|description_value: DescriptionValue| description_value.into())
+        })
 }
 
-fn parse_single_line_description(tokens: &mut PeekableLexer) -> Option<WithSpan<DescriptionValue>> {
+fn parse_single_line_description(tokens: &mut PeekableLexer) -> Option<WithSpan<Description>> {
     tokens
         .parse_source_of_kind(
             IsographLangTokenKind::StringLiteral,
@@ -40,6 +43,9 @@ fn parse_single_line_description(tokens: &mut PeekableLexer) -> Option<WithSpan<
             })
         })
         .ok()
+        .map(|with_span| {
+            with_span.map(|description_value: DescriptionValue| description_value.into())
+        })
 }
 // https://spec.graphql.org/June2018/#sec-String-Value
 fn clean_block_string_literal(source: &str) -> String {

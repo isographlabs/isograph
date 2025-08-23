@@ -1,18 +1,18 @@
 use common_lang_types::{
-    ClientSelectableName, DescriptionValue, ObjectTypeAndFieldName, ServerObjectEntityName,
-    WithSpan,
+    ClientSelectableName, ObjectTypeAndFieldName, SelectableName, ServerObjectEntityName, WithSpan,
 };
 use impl_base_types_macro::impl_for_selection_type;
-use isograph_lang_types::VariableDefinition;
+use isograph_lang_types::{Description, VariableDefinition};
 
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, NetworkProtocol,
-    ObjectSelectableId, RefetchStrategy, ScalarSelectableId, ServerEntityName, ValidatedSelection,
+    ObjectSelectableId, RefetchStrategy, ScalarSelectableId, SelectableTrait, ServerEntityName,
+    ValidatedSelection,
 };
 
 #[impl_for_selection_type]
 pub trait ClientScalarOrObjectSelectable {
-    fn description(&self) -> Option<DescriptionValue>;
+    fn description(&self) -> Option<Description>;
     fn name(&self) -> ClientSelectableName;
     fn type_and_field(&self) -> ObjectTypeAndFieldName;
     fn parent_object_entity_name(&self) -> ServerObjectEntityName;
@@ -28,7 +28,7 @@ pub trait ClientScalarOrObjectSelectable {
 impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     for &ClientScalarSelectable<TNetworkProtocol>
 {
-    fn description(&self) -> Option<DescriptionValue> {
+    fn description(&self) -> Option<Description> {
         self.description
     }
 
@@ -78,7 +78,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     for &ClientObjectSelectable<TNetworkProtocol>
 {
-    fn description(&self) -> Option<DescriptionValue> {
+    fn description(&self) -> Option<Description> {
         self.description
     }
 
@@ -91,7 +91,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     }
 
     fn parent_object_entity_name(&self) -> ServerObjectEntityName {
-        self.parent_object_name
+        self.parent_object_entity_name
     }
 
     fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>] {
@@ -112,5 +112,45 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 
     fn client_type(&self) -> &'static str {
         "pointer"
+    }
+}
+
+impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
+    for ClientScalarSelectable<TNetworkProtocol>
+{
+    fn description(&self) -> Option<Description> {
+        self.description
+    }
+
+    fn name(&self) -> SelectableName {
+        self.name.into()
+    }
+
+    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
+        self.parent_object_entity_name
+    }
+
+    fn arguments(&self) -> Vec<&VariableDefinition<ServerEntityName>> {
+        self.variable_definitions.iter().map(|x| &x.item).collect()
+    }
+}
+
+impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
+    for ClientObjectSelectable<TNetworkProtocol>
+{
+    fn description(&self) -> Option<Description> {
+        self.description
+    }
+
+    fn name(&self) -> SelectableName {
+        self.name.into()
+    }
+
+    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
+        self.parent_object_entity_name
+    }
+
+    fn arguments(&self) -> Vec<&VariableDefinition<ServerEntityName>> {
+        self.variable_definitions.iter().map(|x| &x.item).collect()
     }
 }

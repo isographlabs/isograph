@@ -5,9 +5,9 @@ use std::{
 
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, JavascriptName, Location,
-    ObjectSelectableName, RelativePathToSourceFile, SelectableName, ServerObjectEntityName,
-    ServerObjectSelectableName, ServerScalarEntityName, ServerScalarIdSelectableName,
-    ServerScalarSelectableName, UnvalidatedTypeName, WithLocation,
+    ObjectSelectableName, SelectableName, ServerObjectEntityName, ServerObjectSelectableName,
+    ServerScalarEntityName, ServerScalarIdSelectableName, ServerScalarSelectableName,
+    UnvalidatedTypeName, WithLocation,
 };
 use graphql_lang_types::GraphQLNamedTypeAnnotation;
 use intern::string_key::Intern;
@@ -15,20 +15,18 @@ use intern::Lookup;
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDirectiveSet, DefinitionLocation, EmptyDirectiveSet,
-    ObjectSelection, ScalarSelection, SchemaSource, SelectionType,
-    SelectionTypeContainingSelections, VariableDefinition, WithId,
+    ObjectSelection, ScalarSelection, SelectionType, SelectionTypeContainingSelections,
+    VariableDefinition, WithId,
 };
 use lazy_static::lazy_static;
-use pico::SourceId;
-use pico_macros::Singleton;
 
 use crate::{
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectableId,
     EntrypointDeclarationInfo, NetworkProtocol, NormalizationKey, ObjectSelectable,
-    ObjectSelectableId, ServerEntity, ServerEntityName, ServerObjectEntity,
-    ServerObjectEntityAvailableSelectables, ServerObjectSelectable, ServerScalarEntity,
-    ServerScalarSelectable, ServerSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
+    ObjectSelectableId, ScalarSelectable, Selectable, SelectableId, ServerEntity, ServerEntityName,
+    ServerObjectEntity, ServerObjectEntityAvailableSelectables, ServerObjectSelectable,
+    ServerScalarEntity, ServerScalarSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
 };
 
 lazy_static! {
@@ -163,7 +161,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     ) -> Result<WithId<&ServerObjectEntity<TNetworkProtocol>>, CreateAdditionalFieldsError> {
         let mut current_entity = self
             .server_entity_data
-            .server_object_entity(root_object_name);
+            .server_object_entity(root_object_name)
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            );
         let mut current_selectables = &self
             .server_entity_data
             .server_object_entity_extra_info
@@ -193,7 +195,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                                     *parent_object_entity_name,
                                     *server_object_selectable_name,
                                 );
-                                selectable.target_object_entity.inner()
+                                selectable
+                                    .expect(
+                                        "Expected selectable to exist. \
+                                        This is indicative of a bug in Isograph.",
+                                    )
+                                    .target_object_entity
+                                    .inner()
                             }
                             DefinitionLocation::Client((
                                 parent_object_entity_name,
@@ -203,13 +211,23 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                                     *parent_object_entity_name,
                                     *client_object_selectable_id,
                                 );
-                                pointer.target_object_entity_name.inner()
+                                pointer
+                                    .expect(
+                                        "Expected selectable to exist. \
+                                        This is indicative of a bug in Isograph.",
+                                    )
+                                    .target_object_entity_name
+                                    .inner()
                             }
                         };
 
                         current_entity = self
                             .server_entity_data
-                            .server_object_entity(*target_object_entity_name);
+                            .server_object_entity(*target_object_entity_name)
+                            .expect(
+                                "Expected entity to exist. \
+                                This is indicative of a bug in Isograph.",
+                            );
                         current_selectables = &self
                             .server_entity_data
                             .server_object_entity_extra_info
@@ -240,7 +258,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     ) -> Result<Vec<&ServerObjectSelectable<TNetworkProtocol>>, CreateAdditionalFieldsError> {
         let mut current_entity = self
             .server_entity_data
-            .server_object_entity(root_object_name);
+            .server_object_entity(root_object_name)
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            );
 
         let mut current_selectables = &self
             .server_entity_data
@@ -269,10 +291,15 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                                 parent_object_entity_name,
                                 server_object_selectable_name,
                             )) => {
-                                let selectable = self.server_object_selectable(
-                                    *parent_object_entity_name,
-                                    *server_object_selectable_name,
-                                );
+                                let selectable = self
+                                    .server_object_selectable(
+                                        *parent_object_entity_name,
+                                        *server_object_selectable_name,
+                                    )
+                                    .expect(
+                                        "Expected selectable to exist. \
+                                        This is indicative of a bug in Isograph.",
+                                    );
                                 path.push(selectable);
                                 selectable.target_object_entity.inner()
                             }
@@ -287,7 +314,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
                         current_entity = self
                             .server_entity_data
-                            .server_object_entity(*target_object_entity_name);
+                            .server_object_entity(*target_object_entity_name)
+                            .expect(
+                                "Expected entity to exist. \
+                                This is indicative of a bug in Isograph.",
+                            );
                         current_selectables = &self
                             .server_entity_data
                             .server_object_entity_extra_info
@@ -348,38 +379,43 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &self,
         parent_object_entity_name: ServerObjectEntityName,
         server_scalar_selectable_name: ServerScalarSelectableName,
-    ) -> &ServerScalarSelectable<TNetworkProtocol> {
+    ) -> Option<&ServerScalarSelectable<TNetworkProtocol>> {
         self.server_scalar_selectables
             .get(&(parent_object_entity_name, server_scalar_selectable_name))
-            .expect("Expected server scalar selectable to exist")
     }
 
     pub fn server_object_selectable(
         &self,
         parent_object_entity_name: ServerObjectEntityName,
         server_object_selectable_name: ServerObjectSelectableName,
-    ) -> &ServerObjectSelectable<TNetworkProtocol> {
+    ) -> Option<&ServerObjectSelectable<TNetworkProtocol>> {
         self.server_object_selectables
             .get(&(parent_object_entity_name, server_object_selectable_name))
-            .expect("Expected server object selectable to exist")
     }
 
     pub fn server_selectable(
         &'_ self,
         server_selectable_id: ServerSelectableId,
-    ) -> ServerSelectable<'_, TNetworkProtocol> {
+    ) -> Option<
+        SelectionType<
+            &ServerScalarSelectable<TNetworkProtocol>,
+            &ServerObjectSelectable<TNetworkProtocol>,
+        >,
+    > {
         match server_selectable_id {
             SelectionType::Scalar((parent_object_entity_name, server_scalar_selectable_name)) => {
-                SelectionType::Scalar(self.server_scalar_selectable(
+                self.server_scalar_selectable(
                     parent_object_entity_name,
                     server_scalar_selectable_name,
-                ))
+                )
+                .map(SelectionType::Scalar)
             }
             SelectionType::Object((parent_object_entity_name, server_object_selectable_name)) => {
-                SelectionType::Object(self.server_object_selectable(
+                self.server_object_selectable(
                     parent_object_entity_name,
                     server_object_selectable_name,
-                ))
+                )
+                .map(SelectionType::Object)
             }
         }
     }
@@ -417,7 +453,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         {
             let parent_object = self
                 .server_entity_data
-                .server_object_entity(parent_object_entity_name);
+                .server_object_entity(parent_object_entity_name)
+                .expect(
+                    "Expected entity to exist. \
+                    This is indicative of a bug in Isograph.",
+                );
             return Err(CreateAdditionalFieldsError::DuplicateField {
                 field_name: server_scalar_selectable.name.item.into(),
                 parent_type: parent_object.name,
@@ -451,7 +491,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &mut self,
         server_object_selectable: ServerObjectSelectable<TNetworkProtocol>,
     ) -> CreateAdditionalFieldsResult<()> {
-        let parent_object_entity_name = server_object_selectable.parent_object_name;
+        let parent_object_entity_name = server_object_selectable.parent_object_entity_name;
         let next_object_name = server_object_selectable.name;
 
         if self
@@ -471,7 +511,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         {
             let parent_object = self
                 .server_entity_data
-                .server_object_entity(parent_object_entity_name);
+                .server_object_entity(parent_object_entity_name)
+                .expect(
+                    "Expected entity to exist. \
+                    This is indicative of a bug in Isograph.",
+                );
             return Err(CreateAdditionalFieldsError::DuplicateField {
                 field_name: next_object_name.item.into(),
                 parent_type: parent_object.name,
@@ -495,10 +539,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &self,
         parent_type_name: ServerObjectEntityName,
         client_field_name: ClientScalarSelectableName,
-    ) -> &ClientScalarSelectable<TNetworkProtocol> {
+    ) -> Option<&ClientScalarSelectable<TNetworkProtocol>> {
         self.client_scalar_selectables
             .get(&(parent_type_name, client_field_name))
-            .expect("Expected client field to exist")
     }
 
     // TODO this function should not exist
@@ -506,30 +549,48 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &mut self,
         parent_type_name: ServerObjectEntityName,
         client_field_name: ClientScalarSelectableName,
-    ) -> &mut ClientScalarSelectable<TNetworkProtocol> {
+    ) -> Option<&mut ClientScalarSelectable<TNetworkProtocol>> {
         self.client_scalar_selectables
             .get_mut(&(parent_type_name, client_field_name))
-            .expect("Expected client field to exist")
     }
 
     pub fn object_selectable(
         &self,
         field_id: ObjectSelectableId,
-    ) -> ObjectSelectable<'_, TNetworkProtocol> {
+    ) -> Option<ObjectSelectable<'_, TNetworkProtocol>> {
         match field_id {
             DefinitionLocation::Server((
                 parent_object_entity_name,
                 server_object_selectable_name,
-            )) => DefinitionLocation::Server(self.server_object_selectable(
-                parent_object_entity_name,
-                server_object_selectable_name,
-            )),
+            )) => self
+                .server_object_selectable(parent_object_entity_name, server_object_selectable_name)
+                .map(DefinitionLocation::Server),
             DefinitionLocation::Client((
                 parent_object_entity_name,
                 client_object_selectable_name,
-            )) => DefinitionLocation::Client(
-                self.client_pointer(parent_object_entity_name, client_object_selectable_name),
-            ),
+            )) => self
+                .client_pointer(parent_object_entity_name, client_object_selectable_name)
+                .map(DefinitionLocation::Client),
+        }
+    }
+
+    pub fn scalar_selectable(
+        &self,
+        field_id: ScalarSelectableId,
+    ) -> Option<ScalarSelectable<'_, TNetworkProtocol>> {
+        match field_id {
+            DefinitionLocation::Server((
+                parent_object_entity_name,
+                server_scalar_selectable_name,
+            )) => self
+                .server_scalar_selectable(parent_object_entity_name, server_scalar_selectable_name)
+                .map(DefinitionLocation::Server),
+            DefinitionLocation::Client((
+                parent_object_entity_name,
+                client_scalar_selectable_name,
+            )) => self
+                .client_field(parent_object_entity_name, client_scalar_selectable_name)
+                .map(DefinitionLocation::Client),
         }
     }
 
@@ -537,10 +598,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &self,
         parent_object_entity_name: ServerObjectEntityName,
         client_object_selectable_name: ClientObjectSelectableName,
-    ) -> &ClientObjectSelectable<TNetworkProtocol> {
+    ) -> Option<&ClientObjectSelectable<TNetworkProtocol>> {
         self.client_object_selectables
             .get(&(parent_object_entity_name, client_object_selectable_name))
-            .expect("Expected client pointer to exist")
     }
 
     // TODO this function should not exist
@@ -548,30 +608,38 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &mut self,
         parent_object_entity_name: ServerObjectEntityName,
         client_object_selectable_name: ClientObjectSelectableName,
-    ) -> &mut ClientObjectSelectable<TNetworkProtocol> {
+    ) -> Option<&mut ClientObjectSelectable<TNetworkProtocol>> {
         self.client_object_selectables
             .get_mut(&(parent_object_entity_name, client_object_selectable_name))
-            .expect("Expected client pointer to exist")
+    }
+
+    pub fn selectable(&self, id: SelectableId) -> Option<Selectable<'_, TNetworkProtocol>> {
+        match id {
+            DefinitionLocation::Server(server_selectable_id) => Some(DefinitionLocation::Server(
+                self.server_selectable(server_selectable_id)?,
+            )),
+            DefinitionLocation::Client(client_selectable_id) => Some(DefinitionLocation::Client(
+                self.client_type(client_selectable_id)?,
+            )),
+        }
     }
 
     pub fn client_type(
         &self,
         client_type_id: ClientSelectableId,
-    ) -> SelectionType<
-        &ClientScalarSelectable<TNetworkProtocol>,
-        &ClientObjectSelectable<TNetworkProtocol>,
+    ) -> Option<
+        SelectionType<
+            &ClientScalarSelectable<TNetworkProtocol>,
+            &ClientObjectSelectable<TNetworkProtocol>,
+        >,
     > {
         match client_type_id {
-            SelectionType::Scalar((parent_entity_object_name, client_field_name)) => {
-                SelectionType::Scalar(
-                    self.client_field(parent_entity_object_name, client_field_name),
-                )
-            }
-            SelectionType::Object((parent_entity_object_name, client_pointer_name)) => {
-                SelectionType::Object(
-                    self.client_pointer(parent_entity_object_name, client_pointer_name),
-                )
-            }
+            SelectionType::Scalar((parent_entity_object_name, client_field_name)) => self
+                .client_field(parent_entity_object_name, client_field_name)
+                .map(SelectionType::Scalar),
+            SelectionType::Object((parent_entity_object_name, client_pointer_name)) => self
+                .client_pointer(parent_entity_object_name, client_pointer_name)
+                .map(SelectionType::Object),
         }
     }
 
@@ -604,7 +672,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             })
             .chain(self.client_object_selectables.values().map(|pointer| {
                 (
-                    SelectionType::Object((pointer.parent_object_name, pointer.name)),
+                    SelectionType::Object((pointer.parent_object_entity_name, pointer.name)),
                     SelectionType::Object(pointer),
                     ClientFieldDirectiveSet::None(EmptyDirectiveSet {}),
                 )
@@ -616,30 +684,29 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
     pub fn server_scalar_entity(
         &self,
         scalar_entity_name: ServerScalarEntityName,
-    ) -> &ServerScalarEntity<TNetworkProtocol> {
-        self.server_scalars
-            .get(&scalar_entity_name)
-            .expect("Expected scalar to exist")
+    ) -> Option<&ServerScalarEntity<TNetworkProtocol>> {
+        self.server_scalars.get(&scalar_entity_name)
     }
 
-    pub fn server_entity(&self, type_id: ServerEntityName) -> ServerEntity<'_, TNetworkProtocol> {
+    pub fn server_entity(
+        &self,
+        type_id: ServerEntityName,
+    ) -> Option<ServerEntity<'_, TNetworkProtocol>> {
         match type_id {
-            ServerEntityName::Object(object_entity_name) => {
-                ServerEntity::Object(self.server_object_entity(object_entity_name))
-            }
-            ServerEntityName::Scalar(scalar_entity_name) => {
-                ServerEntity::Scalar(self.server_scalar_entity(scalar_entity_name))
-            }
+            ServerEntityName::Object(object_entity_name) => self
+                .server_object_entity(object_entity_name)
+                .map(ServerEntity::Object),
+            ServerEntityName::Scalar(scalar_entity_name) => self
+                .server_scalar_entity(scalar_entity_name)
+                .map(ServerEntity::Scalar),
         }
     }
 
     pub fn server_object_entity(
         &self,
         object_entity_name: ServerObjectEntityName,
-    ) -> &ServerObjectEntity<TNetworkProtocol> {
-        self.server_objects
-            .get(&object_entity_name)
-            .expect("Expected object to exist")
+    ) -> Option<&ServerObjectEntity<TNetworkProtocol>> {
+        self.server_objects.get(&object_entity_name)
     }
 
     // TODO this function should not exist
@@ -820,17 +887,4 @@ fn set_and_validate_id_field(
             Ok(())
         }
     }
-}
-
-// We're using this type to constrain the types of sources that we accept. i.e.
-// in theory, you can have a TNetworkProtocol with a different Source associated
-// type, but for now, we get a source + set of extensions, and have to restrict
-// TNetworkProtocol accordingly. Perhaps the config can have a generic, and
-// thus we can thread this further back, but that is not yet implemented.
-#[derive(Debug, Clone, Singleton, PartialEq, Eq)]
-pub struct StandardSources {
-    // TODO we should just store this as a singleton, and not have it in standard sources.
-    // Or perhaps, we store the schema source directly here.
-    pub schema_source_id: SourceId<SchemaSource>,
-    pub schema_extension_sources: BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
 }

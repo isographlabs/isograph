@@ -120,10 +120,6 @@ pnpm i
 
 ### Build the Isograph JavaScript libraries for use in demos
 
-:::warn
-If you are on Windows, you need to use a linux-based terminal, or else `pnpm watch-libs` will not work, because `rm` is not a command. As a temporary workaround, you can search-and-replace `rm -rf dist/* && ` with an empty string.
-:::
-
 ```sh
 pnpm watch-libs
 ```
@@ -131,13 +127,13 @@ pnpm watch-libs
 `watch-libs` will watch the source files for changes, and rebuild everything. If you only want to do it once, you can:
 
 ```sh
-pnpm -r compile
+pnpm compile-libs
 ```
 
 ### Run unit tests in the libs folder
 
 ```sh
-pnpm -r test
+pnpm test
 ```
 
 ### Format the code
@@ -151,15 +147,7 @@ pnpm format # which also formats the Rust code
 ## Run the pet demo
 
 ```sh
-cd demos/pet-demo
-pnpm dev
-```
-
-You must also run the backend
-
-```sh
-cd demos/pet-demo
-pnpm backend
+pnpm dev-pet-demo
 ```
 
 ## VSCode extension
@@ -177,7 +165,7 @@ or
 
 ```sh
 pnpm i
-pnpm -r compile
+pnpm compile-libs
 ```
 
 - Open VSCode in `isograph/vscode-extension`

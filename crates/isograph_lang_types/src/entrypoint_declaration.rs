@@ -1,13 +1,18 @@
-use common_lang_types::{
-    IsoLiteralText, ServerScalarSelectableName, UnvalidatedTypeName, WithSpan,
+use common_lang_types::{IsoLiteralText, ServerScalarSelectableName, WithSpan};
+use resolve_position::PositionResolutionPath;
+use resolve_position_macros::ResolvePosition;
+
+use crate::{
+    entrypoint_directive_set::EntrypointDirectiveSet, IsographResolvedNode, IsographSemanticToken,
+    ServerObjectEntityNameWrapper,
 };
 
-use crate::{entrypoint_directive_set::EntrypointDirectiveSet, IsographSemanticToken};
-
 // TODO should this be ObjectTypeAndFieldNames?
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, ResolvePosition)]
+#[resolve_position(parent_type=(), resolved_node=IsographResolvedNode<'a>)]
 pub struct EntrypointDeclaration {
-    pub parent_type: WithSpan<UnvalidatedTypeName>,
+    #[resolve_field]
+    pub parent_type: WithSpan<ServerObjectEntityNameWrapper>,
     // N.B. there is no reason this can't be a server field name /shrug
     pub client_field_name: WithSpan<ServerScalarSelectableName>,
 
@@ -20,3 +25,5 @@ pub struct EntrypointDeclaration {
 
     pub semantic_tokens: Vec<WithSpan<IsographSemanticToken>>,
 }
+
+pub type EntrypointDeclarationPath<'a> = PositionResolutionPath<&'a EntrypointDeclaration, ()>;

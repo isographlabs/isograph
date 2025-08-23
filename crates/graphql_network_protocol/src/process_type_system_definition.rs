@@ -11,6 +11,7 @@ use graphql_lang_types::{
     GraphQLTypeSystemExtensionDocument, GraphQLTypeSystemExtensionOrDefinition, RootOperationKind,
 };
 use intern::string_key::Intern;
+use isograph_lang_types::Description;
 use isograph_schema::{
     CreateAdditionalFieldsError, ExposeAsFieldToInsert, ExposeFieldDirective, FieldMapItem,
     FieldToInsert, IsographObjectTypeDefinition, ProcessObjectTypeDefinitionOutcome,
@@ -168,7 +169,9 @@ pub fn process_graphql_type_system_document(
                 let (process_object_type_definition_outcome, new_directives) =
                     process_object_type_definition(
                         IsographObjectTypeDefinition {
-                            description: union_definition.description,
+                            description: union_definition
+                                .description
+                                .map(|with_span| with_span.map(|dv| dv.into())),
                             name: union_definition.name.map(|x| x.into()),
                             interfaces: vec![],
                             directives: union_definition.directives,
@@ -222,9 +225,11 @@ pub fn process_graphql_type_system_document(
                 object_outcome.fields_to_insert.push(WithLocation::new(
                     FieldToInsert {
                         description: Some(WithSpan::new(
-                            format!("A client pointer for the {subtype_name} type.")
-                                .intern()
-                                .into(),
+                            Description(
+                                format!("A client pointer for the {subtype_name} type.")
+                                    .intern()
+                                    .into(),
+                            ),
                             Span::todo_generated(),
                         )),
                         name: WithLocation::new(
@@ -341,7 +346,10 @@ fn process_object_type_definition(
         .map(|field_definition| {
             WithLocation::new(
                 FieldToInsert {
-                    description: field_definition.item.description,
+                    description: field_definition
+                        .item
+                        .description
+                        .map(|with_span| with_span.map(|dv| dv.into())),
                     name: field_definition.item.name,
                     type_: field_definition.item.type_,
                     arguments: field_definition.item.arguments,
@@ -384,14 +392,14 @@ fn process_object_type_definition(
                     .into(),
             },
             parent_object_name: object_type_definition.name.item,
-            description: Some(
+            description: Some(Description(
                 format!(
                     "A refetch field for the {} type.",
                     object_type_definition.name.item
                 )
                 .intern()
                 .into(),
-            ),
+            )),
         });
     }
 
@@ -421,7 +429,9 @@ fn process_scalar_definition(
     scalar_type_definition: GraphQLScalarTypeDefinition,
 ) -> ServerScalarEntity<GraphQLNetworkProtocol> {
     ServerScalarEntity {
-        description: scalar_type_definition.description,
+        description: scalar_type_definition
+            .description
+            .map(|with_span| with_span.map(|dv| dv.into())),
         name: scalar_type_definition.name,
         javascript_name: *STRING_JAVASCRIPT_TYPE,
         network_protocol: std::marker::PhantomData,

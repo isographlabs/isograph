@@ -1,10 +1,10 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, DescriptionValue,
-    ObjectTypeAndFieldName, ServerObjectEntityName, WithSpan,
+    ClientObjectSelectableName, ClientScalarSelectableName, ObjectTypeAndFieldName,
+    ServerObjectEntityName, WithSpan,
 };
-use isograph_lang_types::{SelectionType, TypeAnnotation, VariableDefinition};
+use isograph_lang_types::{Description, SelectionType, TypeAnnotation, VariableDefinition};
 
 use crate::{
     ClientFieldVariant, NetworkProtocol, ObjectSelectableId, RefetchStrategy, ScalarSelectableId,
@@ -26,7 +26,7 @@ pub type ClientSelectable<'a, TNetworkProtocol> = SelectionType<
 /// in iso literals.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
-    pub description: Option<DescriptionValue>,
+    pub description: Option<Description>,
     pub name: ClientScalarSelectableName,
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 
@@ -51,7 +51,7 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
 /// in iso literals.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
-    pub description: Option<DescriptionValue>,
+    pub description: Option<Description>,
     pub name: ClientObjectSelectableName,
     pub target_object_entity_name: TypeAnnotation<ServerObjectEntityName>,
 
@@ -64,7 +64,7 @@ pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     // Why is this not calculated when needed?
     pub type_and_field: ObjectTypeAndFieldName,
 
-    pub parent_object_name: ServerObjectEntityName,
+    pub parent_object_entity_name: ServerObjectEntityName,
 
     pub network_protocol: PhantomData<TNetworkProtocol>,
     pub info: UserWrittenClientPointerInfo,

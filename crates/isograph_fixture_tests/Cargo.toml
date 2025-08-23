@@ -9,11 +9,14 @@ name = "generate_isograph_fixtures"
 path = "src/main.rs"
 
 [dependencies]
+common_lang_types = { path = "../common_lang_types" }
 intern = { path = "../../relay-crates/intern" }
 isograph_compiler = { path = "../isograph_compiler" }
 isograph_config = { path = "../isograph_config" }
+graphql_network_protocol = { path = "../graphql_network_protocol" }
 isograph_lang_types = { path = "../isograph_lang_types" }
-common_lang_types = { path = "../common_lang_types" }
+isograph_schema = { path = "../isograph_schema" }
+pico = { path = "../pico" }
 clap = { workspace = true }
 regex = { workspace = true }
 lazy_static = { workspace = true }

@@ -111,17 +111,16 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::ops::ControlFlow;
-    use std::sync::atomic::AtomicI32;
-    use std::sync::atomic::Ordering;
+    use std::{
+        ops::ControlFlow,
+        str::FromStr,
+        sync::atomic::{AtomicI32, Ordering},
+    };
 
-    use lsp_types::request::GotoDefinition;
-    use lsp_types::request::HoverRequest;
-    use lsp_types::request::Request;
-    use lsp_types::Position;
-    use lsp_types::TextDocumentIdentifier;
-    use lsp_types::TextDocumentPositionParams;
-    use lsp_types::Url;
+    use lsp_types::{
+        request::{GotoDefinition, HoverRequest, Request},
+        Position, TextDocumentIdentifier, TextDocumentPositionParams, Uri,
+    };
 
     use super::LSPRequestDispatch;
     use crate::lsp_runtime_error::LSPRuntimeResult;
@@ -135,7 +134,7 @@ mod test {
                 method: "textDocument/definition".to_string(),
                 params: serde_json::to_value(TextDocumentPositionParams {
                     text_document: TextDocumentIdentifier {
-                        uri: Url::parse("https://example.net").unwrap(),
+                        uri: Uri::from_str("https://example.net").unwrap(),
                     },
                     position: Position {
                         line: 0,

@@ -1,7 +1,7 @@
 use crate::{ClientFieldVariant, ClientScalarSelectable, NetworkProtocol, Schema, LINK_FIELD_NAME};
 use common_lang_types::{Location, ObjectTypeAndFieldName, WithLocation};
 use intern::string_key::Intern;
-use isograph_lang_types::{DefinitionLocation, SelectionType, WithId};
+use isograph_lang_types::{DefinitionLocation, Description, SelectionType, WithId};
 
 use super::create_additional_fields_error::{
     CreateAdditionalFieldsError, ProcessTypeDefinitionResult,
@@ -19,11 +19,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             self.client_scalar_selectables.insert(
                 (parent_object_entity_name, field_name),
                 ClientScalarSelectable {
-                    description: Some(
+                    description: Some(Description(
                         format!("A store Link for the {} type.", object.name)
                             .intern()
                             .into(),
-                    ),
+                    )),
                     name: field_name,
                     parent_object_entity_name,
                     variable_definitions: vec![],

@@ -1,6 +1,6 @@
 use common_lang_types::relative_path_from_absolute_and_working_directory;
-use isograph_compiler::{get_current_working_directory, get_open_file_map, CompilerState};
-use isograph_lang_types::OpenFileSource;
+use isograph_compiler::CompilerState;
+use isograph_schema::{NetworkProtocol, OpenFileSource};
 use lsp_types::{
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification,
@@ -9,17 +9,17 @@ use lsp_types::{
 };
 use pico::Database;
 
-use crate::lsp_runtime_error::LSPRuntimeResult;
+use crate::{lsp_runtime_error::LSPRuntimeResult, uri_file_path_ext::UriFilePathExt};
 
-pub fn on_did_open_text_document(
-    compiler_state: &mut CompilerState,
+pub fn on_did_open_text_document<TNetworkProtocol: NetworkProtocol + 'static>(
+    compiler_state: &mut CompilerState<TNetworkProtocol>,
     params: <DidOpenTextDocument as Notification>::Params,
 ) -> LSPRuntimeResult<()> {
     let DidOpenTextDocumentParams { text_document } = params;
     let TextDocumentItem { text, uri, .. } = text_document;
 
     let db = &mut compiler_state.db;
-    let current_working_directory = get_current_working_directory(db);
+    let current_working_directory = db.get_current_working_directory();
 
     let relative_path_to_source_file = relative_path_from_absolute_and_working_directory(
         current_working_directory,
@@ -31,7 +31,7 @@ pub fn on_did_open_text_document(
         content: text,
     });
 
-    let mut open_file_map = get_open_file_map(db).clone();
+    let mut open_file_map = db.get_open_file_map().clone();
 
     open_file_map
         .0
@@ -43,21 +43,21 @@ pub fn on_did_open_text_document(
 }
 
 #[allow(clippy::unnecessary_wraps)]
-pub fn on_did_close_text_document(
-    compiler_state: &mut CompilerState,
+pub fn on_did_close_text_document<TNetworkProtocol: NetworkProtocol + 'static>(
+    compiler_state: &mut CompilerState<TNetworkProtocol>,
     params: <DidCloseTextDocument as Notification>::Params,
 ) -> LSPRuntimeResult<()> {
     let uri = params.text_document.uri;
     let db = &mut compiler_state.db;
 
-    let current_working_directory = get_current_working_directory(db);
+    let current_working_directory = db.get_current_working_directory();
 
     let relative_path_to_source_file = relative_path_from_absolute_and_working_directory(
         current_working_directory,
         &uri.to_file_path().expect("Expected file path to be valid."),
     );
 
-    let mut open_file_map = get_open_file_map(db).clone();
+    let mut open_file_map = db.get_open_file_map().clone();
 
     let deleted_entry = open_file_map
         .0
@@ -71,8 +71,8 @@ pub fn on_did_close_text_document(
     Ok(())
 }
 
-pub fn on_did_change_text_document(
-    compiler_state: &mut CompilerState,
+pub fn on_did_change_text_document<TNetworkProtocol: NetworkProtocol + 'static>(
+    compiler_state: &mut CompilerState<TNetworkProtocol>,
     params: <DidChangeTextDocument as Notification>::Params,
 ) -> LSPRuntimeResult<()> {
     let DidChangeTextDocumentParams {
@@ -87,7 +87,7 @@ pub fn on_did_change_text_document(
         .first()
         .expect("content_changes should always be non-empty");
 
-    let current_working_directory = get_current_working_directory(db);
+    let current_working_directory = db.get_current_working_directory();
 
     let relative_path_to_source_file = relative_path_from_absolute_and_working_directory(
         current_working_directory,

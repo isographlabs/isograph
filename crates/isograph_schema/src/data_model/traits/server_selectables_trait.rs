@@ -1,14 +1,12 @@
-use common_lang_types::{
-    DescriptionValue, ServerObjectEntityName, ServerSelectableName, WithLocation,
-};
+use common_lang_types::{ServerObjectEntityName, ServerSelectableName, WithLocation};
 use impl_base_types_macro::impl_for_selection_type;
-use isograph_lang_types::{SelectionType, TypeAnnotation, VariableDefinition};
+use isograph_lang_types::{Description, SelectionType, TypeAnnotation, VariableDefinition};
 
 use crate::{NetworkProtocol, ServerEntityName, ServerObjectSelectable, ServerScalarSelectable};
 
 #[impl_for_selection_type]
 pub trait ServerScalarOrObjectSelectable {
-    fn description(&self) -> Option<DescriptionValue>;
+    fn description(&self) -> Option<Description>;
     fn name(&self) -> WithLocation<ServerSelectableName>;
     fn target_entity_name(&self) -> TypeAnnotation<ServerEntityName>;
     fn parent_type_name(&self) -> ServerObjectEntityName;
@@ -18,7 +16,7 @@ pub trait ServerScalarOrObjectSelectable {
 impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
     for ServerObjectSelectable<TNetworkProtocol>
 {
-    fn description(&self) -> Option<DescriptionValue> {
+    fn description(&self) -> Option<Description> {
         self.description
     }
 
@@ -33,7 +31,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
     }
 
     fn parent_type_name(&self) -> ServerObjectEntityName {
-        self.parent_object_name
+        self.parent_object_entity_name
     }
 
     fn arguments(&self) -> &[WithLocation<VariableDefinition<ServerEntityName>>] {
@@ -44,7 +42,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
 impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
     for ServerScalarSelectable<TNetworkProtocol>
 {
-    fn description(&self) -> Option<DescriptionValue> {
+    fn description(&self) -> Option<Description> {
         self.description
     }
 

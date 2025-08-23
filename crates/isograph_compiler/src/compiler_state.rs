@@ -6,8 +6,7 @@ use std::{
 
 use common_lang_types::CurrentWorkingDirectory;
 use isograph_config::create_config;
-use isograph_lang_types::{IsographDatabase, OpenFileMap};
-use isograph_schema::NetworkProtocol;
+use isograph_schema::{IsographDatabase, NetworkProtocol, OpenFileMap};
 use pico::Database;
 
 use crate::{batch_compile::BatchCompileError, source_files::initialize_sources};
@@ -15,13 +14,13 @@ use crate::{batch_compile::BatchCompileError, source_files::initialize_sources};
 const GC_DURATION_SECONDS: u64 = 60;
 
 #[derive(Debug)]
-pub struct CompilerState {
-    pub db: IsographDatabase,
+pub struct CompilerState<TNetworkProtocol: NetworkProtocol> {
+    pub db: IsographDatabase<TNetworkProtocol>,
     pub last_gc_run: Instant,
 }
 
-impl CompilerState {
-    pub fn new<TNetworkProtocol: NetworkProtocol + 'static>(
+impl<TNetworkProtocol: NetworkProtocol> CompilerState<TNetworkProtocol> {
+    pub fn new(
         config_location: &PathBuf,
         current_working_directory: CurrentWorkingDirectory,
     ) -> Result<Self, BatchCompileError<TNetworkProtocol>> {

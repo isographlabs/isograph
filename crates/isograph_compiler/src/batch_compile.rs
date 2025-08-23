@@ -2,20 +2,15 @@ use std::{ops::Deref, path::PathBuf};
 
 use crate::{
     compiler_state::CompilerState,
-    create_schema::{
-        create_schema, process_iso_literals_for_schema, CreateSchemaError,
-        ProcessIsoLiteralsForSchemaError,
-    },
-    get_isograph_config,
+    get_validated_schema,
     with_duration::WithDuration,
     write_artifacts::{write_artifacts_to_disk, GenerateArtifactsError},
-    SourceError,
+    GetValidatedSchemaError, SourceError,
 };
 use colored::Colorize;
-use common_lang_types::{CurrentWorkingDirectory, WithLocation};
+use common_lang_types::CurrentWorkingDirectory;
 use generate_artifacts::get_artifact_path_and_content;
-use isograph_lang_types::IsographDatabase;
-use isograph_schema::{validate_use_of_arguments, NetworkProtocol, ValidateUseOfArgumentsError};
+use isograph_schema::{IsographDatabase, NetworkProtocol};
 use pretty_duration::pretty_duration;
 use thiserror::Error;
 use tracing::{error, info};
@@ -98,25 +93,20 @@ pub fn print_result<TNetworkProtocol: NetworkProtocol + 'static>(
 /// These are less "core" to the overall mission, and thus invite the question
 /// of whether they belong in this function, or at all.
 pub fn compile<TNetworkProtocol: NetworkProtocol + 'static>(
-    db: &IsographDatabase,
+    db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<CompilationStats, BatchCompileError<TNetworkProtocol>> {
-    // Create schema
-    let (unvalidated_isograph_schema, unprocessed_items) =
-        create_schema::<TNetworkProtocol>(db).deref().clone()?;
-    let (isograph_schema, stats) = process_iso_literals_for_schema::<TNetworkProtocol>(
-        db,
-        unvalidated_isograph_schema,
-        unprocessed_items,
-    )?;
-
-    validate_use_of_arguments(&isograph_schema)?;
+    let validated_schema = get_validated_schema(db);
+    let (isograph_schema, stats) = match validated_schema.deref() {
+        Ok((schema, stats)) => (schema, stats),
+        Err(e) => return Err(e.clone().into()),
+    };
 
     // Note: we calculate all of the artifact paths and contents first, so that writing to
     // disk can be as fast as possible and we minimize the chance that changes to the file
     // system occur while we're writing and we get unpredictable results.
 
-    let config = get_isograph_config(db);
-    let artifacts = get_artifact_path_and_content(&isograph_schema, config);
+    let config = db.get_isograph_config();
+    let artifacts = get_artifact_path_and_content(isograph_schema, config);
     let total_artifacts_written =
         write_artifacts_to_disk(artifacts, &config.artifact_directory.absolute_path)?;
 
@@ -129,18 +119,6 @@ pub fn compile<TNetworkProtocol: NetworkProtocol + 'static>(
 
 #[derive(Error, Debug)]
 pub enum BatchCompileError<TNetworkProtocol: NetworkProtocol + 'static> {
-    #[error("{error}")]
-    CreateSchemaError {
-        #[from]
-        error: CreateSchemaError<TNetworkProtocol>,
-    },
-
-    #[error("{error}")]
-    ProcessIsoLiteralsForSchemaError {
-        #[from]
-        error: ProcessIsoLiteralsForSchemaError,
-    },
-
     #[error("{error}")]
     SourceError {
         #[from]
@@ -160,26 +138,13 @@ pub enum BatchCompileError<TNetworkProtocol: NetworkProtocol + 'static> {
             output
         })
     )]
-    ValidateUseOfArguments {
-        messages: Vec<WithLocation<ValidateUseOfArgumentsError>>,
-    },
-
-    #[error(
-        "{}",
-        messages.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{x}"));
-            output
-        })
-    )]
     NotifyErrors { messages: Vec<notify::Error> },
-}
 
-impl<TNetworkProtocol: NetworkProtocol + 'static>
-    From<Vec<WithLocation<ValidateUseOfArgumentsError>>> for BatchCompileError<TNetworkProtocol>
-{
-    fn from(messages: Vec<WithLocation<ValidateUseOfArgumentsError>>) -> Self {
-        BatchCompileError::ValidateUseOfArguments { messages }
-    }
+    #[error("{error}")]
+    GetValidatedSchemaError {
+        #[from]
+        error: GetValidatedSchemaError<TNetworkProtocol>,
+    },
 }
 
 impl<TNetworkProtocol: NetworkProtocol + 'static> From<Vec<notify::Error>>

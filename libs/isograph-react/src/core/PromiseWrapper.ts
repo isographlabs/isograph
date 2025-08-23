@@ -1,6 +1,6 @@
 export type AnyError = any;
 
-export const NOT_SET: Symbol = Symbol('NOT_SET');
+export const NOT_SET = Symbol('NOT_SET');
 export type NotSet = typeof NOT_SET;
 
 export type Result<T, E> =
@@ -18,31 +18,32 @@ export type Result<T, E> =
  * Before the promise is resolved, value becomes non-null.
  */
 export type PromiseWrapper<T, E = any> = {
-  readonly promise: Promise<T>;
+  readonly promise: Promise<Exclude<T, NotSet>>;
   result: Result<Exclude<T, NotSet>, E> | NotSet;
 };
 
-export function wrapPromise<T>(promise: Promise<T>): PromiseWrapper<T, any> {
+export function wrapPromise<T>(
+  promise: Promise<Exclude<T, NotSet>>,
+): PromiseWrapper<T, any> {
   // TODO confirm suspense works if the promise is already resolved.
   const wrapper: PromiseWrapper<T, any> = { promise, result: NOT_SET };
   promise
     .then((v) => {
-      // v is assignable to Exclude<T, Symbol> | Symbol
-      wrapper.result = { kind: 'Ok', value: v as any };
+      wrapper.result = { kind: 'Ok', value: v };
     })
     .catch((e) => {
-      // e is assignable to Exclude<T, Symbol> | Symbol
-      wrapper.result = { kind: 'Err', error: e as any };
+      wrapper.result = { kind: 'Err', error: e };
     });
   return wrapper;
 }
 
-export function wrapResolvedValue<T>(value: T): PromiseWrapper<T, never> {
+export function wrapResolvedValue<T>(
+  value: Exclude<T, NotSet>,
+): PromiseWrapper<T, never> {
   return {
     promise: Promise.resolve(value),
     result: {
       kind: 'Ok',
-      // @ts-expect-error one should not call wrapResolvedValue with NOT_SET
       value,
     },
   };
@@ -51,8 +52,7 @@ export function wrapResolvedValue<T>(value: T): PromiseWrapper<T, never> {
 export function readPromise<T, E>(p: PromiseWrapper<T, E>): T {
   const { result } = p;
   if (result !== NOT_SET) {
-    // Safety: p.result is either NOT_SET or an actual value.
-    const resultKind = result as Result<T, any>;
+    const resultKind = result;
     if (resultKind.kind === 'Ok') {
       return resultKind.value;
     } else {
@@ -73,11 +73,8 @@ export type PromiseState<T, E> =
 export function getPromiseState<T, E>(
   p: PromiseWrapper<T, E>,
 ): PromiseState<T, E> {
-  const { result } = p;
-  if (result !== NOT_SET) {
-    // Safety: p.result is either NOT_SET or an actual value.
-    const resultKind = result as Result<T, any>;
-    return resultKind;
+  if (p.result !== NOT_SET) {
+    return p.result;
   }
   return {
     kind: 'Pending',

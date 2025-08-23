@@ -8,8 +8,8 @@ license = { workspace = true }
 common_lang_types = { path = "../common_lang_types" }
 graphql_lang_types = { path = "../graphql_lang_types" }
 intern = { path = "../../relay-crates/intern" }
-pico = { path = "../pico" }
-pico_macros = { path = "../pico_macros" }
+resolve_position = { path = "../resolve_position" }
+resolve_position_macros = { path = "../resolve_position_macros" }
 lsp-types = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

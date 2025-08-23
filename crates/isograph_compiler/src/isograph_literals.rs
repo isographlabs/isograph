@@ -5,11 +5,10 @@ use common_lang_types::{
 use isograph_lang_parser::{
     parse_iso_literal, IsoLiteralExtractionResult, IsographLiteralParseError,
 };
-use isograph_lang_types::{
-    EntrypointDeclaration, IsoLiteralsSource, IsographDatabase, SelectionType,
-};
+use isograph_lang_types::{EntrypointDeclaration, SelectionType};
 use isograph_schema::{
-    NetworkProtocol, ProcessClientFieldDeclarationError, Schema, UnprocessedItem,
+    get_open_file, IsoLiteralsSource, IsographDatabase, NetworkProtocol,
+    ProcessClientFieldDeclarationError, Schema, UnprocessedItem,
 };
 use lazy_static::lazy_static;
 use pico::SourceId;
@@ -24,10 +23,7 @@ use std::{
 };
 use thiserror::Error;
 
-use crate::{
-    create_schema::ParsedIsoLiteralsMap, db_singletons::get_current_working_directory,
-    get_iso_literal_map, get_open_file,
-};
+use crate::{create_schema::ParsedIsoLiteralsMap, get_iso_literal_map};
 
 pub fn read_files_in_folder(
     folder: &Path,
@@ -117,10 +113,9 @@ fn visit_dirs_skipping_isograph(dir: &Path, cb: &mut dyn FnMut(&DirEntry)) -> io
 // TODO this should return a Vec of Results, since a file can contain
 // both valid and invalid iso literals.
 #[allow(clippy::type_complexity)]
-pub fn parse_iso_literals_in_file_content(
-    db: &IsographDatabase,
+pub fn parse_iso_literals_in_file_content<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     relative_path_to_source_file: RelativePathToSourceFile,
-    file_content: &str,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<
     Vec<(IsoLiteralExtractionResult, TextSource)>,
@@ -129,7 +124,11 @@ pub fn parse_iso_literals_in_file_content(
     let mut extraction_results = vec![];
     let mut isograph_literal_parse_errors = vec![];
 
-    for iso_literal_extraction in extract_iso_literals_from_file_content(file_content) {
+    for iso_literal_extraction in
+        extract_iso_literals_from_file_content(db, relative_path_to_source_file)
+            .deref()
+            .iter()
+    {
         match process_iso_literal_extraction(
             db,
             iso_literal_extraction,
@@ -150,14 +149,17 @@ pub fn parse_iso_literals_in_file_content(
 
 // TODO this (and the previous function) smell
 #[allow(clippy::type_complexity)]
-pub fn parse_iso_literals_in_file_content_and_return_all(
-    db: &IsographDatabase,
+pub fn parse_iso_literals_in_file_content_and_return_all<
+    TNetworkProtocol: NetworkProtocol + 'static,
+>(
+    db: &IsographDatabase<TNetworkProtocol>,
     relative_path_to_source_file: RelativePathToSourceFile,
-    file_content: &str,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Vec<Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>>>
 {
-    extract_iso_literals_from_file_content(file_content)
+    extract_iso_literals_from_file_content(db, relative_path_to_source_file)
+        .deref()
+        .iter()
         .map(|iso_literal_extraction| {
             process_iso_literal_extraction(
                 db,
@@ -171,8 +173,8 @@ pub fn parse_iso_literals_in_file_content_and_return_all(
 
 #[allow(clippy::type_complexity)]
 #[memo]
-pub fn parse_iso_literal_in_source(
-    db: &IsographDatabase,
+pub fn parse_iso_literal_in_source<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     iso_literals_source_id: SourceId<IsoLiteralsSource>,
 ) -> Result<
     Vec<(IsoLiteralExtractionResult, TextSource)>,
@@ -181,45 +183,15 @@ pub fn parse_iso_literal_in_source(
     let memo_ref = read_iso_literals_source(db, iso_literals_source_id);
     let IsoLiteralsSource {
         relative_path,
-        content,
+        content: _,
     } = memo_ref.deref();
 
-    parse_iso_literals_in_file_content(
-        db,
-        *relative_path,
-        content,
-        get_current_working_directory(db),
-    )
-}
-
-#[allow(clippy::type_complexity)]
-#[memo]
-pub fn parse_iso_literal_in_relative_file(
-    db: &IsographDatabase,
-    relative_path_to_source_file: RelativePathToSourceFile,
-) -> Option<
-    Result<
-        Vec<(IsoLiteralExtractionResult, TextSource)>,
-        Vec<WithLocation<IsographLiteralParseError>>,
-    >,
-> {
-    let memo_ref = read_iso_literals_source_from_relative_path(db, relative_path_to_source_file);
-    let IsoLiteralsSource {
-        relative_path,
-        content,
-    } = memo_ref.to_owned()?;
-
-    Some(parse_iso_literals_in_file_content(
-        db,
-        relative_path,
-        &content,
-        get_current_working_directory(db),
-    ))
+    parse_iso_literals_in_file_content(db, *relative_path, db.get_current_working_directory())
 }
 
 #[memo]
-pub fn read_iso_literals_source_from_relative_path(
-    db: &IsographDatabase,
+pub fn read_iso_literals_source_from_relative_path<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     relative_path_to_source_file: RelativePathToSourceFile,
 ) -> Option<IsoLiteralsSource> {
     let map = get_iso_literal_map(db);
@@ -232,8 +204,8 @@ pub fn read_iso_literals_source_from_relative_path(
 /// We should (probably) never directly read SourceId<IsoLiteralsSource>, since if we do so,
 /// we will ignore open files.
 #[memo]
-pub fn read_iso_literals_source(
-    db: &IsographDatabase,
+pub fn read_iso_literals_source<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     iso_literals_source_id: SourceId<IsoLiteralsSource>,
 ) -> IsoLiteralsSource {
     let IsoLiteralsSource {
@@ -253,7 +225,7 @@ pub fn read_iso_literals_source(
 }
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &mut Schema<TNetworkProtocol>,
     contains_iso: ParsedIsoLiteralsMap,
 ) -> Result<
@@ -307,9 +279,9 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn process_iso_literal_extraction(
-    db: &IsographDatabase,
-    iso_literal_extraction: IsoLiteralExtraction<'_>,
+pub fn process_iso_literal_extraction<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    iso_literal_extraction: &IsoLiteralExtraction,
     relative_path_to_source_file: RelativePathToSourceFile,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>> {
@@ -323,7 +295,7 @@ fn process_iso_literal_extraction(
     let text_source = TextSource {
         relative_path_to_source_file,
         span: Some(Span::new(
-            iso_literal_start_index as u32,
+            *iso_literal_start_index as u32,
             (iso_literal_start_index + iso_literal_text.len()) as u32,
         )),
         current_working_directory,
@@ -336,11 +308,11 @@ fn process_iso_literal_extraction(
         ));
     }
 
-    let iso_literal_extraction_result = parse_iso_literal(
+    let iso_literal_extraction_result = memoized_parse_iso_literal(
         db,
         iso_literal_text.to_string(),
         relative_path_to_source_file,
-        const_export_name.map(|x| x.to_string()),
+        const_export_name.clone(),
         text_source,
     )
     .to_owned()?;
@@ -365,9 +337,10 @@ lazy_static! {
         Regex::new(r"(// )?(export const ([^ ]+) =\s+)?iso(\()?`([^`]+)`(\))?(\()?").unwrap();
 }
 
-pub struct IsoLiteralExtraction<'a> {
-    pub const_export_name: Option<&'a str>,
-    pub iso_literal_text: &'a str,
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct IsoLiteralExtraction {
+    pub const_export_name: Option<String>,
+    pub iso_literal_text: String,
     pub iso_literal_start_index: usize,
     pub has_associated_js_function: bool,
     /// true if the iso function is called as iso(`...`), and false if it is
@@ -378,9 +351,20 @@ pub struct IsoLiteralExtraction<'a> {
     pub iso_function_called_with_paren: bool,
 }
 
-pub fn extract_iso_literals_from_file_content(
-    content: &str,
-) -> impl Iterator<Item = IsoLiteralExtraction<'_>> + '_ {
+#[memo]
+pub fn extract_iso_literals_from_file_content<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    relative_path_to_source_file: RelativePathToSourceFile,
+) -> Vec<IsoLiteralExtraction> {
+    let memo_ref = read_iso_literals_source_from_relative_path(db, relative_path_to_source_file);
+    let IsoLiteralsSource {
+        relative_path: _,
+        content,
+    } = memo_ref
+        .deref()
+        .as_ref()
+        .expect("Expected relative path to exist");
+
     EXTRACT_ISO_LITERAL
         .captures_iter(content)
         .flat_map(|captures| {
@@ -391,11 +375,32 @@ pub fn extract_iso_literals_from_file_content(
                 return None;
             }
             Some(IsoLiteralExtraction {
-                const_export_name: captures.get(2).map(|_| captures.get(3).unwrap().as_str()),
-                iso_literal_text: iso_literal_match.as_str(),
+                const_export_name: captures
+                    .get(2)
+                    .map(|_| captures.get(3).unwrap().as_str().to_string()),
+                iso_literal_text: iso_literal_match.as_str().to_string(),
                 iso_literal_start_index: iso_literal_match.start(),
                 has_associated_js_function: captures.get(7).is_some(),
                 iso_function_called_with_paren: captures.get(4).is_some(),
             })
         })
+        .collect()
+}
+
+#[memo]
+pub fn memoized_parse_iso_literal<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    iso_literal_text: String,
+    definition_file_path: RelativePathToSourceFile,
+    const_export_name: Option<String>,
+    // TODO we should not pass the text source here! Whenever the iso literal
+    // moves around the page, we break memoization, due to this parameter.
+    text_source: TextSource,
+) -> Result<IsoLiteralExtractionResult, WithLocation<IsographLiteralParseError>> {
+    parse_iso_literal(
+        iso_literal_text,
+        definition_file_path,
+        const_export_name,
+        text_source,
+    )
 }

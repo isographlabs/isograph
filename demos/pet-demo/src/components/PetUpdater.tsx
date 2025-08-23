@@ -1,7 +1,6 @@
 import { iso } from '@iso';
 import { Box, Button, Input, MenuItem, Select } from '@mui/material';
 import React, { useState } from 'react';
-import { getAllJSDocTagsOfKind } from 'typescript';
 import { PetId } from './routes';
 
 export const PetUpdater = iso(`
@@ -16,7 +15,7 @@ export const PetUpdater = iso(`
     potential_new_best_friends {
       id
       name
-    },
+    }
 
     set_pet_tagline
     tagline @updatable

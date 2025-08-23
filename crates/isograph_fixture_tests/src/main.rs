@@ -1,19 +1,21 @@
-use std::{ffi::OsStr, fs, path::PathBuf};
+use std::{collections::HashMap, ffi::OsStr, fs, path::PathBuf};
 
 use clap::Parser;
 use common_lang_types::{
     relative_path_from_absolute_and_working_directory, CurrentWorkingDirectory,
 };
+use graphql_network_protocol::GraphQLNetworkProtocol;
 use intern::{string_key::Intern, Lookup};
-use isograph_compiler::parse_iso_literals_in_file_content;
-use isograph_lang_types::IsographDatabase;
+use isograph_compiler::{parse_iso_literals_in_file_content, IsoLiteralMap};
+use isograph_schema::{IsoLiteralsSource, IsographDatabase, OpenFileMap};
 use lazy_static::lazy_static;
+use pico::Database;
 use regex::Regex;
 
 fn main() {
     let args = FixtureOpt::parse();
 
-    let db = IsographDatabase::default();
+    let mut db: IsographDatabase<GraphQLNetworkProtocol> = IsographDatabase::default();
 
     if args.dir.is_empty() {
         panic!("At least one directory must be provided.");
@@ -35,7 +37,11 @@ fn main() {
             panic!("Expected {fixture_dir:?} to be a directory");
         }
 
-        generate_fixtures_for_files_in_folder(&db, canonicalized_folder, current_working_directory);
+        generate_fixtures_for_files_in_folder(
+            &mut db,
+            canonicalized_folder,
+            current_working_directory,
+        );
     }
 }
 
@@ -54,7 +60,7 @@ lazy_static! {
 const OUTPUT_SUFFIX: &str = r"output";
 
 fn generate_fixtures_for_files_in_folder(
-    db: &IsographDatabase,
+    db: &mut IsographDatabase<GraphQLNetworkProtocol>,
     folder: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) {
@@ -91,7 +97,7 @@ fn generate_fixtures_for_files_in_folder(
 }
 
 fn process_input_file(
-    db: &IsographDatabase,
+    db: &mut IsographDatabase<GraphQLNetworkProtocol>,
     input_file: PathBuf,
     output_file: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
@@ -102,23 +108,35 @@ fn process_input_file(
     )
     .unwrap_or_else(|_| panic!("Content cannot be turned into string (path: {input_file:?})"));
 
+    let mut literal_map = HashMap::new();
+    let relative_path =
+        relative_path_from_absolute_and_working_directory(current_working_directory, &input_file);
+
+    let source_id = db.set(IsoLiteralsSource {
+        relative_path,
+        content: file_content,
+    });
+
+    literal_map.insert(relative_path, source_id);
+
+    db.set(IsoLiteralMap(literal_map));
+    db.set(OpenFileMap(HashMap::new()));
+
     // N.B. for now, we are just parsing and printing those results.
     // But, we actually want to either just parse iso literals, or
     // parse the GraphQL schema, or parse and validate, or parse and
     // validate and generate artifacts, or something else entirely.
     //
     // So, we will need to make this a bit more flexible.
-    let results =
-        generate_content_for_output_file(db, input_file, file_content, current_working_directory);
+    let results = generate_content_for_output_file(db, input_file, current_working_directory);
 
     fs::write(output_file.clone(), results)
         .unwrap_or_else(|_| panic!("Failed to write to {output_file:?}"));
 }
 
 fn generate_content_for_output_file(
-    db: &IsographDatabase,
+    db: &IsographDatabase<GraphQLNetworkProtocol>,
     input_file: PathBuf,
-    content: String,
     current_working_directory: CurrentWorkingDirectory,
 ) -> String {
     let canonicalized_root_path = &PathBuf::from(current_working_directory.lookup());
@@ -130,7 +148,6 @@ fn generate_content_for_output_file(
     match parse_iso_literals_in_file_content(
         db,
         relative_path_to_source_file,
-        &content,
         current_working_directory,
     ) {
         Ok(item) => {

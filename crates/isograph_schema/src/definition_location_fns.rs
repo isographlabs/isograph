@@ -1,5 +1,5 @@
-use common_lang_types::{DescriptionValue, ServerObjectEntityName};
-use isograph_lang_types::{DefinitionLocation, TypeAnnotation};
+use common_lang_types::ServerObjectEntityName;
+use isograph_lang_types::{DefinitionLocation, Description, TypeAnnotation};
 
 use crate::{ClientObjectSelectable, NetworkProtocol, ServerObjectSelectable};
 
@@ -9,7 +9,7 @@ pub fn description<TNetworkProtocol: NetworkProtocol>(
         &ServerObjectSelectable<TNetworkProtocol>,
         &ClientObjectSelectable<TNetworkProtocol>,
     >,
-) -> Option<DescriptionValue> {
+) -> Option<Description> {
     match definition_location {
         DefinitionLocation::Server(server_field) => server_field.description,
         DefinitionLocation::Client(client_field) => client_field.description,

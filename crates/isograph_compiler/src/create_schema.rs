@@ -12,12 +12,10 @@ use graphql_lang_types::{
 };
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_parser::{IsoLiteralExtractionResult, IsographLiteralParseError};
-use isograph_lang_types::{
-    ConstantValue, IsographDatabase, SelectionType, TypeAnnotation, VariableDefinition,
-};
+use isograph_lang_types::{ConstantValue, SelectionType, TypeAnnotation, VariableDefinition};
 use isograph_schema::{
-    validate_entrypoints, CreateAdditionalFieldsError, FieldToInsert, NetworkProtocol,
-    ProcessClientFieldDeclarationError, ProcessObjectTypeDefinitionOutcome,
+    validate_entrypoints, CreateAdditionalFieldsError, FieldToInsert, IsographDatabase,
+    NetworkProtocol, ProcessClientFieldDeclarationError, ProcessObjectTypeDefinitionOutcome,
     ProcessTypeSystemDocumentOutcome, RootOperationName, Schema, ServerEntityName,
     ServerObjectSelectable, ServerObjectSelectableVariant, ServerScalarSelectable,
     UnprocessedClientFieldItem, UnprocessedClientPointerItem, ValidateEntrypointDeclarationError,
@@ -27,14 +25,14 @@ use thiserror::Error;
 
 use crate::{
     add_selection_sets::{add_selection_sets_to_client_selectables, AddSelectionSetsError},
-    db_singletons::{get_iso_literal_map, get_isograph_config},
+    get_iso_literal_map,
     isograph_literals::{parse_iso_literal_in_source, process_iso_literals},
 };
 
 #[memo]
 #[allow(clippy::type_complexity)]
 pub fn create_schema<TNetworkProtocol: NetworkProtocol + 'static>(
-    db: &IsographDatabase,
+    db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
     (
         Schema<TNetworkProtocol>,
@@ -95,7 +93,7 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     process_field_queue(
         &mut unvalidated_isograph_schema,
         field_queue,
-        &get_isograph_config(db).options,
+        &db.get_isograph_config().options,
     )?;
 
     // Step one: we can create client selectables. However, we must create all
@@ -117,8 +115,8 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok((unvalidated_isograph_schema, unprocessed_items))
 }
 
-pub fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase,
+pub fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     mut unvalidated_isograph_schema: Schema<TNetworkProtocol>,
     mut unprocessed_items: Vec<
         SelectionType<UnprocessedClientFieldItem, UnprocessedClientPointerItem>,
@@ -148,7 +146,7 @@ pub fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol>(
     Ok((unvalidated_isograph_schema, contains_iso_stats))
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum ProcessIsoLiteralsForSchemaError {
     #[error(
         "{}{}",
@@ -230,8 +228,8 @@ impl From<Vec<WithLocation<AddSelectionSetsError>>> for ProcessIsoLiteralsForSch
     }
 }
 
-fn parse_iso_literals(
-    db: &IsographDatabase,
+fn parse_iso_literals<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<ParsedIsoLiteralsMap, Vec<WithLocation<IsographLiteralParseError>>> {
     // TODO we are not checking the open file map here. This will probably be fixed when we
     // fully rewrite everything to be incremental.
@@ -302,6 +300,7 @@ impl DerefMut for ParsedIsoLiteralsMap {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ContainsIsoStats {
     pub client_field_count: usize,
     pub entrypoint_count: usize,
@@ -317,7 +316,7 @@ pub struct ContainsIsoStats {
 /// - insert it into to the parent object's encountered_fields
 /// - append it to schema.server_fields
 /// - if it is an id field, modify the parent object
-fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
+fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &mut Schema<TNetworkProtocol>,
     field_queue: HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
     options: &CompilerConfigOptions,
@@ -326,7 +325,11 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
         for server_field_to_insert in field_definitions_to_insert.into_iter() {
             let parent_object_entity = schema
                 .server_entity_data
-                .server_object_entity(parent_object_entity_name);
+                .server_object_entity(parent_object_entity_name)
+                .expect(
+                    "Expected entity to exist. \
+                    This is indicative of a bug in Isograph.",
+                );
 
             let target_entity_type_name = server_field_to_insert.item.type_.inner();
 
@@ -395,7 +398,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
                                 server_field_to_insert.item.type_.clone(),
                             )
                             .map(&mut |_| *object_entity_name),
-                            parent_object_name: parent_object_entity_name,
+                            parent_object_entity_name,
                             arguments,
                             phantom_data: std::marker::PhantomData,
                             object_selectable_variant:

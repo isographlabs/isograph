@@ -77,6 +77,10 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
         ServerEntityName::Scalar(scalar_entity_name) => schema
             .server_entity_data
             .server_scalar_entity(scalar_entity_name)
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            )
             .javascript_name
             .to_string(),
     }
@@ -88,7 +92,10 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
     server_selectable_id: ServerSelectableId,
     indentation_level: u8,
 ) -> String {
-    let (is_optional, selection_type) = match schema.server_selectable(server_selectable_id) {
+    let (is_optional, selection_type) = match schema.server_selectable(server_selectable_id).expect(
+        "Expected selectable to exist. \
+        This is indicative of a bug in Isograph.",
+    ) {
         SelectionType::Scalar(scalar_selectable) => (
             is_nullable(&scalar_selectable.target_scalar_entity),
             scalar_selectable

@@ -16,7 +16,9 @@ use thiserror::Error;
 pub type ValidateAddSelectionSetsResultWithMultipleErrors<T> =
     Result<T, Vec<WithLocation<AddSelectionSetsError>>>;
 
-pub(crate) fn add_selection_sets_to_client_selectables<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn add_selection_sets_to_client_selectables<
+    TNetworkProtocol: NetworkProtocol + 'static,
+>(
     schema: &mut Schema<TNetworkProtocol>,
     unprocessed_items: Vec<UnprocessedItem>,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
@@ -48,17 +50,26 @@ pub(crate) fn add_selection_sets_to_client_selectables<TNetworkProtocol: Network
 
 // TODO we should not be mutating items in the schema. Instead, we should be creating
 // new items (the refetch and reader selection sets).
-fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
+fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &mut Schema<TNetworkProtocol>,
     unprocessed_item: UnprocessedClientFieldItem,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
-    let client_field = schema.client_field(
-        unprocessed_item.parent_object_entity_name,
-        unprocessed_item.client_field_name,
-    );
+    let client_field = schema
+        .client_field(
+            unprocessed_item.parent_object_entity_name,
+            unprocessed_item.client_field_name,
+        )
+        .expect(
+            "Expected selectable to exist. \
+            This is indicative of a bug in Isograph.",
+        );
     let parent_object = schema
         .server_entity_data
-        .server_object_entity(client_field.parent_object_entity_name);
+        .server_object_entity(client_field.parent_object_entity_name)
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        );
 
     let new_selection_set = get_validated_selection_set(
         schema,
@@ -76,10 +87,15 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
         &client_field,
     )?;
 
-    let client_field = schema.client_field_mut(
-        unprocessed_item.parent_object_entity_name,
-        unprocessed_item.client_field_name,
-    );
+    let client_field = schema
+        .client_field_mut(
+            unprocessed_item.parent_object_entity_name,
+            unprocessed_item.client_field_name,
+        )
+        .expect(
+            "Expected selectable to exist. \
+            This is indicative of a bug in Isograph.",
+        );
 
     client_field.reader_selection_set = new_selection_set;
     client_field.refetch_strategy = refetch_strategy;
@@ -89,30 +105,44 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
 
 // TODO we should not be mutating items in the schema. Instead, we should be creating
 // new items (the refetch and reader selection sets).
-fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol>(
+fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &mut Schema<TNetworkProtocol>,
     unprocessed_item: UnprocessedClientPointerItem,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
-    let client_pointer = schema.client_pointer(
-        unprocessed_item.parent_object_entity_name,
-        unprocessed_item.client_object_selectable_name,
-    );
+    let client_pointer = schema
+        .client_pointer(
+            unprocessed_item.parent_object_entity_name,
+            unprocessed_item.client_object_selectable_name,
+        )
+        .expect(
+            "Expected selectable to exist. \
+            This is indicative of a bug in Isograph.",
+        );
     let parent_object = schema
         .server_entity_data
-        .server_object_entity(client_pointer.parent_object_name);
+        .server_object_entity(client_pointer.parent_object_entity_name)
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        );
 
     let new_selection_set = get_validated_selection_set(
         schema,
         unprocessed_item.reader_selection_set,
         parent_object,
-        client_pointer.parent_object_name,
+        client_pointer.parent_object_entity_name,
         &client_pointer,
     )?;
 
-    let client_pointer = schema.client_pointer_mut(
-        unprocessed_item.parent_object_entity_name,
-        unprocessed_item.client_object_selectable_name,
-    );
+    let client_pointer = schema
+        .client_pointer_mut(
+            unprocessed_item.parent_object_entity_name,
+            unprocessed_item.client_object_selectable_name,
+        )
+        .expect(
+            "Expected selectable to exist. \
+            This is indicative of a bug in Isograph.",
+        );
 
     client_pointer.reader_selection_set = new_selection_set;
 
@@ -125,7 +155,7 @@ fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol>(
 ///   as scalars, etc)
 /// - validate loadability/selectability (e.g. client fields cannot be selected updatably), and
 /// - include the selectable id in the associated data
-fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol>(
+fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     parent_object: &ServerObjectEntity<TNetworkProtocol>,
@@ -143,7 +173,7 @@ fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol>(
     }))
 }
 
-fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
+fn get_validated_selection<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     with_span: WithSpan<UnvalidatedSelection>,
     selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
@@ -173,7 +203,7 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
     })
 }
 
-fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
+fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
     selection_parent_object_name: ServerObjectEntityName,
@@ -220,38 +250,48 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
                 ));
             }
 
-            let server_scalar_selectable_id = *server_selectable_id.as_scalar_result().map_err(
-                |(parent_object_entity_name, server_object_selectable_name)| {
-                    let object_selectable = schema.server_object_selectable(
-                        *parent_object_entity_name,
-                        *server_object_selectable_name,
-                    );
-                    let object = schema
-                        .server_entity_data
-                        .server_object_entity(*object_selectable.target_object_entity.inner());
+            let server_scalar_selectable_id =
+                *server_selectable_id.as_scalar_result().as_ref().map_err(
+                    |(parent_object_entity_name, server_object_selectable_name)| {
+                        let object_selectable = schema
+                            .server_object_selectable(
+                                *parent_object_entity_name,
+                                *server_object_selectable_name,
+                            )
+                            .expect(
+                                "Expected selectable to exist. \
+                            This is indicative of a bug in Isograph.",
+                            );
+                        let object = schema
+                            .server_entity_data
+                            .server_object_entity(*object_selectable.target_object_entity.inner())
+                            .expect(
+                                "Expected entity to exist. \
+                            This is indicative of a bug in Isograph.",
+                            );
 
-                    WithLocation::new(
-                        AddSelectionSetsError::SelectionTypeSelectionFieldIsNotScalar {
-                            client_field_parent_type_name: top_level_field_or_pointer
-                                .type_and_field()
-                                .type_name,
-                            client_field_name: top_level_field_or_pointer.name().into(),
-                            field_parent_type_name: selection_parent_object.name,
-                            field_name: scalar_selection.name.item.into(),
-                            target_type_name: object.name.into(),
-                            client_type: top_level_field_or_pointer.client_type().to_string(),
-                            field_type: top_level_field_or_pointer.client_type(),
-                        },
-                        scalar_selection.name.location,
-                    )
-                },
-            )?;
+                        WithLocation::new(
+                            AddSelectionSetsError::SelectionTypeSelectionFieldIsNotScalar {
+                                client_field_parent_type_name: top_level_field_or_pointer
+                                    .type_and_field()
+                                    .type_name,
+                                client_field_name: top_level_field_or_pointer.name().into(),
+                                field_parent_type_name: selection_parent_object.name,
+                                field_name: scalar_selection.name.item.into(),
+                                target_type_name: object.name.into(),
+                                client_type: top_level_field_or_pointer.client_type().to_string(),
+                                field_type: top_level_field_or_pointer.client_type(),
+                            },
+                            scalar_selection.name.location,
+                        )
+                    },
+                )?;
 
             DefinitionLocation::Server(server_scalar_selectable_id)
         }
         DefinitionLocation::Client(client_type) => {
             let (parent_object_entity_name, client_field_name) =
-                *client_type.as_scalar().ok_or_else(|| {
+                *client_type.as_scalar().as_ref().ok_or_else(|| {
                     WithLocation::new(
                     AddSelectionSetsError::SelectionTypeSelectionClientPointerSelectedAsScalar {
                         client_field_parent_type_name: top_level_field_or_pointer
@@ -278,7 +318,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
     })
 }
 
-fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
+fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
     selection_parent_object_name: ServerObjectEntityName,
@@ -313,15 +353,26 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     let (associated_data, new_parent_object_entity_name) = match *location {
         DefinitionLocation::Server(server_selectable_id) => {
             let (parent_object_entity_name, server_object_selectable_name) =
-                *server_selectable_id.as_object_result().map_err(
+                *server_selectable_id.as_object_result().as_ref().map_err(
                     |(parent_object_entity_name, server_scalar_selectable_name)| {
-                        let server_scalar_selectable = schema.server_scalar_selectable(
-                            *parent_object_entity_name,
-                            *server_scalar_selectable_name,
-                        );
-                        let server_scalar = schema.server_entity_data.server_scalar_entity(
-                            *server_scalar_selectable.target_scalar_entity.inner(),
-                        );
+                        let server_scalar_selectable = schema
+                            .server_scalar_selectable(
+                                *parent_object_entity_name,
+                                *server_scalar_selectable_name,
+                            )
+                            .expect(
+                                "Expected selectable to exist. \
+                                This is indicative of a bug in Isograph.",
+                            );
+                        let server_scalar = schema
+                            .server_entity_data
+                            .server_scalar_entity(
+                                *server_scalar_selectable.target_scalar_entity.inner(),
+                            )
+                            .expect(
+                                "Expected entity to exist. \
+                                This is indicative of a bug in Isograph.",
+                            );
 
                         vec![WithLocation::new(
                             AddSelectionSetsError::SelectionTypeSelectionFieldIsScalar {
@@ -339,7 +390,11 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                     },
                 )?;
             let server_object_selectable = schema
-                .server_object_selectable(parent_object_entity_name, server_object_selectable_name);
+                .server_object_selectable(parent_object_entity_name, server_object_selectable_name)
+                .expect(
+                    "Expected selectable to exist. \
+                    This is indicative of a bug in Isograph.",
+                );
 
             (
                 DefinitionLocation::Server((
@@ -351,7 +406,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
         }
         DefinitionLocation::Client(client_type) => {
             let (parent_object_entity_name, client_pointer_name) =
-                *client_type.as_object().ok_or_else(|| {
+                *client_type.as_object().as_ref().ok_or_else(|| {
                     vec![WithLocation::new(
                     AddSelectionSetsError::SelectionTypeSelectionClientPointerSelectedAsScalar {
                         client_field_parent_type_name: top_level_field_or_pointer
@@ -365,8 +420,12 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                     Location::generated(),
                 )]
                 })?;
-            let client_pointer =
-                schema.client_pointer(parent_object_entity_name, client_pointer_name);
+            let client_pointer = schema
+                .client_pointer(parent_object_entity_name, client_pointer_name)
+                .expect(
+                    "Expected selectable to exist. \
+                    This is indicative of a bug in Isograph.",
+                );
 
             (
                 DefinitionLocation::Client((parent_object_entity_name, client_pointer_name)),
@@ -377,7 +436,11 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
 
     let new_parent_object = schema
         .server_entity_data
-        .server_object_entity(new_parent_object_entity_name);
+        .server_object_entity(new_parent_object_entity_name)
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        );
 
     Ok(ObjectSelection {
         name: object_selection.name,
@@ -395,7 +458,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     })
 }
 
-fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol>(
+fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     refetch_strategy: Option<RefetchStrategy<(), ()>>,
     parent_object: &ServerObjectEntity<TNetworkProtocol>,

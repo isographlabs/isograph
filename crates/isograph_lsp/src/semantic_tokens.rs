@@ -1,24 +1,28 @@
 use std::ops::Deref;
 
-use crate::lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult};
+use crate::{
+    lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult},
+    uri_file_path_ext::UriFilePathExt,
+};
 use common_lang_types::{
     relative_path_from_absolute_and_working_directory, Span, TextSource, WithSpan,
 };
 use isograph_compiler::{
-    get_current_working_directory, parse_iso_literals_in_file_content_and_return_all,
-    read_iso_literals_source_from_relative_path, CompilerState,
+    parse_iso_literals_in_file_content_and_return_all, read_iso_literals_source_from_relative_path,
+    CompilerState,
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
-use isograph_lang_types::{IsoLiteralsSource, IsographDatabase, IsographSemanticToken};
+use isograph_lang_types::IsographSemanticToken;
+use isograph_schema::{IsographDatabase, NetworkProtocol};
 use lsp_types::{
     request::{Request, SemanticTokensFullRequest},
     SemanticToken as LspSemanticToken, SemanticTokens as LspSemanticTokens,
-    SemanticTokensResult as LspSemanticTokensResult, Url,
+    SemanticTokensResult as LspSemanticTokensResult, Uri,
 };
 use pico_macros::memo;
 
-pub fn on_semantic_token_full_request(
-    compiler_state: &CompilerState,
+pub fn on_semantic_token_full_request<TNetworkProtocol: NetworkProtocol + 'static>(
+    compiler_state: &CompilerState<TNetworkProtocol>,
     params: <SemanticTokensFullRequest as Request>::Params,
 ) -> LSPRuntimeResult<<SemanticTokensFullRequest as Request>::Result> {
     let uri = params.text_document.uri;
@@ -46,32 +50,21 @@ pub fn on_semantic_token_full_request(
 /// we cannot reuse that cached value (as the output changes.) (We already can't reuse the
 /// cached value, but that is a bug.) See https://github.com/isographlabs/isograph/issues/548
 #[memo]
-fn get_semantic_tokens(
-    db: &IsographDatabase,
-    uri: Url,
+fn get_semantic_tokens<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    uri: Uri,
 ) -> Result<Option<LspSemanticTokensResult>, LSPRuntimeError> {
-    let current_working_directory = get_current_working_directory(db);
+    let current_working_directory = db.get_current_working_directory();
 
     let relative_path_to_source_file = relative_path_from_absolute_and_working_directory(
         current_working_directory,
         &uri.to_file_path().expect("Expected file path to be valid."),
     );
 
-    let memo_ref = read_iso_literals_source_from_relative_path(db, relative_path_to_source_file);
-    let IsoLiteralsSource {
-        relative_path,
-        content,
-    } = match memo_ref.to_owned() {
-        Some(s) => s,
-        // Is this the correct behavior?
-        None => return Ok(None),
-    };
-
     let parse_results = parse_iso_literals_in_file_content_and_return_all(
         db,
-        relative_path,
-        &content,
-        get_current_working_directory(db),
+        relative_path_to_source_file,
+        db.get_current_working_directory(),
     );
 
     // TODO call this earlier, pass it as a param to parse_iso_literal_in_relative_file
@@ -113,7 +106,8 @@ fn concatenate_and_absolutize_relative_tokens<'a>(
             .span
             .expect("Expected span to exist. This is indicative of a bug in Isograph.");
 
-        get_isograph_semantic_tokens(extraction)
+        extraction
+            .semantic_tokens()
             .iter()
             .flat_map(move |relative_token| {
                 absolutize_relative_token(page_content, iso_literal_extraction_span, relative_token)
@@ -162,7 +156,7 @@ fn convert_absolute_token_to_lsp_token<'a>(
             delta_line,
             delta_start,
             length: absolute_token.len,
-            token_type: absolute_token.semantic_token.0,
+            token_type: absolute_token.semantic_token.lsp_semantic_token.0,
             token_modifiers_bitset: 0,
         };
 
@@ -171,17 +165,7 @@ fn convert_absolute_token_to_lsp_token<'a>(
     })
 }
 
-fn get_isograph_semantic_tokens(
-    result: &IsoLiteralExtractionResult,
-) -> &[WithSpan<IsographSemanticToken>] {
-    match result {
-        IsoLiteralExtractionResult::ClientPointerDeclaration(s) => &s.item.semantic_tokens,
-        IsoLiteralExtractionResult::ClientFieldDeclaration(s) => &s.item.semantic_tokens,
-        IsoLiteralExtractionResult::EntrypointDeclaration(s) => &s.item.semantic_tokens,
-    }
-}
-
-fn delta_line_delta_start(text: &str) -> (u32, u32) {
+pub fn delta_line_delta_start(text: &str) -> (u32, u32) {
     let mut last_line_break_index = 0;
     let mut line_break_count = 0;
     for (index, char) in text.chars().enumerate() {

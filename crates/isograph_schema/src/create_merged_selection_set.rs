@@ -485,8 +485,12 @@ pub fn get_imperatively_loaded_artifact_info<TNetworkProtocol: NetworkProtocol>(
         client_field_name,
     } = path_to_refetch_field_info;
 
-    let client_scalar_selectable =
-        schema.client_field(refetch_field_parent_object_entity_name, client_field_name);
+    let client_scalar_selectable = schema
+        .client_field(refetch_field_parent_object_entity_name, client_field_name)
+        .expect(
+            "Expected selectable to exist. \
+                This is indicative of a bug in Isograph.",
+        );
 
     process_imperatively_loaded_field(
         schema,
@@ -535,6 +539,10 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
         let refetch_field_parent_type_name = schema
             .server_entity_data
             .server_object_entity(refetch_field_parent_object_entity_name)
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            )
             .name;
         // This could be Pet
         subfields_or_inline_fragments.insert(
@@ -561,6 +569,10 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
     let root_parent_object = schema
         .server_entity_data
         .server_object_entity(entrypoint.parent_object_entity_name)
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        )
         .name;
 
     let root_operation_name = schema
@@ -588,6 +600,10 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
         concrete_type: schema
             .server_entity_data
             .server_object_entity(root_object_entity_name)
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            )
             .name,
     }
 }
@@ -689,6 +705,10 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
             SelectionType::Object(object_selection) => {
                 let parent_object_entity_name = *schema
                     .object_selectable(object_selection.associated_data)
+                    .expect(
+                        "Expected selectable to exist. \
+                            This is indicative of a bug in Isograph.",
+                    )
                     .target_object_entity_name()
                     .inner();
                 let object_selection_parent_object = schema
@@ -725,7 +745,10 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             variable_context,
                             object_selection,
                             parent_object_entity_name,
-                            object_selection_parent_object,
+                            object_selection_parent_object.expect(
+                                "Expected entity to exist. \
+                                This is indicative of a bug in Isograph.",
+                            ),
                             field_parent_object_entity_name,
                             field_object_selectable_name,
                         );
@@ -754,10 +777,15 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
     field_parent_object_entity_name: ServerObjectEntityName,
     field_server_object_selectable_name: ServerObjectSelectableName,
 ) {
-    let server_object_selectable = schema.server_object_selectable(
-        field_parent_object_entity_name,
-        field_server_object_selectable_name,
-    );
+    let server_object_selectable = schema
+        .server_object_selectable(
+            field_parent_object_entity_name,
+            field_server_object_selectable_name,
+        )
+        .expect(
+            "Expected selectable to exist. \
+            This is indicative of a bug in Isograph.",
+        );
 
     match &server_object_selectable.object_selectable_variant {
         ServerObjectSelectableVariant::InlineFragment => {
@@ -791,7 +819,11 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                 MergedServerSelection::InlineFragment(existing_inline_fragment) => {
                     let object_selection_parent_object = schema
                         .server_entity_data
-                        .server_object_entity(parent_object_entity_name);
+                        .server_object_entity(parent_object_entity_name)
+                        .expect(
+                            "Expected entity to exist. \
+                            This is indicative of a bug in Isograph.",
+                        );
 
                     let reader_selection_set =
                         inline_fragment_reader_selection_set(schema, server_object_selectable);
@@ -853,8 +885,16 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         .server_object_entity(
                             *schema
                                 .object_selectable(object_selection.associated_data)
+                                .expect(
+                                    "Expected selectable to exist. \
+                                    This is indicative of a bug in Isograph.",
+                                )
                                 .target_object_entity_name()
                                 .inner(),
+                        )
+                        .expect(
+                            "Expected entity to exist. \
+                            This is indicative of a bug in Isograph.",
                         )
                         .concrete_type,
                     name: object_selection.name.item,
@@ -909,10 +949,15 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
     parent_object_entity_name: ServerObjectEntityName,
     newly_encountered_client_object_selectable_id: ClientObjectSelectableName,
 ) {
-    let newly_encountered_client_object_selectable = schema.client_pointer(
-        parent_object_entity_name,
-        newly_encountered_client_object_selectable_id,
-    );
+    let newly_encountered_client_object_selectable = schema
+        .client_pointer(
+            parent_object_entity_name,
+            newly_encountered_client_object_selectable_id,
+        )
+        .expect(
+            "Expected selectable to exist. \
+            This is indicative of a bug in Isograph.",
+        );
 
     merge_non_loadable_client_type(
         parent_object_entity,
@@ -949,10 +994,15 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
     parent_object_entity_name: &ServerObjectEntityName,
     newly_encountered_scalar_client_selectable_id: &ClientScalarSelectableName,
 ) {
-    let newly_encountered_scalar_client_selectable = schema.client_field(
-        *parent_object_entity_name,
-        *newly_encountered_scalar_client_selectable_id,
-    );
+    let newly_encountered_scalar_client_selectable = schema
+        .client_field(
+            *parent_object_entity_name,
+            *newly_encountered_scalar_client_selectable_id,
+        )
+        .expect(
+            "Expected selectable to exist. \
+            This is indicative of a bug in Isograph.",
+        );
 
     // If the field is selected loadably or is imperative, we must note the refetch path,
     // because this results in an artifact being generated.
@@ -1348,8 +1398,10 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
                     .get(&"__typename".intern().into())
                     .expect("Expected __typename to exist")
                     .as_server()
+                    .as_ref()
                     .expect("Expected __typename to be server field")
                     .as_scalar()
+                    .as_ref()
                     .expect("Expected __typename to be scalar"),
             ),
             name: WithLocation::new("__typename".intern().into(), Location::generated()),
@@ -1366,8 +1418,10 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
                     .get(&(*LINK_FIELD_NAME).into())
                     .expect("Expected link to exist")
                     .as_client()
+                    .as_ref()
                     .expect("Expected link to be client field")
                     .as_scalar()
+                    .as_ref()
                     .expect("Expected link to be scalar field"),
             ),
             scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),

@@ -8,8 +8,8 @@ use common_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientFieldDirectiveSet, ClientPointerDeclaration,
-    DefinitionLocation, DeserializationError, NonConstantValue, SelectionType, TypeAnnotation,
-    UnvalidatedSelection, VariableDefinition,
+    DefinitionLocation, DeserializationError, NonConstantValue, SelectionType,
+    ServerObjectEntityNameWrapper, TypeAnnotation, UnvalidatedSelection, VariableDefinition,
 };
 
 use thiserror::Error;
@@ -48,7 +48,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let parent_type_id = self
             .server_entity_data
             .defined_entities
-            .get(&client_field_declaration.item.parent_type.item)
+            .get(&client_field_declaration.item.parent_type.item.0)
             .ok_or(WithLocation::new(
                 ProcessClientFieldDeclarationError::ParentTypeNotDefined {
                     parent_type_name: client_field_declaration.item.parent_type.item,
@@ -64,6 +64,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 let scalar_name = self
                     .server_entity_data
                     .server_scalar_entity(*scalar_entity_name)
+                    .expect(
+                        "Expected entity to exist. \
+                        This is indicative of a bug in Isograph.",
+                    )
                     .name;
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
@@ -87,7 +91,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let parent_type_id = self
             .server_entity_data
             .defined_entities
-            .get(&client_pointer_declaration.item.parent_type.item)
+            .get(&client_pointer_declaration.item.parent_type.item.0)
             .ok_or(WithLocation::new(
                 ProcessClientFieldDeclarationError::ParentTypeNotDefined {
                     parent_type_name: client_pointer_declaration.item.parent_type.item,
@@ -104,7 +108,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .get(client_pointer_declaration.item.target_type.inner())
             .ok_or(WithLocation::new(
                 ProcessClientFieldDeclarationError::ParentTypeNotDefined {
-                    parent_type_name: *client_pointer_declaration.item.target_type.inner(),
+                    parent_type_name: ServerObjectEntityNameWrapper(
+                        *client_pointer_declaration.item.target_type.inner(),
+                    ),
                 },
                 Location::new(
                     text_source,
@@ -131,6 +137,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     let scalar_name = self
                         .server_entity_data
                         .server_scalar_entity(*scalar_entity_name)
+                        .expect(
+                            "Expected entity to exist. \
+                            This is indicative of a bug in Isograph.",
+                        )
                         .name;
                     return Err(WithLocation::new(
                         ProcessClientFieldDeclarationError::ClientPointerInvalidTargetType {
@@ -147,6 +157,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 let scalar_name = self
                     .server_entity_data
                     .server_scalar_entity(*scalar_entity_name)
+                    .expect(
+                        "Expected entity to exist. \
+                        This is indicative of a bug in Isograph.",
+                    )
                     .name;
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
@@ -186,10 +200,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .or_default()
             .selectables
             .insert(
-                client_field_name.into(),
+                client_field_name.0.into(),
                 DefinitionLocation::Client(SelectionType::Scalar((
                     parent_object_entity_name,
-                    client_scalar_selectable_name,
+                    client_scalar_selectable_name.0,
                 ))),
             )
             .is_some()
@@ -198,7 +212,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             return Err(WithSpan::new(
                 ProcessClientFieldDeclarationError::ParentAlreadyHasField {
                     parent_type_name: object.name,
-                    client_field_name: client_field_name.into(),
+                    client_field_name: client_field_name.0.into(),
                 },
                 client_field_name_span,
             ));
@@ -207,10 +221,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let variant = get_client_variant(&client_field_declaration.item);
 
         self.client_scalar_selectables.insert(
-            (object.name, client_scalar_selectable_name),
+            (object.name, client_scalar_selectable_name.0),
             ClientScalarSelectable {
                 description: client_field_declaration.item.description.map(|x| x.item),
-                name: client_scalar_selectable_name,
+                name: client_scalar_selectable_name.0,
                 reader_selection_set: vec![],
                 variant,
                 variable_definitions: client_field_declaration
@@ -222,13 +236,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                             &self.server_entity_data.defined_entities,
                             variable_definition,
                             object.name,
-                            client_field_name.into(),
+                            client_field_name.0.into(),
                         )
                     })
                     .collect::<Result<_, _>>()?,
                 type_and_field: ObjectTypeAndFieldName {
                     type_name: object.name,
-                    field_name: client_scalar_selectable_name.into(),
+                    field_name: client_scalar_selectable_name.0.into(),
                 },
 
                 parent_object_entity_name,
@@ -265,7 +279,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         Ok(UnprocessedClientFieldItem {
             parent_object_entity_name,
-            client_field_name: client_scalar_selectable_name,
+            client_field_name: *client_scalar_selectable_name,
             reader_selection_set: selections,
             refetch_strategy,
         })
@@ -280,10 +294,18 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let query_id = self.query_id();
         let to_object = self
             .server_entity_data
-            .server_object_entity(*to_object_name.inner());
+            .server_object_entity(*to_object_name.inner())
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            );
         let parent_object = self
             .server_entity_data
-            .server_object_entity(parent_object_name);
+            .server_object_entity(parent_object_name)
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            );
         let client_pointer_pointer_name_ws = client_pointer_declaration.item.client_pointer_name;
         let client_pointer_name = client_pointer_pointer_name_ws.item;
         let client_pointer_name_span = client_pointer_pointer_name_ws.span;
@@ -342,10 +364,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         }?;
 
         self.client_object_selectables.insert(
-            (parent_object_name, client_object_selectable_name),
+            (parent_object_name, *client_object_selectable_name),
             ClientObjectSelectable {
                 description: client_pointer_declaration.item.description.map(|x| x.item),
-                name: client_object_selectable_name,
+                name: *client_object_selectable_name,
                 reader_selection_set: vec![],
 
                 variable_definitions: client_pointer_declaration
@@ -357,16 +379,16 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                             &self.server_entity_data.defined_entities,
                             variable_definition,
                             parent_object.name,
-                            client_pointer_name.into(),
+                            client_pointer_name.0.into(),
                         )
                     })
                     .collect::<Result<_, _>>()?,
                 type_and_field: ObjectTypeAndFieldName {
                     type_name: parent_object.name,
-                    field_name: client_object_selectable_name.into(),
+                    field_name: client_object_selectable_name.0.into(),
                 },
 
-                parent_object_name,
+                parent_object_entity_name: parent_object_name,
                 refetch_strategy,
                 target_object_entity_name: to_object_name,
                 network_protocol: std::marker::PhantomData,
@@ -385,29 +407,33 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .or_default()
             .selectables
             .insert(
-                client_pointer_name.into(),
+                client_pointer_name.0.into(),
                 DefinitionLocation::Client(SelectionType::Object((
                     parent_object_name,
-                    client_object_selectable_name,
+                    *client_object_selectable_name,
                 ))),
             )
             .is_some()
         {
             let parent_object = self
                 .server_entity_data
-                .server_object_entity(parent_object_name);
+                .server_object_entity(parent_object_name)
+                .expect(
+                    "Expected entity to exist. \
+                    This is indicative of a bug in Isograph.",
+                );
             // Did not insert, so this object already has a field with the same name :(
             return Err(WithSpan::new(
                 ProcessClientFieldDeclarationError::ParentAlreadyHasField {
                     parent_type_name: parent_object.name,
-                    client_field_name: client_pointer_name.into(),
+                    client_field_name: client_pointer_name.0.into(),
                 },
                 client_pointer_name_span,
             ));
         }
 
         Ok(UnprocessedClientPointerItem {
-            client_object_selectable_name: client_pointer_name,
+            client_object_selectable_name: *client_pointer_name,
             parent_object_entity_name: parent_object_name,
             reader_selection_set: unprocessed_fields,
             refetch_selection_set: vec![id_selection()],
@@ -418,11 +444,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 type ProcessClientFieldDeclarationResult<T> =
     Result<T, WithSpan<ProcessClientFieldDeclarationError>>;
 
-#[derive(Error, Eq, PartialEq, Debug)]
+#[derive(Error, Eq, PartialEq, Debug, Clone)]
 pub enum ProcessClientFieldDeclarationError {
     #[error("`{parent_type_name}` is not a type that has been defined.")]
     ParentTypeNotDefined {
-        parent_type_name: UnvalidatedTypeName,
+        parent_type_name: ServerObjectEntityNameWrapper,
     },
 
     #[error("Directive {directive_name} is not supported on client pointers.")]

@@ -6,6 +6,7 @@ use common_lang_types::{
 };
 use isograph_lang_types::{
     DefinitionLocation, EntrypointDeclaration, EntrypointDirectiveSet, SelectionType,
+    ServerObjectEntityNameWrapper,
 };
 
 use thiserror::Error;
@@ -43,6 +44,7 @@ pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol>(
                         .item
                         .parent_type
                         .item
+                        .0
                         .unchecked_conversion(),
                     client_field_id,
                 )) {
@@ -97,13 +99,13 @@ fn validate_entrypoint_type_and_field<TNetworkProtocol: NetworkProtocol>(
 
 fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    parent_type: WithSpan<UnvalidatedTypeName>,
+    parent_type: WithSpan<ServerObjectEntityNameWrapper>,
     text_source: TextSource,
 ) -> Result<ServerObjectEntityName, WithLocation<ValidateEntrypointDeclarationError>> {
     let parent_type_id = schema
         .server_entity_data
         .defined_entities
-        .get(&parent_type.item)
+        .get(&parent_type.item.0)
         .ok_or(WithLocation::new(
             ValidateEntrypointDeclarationError::ParentTypeNotDefined {
                 parent_type_name: parent_type.item,
@@ -124,6 +126,10 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
                                 schema
                                     .server_entity_data
                                     .server_object_entity(*object_entity_name)
+                                    .expect(
+                                        "Expected entity to exist. \
+                                            This is indicative of a bug in Isograph.",
+                                    )
                                     .name
                                     .to_string()
                             })
@@ -140,6 +146,10 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
             let scalar_name = schema
                 .server_entity_data
                 .server_scalar_entity(*scalar_entity_name)
+                .expect(
+                    "Expected entity to exist. \
+                    This is indicative of a bug in Isograph.",
+                )
                 .name;
             Err(WithLocation::new(
                 ValidateEntrypointDeclarationError::InvalidParentType {
@@ -160,7 +170,11 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
 ) -> Result<ClientScalarSelectableName, WithLocation<ValidateEntrypointDeclarationError>> {
     let parent_object = schema
         .server_entity_data
-        .server_object_entity(parent_object_name);
+        .server_object_entity(parent_object_name)
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        );
 
     match schema
         .server_entity_data
@@ -201,7 +215,7 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
 pub enum ValidateEntrypointDeclarationError {
     #[error("`{parent_type_name}` is not a type that has been defined.")]
     ParentTypeNotDefined {
-        parent_type_name: UnvalidatedTypeName,
+        parent_type_name: ServerObjectEntityNameWrapper,
     },
 
     #[error("Invalid parent type. `{parent_type_name}` is a {parent_type}, but it should be an object or interface.")]
@@ -214,7 +228,7 @@ pub enum ValidateEntrypointDeclarationError {
         "The type `{parent_type_name}` is not fetchable. The following types are fetchable: {fetchable_types}.",
     )]
     NonFetchableParentType {
-        parent_type_name: UnvalidatedTypeName,
+        parent_type_name: ServerObjectEntityNameWrapper,
         fetchable_types: String,
     },
 

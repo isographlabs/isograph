@@ -38,6 +38,7 @@ string_key_newtype!(InputTypeName);
 // It can also be used in error messages a sort of top type name type, i.e. any type name
 // can be converted into this type name.
 string_key_newtype!(UnvalidatedTypeName);
+
 string_key_one_way_conversion!(from: ServerObjectEntityName, to: UnvalidatedTypeName);
 
 string_key_newtype!(GraphQLObjectTypeName);
