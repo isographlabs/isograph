@@ -433,8 +433,9 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
         config.options.no_babel_transform,
     ));
 
-    path_and_contents
-        .push(persisted_documents.map_or(PersistedDocuments::empty(), |pd| pd.path_and_content()));
+    if let Some(persisted_documents) = persisted_documents {
+        path_and_contents.push(persisted_documents.path_and_content());
+    }
 
     path_and_contents
 }

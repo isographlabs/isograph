@@ -35,14 +35,6 @@ impl PersistedDocuments<'_> {
             type_and_field: None,
         }
     }
-
-    pub fn empty() -> ArtifactPathAndContent {
-        ArtifactPathAndContent {
-            file_content: "".to_string(),
-            file_name: *PERSISTED_DOCUMENT_FILE_NAME,
-            type_and_field: None,
-        }
-    }
 }
 
 impl Serialize for PersistedDocuments<'_> {
