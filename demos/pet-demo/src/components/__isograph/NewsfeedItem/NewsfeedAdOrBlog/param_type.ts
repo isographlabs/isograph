@@ -1,5 +1,7 @@
-import { type AdItem__AdItemDisplayWrapper__output_type } from '../../AdItem/AdItemDisplayWrapper/output_type';
+import { type AdItem__AdItemDisplay__output_type } from '../../AdItem/AdItemDisplay/output_type';
 import { type BlogItem__BlogItemDisplay__output_type } from '../../BlogItem/BlogItemDisplay/output_type';
+import { type LoadableField, type ExtractParameters } from '@isograph/react';
+import { type AdItem__AdItemDisplay__param } from '../../AdItem/AdItemDisplay/param_type';
 
 export type NewsfeedItem__NewsfeedAdOrBlog__param = {
   readonly data: {
@@ -7,7 +9,10 @@ export type NewsfeedItem__NewsfeedAdOrBlog__param = {
 A client pointer for the AdItem type.
     */
     readonly asAdItem: ({
-      readonly AdItemDisplayWrapper: AdItem__AdItemDisplayWrapper__output_type,
+      readonly AdItemDisplay: LoadableField<
+        AdItem__AdItemDisplay__param,
+        AdItem__AdItemDisplay__output_type
+      >,
     } | null),
     /**
 A client pointer for the BlogItem type.

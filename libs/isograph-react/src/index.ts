@@ -143,6 +143,7 @@ export {
   FragmentReader,
   type IsExactlyIntrinsicAttributes,
 } from './react/FragmentReader';
+export { LoadableFieldReader } from './react/LoadableFieldReader';
 export { useResult } from './react/useResult';
 export {
   useReadAndSubscribe,

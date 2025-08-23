@@ -1,5 +1,4 @@
 import type { IsographEntrypoint } from '@isograph/react';
-import { type AdItem__AdItemDisplayWrapper__param } from './AdItem/AdItemDisplayWrapper/param_type';
 import { type AdItem__AdItemDisplay__param } from './AdItem/AdItemDisplay/param_type';
 import { type BlogItem__BlogItemDisplay__param } from './BlogItem/BlogItemDisplay/param_type';
 import { type BlogItem__BlogItemMoreDetail__param } from './BlogItem/BlogItemMoreDetail/param_type';
@@ -85,10 +84,6 @@ type MatchesWhitespaceAndString<
   TString extends string,
   T
 > = Whitespace<T> extends `${TString}${string}` ? T : never;
-
-export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'field AdItem.AdItemDisplayWrapper', T>
-): IdentityWithParamComponent<AdItem__AdItemDisplayWrapper__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field AdItem.AdItemDisplay', T>

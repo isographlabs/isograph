@@ -1,6 +1,7 @@
 import { iso } from '@iso';
 import {
   FragmentReader,
+  LoadableFieldReader,
   useLazyReference,
   useSkipLimitPagination,
 } from '@isograph/react';
@@ -73,7 +74,7 @@ export function NewsfeedLoader() {
 export const NewsfeedAdOrBlog = iso(`
   field NewsfeedItem.NewsfeedAdOrBlog @component {
     asAdItem {
-      AdItemDisplayWrapper
+      AdItemDisplay @loadable(lazyLoadArtifact: true)
     }
     asBlogItem {
       BlogItemDisplay
@@ -91,10 +92,14 @@ export const NewsfeedAdOrBlog = iso(`
   if (newsfeedItem.asAdItem != null) {
     return (
       <Suspense fallback={fallback}>
-        <newsfeedItem.asAdItem.AdItemDisplayWrapper
-          onVisible={onVisible}
-          index={index}
-        />
+        <LoadableFieldReader
+          loadableField={newsfeedItem.asAdItem.AdItemDisplay}
+          args={{}}
+        >
+          {(AdItemDisplay) => (
+            <AdItemDisplay onVisible={onVisible} index={index} />
+          )}
+        </LoadableFieldReader>
       </Suspense>
     );
   } else if (newsfeedItem.asBlogItem != null) {

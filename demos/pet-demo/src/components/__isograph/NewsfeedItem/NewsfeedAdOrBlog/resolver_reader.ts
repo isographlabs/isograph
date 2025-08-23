@@ -1,7 +1,6 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { NewsfeedItem__NewsfeedAdOrBlog__param } from './param_type';
 import { NewsfeedAdOrBlog as resolver } from '../../../Newsfeed/NewsfeedRoute';
-import AdItem__AdItemDisplayWrapper__resolver_reader from '../../AdItem/AdItemDisplayWrapper/resolver_reader';
 import BlogItem__BlogItemDisplay__resolver_reader from '../../BlogItem/BlogItemDisplay/resolver_reader';
 import NewsfeedItem__asAdItem__resolver_reader from '../../NewsfeedItem/asAdItem/resolver_reader';
 import NewsfeedItem__asBlogItem__resolver_reader from '../../NewsfeedItem/asBlogItem/resolver_reader';
@@ -16,11 +15,24 @@ const readerAst: ReaderAst<NewsfeedItem__NewsfeedAdOrBlog__param> = [
     isUpdatable: false,
     selections: [
       {
-        kind: "Resolver",
-        alias: "AdItemDisplayWrapper",
-        arguments: null,
-        readerArtifact: AdItem__AdItemDisplayWrapper__resolver_reader,
-        usedRefetchQueries: [],
+        kind: "LoadablySelectedField",
+        alias: "AdItemDisplay",
+        name: "AdItemDisplay",
+        queryArguments: null,
+        refetchReaderAst: [
+          {
+            kind: "Scalar",
+            fieldName: "id",
+            alias: null,
+            arguments: null,
+            isUpdatable: false,
+          },
+        ],
+        entrypoint: { 
+          kind: "EntrypointLoader",
+          typeAndField: "AdItem__AdItemDisplay",
+          loader: () => import("../../AdItem/AdItemDisplay/entrypoint").then(module => module.default),
+        },
       },
     ],
     refetchQueryIndex: null,
