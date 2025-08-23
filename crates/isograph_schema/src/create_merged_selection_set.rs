@@ -1319,7 +1319,7 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
         | MergedServerSelection::InlineFragment(_) => {
             panic!(
                 "Expected client pointer. \
-                    This is indicative of a bug in Isograph."
+                This is indicative of a bug in Isograph."
             )
         }
     }
