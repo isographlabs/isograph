@@ -1,10 +1,8 @@
 use std::{error::Error, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
-    DescriptionValue, Location, QueryExtraInfo, QueryOperationName, QueryText,
-    ServerObjectEntityName, ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
-    Location, QueryOperationName, QueryText, ServerObjectEntityName, ServerSelectableName,
-    UnvalidatedTypeName, WithLocation, WithSpan,
+    Location, QueryExtraInfo, QueryOperationName, QueryText, ServerObjectEntityName,
+    ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation, RootOperationKind};
 use isograph_lang_types::Description;
