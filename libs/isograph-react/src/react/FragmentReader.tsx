@@ -1,7 +1,10 @@
 import * as React from 'react';
-import { ExtractReadFromStore, IsographEntrypoint } from '../core/entrypoint';
-import { FragmentReference } from '../core/FragmentReference';
-import { NetworkRequestReaderOptions } from '../core/read';
+import {
+  type ExtractReadFromStore,
+  type IsographEntrypoint,
+} from '../core/entrypoint';
+import { type FragmentReference } from '../core/FragmentReference';
+import { type NetworkRequestReaderOptions } from '../core/read';
 import { useResult } from './useResult';
 
 export type IsExactlyIntrinsicAttributes<T> = T extends JSX.IntrinsicAttributes
