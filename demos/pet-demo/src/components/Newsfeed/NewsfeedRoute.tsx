@@ -92,6 +92,14 @@ export const NewsfeedAdOrBlog = iso(`
   if (newsfeedItem.asAdItem != null) {
     return (
       <Suspense fallback={fallback}>
+        {/*
+          Why not use FragmentReader here? That's because in order to use FragmentReader,
+          we we would have to call useClientSideDefer, and that's a hook, so it must be
+          called unconditionally. But AdItemDisplay is only present if asAdItem != null,
+          hence the need for a wrapper component (AdItemDisplayWrapper, previously).
+
+          LoadableFieldReader is a generic component that replaces the wrapper component.
+        */}
         <LoadableFieldReader
           loadableField={newsfeedItem.asAdItem.AdItemDisplay}
           args={{}}
