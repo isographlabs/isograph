@@ -35,11 +35,14 @@ export type ExtractParameters<T> = T extends {
   ? P
   : Variables;
 
-export type ExtractStartUpdate<
-  T extends {
-    startUpdate?: StartUpdate<object>;
-  },
-> = T['startUpdate'];
+export type ExtractStartUpdate<T extends UnknownTReadFromStore> =
+  T['startUpdate'];
+
+export type ExtractUpdatableData<T extends UnknownTReadFromStore> =
+  ExtractUpdatableDataFromStartUpdate<ExtractStartUpdate<T>>;
+
+export type ExtractUpdatableDataFromStartUpdate<T> =
+  T extends StartUpdate<infer D> ? D : never;
 
 export type FragmentReference<
   TReadFromStore extends UnknownTReadFromStore,

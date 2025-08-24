@@ -1,11 +1,15 @@
 import type { IsographEntrypoint } from '@isograph/react';
+import { type Query__linkedUpdate__param } from './Query/linkedUpdate/param_type';
 import { type Query__meNameSuccessor__param } from './Query/meNameSuccessor/param_type';
 import { type Query__meName__param } from './Query/meName/param_type';
 import { type Query__nodeField__param } from './Query/nodeField/param_type';
+import { type Query__startUpdate__param } from './Query/startUpdate/param_type';
 import { type Query__subquery__param } from './Query/subquery/param_type';
+import entrypoint_Query__linkedUpdate from '../__isograph/Query/linkedUpdate/entrypoint';
 import entrypoint_Query__meNameSuccessor from '../__isograph/Query/meNameSuccessor/entrypoint';
 import entrypoint_Query__meName from '../__isograph/Query/meName/entrypoint';
 import entrypoint_Query__nodeField from '../__isograph/Query/nodeField/entrypoint';
+import entrypoint_Query__startUpdate from '../__isograph/Query/startUpdate/entrypoint';
 import entrypoint_Query__subquery from '../__isograph/Query/subquery/entrypoint';
 
 // This is the type given to regular client fields.
@@ -57,6 +61,10 @@ type MatchesWhitespaceAndString<
 > = Whitespace<T> extends `${TString}${string}` ? T : never;
 
 export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.linkedUpdate', T>
+): IdentityWithParam<Query__linkedUpdate__param>;
+
+export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.meNameSuccessor', T>
 ): IdentityWithParam<Query__meNameSuccessor__param>;
 
@@ -69,8 +77,16 @@ export function iso<T>(
 ): IdentityWithParam<Query__nodeField__param>;
 
 export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.startUpdate', T>
+): IdentityWithParam<Query__startUpdate__param>;
+
+export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.subquery', T>
 ): IdentityWithParam<Query__subquery__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.linkedUpdate', T>
+): typeof entrypoint_Query__linkedUpdate;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.meNameSuccessor', T>
@@ -83,6 +99,10 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.nodeField', T>
 ): typeof entrypoint_Query__nodeField;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.startUpdate', T>
+): typeof entrypoint_Query__startUpdate;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.subquery', T>

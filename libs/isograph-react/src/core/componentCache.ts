@@ -16,7 +16,11 @@ export function getOrCreateCachedComponent(
   networkRequestOptions: NetworkRequestReaderOptions,
 ): React.FC<any> {
   // We create startUpdate outside of component to make it stable
-  const startUpdate = createStartUpdate(environment, fragmentReference);
+  const startUpdate = createStartUpdate(
+    environment,
+    fragmentReference,
+    networkRequestOptions,
+  );
 
   return (environment.componentCache[
     stableIdForFragmentReference(fragmentReference, componentName)
