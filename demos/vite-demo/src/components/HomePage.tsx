@@ -27,7 +27,9 @@ export const HomePage = iso(`
     >
       {data.getAllPokemon
         ?.filter(({ forme }) => !forme)
-        .map((pokemon) => <pokemon.Pokemon key={pokemon.key} />)}
+        .map((pokemon) => (
+          <pokemon.Pokemon key={pokemon.key} />
+        ))}
     </div>
   );
 });
