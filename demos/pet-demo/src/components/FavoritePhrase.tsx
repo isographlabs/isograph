@@ -1,6 +1,5 @@
 import { iso } from '@iso';
 import { FragmentReader, useImperativeReference } from '@isograph/react';
-import { UNASSIGNED_STATE } from '@isograph/react-disposable-state';
 import React from 'react';
 import { ErrorBoundary } from './ErrorBoundary';
 
