@@ -11,8 +11,8 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
-    RefetchQueryIndex, ScalarSelection, ScalarSelectionDirectiveSet, SelectionFieldArgument,
-    SelectionType, SelectionTypeContainingSelections, VariableDefinition,
+    ObjectSelectionDirectiveSet, RefetchQueryIndex, ScalarSelection, ScalarSelectionDirectiveSet,
+    SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -777,6 +777,12 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
     field_parent_object_entity_name: ServerObjectEntityName,
     field_server_object_selectable_name: ServerObjectSelectableName,
 ) {
+    if let ObjectSelectionDirectiveSet::Updatable(_) =
+        object_selection.object_selection_directive_set
+    {
+        merge_traversal_state.has_updatable = true;
+    }
+
     let server_object_selectable = schema
         .server_object_selectable(
             field_parent_object_entity_name,
