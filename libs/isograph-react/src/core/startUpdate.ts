@@ -62,8 +62,11 @@ export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
       mutableUpdatedIds,
     );
 
-    updater(data);
-    callSubscriptions(environment, mutableUpdatedIds);
+    try {
+      updater(data);
+    } finally {
+      callSubscriptions(environment, mutableUpdatedIds);
+    }
   };
 }
 
