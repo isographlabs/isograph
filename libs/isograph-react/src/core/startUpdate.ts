@@ -94,20 +94,20 @@ export function createUpdatableProxy<
   ).data;
 }
 
+type MutableInvalidationState = {
+  lastInvalidated: number;
+};
+
+type DefineCachedPropertyOptions = {
+  mutableState: MutableInvalidationState;
+  get(): any;
+  set?(v: any): void;
+};
+
 function defineCachedProperty<T>(
   target: T,
   property: PropertyKey,
-  {
-    get,
-    set,
-    mutableState,
-  }: {
-    mutableState: {
-      lastInvalidated: number;
-    };
-    get(): any;
-    set?(v: any): void;
-  },
+  { get, set, mutableState }: DefineCachedPropertyOptions,
 ) {
   let value:
     | { kind: 'Set'; value: T; validatedAt: number }
@@ -150,9 +150,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
-  mutableState: {
-    lastInvalidated: number;
-  },
+  mutableState: MutableInvalidationState,
   mutableUpdatedIds: EncounteredIds,
 ): ReadDataResultSuccess<ExtractUpdatableData<TReadFromStore>> {
   let storeRecord = environment.store[root.__typename]?.[root.__link];
