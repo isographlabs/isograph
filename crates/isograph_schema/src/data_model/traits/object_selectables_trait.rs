@@ -33,7 +33,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
     }
 
     fn name(&self) -> ObjectSelectableName {
-        self.name.into()
+        self.name.item.into()
     }
 
     fn parent_object_entity_name(&self) -> ServerObjectEntityName {
