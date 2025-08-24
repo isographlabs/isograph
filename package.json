@@ -40,7 +40,7 @@
     "format-prettier": "prettier --experimental-cli --cache --config-path ./.prettierrc.json --write .",
     "format-rust": "cargo fmt",
     "tsc": "pnpm -r --parallel --aggregate-output tsc",
-    "test": "vitest run",
+    "test": "pnpm -r test",
     "test-watch": "vitest",
     "coverage": "vitest run --coverage",
     "sanity-check": "./scripts/sanity-check.sh",
