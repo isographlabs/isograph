@@ -10,7 +10,9 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, DefinitionLocation, EmptyDirectiveSet, NonConstantValue, ObjectSelectionDirectiveSet, RefetchQueryIndex, ScalarSelection, ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, VariableDefinition
+    ArgumentKeyAndValue, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
+    ObjectSelectionDirectiveSet, RefetchQueryIndex, ScalarSelection, ScalarSelectionDirectiveSet,
+    SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
