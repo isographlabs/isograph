@@ -6,6 +6,7 @@ use lsp_server::Connection;
 
 use crate::server::LSPProcessResult;
 
+mod goto_definition;
 mod format;
 mod hover;
 pub mod lsp_notification_dispatch;
