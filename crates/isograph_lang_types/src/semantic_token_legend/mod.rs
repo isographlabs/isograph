@@ -90,13 +90,24 @@ pub struct IsographSemanticToken {
     pub indent_change: IndentChange,
 }
 
-pub const ST_KEYWORD: IsographSemanticToken = IsographSemanticToken {
+// entrypoint is a "use" of another selectable
+pub const ST_KEYWORD_USE: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_KEYWORD,
+    line_behavior: LineBehavior::Inline(InlineBehavior {
+        space_before: SpaceBefore(false),
+        space_after: SpaceAfter(true),
+    }),
+    indent_change: IndentChange::Same,
+};
+// field, pointer are "declarations" of a selectable
+pub const ST_KEYWORD_DECLARATION: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_KEYWORD,
     line_behavior: LineBehavior::StartsNewLine(StartsNewLineBehavior {
         space_after: SpaceAfter(true),
     }),
     indent_change: IndentChange::Same,
 };
+
 pub const ST_SERVER_OBJECT_TYPE: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_CLASS,
     line_behavior: LineBehavior::Inline(InlineBehavior {

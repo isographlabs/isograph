@@ -50,38 +50,63 @@ pub fn parse_iso_literal(
     text_source: TextSource,
 ) -> Result<IsoLiteralExtractionResult, WithLocation<IsographLiteralParseError>> {
     let mut tokens = PeekableLexer::new(&iso_literal_text);
-    let discriminator = tokens
-        .parse_source_of_kind(
-            IsographLangTokenKind::Identifier,
-            semantic_token_legend::ST_KEYWORD,
-        )
-        .map_err(|with_span| with_span.map(IsographLiteralParseError::from))
-        .map_err(|err| err.to_with_location(text_source))?;
-    match discriminator.item {
-        "entrypoint" => Ok(IsoLiteralExtractionResult::EntrypointDeclaration(
-            parse_iso_entrypoint_declaration(
-                &mut tokens,
-                text_source,
-                discriminator.span,
-                (&iso_literal_text).intern().into(),
-            )?,
-        )),
-        "field" => Ok(IsoLiteralExtractionResult::ClientFieldDeclaration(
-            parse_iso_client_field_declaration(
-                &mut tokens,
-                definition_file_path,
-                const_export_name.as_deref(),
-                text_source,
-            )?,
-        )),
-        "pointer" => Ok(IsoLiteralExtractionResult::ClientPointerDeclaration(
-            parse_iso_client_pointer_declaration(
-                &mut tokens,
-                definition_file_path,
-                const_export_name.as_deref(),
-                text_source,
-            )?,
-        )),
+    let discriminator = tokens.peek();
+    let text = tokens.source(discriminator.span);
+    // TODO this is awkward. Entrypoint has a different isograph semantic token type than
+    // field and pointer, hence we have to peek, then re-parse.
+
+    match text {
+        "entrypoint" => {
+            let entrypoint_keyword = tokens
+                .parse_source_of_kind(
+                    IsographLangTokenKind::Identifier,
+                    semantic_token_legend::ST_KEYWORD_USE,
+                )
+                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))
+                .map_err(|err| err.to_with_location(text_source))?;
+            Ok(IsoLiteralExtractionResult::EntrypointDeclaration(
+                parse_iso_entrypoint_declaration(
+                    &mut tokens,
+                    text_source,
+                    entrypoint_keyword.span,
+                    (&iso_literal_text).intern().into(),
+                )?,
+            ))
+        }
+        "field" => {
+            tokens
+                .parse_source_of_kind(
+                    IsographLangTokenKind::Identifier,
+                    semantic_token_legend::ST_KEYWORD_DECLARATION,
+                )
+                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))
+                .map_err(|err| err.to_with_location(text_source))?;
+            Ok(IsoLiteralExtractionResult::ClientFieldDeclaration(
+                parse_iso_client_field_declaration(
+                    &mut tokens,
+                    definition_file_path,
+                    const_export_name.as_deref(),
+                    text_source,
+                )?,
+            ))
+        }
+        "pointer" => {
+            tokens
+                .parse_source_of_kind(
+                    IsographLangTokenKind::Identifier,
+                    semantic_token_legend::ST_KEYWORD_DECLARATION,
+                )
+                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))
+                .map_err(|err| err.to_with_location(text_source))?;
+            Ok(IsoLiteralExtractionResult::ClientPointerDeclaration(
+                parse_iso_client_pointer_declaration(
+                    &mut tokens,
+                    definition_file_path,
+                    const_export_name.as_deref(),
+                    text_source,
+                )?,
+            ))
+        }
         _ => Err(WithLocation::new(
             IsographLiteralParseError::ExpectedFieldOrPointerOrEntrypoint,
             Location::new(text_source, discriminator.span),
