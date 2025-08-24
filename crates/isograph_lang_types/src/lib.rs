@@ -19,7 +19,7 @@ pub use base_types::*;
 pub use client_field_declaration::*;
 pub use client_field_directive_set::*;
 pub use entrypoint_declaration::*;
-pub use entrypoint_directive_set::EntrypointDirectiveSet;
+pub use entrypoint_directive_set::*;
 pub use isograph_directives::*;
 pub use isograph_resolved_node::*;
 pub use isograph_type_annotation::*;

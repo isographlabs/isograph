@@ -131,11 +131,14 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
             });
 
     // For each entrypoint, generate an entrypoint artifact and refetch artifacts
-    for (parent_object_entity_name, entrypoint_selectable_name) in schema.entrypoints.keys() {
+    for ((parent_object_entity_name, entrypoint_selectable_name), entrypoint_info) in
+        &schema.entrypoints
+    {
         let entrypoint_path_and_content = generate_entrypoint_artifacts(
             schema,
             *parent_object_entity_name,
             *entrypoint_selectable_name,
+            entrypoint_info,
             &mut encountered_client_type_map,
             config.options.include_file_extensions_in_import_statements,
             &mut persisted_documents,
@@ -329,6 +332,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 generate_entrypoint_artifacts_with_client_field_traversal_result(
                                     schema,
                                     client_scalar_selectable,
+                                    None,
                                     &wrapped_map,
                                     &traversal_state,
                                     &encountered_client_type_map,

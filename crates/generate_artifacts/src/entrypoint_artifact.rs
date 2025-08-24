@@ -5,15 +5,18 @@ use common_lang_types::{
     QueryText, ServerObjectEntityName, VariableName,
 };
 use isograph_config::GenerateFileExtensionsOption;
-use isograph_lang_types::{DefinitionLocation, ScalarSelectionDirectiveSet, SelectionType};
+use isograph_lang_types::{
+    DefinitionLocation, EmptyDirectiveSet, EntrypointDirectiveSet, LazyLoadDirectiveParameters,
+    LazyLoadDirectiveSet, ScalarSelectionDirectiveSet, SelectionType,
+};
 use isograph_schema::{
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
     get_reachable_variables, initial_variable_context, ClientScalarOrObjectSelectable,
-    ClientScalarSelectable, FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, Format,
-    MergedSelectionMap, NetworkProtocol, RootOperationName, RootRefetchedPath,
-    ScalarClientFieldTraversalState, Schema, ServerObjectEntity, ValidatedVariableDefinition,
-    WrappedSelectionMapSelection,
+    ClientScalarSelectable, EntrypointDeclarationInfo, FieldToCompletedMergeTraversalStateMap,
+    FieldTraversalResult, Format, MergedSelectionMap, NetworkProtocol, RootOperationName,
+    RootRefetchedPath, ScalarClientFieldTraversalState, Schema, ServerObjectEntity,
+    ValidatedVariableDefinition, WrappedSelectionMapSelection,
 };
 
 use crate::{
@@ -37,12 +40,14 @@ struct EntrypointArtifactInfo<'schema, TNetworkProtocol: NetworkProtocol> {
     normalization_ast_text: NormalizationAstText,
     refetch_query_artifact_import: RefetchQueryArtifactImport,
     concrete_type: ServerObjectEntityName,
+    directive_set: EntrypointDirectiveSet,
 }
 
 pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     entrypoint_scalar_selectable_name: ClientScalarSelectableName,
+    info: &EntrypointDeclarationInfo,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     file_extensions: GenerateFileExtensionsOption,
     persisted_documents: &mut Option<PersistedDocuments>,
@@ -79,6 +84,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     generate_entrypoint_artifacts_with_client_field_traversal_result(
         schema,
         entrypoint,
+        Some(info),
         &merged_selection_map,
         &traversal_state,
         encountered_client_type_map,
@@ -99,6 +105,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
 >(
     schema: &Schema<TNetworkProtocol>,
     entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
+    info: Option<&EntrypointDeclarationInfo>,
     merged_selection_map: &MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,
     encountered_client_type_map: &FieldToCompletedMergeTraversalStateMap,
@@ -232,6 +239,9 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         normalization_ast_text,
         refetch_query_artifact_import,
         concrete_type: concrete_type.name,
+        directive_set: info
+            .map(|info| info.directive_set)
+            .unwrap_or(EntrypointDirectiveSet::None(EmptyDirectiveSet {})),
     }
     .path_and_content(file_extensions);
 
@@ -320,6 +330,7 @@ impl<TNetworkProtocol: NetworkProtocol> EntrypointArtifactInfo<'_, TNetworkProto
             normalization_ast_text,
             refetch_query_artifact_import,
             concrete_type,
+            directive_set,
         } = &self;
         let field_name = (*query_name).into();
         let type_name = parent_type.name;
@@ -331,6 +342,7 @@ impl<TNetworkProtocol: NetworkProtocol> EntrypointArtifactInfo<'_, TNetworkProto
             parent_type,
             refetch_query_artifact_import,
             concrete_type,
+            directive_set,
         );
 
         vec![
@@ -377,6 +389,7 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
     refetch_query_artifact_import: &RefetchQueryArtifactImport,
     concrete_type: &ServerObjectEntityName,
+    directive_set: &EntrypointDirectiveSet,
 ) -> String {
     let ts_file_extension = file_extensions.ts();
     let entrypoint_params_typename = format!("{}__{}__param", parent_type.name, query_name);
@@ -387,25 +400,47 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
     let query_text_file_name = *QUERY_TEXT;
     let normalization_text_file_name = *NORMALIZATION_AST;
     let indent = "  ";
+
+    let (normalization_ast_type_name, normalization_ast_import, normalization_ast_code) = {
+        let file_path = format!("'./{normalization_text_file_name}{ts_file_extension}'");
+        match directive_set {
+            EntrypointDirectiveSet::LazyLoad(LazyLoadDirectiveSet { lazy_load: LazyLoadDirectiveParameters {} }) => (
+                "NormalizationAstLoader",
+                "".to_string(),
+                format!(
+                    "{indent}  normalizationAst: {{\n\
+                     {indent}    kind: \"NormalizationAstLoader\",\n\
+                     {indent}    loader: () => import({file_path}).then(module => module.default),\n\
+                     {indent}  }},"
+                ),
+            ),
+            EntrypointDirectiveSet::None(_) => (
+                "NormalizationAst",
+                format!("import normalizationAst from {file_path};\n"),
+                format!("{indent}  normalizationAst,"),
+            ),
+        }
+    };
+
     format!(
         "import type {{IsographEntrypoint, \
-        NormalizationAst, RefetchQueryNormalizationArtifactWrapper}} from '@isograph/react';\n\
+        {normalization_ast_type_name}, RefetchQueryNormalizationArtifactWrapper}} from '@isograph/react';\n\
         import {{{entrypoint_params_typename}}} from './{param_type_file_name}{ts_file_extension}';\n\
         import {{{entrypoint_output_type_name}}} from './{output_type_file_name}{ts_file_extension}';\n\
         import readerResolver from './{resolver_reader_file_name}{ts_file_extension}';\n\
         import queryText from './{query_text_file_name}{ts_file_extension}';\n\
-        import normalizationAst from './{normalization_text_file_name}{ts_file_extension}';\n\
+        {normalization_ast_import}\
         {refetch_query_artifact_import}\n\n\
         const artifact: IsographEntrypoint<\n\
         {indent}{entrypoint_params_typename},\n\
         {indent}{entrypoint_output_type_name},\n\
-        {indent}NormalizationAst\n\
+        {indent}{normalization_ast_type_name}\n\
         > = {{\n\
         {indent}kind: \"Entrypoint\",\n\
         {indent}networkRequestInfo: {{\n\
         {indent}  kind: \"NetworkRequestInfo\",\n\
         {indent}  operation: {operation_text},\n\
-        {indent}  normalizationAst,\n\
+        {normalization_ast_code}\n\
         {indent}}},\n\
         {indent}concreteType: \"{concrete_type}\",\n\
         {indent}readerWithRefetchQueries: {{\n\
