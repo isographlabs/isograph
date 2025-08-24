@@ -13,7 +13,6 @@ mod selection_directive_set;
 pub mod semantic_token_legend;
 mod string_key_wrappers;
 mod variable_definition;
-mod with_id;
 mod with_target_entity_id;
 
 pub use base_types::*;
@@ -32,5 +31,4 @@ pub use semantic_token_legend::line_behavior::*;
 pub use semantic_token_legend::IsographSemanticToken;
 pub use string_key_wrappers::*;
 pub use variable_definition::*;
-pub use with_id::*;
 pub use with_target_entity_id::*;

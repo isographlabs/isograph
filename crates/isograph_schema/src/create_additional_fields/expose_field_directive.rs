@@ -124,16 +124,15 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .server_entity_data
             .server_object_entity(payload_object_entity_name);
 
-        let maybe_abstract_target_object_entity_with_id = self
+        let maybe_abstract_target_object_entity = self
             .traverse_object_selections(
                 payload_object_entity_name,
                 primary_field_name_selection_parts.iter().copied(),
             )
             .map_err(|e| WithLocation::new(e, Location::generated()))?;
 
-        let maybe_abstract_parent_object_entity_name =
-            maybe_abstract_target_object_entity_with_id.item.name;
-        let maybe_abstract_parent_object_entity = maybe_abstract_target_object_entity_with_id.item;
+        let maybe_abstract_parent_object_entity_name = maybe_abstract_target_object_entity.name;
+        let maybe_abstract_parent_object_entity = maybe_abstract_target_object_entity;
 
         let fields = processed_field_map_items
             .iter()

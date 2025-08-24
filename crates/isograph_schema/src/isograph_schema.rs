@@ -16,7 +16,7 @@ use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDirectiveSet, DefinitionLocation, EmptyDirectiveSet,
     ObjectSelection, ScalarSelection, SelectionType, SelectionTypeContainingSelections,
-    VariableDefinition, WithId,
+    VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -158,7 +158,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &self,
         root_object_name: ServerObjectEntityName,
         selections: impl Iterator<Item = ObjectSelectableName>,
-    ) -> Result<WithId<&ServerObjectEntity<TNetworkProtocol>>, CreateAdditionalFieldsError> {
+    ) -> Result<&ServerObjectEntity<TNetworkProtocol>, CreateAdditionalFieldsError> {
         let mut current_entity = self
             .server_entity_data
             .server_object_entity(root_object_name)
@@ -248,7 +248,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             };
         }
 
-        Ok(WithId::new(current_entity.name, current_entity))
+        Ok(current_entity)
     }
 
     pub fn get_object_selections_path(
@@ -710,12 +710,10 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
     }
 
     // TODO this function should not exist
-    pub fn server_object_entities_and_ids_mut(
+    pub fn server_object_entities_mut(
         &mut self,
-    ) -> impl Iterator<Item = WithId<&mut ServerObjectEntity<TNetworkProtocol>>> + '_ {
-        self.server_objects
-            .iter_mut()
-            .map(|(name, object)| WithId::new(*name, object))
+    ) -> impl Iterator<Item = &mut ServerObjectEntity<TNetworkProtocol>> + '_ {
+        self.server_objects.values_mut()
     }
 
     // TODO this function should not exist

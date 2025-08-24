@@ -1,7 +1,7 @@
 use crate::{ClientFieldVariant, ClientScalarSelectable, NetworkProtocol, Schema, LINK_FIELD_NAME};
 use common_lang_types::{Location, ObjectTypeAndFieldName, WithLocation};
 use intern::string_key::Intern;
-use isograph_lang_types::{DefinitionLocation, Description, SelectionType, WithId};
+use isograph_lang_types::{DefinitionLocation, Description, SelectionType};
 
 use super::create_additional_fields_error::{
     CreateAdditionalFieldsError, ProcessTypeDefinitionResult,
@@ -10,12 +10,9 @@ use super::create_additional_fields_error::{
 impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn add_link_fields(&mut self) -> ProcessTypeDefinitionResult<()> {
         let mut selectables_to_process = vec![];
-        for WithId {
-            id: parent_object_entity_name,
-            item: object,
-        } in &mut self.server_entity_data.server_object_entities_and_ids_mut()
-        {
+        for object in &mut self.server_entity_data.server_object_entities_mut() {
             let field_name = *LINK_FIELD_NAME;
+            let parent_object_entity_name = object.name;
             self.client_scalar_selectables.insert(
                 (parent_object_entity_name, field_name),
                 ClientScalarSelectable {

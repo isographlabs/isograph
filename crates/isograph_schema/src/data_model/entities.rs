@@ -4,7 +4,7 @@ use common_lang_types::{
     JavascriptName, SelectableName, ServerObjectEntityName, ServerScalarEntityName, WithLocation,
     WithSpan,
 };
-use isograph_lang_types::{impl_with_id, DefinitionLocation, Description, SelectionType};
+use isograph_lang_types::{DefinitionLocation, Description, SelectionType};
 
 use crate::{ClientSelectableId, NetworkProtocol, ServerSelectableId};
 
@@ -29,8 +29,6 @@ pub struct ServerObjectEntity<TNetworkProtocol: NetworkProtocol> {
 
     pub network_protocol_associated_data: TNetworkProtocol::SchemaObjectAssociatedData,
 }
-
-impl_with_id!(ServerObjectEntity<TNetworkProtocol: NetworkProtocol>, ServerObjectEntityName);
 
 pub type ServerEntity<'a, TNetworkProtocol> = SelectionType<
     &'a ServerScalarEntity<TNetworkProtocol>,
