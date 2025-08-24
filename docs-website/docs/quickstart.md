@@ -482,6 +482,6 @@ Now, if you refresh, the UI will be divided into subcomponents and look exactly 
 
 Congratulations! You just built your first Isograph app.
 
-Want more? Try extracting the sorted list of films into its own client field (no need to use `@component` for this one.) Use hooks in your components (they work!) Check out the [mutation](/docs/mutation/), [pagination](/docs/pagination/), and the [loadable fields](/docs/loadable-fields/) documentation!
+Want more? Try extracting the sorted list of films into its own client field (no need to use `@component` for this one.) Use hooks in your components (they work!) Check out the [mutations](/docs/mutations/), [pagination](/docs/pagination/), and the [loadable fields](/docs/loadable-fields/) documentation!
 
 Or, [join the Discord](https://discord.gg/qcHUxb6deQ)!

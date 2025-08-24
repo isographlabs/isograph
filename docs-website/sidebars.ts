@@ -18,7 +18,7 @@ const sidebars: SidebarsConfig = {
     'isograph-config',
     'loadable-fields',
     'pagination',
-    'mutation',
+    'mutations',
     'conditional-fetching',
     'abstract-types',
     'data-driven-dependencies',
