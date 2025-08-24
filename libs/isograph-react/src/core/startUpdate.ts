@@ -98,16 +98,12 @@ type MutableInvalidationState = {
   lastInvalidated: number;
 };
 
-type DefineCachedPropertyOptions = {
-  mutableState: MutableInvalidationState;
-  get(): any;
-  set?(v: any): void;
-};
-
 function defineCachedProperty<T>(
   target: T,
   property: PropertyKey,
-  { get, set, mutableState }: DefineCachedPropertyOptions,
+  mutableState: MutableInvalidationState,
+  get: () => any,
+  set?: (v: any) => void,
 ) {
   let value:
     | { kind: 'Set'; value: T; validatedAt: number }
@@ -168,9 +164,11 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
       case 'Scalar': {
         const storeRecordName = getParentRecordKey(field, variables);
 
-        defineCachedProperty(target, field.alias ?? field.fieldName, {
+        defineCachedProperty(
+          target,
+          field.alias ?? field.fieldName,
           mutableState,
-          get: () => {
+          () => {
             const data = readScalarFieldData(
               field,
               storeRecord,
@@ -182,26 +180,26 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             }
             return data.data;
           },
-          ...(field.isUpdatable
-            ? {
-                set: (newValue) => {
-                  storeRecord[storeRecordName] = newValue;
-                  const updatedIds = insertEmptySetIfMissing(
-                    mutableUpdatedIds,
-                    root.__typename,
-                  );
-                  updatedIds.add(root.__link);
-                },
+          field.isUpdatable
+            ? (newValue) => {
+                storeRecord[storeRecordName] = newValue;
+                const updatedIds = insertEmptySetIfMissing(
+                  mutableUpdatedIds,
+                  root.__typename,
+                );
+                updatedIds.add(root.__link);
               }
-            : undefined),
-        });
+            : undefined,
+        );
         break;
       }
       case 'Linked': {
         const storeRecordName = getParentRecordKey(field, variables);
-        defineCachedProperty(target, field.alias ?? field.fieldName, {
+        defineCachedProperty(
+          target,
+          field.alias ?? field.fieldName,
           mutableState,
-          get: () => {
+          () => {
             const data = readLinkedFieldData(
               environment,
               field,
@@ -229,89 +227,78 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             }
             return data.data;
           },
-          ...('isUpdatable' in field && field.isUpdatable
-            ? {
-                set: (newValue) => {
-                  if (Array.isArray(newValue)) {
-                    storeRecord[storeRecordName] = newValue.map((node) =>
-                      assertLink(node?.link),
-                    );
-                  } else {
-                    storeRecord[storeRecordName] = assertLink(newValue?.link);
-                  }
-                  const updatedIds = insertEmptySetIfMissing(
-                    mutableUpdatedIds,
-                    root.__typename,
+          'isUpdatable' in field && field.isUpdatable
+            ? (newValue) => {
+                if (Array.isArray(newValue)) {
+                  storeRecord[storeRecordName] = newValue.map((node) =>
+                    assertLink(node?.link),
                   );
-                  updatedIds.add(root.__link);
-                },
+                } else {
+                  storeRecord[storeRecordName] = assertLink(newValue?.link);
+                }
+                const updatedIds = insertEmptySetIfMissing(
+                  mutableUpdatedIds,
+                  root.__typename,
+                );
+                updatedIds.add(root.__link);
               }
-            : undefined),
-        });
+            : undefined,
+        );
         break;
       }
       case 'ImperativelyLoadedField': {
-        defineCachedProperty(target, field.alias, {
-          mutableState,
-          get() {
-            const data = readImperativelyLoadedField(
-              environment,
-              field,
-              root,
-              variables,
-              nestedRefetchQueries,
-              networkRequest,
-              networkRequestOptions,
-              new Map(),
-            );
-            if (data.kind === 'MissingData') {
-              throw new Error(data.reason);
-            }
-            return data.data;
-          },
+        defineCachedProperty(target, field.alias, mutableState, () => {
+          const data = readImperativelyLoadedField(
+            environment,
+            field,
+            root,
+            variables,
+            nestedRefetchQueries,
+            networkRequest,
+            networkRequestOptions,
+            new Map(),
+          );
+          if (data.kind === 'MissingData') {
+            throw new Error(data.reason);
+          }
+          return data.data;
         });
         break;
       }
       case 'Resolver': {
-        defineCachedProperty(target, field.alias, {
-          mutableState,
-          get() {
-            const data = readResolverFieldData(
-              environment,
-              field,
-              root,
-              variables,
-              nestedRefetchQueries,
-              networkRequest,
-              networkRequestOptions,
-              new Map(),
-            );
-            if (data.kind === 'MissingData') {
-              throw new Error(data.reason);
-            }
-            return data.data;
-          },
+        defineCachedProperty(target, field.alias, mutableState, () => {
+          const data = readResolverFieldData(
+            environment,
+            field,
+            root,
+            variables,
+            nestedRefetchQueries,
+            networkRequest,
+            networkRequestOptions,
+            new Map(),
+          );
+          if (data.kind === 'MissingData') {
+            throw new Error(data.reason);
+          }
+          return data.data;
         });
         break;
       }
       case 'LoadablySelectedField': {
-        defineCachedProperty(target, field.alias, {
-          mutableState,
-          get() {
-            const data = readLoadablySelectedFieldData(
-              environment,
-              field,
-              root,
-              variables,
-              networkRequest,
-              networkRequestOptions,
-              new Map(),
-            );
-            if (data.kind === 'MissingData') {
-              throw new Error(data.reason);
-            }
-            return data.data;
-          },
+        defineCachedProperty(target, field.alias, mutableState, () => {
+          const data = readLoadablySelectedFieldData(
+            environment,
+            field,
+            root,
+            variables,
+            networkRequest,
+            networkRequestOptions,
+            new Map(),
+          );
+          if (data.kind === 'MissingData') {
+            throw new Error(data.reason);
+          }
+          return data.data;
         });
         break;
       }
