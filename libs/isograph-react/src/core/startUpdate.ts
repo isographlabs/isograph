@@ -64,6 +64,8 @@ export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
 
     try {
       updater(data);
+    } catch (e) {
+      throw e;
     } finally {
       callSubscriptions(environment, mutableUpdatedIds);
     }
