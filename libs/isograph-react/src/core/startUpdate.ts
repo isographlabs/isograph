@@ -110,21 +110,21 @@ function defineCachedProperty<T>(
   },
 ) {
   let value = get();
-  let lastInvalidated = Date.now();
+  let lastInvalidated = mutableState.lastInvalidated;
   Object.defineProperty(target, property, {
     configurable: true,
     enumerable: true,
     get: () => {
-      if (lastInvalidated <= mutableState.lastInvalidated) {
+      if (lastInvalidated < mutableState.lastInvalidated) {
         value = get();
-        lastInvalidated = Date.now();
+        lastInvalidated = mutableState.lastInvalidated;
       }
       return value;
     },
     ...(set && {
       set: (newValue) => {
         set(newValue);
-        mutableState.lastInvalidated = Date.now();
+        mutableState.lastInvalidated++;
       },
     }),
   });
