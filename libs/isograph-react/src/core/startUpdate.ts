@@ -109,17 +109,29 @@ function defineCachedProperty<T>(
     set?(v: any): void;
   },
 ) {
-  let value = get();
-  let lastInvalidated = mutableState.lastInvalidated;
+  let value:
+    | { kind: 'Set'; value: T; validatedAt: number }
+    | {
+        kind: 'NotSet';
+      } = {
+    kind: 'NotSet',
+  };
+
   Object.defineProperty(target, property, {
     configurable: true,
     enumerable: true,
     get: () => {
-      if (lastInvalidated < mutableState.lastInvalidated) {
-        value = get();
-        lastInvalidated = mutableState.lastInvalidated;
+      if (
+        value.kind === 'NotSet' ||
+        value.validatedAt < mutableState.lastInvalidated
+      ) {
+        value = {
+          kind: 'Set',
+          value: get(),
+          validatedAt: mutableState.lastInvalidated,
+        };
       }
-      return value;
+      return value.value;
     },
     ...(set && {
       set: (newValue) => {
