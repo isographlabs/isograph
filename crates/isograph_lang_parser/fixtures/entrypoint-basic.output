@@ -50,8 +50,11 @@ Ok(
                                     lsp_semantic_token: LspSemanticToken(
                                         15,
                                     ),
-                                    line_behavior: StartsNewLine(
-                                        StartsNewLineBehavior {
+                                    line_behavior: Inline(
+                                        InlineBehavior {
+                                            space_before: SpaceBefore(
+                                                false,
+                                            ),
                                             space_after: SpaceAfter(
                                                 true,
                                             ),
