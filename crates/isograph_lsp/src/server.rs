@@ -1,5 +1,6 @@
 use crate::{
     format::on_format,
+    goto_definition::on_goto_definition,
     hover::on_hover,
     lsp_notification_dispatch::LSPNotificationDispatch,
     lsp_request_dispatch::LSPRequestDispatch,
@@ -23,7 +24,7 @@ use log::{info, warn};
 use lsp_server::{Connection, ErrorCode, ProtocolError, Response, ResponseError};
 use lsp_types::{
     notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument},
-    request::Formatting,
+    request::{Formatting, GotoDefinition},
     InitializeParams, OneOf, SemanticTokensFullOptions, SemanticTokensOptions,
     SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentSyncCapability,
     TextDocumentSyncKind, WorkDoneProgressOptions,
@@ -53,6 +54,7 @@ pub fn initialize<TNetworkProtocol: NetworkProtocol + 'static>(
         )),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
         document_formatting_provider: Some(OneOf::Left(true)),
+        definition_provider: Some(OneOf::Left(true)),
         ..Default::default()
     };
     let server_capabilities = serde_json::to_value(server_capabilities)?;
@@ -171,6 +173,7 @@ fn dispatch_request<TNetworkProtocol: NetworkProtocol + 'static>(
             .on_request_sync::<SemanticTokensFullRequest>(on_semantic_token_full_request)?
             .on_request_sync::<HoverRequest>(on_hover)?
             .on_request_sync::<Formatting>(on_format)?
+            .on_request_sync::<GotoDefinition>(on_goto_definition)?
             .request();
 
         // If we have gotten here, we have not handled the request

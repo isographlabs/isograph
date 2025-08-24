@@ -76,7 +76,7 @@ fn get_range_of_extraction(extraction: &IsoLiteralExtraction, content: &str) -> 
     }
 }
 
-fn char_index_to_position(content: &str, char_index: usize) -> Position {
+pub fn char_index_to_position(content: &str, char_index: usize) -> Position {
     let text_before = &content[..char_index];
     let mut line = 0;
     let mut last_line_start = 0;
