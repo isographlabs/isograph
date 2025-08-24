@@ -35,7 +35,7 @@ lazy_static! {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RootOperationName(pub String);
+pub struct RootOperationName(pub &'static str);
 
 /// The in-memory representation of a schema.
 #[derive(Debug, PartialEq, Eq, Clone)]

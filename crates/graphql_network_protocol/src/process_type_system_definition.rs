@@ -8,27 +8,25 @@ use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLNamedTypeAnnotation,
     GraphQLNonNullTypeAnnotation, GraphQLScalarTypeDefinition, GraphQLTypeAnnotation,
     GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument, GraphQLTypeSystemExtension,
-    GraphQLTypeSystemExtensionDocument, GraphQLTypeSystemExtensionOrDefinition, RootOperationKind,
+    GraphQLTypeSystemExtensionDocument, GraphQLTypeSystemExtensionOrDefinition,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::Description;
 use isograph_schema::{
     CreateAdditionalFieldsError, ExposeAsFieldToInsert, ExposeFieldDirective, FieldMapItem,
     FieldToInsert, IsographObjectTypeDefinition, ProcessObjectTypeDefinitionOutcome,
-    ProcessTypeSystemDocumentOutcome, RootTypes, ServerObjectEntity, ServerScalarEntity,
+    ProcessTypeSystemDocumentOutcome, ServerObjectEntity, ServerScalarEntity,
     STRING_JAVASCRIPT_TYPE, TYPENAME_FIELD_NAME,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    GraphQLNetworkProtocol, GraphQLSchemaObjectAssociatedData, GraphQLSchemaOriginalDefinitionType,
+    GraphQLNetworkProtocol, GraphQLRootTypes, GraphQLSchemaObjectAssociatedData,
+    GraphQLSchemaOriginalDefinitionType,
 };
 
 lazy_static! {
-    pub static ref QUERY_TYPE: ServerObjectEntityName = "Query".intern().into();
-    static ref MUTATION_TYPE: ServerObjectEntityName = "Mutation".intern().into();
-    static ref SUBSCRIPTION_TYPE: ServerObjectEntityName = "Subscription".intern().into();
     static ref ID_FIELD_NAME: ServerScalarSelectableName = "id".intern().into();
     // TODO use schema_data.string_type_id or something
     static ref STRING_TYPE_NAME: UnvalidatedTypeName = "String".intern().into();
@@ -40,6 +38,7 @@ lazy_static! {
 #[allow(clippy::type_complexity)]
 pub fn process_graphql_type_system_document(
     type_system_document: GraphQLTypeSystemDocument,
+    graphql_root_types: &mut Option<GraphQLRootTypes>,
 ) -> ProcessGraphqlTypeDefinitionResult<(
     ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>,
     HashMap<ServerObjectEntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
@@ -52,8 +51,6 @@ pub fn process_graphql_type_system_document(
     // concrete objects.
 
     let mut supertype_to_subtype_map = HashMap::new();
-
-    let mut processed_root_types = None;
 
     let mut scalars = vec![];
     let mut objects = vec![];
@@ -199,16 +196,25 @@ pub fn process_graphql_type_system_document(
                 }
             }
             GraphQLTypeSystemDefinition::SchemaDefinition(schema_definition) => {
-                if processed_root_types.is_some() {
+                if graphql_root_types.is_some() {
                     return Err(WithLocation::new(
                         ProcessGraphqlTypeSystemDefinitionError::DuplicateSchemaDefinition,
                         location,
                     ));
                 }
-                processed_root_types = Some(RootTypes {
-                    query: schema_definition.query,
-                    mutation: schema_definition.mutation,
-                    subscription: schema_definition.subscription,
+                *graphql_root_types = Some(GraphQLRootTypes {
+                    query: schema_definition
+                        .query
+                        .map(|x| x.item.into())
+                        .unwrap_or_else(|| "Query".intern().into()),
+                    mutation: schema_definition
+                        .mutation
+                        .map(|x| x.item.into())
+                        .unwrap_or_else(|| "Mutation".intern().into()),
+                    subscription: schema_definition
+                        .subscription
+                        .map(|x| x.item.into())
+                        .unwrap_or_else(|| "Subscription".intern().into()),
                 })
             }
         }
@@ -266,6 +272,7 @@ pub fn process_graphql_type_system_document(
 #[allow(clippy::type_complexity)]
 pub fn process_graphql_type_extension_document(
     extension_document: GraphQLTypeSystemExtensionDocument,
+    graphql_root_types: &mut Option<GraphQLRootTypes>,
 ) -> ProcessGraphqlTypeDefinitionResult<(
     ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>,
     HashMap<ServerObjectEntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
@@ -286,8 +293,10 @@ pub fn process_graphql_type_extension_document(
         }
     }
 
-    let (outcome, mut directives, refetch_fields) =
-        process_graphql_type_system_document(GraphQLTypeSystemDocument(definitions))?;
+    let (outcome, mut directives, refetch_fields) = process_graphql_type_system_document(
+        GraphQLTypeSystemDocument(definitions),
+        graphql_root_types,
+    )?;
 
     for extension in extensions.into_iter() {
         // TODO collect errors into vec
@@ -403,19 +412,8 @@ fn process_object_type_definition(
         });
     }
 
-    let encountered_root_kind = if object_type_definition.name.item == *QUERY_TYPE {
-        Some(RootOperationKind::Query)
-    } else if object_type_definition.name.item == *MUTATION_TYPE {
-        Some(RootOperationKind::Mutation)
-    } else if object_type_definition.name.item == *SUBSCRIPTION_TYPE {
-        Some(RootOperationKind::Subscription)
-    } else {
-        None
-    };
-
     Ok((
         ProcessObjectTypeDefinitionOutcome {
-            encountered_root_kind,
             server_object_entity,
             fields_to_insert,
             expose_as_fields_to_insert: vec![],

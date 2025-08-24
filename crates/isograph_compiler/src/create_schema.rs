@@ -7,18 +7,16 @@ use common_lang_types::{
     RelativePathToSourceFile, SelectableName, ServerObjectEntityName, TextSource,
     UnvalidatedTypeName, VariableName, WithLocation,
 };
-use graphql_lang_types::{
-    GraphQLConstantValue, GraphQLInputValueDefinition, NameValuePair, RootOperationKind,
-};
+use graphql_lang_types::{GraphQLConstantValue, GraphQLInputValueDefinition, NameValuePair};
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_parser::{IsoLiteralExtractionResult, IsographLiteralParseError};
 use isograph_lang_types::{ConstantValue, SelectionType, TypeAnnotation, VariableDefinition};
 use isograph_schema::{
     validate_entrypoints, CreateAdditionalFieldsError, FieldToInsert, IsographDatabase,
     NetworkProtocol, ProcessClientFieldDeclarationError, ProcessObjectTypeDefinitionOutcome,
-    ProcessTypeSystemDocumentOutcome, RootOperationName, Schema, ServerEntityName,
-    ServerObjectSelectable, ServerObjectSelectableVariant, ServerScalarSelectable,
-    UnprocessedClientFieldItem, UnprocessedClientPointerItem, ValidateEntrypointDeclarationError,
+    ProcessTypeSystemDocumentOutcome, Schema, ServerEntityName, ServerObjectSelectable,
+    ServerObjectSelectableVariant, ServerScalarSelectable, UnprocessedClientFieldItem,
+    UnprocessedClientPointerItem, ValidateEntrypointDeclarationError,
 };
 use pico_macros::memo;
 use thiserror::Error;
@@ -40,11 +38,14 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     ),
     CreateSchemaError<TNetworkProtocol>,
 > {
-    let ProcessTypeSystemDocumentOutcome { scalars, objects } =
+    let (ProcessTypeSystemDocumentOutcome { scalars, objects }, fetchable_types) =
         TNetworkProtocol::parse_and_process_type_system_documents(db)
             .map_err(|e| CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e })?;
 
     let mut unvalidated_isograph_schema = Schema::<TNetworkProtocol>::new();
+
+    unvalidated_isograph_schema.fetchable_types = fetchable_types;
+
     for (server_scalar_entity, name_location) in scalars {
         unvalidated_isograph_schema
             .server_entity_data
@@ -55,7 +56,6 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     let mut expose_as_field_queue = HashMap::new();
     for (
         ProcessObjectTypeDefinitionOutcome {
-            encountered_root_kind,
             server_object_entity,
             fields_to_insert,
             expose_as_fields_to_insert,
@@ -67,25 +67,6 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol + 'static>(
             .server_entity_data
             .insert_server_object_entity(server_object_entity, name_location)?;
         field_queue.insert(new_object_id, fields_to_insert);
-
-        match encountered_root_kind {
-            Some(RootOperationKind::Query) => {
-                unvalidated_isograph_schema
-                    .fetchable_types
-                    .insert(new_object_id, RootOperationName("query".to_string()));
-            }
-            Some(RootOperationKind::Mutation) => {
-                unvalidated_isograph_schema
-                    .fetchable_types
-                    .insert(new_object_id, RootOperationName("mutation".to_string()));
-            }
-            Some(RootOperationKind::Subscription) => {
-                unvalidated_isograph_schema
-                    .fetchable_types
-                    .insert(new_object_id, RootOperationName("subscription".to_string()));
-            }
-            None => {}
-        }
 
         expose_as_field_queue.insert(new_object_id, expose_as_fields_to_insert);
     }

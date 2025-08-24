@@ -1,10 +1,10 @@
-use std::{error::Error, fmt::Debug, hash::Hash};
+use std::{collections::BTreeMap, error::Error, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
     Location, QueryExtraInfo, QueryOperationName, QueryText, ServerObjectEntityName,
     ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
-use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation, RootOperationKind};
+use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation};
 use isograph_lang_types::Description;
 
 use crate::{
@@ -23,7 +23,13 @@ where
     #[allow(clippy::type_complexity)]
     fn parse_and_process_type_system_documents(
         db: &IsographDatabase<Self>,
-    ) -> Result<ProcessTypeSystemDocumentOutcome<Self>, Self::ParseAndProcessTypeSystemDocumentsError>;
+    ) -> Result<
+        (
+            ProcessTypeSystemDocumentOutcome<Self>,
+            BTreeMap<ServerObjectEntityName, RootOperationName>,
+        ),
+        Self::ParseAndProcessTypeSystemDocumentsError,
+    >;
 
     fn generate_query_text<'a>(
         query_name: QueryOperationName,
@@ -52,8 +58,6 @@ pub struct ProcessTypeSystemDocumentOutcome<TNetworkProtocol: NetworkProtocol> {
 
 #[derive(Debug)]
 pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol> {
-    // TODO this is a GraphQLism, remove
-    pub encountered_root_kind: Option<RootOperationKind>,
     pub server_object_entity: ServerObjectEntity<TNetworkProtocol>,
     pub fields_to_insert: Vec<WithLocation<FieldToInsert>>,
     // TODO this seems sketch

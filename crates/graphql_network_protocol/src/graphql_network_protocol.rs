@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use common_lang_types::{
     DirectiveName, QueryExtraInfo, QueryOperationName, QueryText, ServerObjectEntityName,
     WithLocation,
@@ -18,13 +20,39 @@ use crate::{
     parse_graphql_schema,
     process_type_system_definition::{
         process_graphql_type_extension_document, process_graphql_type_system_document,
-        ProcessGraphqlTypeSystemDefinitionError, QUERY_TYPE,
+        ProcessGraphqlTypeSystemDefinitionError,
     },
     query_text::generate_query_text,
 };
 
 lazy_static! {
     static ref EXPOSE_FIELD_DIRECTIVE: DirectiveName = "exposeField".intern().into();
+}
+
+pub(crate) struct GraphQLRootTypes {
+    pub query: ServerObjectEntityName,
+    pub mutation: ServerObjectEntityName,
+    pub subscription: ServerObjectEntityName,
+}
+
+impl Default for GraphQLRootTypes {
+    fn default() -> Self {
+        Self {
+            query: "Query".intern().into(),
+            mutation: "Mutation".intern().into(),
+            subscription: "Subscription".intern().into(),
+        }
+    }
+}
+
+impl From<GraphQLRootTypes> for BTreeMap<ServerObjectEntityName, RootOperationName> {
+    fn from(val: GraphQLRootTypes) -> Self {
+        let mut map = BTreeMap::new();
+        map.insert(val.query, RootOperationName("query"));
+        map.insert(val.mutation, RootOperationName("mutation"));
+        map.insert(val.subscription, RootOperationName("subscription"));
+        map
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash, Default)]
@@ -37,7 +65,10 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
     fn parse_and_process_type_system_documents(
         db: &IsographDatabase<Self>,
     ) -> Result<
-        ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>,
+        (
+            ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>,
+            BTreeMap<ServerObjectEntityName, RootOperationName>,
+        ),
         ParseAndProcessGraphQLTypeSystemDocumentsError,
     > {
         let StandardSources {
@@ -45,15 +76,23 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             schema_extension_sources,
         } = db.get_standard_sources();
 
+        let mut graphql_root_types = None;
+
         let (type_system_document, type_system_extension_documents) =
             parse_graphql_schema(db, *schema_source_id, schema_extension_sources).to_owned()?;
 
         let (mut result, mut directives, mut refetch_fields) =
-            process_graphql_type_system_document(type_system_document.to_owned())?;
+            process_graphql_type_system_document(
+                type_system_document.to_owned(),
+                &mut graphql_root_types,
+            )?;
 
         for type_system_extension_document in type_system_extension_documents.values() {
             let (outcome, objects_and_directives, new_refetch_fields) =
-                process_graphql_type_extension_document(type_system_extension_document.to_owned())?;
+                process_graphql_type_extension_document(
+                    type_system_extension_document.to_owned(),
+                    &mut graphql_root_types,
+                )?;
 
             for (name, new_directives) in objects_and_directives {
                 directives.entry(name).or_default().extend(new_directives);
@@ -69,11 +108,13 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             refetch_fields.extend(new_refetch_fields);
         }
 
+        let graphql_root_types = graphql_root_types.unwrap_or_default();
+
         let query = result
             .objects
             .iter_mut()
-            .find(|(object, _)| object.server_object_entity.name == *QUERY_TYPE)
-            .expect("Expected query type to be defined. Renaming the query is not yet supported.");
+            .find(|(object, _)| object.server_object_entity.name == graphql_root_types.query)
+            .expect("Expected query type to be found.");
         query.0.expose_as_fields_to_insert.extend(refetch_fields);
 
         // - in the extension document, you may have added directives to objects, e.g. @exposeAs
@@ -118,7 +159,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             }
         }
 
-        Ok(result)
+        Ok((result, graphql_root_types.into()))
     }
 
     fn generate_query_text<'a>(
