@@ -118,7 +118,7 @@ function defineCachedProperty<T>(
   };
 
   Object.defineProperty(target, property, {
-    configurable: true,
+    configurable: false,
     enumerable: true,
     get: () => {
       if (
