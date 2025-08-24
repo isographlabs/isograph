@@ -19,6 +19,7 @@ const sidebars: SidebarsConfig = {
     'loadable-fields',
     'pagination',
     'mutations',
+    'local-updates',
     'conditional-fetching',
     'abstract-types',
     'data-driven-dependencies',
