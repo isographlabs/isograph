@@ -1,4 +1,4 @@
-use common_lang_types::{ConstExportName, RelativePathToSourceFile, UnvalidatedTypeName, WithSpan};
+use common_lang_types::{ConstExportName, RelativePathToSourceFile, UnvalidatedTypeName, WithLocation, WithSpan};
 use graphql_lang_types::GraphQLTypeAnnotation;
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
@@ -44,7 +44,7 @@ pub struct ClientPointerDeclaration {
     // impl<T: ResolvePosition> ResolvePosition for GraphQLTypeAnnotation<T>?
     pub target_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     #[resolve_field]
-    pub client_pointer_name: WithSpan<ClientObjectSelectableNameWrapper>,
+    pub client_pointer_name: WithLocation<ClientObjectSelectableNameWrapper>,
     #[resolve_field]
     pub description: Option<WithSpan<Description>>,
     #[resolve_field]

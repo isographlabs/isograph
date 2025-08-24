@@ -672,7 +672,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             })
             .chain(self.client_object_selectables.values().map(|pointer| {
                 (
-                    SelectionType::Object((pointer.parent_object_entity_name, pointer.name)),
+                    SelectionType::Object((pointer.parent_object_entity_name, pointer.name.item)),
                     SelectionType::Object(pointer),
                     ClientFieldDirectiveSet::None(EmptyDirectiveSet {}),
                 )
