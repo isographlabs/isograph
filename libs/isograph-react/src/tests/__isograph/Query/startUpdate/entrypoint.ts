@@ -2,69 +2,10 @@ import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArti
 import {Query__startUpdate__param} from './param_type';
 import {Query__startUpdate__output_type} from './output_type';
 import readerResolver from './resolver_reader';
+import queryText from './query_text';
+import normalizationAst from './normalization_ast';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
-const queryText = 'query startUpdate ($id: ID!) {\
-  node____id___v_id: node(id: $id) {\
-    __typename,\
-    id,\
-    ... on Economist {\
-      id,\
-      __typename,\
-      name,\
-    },\
-  },\
-}';
-
-const normalizationAst: NormalizationAst = {
-  kind: "NormalizationAst",
-  selections: [
-    {
-      kind: "Linked",
-      fieldName: "node",
-      arguments: [
-        [
-          "id",
-          { kind: "Variable", name: "id" },
-        ],
-      ],
-      concreteType: null,
-      selections: [
-        {
-          kind: "Scalar",
-          fieldName: "__typename",
-          arguments: null,
-        },
-        {
-          kind: "Scalar",
-          fieldName: "id",
-          arguments: null,
-        },
-        {
-          kind: "InlineFragment",
-          type: "Economist",
-          selections: [
-            {
-              kind: "Scalar",
-              fieldName: "id",
-              arguments: null,
-            },
-            {
-              kind: "Scalar",
-              fieldName: "__typename",
-              arguments: null,
-            },
-            {
-              kind: "Scalar",
-              fieldName: "name",
-              arguments: null,
-            },
-          ],
-        },
-      ],
-    },
-  ],
-};
 const artifact: IsographEntrypoint<
   Query__startUpdate__param,
   Query__startUpdate__output_type,
@@ -73,7 +14,10 @@ const artifact: IsographEntrypoint<
   kind: "Entrypoint",
   networkRequestInfo: {
     kind: "NetworkRequestInfo",
-    queryText,
+    operation: {
+      kind: "Operation",
+      text: queryText,
+    },
     normalizationAst,
   },
   concreteType: "Query",

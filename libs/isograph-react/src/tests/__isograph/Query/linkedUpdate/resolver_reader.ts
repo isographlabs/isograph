@@ -2,7 +2,7 @@ import type { EagerReaderArtifact, ReaderAst } from '@isograph/react';
 import { Query__linkedUpdate__param } from './param_type';
 import { Query__linkedUpdate__output_type } from './output_type';
 import { linkedUpdate as resolver } from '../../../startUpdate.test';
-import Economist__asEconomist__resolver_reader from '../../Economist/asEconomist/resolver_reader';
+import Node__asEconomist__resolver_reader from '../../Node/asEconomist/resolver_reader';
 
 const readerAst: ReaderAst<Query__linkedUpdate__param> = [
   {
@@ -23,7 +23,7 @@ const readerAst: ReaderAst<Query__linkedUpdate__param> = [
         fieldName: "asEconomist",
         alias: null,
         arguments: null,
-        condition: Economist__asEconomist__resolver_reader,
+        condition: Node__asEconomist__resolver_reader,
         isUpdatable: false,
         selections: [
           {
@@ -34,8 +34,10 @@ const readerAst: ReaderAst<Query__linkedUpdate__param> = [
             isUpdatable: true,
           },
         ],
+        refetchQueryIndex: null,
       },
     ],
+    refetchQueryIndex: null,
   },
   {
     kind: "Linked",
@@ -59,7 +61,7 @@ const readerAst: ReaderAst<Query__linkedUpdate__param> = [
         fieldName: "asEconomist",
         alias: null,
         arguments: null,
-        condition: Economist__asEconomist__resolver_reader,
+        condition: Node__asEconomist__resolver_reader,
         isUpdatable: false,
         selections: [
           {
@@ -70,8 +72,10 @@ const readerAst: ReaderAst<Query__linkedUpdate__param> = [
             isUpdatable: false,
           },
         ],
+        refetchQueryIndex: null,
       },
     ],
+    refetchQueryIndex: null,
   },
 ];
 
