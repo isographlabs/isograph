@@ -370,7 +370,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 name: client_pointer_declaration
                     .item
                     .client_pointer_name
-                    .clone()
                     .map(|client_object_selectable_name| *client_object_selectable_name),
                 reader_selection_set: vec![],
 
