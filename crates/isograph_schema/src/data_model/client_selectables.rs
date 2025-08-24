@@ -1,7 +1,8 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, ObjectTypeAndFieldName, ServerObjectEntityName, WithLocation, WithSpan
+    ClientObjectSelectableName, ClientScalarSelectableName, ObjectTypeAndFieldName,
+    ServerObjectEntityName, WithLocation, WithSpan,
 };
 use isograph_lang_types::{Description, SelectionType, TypeAnnotation, VariableDefinition};
 

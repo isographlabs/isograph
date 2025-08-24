@@ -1,4 +1,6 @@
-use common_lang_types::{ConstExportName, RelativePathToSourceFile, UnvalidatedTypeName, WithLocation, WithSpan};
+use common_lang_types::{
+    ConstExportName, RelativePathToSourceFile, UnvalidatedTypeName, WithLocation, WithSpan,
+};
 use graphql_lang_types::GraphQLTypeAnnotation;
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;

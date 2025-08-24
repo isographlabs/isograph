@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, ConstExportName, EmbeddedLocation,
-    IsographDirectiveName, Location, ObjectTypeAndFieldName, RelativePathToSourceFile,
-    SelectableName, ServerObjectEntityName, TextSource, UnvalidatedTypeName, VariableName,
-    WithLocation, WithSpan,
+    ClientObjectSelectableName, ClientScalarSelectableName, ConstExportName, IsographDirectiveName,
+    Location, ObjectTypeAndFieldName, RelativePathToSourceFile, SelectableName,
+    ServerObjectEntityName, TextSource, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
