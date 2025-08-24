@@ -9,7 +9,7 @@ export const FavoritePhraseLoader = iso(`
   }
 `)(({ data: pet }) => {
   const { fragmentReference, loadFragmentReference } = useImperativeReference(
-    iso(`entrypoint Query.PetFavoritePhrase`),
+    iso(`entrypoint Query.PetFavoritePhrase @lazyLoad`),
   );
 
   return (
@@ -20,6 +20,7 @@ export const FavoritePhraseLoader = iso(`
             loadFragmentReference(
               { id: pet.id },
               {
+                shouldFetch: 'Yes',
                 onComplete: (data) => {
                   console.log(
                     'Successfully loaded favorite phrase and received this component',
