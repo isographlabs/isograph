@@ -21,7 +21,8 @@ Now, navigate to the root directory of your Isograph repository and run the foll
 ```bash
 fnm install --resolve-engines
 fnm use --resolve-engines
-# This makes sure that corepack treats npm the same way as other node package managers. More information at this link: https://github.com/nodejs/corepack?tab=readme-ov-file#corepack-enable--name
+# This makes sure that corepack treats npm the same way as other node package managers.
+# More information at [this link](https://github.com/nodejs/corepack?tab=readme-ov-file#corepack-enable--name)
 corepack enable npm
 corepack enable
 corepack install
