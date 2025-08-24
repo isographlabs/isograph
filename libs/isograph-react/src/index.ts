@@ -18,6 +18,7 @@ export {
   NOT_SET,
 } from './core/PromiseWrapper';
 export {
+  callSubscriptions,
   subscribe,
   normalizeData,
   type NetworkResponseObject,
