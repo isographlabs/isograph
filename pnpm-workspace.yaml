@@ -3,3 +3,6 @@ packages:
   - 'demos/*'
   - 'docs-website'
   - 'tree-sitter'
+
+onlyBuiltDependencies:
+  - 'tree-sitter'
