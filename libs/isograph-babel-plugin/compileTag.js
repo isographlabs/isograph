@@ -13,10 +13,18 @@ const os = require('os');
 function compileTag(t, path, config) {
   const callee = path.node.callee;
   if (t.isIdentifier(callee) && callee.name === 'iso' && path.node.arguments) {
-    const { keyword, type, field } = getTypeAndField(path);
+    const { keyword, parentObjectEntityName, selectableName } =
+      getParentObjectEntityNameAndSelectableName(path);
     if (keyword === 'entrypoint') {
       // This throws if the tag is invalid
-      compileImportStatement(t, path, type, field, 'entrypoint', config);
+      compileImportStatement(
+        t,
+        path,
+        parentObjectEntityName,
+        selectableName,
+        'entrypoint',
+        config,
+      );
     } else if (keyword === 'field' || keyword === 'pointer') {
       if (t.isCallExpression(path.parentPath.node)) {
         const firstArg = path.parentPath.node.arguments[0];
@@ -41,7 +49,7 @@ function compileTag(t, path, config) {
   return false;
 }
 
-const typeAndFieldRegex = new RegExp(
+const parentObjectEntityNameAndSelectableNameRegex = new RegExp(
   '\\s*(entrypoint|field|pointer)\\s*([^\\.\\s]+)\\.([^\\s\\(]+)',
   'm',
 );
@@ -49,7 +57,7 @@ const typeAndFieldRegex = new RegExp(
 /**
  * @param {babel.NodePath<babel.types.CallExpression>} path
  **/
-function getTypeAndField(path) {
+function getParentObjectEntityNameAndSelectableName(path) {
   const firstArg = path.node.arguments[0];
   if (path.node.arguments.length !== 1 || firstArg == null) {
     throw new Error(
@@ -72,18 +80,23 @@ function getTypeAndField(path) {
   }
 
   const content = firstQuasi.value.raw;
-  const typeAndField = typeAndFieldRegex.exec(content);
+  const typeAndField =
+    parentObjectEntityNameAndSelectableNameRegex.exec(content);
 
   const keyword = typeAndField?.[1];
-  const type = typeAndField?.[2];
-  const field = typeAndField?.[3];
+  const parentObjectEntityName = typeAndField?.[2];
+  const selectableName = typeAndField?.[3];
 
-  if (keyword == null || type == null || field == null) {
+  if (
+    keyword == null ||
+    parentObjectEntityName == null ||
+    selectableName == null
+  ) {
     throw new Error(
       'Malformed iso literal. I hope the iso compiler failed to accept this literal!',
     );
   }
-  return { keyword, type, field };
+  return { keyword, parentObjectEntityName, selectableName };
 }
 
 /**
