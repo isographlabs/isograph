@@ -360,6 +360,10 @@ jobs:
         env:
           RELEASE_COMMIT_SHA: ${{ github.sha }}
 
+      - name: Re-install dependencies without frozen lockfile
+        # This is required because pnpm tries to re-install dependencies due to `verify-deps-before-run = install`,
+        # and in CI, this is always done with --frozen-lockfile.
+        run: pnpm install --no-frozen-lockfile --ignore-scripts
       # TODO do not rebuild the libs
       - name: Build
         run: pnpm compile-libs
