@@ -4,5 +4,15 @@ packages:
   - 'docs-website'
   - 'tree-sitter'
 
+ignoredBuiltDependencies:
+  - '@swc/core'
+  - 'core-js'
+  - 'core-js-pure'
+  - 'es5-ext'
+  - 'esbuild'
+  - 'fsevents'
+  - 'unrs-resolver'
+
 onlyBuiltDependencies:
   - 'tree-sitter'
+  - 'tree-sitter-cli'
