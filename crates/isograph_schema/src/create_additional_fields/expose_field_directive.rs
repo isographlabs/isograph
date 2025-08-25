@@ -1,5 +1,5 @@
 use common_lang_types::{
-    ClientScalarSelectableName, Location, ObjectTypeAndFieldName, SelectableName,
+    ClientScalarSelectableName, Location, ParentObjectEntityNameAndSelectableName, SelectableName,
     ServerObjectEntityName, ServerObjectSelectableName, Span, StringLiteralValue, WithLocation,
     WithSpan,
 };
@@ -234,7 +234,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 field_map,
             }),
             variable_definitions: vec![],
-            type_and_field: ObjectTypeAndFieldName {
+            type_and_field: ParentObjectEntityNameAndSelectableName {
                 type_name: maybe_abstract_parent_object_entity_name.unchecked_conversion(), // e.g. Pet
                 field_name: client_field_scalar_selection_name, // set_pet_best_friend
             },

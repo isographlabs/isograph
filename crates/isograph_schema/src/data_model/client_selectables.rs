@@ -1,8 +1,8 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, ObjectTypeAndFieldName,
-    ServerObjectEntityName, WithSpan,
+    ClientObjectSelectableName, ClientScalarSelectableName,
+    ParentObjectEntityNameAndSelectableName, ServerObjectEntityName, WithSpan,
 };
 use isograph_lang_types::{Description, SelectionType, TypeAnnotation, VariableDefinition};
 
@@ -41,7 +41,7 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub variable_definitions: Vec<WithSpan<VariableDefinition<ServerEntityName>>>,
 
     // Why is this not calculated when needed?
-    pub type_and_field: ObjectTypeAndFieldName,
+    pub type_and_field: ParentObjectEntityNameAndSelectableName,
 
     pub parent_object_entity_name: ServerObjectEntityName,
     pub network_protocol: PhantomData<TNetworkProtocol>,
@@ -62,7 +62,7 @@ pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub variable_definitions: Vec<WithSpan<VariableDefinition<ServerEntityName>>>,
 
     // Why is this not calculated when needed?
-    pub type_and_field: ObjectTypeAndFieldName,
+    pub type_and_field: ParentObjectEntityNameAndSelectableName,
 
     pub parent_object_entity_name: ServerObjectEntityName,
 

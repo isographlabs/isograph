@@ -1,5 +1,5 @@
 use crate::{ClientFieldVariant, ClientScalarSelectable, NetworkProtocol, Schema, LINK_FIELD_NAME};
-use common_lang_types::{Location, ObjectTypeAndFieldName, WithLocation};
+use common_lang_types::{Location, ParentObjectEntityNameAndSelectableName, WithLocation};
 use intern::string_key::Intern;
 use isograph_lang_types::{DefinitionLocation, Description, SelectionType};
 
@@ -26,7 +26,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     variable_definitions: vec![],
                     reader_selection_set: vec![],
                     variant: ClientFieldVariant::Link,
-                    type_and_field: ObjectTypeAndFieldName {
+                    type_and_field: ParentObjectEntityNameAndSelectableName {
                         field_name: field_name.into(),
                         type_name: object.name,
                     },

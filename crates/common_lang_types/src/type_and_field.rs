@@ -3,12 +3,12 @@ use crate::{ArtifactFilePrefix, SelectableName, ServerObjectEntityName};
 // TODO consider making this generic over the type of field_name. We sometimes know
 // that the field is e.g. a scalar field
 #[derive(Debug, PartialEq, Eq, Hash, Ord, PartialOrd, Clone, Copy)]
-pub struct ObjectTypeAndFieldName {
+pub struct ParentObjectEntityNameAndSelectableName {
     pub type_name: ServerObjectEntityName,
     pub field_name: SelectableName,
 }
 
-impl ObjectTypeAndFieldName {
+impl ParentObjectEntityNameAndSelectableName {
     pub fn underscore_separated(&self) -> String {
         format!("{}__{}", self.type_name, self.field_name)
     }
@@ -18,7 +18,7 @@ impl ObjectTypeAndFieldName {
         current_file_type_name: ServerObjectEntityName,
         file_type: ArtifactFilePrefix,
     ) -> String {
-        let ObjectTypeAndFieldName {
+        let ParentObjectEntityNameAndSelectableName {
             type_name,
             field_name,
         } = *self;

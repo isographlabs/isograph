@@ -1,7 +1,7 @@
 use common_lang_types::{
     derive_display, ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent,
-    ClientScalarSelectableName, Location, ObjectTypeAndFieldName, SelectableNameOrAlias,
-    ServerObjectEntityName, Span, WithLocation, WithSpan,
+    ClientScalarSelectableName, Location, ParentObjectEntityNameAndSelectableName,
+    SelectableNameOrAlias, ServerObjectEntityName, Span, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
@@ -791,8 +791,8 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     query_type_declaration: &mut String,
-    nested_client_field_imports: &mut BTreeSet<ObjectTypeAndFieldName>,
-    loadable_fields: &mut BTreeSet<ObjectTypeAndFieldName>,
+    nested_client_field_imports: &mut BTreeSet<ParentObjectEntityNameAndSelectableName>,
+    loadable_fields: &mut BTreeSet<ParentObjectEntityNameAndSelectableName>,
     indentation_level: u8,
     link_fields: &mut bool,
     scalar_field_selection: &ScalarSelection<ScalarSelectableId>,

@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use common_lang_types::{
-    FieldArgumentName, Location, ObjectTypeAndFieldName, SelectableName, ServerObjectEntityName,
-    VariableName, WithLocation, WithSpan,
+    FieldArgumentName, Location, ParentObjectEntityNameAndSelectableName, SelectableName,
+    ServerObjectEntityName, VariableName, WithLocation, WithSpan,
 };
 
 use intern::string_key::Intern;
@@ -239,7 +239,7 @@ fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
 fn validate_all_variables_are_used(
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     used_variables: UsedVariables,
-    top_level_type_and_field_name: ObjectTypeAndFieldName,
+    top_level_type_and_field_name: ParentObjectEntityNameAndSelectableName,
     location: Location,
 ) -> ValidateUseOfArgumentsResult<()> {
     let unused_variables = variable_definitions

@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use common_lang_types::{
-    ArtifactPathAndContent, ClientScalarSelectableName, ObjectTypeAndFieldName, QueryOperationName,
-    QueryText, ServerObjectEntityName, VariableName,
+    ArtifactPathAndContent, ClientScalarSelectableName, ParentObjectEntityNameAndSelectableName,
+    QueryOperationName, QueryText, ServerObjectEntityName, VariableName,
 };
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
@@ -349,7 +349,7 @@ impl<TNetworkProtocol: NetworkProtocol> EntrypointArtifactInfo<'_, TNetworkProto
             ArtifactPathAndContent {
                 file_content: format!("export default '{query_text}';"),
                 file_name: *QUERY_TEXT_FILE_NAME,
-                type_and_field: Some(ObjectTypeAndFieldName {
+                type_and_field: Some(ParentObjectEntityNameAndSelectableName {
                     type_name,
                     field_name,
                 }),
@@ -365,7 +365,7 @@ impl<TNetworkProtocol: NetworkProtocol> EntrypointArtifactInfo<'_, TNetworkProto
                     "  ", "  "
                 ),
                 file_name: *NORMALIZATION_AST_FILE_NAME,
-                type_and_field: Some(ObjectTypeAndFieldName {
+                type_and_field: Some(ParentObjectEntityNameAndSelectableName {
                     type_name,
                     field_name,
                 }),
@@ -373,7 +373,7 @@ impl<TNetworkProtocol: NetworkProtocol> EntrypointArtifactInfo<'_, TNetworkProto
             ArtifactPathAndContent {
                 file_content: entrypoint_file_content,
                 file_name: *ENTRYPOINT_FILE_NAME,
-                type_and_field: Some(ObjectTypeAndFieldName {
+                type_and_field: Some(ParentObjectEntityNameAndSelectableName {
                     type_name,
                     field_name,
                 }),

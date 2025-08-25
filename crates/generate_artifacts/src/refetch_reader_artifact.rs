@@ -1,4 +1,4 @@
-use common_lang_types::{ArtifactPathAndContent, ObjectTypeAndFieldName};
+use common_lang_types::{ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName};
 
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::SelectionType;
@@ -75,7 +75,7 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
     ArtifactPathAndContent {
         file_name: *REFETCH_READER_FILE_NAME,
         file_content: reader_content,
-        type_and_field: Some(ObjectTypeAndFieldName {
+        type_and_field: Some(ParentObjectEntityNameAndSelectableName {
             type_name: parent_type.name,
             field_name: client_field.name.into(),
         }),
@@ -112,7 +112,7 @@ pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkPro
     ArtifactPathAndContent {
         file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
         file_content: output_type_text,
-        type_and_field: Some(ObjectTypeAndFieldName {
+        type_and_field: Some(ParentObjectEntityNameAndSelectableName {
             type_name: parent_type.name,
             field_name: client_field.name.into(),
         }),

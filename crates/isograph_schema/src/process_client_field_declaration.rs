@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ConstExportName, IsographDirectiveName,
-    Location, ObjectTypeAndFieldName, RelativePathToSourceFile, SelectableName,
+    Location, ParentObjectEntityNameAndSelectableName, RelativePathToSourceFile, SelectableName,
     ServerObjectEntityName, TextSource, UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use intern::string_key::Intern;
@@ -240,7 +240,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         )
                     })
                     .collect::<Result<_, _>>()?,
-                type_and_field: ObjectTypeAndFieldName {
+                type_and_field: ParentObjectEntityNameAndSelectableName {
                     type_name: object.name,
                     field_name: client_scalar_selectable_name.0.into(),
                 },
@@ -383,7 +383,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         )
                     })
                     .collect::<Result<_, _>>()?,
-                type_and_field: ObjectTypeAndFieldName {
+                type_and_field: ParentObjectEntityNameAndSelectableName {
                     type_name: parent_object.name,
                     field_name: client_object_selectable_name.0.into(),
                 },

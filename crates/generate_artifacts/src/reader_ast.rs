@@ -1,6 +1,8 @@
 use std::collections::{BTreeSet, HashSet};
 
-use common_lang_types::{ClientScalarSelectableName, ObjectTypeAndFieldName, WithSpan};
+use common_lang_types::{
+    ClientScalarSelectableName, ParentObjectEntityNameAndSelectableName, WithSpan,
+};
 use isograph_lang_types::{
     DefinitionLocation, EmptyDirectiveSet, LoadableDirectiveParameters,
     ObjectSelectionDirectiveSet, RefetchQueryIndex, ScalarSelectionDirectiveSet,
@@ -224,7 +226,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
                             This is indicative of a bug in Isograph.",
                         );
 
-                    let type_and_field = ObjectTypeAndFieldName {
+                    let type_and_field = ParentObjectEntityNameAndSelectableName {
                         field_name: linked_field.name.item.into(),
                         type_name: object.name,
                     };

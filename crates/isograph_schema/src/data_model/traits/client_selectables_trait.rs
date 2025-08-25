@@ -1,5 +1,6 @@
 use common_lang_types::{
-    ClientSelectableName, ObjectTypeAndFieldName, SelectableName, ServerObjectEntityName, WithSpan,
+    ClientSelectableName, ParentObjectEntityNameAndSelectableName, SelectableName,
+    ServerObjectEntityName, WithSpan,
 };
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{Description, VariableDefinition};
@@ -14,7 +15,7 @@ use crate::{
 pub trait ClientScalarOrObjectSelectable {
     fn description(&self) -> Option<Description>;
     fn name(&self) -> ClientSelectableName;
-    fn type_and_field(&self) -> ObjectTypeAndFieldName;
+    fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName;
     fn parent_object_entity_name(&self) -> ServerObjectEntityName;
     fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>];
     fn refetch_strategy(&self) -> Option<&RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>;
@@ -36,7 +37,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         self.name.into()
     }
 
-    fn type_and_field(&self) -> ObjectTypeAndFieldName {
+    fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
         self.type_and_field
     }
 
@@ -86,7 +87,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         self.name.into()
     }
 
-    fn type_and_field(&self) -> ObjectTypeAndFieldName {
+    fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
         self.type_and_field
     }
 
