@@ -1,0 +1,143 @@
+==================
+Empty Selection Set
+==================
+
+field Type.Name {}
+
+---
+
+(source_file
+  (client_field_declaration
+    (field_name
+      (identifier)
+      (identifier))
+    (selection_set)))
+
+==================
+Empty Linked Field Selection Set
+==================
+
+field Type.Name {
+  linked {}
+}
+
+---
+
+(source_file
+  (client_field_declaration
+    (field_name
+      (identifier)
+      (identifier))
+    (selection_set
+      (field
+        (identifier)
+        (selection_set)))))
+
+==================
+Grabbag Field Set
+==================
+
+field Type.Name
+{
+  scalar
+  linked {
+    scalarWithComma,
+  }
+  linkedWithComma {
+    blah
+  },
+  multiple, on, the, same, line
+  including, youCanEndWithALinkedField {
+    butWhyWouldYouDoThat
+  }
+}
+
+---
+
+(source_file
+  (client_field_declaration
+    (field_name
+      (identifier)
+      (identifier))
+    (selection_set
+      (field
+        (identifier))
+      (field
+        (identifier)
+        (selection_set
+          (field
+            (identifier))))
+      (field
+        (identifier)
+        (selection_set
+          (field
+            (identifier))))
+      (field
+        (identifier))
+      (field
+        (identifier))
+      (field
+        (identifier))
+      (field
+        (identifier))
+      (field
+        (identifier))
+      (field
+        (identifier))
+      (field
+        (identifier)
+        (selection_set
+          (field
+            (identifier)))))))
+
+==================
+Multi Line Description
+==================
+
+field Type.Name
+"""
+Look, a multi-line description.
+
+Very cool.
+"""
+{}
+
+---
+
+(source_file
+  (client_field_declaration
+    (field_name
+      (identifier)
+      (identifier))
+    (description
+      (block_string))
+    (selection_set)))
+
+==================
+No Field Name
+:error
+==================
+
+field Type. {
+}
+
+---
+
+==================
+No Type Name
+:error
+==================
+
+field .Name {
+}
+
+---
+
+==================
+Unclosed
+:error
+==================
+
+field Type.Name {
+
+---
