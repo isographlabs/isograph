@@ -331,12 +331,7 @@ jobs:
     runs-on: ubuntu-latest
     if: >-
       github.event_name == 'push' &&
-      github.repository == 'isographlabs/isograph' &&
-      (
-        github.ref == 'refs/heads/main' ||
-        (github.ref_type == 'tag' && startsWith(github.ref_name, 'v')) ||
-        startsWith(github.ref, 'refs/heads/deploy/')
-      )
+      github.repository == 'isographlabs/isograph'
     needs: [all-checks-passed]
     steps:
       - uses: actions/checkout@v2
@@ -360,6 +355,10 @@ jobs:
         env:
           RELEASE_COMMIT_SHA: ${{ github.sha }}
 
+      - name: Re-install dependencies without frozen lockfile
+        # This is required because pnpm tries to re-install dependencies due to `verify-deps-before-run = install`,
+        # and in CI, this is always done with --frozen-lockfile.
+        run: pnpm install --no-frozen-lockfile --ignore-scripts
       # TODO do not rebuild the libs
       - name: Build
         run: pnpm compile-libs
