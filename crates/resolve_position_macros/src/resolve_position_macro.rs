@@ -186,8 +186,6 @@ fn parse_resolve_field_type(
     generics_map: &HashMap<syn::Ident, syn::GenericArgument>,
 ) -> Result<ResolveFieldInfoTypeWrapper, proc_macro2::TokenStream> {
     if let Some(last_segment) = path.segments.last() {
-
-
         if last_segment.ident == "WithSpan" {
             if let Some(inner_type) = extract_single_generic_type(last_segment) {
                 return Ok(ResolveFieldInfoTypeWrapper::None(Box::new(
@@ -273,7 +271,6 @@ fn generate_resolve_code_recursive(
 ) -> proc_macro2::TokenStream {
     match wrapper {
         ResolveFieldInfoTypeWrapper::None(inner) => match inner.deref() {
-
             ResolveFieldInfoType::WithSpan(inner_type) => quote! {
                 if #field_expr.span.contains(position) {
                     let new_parent = <#inner_type as ::resolve_position::ResolvePosition>::Parent::#struct_name(self.path(parent).into());
