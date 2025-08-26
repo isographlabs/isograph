@@ -134,6 +134,8 @@ jobs:
           node-version: 22
           cache: 'pnpm'
       - name: Install dependencies
+        # this used to be --frozen-lockfile --ignore-scripts
+        # see pnpm-workspace.yaml's onlyBuildDependencies key to see which packages need scripts
         run: pnpm install --frozen-lockfile
       - name: Build
         run: pnpm compile-libs
