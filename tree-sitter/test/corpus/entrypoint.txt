@@ -8,7 +8,7 @@ entrypoint Type.Name
 
 (source_file
   (entrypoint_declaration
-    (field_name
+    (parent_object_entity_name_and_selectable_name
       (identifier)
       (identifier))))
 
@@ -22,7 +22,7 @@ entrypoint Type.Name @foo
 
 (source_file
   (entrypoint_declaration
-    (field_name
+    (parent_object_entity_name_and_selectable_name
       (identifier)
       (identifier))
     (directives

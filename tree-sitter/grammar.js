@@ -21,11 +21,15 @@ module.exports = grammar({
         $.client_pointer_declaration,
       ),
     entrypoint_declaration: ($) =>
-      seq('entrypoint', $.field_name, optional($.directives)),
+      seq(
+        'entrypoint',
+        $.parent_object_entity_name_and_selectable_name,
+        optional($.directives),
+      ),
     client_field_declaration: ($) =>
       seq(
         'field',
-        $.field_name,
+        $.parent_object_entity_name_and_selectable_name,
         optional($.variable_definitions),
         optional($.directives),
         optional($.description),
@@ -34,7 +38,7 @@ module.exports = grammar({
     client_pointer_declaration: ($) =>
       seq(
         'pointer',
-        $.field_name,
+        $.parent_object_entity_name_and_selectable_name,
         'to',
         $.type_annotation,
         optional($.variable_definitions),
@@ -42,8 +46,12 @@ module.exports = grammar({
         optional($.description),
         $.selection_set,
       ),
-    field_name: ($) =>
-      seq(field('parent_type', $.identifier), '.', field('name', $.identifier)),
+    parent_object_entity_name_and_selectable_name: ($) =>
+      seq(
+        field('parent_object_entity_name', $.identifier),
+        '.',
+        field('selectable_name', $.identifier),
+      ),
     default_value: ($) => seq('=', $.value),
     variable_definitions: ($) => seq('(', commaSep($.variable_definition), ')'),
     variable_definition: ($) =>

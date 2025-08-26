@@ -123,7 +123,7 @@
           "named": true
         },
         {
-          "type": "field_name",
+          "type": "parent_object_entity_name_and_selectable_name",
           "named": true
         },
         {
@@ -154,7 +154,7 @@
           "named": true
         },
         {
-          "type": "field_name",
+          "type": "parent_object_entity_name_and_selectable_name",
           "named": true
         },
         {
@@ -253,7 +253,7 @@
           "named": true
         },
         {
-          "type": "field_name",
+          "type": "parent_object_entity_name_and_selectable_name",
           "named": true
         }
       ]
@@ -291,32 +291,6 @@
     }
   },
   {
-    "type": "field_name",
-    "named": true,
-    "fields": {
-      "name": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "identifier",
-            "named": true
-          }
-        ]
-      },
-      "parent_type": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "identifier",
-            "named": true
-          }
-        ]
-      }
-    }
-  },
-  {
     "type": "object",
     "named": true,
     "fields": {},
@@ -348,6 +322,32 @@
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "parent_object_entity_name_and_selectable_name",
+    "named": true,
+    "fields": {
+      "parent_object_entity_name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "selectable_name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {

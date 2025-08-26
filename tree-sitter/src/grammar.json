@@ -32,7 +32,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "field_name"
+          "name": "parent_object_entity_name_and_selectable_name"
         },
         {
           "type": "CHOICE",
@@ -57,7 +57,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "field_name"
+          "name": "parent_object_entity_name_and_selectable_name"
         },
         {
           "type": "CHOICE",
@@ -110,7 +110,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "field_name"
+          "name": "parent_object_entity_name_and_selectable_name"
         },
         {
           "type": "STRING",
@@ -162,12 +162,12 @@
         }
       ]
     },
-    "field_name": {
+    "parent_object_entity_name_and_selectable_name": {
       "type": "SEQ",
       "members": [
         {
           "type": "FIELD",
-          "name": "parent_type",
+          "name": "parent_object_entity_name",
           "content": {
             "type": "SYMBOL",
             "name": "identifier"
@@ -179,7 +179,7 @@
         },
         {
           "type": "FIELD",
-          "name": "name",
+          "name": "selectable_name",
           "content": {
             "type": "SYMBOL",
             "name": "identifier"

@@ -9,7 +9,7 @@ field Type.Name @component {
 
 (source_file
   (client_field_declaration
-    (field_name
+    (parent_object_entity_name_and_selectable_name
       (identifier)
       (identifier))
     (directives
@@ -29,7 +29,7 @@ field Type.Name {
 
 (source_file
   (client_field_declaration
-    (field_name
+    (parent_object_entity_name_and_selectable_name
       (identifier)
       (identifier))
     (selection_set
@@ -51,7 +51,7 @@ field Type.Name {
 
 (source_file
   (client_field_declaration
-    (field_name
+    (parent_object_entity_name_and_selectable_name
       (identifier)
       (identifier))
     (selection_set
@@ -78,7 +78,7 @@ field Type.Name {
 
 (source_file
   (client_field_declaration
-    (field_name
+    (parent_object_entity_name_and_selectable_name
       (identifier)
       (identifier))
     (selection_set

@@ -54,7 +54,7 @@ enum ts_symbol_identifiers {
   sym_entrypoint_declaration = 32,
   sym_client_field_declaration = 33,
   sym_client_pointer_declaration = 34,
-  sym_field_name = 35,
+  sym_parent_object_entity_name_and_selectable_name = 35,
   sym_default_value = 36,
   sym_variable_definitions = 37,
   sym_variable_definition = 38,
@@ -119,7 +119,7 @@ static const char * const ts_symbol_names[] = {
   [sym_entrypoint_declaration] = "entrypoint_declaration",
   [sym_client_field_declaration] = "client_field_declaration",
   [sym_client_pointer_declaration] = "client_pointer_declaration",
-  [sym_field_name] = "field_name",
+  [sym_parent_object_entity_name_and_selectable_name] = "parent_object_entity_name_and_selectable_name",
   [sym_default_value] = "default_value",
   [sym_variable_definitions] = "variable_definitions",
   [sym_variable_definition] = "variable_definition",
@@ -184,7 +184,7 @@ static const TSSymbol ts_symbol_map[] = {
   [sym_entrypoint_declaration] = sym_entrypoint_declaration,
   [sym_client_field_declaration] = sym_client_field_declaration,
   [sym_client_pointer_declaration] = sym_client_pointer_declaration,
-  [sym_field_name] = sym_field_name,
+  [sym_parent_object_entity_name_and_selectable_name] = sym_parent_object_entity_name_and_selectable_name,
   [sym_default_value] = sym_default_value,
   [sym_variable_definitions] = sym_variable_definitions,
   [sym_variable_definition] = sym_variable_definition,
@@ -355,7 +355,7 @@ static const TSSymbolMetadata ts_symbol_metadata[] = {
     .visible = true,
     .named = true,
   },
-  [sym_field_name] = {
+  [sym_parent_object_entity_name_and_selectable_name] = {
     .visible = true,
     .named = true,
   },
@@ -467,14 +467,14 @@ static const TSSymbolMetadata ts_symbol_metadata[] = {
 };
 
 enum ts_field_identifiers {
-  field_name = 1,
-  field_parent_type = 2,
+  field_parent_object_entity_name = 1,
+  field_selectable_name = 2,
 };
 
 static const char * const ts_field_names[] = {
   [0] = NULL,
-  [field_name] = "name",
-  [field_parent_type] = "parent_type",
+  [field_parent_object_entity_name] = "parent_object_entity_name",
+  [field_selectable_name] = "selectable_name",
 };
 
 static const TSMapSlice ts_field_map_slices[PRODUCTION_ID_COUNT] = {
@@ -483,8 +483,8 @@ static const TSMapSlice ts_field_map_slices[PRODUCTION_ID_COUNT] = {
 
 static const TSFieldMapEntry ts_field_map_entries[] = {
   [0] =
-    {field_name, 2},
-    {field_parent_type, 0},
+    {field_parent_object_entity_name, 0},
+    {field_selectable_name, 2},
 };
 
 static const TSSymbol ts_alias_sequences[PRODUCTION_ID_COUNT][MAX_ALIAS_SEQUENCE_LENGTH] = {
@@ -2103,7 +2103,7 @@ static const uint16_t ts_small_parse_table[] = {
     ACTIONS(258), 1,
       sym_identifier,
     STATE(2), 1,
-      sym_field_name,
+      sym_parent_object_entity_name_and_selectable_name,
   [1212] = 2,
     ACTIONS(11), 1,
       anon_sym_LBRACE,
@@ -2113,7 +2113,7 @@ static const uint16_t ts_small_parse_table[] = {
     ACTIONS(258), 1,
       sym_identifier,
     STATE(133), 1,
-      sym_field_name,
+      sym_parent_object_entity_name_and_selectable_name,
   [1226] = 1,
     ACTIONS(260), 2,
       anon_sym_COMMA,
@@ -2168,7 +2168,7 @@ static const uint16_t ts_small_parse_table[] = {
     ACTIONS(258), 1,
       sym_identifier,
     STATE(28), 1,
-      sym_field_name,
+      sym_parent_object_entity_name_and_selectable_name,
   [1297] = 2,
     ACTIONS(11), 1,
       anon_sym_LBRACE,
@@ -2440,8 +2440,8 @@ static const TSParseActionEntry ts_parse_actions[] = {
   [63] = {.entry = {.count = 1, .reusable = false}}, REDUCE(sym_type_annotation, 2, 0, 0),
   [65] = {.entry = {.count = 1, .reusable = true}}, REDUCE(sym_type_annotation, 4, 0, 0),
   [67] = {.entry = {.count = 1, .reusable = false}}, REDUCE(sym_type_annotation, 4, 0, 0),
-  [69] = {.entry = {.count = 1, .reusable = true}}, REDUCE(sym_field_name, 3, 0, 1),
-  [71] = {.entry = {.count = 1, .reusable = false}}, REDUCE(sym_field_name, 3, 0, 1),
+  [69] = {.entry = {.count = 1, .reusable = true}}, REDUCE(sym_parent_object_entity_name_and_selectable_name, 3, 0, 1),
+  [71] = {.entry = {.count = 1, .reusable = false}}, REDUCE(sym_parent_object_entity_name_and_selectable_name, 3, 0, 1),
   [73] = {.entry = {.count = 1, .reusable = true}}, REDUCE(aux_sym_directives_repeat1, 2, 0, 0),
   [75] = {.entry = {.count = 2, .reusable = true}}, REDUCE(aux_sym_directives_repeat1, 2, 0, 0), SHIFT_REPEAT(134),
   [78] = {.entry = {.count = 1, .reusable = false}}, REDUCE(aux_sym_directives_repeat1, 2, 0, 0),

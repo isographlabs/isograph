@@ -13,7 +13,7 @@ pointer User.bestFriend to User {
 
 (source_file
   (client_pointer_declaration
-    (field_name
+    (parent_object_entity_name_and_selectable_name
       (identifier)
       (identifier))
     (type_annotation
@@ -42,7 +42,7 @@ pointer User.bestFriend to User @directives @allowed @at @parse @time {
 
 (source_file
   (client_pointer_declaration
-    (field_name
+    (parent_object_entity_name_and_selectable_name
       (identifier)
       (identifier))
     (type_annotation
