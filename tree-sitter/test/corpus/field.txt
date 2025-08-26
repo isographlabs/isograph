@@ -34,63 +34,6 @@ field Type.Name {
         (selection_set)))))
 
 ==================
-Grabbag Field Set
-==================
-
-field Type.Name
-{
-  scalar
-  linked {
-    scalarWithComma,
-  }
-  linkedWithComma {
-    blah
-  },
-  multiple, on, the, same, line
-  including, youCanEndWithALinkedField {
-    butWhyWouldYouDoThat
-  }
-}
-
----
-
-(source_file
-  (client_field_declaration
-    (parent_object_entity_name_and_selectable_name
-      (identifier)
-      (identifier))
-    (selection_set
-      (field
-        (identifier))
-      (field
-        (identifier)
-        (selection_set
-          (field
-            (identifier))))
-      (field
-        (identifier)
-        (selection_set
-          (field
-            (identifier))))
-      (field
-        (identifier))
-      (field
-        (identifier))
-      (field
-        (identifier))
-      (field
-        (identifier))
-      (field
-        (identifier))
-      (field
-        (identifier))
-      (field
-        (identifier)
-        (selection_set
-          (field
-            (identifier)))))))
-
-==================
 Multi Line Description
 ==================
 
@@ -139,5 +82,27 @@ Unclosed
 ==================
 
 field Type.Name {
+
+---
+
+==================
+Grabbag Field Set
+:error
+==================
+
+field Type.Name
+{
+  scalar
+  linked {
+    scalarWithComma,
+  }
+  linkedWithComma {
+    blah
+  },
+  multiple, on, the, same, line
+  including, youCanEndWithALinkedField {
+    butWhyWouldYouDoThat
+  }
+}
 
 ---
