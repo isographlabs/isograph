@@ -32,16 +32,32 @@ Ok(
                                 },
                             ),
                         ),
-                        client_pointer_name: WithSpan {
+                        client_pointer_name: WithLocation {
+                            location: Embedded(
+                                EmbeddedLocation {
+                                    text_source: TextSource {
+                                        current_working_directory: CurrentWorkingDirectory,
+                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                            "crates/isograph_lang_parser/fixtures/pointer-basic.input.js",
+                                        ),
+                                        span: Some(
+                                            Span {
+                                                start: 28,
+                                                end: 114,
+                                            },
+                                        ),
+                                    },
+                                    span: Span {
+                                        start: 16,
+                                        end: 26,
+                                    },
+                                },
+                            ),
                             item: ClientObjectSelectableNameWrapper(
                                 ClientObjectSelectableName(
                                     "bestFriend",
                                 ),
                             ),
-                            span: Span {
-                                start: 16,
-                                end: 26,
-                            },
                         },
                         description: None,
                         selection_set: [

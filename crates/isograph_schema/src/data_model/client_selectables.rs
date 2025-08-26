@@ -2,7 +2,7 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName,
-    ParentObjectEntityNameAndSelectableName, ServerObjectEntityName, WithSpan,
+    ParentObjectEntityNameAndSelectableName, ServerObjectEntityName, WithLocation, WithSpan,
 };
 use isograph_lang_types::{Description, SelectionType, TypeAnnotation, VariableDefinition};
 
@@ -52,7 +52,7 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
-    pub name: ClientObjectSelectableName,
+    pub name: WithLocation<ClientObjectSelectableName>,
     pub target_object_entity_name: TypeAnnotation<ServerObjectEntityName>,
 
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,

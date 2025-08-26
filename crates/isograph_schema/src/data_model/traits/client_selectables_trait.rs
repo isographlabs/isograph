@@ -84,7 +84,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     }
 
     fn name(&self) -> ClientSelectableName {
-        self.name.into()
+        self.name.item.into()
     }
 
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
@@ -144,7 +144,7 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     }
 
     fn name(&self) -> SelectableName {
-        self.name.into()
+        self.name.item.into()
     }
 
     fn parent_object_entity_name(&self) -> ServerObjectEntityName {
