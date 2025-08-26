@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Deref};
 
 use proc_macro::TokenStream;
 use quote::quote;
@@ -56,31 +56,18 @@ fn handle_data_struct(
         .map(|field| get_resolve_field_info(field, &generics_map))
         .collect::<Result<Vec<_>, _>>()
     {
-        Ok(field_infos) => {
-            field_infos
-                .into_iter()
-                .flatten()
-                .map(|ResolveFieldInfo { inner_type, field_name, is_iter}| {
-                    if is_iter {
-                        quote! {
-                            for with_span in self.#field_name.iter() {
-                                if with_span.span.contains(position) {
-                                    let new_parent = <#inner_type as ::resolve_position::ResolvePosition>::Parent::#struct_name(self.path(parent).into());
-                                    return with_span.item.resolve(new_parent, position);
-                                }
-                            }
-                        }
-                    } else {
-                        quote! {
-                            if self.#field_name.span.contains(position) {
-                                let new_parent = <#inner_type as ::resolve_position::ResolvePosition>::Parent::#struct_name(self.path(parent).into());
-                                return self.#field_name.item.resolve(new_parent, position);
-                            }
-                        }
-                    }
-                })
-                .collect::<Vec<_>>()
-        }
+        Ok(field_infos) => field_infos
+            .into_iter()
+            .flatten()
+            .map(
+                |ResolveFieldInfo {
+                     field_name,
+                     field_type,
+                 }| {
+                    generate_resolve_code(&field_name, &field_type, &struct_name)
+                },
+            )
+            .collect::<Vec<_>>(),
         Err(e) => {
             return e.into();
         }
@@ -166,10 +153,75 @@ struct ResolvePositionArgs {
     self_type_generics: Option<syn::AngleBracketedGenericArguments>,
 }
 
+enum ResolveFieldInfoType {
+    WithSpan(syn::Type),
+}
+
+enum ResolveFieldInfoTypeWrapper {
+    None(Box<ResolveFieldInfoType>),
+    Vec(Box<ResolveFieldInfoTypeWrapper>),
+}
+
 struct ResolveFieldInfo {
-    inner_type: syn::Type,
     field_name: syn::Ident,
-    is_iter: bool,
+    field_type: ResolveFieldInfoTypeWrapper,
+}
+
+// Attempts to extract the single generic type from angle bracketed path arguments, e.g. X<Inner>
+fn extract_single_generic_type(segment: &syn::PathSegment) -> Option<&syn::Type> {
+    match &segment.arguments {
+        syn::PathArguments::AngleBracketed(args) => args.args.first().and_then(|arg| {
+            if let syn::GenericArgument::Type(ty) = arg {
+                Some(ty)
+            } else {
+                None
+            }
+        }),
+        _ => None,
+    }
+}
+
+fn parse_resolve_field_type(
+    path: &syn::Path,
+    generics_map: &HashMap<syn::Ident, syn::GenericArgument>,
+) -> Result<ResolveFieldInfoTypeWrapper, proc_macro2::TokenStream> {
+    if let Some(last_segment) = path.segments.last() {
+
+
+        if last_segment.ident == "WithSpan" {
+            if let Some(inner_type) = extract_single_generic_type(last_segment) {
+                return Ok(ResolveFieldInfoTypeWrapper::None(Box::new(
+                    ResolveFieldInfoType::WithSpan(replace_generics_in_type(
+                        inner_type.clone(),
+                        generics_map,
+                    )),
+                )));
+            }
+            return Err(
+                Error::new_spanned(last_segment, "WithSpan must have a type parameter")
+                    .to_compile_error(),
+            );
+        }
+
+        // Container types: Vec<T> or Option<T>
+        if last_segment.ident == "Vec" || last_segment.ident == "Option" {
+            if let Some(syn::Type::Path(syn::TypePath {
+                path: inner_path, ..
+            })) = extract_single_generic_type(last_segment)
+            {
+                // Recursively parse the inner type
+                let inner_wrapper = parse_resolve_field_type(inner_path, generics_map)?;
+
+                return Ok(ResolveFieldInfoTypeWrapper::Vec(Box::new(inner_wrapper)));
+            }
+        }
+    }
+
+    Err(Error::new_spanned(
+        path,
+        "Expected WithSpan<T>, Vec<T>, or Option<T> where T is a valid resolve field type",
+    )
+    .to_compile_error())
 }
 
 fn get_resolve_field_info(
@@ -191,60 +243,53 @@ fn get_resolve_field_info(
     })?;
 
     if let syn::Type::Path(syn::TypePath { path, .. }) = &field.ty {
-        // Check for direct WithSpan<T>
-        if let Some(last_segment) = path.segments.last() {
-            if last_segment.ident == "WithSpan" {
-                if let syn::PathArguments::AngleBracketed(args) = &last_segment.arguments {
-                    if let Some(syn::GenericArgument::Type(inner_type)) = args.args.first() {
-                        return Ok(Some(ResolveFieldInfo {
-                            inner_type: replace_generics_in_type(inner_type.clone(), generics_map),
-                            field_name,
-                            is_iter: false,
-                        }));
-                    }
-                }
-                return Err(Error::new_spanned(
-                    &field.ty,
-                    "#[resolve_field] field must be WithSpan<T> with a type parameter",
-                )
-                .to_compile_error());
-            }
+        match parse_resolve_field_type(path, generics_map) {
+            Ok(field_type) => Ok(Some(ResolveFieldInfo {
+                field_name,
+                field_type,
+            })),
+            Err(e) => Err(e),
+        }
+    } else {
+        Err(
+            Error::new_spanned(&field.ty, "#[resolve_field] fields must be path types")
+                .to_compile_error(),
+        )
+    }
+}
 
-            // Check for Vec<WithSpan<T>> or Option<WithSpan<T>>
-            if last_segment.ident == "Vec" || last_segment.ident == "Option" {
-                if let syn::PathArguments::AngleBracketed(args) = &last_segment.arguments {
-                    if let Some(syn::GenericArgument::Type(syn::Type::Path(inner_path))) =
-                        args.args.first()
-                    {
-                        if let Some(inner_segment) = inner_path.path.segments.last() {
-                            if inner_segment.ident == "WithSpan" {
-                                if let syn::PathArguments::AngleBracketed(inner_args) =
-                                    &inner_segment.arguments
-                                {
-                                    if let Some(syn::GenericArgument::Type(inner_type)) =
-                                        inner_args.args.first()
-                                    {
-                                        return Ok(Some(ResolveFieldInfo {
-                                            inner_type: replace_generics_in_type(
-                                                inner_type.clone(),
-                                                generics_map,
-                                            ),
-                                            field_name,
-                                            is_iter: true,
-                                        }));
-                                    }
-                                }
-                            }
-                        }
-                    }
+fn generate_resolve_code(
+    field_name: &syn::Ident,
+    wrapper: &ResolveFieldInfoTypeWrapper,
+    struct_name: &syn::Ident,
+) -> proc_macro2::TokenStream {
+    generate_resolve_code_recursive(wrapper, struct_name, quote!(self.#field_name))
+}
+
+fn generate_resolve_code_recursive(
+    wrapper: &ResolveFieldInfoTypeWrapper,
+    struct_name: &syn::Ident,
+    field_expr: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+    match wrapper {
+        ResolveFieldInfoTypeWrapper::None(inner) => match inner.deref() {
+
+            ResolveFieldInfoType::WithSpan(inner_type) => quote! {
+                if #field_expr.span.contains(position) {
+                    let new_parent = <#inner_type as ::resolve_position::ResolvePosition>::Parent::#struct_name(self.path(parent).into());
+                    return #field_expr.item.resolve(new_parent, position);
+                }
+            },
+        },
+
+        ResolveFieldInfoTypeWrapper::Vec(inner) => {
+            let inner_code = generate_resolve_code_recursive(inner, struct_name, quote!(item));
+
+            quote! {
+                for item in #field_expr.iter() {
+                    #inner_code
                 }
             }
         }
     }
-
-    Err(Error::new_spanned(
-        &field.ty,
-        "#[resolve_field] fields must be of type WithSpan<T>, Option<WithSpan<T>> or Vec<WithSpan<T>>",
-    )
-    .to_compile_error())
 }
