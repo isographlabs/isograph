@@ -50,30 +50,41 @@ fn handle_data_struct(
         }
     };
 
-    let attributes_to_resolve = data_struct
+    let attributes_to_resolve = match data_struct
         .fields
         .iter()
-        .flat_map(|field| get_resolve_field_info(field, &generics_map).ok())
-        .flatten()
-        .map(|ResolveFieldInfo { inner_type, field_name, is_iter}| {
-            if is_iter {
-                quote! {
-                    for with_span in self.#field_name.iter() {
-                        if with_span.span.contains(position) {
-                            let new_parent = <#inner_type as ::resolve_position::ResolvePosition>::Parent::#struct_name(self.path(parent).into());
-                            return with_span.item.resolve(new_parent, position);
+        .map(|field| get_resolve_field_info(field, &generics_map))
+        .collect::<Result<Vec<_>, _>>()
+    {
+        Ok(field_infos) => {
+            field_infos
+                .into_iter()
+                .flatten()
+                .map(|ResolveFieldInfo { inner_type, field_name, is_iter}| {
+                    if is_iter {
+                        quote! {
+                            for with_span in self.#field_name.iter() {
+                                if with_span.span.contains(position) {
+                                    let new_parent = <#inner_type as ::resolve_position::ResolvePosition>::Parent::#struct_name(self.path(parent).into());
+                                    return with_span.item.resolve(new_parent, position);
+                                }
+                            }
+                        }
+                    } else {
+                        quote! {
+                            if self.#field_name.span.contains(position) {
+                                let new_parent = <#inner_type as ::resolve_position::ResolvePosition>::Parent::#struct_name(self.path(parent).into());
+                                return self.#field_name.item.resolve(new_parent, position);
+                            }
                         }
                     }
-                }
-            } else {
-                quote! {
-                    if self.#field_name.span.contains(position) {
-                        let new_parent = <#inner_type as ::resolve_position::ResolvePosition>::Parent::#struct_name(self.path(parent).into());
-                        return self.#field_name.item.resolve(new_parent, position);
-                    }
-                }
-            }
-        });
+                })
+                .collect::<Vec<_>>()
+        }
+        Err(e) => {
+            return e.into();
+        }
+    };
 
     let output = quote! {
         impl ::resolve_position::ResolvePosition for #struct_name #self_type_generics {
@@ -199,7 +210,7 @@ fn get_resolve_field_info(
                 .to_compile_error());
             }
 
-            // Check for Vec<WithSpan<T>>
+            // Check for Vec<WithSpan<T>> or Option<WithSpan<T>>
             if last_segment.ident == "Vec" || last_segment.ident == "Option" {
                 if let syn::PathArguments::AngleBracketed(args) = &last_segment.arguments {
                     if let Some(syn::GenericArgument::Type(syn::Type::Path(inner_path))) =
@@ -233,7 +244,7 @@ fn get_resolve_field_info(
 
     Err(Error::new_spanned(
         &field.ty,
-        "#[resolve_field] fields must be of type WithSpan<T> or Vec<WithSpan<T>>",
+        "#[resolve_field] fields must be of type WithSpan<T>, Option<WithSpan<T>> or Vec<WithSpan<T>>",
     )
     .to_compile_error())
 }
