@@ -159,7 +159,7 @@ enum ResolveFieldInfoType {
 
 enum ResolveFieldInfoTypeWrapper {
     None(Box<ResolveFieldInfoType>),
-    Vec(Box<ResolveFieldInfoTypeWrapper>),
+    IteratorWrapper(Box<ResolveFieldInfoTypeWrapper>),
 }
 
 struct ResolveFieldInfo {
@@ -210,7 +210,9 @@ fn parse_resolve_field_type(
                 // Recursively parse the inner type
                 let inner_wrapper = parse_resolve_field_type(inner_path, generics_map)?;
 
-                return Ok(ResolveFieldInfoTypeWrapper::Vec(Box::new(inner_wrapper)));
+                return Ok(ResolveFieldInfoTypeWrapper::IteratorWrapper(Box::new(
+                    inner_wrapper,
+                )));
             }
         }
     }
@@ -279,7 +281,7 @@ fn generate_resolve_code_recursive(
             },
         },
 
-        ResolveFieldInfoTypeWrapper::Vec(inner) => {
+        ResolveFieldInfoTypeWrapper::IteratorWrapper(inner) => {
             let inner_code = generate_resolve_code_recursive(inner, struct_name, quote!(item));
 
             quote! {
