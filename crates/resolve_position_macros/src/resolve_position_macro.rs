@@ -154,6 +154,7 @@ struct ResolvePositionArgs {
 }
 
 enum ResolveFieldInfoType {
+    WithLocation(syn::Type),
     WithSpan(syn::Type),
 }
 
@@ -186,6 +187,23 @@ fn parse_resolve_field_type(
     generics_map: &HashMap<syn::Ident, syn::GenericArgument>,
 ) -> Result<ResolveFieldInfoTypeWrapper, proc_macro2::TokenStream> {
     if let Some(last_segment) = path.segments.last() {
+        // Base cases: WithLocation<T> or WithSpan<T>
+        if last_segment.ident == "WithLocation" {
+            if let Some(inner_type) = extract_single_generic_type(last_segment) {
+                return Ok(ResolveFieldInfoTypeWrapper::None(Box::new(
+                    ResolveFieldInfoType::WithLocation(replace_generics_in_type(
+                        inner_type.clone(),
+                        generics_map,
+                    )),
+                )));
+            }
+            return Err(Error::new_spanned(
+                last_segment,
+                "WithLocation must have a type parameter",
+            )
+            .to_compile_error());
+        }
+
         if last_segment.ident == "WithSpan" {
             if let Some(inner_type) = extract_single_generic_type(last_segment) {
                 return Ok(ResolveFieldInfoTypeWrapper::None(Box::new(
@@ -219,7 +237,7 @@ fn parse_resolve_field_type(
 
     Err(Error::new_spanned(
         path,
-        "Expected WithSpan<T>, Vec<T>, or Option<T> where T is a valid resolve field type",
+        "Expected WithLocation<T>, WithSpan<T>, Vec<T>, or Option<T> where T is a valid resolve field type",
     )
     .to_compile_error())
 }
@@ -273,6 +291,14 @@ fn generate_resolve_code_recursive(
 ) -> proc_macro2::TokenStream {
     match wrapper {
         ResolveFieldInfoTypeWrapper::None(inner) => match inner.deref() {
+            ResolveFieldInfoType::WithLocation(inner_type) => quote! {
+                if let Some(span) = #field_expr.location.span() {
+                    if span.contains(position) {
+                        let new_parent = <#inner_type as ::resolve_position::ResolvePosition>::Parent::#struct_name(self.path(parent).into());
+                        return #field_expr.item.resolve(new_parent, position);
+                    }
+                }
+            },
             ResolveFieldInfoType::WithSpan(inner_type) => quote! {
                 if #field_expr.span.contains(position) {
                     let new_parent = <#inner_type as ::resolve_position::ResolvePosition>::Parent::#struct_name(self.path(parent).into());
