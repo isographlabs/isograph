@@ -1,0 +1,103 @@
+==================
+On Definition
+==================
+
+field Type.Name @component {
+}
+
+---
+
+(source_file
+  (client_field_declaration
+    (parent_object_entity_name_and_selectable_name
+      (identifier)
+      (identifier))
+    (directives
+      (directive
+        (identifier)))
+    (selection_set)))
+
+==================
+On Scalar
+==================
+
+field Type.Name {
+  scalar @loadable
+}
+
+---
+
+(source_file
+  (client_field_declaration
+    (parent_object_entity_name_and_selectable_name
+      (identifier)
+      (identifier))
+    (selection_set
+      (field
+        (identifier)
+        (directives
+          (directive
+            (identifier)))))))
+
+==================
+On Scalar with arg
+==================
+
+field Type.Name {
+  scalar @loadable(lazyLoadArtifact: true)
+}
+
+---
+
+(source_file
+  (client_field_declaration
+    (parent_object_entity_name_and_selectable_name
+      (identifier)
+      (identifier))
+    (selection_set
+      (field
+        (identifier)
+        (directives
+          (directive
+            (identifier)
+            (arguments
+              (argument
+                (identifier)
+                (boolean)))))))))
+
+==================
+On Linked
+==================
+
+field Type.Name {
+  linked @loadable {
+  }
+}
+
+---
+
+(source_file
+  (client_field_declaration
+    (parent_object_entity_name_and_selectable_name
+      (identifier)
+      (identifier))
+    (selection_set
+      (field
+        (identifier)
+        (directives
+          (directive
+            (identifier)))
+        (selection_set)))))
+
+==================
+After open curly
+:error
+==================
+
+field Type.Name {
+  linked {
+    @wat
+  }
+}
+
+---

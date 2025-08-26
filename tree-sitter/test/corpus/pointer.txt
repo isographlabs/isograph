@@ -1,0 +1,68 @@
+==================
+Basic
+==================
+
+pointer User.bestFriend to User {
+  friends {
+    id
+    closeness
+  }
+}
+
+---
+
+(source_file
+  (client_pointer_declaration
+    (parent_object_entity_name_and_selectable_name
+      (identifier)
+      (identifier))
+    (type_annotation
+      (identifier))
+    (selection_set
+      (field
+        (identifier)
+        (selection_set
+          (field
+            (identifier))
+          (field
+            (identifier)))))))
+
+==================
+Directives
+==================
+
+pointer User.bestFriend to User @directives @allowed @at @parse @time {
+  friends {
+    id
+    closeness
+  }
+}
+
+---
+
+(source_file
+  (client_pointer_declaration
+    (parent_object_entity_name_and_selectable_name
+      (identifier)
+      (identifier))
+    (type_annotation
+      (identifier))
+    (directives
+      (directive
+        (identifier))
+      (directive
+        (identifier))
+      (directive
+        (identifier))
+      (directive
+        (identifier))
+      (directive
+        (identifier)))
+    (selection_set
+      (field
+        (identifier)
+        (selection_set
+          (field
+            (identifier))
+          (field
+            (identifier)))))))
