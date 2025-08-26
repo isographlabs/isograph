@@ -11,6 +11,8 @@ module.exports = grammar({
   name: 'isograph',
 
   supertypes: ($) => [$.declaration, $.value],
+  externals: ($) => [$._newline],
+  extras: () => [/[ \t\r\n\f\ufeff]/],
 
   rules: {
     source_file: ($) => $.declaration,
@@ -53,10 +55,17 @@ module.exports = grammar({
         field('selectable_name', $.identifier),
       ),
     default_value: ($) => seq('=', $.value),
-    variable_definitions: ($) => seq('(', commaSep($.variable_definition), ')'),
+    variable_definitions: ($) => seq('(', sep($.variable_definition, ','), ')'),
     variable_definition: ($) =>
       seq($.variable, ':', $.type_annotation, optional($.default_value)),
-    selection_set: ($) => seq('{', repeat($.field), '}'),
+    selection_set: ($) =>
+      seq(
+        '{',
+        optional($._newline),
+        sep($.field, $._newline),
+        optional($._newline),
+        '}',
+      ),
     field: ($) =>
       seq(
         optional($.alias),
@@ -66,7 +75,14 @@ module.exports = grammar({
         optional($.selection_set),
       ),
     alias: ($) => seq($.identifier, ':'),
-    arguments: ($) => seq('(', repeat($.argument), ')'),
+    arguments: ($) =>
+      seq(
+        '(',
+        optional($._newline),
+        sep($.argument, $._newline),
+        optional($._newline),
+        ')',
+      ),
     argument: ($) => seq($.identifier, ':', $.value),
     value: ($) =>
       choice($.variable, $.string, $.integer, $.object, $.null, $.boolean),
@@ -92,7 +108,14 @@ module.exports = grammar({
     integer: () => /-?(0|[1-9][0-9]*)/,
     boolean: () => choice('true', 'false'),
     null: () => 'null',
-    object: ($) => seq('{', repeat($.object_field), '}'),
+    object: ($) =>
+      seq(
+        '{',
+        optional($._newline),
+        sep($.object_field, $._newline),
+        optional($._newline),
+        '}',
+      ),
     object_field: ($) => seq($.identifier, ':', $.value),
     _escaped_character: () => /\\["\\/bfnrt]/,
     _escaped_unicode: () => /\\u[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]"/,
@@ -111,23 +134,25 @@ module.exports = grammar({
 });
 
 /**
- * Creates a rule to match one or more of the rules separated by a comma
+ * Creates a rule to match one or more of the rules separated by a separator
  *
  * @param {Rule} rule
+ * @param {Rule | string} separator
  *
  * @returns {SeqRule}
  */
-function commaSep1(rule) {
-  return seq(rule, repeat(seq(',', rule)));
+function sep1(rule, separator) {
+  return seq(rule, repeat(seq(separator, rule)));
 }
 
 /**
- * Creates a rule to optionally match one or more of the rules separated by a comma
+ * Creates a rule to optionally match one or more of the rules separated by a separator
  *
  * @param {Rule} rule
+ * @param {Rule | string} separator
  *
  * @returns {ChoiceRule}
  */
-function commaSep(rule) {
-  return optional(commaSep1(rule));
+function sep(rule, separator) {
+  return optional(sep1(rule, separator));
 }
