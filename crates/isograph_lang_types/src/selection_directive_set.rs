@@ -1,7 +1,5 @@
 use serde::Deserialize;
 
-use crate::LoadableDirectiveParameters;
-
 #[derive(Deserialize, Debug, Default, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct UpdatableDirectiveParameters {}
@@ -37,3 +35,12 @@ pub struct LoadableDirectiveSet {
 #[derive(Deserialize, Debug, Default, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct EmptyDirectiveSet {}
+
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Default, Hash)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LoadableDirectiveParameters {
+    #[serde(default)]
+    complete_selection_set: bool,
+    #[serde(default)]
+    pub lazy_load_artifact: bool,
+}

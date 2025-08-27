@@ -4,7 +4,6 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLTypeAnnotation;
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
-use serde::Deserialize;
 use std::fmt::Debug;
 
 use crate::{
@@ -59,12 +58,3 @@ pub struct ClientPointerDeclaration {
 
 pub type ClientPointerDeclarationPath<'a> =
     PositionResolutionPath<&'a ClientPointerDeclaration, ()>;
-
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy, Default, Hash)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct LoadableDirectiveParameters {
-    #[serde(default)]
-    complete_selection_set: bool,
-    #[serde(default)]
-    pub lazy_load_artifact: bool,
-}
