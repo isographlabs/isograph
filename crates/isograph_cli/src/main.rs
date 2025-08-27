@@ -104,8 +104,14 @@ fn configure_logger(log_level: LevelFilter) {
 }
 
 fn current_working_directory() -> CurrentWorkingDirectory {
-    std::env::current_dir()
-        .expect("Expected current working to exist")
+    let mut current_dir = std::env::current_dir().expect("Expected current working to exist");
+
+    if cfg!(target_os = "windows") {
+        current_dir = std::fs::canonicalize(current_dir)
+            .expect("Expected current working directory to be able to be canonicalized");
+    }
+
+    current_dir
         .to_str()
         .expect("Expected current working directory to be able to be stringified.")
         .intern()
