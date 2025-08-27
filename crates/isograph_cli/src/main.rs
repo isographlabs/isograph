@@ -108,7 +108,7 @@ fn current_working_directory() -> CurrentWorkingDirectory {
 
     if cfg!(target_os = "windows") {
         current_dir = std::fs::canonicalize(current_dir)
-            .expect("Expected current working directory to exist");
+            .expect("Expected current working directory to be able to be canonicalized");
     }
 
     current_dir
