@@ -30,7 +30,11 @@ async fn start_compiler(
     compile_command: CompileCommand,
     current_working_directory: CurrentWorkingDirectory,
 ) {
+    eprintln!("about to configure logger {:?}", compile_command.log_level);
+    info!("asdf");
     configure_logger(compile_command.log_level);
+    eprintln!("configured");
+    info!("asdf2");
     let config_location = compile_command
         .config
         .unwrap_or("./isograph.config.json".into());
