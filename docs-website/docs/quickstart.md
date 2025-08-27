@@ -95,8 +95,8 @@ module.exports = {
 };
 ```
 
-:::note What about SWC?
-Isograph currently requires a Babel plugin, but there is an [open, good first issue](https://github.com/isographlabs/isograph/issues/13) to make it work with SWC.
+:::note
+You can also use `swc`! See [this file](https://github.com/isographlabs/isograph/blob/7459c36ddd0c49b5386a7078db278ab84d5f9c83/demos/pet-demo/next.config.js#L7-L16). A good first issue would be actually publishing the swc plugin 😊
 :::
 
 ## Download the schema
