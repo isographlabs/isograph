@@ -67,7 +67,7 @@ jobs:
           packages: musl-tools # provides musl-gcc
           version: 1.0
       - name: 'Build isograph_cli with cargo (${{inputs.target}})'
-        run: pnpm exec turbo ${{ inputs.cross && 'cross' || 'build-compiler' }} -- --target ${{ inputs.target }} --release
+        run: pnpm exec turbo ${{ inputs.cross && 'cross' || 'build-compiler' }} -- --target ${{ inputs.target }} --release -p isograph_cli
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact-name }}
