@@ -1,7 +1,7 @@
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, IsoLiteralText, Location,
-    RelativePathToSourceFile, Span, TextSource, UnvalidatedTypeName, ValueKeyName, WithLocation,
-    WithSpan,
+    RelativePathToSourceFile, Span, TextSource, UnvalidatedTypeName, ValueKeyName,
+    WithEmbeddedLocation, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,

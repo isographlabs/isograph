@@ -308,7 +308,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             );
         let client_pointer_pointer_name_ws = client_pointer_declaration.item.client_pointer_name;
         let client_pointer_name = client_pointer_pointer_name_ws.item;
-        let client_pointer_name_span = client_pointer_pointer_name_ws.location.span();
+        let client_pointer_name_span = client_pointer_pointer_name_ws.location.span;
 
         let client_object_selectable_name =
             client_pointer_declaration.item.client_pointer_name.item;
@@ -370,7 +370,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 name: client_pointer_declaration
                     .item
                     .client_pointer_name
-                    .map(|client_object_selectable_name| *client_object_selectable_name),
+                    .map(|client_object_selectable_name| *client_object_selectable_name)
+                    .into_with_location(),
                 reader_selection_set: vec![],
 
                 variable_definitions: client_pointer_declaration
@@ -431,7 +432,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     parent_type_name: parent_object.name,
                     client_field_name: client_pointer_name.0.into(),
                 },
-                client_pointer_name_span.expect("Expected span to exist"),
+                client_pointer_name_span,
             ));
         }
 
