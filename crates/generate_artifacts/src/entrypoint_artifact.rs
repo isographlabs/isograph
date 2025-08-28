@@ -114,7 +114,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     file_extensions: GenerateFileExtensionsOption,
     persisted_documents: &mut Option<PersistedDocuments>,
 ) -> Vec<ArtifactPathAndContent> {
-    let query_name = entrypoint.name.into();
+    let query_name = entrypoint.name.item.into();
     // TODO when we do not call generate_entrypoint_artifact extraneously,
     // we can panic instead of using a default entrypoint type
     // TODO model this better so that the RootOperationName is somehow a

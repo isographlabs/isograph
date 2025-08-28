@@ -21,7 +21,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                             .intern()
                             .into(),
                     )),
-                    name: field_name,
+                    name: WithLocation::new(field_name, Location::generated()),
                     parent_object_entity_name,
                     variable_definitions: vec![],
                     reader_selection_set: vec![],

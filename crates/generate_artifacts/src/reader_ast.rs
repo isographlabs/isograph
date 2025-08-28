@@ -723,7 +723,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                             Some(Loadability::ImperativelyLoadedField(_)) => {
                                 paths.insert(PathToRefetchField {
                                     linked_fields: path.clone(),
-                                    field_name: client_field.name,
+                                    field_name: client_field.name.item,
                                 });
                             }
                             Some(Loadability::LoadablySelectedField(_)) => {

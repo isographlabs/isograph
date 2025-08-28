@@ -593,7 +593,7 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
         merged_selection_set: wrapped_selection_map,
         root_parent_object,
         variable_definitions: definitions_of_used_variables,
-        root_fetchable_field: entrypoint.name,
+        root_fetchable_field: entrypoint.name.item,
         refetch_query_index: RefetchQueryIndex(index as u32),
         root_operation_name,
         query_name,
@@ -1096,7 +1096,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
 ) {
     let path = PathToRefetchField {
         linked_fields: merge_traversal_state.traversal_path.clone(),
-        field_name: newly_encountered_scalar_client_selectable.name,
+        field_name: newly_encountered_scalar_client_selectable.name.item,
     };
 
     let info = PathToRefetchFieldInfo {
@@ -1112,7 +1112,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
             ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
         ),
         RootRefetchedPath {
-            field_name: newly_encountered_scalar_client_selectable.name,
+            field_name: newly_encountered_scalar_client_selectable.name.item,
             path_to_refetch_field_info: info,
         },
     );

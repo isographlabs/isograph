@@ -216,12 +216,13 @@ fn parse_client_field_declaration_inner(
             .parse_token_of_kind(IsographLangTokenKind::Period, semantic_token_legend::ST_DOT)
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
-        let client_field_name: WithSpan<ClientScalarSelectableName> = tokens
+        let client_field_name: WithEmbeddedLocation<ClientScalarSelectableName> = tokens
             .parse_string_key_type(
                 IsographLangTokenKind::Identifier,
                 semantic_token_legend::ST_CLIENT_SELECTABLE_NAME,
             )
-            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?
+            .to_with_embedded_location(text_source);
 
         let variable_definitions = parse_variable_definitions(tokens, text_source)?;
 

@@ -20,7 +20,7 @@ pub struct ClientFieldDeclaration {
     #[resolve_field]
     pub parent_type: WithSpan<ServerObjectEntityNameWrapper>,
     #[resolve_field]
-    pub client_field_name: WithSpan<ClientScalarSelectableNameWrapper>,
+    pub client_field_name: WithEmbeddedLocation<ClientScalarSelectableNameWrapper>,
     #[resolve_field]
     pub description: Option<WithSpan<Description>>,
     #[resolve_field]
