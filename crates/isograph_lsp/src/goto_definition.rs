@@ -84,11 +84,11 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 {
                     match selectable {
                         DefinitionLocation::Server(server_selectable) => {
-                            server_definition_location(db, &server_selectable.name.location)
+                            isograph_location_to_lsp_location(db, &server_selectable.name.location)
                                 .to_owned()
                         }
                         DefinitionLocation::Client(client_selectable) => {
-                            server_definition_location(db, &client_selectable.name.location)
+                            isograph_location_to_lsp_location(db, &client_selectable.name.location)
                                 .to_owned()
                         }
                     }
@@ -102,11 +102,11 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 {
                     match selectable {
                         DefinitionLocation::Server(server_selectable) => {
-                            server_definition_location(db, &server_selectable.name.location)
+                            isograph_location_to_lsp_location(db, &server_selectable.name.location)
                                 .to_owned()
                         }
                         DefinitionLocation::Client(client_selectable) => {
-                            server_definition_location(db, &client_selectable.name.location)
+                            isograph_location_to_lsp_location(db, &client_selectable.name.location)
                                 .to_owned()
                         }
                     }
@@ -125,7 +125,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[memo]
-fn server_definition_location<TNetworkProtocol: NetworkProtocol + 'static>(
+fn isograph_location_to_lsp_location<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     location: &Location,
 ) -> Option<lsp_types::Location> {
