@@ -2,27 +2,27 @@ use crate::format::char_index_to_position;
 use crate::hover::get_iso_literal_extraction_from_text_position_params;
 use crate::{lsp_runtime_error::LSPRuntimeResult, uri_file_path_ext::UriFilePathExt};
 use common_lang_types::{
-    relative_path_from_absolute_and_working_directory, strip_windows_long_path_prefix, Span,
+    relative_path_from_absolute_and_working_directory, Location, Span, TextSource,
 };
+use intern::string_key::Lookup;
 use isograph_compiler::CompilerState;
 use isograph_compiler::{get_validated_schema, process_iso_literal_extraction};
 use isograph_lang_types::{DefinitionLocation, IsographResolvedNode};
 use isograph_schema::IsographDatabase;
+use isograph_schema::NetworkProtocol;
 use isograph_schema::{
     get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
-    SchemaSource,
 };
-use isograph_schema::{NetworkProtocol, StandardSources};
 use lsp_types::request::GotoDefinition;
 use lsp_types::request::Request;
 use lsp_types::GotoDefinitionResponse;
-use lsp_types::Location;
 use lsp_types::Range;
 use lsp_types::{Position, Uri};
 use pico_macros::memo;
 use resolve_position::ResolvePosition;
 use std::borrow::Cow;
 use std::ops::Deref;
+use std::path::PathBuf;
 use std::str::FromStr;
 
 pub fn on_goto_definition<TNetworkProtocol: NetworkProtocol + 'static>(
@@ -44,7 +44,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     url: Uri,
     position: Position,
-) -> LSPRuntimeResult<Option<Location>> {
+) -> LSPRuntimeResult<Option<lsp_types::Location>> {
     let current_working_directory = db.get_current_working_directory();
 
     let relative_path_to_source_file = relative_path_from_absolute_and_working_directory(
@@ -84,10 +84,13 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 {
                     match selectable {
                         DefinitionLocation::Server(server_selectable) => {
-                            server_definition_location(db, &server_selectable.name.location.span())
+                            server_definition_location(db, &server_selectable.name.location)
                                 .to_owned()
                         }
-                        DefinitionLocation::Client(_) => None,
+                        DefinitionLocation::Client(client_selectable) => {
+                            server_definition_location(db, &client_selectable.name.location)
+                                .to_owned()
+                        }
                     }
                 } else {
                     None
@@ -99,10 +102,13 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 {
                     match selectable {
                         DefinitionLocation::Server(server_selectable) => {
-                            server_definition_location(db, &server_selectable.name.location.span())
+                            server_definition_location(db, &server_selectable.name.location)
                                 .to_owned()
                         }
-                        DefinitionLocation::Client(_) => None,
+                        DefinitionLocation::Client(client_selectable) => {
+                            server_definition_location(db, &client_selectable.name.location)
+                                .to_owned()
+                        }
                     }
                 } else {
                     None
@@ -121,32 +127,55 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
 #[memo]
 fn server_definition_location<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
-    span: &Option<Span>,
-) -> Option<Location> {
-    let binding = strip_windows_long_path_prefix(&db.get_isograph_config().schema.absolute_path);
-    let schema_path = binding.to_str()?;
+    location: &Location,
+) -> Option<lsp_types::Location> {
+    match location {
+        Location::Generated => None,
+        Location::Embedded(location) => {
+            let path_buf = PathBuf::from(db.get_current_working_directory().lookup())
+                .join(location.text_source.relative_path_to_source_file.lookup());
 
-    let normalized_schema_path = if cfg!(windows) {
-        Cow::Owned(schema_path.replace("\\", "/"))
-    } else {
-        Cow::Borrowed(schema_path)
-    };
+            let path = path_buf.to_str()?;
 
-    let uri = Uri::from_str(&format!("file:///{normalized_schema_path}"));
+            let normalized_path = if cfg!(windows) {
+                Cow::Owned(
+                    path.strip_prefix(r"\\?\")
+                        .unwrap_or(path)
+                        .replace("\\", "/"),
+                )
+            } else {
+                Cow::Borrowed(path)
+            };
 
-    let StandardSources {
-        schema_source_id, ..
-    } = db.get_standard_sources();
+            let uri = Uri::from_str(&format!("file:///{normalized_path}")).ok()?;
 
-    let SchemaSource { content, .. } = db.get(*schema_source_id);
+            let (_, content) = TextSource {
+                span: None,
+                ..location.text_source
+            }
+            .read_to_string();
 
-    Some(Location {
-        uri: uri.ok()?,
-        range: span
-            .map(|span| Range {
-                start: char_index_to_position(content, span.start.try_into().unwrap()),
-                end: char_index_to_position(content, span.end.try_into().unwrap()),
+            let text_source_start = location
+                .text_source
+                .span
+                .map(|span| span.start)
+                .unwrap_or_default();
+
+            Some(lsp_types::Location {
+                uri,
+                range: Range {
+                    start: char_index_to_position(
+                        &content,
+                        (text_source_start + location.span.start)
+                            .try_into()
+                            .unwrap(),
+                    ),
+                    end: char_index_to_position(
+                        &content,
+                        (text_source_start + location.span.end).try_into().unwrap(),
+                    ),
+                },
             })
-            .unwrap_or_default(),
-    })
+        }
+    }
 }

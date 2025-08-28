@@ -1,9 +1,5 @@
 use intern::string_key::{Intern, Lookup};
-use std::{
-    error::Error,
-    fmt,
-    path::{Path, PathBuf},
-};
+use std::{error::Error, fmt, path::PathBuf};
 
 use crate::{
     text_with_carats::text_with_carats, CurrentWorkingDirectory, RelativePathToSourceFile, Span,
@@ -228,31 +224,11 @@ impl<T> From<WithEmbeddedLocation<T>> for WithLocation<T> {
     }
 }
 
-pub fn strip_windows_long_path_prefix(path: &Path) -> &Path {
-    #[cfg(target_os = "windows")]
-    {
-        if let Ok(stripped) = path.strip_prefix(r"\\?\") {
-            return stripped;
-        }
-    }
-    path
-}
-
-pub fn diff_paths_with_prefix<P, B>(path: P, base: B) -> Option<PathBuf>
-where
-    P: AsRef<Path>,
-    B: AsRef<Path>,
-{
-    let clean_path = strip_windows_long_path_prefix(path.as_ref());
-
-    pathdiff::diff_paths(clean_path, base)
-}
-
 pub fn relative_path_from_absolute_and_working_directory(
     current_working_directory: CurrentWorkingDirectory,
     absolute_path: &PathBuf,
 ) -> RelativePathToSourceFile {
-    diff_paths_with_prefix(
+    pathdiff::diff_paths(
         absolute_path,
         PathBuf::from(current_working_directory.lookup()),
     )
