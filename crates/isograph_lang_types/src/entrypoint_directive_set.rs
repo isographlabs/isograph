@@ -15,6 +15,44 @@ pub struct LazyLoadDirectiveSet {
     pub lazy_load: LazyLoadDirectiveParameters,
 }
 
-#[derive(Deserialize, Debug, Default, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
+#[derive(Deserialize, Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
+#[serde(from = "LazyLoadDirectiveParametersInput")]
+pub struct LazyLoadDirectiveParameters {
+    #[serde(default)]
+    pub reader: bool,
+    #[serde(default)]
+    pub normalization: bool,
+}
+
+#[derive(Deserialize, Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct LazyLoadDirectiveParameters {}
+struct LazyLoadDirectiveParametersInput {
+    #[serde(default)]
+    reader: Option<bool>,
+    #[serde(default)]
+    normalization: Option<bool>,
+}
+
+impl From<LazyLoadDirectiveParametersInput> for LazyLoadDirectiveParameters {
+    fn from(value: LazyLoadDirectiveParametersInput) -> Self {
+        match value {
+            LazyLoadDirectiveParametersInput {
+                reader: None,
+                normalization: None,
+            } => Self::default(),
+            _ => Self {
+                reader: value.reader.unwrap_or(false),
+                normalization: value.normalization.unwrap_or(false),
+            },
+        }
+    }
+}
+
+impl Default for LazyLoadDirectiveParameters {
+    fn default() -> Self {
+        Self {
+            reader: true,
+            normalization: true,
+        }
+    }
+}

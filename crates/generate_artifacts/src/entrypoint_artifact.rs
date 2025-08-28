@@ -6,8 +6,8 @@ use common_lang_types::{
 };
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
-    DefinitionLocation, EmptyDirectiveSet, EntrypointDirectiveSet, LazyLoadDirectiveParameters,
-    LazyLoadDirectiveSet, ScalarSelectionDirectiveSet, SelectionType,
+    DefinitionLocation, EmptyDirectiveSet, EntrypointDirectiveSet, ScalarSelectionDirectiveSet,
+    SelectionType,
 };
 use isograph_schema::{
     create_merged_selection_map_for_field_and_insert_into_global_map,
@@ -404,7 +404,7 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
     let (normalization_ast_type_name, normalization_ast_import, normalization_ast_code) = {
         let file_path = format!("'./{normalization_text_file_name}{ts_file_extension}'");
         match directive_set {
-            EntrypointDirectiveSet::LazyLoad(LazyLoadDirectiveSet { lazy_load: LazyLoadDirectiveParameters {} }) => (
+            EntrypointDirectiveSet::LazyLoad(directive_set) if directive_set.lazy_load.normalization => (
                 "NormalizationAstLoader",
                 "".to_string(),
                 format!(
@@ -414,7 +414,7 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
                      {indent}  }},"
                 ),
             ),
-            EntrypointDirectiveSet::None(_) => (
+            _ => (
                 "NormalizationAst",
                 format!("import normalizationAst from {file_path};\n"),
                 format!("{indent}  normalizationAst,"),
