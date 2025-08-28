@@ -190,7 +190,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .expect("Expected type to exist");
         let client_field_field_name_ws = client_field_declaration.item.client_field_name;
         let client_field_name = client_field_field_name_ws.item;
-        let client_field_name_span = client_field_field_name_ws.span;
+        let client_field_name_span = client_field_field_name_ws.location.span;
         let client_scalar_selectable_name = client_field_declaration.item.client_field_name.item;
 
         if self
@@ -224,7 +224,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             (object.name, client_scalar_selectable_name.0),
             ClientScalarSelectable {
                 description: client_field_declaration.item.description.map(|x| x.item),
-                name: client_scalar_selectable_name.0,
+                name: client_field_declaration
+                    .item
+                    .client_field_name
+                    .map(|client_scalar_selectable_name| *client_scalar_selectable_name)
+                    .into_with_location(),
                 reader_selection_set: vec![],
                 variant,
                 variable_definitions: client_field_declaration

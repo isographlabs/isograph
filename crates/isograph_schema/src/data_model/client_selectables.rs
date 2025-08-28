@@ -27,7 +27,7 @@ pub type ClientSelectable<'a, TNetworkProtocol> = SelectionType<
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
-    pub name: ClientScalarSelectableName,
+    pub name: WithLocation<ClientScalarSelectableName>,
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 
     // None -> not refetchable

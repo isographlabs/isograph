@@ -221,7 +221,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         let mutation_client_scalar_selectable = ClientScalarSelectable {
             description,
-            name: client_field_scalar_selection_name.unchecked_conversion(),
+            name: WithLocation::new(
+                client_field_scalar_selection_name.unchecked_conversion(),
+                Location::generated(),
+            ),
             reader_selection_set: vec![],
 
             variant: ClientFieldVariant::ImperativelyLoadedField(ImperativelyLoadedFieldVariant {
@@ -245,7 +248,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         self.client_scalar_selectables.insert(
             (
                 maybe_abstract_parent_object_entity_name,
-                mutation_client_scalar_selectable.name,
+                mutation_client_scalar_selectable.name.item,
             ),
             mutation_client_scalar_selectable,
         );

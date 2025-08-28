@@ -18,16 +18,30 @@ Ok(
                                 end: 13,
                             },
                         },
-                        client_field_name: WithSpan {
+                        client_field_name: WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/field-multi-line-description.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 31,
+                                            end: 115,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 14,
+                                    end: 18,
+                                },
+                            },
                             item: ClientScalarSelectableNameWrapper(
                                 ClientScalarSelectableName(
                                     "Name",
                                 ),
                             ),
-                            span: Span {
-                                start: 14,
-                                end: 18,
-                            },
                         },
                         description: Some(
                             WithSpan {

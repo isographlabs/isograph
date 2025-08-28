@@ -77,7 +77,7 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
         file_content: reader_content,
         type_and_field: Some(ParentObjectEntityNameAndSelectableName {
             type_name: parent_type.name,
-            field_name: client_field.name.into(),
+            field_name: client_field.name.item.into(),
         }),
     }
 }
@@ -101,7 +101,7 @@ pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkPro
         let output_type = client_field_output_type;
         format!(
             "export type {}__{}__output_type = {};",
-            parent_type_name, client_field.name, output_type
+            parent_type_name, client_field.name.item, output_type
         )
     };
     let output_type_text = format!(
@@ -114,7 +114,7 @@ pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkPro
         file_content: output_type_text,
         type_and_field: Some(ParentObjectEntityNameAndSelectableName {
             type_name: parent_type.name,
-            field_name: client_field.name.into(),
+            field_name: client_field.name.item.into(),
         }),
     }
 }

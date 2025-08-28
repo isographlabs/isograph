@@ -664,7 +664,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .flat_map(|field| match field.variant {
                 ClientFieldVariant::Link => None,
                 ClientFieldVariant::UserWritten(info) => Some((
-                    SelectionType::Scalar((field.parent_object_entity_name, field.name)),
+                    SelectionType::Scalar((field.parent_object_entity_name, field.name.item)),
                     SelectionType::Scalar(field),
                     info.client_field_directive_set,
                 )),
