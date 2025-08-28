@@ -1,51 +1,7 @@
 import { iso } from '@iso';
-import { FragmentReader, useImperativeReference } from '@isograph/react';
 import React from 'react';
-import { ErrorBoundary } from './ErrorBoundary';
 
-export const FavoritePhraseLoader = iso(`
-  field Pet.FavoritePhraseLoader @component {
-    id
-  }
-`)(({ data: pet }) => {
-  const { fragmentReference, loadFragmentReference } = useImperativeReference(
-    iso(`entrypoint Query.PetFavoritePhrase @lazyLoad`),
-  );
-
-  return (
-    <>
-      {fragmentReference == null ? (
-        <button
-          onClick={() =>
-            loadFragmentReference(
-              { id: pet.id },
-              {
-                shouldFetch: 'Yes',
-                onComplete: (data) => {
-                  console.log(
-                    'Successfully loaded favorite phrase and received this component',
-                    data,
-                  );
-                },
-                onError: () => {
-                  console.log('Error when loading favorite phrase');
-                },
-              },
-            )
-          }
-        >
-          Reveal favorite phrase
-        </button>
-      ) : (
-        <ErrorBoundary>
-          <React.Suspense fallback="Loading favorite phrase...">
-            <FragmentReader fragmentReference={fragmentReference} />
-          </React.Suspense>
-        </ErrorBoundary>
-      )}
-    </>
-  );
-});
+console.log('Query.PetFavoritePhrase bundle being loaded!');
 
 export const PetFavoritePhrase = iso(`
   field Query.PetFavoritePhrase($id: ID!) @component {
