@@ -113,7 +113,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let processed_field_map_items = skip_arguments_contained_in_field_map(
             self,
             mutation_field_arguments.clone(),
-            mutation_field_payload_type_name,
+            mutation_field_payload_type_name.item,
             expose_field_to_insert.parent_object_name,
             client_field_scalar_selection_name,
             // TODO don't clone
@@ -206,7 +206,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                                     "Expected entity to exist. \
                                     This is indicative of a bug in Isograph.",
                                 )
-                                .name,
+                                .name.item,
                         )
                     }
                 }
@@ -238,16 +238,16 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             }),
             variable_definitions: vec![],
             type_and_field: ParentObjectEntityNameAndSelectableName {
-                type_name: maybe_abstract_parent_object_entity_name.unchecked_conversion(), // e.g. Pet
+                type_name: maybe_abstract_parent_object_entity_name.item.unchecked_conversion(), // e.g. Pet
                 field_name: client_field_scalar_selection_name, // set_pet_best_friend
             },
-            parent_object_entity_name: maybe_abstract_parent_object_entity_name,
+            parent_object_entity_name: maybe_abstract_parent_object_entity_name.item,
             refetch_strategy: None,
             network_protocol: std::marker::PhantomData,
         };
         self.client_scalar_selectables.insert(
             (
-                maybe_abstract_parent_object_entity_name,
+                maybe_abstract_parent_object_entity_name.item,
                 mutation_client_scalar_selectable.name.item,
             ),
             mutation_client_scalar_selectable,
@@ -255,13 +255,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         self.insert_client_field_on_object(
             client_field_scalar_selection_name,
-            maybe_abstract_parent_object_entity_name,
+            maybe_abstract_parent_object_entity_name.item,
             mutation_field_client_field_name,
-            mutation_field_payload_type_name,
+            mutation_field_payload_type_name.item,
         )?;
         Ok(UnprocessedClientFieldItem {
             client_field_name: mutation_field_client_field_name,
-            parent_object_entity_name: maybe_abstract_parent_object_entity_name,
+            parent_object_entity_name: maybe_abstract_parent_object_entity_name.item,
             reader_selection_set: vec![],
             refetch_strategy: Some(RefetchStrategy::UseRefetchField(
                 generate_refetch_field_strategy(

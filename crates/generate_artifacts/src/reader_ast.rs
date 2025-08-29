@@ -129,7 +129,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                                     "Expected entity to exist. \
                                     This is indicative of a bug in Isograph.",
                                 );
-                            NormalizationKey::InlineFragment(target_object_entity.name)
+                            NormalizationKey::InlineFragment(target_object_entity.name.item)
                         }
                     };
 
@@ -228,7 +228,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
 
                     let type_and_field = ParentObjectEntityNameAndSelectableName {
                         field_name: linked_field.name.item.into(),
-                        type_name: object.name,
+                        type_name: object.name.item,
                     };
 
                     let reader_artifact_import_name =
@@ -791,7 +791,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                                             "Expected entity to exist. \
                                             This is indicative of a bug in Isograph.",
                                         );
-                                    NormalizationKey::InlineFragment(target_object_entity.name)
+                                    NormalizationKey::InlineFragment(target_object_entity.name.item)
                                 }
                             };
 

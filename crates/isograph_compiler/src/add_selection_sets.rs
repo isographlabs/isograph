@@ -227,7 +227,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                         .type_and_field()
                         .type_name,
                     client_field_name: top_level_field_or_pointer.type_and_field().field_name,
-                    field_parent_type_name: selection_parent_object.name,
+                    field_parent_type_name: selection_parent_object.name.item,
                     field_name: scalar_selection.name.item.into(),
                     client_type: top_level_field_or_pointer.client_type().to_string(),
                 },
@@ -276,9 +276,9 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                                     .type_and_field()
                                     .type_name,
                                 client_field_name: top_level_field_or_pointer.name().into(),
-                                field_parent_type_name: selection_parent_object.name,
+                                field_parent_type_name: selection_parent_object.name.item,
                                 field_name: scalar_selection.name.item.into(),
-                                target_type_name: object.name.into(),
+                                target_type_name: object.name.item.into(),
                                 client_type: top_level_field_or_pointer.client_type().to_string(),
                                 field_type: top_level_field_or_pointer.client_type(),
                             },
@@ -298,7 +298,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                             .type_and_field()
                             .type_name,
                         client_field_name: top_level_field_or_pointer.type_and_field().field_name,
-                        field_parent_type_name: selection_parent_object.name,
+                        field_parent_type_name: selection_parent_object.name.item,
                         field_name: scalar_selection.name.item.into(),
                         client_type: top_level_field_or_pointer.client_type().to_string(),
                     },
@@ -342,7 +342,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                         .type_and_field()
                         .type_name,
                     client_field_name: top_level_field_or_pointer.type_and_field().field_name,
-                    field_parent_type_name: selection_parent_object.name,
+                    field_parent_type_name: selection_parent_object.name.item,
                     field_name: object_selection.name.item.into(),
                     client_type: top_level_field_or_pointer.client_type().to_string(),
                 },
@@ -380,7 +380,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                                     .type_and_field()
                                     .type_name,
                                 client_field_name: top_level_field_or_pointer.name().into(),
-                                field_parent_type_name: selection_parent_object.name,
+                                field_parent_type_name: selection_parent_object.name.item,
                                 field_name: object_selection.name.item.into(),
                                 target_type_name: server_scalar.name.item.into(),
                                 client_type: top_level_field_or_pointer.client_type().to_string(),
@@ -413,7 +413,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                             .type_and_field()
                             .type_name,
                         client_field_name: top_level_field_or_pointer.type_and_field().field_name,
-                        field_parent_type_name: selection_parent_object.name,
+                        field_parent_type_name: selection_parent_object.name.item,
                         field_name: object_selection.name.item.into(),
                         client_type: top_level_field_or_pointer.client_type().to_string(),
                     },

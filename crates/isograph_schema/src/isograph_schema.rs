@@ -241,7 +241,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 },
                 None => {
                     return Err(CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
-                        primary_type_name: current_entity.name,
+                        primary_type_name: current_entity.name.item,
                         field_name: selection_name.unchecked_conversion(),
                     })
                 }
@@ -332,7 +332,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 },
                 None => {
                     return Err(CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
-                        primary_type_name: current_entity.name,
+                        primary_type_name: current_entity.name.item,
                         field_name: selection_name.unchecked_conversion(),
                     })
                 }
@@ -460,7 +460,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 );
             return Err(CreateAdditionalFieldsError::DuplicateField {
                 field_name: server_scalar_selectable.name.item.into(),
-                parent_type: parent_object.name,
+                parent_type: parent_object.name.item,
             });
         }
 
@@ -518,7 +518,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 );
             return Err(CreateAdditionalFieldsError::DuplicateField {
                 field_name: next_object_name.item.into(),
-                parent_type: parent_object.name,
+                parent_type: parent_object.name.item,
             });
         }
 
@@ -753,23 +753,23 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
         if self
             .defined_entities
             .insert(
-                server_object_entity.name.into(),
-                SelectionType::Object(server_object_entity.name),
+                server_object_entity.name.item.into(),
+                SelectionType::Object(server_object_entity.name.item),
             )
             .is_some()
         {
             return Err(WithLocation::new(
                 CreateAdditionalFieldsError::DuplicateTypeDefinition {
                     type_definition_type: "object",
-                    type_name: server_object_entity.name.into(),
+                    type_name: server_object_entity.name.item.into(),
                 },
                 name_location,
             ));
         }
 
         self.server_objects
-            .insert(server_object_entity.name, server_object_entity);
-        Ok(name)
+            .insert(server_object_entity.name.item, server_object_entity);
+        Ok(name.item)
     }
 }
 

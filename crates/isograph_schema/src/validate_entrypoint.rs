@@ -191,7 +191,7 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
             DefinitionLocation::Client(SelectionType::Object(_))
             | DefinitionLocation::Server(_) => Err(WithLocation::new(
                 ValidateEntrypointDeclarationError::FieldMustBeClientField {
-                    parent_type_name: parent_object.name,
+                    parent_type_name: parent_object.name.item,
                     client_field_name: field_name.item,
                 },
                 Location::new(text_source, field_name.span),
@@ -203,7 +203,7 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
         },
         None => Err(WithLocation::new(
             ValidateEntrypointDeclarationError::ClientFieldMustExist {
-                parent_type_name: parent_object.name,
+                parent_type_name: parent_object.name.item,
                 client_field_name: field_name.item,
             },
             Location::new(text_source, field_name.span),

@@ -211,7 +211,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             // Did not insert, so this object already has a field with the same name :(
             return Err(WithSpan::new(
                 ProcessClientFieldDeclarationError::ParentAlreadyHasField {
-                    parent_type_name: object.name,
+                    parent_type_name: object.name.item,
                     client_field_name: client_field_name.0.into(),
                 },
                 client_field_name_span,
@@ -221,7 +221,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let variant = get_client_variant(&client_field_declaration.item);
 
         self.client_scalar_selectables.insert(
-            (object.name, client_scalar_selectable_name.0),
+            (object.name.item, client_scalar_selectable_name.0),
             ClientScalarSelectable {
                 description: client_field_declaration.item.description.map(|x| x.item),
                 name: client_field_declaration
@@ -239,13 +239,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         validate_variable_definition(
                             &self.server_entity_data.defined_entities,
                             variable_definition,
-                            object.name,
+                            object.name.item,
                             client_field_name.0.into(),
                         )
                     })
                     .collect::<Result<_, _>>()?,
                 type_and_field: ParentObjectEntityNameAndSelectableName {
-                    type_name: object.name,
+                    type_name: object.name.item,
                     field_name: client_scalar_selectable_name.0.into(),
                 },
 
@@ -271,7 +271,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 vec![id_selection()],
                 query_id,
                 vec![
-                    WrappedSelectionMapSelection::InlineFragment(object.name),
+                    WrappedSelectionMapSelection::InlineFragment(object.name.item),
                     WrappedSelectionMapSelection::LinkedField {
                         server_object_selectable_name: *NODE_FIELD_NAME,
                         arguments: id_top_level_arguments(),
@@ -355,7 +355,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         vec![],
                         query_id,
                         vec![
-                            WrappedSelectionMapSelection::InlineFragment(to_object.name),
+                            WrappedSelectionMapSelection::InlineFragment(to_object.name.item),
                             WrappedSelectionMapSelection::LinkedField {
                                 server_object_selectable_name: *NODE_FIELD_NAME,
                                 arguments: id_top_level_arguments(),
@@ -386,13 +386,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         validate_variable_definition(
                             &self.server_entity_data.defined_entities,
                             variable_definition,
-                            parent_object.name,
+                            parent_object.name.item,
                             client_pointer_name.0.into(),
                         )
                     })
                     .collect::<Result<_, _>>()?,
                 type_and_field: ParentObjectEntityNameAndSelectableName {
-                    type_name: parent_object.name,
+                    type_name: parent_object.name.item,
                     field_name: client_object_selectable_name.0.into(),
                 },
 
@@ -433,7 +433,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             // Did not insert, so this object already has a field with the same name :(
             return Err(WithSpan::new(
                 ProcessClientFieldDeclarationError::ParentAlreadyHasField {
-                    parent_type_name: parent_object.name,
+                    parent_type_name: parent_object.name.item,
                     client_field_name: client_pointer_name.0.into(),
                 },
                 client_pointer_name_span,

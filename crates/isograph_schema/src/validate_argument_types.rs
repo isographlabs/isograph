@@ -526,7 +526,7 @@ fn id_annotation_to_typename_annotation<TNetworkProtocol: NetworkProtocol>(
                 "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
             )
-            .name
+            .name.item
             .into(),
     })
 }
@@ -547,7 +547,7 @@ fn enum_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                             "Expected entity to exist. \
                             This is indicative of a bug in Isograph.",
                         )
-                        .name
+                        .name.item
                         .into()
                 }),
             ));

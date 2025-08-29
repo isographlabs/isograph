@@ -337,7 +337,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
                     graphql_input_value_definition_to_variable_definition(
                         &schema.server_entity_data.defined_entities,
                         input_value_definition,
-                        parent_object_entity.name,
+                        parent_object_entity.name.item,
                         server_field_to_insert.item.name.item.into(),
                     )
                 })

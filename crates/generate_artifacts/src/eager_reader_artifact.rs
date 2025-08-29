@@ -127,7 +127,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
         file_name: *RESOLVER_READER_FILE_NAME,
         file_content: reader_content,
         type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-            type_name: parent_object_entity.name,
+            type_name: parent_object_entity.name.item,
             field_name: client_selectable.name().into(),
         }),
     }];
@@ -149,7 +149,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
             file_name: *RESOLVER_PARAMETERS_TYPE_FILE_NAME,
             file_content: parameters_content,
             type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-                type_name: parent_object_entity.name,
+                type_name: parent_object_entity.name.item,
                 field_name: client_selectable.name().into(),
             }),
         });
@@ -225,7 +225,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
         file_name: *RESOLVER_READER_FILE_NAME,
         file_content: reader_content,
         type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-            type_name: parent_object_entity.name,
+            type_name: parent_object_entity.name.item,
             field_name: server_object_selectable_name.into(),
         }),
     }
@@ -338,7 +338,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         file_name: *RESOLVER_PARAM_TYPE_FILE_NAME,
         file_content: param_type_content,
         type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-            type_name: parent_type.name,
+            type_name: parent_type.name.item,
             field_name: client_scalar_selectable.name().into(),
         }),
     }
@@ -403,7 +403,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
         file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
         file_content: final_output_type_text,
         type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-            type_name: parent_type.name,
+            type_name: parent_type.name.item,
             field_name: client_field.name().into(),
         }),
     }

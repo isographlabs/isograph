@@ -84,7 +84,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                         selectable.name(),
                         selectable.description(),
                         selectable.arguments(),
-                        parent_object.name,
+                        parent_object.name.item,
                         parent_object.description,
                     ))
                 } else {
@@ -100,7 +100,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                         selectable.name(),
                         selectable.description(),
                         selectable.arguments(),
-                        parent_object.name,
+                        parent_object.name.item,
                         parent_object.description,
                     ))
                 } else {

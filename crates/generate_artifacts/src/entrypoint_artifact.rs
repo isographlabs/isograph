@@ -226,7 +226,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         merged_selection_map,
         variable_definitions,
         root_operation_name,
-        concrete_type.name,
+        concrete_type.name.item,
         persisted_documents,
         1,
     );
@@ -238,7 +238,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         parent_type: parent_object,
         normalization_ast_text,
         refetch_query_artifact_import,
-        concrete_type: concrete_type.name,
+        concrete_type: concrete_type.name.item,
         directive_set: info
             .map(|info| info.directive_set)
             .unwrap_or(EntrypointDirectiveSet::None(EmptyDirectiveSet {})),
@@ -333,7 +333,7 @@ impl<TNetworkProtocol: NetworkProtocol> EntrypointArtifactInfo<'_, TNetworkProto
             directive_set,
         } = &self;
         let field_name = (*query_name).into();
-        let type_name = parent_type.name;
+        let type_name = parent_type.name.item;
 
         let entrypoint_file_content = entrypoint_file_content(
             file_extensions,
