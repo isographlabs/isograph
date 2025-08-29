@@ -101,7 +101,7 @@ pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkPro
         let output_type = client_field_output_type;
         format!(
             "export type {}__{}__output_type = {};",
-            parent_type_name, client_field.name.item, output_type
+            parent_type_name.item, client_field.name.item, output_type
         )
     };
     let output_type_text = format!(

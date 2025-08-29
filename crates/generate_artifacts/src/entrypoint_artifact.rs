@@ -392,8 +392,9 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
     directive_set: &EntrypointDirectiveSet,
 ) -> String {
     let ts_file_extension = file_extensions.ts();
-    let entrypoint_params_typename = format!("{}__{}__param", parent_type.name, query_name);
-    let entrypoint_output_type_name = format!("{}__{}__output_type", parent_type.name, query_name);
+    let entrypoint_params_typename = format!("{}__{}__param", parent_type.name.item, query_name);
+    let entrypoint_output_type_name =
+        format!("{}__{}__output_type", parent_type.name.item, query_name);
     let resolver_reader_file_name = *RESOLVER_READER;
     let param_type_file_name = *RESOLVER_PARAM_TYPE;
     let output_type_file_name = *RESOLVER_OUTPUT_TYPE;

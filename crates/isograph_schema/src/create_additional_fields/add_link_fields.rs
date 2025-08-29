@@ -17,7 +17,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 (parent_object_entity_name.item, field_name),
                 ClientScalarSelectable {
                     description: Some(Description(
-                        format!("A store Link for the {} type.", object.name)
+                        format!("A store Link for the {} type.", object.name.item)
                             .intern()
                             .into(),
                     )),

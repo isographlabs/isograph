@@ -573,7 +573,8 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
             "Expected entity to exist. \
             This is indicative of a bug in Isograph.",
         )
-        .name;
+        .name
+        .item;
 
     let root_operation_name = schema
         .fetchable_types
@@ -591,7 +592,7 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
     ImperativelyLoadedFieldArtifactInfo {
         // TODO don't clone, have lifetime parameter
         merged_selection_set: wrapped_selection_map,
-        root_parent_object: root_parent_object.item,
+        root_parent_object,
         variable_definitions: definitions_of_used_variables,
         root_fetchable_field: entrypoint.name.item,
         refetch_query_index: RefetchQueryIndex(index as u32),

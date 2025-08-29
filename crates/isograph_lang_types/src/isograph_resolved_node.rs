@@ -46,14 +46,14 @@ fn get_path_using_selection_parent<'a>(
             string_vec.push(format!(
                 "{}.{}",
                 client_field_declaration.inner.parent_type,
-                client_field_declaration.inner.client_field_name
+                client_field_declaration.inner.client_field_name.item
             ));
         }
         crate::SelectionParentType::ClientPointerDeclaration(client_pointer_declaration) => {
             string_vec.push(format!(
                 "{}.{}",
                 client_pointer_declaration.inner.parent_type,
-                client_pointer_declaration.inner.client_pointer_name
+                client_pointer_declaration.inner.client_pointer_name.item
             ));
         }
     };

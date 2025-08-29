@@ -131,6 +131,7 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
                                             This is indicative of a bug in Isograph.",
                                     )
                                     .name
+                                    .item
                                     .to_string()
                             })
                             .collect::<Vec<_>>()

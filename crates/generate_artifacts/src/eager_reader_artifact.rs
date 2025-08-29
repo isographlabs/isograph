@@ -64,16 +64,19 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
 
     let reader_param_type = format!(
         "{}__{}__param",
-        parent_object_entity.name,
+        parent_object_entity.name.item,
         client_selectable.name()
     );
 
     let reader_content = if let ClientFieldDirectiveSet::None(_) = user_written_component_variant {
-        let eager_reader_name =
-            format!("{}.{}", parent_object_entity.name, client_selectable.name());
+        let eager_reader_name = format!(
+            "{}.{}",
+            parent_object_entity.name.item,
+            client_selectable.name()
+        );
         let reader_output_type = format!(
             "{}__{}__output_type",
-            parent_object_entity.name,
+            parent_object_entity.name.item,
             client_selectable.name()
         );
         let param_type_file_name = *RESOLVER_PARAM_TYPE;
@@ -99,7 +102,11 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
             "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         )
     } else {
-        let component_name = format!("{}.{}", parent_object_entity.name, client_selectable.name());
+        let component_name = format!(
+            "{}.{}",
+            parent_object_entity.name.item,
+            client_selectable.name()
+        );
         let param_type_file_name = *RESOLVER_PARAM_TYPE;
         format!(
             "import type {{ComponentReaderArtifact, ExtractSecondParam, \
@@ -135,7 +142,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
     if !client_selectable.variable_definitions().is_empty() {
         let reader_parameters_type = format!(
             "{}__{}__parameters",
-            parent_object_entity.name,
+            parent_object_entity.name.item,
             client_selectable.name()
         );
         let parameters = client_selectable
@@ -182,7 +189,8 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
             "Expected entity to exist. \
             This is indicative of a bug in Isograph.",
         )
-        .name;
+        .name
+        .item;
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         schema,
@@ -200,7 +208,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
 
     let eager_reader_name = format!(
         "{}.{}",
-        parent_object_entity.name, server_object_selectable_name
+        parent_object_entity.name.item, server_object_selectable_name
     );
 
     let reader_content = format!(
@@ -271,7 +279,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         param_type_imports_to_import_statement(&param_type_imports, file_extensions);
     let reader_param_type = format!(
         "{}__{}__param",
-        parent_type.name,
+        parent_type.name.item,
         client_scalar_selectable.name()
     );
 
@@ -304,7 +312,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     {
         let reader_parameters_type = format!(
             "{}__{}__parameters",
-            parent_type.name,
+            parent_type.name.item,
             client_scalar_selectable.name()
         );
         (
@@ -378,7 +386,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
         "import type React from 'react';\n\
         {function_import_statement}\n\
         export type {}__{}__output_type = {};",
-        parent_type.name,
+        parent_type.name.item,
         client_field.name(),
         client_field_output_type
     );
