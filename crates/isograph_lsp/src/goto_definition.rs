@@ -2,17 +2,17 @@ use crate::format::char_index_to_position;
 use crate::hover::get_iso_literal_extraction_from_text_position_params;
 use crate::{lsp_runtime_error::LSPRuntimeResult, uri_file_path_ext::UriFilePathExt};
 use common_lang_types::{
-    relative_path_from_absolute_and_working_directory, Location, Span, TextSource,
+    relative_path_from_absolute_and_working_directory, EmbeddedLocation, Location, Span,
 };
 use intern::string_key::Lookup;
-use isograph_compiler::CompilerState;
 use isograph_compiler::{get_validated_schema, process_iso_literal_extraction};
+use isograph_compiler::{read_iso_literals_source_from_relative_path, CompilerState};
 use isograph_lang_types::{DefinitionLocation, IsographResolvedNode};
-use isograph_schema::IsographDatabase;
 use isograph_schema::NetworkProtocol;
 use isograph_schema::{
     get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
 };
+use isograph_schema::{IsoLiteralsSource, IsographDatabase};
 use lsp_types::request::GotoDefinition;
 use lsp_types::request::Request;
 use lsp_types::GotoDefinitionResponse;
@@ -84,12 +84,37 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 {
                     match selectable {
                         DefinitionLocation::Server(server_selectable) => {
-                            isograph_location_to_lsp_location(db, &server_selectable.name.location)
-                                .to_owned()
+                            match &server_selectable.name.location {
+                                Location::Generated => None,
+                                Location::Embedded(location) => {
+                                    let schema_source_id = db.get_standard_sources();
+                                    isograph_location_to_lsp_location(
+                                        db,
+                                        location,
+                                        &db.get(schema_source_id.schema_source_id).content,
+                                    )
+                                }
+                            }
                         }
                         DefinitionLocation::Client(client_selectable) => {
-                            isograph_location_to_lsp_location(db, &client_selectable.name.location)
-                                .to_owned()
+                            match &client_selectable.name.location {
+                                Location::Generated => None,
+                                Location::Embedded(location) => {
+                                    let memo_ref = read_iso_literals_source_from_relative_path(
+                                        db,
+                                        location.text_source.relative_path_to_source_file,
+                                    );
+
+                                    let IsoLiteralsSource {
+                                        relative_path: _,
+                                        content,
+                                    } = memo_ref
+                                        .deref()
+                                        .as_ref()
+                                        .expect("Expected relative path to exist");
+                                    isograph_location_to_lsp_location(db, location, content)
+                                }
+                            }
                         }
                     }
                 } else {
@@ -102,12 +127,39 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 {
                     match selectable {
                         DefinitionLocation::Server(server_selectable) => {
-                            isograph_location_to_lsp_location(db, &server_selectable.name.location)
-                                .to_owned()
+                            match &server_selectable.name.location {
+                                Location::Generated => None,
+                                Location::Embedded(location) => {
+                                    let schema_source_id = db.get_standard_sources();
+
+                                    isograph_location_to_lsp_location(
+                                        db,
+                                        location,
+                                        &db.get(schema_source_id.schema_source_id).content,
+                                    )
+                                }
+                            }
                         }
                         DefinitionLocation::Client(client_selectable) => {
-                            isograph_location_to_lsp_location(db, &client_selectable.name.location)
-                                .to_owned()
+                            match &client_selectable.name.location {
+                                Location::Generated => None,
+                                Location::Embedded(location) => {
+                                    let memo_ref = read_iso_literals_source_from_relative_path(
+                                        db,
+                                        location.text_source.relative_path_to_source_file,
+                                    );
+
+                                    let IsoLiteralsSource {
+                                        relative_path: _,
+                                        content,
+                                    } = memo_ref
+                                        .deref()
+                                        .as_ref()
+                                        .expect("Expected relative path to exist");
+
+                                    isograph_location_to_lsp_location(db, location, content)
+                                }
+                            }
                         }
                     }
                 } else {
@@ -124,58 +176,47 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok(goto_location)
 }
 
-#[memo]
 fn isograph_location_to_lsp_location<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
-    location: &Location,
+    location: &EmbeddedLocation,
+    content: &str,
 ) -> Option<lsp_types::Location> {
-    match location {
-        Location::Generated => None,
-        Location::Embedded(location) => {
-            let path_buf = PathBuf::from(db.get_current_working_directory().lookup())
-                .join(location.text_source.relative_path_to_source_file.lookup());
+    let path_buf = PathBuf::from(db.get_current_working_directory().lookup())
+        .join(location.text_source.relative_path_to_source_file.lookup());
 
-            let path = path_buf.to_str()?;
+    let path = path_buf.to_str()?;
 
-            let normalized_path = if cfg!(windows) {
-                Cow::Owned(
-                    path.strip_prefix(r"\\?\")
-                        .unwrap_or(path)
-                        .replace("\\", "/"),
-                )
-            } else {
-                Cow::Borrowed(path)
-            };
+    let normalized_path = if cfg!(windows) {
+        Cow::Owned(
+            path.strip_prefix(r"\\?\")
+                .unwrap_or(path)
+                .replace("\\", "/"),
+        )
+    } else {
+        Cow::Borrowed(path)
+    };
 
-            let uri = Uri::from_str(&format!("file:///{normalized_path}")).ok()?;
+    let uri = Uri::from_str(&format!("file:///{normalized_path}")).ok()?;
 
-            let (_, content) = TextSource {
-                span: None,
-                ..location.text_source
-            }
-            .read_to_string();
+    let text_source_start = location
+        .text_source
+        .span
+        .map(|span| span.start)
+        .unwrap_or_default();
 
-            let text_source_start = location
-                .text_source
-                .span
-                .map(|span| span.start)
-                .unwrap_or_default();
-
-            Some(lsp_types::Location {
-                uri,
-                range: Range {
-                    start: char_index_to_position(
-                        &content,
-                        (text_source_start + location.span.start)
-                            .try_into()
-                            .unwrap(),
-                    ),
-                    end: char_index_to_position(
-                        &content,
-                        (text_source_start + location.span.end).try_into().unwrap(),
-                    ),
-                },
-            })
-        }
-    }
+    Some(lsp_types::Location {
+        uri,
+        range: Range {
+            start: char_index_to_position(
+                content,
+                (text_source_start + location.span.start)
+                    .try_into()
+                    .unwrap(),
+            ),
+            end: char_index_to_position(
+                content,
+                (text_source_start + location.span.end).try_into().unwrap(),
+            ),
+        },
+    })
 }
