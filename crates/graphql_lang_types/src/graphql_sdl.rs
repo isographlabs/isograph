@@ -4,7 +4,10 @@ use crate::{GraphQLDirective, GraphQLTypeAnnotation};
 
 use super::{write_arguments, write_directives, GraphQLConstantValue};
 use common_lang_types::{
-    DescriptionValue, DirectiveName, EnumLiteralValue, GraphQLInterfaceTypeName, GraphQLObjectTypeName, GraphQLUnionTypeName, InputTypeName, InputValueName, ServerScalarEntityName, ServerSelectableName, UnvalidatedTypeName, WithEmbeddedLocation, WithLocation, WithSpan
+    DescriptionValue, DirectiveName, EnumLiteralValue, GraphQLInterfaceTypeName,
+    GraphQLObjectTypeName, GraphQLUnionTypeName, InputTypeName, InputValueName,
+    ServerScalarEntityName, ServerSelectableName, UnvalidatedTypeName, WithEmbeddedLocation,
+    WithLocation, WithSpan,
 };
 use strum::EnumString;
 

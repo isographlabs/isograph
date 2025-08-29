@@ -604,7 +604,8 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
                 "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
             )
-            .name.item,
+            .name
+            .item,
     }
 }
 

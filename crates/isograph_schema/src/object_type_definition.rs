@@ -1,4 +1,6 @@
-use common_lang_types::{GraphQLInterfaceTypeName, ServerObjectEntityName, WithEmbeddedLocation, WithLocation, WithSpan};
+use common_lang_types::{
+    GraphQLInterfaceTypeName, ServerObjectEntityName, WithEmbeddedLocation, WithLocation, WithSpan,
+};
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition,
     GraphQLInputObjectTypeDefinition, GraphQLInterfaceTypeDefinition, GraphQLObjectTypeDefinition,

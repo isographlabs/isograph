@@ -1,7 +1,8 @@
 use std::{collections::BTreeMap, marker::PhantomData};
 
 use common_lang_types::{
-    JavascriptName, SelectableName, ServerObjectEntityName, ServerScalarEntityName, WithEmbeddedLocation, WithLocation, WithSpan
+    JavascriptName, SelectableName, ServerObjectEntityName, ServerScalarEntityName,
+    WithEmbeddedLocation, WithLocation, WithSpan,
 };
 use isograph_lang_types::{DefinitionLocation, Description, SelectionType};
 
