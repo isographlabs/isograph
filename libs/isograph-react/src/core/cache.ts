@@ -8,7 +8,6 @@ import {
   NormalizationInlineFragment,
   NormalizationLinkedField,
   NormalizationScalarField,
-  RefetchQueryNormalizationArtifactWrapper,
   type NormalizationAst,
   type NormalizationAstLoader,
   type NormalizationAstNodes,
@@ -157,7 +156,6 @@ export function normalizeData(
   normalizationAst: NormalizationAstNodes,
   networkResponse: NetworkResponseObject,
   variables: Variables,
-  nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   root: Link,
 ): EncounteredIds {
   const encounteredIds: EncounteredIds = new Map();
@@ -179,7 +177,6 @@ export function normalizeData(
     newStoreRecord,
     root,
     variables,
-    nestedRefetchQueries,
     encounteredIds,
   );
 
@@ -391,7 +388,6 @@ function normalizeDataIntoRecord(
   targetParentRecord: StoreRecord,
   targetParentRecordLink: Link,
   variables: Variables,
-  nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: EncounteredIds,
 ): RecordHasBeenUpdated {
   let recordHasBeenUpdated = false;
@@ -416,7 +412,6 @@ function normalizeDataIntoRecord(
           targetParentRecord,
           targetParentRecordLink,
           variables,
-          nestedRefetchQueries,
           mutableEncounteredIds,
         );
         recordHasBeenUpdated =
@@ -431,7 +426,6 @@ function normalizeDataIntoRecord(
           targetParentRecord,
           targetParentRecordLink,
           variables,
-          nestedRefetchQueries,
           mutableEncounteredIds,
         );
         recordHasBeenUpdated =
@@ -499,7 +493,6 @@ function normalizeLinkedField(
   targetParentRecord: StoreRecord,
   targetParentRecordLink: Link,
   variables: Variables,
-  nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: EncounteredIds,
 ): RecordHasBeenUpdated {
   const networkResponseKey = getNetworkResponseKey(astNode);
@@ -537,7 +530,6 @@ function normalizeLinkedField(
         targetParentRecordLink,
         variables,
         i,
-        nestedRefetchQueries,
         mutableEncounteredIds,
       );
 
@@ -564,7 +556,6 @@ function normalizeLinkedField(
       targetParentRecordLink,
       variables,
       null,
-      nestedRefetchQueries,
       mutableEncounteredIds,
     );
 
@@ -598,7 +589,6 @@ function normalizeInlineFragment(
   targetParentRecord: StoreRecord,
   targetParentRecordLink: Link,
   variables: Variables,
-  nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: EncounteredIds,
 ): RecordHasBeenUpdated {
   const typeToRefineTo = astNode.type;
@@ -610,7 +600,6 @@ function normalizeInlineFragment(
       targetParentRecord,
       targetParentRecordLink,
       variables,
-      nestedRefetchQueries,
       mutableEncounteredIds,
     );
     return hasBeenModified;
@@ -648,7 +637,6 @@ function normalizeNetworkResponseObject(
   targetParentRecordLink: Link,
   variables: Variables,
   index: number | null,
-  nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   mutableEncounteredIds: EncounteredIds,
 ): DataId /* The id of the modified or newly created item */ {
   const newStoreRecordId = getDataIdOfNetworkResponse(
@@ -678,7 +666,6 @@ function normalizeNetworkResponseObject(
     newStoreRecord,
     { __link: newStoreRecordId, __typename: __typename },
     variables,
-    nestedRefetchQueries,
     mutableEncounteredIds,
   );
 
