@@ -15,7 +15,7 @@ import {
 } from '../core/FragmentReference';
 import { ROOT_ID } from '../core/IsographEnvironment';
 import { maybeMakeNetworkRequest } from '../core/makeNetworkRequest';
-import { wrapResolvedValue } from '../core/PromiseWrapper';
+import { wrapPromise, wrapResolvedValue } from '../core/PromiseWrapper';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 
 export type UseImperativeReferenceResult<
@@ -61,21 +61,22 @@ export function useImperativeReference<
       variables: ExtractParameters<TReadFromStore>,
       fetchOptions?: FetchOptions<TClientFieldValue>,
     ) => {
+      const readerWithRefetchQueries =
+        entrypoint.readerWithRefetchQueries.kind ===
+        'ReaderWithRefetchQueriesLoader'
+          ? wrapPromise(entrypoint.readerWithRefetchQueries.loader())
+          : wrapResolvedValue(entrypoint.readerWithRefetchQueries);
       const [networkRequest, disposeNetworkRequest] = maybeMakeNetworkRequest(
         environment,
         entrypoint,
         variables,
+        readerWithRefetchQueries,
         fetchOptions,
       );
       setState([
         {
           kind: 'FragmentReference',
-          readerWithRefetchQueries: wrapResolvedValue({
-            kind: 'ReaderWithRefetchQueries',
-            readerArtifact: entrypoint.readerWithRefetchQueries.readerArtifact,
-            nestedRefetchQueries:
-              entrypoint.readerWithRefetchQueries.nestedRefetchQueries,
-          }),
+          readerWithRefetchQueries,
           root: { __link: ROOT_ID, __typename: entrypoint.concreteType },
           variables,
           networkRequest,

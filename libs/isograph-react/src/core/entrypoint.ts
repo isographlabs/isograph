@@ -17,6 +17,16 @@ export type ReaderWithRefetchQueries<
   readonly nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[];
 };
 
+export type ReaderWithRefetchQueriesLoader<
+  TReadFromStore extends UnknownTReadFromStore,
+  TClientFieldValue,
+> = {
+  readonly kind: 'ReaderWithRefetchQueriesLoader';
+  readonly loader: () => Promise<
+    ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
+  >;
+};
+
 export type NetworkRequestInfo<TNormalizationAst> = {
   readonly kind: 'NetworkRequestInfo';
   readonly operation: IsographOperation | IsographPersistedOperation;
@@ -48,10 +58,9 @@ export type IsographEntrypoint<
 > = {
   readonly kind: 'Entrypoint';
   readonly networkRequestInfo: NetworkRequestInfo<TNormalizationAst>;
-  readonly readerWithRefetchQueries: ReaderWithRefetchQueries<
-    TReadFromStore,
-    TClientFieldValue
-  >;
+  readonly readerWithRefetchQueries:
+    | ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
+    | ReaderWithRefetchQueriesLoader<TReadFromStore, TClientFieldValue>;
   readonly concreteType: TypeName;
 };
 
