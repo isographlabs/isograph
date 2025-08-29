@@ -1,7 +1,6 @@
 import type {IsographEntrypoint, NormalizationAstLoader, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
 import {Query__PetFavoritePhrase__param} from './param_type';
 import {Query__PetFavoritePhrase__output_type} from './output_type';
-import readerResolver from './resolver_reader';
 import queryText from './query_text';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
@@ -24,10 +23,14 @@ const artifact: IsographEntrypoint<
   },
   concreteType: "Query",
   readerWithRefetchQueries: {
-    kind: "ReaderWithRefetchQueries",
-    nestedRefetchQueries,
-    readerArtifact: readerResolver,
-  },
+    kind: "ReaderWithRefetchQueriesLoader",
+    loader: () => import('./resolver_reader')
+      .then(module => ({
+        kind: "ReaderWithRefetchQueries",
+        nestedRefetchQueries,
+        readerArtifact: module.default,
+      }))
+  }
 };
 
 export default artifact;

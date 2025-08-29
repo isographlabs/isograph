@@ -423,12 +423,43 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
         }
     };
 
+    let (reader_import, reader_code) = {
+        let reader_resolver_file_path =
+            format!("'./{resolver_reader_file_name}{ts_file_extension}'");
+        match directive_set {
+            EntrypointDirectiveSet::LazyLoad(directive_set) if directive_set.lazy_load.reader => (
+                "".to_string(),
+                format!(
+                    "{indent}readerWithRefetchQueries: {{\n\
+                     {indent}  kind: \"ReaderWithRefetchQueriesLoader\",\n\
+                     {indent}  loader: () => import({reader_resolver_file_path})\n\
+                     {indent}    .then(module => ({{\n\
+                     {indent}      kind: \"ReaderWithRefetchQueries\",\n\
+                     {indent}      nestedRefetchQueries,\n\
+                     {indent}      readerArtifact: module.default,\n\
+                     {indent}    }}))\n\
+                     {indent}}}"
+                ),
+            ),
+            _ => (
+                format!("import readerResolver from {reader_resolver_file_path};\n"),
+                format!(
+                    "{indent}readerWithRefetchQueries: {{\n\
+                     {indent}  kind: \"ReaderWithRefetchQueries\",\n\
+                     {indent}  nestedRefetchQueries,\n\
+                     {indent}  readerArtifact: readerResolver,\n\
+                     {indent}}},"
+                ),
+            ),
+        }
+    };
+
     format!(
         "import type {{IsographEntrypoint, \
         {normalization_ast_type_name}, RefetchQueryNormalizationArtifactWrapper}} from '@isograph/react';\n\
         import {{{entrypoint_params_typename}}} from './{param_type_file_name}{ts_file_extension}';\n\
         import {{{entrypoint_output_type_name}}} from './{output_type_file_name}{ts_file_extension}';\n\
-        import readerResolver from './{resolver_reader_file_name}{ts_file_extension}';\n\
+        {reader_import}\
         import queryText from './{query_text_file_name}{ts_file_extension}';\n\
         {normalization_ast_import}\
         {refetch_query_artifact_import}\n\n\
@@ -444,11 +475,7 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
         {normalization_ast_code}\n\
         {indent}}},\n\
         {indent}concreteType: \"{concrete_type}\",\n\
-        {indent}readerWithRefetchQueries: {{\n\
-        {indent}  kind: \"ReaderWithRefetchQueries\",\n\
-        {indent}  nestedRefetchQueries,\n\
-        {indent}  readerArtifact: readerResolver,\n\
-        {indent}}},\n\
+        {reader_code}\n\
         }};\n\n\
         export default artifact;\n",
     )
