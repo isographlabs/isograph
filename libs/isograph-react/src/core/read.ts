@@ -861,7 +861,7 @@ export function readLinkedFieldData(
             '/' +
             stableStringifyArgs(localVariables),
           // Fetcher
-          (): ItemCleanupPair<FragmentReference<any, any>> => {
+          (): ItemCleanupPair<FragmentReference<any, any>> | undefined => {
             const variables = includeReadOutData(
               filterVariables({ ...args, ...localVariables }, allowedVariables),
               refetchReaderParams.data,

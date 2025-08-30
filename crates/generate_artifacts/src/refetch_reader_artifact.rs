@@ -139,7 +139,7 @@ fn generate_function_import_statement(read_out_data: String) -> ClientFieldFunct
         {indent}// TODO reflect this in the types.\n\
         {indent}readerArtifact: TopLevelReaderArtifact<any, any, any> | null,\n\
         {indent}nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],\n\
-        ) => (): ItemCleanupPair<FragmentReference<any, any>> => {{\n\
+        ) => (): ItemCleanupPair<FragmentReference<any, any>> | undefined => {{\n\
         {indent}const variables = includeReadOutData(filteredVariables, readOutData);\n\
         {indent}const [networkRequest, disposeNetworkRequest] = makeNetworkRequest(environment, artifact, variables);\n\
         {indent}if (readerArtifact == null) return;\n\
