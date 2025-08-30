@@ -183,18 +183,17 @@ fn isograph_location_to_lsp_location<TNetworkProtocol: NetworkProtocol + 'static
         .join(location.text_source.relative_path_to_source_file.lookup());
 
     let path = path_buf.to_str()?;
-
     let normalized_path = if cfg!(windows) {
-        Cow::Owned(
+        Cow::Owned(format!(
+            "/{}",
             path.strip_prefix(r"\\?\")
                 .unwrap_or(path)
-                .replace("\\", "/"),
-        )
+                .replace("\\", "/")
+        ))
     } else {
         Cow::Borrowed(path)
     };
-
-    let uri = Uri::from_str(&format!("file:///{normalized_path}")).ok()?;
+    let uri = Uri::from_str(&format!("file://{normalized_path}")).ok()?;
 
     let text_source_start = location
         .text_source
