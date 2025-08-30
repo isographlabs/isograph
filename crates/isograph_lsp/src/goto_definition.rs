@@ -74,7 +74,24 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
             IsographResolvedNode::ClientFieldDeclaration(_) => None,
             IsographResolvedNode::ClientPointerDeclaration(_) => None,
             IsographResolvedNode::EntrypointDeclaration(_) => None,
-            IsographResolvedNode::ServerObjectEntityNameWrapper(_) => None,
+            IsographResolvedNode::ServerObjectEntityNameWrapper(entity) => {
+                let server_object_entity = match validated_schema
+                    .server_entity_data
+                    .server_object_entity(entity.inner.0.unchecked_conversion())
+                {
+                    Some(server_object_entity) => server_object_entity,
+                    None => {
+                        return Ok(None);
+                    }
+                };
+
+                let schema_source_id = db.get_standard_sources();
+                isograph_location_to_lsp_location(
+                    db,
+                    &server_object_entity.name.location,
+                    &db.get(schema_source_id.schema_source_id).content,
+                )
+            }
             IsographResolvedNode::Description(_) => None,
             IsographResolvedNode::ScalarSelection(scalar_path) => {
                 if let Ok((_, selectable)) =
