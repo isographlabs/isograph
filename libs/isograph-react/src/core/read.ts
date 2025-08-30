@@ -344,23 +344,23 @@ export function readLoadablySelectedFieldData(
           const fragmentReferenceAndDisposeFromEntrypoint = (
             entrypoint: IsographEntrypoint<any, any, any>,
           ): [FragmentReference<any, any>, CleanupFn] => {
+            const readerWithRefetchQueries =
+              entrypoint.readerWithRefetchQueries.kind ===
+              'ReaderWithRefetchQueriesLoader'
+                ? wrapPromise(entrypoint.readerWithRefetchQueries.loader())
+                : wrapResolvedValue(entrypoint.readerWithRefetchQueries);
             const [networkRequest, disposeNetworkRequest] =
               maybeMakeNetworkRequest(
                 environment,
                 entrypoint,
                 localVariables,
+                readerWithRefetchQueries,
                 fetchOptions,
               );
 
             const fragmentReference: FragmentReference<any, any> = {
               kind: 'FragmentReference',
-              readerWithRefetchQueries: wrapResolvedValue({
-                kind: 'ReaderWithRefetchQueries',
-                readerArtifact:
-                  entrypoint.readerWithRefetchQueries.readerArtifact,
-                nestedRefetchQueries:
-                  entrypoint.readerWithRefetchQueries.nestedRefetchQueries,
-              } as const),
+              readerWithRefetchQueries,
 
               // TODO localVariables is not guaranteed to have an id field
               root,
@@ -394,6 +394,14 @@ export function readLoadablySelectedFieldData(
                   }
                 | { kind: 'Disposed' } = { kind: 'EntrypointNotLoaded' };
 
+              const readerWithRefetchQueries = wrapPromise(
+                isographArtifactPromiseWrapper.promise.then((entrypoint) =>
+                  entrypoint.readerWithRefetchQueries.kind ===
+                  'ReaderWithRefetchQueriesLoader'
+                    ? entrypoint.readerWithRefetchQueries.loader()
+                    : entrypoint.readerWithRefetchQueries,
+                ),
+              );
               const networkRequest = wrapPromise(
                 isographArtifactPromiseWrapper.promise.then((entrypoint) => {
                   if (entrypointLoaderState.kind === 'EntrypointNotLoaded') {
@@ -402,6 +410,7 @@ export function readLoadablySelectedFieldData(
                         environment,
                         entrypoint,
                         localVariables,
+                        readerWithRefetchQueries,
                         fetchOptions,
                       );
                     entrypointLoaderState = {
@@ -412,14 +421,10 @@ export function readLoadablySelectedFieldData(
                   }
                 }),
               );
-              const readerWithRefetchPromise =
-                isographArtifactPromiseWrapper.promise.then(
-                  (entrypoint) => entrypoint.readerWithRefetchQueries,
-                );
 
               const fragmentReference: FragmentReference<any, any> = {
                 kind: 'FragmentReference',
-                readerWithRefetchQueries: wrapPromise(readerWithRefetchPromise),
+                readerWithRefetchQueries,
 
                 // TODO localVariables is not guaranteed to have an id field
                 root,
@@ -872,6 +877,7 @@ export function readLinkedFieldData(
                 environment,
                 refetchQueryArtifact,
                 variables,
+                undefined,
                 fetchOptions,
               );
 

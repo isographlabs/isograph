@@ -4,6 +4,7 @@ import { check, DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
 import { getOrCreateCachedComponent } from './componentCache';
 import {
   IsographEntrypoint,
+  ReaderWithRefetchQueries,
   RefetchQueryNormalizationArtifact,
   type NormalizationAst,
   type NormalizationAstLoader,
@@ -35,18 +36,30 @@ let networkRequestId = 0;
 export function maybeMakeNetworkRequest<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
+  TArtifact extends
+    | RefetchQueryNormalizationArtifact
+    | IsographEntrypoint<TReadFromStore, TClientFieldValue, TNormalizationAst>,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 >(
   environment: IsographEnvironment,
-  artifact:
-    | RefetchQueryNormalizationArtifact
-    | IsographEntrypoint<TReadFromStore, TClientFieldValue, TNormalizationAst>,
+  artifact: TArtifact,
   variables: ExtractParameters<TReadFromStore>,
+  readerWithRefetchQueries: TArtifact['kind'] extends 'Entrypoint'
+    ? PromiseWrapper<
+        ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
+      >
+    : undefined,
   fetchOptions?: FetchOptions<TClientFieldValue>,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
   switch (fetchOptions?.shouldFetch ?? DEFAULT_SHOULD_FETCH_VALUE) {
     case 'Yes': {
-      return makeNetworkRequest(environment, artifact, variables, fetchOptions);
+      return makeNetworkRequest(
+        environment,
+        artifact,
+        variables,
+        readerWithRefetchQueries,
+        fetchOptions,
+      );
     }
     case 'No': {
       return [wrapResolvedValue(undefined), () => {}];
@@ -77,6 +90,7 @@ export function maybeMakeNetworkRequest<
           environment,
           artifact,
           variables,
+          readerWithRefetchQueries,
           fetchOptions,
         );
       }
@@ -100,13 +114,19 @@ function loadNormalizationAst(
 export function makeNetworkRequest<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
+  TArtifact extends
+    | RefetchQueryNormalizationArtifact
+    | IsographEntrypoint<TReadFromStore, TClientFieldValue, TNormalizationAst>,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 >(
   environment: IsographEnvironment,
-  artifact:
-    | RefetchQueryNormalizationArtifact
-    | IsographEntrypoint<TReadFromStore, TClientFieldValue, TNormalizationAst>,
+  artifact: TArtifact,
   variables: ExtractParameters<TReadFromStore>,
+  readerWithRefetchQueries?: TArtifact['kind'] extends 'Entrypoint'
+    ? PromiseWrapper<
+        ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
+      >
+    : undefined,
   fetchOptions?: FetchOptions<TClientFieldValue>,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
   // TODO this should be a DataId and stored in the store
@@ -130,8 +150,9 @@ export function makeNetworkRequest<
       variables,
     ),
     loadNormalizationAst(artifact.networkRequestInfo.normalizationAst),
+    readerWithRefetchQueries?.promise,
   ])
-    .then(([networkResponse, normalizationAst]) => {
+    .then(([networkResponse, normalizationAst, readerWithRefetchQueries]) => {
       logMessage(environment, () => ({
         kind: 'ReceivedNetworkResponse',
         networkResponse,
@@ -175,6 +196,7 @@ export function makeNetworkRequest<
           environment,
           root,
           variables,
+          readerWithRefetchQueries,
         );
 
         try {
@@ -235,14 +257,18 @@ type NetworkRequestStatus =
 function readDataForOnComplete<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
-  TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
->(
-  artifact:
+  TArtifact extends
     | RefetchQueryNormalizationArtifact
     | IsographEntrypoint<TReadFromStore, TClientFieldValue, TNormalizationAst>,
+  TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
+>(
+  artifact: TArtifact,
   environment: IsographEnvironment,
   root: Link,
   variables: ExtractParameters<TReadFromStore>,
+  readerWithRefetchQueries:
+    | ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
+    | undefined,
 ): TClientFieldValue | null {
   // An entrypoint, but not a RefetchQueryNormalizationArtifact, has a reader ASTs.
   // So, we can only pass data to onComplete if makeNetworkRequest was passed an entrypoint.
@@ -259,12 +285,17 @@ function readDataForOnComplete<
       suspendIfInFlight: false,
       throwOnNetworkError: false,
     };
+    const resolvedReaderWithRefetchQueries =
+      readerWithRefetchQueries as ReaderWithRefetchQueries<
+        TReadFromStore,
+        TClientFieldValue
+      >;
 
     const fragment: FragmentReference<TReadFromStore, TClientFieldValue> = {
       kind: 'FragmentReference',
       // TODO this smells.
       readerWithRefetchQueries: wrapResolvedValue(
-        artifact.readerWithRefetchQueries,
+        resolvedReaderWithRefetchQueries,
       ),
       root,
       variables,
@@ -275,7 +306,7 @@ function readDataForOnComplete<
       fragment,
       fakeNetworkRequestOptions,
     ).item;
-    const readerArtifact = artifact.readerWithRefetchQueries.readerArtifact;
+    const readerArtifact = resolvedReaderWithRefetchQueries.readerArtifact;
     switch (readerArtifact.kind) {
       case 'ComponentReaderArtifact': {
         // @ts-expect-error We should find a way to encode this in the type system:
@@ -290,7 +321,7 @@ function readDataForOnComplete<
               kind: 'ReaderWithRefetchQueries',
               readerArtifact: readerArtifact,
               nestedRefetchQueries:
-                artifact.readerWithRefetchQueries.nestedRefetchQueries,
+                resolvedReaderWithRefetchQueries.nestedRefetchQueries,
             }),
             root,
             variables,
@@ -308,7 +339,7 @@ function readDataForOnComplete<
                 startUpdate: getOrCreateCachedStartUpdate(
                   environment,
                   fragment,
-                  artifact.readerWithRefetchQueries.readerArtifact.fieldName,
+                  resolvedReaderWithRefetchQueries.readerArtifact.fieldName,
                   fakeNetworkRequestOptions,
                 ),
               }

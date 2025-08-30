@@ -34,7 +34,7 @@ import {
 } from './IsographEnvironment';
 import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
-import { wrapResolvedValue } from './PromiseWrapper';
+import { wrapPromise, wrapResolvedValue } from './PromiseWrapper';
 import { readButDoNotEvaluate, WithEncounteredRecords } from './read';
 import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
 import { Argument, ArgumentValue } from './util';
@@ -106,10 +106,16 @@ export function getOrCreateCacheForArtifact<
       break;
   }
   const factory = () => {
+    const readerWithRefetchQueries =
+      entrypoint.readerWithRefetchQueries.kind ===
+      'ReaderWithRefetchQueriesLoader'
+        ? wrapPromise(entrypoint.readerWithRefetchQueries.loader())
+        : wrapResolvedValue(entrypoint.readerWithRefetchQueries);
     const [networkRequest, disposeNetworkRequest] = maybeMakeNetworkRequest(
       environment,
       entrypoint,
       variables,
+      readerWithRefetchQueries,
       fetchOptions,
     );
 
@@ -118,12 +124,7 @@ export function getOrCreateCacheForArtifact<
     > = [
       {
         kind: 'FragmentReference',
-        readerWithRefetchQueries: wrapResolvedValue({
-          kind: 'ReaderWithRefetchQueries',
-          readerArtifact: entrypoint.readerWithRefetchQueries.readerArtifact,
-          nestedRefetchQueries:
-            entrypoint.readerWithRefetchQueries.nestedRefetchQueries,
-        }),
+        readerWithRefetchQueries,
         root: { __link: ROOT_ID, __typename: entrypoint.concreteType },
         variables,
         networkRequest: networkRequest,
