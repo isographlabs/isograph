@@ -44,21 +44,25 @@ export function maybeMakeNetworkRequest<
   environment: IsographEnvironment,
   artifact: TArtifact,
   variables: ExtractParameters<TReadFromStore>,
-  readerWithRefetchQueries: TArtifact['kind'] extends 'Entrypoint'
-    ? PromiseWrapper<
-        ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
-      >
-    : undefined,
-  fetchOptions?: FetchOptions<TClientFieldValue>,
+  // TODO this disallows us passing shouldFetch: 'Yes' without a readerWithRefetchQueries,
+  // but we should allow that.
+  readerWithRefetchQueriesAndFetchOptions: {
+    readerWithRefetchQueries: PromiseWrapper<
+      ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
+    >;
+    fetchOptions?: FetchOptions<TClientFieldValue>;
+  } | null,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
-  switch (fetchOptions?.shouldFetch ?? DEFAULT_SHOULD_FETCH_VALUE) {
+  const shouldFetch =
+    readerWithRefetchQueriesAndFetchOptions?.fetchOptions?.shouldFetch ??
+    DEFAULT_SHOULD_FETCH_VALUE;
+  switch (shouldFetch) {
     case 'Yes': {
       return makeNetworkRequest(
         environment,
         artifact,
         variables,
-        readerWithRefetchQueries,
-        fetchOptions,
+        readerWithRefetchQueriesAndFetchOptions,
       );
     }
     case 'No': {
@@ -90,8 +94,7 @@ export function maybeMakeNetworkRequest<
           environment,
           artifact,
           variables,
-          readerWithRefetchQueries,
-          fetchOptions,
+          readerWithRefetchQueriesAndFetchOptions,
         );
       }
     }
@@ -122,12 +125,12 @@ export function makeNetworkRequest<
   environment: IsographEnvironment,
   artifact: TArtifact,
   variables: ExtractParameters<TReadFromStore>,
-  readerWithRefetchQueries?: TArtifact['kind'] extends 'Entrypoint'
-    ? PromiseWrapper<
-        ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
-      >
-    : undefined,
-  fetchOptions?: FetchOptions<TClientFieldValue>,
+  readerWithRefetchQueriesAndFetchOptions: {
+    readerWithRefetchQueries: PromiseWrapper<
+      ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
+    >;
+    fetchOptions?: FetchOptions<TClientFieldValue>;
+  } | null,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
   // TODO this should be a DataId and stored in the store
   const myNetworkRequestId = networkRequestId + '';
@@ -143,82 +146,139 @@ export function makeNetworkRequest<
   let status: NetworkRequestStatus = {
     kind: 'UndisposedIncomplete',
   };
-  // This should be an observable, not a promise
-  const promise = Promise.all([
-    environment.networkFunction(
-      artifact.networkRequestInfo.operation,
-      variables,
-    ),
-    loadNormalizationAst(artifact.networkRequestInfo.normalizationAst),
-    readerWithRefetchQueries?.promise,
-  ])
-    .then(([networkResponse, normalizationAst, readerWithRefetchQueries]) => {
-      logMessage(environment, () => ({
-        kind: 'ReceivedNetworkResponse',
-        networkResponse,
-        networkRequestId: myNetworkRequestId,
-      }));
 
-      if (networkResponse.errors != null) {
+  let promise;
+  if (readerWithRefetchQueriesAndFetchOptions != null) {
+    const { readerWithRefetchQueries, fetchOptions } =
+      readerWithRefetchQueriesAndFetchOptions;
+
+    // This should be an observable, not a promise
+    promise = Promise.all([
+      environment.networkFunction(
+        artifact.networkRequestInfo.operation,
+        variables,
+      ),
+      loadNormalizationAst(artifact.networkRequestInfo.normalizationAst),
+      readerWithRefetchQueries?.promise,
+    ])
+      .then(([networkResponse, normalizationAst, readerWithRefetchQueries]) => {
+        logMessage(environment, () => ({
+          kind: 'ReceivedNetworkResponse',
+          networkResponse,
+          networkRequestId: myNetworkRequestId,
+        }));
+
+        if (networkResponse.errors != null) {
+          try {
+            fetchOptions?.onError?.();
+          } catch {}
+          throw new Error('GraphQL network response had errors', {
+            cause: networkResponse,
+          });
+        }
+
+        const root = { __link: ROOT_ID, __typename: artifact.concreteType };
+        if (status.kind === 'UndisposedIncomplete') {
+          normalizeData(
+            environment,
+            normalizationAst.selections,
+            networkResponse.data ?? {},
+            variables,
+            root,
+          );
+          const retainedQuery = {
+            normalizationAst: normalizationAst.selections,
+            variables,
+            root,
+          };
+          status = {
+            kind: 'UndisposedComplete',
+            retainedQuery,
+          };
+          retainQuery(environment, retainedQuery);
+        }
+
+        const onComplete = fetchOptions?.onComplete;
+        if (onComplete != null) {
+          let data = readDataForOnComplete(
+            artifact,
+            environment,
+            root,
+            variables,
+            readerWithRefetchQueries,
+          );
+
+          try {
+            // @ts-expect-error this problem will be fixed when we remove RefetchQueryNormalizationArtifact
+            // (or we can fix this by having a single param of type { kind: 'Entrypoint', entrypoint,
+            // fetchOptions: FetchOptions<TReadFromStore> } | { kind: 'RefetchQuery', refetchQuery,
+            // fetchOptions: FetchOptions<void> }).
+            onComplete(data);
+          } catch {}
+        }
+      })
+      .catch((e) => {
+        logMessage(environment, () => ({
+          kind: 'ReceivedNetworkError',
+          networkRequestId: myNetworkRequestId,
+          error: e,
+        }));
         try {
           fetchOptions?.onError?.();
         } catch {}
-        throw new Error('GraphQL network response had errors', {
-          cause: networkResponse,
-        });
-      }
+        throw e;
+      });
+  } else {
+    promise = Promise.all([
+      environment.networkFunction(
+        artifact.networkRequestInfo.operation,
+        variables,
+      ),
+      loadNormalizationAst(artifact.networkRequestInfo.normalizationAst),
+    ])
+      .then(([networkResponse, normalizationAst]) => {
+        logMessage(environment, () => ({
+          kind: 'ReceivedNetworkResponse',
+          networkResponse,
+          networkRequestId: myNetworkRequestId,
+        }));
 
-      const root = { __link: ROOT_ID, __typename: artifact.concreteType };
-      if (status.kind === 'UndisposedIncomplete') {
-        normalizeData(
-          environment,
-          normalizationAst.selections,
-          networkResponse.data ?? {},
-          variables,
-          root,
-        );
-        const retainedQuery = {
-          normalizationAst: normalizationAst.selections,
-          variables,
-          root,
-        };
-        status = {
-          kind: 'UndisposedComplete',
-          retainedQuery,
-        };
-        retainQuery(environment, retainedQuery);
-      }
+        if (networkResponse.errors != null) {
+          throw new Error('GraphQL network response had errors', {
+            cause: networkResponse,
+          });
+        }
 
-      const onComplete = fetchOptions?.onComplete;
-      if (onComplete != null) {
-        let data = readDataForOnComplete(
-          artifact,
-          environment,
-          root,
-          variables,
-          readerWithRefetchQueries,
-        );
-
-        try {
-          // @ts-expect-error this problem will be fixed when we remove RefetchQueryNormalizationArtifact
-          // (or we can fix this by having a single param of type { kind: 'Entrypoint', entrypoint,
-          // fetchOptions: FetchOptions<TReadFromStore> } | { kind: 'RefetchQuery', refetchQuery,
-          // fetchOptions: FetchOptions<void> }).
-          onComplete(data);
-        } catch {}
-      }
-    })
-    .catch((e) => {
-      logMessage(environment, () => ({
-        kind: 'ReceivedNetworkError',
-        networkRequestId: myNetworkRequestId,
-        error: e,
-      }));
-      try {
-        fetchOptions?.onError?.();
-      } catch {}
-      throw e;
-    });
+        const root = { __link: ROOT_ID, __typename: artifact.concreteType };
+        if (status.kind === 'UndisposedIncomplete') {
+          normalizeData(
+            environment,
+            normalizationAst.selections,
+            networkResponse.data ?? {},
+            variables,
+            root,
+          );
+          const retainedQuery = {
+            normalizationAst: normalizationAst.selections,
+            variables,
+            root,
+          };
+          status = {
+            kind: 'UndisposedComplete',
+            retainedQuery,
+          };
+          retainQuery(environment, retainedQuery);
+        }
+      })
+      .catch((e) => {
+        logMessage(environment, () => ({
+          kind: 'ReceivedNetworkError',
+          networkRequestId: myNetworkRequestId,
+          error: e,
+        }));
+        throw e;
+      });
+  }
 
   const wrapper = wrapPromise(promise);
 
