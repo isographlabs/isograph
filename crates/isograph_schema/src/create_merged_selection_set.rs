@@ -547,7 +547,7 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
         // This could be Pet
         subfields_or_inline_fragments.insert(
             0,
-            WrappedSelectionMapSelection::InlineFragment(refetch_field_parent_type_name),
+            WrappedSelectionMapSelection::InlineFragment(refetch_field_parent_type_name.item),
         );
     }
 
@@ -573,7 +573,8 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
             "Expected entity to exist. \
             This is indicative of a bug in Isograph.",
         )
-        .name;
+        .name
+        .item;
 
     let root_operation_name = schema
         .fetchable_types
@@ -604,7 +605,8 @@ fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
                 "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
             )
-            .name,
+            .name
+            .item,
     }
 }
 
@@ -795,7 +797,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
 
     match &server_object_selectable.object_selectable_variant {
         ServerObjectSelectableVariant::InlineFragment => {
-            let type_to_refine_to = object_selection_parent_object.name;
+            let type_to_refine_to = object_selection_parent_object.name.item;
 
             let normalization_key = NormalizationKey::InlineFragment(type_to_refine_to);
             merge_traversal_state
@@ -1254,7 +1256,7 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
     if let Some(id_field) = schema
         .server_entity_data
         .server_object_entity_extra_info
-        .get(&parent_object_entity.name)
+        .get(&parent_object_entity.name.item)
         .and_then(|ServerObjectEntityExtraInfo { id_field, .. }| *id_field)
     {
         match merged_selection_map.entry(NormalizationKey::Id) {

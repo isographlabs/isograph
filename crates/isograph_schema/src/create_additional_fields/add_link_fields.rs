@@ -14,21 +14,21 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             let field_name = *LINK_FIELD_NAME;
             let parent_object_entity_name = object.name;
             self.client_scalar_selectables.insert(
-                (parent_object_entity_name, field_name),
+                (parent_object_entity_name.item, field_name),
                 ClientScalarSelectable {
                     description: Some(Description(
-                        format!("A store Link for the {} type.", object.name)
+                        format!("A store Link for the {} type.", object.name.item)
                             .intern()
                             .into(),
                     )),
                     name: WithLocation::new(field_name, Location::generated()),
-                    parent_object_entity_name,
+                    parent_object_entity_name: parent_object_entity_name.item,
                     variable_definitions: vec![],
                     reader_selection_set: vec![],
                     variant: ClientFieldVariant::Link,
                     type_and_field: ParentObjectEntityNameAndSelectableName {
                         field_name: field_name.into(),
-                        type_name: object.name,
+                        type_name: object.name.item,
                     },
                     refetch_strategy: None,
                     network_protocol: std::marker::PhantomData,
@@ -46,13 +46,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             if self
                 .server_entity_data
                 .server_object_entity_extra_info
-                .entry(parent_object_entity_name)
+                .entry(parent_object_entity_name.item)
                 .or_default()
                 .selectables
                 .insert(
                     field_name.into(),
                     DefinitionLocation::Client(SelectionType::Scalar((
-                        parent_object_entity_name,
+                        parent_object_entity_name.item,
                         field_name,
                     ))),
                 )
@@ -61,7 +61,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 return Err(WithLocation::new(
                     CreateAdditionalFieldsError::CompilerCreatedFieldExistsOnType {
                         field_name: field_name.into(),
-                        parent_type: object_name,
+                        parent_type: object_name.item,
                     },
                     Location::generated(),
                 ));

@@ -527,6 +527,7 @@ fn id_annotation_to_typename_annotation<TNetworkProtocol: NetworkProtocol>(
                 This is indicative of a bug in Isograph.",
             )
             .name
+            .item
             .into(),
     })
 }
@@ -548,6 +549,7 @@ fn enum_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                             This is indicative of a bug in Isograph.",
                         )
                         .name
+                        .item
                         .into()
                 }),
             ));

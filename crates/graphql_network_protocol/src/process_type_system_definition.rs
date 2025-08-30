@@ -225,7 +225,7 @@ pub fn process_graphql_type_system_document(
         if let Some((object_outcome, _)) = objects.iter_mut().find(|obj| {
             let supertype_name: ServerObjectEntityName = supertype_name.unchecked_conversion();
 
-            obj.0.server_object_entity.name == supertype_name
+            obj.0.server_object_entity.name.item == supertype_name
         }) {
             for subtype_name in subtypes.iter() {
                 object_outcome.fields_to_insert.push(WithLocation::new(
@@ -344,7 +344,7 @@ fn process_object_type_definition(
     let object_implements_node = implements_node(&object_type_definition);
     let server_object_entity = ServerObjectEntity {
         description: object_type_definition.description.map(|d| d.item),
-        name: object_type_definition.name.item,
+        name: object_type_definition.name,
         concrete_type,
         network_protocol_associated_data: associated_data,
     };

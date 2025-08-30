@@ -168,7 +168,7 @@ fn parse_object_type_definition(
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
         .map_err(|with_span| with_span.map(SchemaParseError::from))?
-        .to_with_location(text_source);
+        .to_with_embedded_location(text_source);
 
     let interfaces = parse_implements_interfaces_if_present(tokens, text_source)?;
     let directives = parse_constant_directives(tokens, text_source)?;
@@ -214,7 +214,7 @@ fn parse_interface_type_definition(
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
         .map_err(|with_span| with_span.map(SchemaParseError::from))?
-        .to_with_location(text_source);
+        .to_with_embedded_location(text_source);
 
     let interfaces = parse_implements_interfaces_if_present(tokens, text_source)?;
     let directives = parse_constant_directives(tokens, text_source)?;
@@ -237,7 +237,7 @@ fn parse_input_object_type_definition(
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
         .map_err(|with_span| with_span.map(SchemaParseError::from))?
-        .to_with_location(text_source);
+        .to_with_embedded_location(text_source);
 
     let directives = parse_constant_directives(tokens, text_source)?;
     let fields = parse_optional_enclosed_items(
@@ -409,7 +409,7 @@ fn parse_union_definition(
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
         .map_err(|with_span| with_span.map(SchemaParseError::from))?
-        .to_with_location(text_source);
+        .to_with_embedded_location(text_source);
 
     let directives = parse_constant_directives(tokens, text_source)?;
 
