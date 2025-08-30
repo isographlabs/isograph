@@ -24,7 +24,7 @@ export type PromiseWrapper<T, E = any> = {
 
 export function wrapPromise<T>(
   promise: Promise<Exclude<T, NotSet>>,
-): PromiseWrapper<T, any> {
+): PromiseWrapper<T, unknown> {
   // TODO confirm suspense works if the promise is already resolved.
   const wrapper: PromiseWrapper<T, any> = { promise, result: NOT_SET };
   promise
