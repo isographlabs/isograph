@@ -77,6 +77,7 @@ fn generate_normalization_ast_node<TNetworkProtocol: NetworkProtocol>(
                 {indent}}},\n"
             )
         }
+        MergedServerSelection::ClientPointer(_) => "".to_string(),
         MergedServerSelection::InlineFragment(inline_fragment) => {
             let MergedInlineFragmentSelection {
                 type_to_refine_to,

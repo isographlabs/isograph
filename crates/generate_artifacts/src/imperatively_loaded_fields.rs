@@ -1,5 +1,5 @@
 use common_lang_types::{
-    ArtifactPathAndContent, ClientScalarSelectableName, ParentObjectEntityNameAndSelectableName,
+    ArtifactPathAndContent, ClientSelectableName, ParentObjectEntityNameAndSelectableName,
     QueryText, ServerObjectEntityName,
 };
 use intern::string_key::Intern;
@@ -21,7 +21,7 @@ pub(crate) struct ImperativelyLoadedEntrypointArtifactInfo {
     pub normalization_ast_text: NormalizationAstText,
     pub query_text: QueryText,
     pub operation_text: OperationText,
-    pub root_fetchable_field: ClientScalarSelectableName,
+    pub root_fetchable_field: ClientSelectableName,
     pub root_fetchable_field_parent_object: ServerObjectEntityName,
     pub refetch_query_index: RefetchQueryIndex,
     pub concrete_type: ServerObjectEntityName,

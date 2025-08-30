@@ -727,26 +727,12 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             }
         }
         SelectionTypeContainingSelections::Object(linked_field) => {
-            let field = match linked_field.associated_data {
-                DefinitionLocation::Server((
-                    parent_object_entity_name,
-                    server_object_selectable_name,
-                )) => schema
-                    .server_object_selectable(
-                        parent_object_entity_name,
-                        server_object_selectable_name,
-                    )
-                    .map(DefinitionLocation::Server),
-                DefinitionLocation::Client((parent_object_entity_name, client_pointer_name)) => {
-                    schema
-                        .client_pointer(parent_object_entity_name, client_pointer_name)
-                        .map(DefinitionLocation::Client)
-                }
-            }
-            .expect(
-                "Expected selectable to exist. \
-                This is indicative of a bug in Isograph.",
-            );
+            let field = schema
+                .object_selectable(linked_field.associated_data)
+                .expect(
+                    "Expected selectable to exist. \
+                        This is indicative of a bug in Isograph.",
+                );
 
             write_optional_description(
                 description(&field),
