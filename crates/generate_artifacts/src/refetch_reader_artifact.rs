@@ -134,7 +134,7 @@ fn generate_function_import_statement(read_out_data: String) -> ClientFieldFunct
         {indent}artifact: RefetchQueryNormalizationArtifact,\n\
         {indent}readOutData: any,\n\
         {indent}filteredVariables: any,\n\
-        {indent}rootLink: Link,\n\
+        {indent}rootLink: Link<any>,\n\
         {indent}// If readerArtifact is null, the return value is undefined.\n\
         {indent}// TODO reflect this in the types.\n\
         {indent}readerArtifact: TopLevelReaderArtifact<any, any, any> | null,\n\
