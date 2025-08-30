@@ -784,10 +784,12 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                         parent_object_entity_name,
                         client_pointer_name,
                     )) => {
-                        let client_pointer =
-                            schema.client_pointer(parent_object_entity_name, client_pointer_name)
-                            .expect("Expected selectable to exist. \
-                                This is indicative of a bug in Isograph.");
+                        let client_pointer = schema
+                            .client_pointer(parent_object_entity_name, client_pointer_name)
+                            .expect(
+                                "Expected selectable to exist. \
+                                This is indicative of a bug in Isograph.",
+                            );
 
                         let new_paths = refetched_paths_with_path(
                             client_pointer.selection_set_for_parent_query(),

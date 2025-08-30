@@ -1214,8 +1214,10 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
     let parent_type = schema
         .server_entity_data
         .server_object_entity(parent_object_entity_id)
-        .expect("Expected entity to exist. \
-                     This is indicative of a bug in Isograph.");
+        .expect(
+            "Expected entity to exist. \
+                     This is indicative of a bug in Isograph.",
+        );
 
     let parent_object_entity_name = ClientOrServerObjectSelectable::parent_object_entity_name(
         &newly_encountered_client_object_selectable,
@@ -1233,7 +1235,7 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
     };
 
     let subfields_or_inline_fragments = vec![
-        WrappedSelectionMapSelection::InlineFragment(parent_type.name),
+        WrappedSelectionMapSelection::InlineFragment(parent_type.name.item),
         WrappedSelectionMapSelection::LinkedField {
             server_object_selectable_name: *NODE_FIELD_NAME,
             arguments: vec![ArgumentKeyAndValue {

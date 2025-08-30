@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, ConstExportName,
-    IsographDirectiveName, Location, ParentObjectEntityNameAndSelectableName, RelativePathToSourceFile,
-    SelectableName, ServerObjectEntityName, TextSource, UnvalidatedTypeName, VariableName,
-    WithLocation, WithSpan,
+    IsographDirectiveName, Location, ParentObjectEntityNameAndSelectableName,
+    RelativePathToSourceFile, SelectableName, ServerObjectEntityName, TextSource,
+    UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
