@@ -1,29 +1,27 @@
-use crate::format::char_index_to_position;
-use crate::hover::get_iso_literal_extraction_from_text_position_params;
-use crate::{lsp_runtime_error::LSPRuntimeResult, uri_file_path_ext::UriFilePathExt};
+use crate::{
+    format::char_index_to_position, hover::get_iso_literal_extraction_from_text_position_params,
+    lsp_runtime_error::LSPRuntimeResult, uri_file_path_ext::UriFilePathExt,
+};
 use common_lang_types::{
     relative_path_from_absolute_and_working_directory, EmbeddedLocation, Location, Span,
 };
 use intern::string_key::Lookup;
-use isograph_compiler::{get_validated_schema, process_iso_literal_extraction};
-use isograph_compiler::{read_iso_literals_source_from_relative_path, CompilerState};
+use isograph_compiler::{
+    get_validated_schema, process_iso_literal_extraction,
+    read_iso_literals_source_from_relative_path, CompilerState,
+};
 use isograph_lang_types::{DefinitionLocation, IsographResolvedNode};
-use isograph_schema::NetworkProtocol;
 use isograph_schema::{
     get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
+    IsoLiteralsSource, IsographDatabase, NetworkProtocol,
 };
-use isograph_schema::{IsoLiteralsSource, IsographDatabase};
-use lsp_types::request::GotoDefinition;
-use lsp_types::request::Request;
-use lsp_types::GotoDefinitionResponse;
-use lsp_types::Range;
-use lsp_types::{Position, Uri};
+use lsp_types::{
+    request::{GotoDefinition, Request},
+    GotoDefinitionResponse, Position, Range, Uri,
+};
 use pico_macros::memo;
 use resolve_position::ResolvePosition;
-use std::borrow::Cow;
-use std::ops::Deref;
-use std::path::PathBuf;
-use std::str::FromStr;
+use std::{borrow::Cow, ops::Deref, path::PathBuf, str::FromStr};
 
 pub fn on_goto_definition<TNetworkProtocol: NetworkProtocol + 'static>(
     compiler_state: &CompilerState<TNetworkProtocol>,
