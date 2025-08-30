@@ -17,7 +17,7 @@ const resolver = (
   // TODO reflect this in the types.
   readerArtifact: TopLevelReaderArtifact<any, any, any> | null,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
-) => (): ItemCleanupPair<FragmentReference<any, any>> | undefined => {
+) => (): ItemCleanupPair<FragmentReference<any, any>> => {
   const variables = includeReadOutData(filteredVariables, readOutData);
   const [networkRequest, disposeNetworkRequest] = makeNetworkRequest(environment, artifact, variables);
   if (readerArtifact == null) return;
