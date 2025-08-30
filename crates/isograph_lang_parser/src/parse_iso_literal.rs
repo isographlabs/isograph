@@ -294,7 +294,7 @@ fn parse_iso_client_pointer_declaration(
 
 fn parse_client_pointer_target_type(
     tokens: &mut PeekableLexer<'_>,
-) -> ParseResultWithSpan<GraphQLTypeAnnotation<UnvalidatedTypeName>> {
+) -> ParseResultWithSpan<GraphQLTypeAnnotation<ServerObjectEntityNameWrapper>> {
     let keyword = tokens
         .parse_source_of_kind(
             IsographLangTokenKind::Identifier,
@@ -309,7 +309,7 @@ fn parse_client_pointer_target_type(
         ));
     }
 
-    parse_type_annotation(tokens)
+    parse_type_annotation(tokens).map(|with_span| with_span.map(ServerObjectEntityNameWrapper))
 }
 
 fn parse_client_pointer_declaration_inner(
