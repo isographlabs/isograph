@@ -194,7 +194,7 @@ fn find_iso_literal_extraction_under_cursor<'a>(
             let diff_char = if diff_line > 0 {
                 target_line_char.character
             } else {
-                target_line_char.character - start_line_count
+                target_line_char.character - start_char_count
             };
 
             // This is the character offset in the extract item where we are hovering
