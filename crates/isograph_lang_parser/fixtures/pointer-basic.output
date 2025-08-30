@@ -22,8 +22,10 @@ Ok(
                         target_type: Named(
                             GraphQLNamedTypeAnnotation(
                                 WithSpan {
-                                    item: UnvalidatedTypeName(
-                                        "User",
+                                    item: ServerObjectEntityNameWrapper(
+                                        UnvalidatedTypeName(
+                                            "User",
+                                        ),
                                     ),
                                     span: Span {
                                         start: 30,

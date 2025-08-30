@@ -108,9 +108,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .get(client_pointer_declaration.item.target_type.inner())
             .ok_or(WithLocation::new(
                 ProcessClientFieldDeclarationError::ParentTypeNotDefined {
-                    parent_type_name: ServerObjectEntityNameWrapper(
-                        *client_pointer_declaration.item.target_type.inner(),
-                    ),
+                    parent_type_name: *client_pointer_declaration.item.target_type.inner(),
                 },
                 Location::new(
                     text_source,
@@ -344,7 +342,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let refetch_strategy = match id_field {
             None => Err(WithSpan::new(
                 ProcessClientFieldDeclarationError::ClientPointerTargetTypeHasNoId {
-                    target_type_name: *client_pointer_declaration.item.target_type.inner(),
+                    target_type_name: client_pointer_declaration.item.target_type.inner().0,
                 },
                 client_pointer_declaration.item.target_type.span(),
             )),

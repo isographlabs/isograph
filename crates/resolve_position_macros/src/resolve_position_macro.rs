@@ -158,6 +158,7 @@ enum ResolveFieldInfoType {
     WithLocation(syn::Type),
     WithEmbeddedLocation(syn::Type),
     WithSpan(syn::Type),
+    GraphQLTypeAnnotation(syn::Type),
 }
 
 enum ResolveFieldInfoTypeWrapper {
@@ -184,57 +185,56 @@ fn extract_single_generic_type(segment: &syn::PathSegment) -> Option<&syn::Type>
     }
 }
 
+fn handle_case(
+    last_segment: &syn::PathSegment,
+    generics_map: &HashMap<syn::Ident, syn::GenericArgument>,
+    ctor: fn(syn::Type) -> ResolveFieldInfoType,
+) -> Result<ResolveFieldInfoTypeWrapper, proc_macro2::TokenStream> {
+    if let Some(inner_type) = extract_single_generic_type(last_segment) {
+        Ok(ResolveFieldInfoTypeWrapper::None(Box::new(ctor(
+            replace_generics_in_type(inner_type.clone(), generics_map),
+        ))))
+    } else {
+        Err(Error::new_spanned(
+            last_segment,
+            format!("{} must have a type parameter", last_segment.ident),
+        )
+        .to_compile_error())
+    }
+}
+
 fn parse_resolve_field_type(
     path: &syn::Path,
     generics_map: &HashMap<syn::Ident, syn::GenericArgument>,
 ) -> Result<ResolveFieldInfoTypeWrapper, proc_macro2::TokenStream> {
     if let Some(last_segment) = path.segments.last() {
-        // Base cases: WithLocation<T>, WithEmbeddedLocation<T> or WithSpan<T>
-        if last_segment.ident == "WithLocation" {
-            if let Some(inner_type) = extract_single_generic_type(last_segment) {
-                return Ok(ResolveFieldInfoTypeWrapper::None(Box::new(
-                    ResolveFieldInfoType::WithLocation(replace_generics_in_type(
-                        inner_type.clone(),
-                        generics_map,
-                    )),
-                )));
+        // Base cases: WithLocation<T>, WithEmbeddedLocation<T>, GraphQLTypeAnnotation<T> or WithSpan<T>
+        match last_segment.ident.to_string().as_str() {
+            "WithLocation" => {
+                return handle_case(
+                    last_segment,
+                    generics_map,
+                    ResolveFieldInfoType::WithLocation,
+                )
             }
-            return Err(Error::new_spanned(
-                last_segment,
-                "WithLocation must have a type parameter",
-            )
-            .to_compile_error());
-        }
-
-        if last_segment.ident == "WithEmbeddedLocation" {
-            if let Some(inner_type) = extract_single_generic_type(last_segment) {
-                return Ok(ResolveFieldInfoTypeWrapper::None(Box::new(
-                    ResolveFieldInfoType::WithEmbeddedLocation(replace_generics_in_type(
-                        inner_type.clone(),
-                        generics_map,
-                    )),
-                )));
+            "WithEmbeddedLocation" => {
+                return handle_case(
+                    last_segment,
+                    generics_map,
+                    ResolveFieldInfoType::WithEmbeddedLocation,
+                )
             }
-            return Err(Error::new_spanned(
-                last_segment,
-                "WithEmbeddedLocation must have a type parameter",
-            )
-            .to_compile_error());
-        }
-
-        if last_segment.ident == "WithSpan" {
-            if let Some(inner_type) = extract_single_generic_type(last_segment) {
-                return Ok(ResolveFieldInfoTypeWrapper::None(Box::new(
-                    ResolveFieldInfoType::WithSpan(replace_generics_in_type(
-                        inner_type.clone(),
-                        generics_map,
-                    )),
-                )));
+            "GraphQLTypeAnnotation" => {
+                return handle_case(
+                    last_segment,
+                    generics_map,
+                    ResolveFieldInfoType::GraphQLTypeAnnotation,
+                )
             }
-            return Err(
-                Error::new_spanned(last_segment, "WithSpan must have a type parameter")
-                    .to_compile_error(),
-            );
+            "WithSpan" => {
+                return handle_case(last_segment, generics_map, ResolveFieldInfoType::WithSpan)
+            }
+            _ => {}
         }
 
         // Container types: Vec<T> or Option<T>
@@ -255,7 +255,7 @@ fn parse_resolve_field_type(
 
     Err(Error::new_spanned(
         path,
-        "Expected WithLocation<T>, WithSpan<T>, Vec<T>, or Option<T> where T is a valid resolve field type",
+        "Expected WithLocation<T>, WithSpan<T>, GraphQLTypeAnnotation<T>, Vec<T>, or Option<T> where T is a valid resolve field type",
     )
     .to_compile_error())
 }
@@ -327,6 +327,12 @@ fn generate_resolve_code_recursive(
                 if #field_expr.span.contains(position) {
                     let new_parent = <#inner_type as ::resolve_position::ResolvePosition>::Parent::#struct_name(self.path(parent).into());
                     return #field_expr.item.resolve(new_parent, position);
+                }
+            },
+            ResolveFieldInfoType::GraphQLTypeAnnotation(inner_type) => quote! {
+                if #field_expr.span().contains(position) {
+                    let new_parent = <#inner_type as ::resolve_position::ResolvePosition>::Parent::#struct_name(self.path(parent).into());
+                    return #field_expr.inner().resolve(new_parent, position);
                 }
             },
         },
