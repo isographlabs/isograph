@@ -376,7 +376,9 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
         SelectionType::Object(client_pointer) => {
             ClientFieldOutputType(print_javascript_type_declaration(
                 &client_pointer.target_object_entity_name.clone().map(
-                    &mut |target_object_entity_name| format!("Link<\"{target_object_entity_name}\">"),
+                    &mut |target_object_entity_name| {
+                        format!("Link<\"{target_object_entity_name}\">")
+                    },
                 ),
             ))
         }

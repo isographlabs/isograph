@@ -576,9 +576,10 @@ pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
 ) -> ClientFieldOutputType {
     let variant = &client_field.variant;
     match variant {
-        ClientFieldVariant::Link => {
-            ClientFieldOutputType(format!("Link<\"{}\">", client_field.parent_object_entity_name))
-        }
+        ClientFieldVariant::Link => ClientFieldOutputType(format!(
+            "Link<\"{}\">",
+            client_field.parent_object_entity_name
+        )),
         ClientFieldVariant::UserWritten(info) => match info.client_field_directive_set {
             ClientFieldDirectiveSet::None(_) => {
                 ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
