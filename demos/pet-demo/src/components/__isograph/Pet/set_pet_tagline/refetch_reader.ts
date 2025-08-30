@@ -12,7 +12,7 @@ const resolver = (
   artifact: RefetchQueryNormalizationArtifact,
   readOutData: any,
   filteredVariables: any,
-  rootLink: Link,
+  rootLink: Link<any>,
   // If readerArtifact is null, the return value is undefined.
   // TODO reflect this in the types.
   readerArtifact: TopLevelReaderArtifact<any, any, any> | null,
