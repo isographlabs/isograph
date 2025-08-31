@@ -7,7 +7,8 @@ export type Route =
   | PetDetailRoute
   | PetDetailDeferredRoute
   | PetByNameRoute
-  | PetCheckinListRoute;
+  | PetCheckinListRoute
+  | SmartestRoute;
 
 export type HomeRoute = {
   kind: 'Home';
@@ -33,6 +34,10 @@ export type PetCheckinListRoute = {
   id: PetId;
 };
 
+export type SmartestRoute = {
+  kind: 'Smartest';
+};
+
 export function useNavigateTo() {
   const router = useRouter();
   return (route: Route) => router.push(toRouteUrl(route));
@@ -54,6 +59,9 @@ function toRouteUrl(route: Route): string {
     }
     case 'PetCheckinList': {
       return `/pet/${route.id}/checkin-list`;
+    }
+    case 'Smartest': {
+      return '/smartest';
     }
     default: {
       let _: never = route;
