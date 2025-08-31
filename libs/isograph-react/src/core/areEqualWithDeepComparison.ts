@@ -1,4 +1,4 @@
-import type { Link } from './IsographEnvironment';
+import type { StoreLink } from './IsographEnvironment';
 import type { ReaderAst, ReaderLinkedField, ReaderScalarField } from './reader';
 
 export function mergeUsingReaderAst(
@@ -101,9 +101,9 @@ export function mergeObjectsUsingReaderAst(
       case 'Link': {
         const key = field.alias;
         // @ts-expect-error
-        const oldValue: Link = oldItemObject[key];
+        const oldValue: StoreLink = oldItemObject[key];
         // @ts-expect-error
-        const newValue: Link = newItemObject[key];
+        const newValue: StoreLink = newItemObject[key];
 
         if (
           oldValue.__link !== newValue.__link ||

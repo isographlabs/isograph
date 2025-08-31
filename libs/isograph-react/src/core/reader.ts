@@ -14,7 +14,7 @@ import {
 import {
   ComponentOrFieldName,
   IsographEnvironment,
-  type Link,
+  type StoreLink,
 } from './IsographEnvironment';
 import { Arguments } from './util';
 
@@ -71,7 +71,7 @@ export type RefetchReaderArtifact = {
     variables: any,
     // TODO type this better
     filteredVariables: any,
-    rootLink: Link,
+    rootLink: StoreLink,
     readerArtifact: TopLevelReaderArtifact<any, any, any> | null,
     // TODO type this better
     nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
@@ -110,7 +110,7 @@ export type ReaderLinkedField = {
   readonly arguments: Arguments | null;
   readonly condition: EagerReaderArtifact<
     { data: any; parameters: any; startUpdate?: StartUpdate<any> },
-    Link | null
+    StoreLink | null
   > | null;
   readonly isUpdatable: boolean;
   /**
