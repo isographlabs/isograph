@@ -15,7 +15,7 @@ const readerAst: ReaderAst<Pet__PetTaglineCard__param> = [
     fieldName: "tagline",
     alias: null,
     arguments: null,
-    isUpdatable: false,
+    isUpdatable: true,
   },
 ];
 
@@ -27,7 +27,7 @@ const artifact: ComponentReaderArtifact<
   fieldName: "Pet.PetTaglineCard",
   resolver,
   readerAst,
-  hasUpdatable: false,
+  hasUpdatable: true,
 };
 
 export default artifact;

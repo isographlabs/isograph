@@ -6,9 +6,9 @@ import React, { Suspense } from 'react';
 export const PetTaglineCard = iso(`
   field Pet.PetTaglineCard @component {
     id
-    tagline
+    tagline @updatable
   }
-`)(function PetTaglineCardComponent({ data: pet }) {
+`)(function PetTaglineCardComponent({ data: pet, startUpdate }) {
   const {
     fragmentReference: mutationRef,
     loadFragmentReference: loadMutation,
@@ -16,12 +16,28 @@ export const PetTaglineCard = iso(`
   const button = (
     <Button
       onClick={() => {
-        loadMutation({
-          input: {
-            id: pet.id,
-            tagline: getRandomTagline(),
-          },
+        const oldTagline = pet.tagline;
+        const newTagline = getRandomTagline();
+
+        startUpdate((data) => {
+          data.tagline = newTagline;
         });
+        loadMutation(
+          {
+            input: {
+              id: pet.id,
+              tagline: newTagline,
+            },
+          },
+          {
+            onError: () => {
+              console.log('Reverting');
+              startUpdate((data) => {
+                data.tagline = oldTagline;
+              });
+            },
+          },
+        );
       }}
       variant="contained"
     >
@@ -69,12 +85,16 @@ export const setTagline = iso(`
 });
 
 function getRandomTagline(): string {
-  const index = Math.floor(Math.random() * 4);
+  const index = Math.floor(Math.random() * 8);
 
   return [
     'I AM HUNGRY',
     'LETS GO TO PARK',
     'Pet me now, human',
     'I am... SUPER DOG',
+    'Woof',
+    'Ruff',
+    'Rub my belly',
+    "I'm a good boy, aren't I?",
   ][index];
 }

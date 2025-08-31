@@ -1,3 +1,4 @@
+import type { StartUpdate } from '@isograph/react';
 
 export type Pet__PetTaglineCard__param = {
   readonly data: {
@@ -5,4 +6,8 @@ export type Pet__PetTaglineCard__param = {
     readonly tagline: string,
   },
   readonly parameters: Record<PropertyKey, never>,
+  readonly startUpdate: StartUpdate<{
+    readonly id: string,
+    tagline: string,
+  }>,
 };
