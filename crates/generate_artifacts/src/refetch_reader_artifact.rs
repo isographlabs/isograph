@@ -94,7 +94,7 @@ pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkPro
             This is indicative of a bug in Isograph.",
         );
 
-    let client_field_output_type = generate_output_type(client_field);
+    let client_field_output_type = generate_output_type(schema, client_field);
 
     let output_type_text = {
         let parent_type_name = parent_type.name;

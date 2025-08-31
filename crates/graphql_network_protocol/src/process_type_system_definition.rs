@@ -83,6 +83,7 @@ pub fn process_graphql_type_system_document(
                     concrete_type,
                     GraphQLSchemaObjectAssociatedData {
                         original_definition_type: GraphQLSchemaOriginalDefinitionType::Object,
+                        subtypes: vec![],
                     },
                     GraphQLObjectDefinitionType::Object,
                     &mut refetch_fields,
@@ -108,6 +109,7 @@ pub fn process_graphql_type_system_document(
                         GraphQLSchemaObjectAssociatedData {
                             original_definition_type:
                                 GraphQLSchemaOriginalDefinitionType::Interface,
+                            subtypes: vec![],
                         },
                         GraphQLObjectDefinitionType::Interface,
                         &mut refetch_fields,
@@ -136,6 +138,7 @@ pub fn process_graphql_type_system_document(
                         GraphQLSchemaObjectAssociatedData {
                             original_definition_type:
                                 GraphQLSchemaOriginalDefinitionType::InputObject,
+                            subtypes: vec![],
                         },
                         GraphQLObjectDefinitionType::InputObject,
                         &mut refetch_fields,
@@ -177,6 +180,7 @@ pub fn process_graphql_type_system_document(
                         None,
                         GraphQLSchemaObjectAssociatedData {
                             original_definition_type: GraphQLSchemaOriginalDefinitionType::Union,
+                            subtypes: vec![],
                         },
                         GraphQLObjectDefinitionType::Union,
                         &mut refetch_fields,
@@ -217,6 +221,21 @@ pub fn process_graphql_type_system_document(
                         .unwrap_or_else(|| "Subscription".intern().into()),
                 })
             }
+        }
+    }
+
+    // add subtypes to associated_data
+    for (supertype_name, subtypes) in supertype_to_subtype_map.iter() {
+        if let Some((object_outcome, _)) = objects.iter_mut().find(|obj| {
+            let supertype_name: ServerObjectEntityName = supertype_name.unchecked_conversion();
+
+            obj.0.server_object_entity.name.item == supertype_name
+        }) {
+            object_outcome
+                .server_object_entity
+                .network_protocol_associated_data
+                .subtypes
+                .extend(subtypes);
         }
     }
 

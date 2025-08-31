@@ -40,6 +40,11 @@ where
         format: Format,
     ) -> QueryText;
 
+    fn generate_link_type(
+        schema: &Schema<Self>,
+        server_object_entity: &ServerObjectEntityName,
+    ) -> String;
+
     // TODO: include `QueryText` to incrementally adopt persisted documents
     fn generate_query_extra_info(
         query_name: QueryOperationName,
