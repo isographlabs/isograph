@@ -1,6 +1,6 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Pet__PetSummaryCard__param } from './param_type';
-import { PetSummaryCard as resolver } from '../../../PetSummaryCard';
+import { PetSummaryCard as resolver } from '../../../Pet/PetSummaryCard';
 import Pet__FavoritePhraseLoader__resolver_reader from '../../Pet/FavoritePhraseLoader/resolver_reader';
 
 const readerAst: ReaderAst<Pet__PetSummaryCard__param> = [

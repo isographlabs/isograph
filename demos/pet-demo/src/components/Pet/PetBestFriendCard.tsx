@@ -1,7 +1,7 @@
 import { iso } from '@iso';
 import { Avatar, Card, CardContent, Stack } from '@mui/material';
 import React from 'react';
-import { useNavigateTo } from './routes';
+import { useNavigateTo } from '../routes';
 
 export const PetBestFriendCard = iso(`
   field Pet.PetBestFriendCard @component {

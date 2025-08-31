@@ -1,6 +1,6 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Pet__FirstCheckinMakeSuperButton__param } from './param_type';
-import { FirstCheckinMakeSuperButton as resolver } from '../../../PetMakeFirstCheckinSuperButton';
+import { FirstCheckinMakeSuperButton as resolver } from '../../../Pet/PetMakeFirstCheckinSuperButton';
 import Checkin__make_super__refetch_reader from '../../Checkin/make_super/refetch_reader';
 
 const readerAst: ReaderAst<Pet__FirstCheckinMakeSuperButton__param> = [

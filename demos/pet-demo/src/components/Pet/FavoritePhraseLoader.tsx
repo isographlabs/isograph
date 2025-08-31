@@ -1,7 +1,7 @@
 import { iso } from '@iso';
 import { FragmentReader, useImperativeReference } from '@isograph/react';
 import React from 'react';
-import { ErrorBoundary } from './ErrorBoundary';
+import { ErrorBoundary } from '../ErrorBoundary';
 
 export const FavoritePhraseLoader = iso(`
   field Pet.FavoritePhraseLoader @component {

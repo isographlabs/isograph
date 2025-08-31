@@ -31,6 +31,7 @@ export const PetDetailDeferredRouteComponent = iso(`
   return <pet.PetDetailDeferredRouteInnerComponent />;
 });
 
+// TODO split into separate files!
 export const PetDetailDeferredRouteInnerComponent = iso(`
   field Pet.PetDetailDeferredRouteInnerComponent @component {
     name

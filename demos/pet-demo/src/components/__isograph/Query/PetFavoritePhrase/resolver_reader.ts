@@ -1,6 +1,6 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Query__PetFavoritePhrase__param } from './param_type';
-import { PetFavoritePhrase as resolver } from '../../../FavoritePhrase';
+import { PetFavoritePhrase as resolver } from '../../../Pet/FavoritePhrase';
 
 const readerAst: ReaderAst<Query__PetFavoritePhrase__param> = [
   {
