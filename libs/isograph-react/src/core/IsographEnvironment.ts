@@ -15,6 +15,7 @@ import { LogFunction, WrappedLogFunction } from './logging';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { WithEncounteredRecords } from './read';
 import type { ReaderAst, StartUpdate } from './reader';
+import type { Brand } from './brand';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
@@ -87,9 +88,6 @@ export type IsographNetworkFunction = (
   operation: IsographOperation | IsographPersistedOperation,
   variables: Variables,
 ) => Promise<any>;
-
-// @ts-ignore
-type Brand<A, B extends symbol | string> = infer _ extends B ? A : never;
 
 export interface Link<T extends TypeName> extends StoreLink {
   readonly __link: Brand<DataId, T>;
