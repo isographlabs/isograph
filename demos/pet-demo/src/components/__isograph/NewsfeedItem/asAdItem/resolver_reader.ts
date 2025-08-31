@@ -16,7 +16,7 @@ const readerAst: ReaderAst<{ data: any, parameters: Record<PropertyKey, never> }
 
 const artifact: EagerReaderArtifact<
   { data: any, parameters: Record<PropertyKey, never> },
-  Link<"NewsfeedItem"> | null
+  Link<"AdItem"> | null
 > = {
   kind: "EagerReaderArtifact",
   fieldName: "NewsfeedItem.asAdItem",

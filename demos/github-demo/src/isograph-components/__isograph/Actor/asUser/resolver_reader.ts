@@ -16,7 +16,7 @@ const readerAst: ReaderAst<{ data: any, parameters: Record<PropertyKey, never> }
 
 const artifact: EagerReaderArtifact<
   { data: any, parameters: Record<PropertyKey, never> },
-  Link<"Actor"> | null
+  Link<"User"> | null
 > = {
   kind: "EagerReaderArtifact",
   fieldName: "Actor.asUser",
