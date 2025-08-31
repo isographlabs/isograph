@@ -331,6 +331,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         let unprocessed_fields = client_pointer_declaration.item.selection_set;
 
+        // TODO extract this into a helper function, probably on TNetworkProtocol
         let id_field = self
             .server_entity_data
             .server_object_entity_extra_info
