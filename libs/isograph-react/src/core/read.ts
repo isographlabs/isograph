@@ -355,7 +355,7 @@ export function readLoadablySelectedFieldData(
                 entrypoint,
                 localVariables,
                 readerWithRefetchQueries,
-                fetchOptions,
+                fetchOptions ?? null,
               );
 
             const fragmentReference: FragmentReference<any, any> = {
@@ -411,7 +411,7 @@ export function readLoadablySelectedFieldData(
                         entrypoint,
                         localVariables,
                         readerWithRefetchQueries,
-                        fetchOptions,
+                        fetchOptions ?? null,
                       );
                     entrypointLoaderState = {
                       kind: 'NetworkRequestStarted',
@@ -872,28 +872,30 @@ export function readLinkedFieldData(
               refetchReaderParams.data,
             );
 
+            const readerWithRefetchQueries = wrapResolvedValue({
+              kind: 'ReaderWithRefetchQueries',
+              readerArtifact: {
+                kind: 'EagerReaderArtifact',
+                fieldName: field.fieldName,
+                readerAst: field.selections,
+                resolver: ({ data }: { data: any }) => data,
+                hasUpdatable: false,
+              },
+              nestedRefetchQueries,
+            } as const);
+
             const [networkRequest, disposeNetworkRequest] =
               maybeMakeNetworkRequest(
                 environment,
                 refetchQueryArtifact,
                 variables,
-                undefined,
-                fetchOptions,
+                readerWithRefetchQueries,
+                fetchOptions ?? null,
               );
 
             const fragmentReference: FragmentReference<any, any> = {
               kind: 'FragmentReference',
-              readerWithRefetchQueries: wrapResolvedValue({
-                kind: 'ReaderWithRefetchQueries',
-                readerArtifact: {
-                  kind: 'EagerReaderArtifact',
-                  fieldName: field.fieldName,
-                  readerAst: field.selections,
-                  resolver: ({ data }) => data,
-                  hasUpdatable: false,
-                },
-                nestedRefetchQueries,
-              }),
+              readerWithRefetchQueries: readerWithRefetchQueries,
               root: targetId,
               variables,
               networkRequest,

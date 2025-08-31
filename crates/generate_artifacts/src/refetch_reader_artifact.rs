@@ -141,7 +141,7 @@ fn generate_function_import_statement(read_out_data: String) -> ClientFieldFunct
         {indent}nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],\n\
         ) => (): ItemCleanupPair<FragmentReference<any, any>> | undefined => {{\n\
         {indent}const variables = includeReadOutData(filteredVariables, readOutData);\n\
-        {indent}const [networkRequest, disposeNetworkRequest] = makeNetworkRequest(environment, artifact, variables);\n\
+        {indent}const [networkRequest, disposeNetworkRequest] = makeNetworkRequest(environment, artifact, variables, null, null);\n\
         {indent}if (readerArtifact == null) return;\n\
         {indent}const fragmentReference = {{\n\
         {indent}  kind: \"FragmentReference\",\n\

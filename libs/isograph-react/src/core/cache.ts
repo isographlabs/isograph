@@ -116,7 +116,7 @@ export function getOrCreateCacheForArtifact<
       entrypoint,
       variables,
       readerWithRefetchQueries,
-      fetchOptions,
+      fetchOptions ?? null,
     );
 
     const itemCleanupPair: ItemCleanupPair<

@@ -44,12 +44,10 @@ export function maybeMakeNetworkRequest<
   environment: IsographEnvironment,
   artifact: TArtifact,
   variables: ExtractParameters<TReadFromStore>,
-  readerWithRefetchQueries: TArtifact['kind'] extends 'Entrypoint'
-    ? PromiseWrapper<
-        ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
-      >
-    : undefined,
-  fetchOptions?: FetchOptions<TClientFieldValue>,
+  readerWithRefetchQueries: PromiseWrapper<
+    ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
+  > | null,
+  fetchOptions: FetchOptions<TClientFieldValue> | null,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
   switch (fetchOptions?.shouldFetch ?? DEFAULT_SHOULD_FETCH_VALUE) {
     case 'Yes': {
@@ -122,12 +120,10 @@ export function makeNetworkRequest<
   environment: IsographEnvironment,
   artifact: TArtifact,
   variables: ExtractParameters<TReadFromStore>,
-  readerWithRefetchQueries?: TArtifact['kind'] extends 'Entrypoint'
-    ? PromiseWrapper<
-        ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
-      >
-    : undefined,
-  fetchOptions?: FetchOptions<TClientFieldValue>,
+  readerWithRefetchQueries: PromiseWrapper<
+    ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
+  > | null,
+  fetchOptions: FetchOptions<TClientFieldValue> | null,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
   // TODO this should be a DataId and stored in the store
   const myNetworkRequestId = networkRequestId + '';

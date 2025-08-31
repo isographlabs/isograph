@@ -71,7 +71,7 @@ export function useImperativeReference<
         entrypoint,
         variables,
         readerWithRefetchQueries,
-        fetchOptions,
+        fetchOptions ?? null,
       );
       setState([
         {
