@@ -13,6 +13,21 @@ export const PetTaglineCard = iso(`
     fragmentReference: mutationRef,
     loadFragmentReference: loadMutation,
   } = useImperativeReference(iso(`entrypoint Mutation.SetTagline`));
+  const button = (
+    <Button
+      onClick={() => {
+        loadMutation({
+          input: {
+            id: pet.id,
+            tagline: getRandomTagline(),
+          },
+        });
+      }}
+      variant="contained"
+    >
+      Randomize tagline
+    </Button>
+  );
 
   return (
     <Card
@@ -23,21 +38,11 @@ export const PetTaglineCard = iso(`
         <h2>Tagline</h2>
         <p>&quot;{pet.tagline}&quot;</p>
         {mutationRef === null ? (
-          <Button
-            onClick={() => {
-              loadMutation({
-                input: {
-                  id: pet.id,
-                  tagline: 'SUPER DOG',
-                },
-              });
-            }}
-            variant="contained"
-          >
-            Set tagline to SUPER DOG
-          </Button>
+          button
         ) : (
-          <Suspense fallback="Mutation in flight">
+          <Suspense fallback="Updating tagline...">
+            {button}
+            <br />
             <FragmentReader fragmentReference={mutationRef} />
           </Suspense>
         )}
@@ -62,3 +67,14 @@ export const setTagline = iso(`
     </>
   );
 });
+
+function getRandomTagline(): string {
+  const index = Math.floor(Math.random() * 4);
+
+  return [
+    'I AM HUNGRY',
+    'LETS GO TO PARK',
+    'Pet me now, human',
+    'I am... SUPER DOG',
+  ][index];
+}
