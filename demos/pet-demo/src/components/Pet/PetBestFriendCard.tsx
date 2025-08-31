@@ -1,5 +1,5 @@
 import { iso } from '@iso';
-import { Avatar, Card, CardContent, Stack } from '@mui/material';
+import { Card, CardContent, Stack } from '@mui/material';
 import React from 'react';
 import { useNavigateTo } from '../routes';
 
