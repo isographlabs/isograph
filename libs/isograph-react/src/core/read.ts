@@ -752,13 +752,7 @@ export function readLinkedFieldData(
           }
         : undefined),
     });
-    if (condition === true) {
-      link = root;
-    } else if (condition === false) {
-      link = null;
-    } else {
-      link = condition;
-    }
+    link = condition;
   }
 
   if (link === undefined) {
