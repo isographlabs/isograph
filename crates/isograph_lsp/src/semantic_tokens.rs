@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use crate::{
-    location_utils::uri_is_in_project_root,
+    location_utils::uri_is_project_file,
     lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult},
     uri_file_path_ext::UriFilePathExt,
 };
@@ -57,7 +57,7 @@ fn get_semantic_tokens<TNetworkProtocol: NetworkProtocol + 'static>(
 ) -> Result<Option<LspSemanticTokensResult>, LSPRuntimeError> {
     // TODO we should embed this check elsewhere, and not here. For example, we should just
     // not call .expect on things, and handle non-source files gracefully.
-    if !uri_is_in_project_root(db, &uri) {
+    if !uri_is_project_file(db, &uri) {
         return Ok(None);
     }
 
