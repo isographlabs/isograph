@@ -224,23 +224,6 @@ pub fn process_graphql_type_system_document(
         }
     }
 
-    // add subtypes to associated_data
-    for (supertype_name, subtypes) in supertype_to_subtype_map.iter() {
-        let (object_outcome, _) = objects
-            .iter_mut()
-            .find(|obj| {
-                let supertype_name: ServerObjectEntityName = supertype_name.unchecked_conversion();
-
-                obj.0.server_object_entity.name.item == supertype_name
-            })
-            .expect("Expected supertype to exist. This is indicative of a bug in Isograph.");
-        object_outcome
-            .server_object_entity
-            .network_protocol_associated_data
-            .subtypes
-            .extend(subtypes);
-    }
-
     // For each supertype (e.g. Node) and a subtype (e.g. Pet), we need to add an asConcreteType field.
     for (supertype_name, subtypes) in supertype_to_subtype_map.iter() {
         let (object_outcome, _) = objects
@@ -251,6 +234,13 @@ pub fn process_graphql_type_system_document(
                 obj.0.server_object_entity.name.item == supertype_name
             })
             .expect("Expected supertype to exist. This is indicative of a bug in Isograph.");
+
+        // add subtypes to associated_data
+        object_outcome
+            .server_object_entity
+            .network_protocol_associated_data
+            .subtypes
+            .extend(subtypes);
 
         for subtype_name in subtypes.iter() {
             object_outcome.fields_to_insert.push(WithLocation::new(
