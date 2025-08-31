@@ -28,6 +28,8 @@ import { type Query__PetCheckinListRoute__param } from './Query/PetCheckinListRo
 import { type Query__PetDetailDeferredRoute__param } from './Query/PetDetailDeferredRoute/param_type';
 import { type Query__PetDetailRoute__param } from './Query/PetDetailRoute/param_type';
 import { type Query__PetFavoritePhrase__param } from './Query/PetFavoritePhrase/param_type';
+import { type Query__SmartestPetRoute__param } from './Query/SmartestPetRoute/param_type';
+import { type Query__smartestPet__param } from './Query/smartestPet/param_type';
 import { type Viewer__NewsfeedPaginationComponent__param } from './Viewer/NewsfeedPaginationComponent/param_type';
 import entrypoint_Mutation__SetTagline from '../__isograph/Mutation/SetTagline/entrypoint';
 import entrypoint_Query__HomeRoute from '../__isograph/Query/HomeRoute/entrypoint';
@@ -37,6 +39,7 @@ import entrypoint_Query__PetCheckinListRoute from '../__isograph/Query/PetChecki
 import entrypoint_Query__PetDetailDeferredRoute from '../__isograph/Query/PetDetailDeferredRoute/entrypoint';
 import entrypoint_Query__PetDetailRoute from '../__isograph/Query/PetDetailRoute/entrypoint';
 import entrypoint_Query__PetFavoritePhrase from '../__isograph/Query/PetFavoritePhrase/entrypoint';
+import entrypoint_Query__SmartestPetRoute from '../__isograph/Query/SmartestPetRoute/entrypoint';
 
 // This is the type given to regular client fields.
 // This means that the type of the exported iso literal is exactly
@@ -203,6 +206,14 @@ export function iso<T>(
 ): IdentityWithParamComponent<Query__PetFavoritePhrase__param>;
 
 export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.SmartestPetRoute', T>
+): IdentityWithParamComponent<Query__SmartestPetRoute__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'pointer Query.smartestPet', T>
+): IdentityWithParam<Query__smartestPet__param>;
+
+export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Viewer.NewsfeedPaginationComponent', T>
 ): IdentityWithParam<Viewer__NewsfeedPaginationComponent__param>;
 
@@ -237,6 +248,10 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.PetFavoritePhrase', T>
 ): typeof entrypoint_Query__PetFavoritePhrase;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.SmartestPetRoute', T>
+): typeof entrypoint_Query__SmartestPetRoute;
 
 export function iso(_isographLiteralText: string):
   | IdentityWithParam<any>
