@@ -458,32 +458,41 @@ pub enum ProcessClientFieldDeclarationError {
         parent_type_name: ServerObjectEntityNameWrapper,
     },
 
-    #[error("Directive {directive_name} is not supported on client pointers.")]
+    #[error("Directive `@{directive_name}` is not supported on client pointers.")]
     DirectiveNotSupportedOnClientPointer {
         directive_name: IsographDirectiveName,
     },
 
-    #[error("Invalid parent type. `{parent_type_name}` is a scalar. You are attempting to define a {literal_type} on it. \
-        In order to do so, the parent object must be an object, interface or union.")]
+    #[error(
+        "Invalid parent type. `{parent_type_name}` is a scalar. \
+        You are attempting to define a {literal_type} on it. \
+        In order to do so, the parent object must be an object, interface or union."
+    )]
     InvalidParentType {
         literal_type: String,
         parent_type_name: UnvalidatedTypeName,
     },
 
-    #[error("Invalid client pointer target type. `{target_type_name}` is a scalar. You are attempting to define a pointer to it. \
-        In order to do so, the type must be an object, interface or union.")]
+    #[error(
+        "Invalid client pointer target type. `{target_type_name}` is a scalar. \
+        You are attempting to define a pointer to it. \
+        In order to do so, the type must be an object, interface or union."
+    )]
     ClientPointerInvalidTargetType {
         target_type_name: UnvalidatedTypeName,
     },
 
-    #[error("Invalid client pointer target type. `{target_type_name}` has no id field. You are attempting to define a pointer to it. \
-        In order to do so, the target must be an object implementing Node interface.")]
+    #[error(
+        "Invalid client pointer target type. `{target_type_name}` has no id field. \
+        You are attempting to define a pointer to it. \
+        In order to do so, the target must be an object implementing the `Node` interface."
+    )]
     ClientPointerTargetTypeHasNoId {
         target_type_name: UnvalidatedTypeName,
     },
 
     #[error(
-        "The Isograph object type \"{parent_type_name}\" already has a field named \"{client_field_name}\"."
+        "The Isograph object type `{parent_type_name}` already has a field named `{client_field_name}`."
     )]
     ParentAlreadyHasField {
         parent_type_name: ServerObjectEntityName,
@@ -494,7 +503,8 @@ pub enum ProcessClientFieldDeclarationError {
     UnableToDeserializeDirectives { message: DeserializationError },
 
     #[error(
-        "The argument `{argument_name}` on field `{parent_type_name}.{field_name}` has inner type `{argument_type}`, which does not exist."
+        "The argument `{argument_name}` on field `{parent_type_name}.{field_name}` \
+        has inner type `{argument_type}`, which does not exist."
     )]
     FieldArgumentTypeDoesNotExist {
         argument_name: VariableName,
