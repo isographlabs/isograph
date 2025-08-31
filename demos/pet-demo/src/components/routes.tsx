@@ -55,6 +55,10 @@ function toRouteUrl(route: Route): string {
     case 'PetCheckinList': {
       return `/pet/${route.id}/checkin-list`;
     }
+    default: {
+      let _: never = route;
+      throw new Error('Unhandled route');
+    }
   }
 }
 
