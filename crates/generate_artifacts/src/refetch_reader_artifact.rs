@@ -121,6 +121,7 @@ pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkPro
 
 fn generate_function_import_statement(read_out_data: String) -> ClientFieldFunctionImportStatement {
     let indent = "  ";
+    // TODO: use better type than Link<any>
     ClientFieldFunctionImportStatement(format!(
         "{read_out_data}\n\
         import {{ makeNetworkRequest, wrapResolvedValue, type IsographEnvironment, \
