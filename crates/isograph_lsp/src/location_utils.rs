@@ -3,6 +3,8 @@ use lsp_types::Uri;
 
 use crate::uri_file_path_ext::UriFilePathExt;
 
+// TODO we should have a function that goes from Uri to Option<ProjectFile>
+// and use ProfileFile everywhere in the LSP, instead of this one-off check
 pub(crate) fn uri_is_project_file<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     uri: &Uri,
