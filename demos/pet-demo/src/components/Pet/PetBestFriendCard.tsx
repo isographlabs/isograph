@@ -12,7 +12,7 @@ export const PetBestFriendCard = iso(`
       best_friend {
         id
         name
-        picture
+        Avatar
       }
     }
   }
@@ -40,16 +40,13 @@ export const PetBestFriendCard = iso(`
       <CardContent>
         <Stack direction="column" spacing={4}>
           <Stack direction="row" spacing={4}>
-            <Avatar
-              sx={{ height: 100, width: 100 }}
-              src={bestFriendRelationship.best_friend.picture}
+            <bestFriendRelationship.best_friend.Avatar
               onClick={() =>
                 navigateTo({
                   kind: 'PetDetail',
                   id: bestFriendRelationship.best_friend.id,
                 })
               }
-              style={{ cursor: 'pointer' }}
             />
             <div style={{ width: 300 }}>
               <h2>Best friend: {bestFriendRelationship.best_friend.name}</h2>

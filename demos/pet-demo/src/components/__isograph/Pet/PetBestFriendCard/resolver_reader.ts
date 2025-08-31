@@ -1,6 +1,7 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Pet__PetBestFriendCard__param } from './param_type';
 import { PetBestFriendCard as resolver } from '../../../Pet/PetBestFriendCard';
+import Pet__Avatar__resolver_reader from '../../Pet/Avatar/resolver_reader';
 import Pet__PetUpdater__resolver_reader from '../../Pet/PetUpdater/resolver_reader';
 
 const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
@@ -56,11 +57,11 @@ const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
             isUpdatable: false,
           },
           {
-            kind: "Scalar",
-            fieldName: "picture",
-            alias: null,
+            kind: "Resolver",
+            alias: "Avatar",
             arguments: null,
-            isUpdatable: false,
+            readerArtifact: Pet__Avatar__resolver_reader,
+            usedRefetchQueries: [],
           },
         ],
         refetchQueryIndex: null,

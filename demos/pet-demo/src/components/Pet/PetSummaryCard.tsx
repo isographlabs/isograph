@@ -7,11 +7,11 @@ export const PetSummaryCard = iso(`
   field Pet.PetSummaryCard @component {
     id
     name
-    picture
+    Avatar
     tagline
     FavoritePhraseLoader
   }
-`)(function PetSummaryCardComponent({ data }) {
+`)(function PetSummaryCardComponent({ data: pet }) {
   const navigateTo = useNavigateTo();
   return (
     <Card
@@ -20,13 +20,11 @@ export const PetSummaryCard = iso(`
     >
       <CardContent>
         <Stack direction="row" spacing={4}>
-          <Avatar
-            sx={{ height: 100, width: 100, cursor: 'pointer' }}
-            src={data.picture}
+          <pet.Avatar
             onClick={() =>
               navigateTo({
                 kind: 'PetDetail',
-                id: data.id,
+                id: pet.id,
               })
             }
           />
@@ -35,21 +33,21 @@ export const PetSummaryCard = iso(`
               onClick={() =>
                 navigateTo({
                   kind: 'PetDetailDeferred',
-                  id: data.id,
+                  id: pet.id,
                 })
               }
               style={{ cursor: 'pointer' }}
             >
-              {data.name}
+              {pet.name}
             </h2>
             <div>
-              <i>{data.tagline}</i>
+              <i>{pet.tagline}</i>
             </div>
-            <data.FavoritePhraseLoader />
+            <pet.FavoritePhraseLoader />
             <div>
               <Button
                 onClick={() =>
-                  navigateTo({ kind: 'PetCheckinList', id: data.id })
+                  navigateTo({ kind: 'PetCheckinList', id: pet.id })
                 }
                 variant="text"
               >

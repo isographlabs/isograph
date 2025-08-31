@@ -7,6 +7,7 @@ import { type Image__ImageDisplayWrapper__param } from './Image/ImageDisplayWrap
 import { type Image__ImageDisplay__param } from './Image/ImageDisplay/param_type';
 import { type Mutation__SetTagline__param } from './Mutation/SetTagline/param_type';
 import { type NewsfeedItem__NewsfeedAdOrBlog__param } from './NewsfeedItem/NewsfeedAdOrBlog/param_type';
+import { type Pet__Avatar__param } from './Pet/Avatar/param_type';
 import { type Pet__FavoritePhraseLoader__param } from './Pet/FavoritePhraseLoader/param_type';
 import { type Pet__FirstCheckinMakeSuperButton__param } from './Pet/FirstCheckinMakeSuperButton/param_type';
 import { type Pet__PetBestFriendCard__param } from './Pet/PetBestFriendCard/param_type';
@@ -116,6 +117,10 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field NewsfeedItem.NewsfeedAdOrBlog', T>
 ): IdentityWithParamComponent<NewsfeedItem__NewsfeedAdOrBlog__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Pet.Avatar', T>
+): IdentityWithParamComponent<Pet__Avatar__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.FavoritePhraseLoader', T>
