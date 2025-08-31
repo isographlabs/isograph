@@ -49,7 +49,7 @@ pub(crate) type ProcessTypeDefinitionResult<T> =
 pub enum CreateAdditionalFieldsError {
     #[error(
         "The Isograph compiler attempted to create a field named \
-        \"{field_name}\" on type \"{parent_type}\", but a field with that name already exists."
+        `{field_name}` on type `{parent_type}`, but a field with that name already exists."
     )]
     CompilerCreatedFieldExistsOnType {
         field_name: SelectableName,
@@ -57,7 +57,7 @@ pub enum CreateAdditionalFieldsError {
     },
 
     // TODO include info about where the field was previously defined
-    #[error("Duplicate field named \"{field_name}\" on type \"{parent_type}\"")]
+    #[error("Duplicate field named `{field_name}` on type `{parent_type}`")]
     DuplicateField {
         field_name: SelectableName,
         parent_type: ServerObjectEntityName,
@@ -100,7 +100,7 @@ pub enum CreateAdditionalFieldsError {
     FailedToDeserialize(String),
 
     #[error(
-        "The {strong_field_name} field on \"{parent_type}\" must have type \"ID!\".\n\
+        "The `{strong_field_name}` field on `{parent_type}` must have type `ID!`.\n\
         This error can be suppressed using the \"on_invalid_id_type\" config parameter."
     )]
     IdFieldMustBeNonNullIdType {
@@ -118,12 +118,12 @@ pub enum CreateAdditionalFieldsError {
         argument_type: UnvalidatedTypeName,
     },
 
-    #[error("This field has type {target_entity_type_name}, which does not exist")]
+    #[error("This field has type `{target_entity_type_name}`, which does not exist")]
     FieldTypenameDoesNotExist {
         target_entity_type_name: UnvalidatedTypeName,
     },
 
-    #[error("Duplicate type definition ({type_definition_type}) named \"{type_name}\"")]
+    #[error("Duplicate type definition (`{type_definition_type}`) named `{type_name}`")]
     DuplicateTypeDefinition {
         type_definition_type: &'static str,
         type_name: UnvalidatedTypeName,
