@@ -334,7 +334,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let id_field = self
             .server_entity_data
             .server_object_entity_extra_info
-            .get(&parent_object_name)
+            .get(to_object_name.inner())
             .expect(
                 "Expected parent_object_entity_name \
                 to exist in server_object_entity_available_selectables",
