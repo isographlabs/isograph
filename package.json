@@ -45,7 +45,8 @@
     "coverage": "vitest run --coverage",
     "sanity-check": "./scripts/sanity-check.sh",
     "generate-fixture-tests": "cargo run --bin generate_isograph_fixtures -- --dir ./crates/isograph_lang_parser/fixtures/",
-    "fix-line-endings": "git diff $(git merge-base main HEAD) --name-only | xargs -I {} dos2unix {}"
+    "fix-line-endings": "git diff $(git merge-base main HEAD) --name-only | xargs -I {} dos2unix {}",
+    "latest-published-version": "pnpm view @isograph/react dist-tags.main"
   },
   "license": "MIT",
   "repository": {
