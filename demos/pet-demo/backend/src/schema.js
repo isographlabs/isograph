@@ -303,6 +303,14 @@ const pets = [
     age: 21,
     tagline: 'The lost one',
     favorite_phrase: null,
+    stats: {
+      weight: 10,
+      intelligence: 90,
+      cuteness: 40,
+      hunger: 30,
+      sociability: 14,
+      energy: 12,
+    },
   },
   {
     __typename: 'Pet',
@@ -313,6 +321,14 @@ const pets = [
     age: 7,
     tagline: 'The lazy one',
     favorite_phrase: 'It would be too much effort to utter a phrase.',
+    stats: {
+      weight: 45,
+      intelligence: 30,
+      cuteness: 35,
+      hunger: 100,
+      sociability: 8,
+      energy: 4,
+    },
   },
   {
     __typename: 'Pet',
@@ -323,6 +339,14 @@ const pets = [
     age: 3,
     tagline: 'The golden child',
     favorite_phrase: "I'll get that lazer pointer, you just watch!",
+    stats: {
+      weight: 18,
+      intelligence: 95,
+      cuteness: 55,
+      hunger: 30,
+      sociability: 22,
+      energy: 45,
+    },
   },
   {
     __typename: 'Pet',
