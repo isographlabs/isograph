@@ -9,6 +9,7 @@ use crate::server::LSPProcessResult;
 mod format;
 mod goto_definition;
 mod hover;
+mod location_utils;
 pub mod lsp_notification_dispatch;
 mod lsp_request_dispatch;
 pub mod lsp_runtime_error;
