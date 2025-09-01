@@ -332,7 +332,8 @@ pub enum ProcessGraphqlTypeSystemDefinitionError {
     AttemptedToExtendUndefinedType { type_name: ServerObjectEntityName },
 
     #[error(
-        "Type {subtype_name} claims to implement {supertype_name}, but {supertype_name} is not a type that has been defined.")]
+        "Type {subtype_name} claims to implement {supertype_name}, but {supertype_name} is not a type that has been defined."
+    )]
     AttemptedToImplementNonExistentType {
         subtype_name: UnvalidatedTypeName,
         supertype_name: UnvalidatedTypeName,
