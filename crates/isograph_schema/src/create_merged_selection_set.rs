@@ -1276,13 +1276,6 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
         },
     );
 
-    merge_traversal_state
-        .accessible_client_fields
-        .insert(SelectionType::Object((
-            parent_object_entity_name,
-            newly_encountered_client_object_selectable_name,
-        )));
-
     let normalization_key = NormalizationKey::ClientPointer(name_and_arguments);
 
     merge_traversal_state
