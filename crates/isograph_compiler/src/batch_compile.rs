@@ -92,6 +92,7 @@ pub fn print_result<TNetworkProtocol: NetworkProtocol + 'static>(
 ///
 /// These are less "core" to the overall mission, and thus invite the question
 /// of whether they belong in this function, or at all.
+#[tracing::instrument(skip(db))]
 pub fn compile<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<CompilationStats, BatchCompileError<TNetworkProtocol>> {

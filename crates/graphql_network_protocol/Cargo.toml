@@ -18,3 +18,4 @@ pico_macros = { path = "../pico_macros" }
 lazy_static = { workspace = true }
 pathdiff = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }

@@ -39,4 +39,7 @@ pub(crate) struct LspCommand {
     /// package.json under the `isograph` key.
     #[arg(long)]
     pub config: Option<PathBuf>,
+
+    #[arg(long, value_enum, default_value = "info")]
+    pub log_level: LevelFilter,
 }

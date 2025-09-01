@@ -114,9 +114,11 @@ pub(crate) fn memo_macro(_args: TokenStream, item: TokenStream) -> TokenStream {
             }
         });
 
+    let fn_name = sig.ident.to_string();
     let output = quote! {
         #(#attrs)*
         #vis #new_sig {
+            let _memo_span = ::tracing::debug_span!(#fn_name).entered();
             let mut param_ids = ::pico::macro_fns::init_param_vec();
             #(
                 #param_ids_blocks

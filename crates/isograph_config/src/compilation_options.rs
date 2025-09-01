@@ -40,6 +40,7 @@ pub struct CompilerConfigOptions {
     pub module: JavascriptModule,
     pub generated_file_header: Option<GeneratedFileHeader>,
     pub persisted_documents: Option<PersistedDocumentsOptions>,
+    pub opentelemetry: Option<OpenTelemetryOptions>,
 }
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
@@ -103,6 +104,13 @@ pub struct PersistedDocumentsOptions {
     pub file: Option<PathBuf>,
     pub algorithm: PersistedDocumentsHashAlgorithm,
     pub include_extra_info: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpenTelemetryOptions {
+    pub enable_tracing: bool,
+    pub collector_endpoint: String,
+    pub service_name: String,
 }
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
@@ -243,6 +251,8 @@ pub struct ConfigFileOptions {
     generated_file_header: Option<String>,
     /// Persisted documents options
     persisted_documents: Option<ConfigFilePersistedDocumentsOptions>,
+    /// OpenTelemetry tracing configuration
+    opentelemetry: Option<ConfigFileOpenTelemetryOptions>,
 }
 
 #[derive(Deserialize, Debug, Clone, Copy, JsonSchema)]
@@ -282,6 +292,17 @@ pub struct ConfigFilePersistedDocumentsOptions {
     pub include_extra_info: bool,
 }
 
+#[derive(Deserialize, Default, JsonSchema, Debug)]
+#[serde(default, deny_unknown_fields)]
+pub struct ConfigFileOpenTelemetryOptions {
+    /// Enable sending traces to a collector
+    pub enable_tracing: bool,
+    /// OTLP collector endpoint (e.g., http://localhost:4317)
+    pub collector_endpoint: Option<String>,
+    /// Service name for traces
+    pub service_name: Option<String>,
+}
+
 #[derive(Deserialize, Default, Debug, Clone, Copy, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum ConfigFilePersistedDocumentsHashAlgorithm {
@@ -309,6 +330,7 @@ fn create_options(options: ConfigFileOptions) -> CompilerConfigOptions {
         module: create_module(options.module),
         generated_file_header,
         persisted_documents: create_persisted_documents(options.persisted_documents),
+        opentelemetry: create_opentelemetry(options.opentelemetry),
     }
 }
 
@@ -353,6 +375,18 @@ fn create_persisted_documents(
             algorithm,
             include_extra_info: options.include_extra_info,
         }
+    })
+}
+
+fn create_opentelemetry(
+    opentelemetry: Option<ConfigFileOpenTelemetryOptions>,
+) -> Option<OpenTelemetryOptions> {
+    opentelemetry.map(|options| OpenTelemetryOptions {
+        enable_tracing: options.enable_tracing,
+        collector_endpoint: options
+            .collector_endpoint
+            .unwrap_or("http://localhost:4317".to_string()),
+        service_name: options.service_name.unwrap_or("isograph_cli".to_string()),
     })
 }
 
