@@ -81,14 +81,16 @@ export function stableCopy<T>(value: T): T {
 export function getOrCreateCacheForArtifact<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
-  TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
+  TEntrypoint extends
+    | IsographEntrypoint<TReadFromStore, TClientFieldValue, NormalizationAst>
+    | IsographEntrypoint<
+        TReadFromStore,
+        TClientFieldValue,
+        NormalizationAstLoader
+      >,
 >(
   environment: IsographEnvironment,
-  entrypoint: IsographEntrypoint<
-    TReadFromStore,
-    TClientFieldValue,
-    TNormalizationAst
-  >,
+  entrypoint: TEntrypoint,
   variables: ExtractParameters<TReadFromStore>,
   fetchOptions?: FetchOptions<TClientFieldValue>,
 ): ParentCache<FragmentReference<TReadFromStore, TClientFieldValue>> {

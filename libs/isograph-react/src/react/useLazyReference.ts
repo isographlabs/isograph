@@ -3,36 +3,37 @@ import { getOrCreateCacheForArtifact } from '../core/cache';
 import { FetchOptions, type RequiredFetchOptions } from '../core/check';
 import {
   IsographEntrypoint,
+  type ExtractNormalizationAst,
+  type ExtractReadFromStore,
+  type ExtractResolverResult,
   type NormalizationAst,
   type NormalizationAstLoader,
 } from '../core/entrypoint';
 import {
   ExtractParameters,
   FragmentReference,
-  type UnknownTReadFromStore,
 } from '../core/FragmentReference';
 import { logMessage } from '../core/logging';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 
 export function useLazyReference<
-  TReadFromStore extends UnknownTReadFromStore,
-  TClientFieldValue,
-  TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
+  TEntrypoint extends
+    | IsographEntrypoint<any, any, NormalizationAst>
+    | IsographEntrypoint<any, any, NormalizationAstLoader>,
 >(
-  entrypoint: IsographEntrypoint<
-    TReadFromStore,
-    TClientFieldValue,
-    TNormalizationAst
-  >,
-  variables: ExtractParameters<TReadFromStore>,
-  ...[fetchOptions]: TNormalizationAst extends NormalizationAstLoader
-    ? [fetchOptions: RequiredFetchOptions<TClientFieldValue>]
-    : [fetchOptions?: FetchOptions<TClientFieldValue>]
-): NormalizationAst | NormalizationAstLoader extends TNormalizationAst
-  ? unknown
-  : {
-      fragmentReference: FragmentReference<TReadFromStore, TClientFieldValue>;
-    } {
+  entrypoint: TEntrypoint,
+  variables: ExtractParameters<ExtractReadFromStore<TEntrypoint>>,
+  ...[
+    fetchOptions,
+  ]: NormalizationAstLoader extends ExtractNormalizationAst<TEntrypoint>
+    ? [fetchOptions: RequiredFetchOptions<ExtractResolverResult<TEntrypoint>>]
+    : [fetchOptions?: FetchOptions<ExtractResolverResult<TEntrypoint>>]
+): {
+  fragmentReference: FragmentReference<
+    ExtractReadFromStore<TEntrypoint>,
+    ExtractResolverResult<TEntrypoint>
+  >;
+} {
   const environment = useIsographEnvironment();
 
   if (entrypoint?.kind !== 'Entrypoint') {
@@ -57,13 +58,9 @@ export function useLazyReference<
 
 // @ts-ignore
 function tsTests() {
-  let withAst!: IsographEntrypoint<any, unknown, NormalizationAst>;
-  let withAstLoader!: IsographEntrypoint<any, unknown, NormalizationAstLoader>;
-  let withAstOrLoader!: IsographEntrypoint<
-    any,
-    unknown,
-    NormalizationAst | NormalizationAstLoader
-  >;
+  let withAst!: IsographEntrypoint<any, any, NormalizationAst>;
+  let withAstLoader!: IsographEntrypoint<any, any, NormalizationAstLoader>;
+  let withAstOrLoader = Math.random() ? withAst : withAstLoader;
 
   useLazyReference(withAst, {}) satisfies {};
   useLazyReference(withAst, {}, { shouldFetch: 'Yes' }) satisfies {};
@@ -76,15 +73,39 @@ function tsTests() {
   useLazyReference(withAstLoader, {}, { shouldFetch: 'IfNecessary' });
 
   // if the type is unknown there can be no ast so we should use the same rules
-  // but because of TS bugs with inference we just return unknown
-  // @ts-expect-error this returns unknown which doesn't satisfy the constraint
-  useLazyReference(withAstOrLoader, {}) satisfies {};
-  // @ts-expect-error this returns unknown which doesn't satisfy the constraint
+  // @ts-expect-error if there's no ast, require `shouldFetch` to be specified
+  useLazyReference(withAstOrLoader, {});
   useLazyReference(withAstOrLoader, {}, { shouldFetch: 'Yes' }) satisfies {};
+  // @ts-expect-error if there's no ast, `shouldFetch` can't be `IfNecessary`
+  useLazyReference(withAstOrLoader, {}, { shouldFetch: 'IfNecessary' });
+
+  type Foo = {
+    parameters: { foo: '' };
+    data: any;
+  };
+  type Bar = {
+    parameters: { bar: '' };
+    data: any;
+  };
+  type Baz = {
+    parameters: { baz: '' };
+    data: any;
+  };
+
+  let withVariables!:
+    | IsographEntrypoint<Foo, 'Foo', NormalizationAst>
+    | IsographEntrypoint<Bar, 'Bar', NormalizationAstLoader>
+    | IsographEntrypoint<Baz, 'Baz', NormalizationAstLoader>;
+
   useLazyReference(
-    withAstOrLoader,
-    {},
-    { shouldFetch: 'IfNecessary' },
-    // @ts-expect-error this returns unknown which doesn't satisfy the constraint
-  ) satisfies {};
+    withVariables,
+    {
+      foo: '',
+      bar: '',
+      baz: '',
+    },
+    { shouldFetch: 'Yes' },
+  ) satisfies {
+    readonly fragmentReference: FragmentReference<any, 'Foo' | 'Bar' | 'Baz'>;
+  };
 }

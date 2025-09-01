@@ -5,13 +5,15 @@ import {
 import { FetchOptions, type RequiredFetchOptions } from '../core/check';
 import {
   IsographEntrypoint,
+  type ExtractNormalizationAst,
+  type ExtractReadFromStore,
+  type ExtractResolverResult,
   type NormalizationAst,
   type NormalizationAstLoader,
 } from '../core/entrypoint';
 import {
   ExtractParameters,
   FragmentReference,
-  type UnknownTReadFromStore,
 } from '../core/FragmentReference';
 import { ROOT_ID } from '../core/IsographEnvironment';
 import { maybeMakeNetworkRequest } from '../core/makeNetworkRequest';
@@ -19,37 +21,32 @@ import { wrapPromise, wrapResolvedValue } from '../core/PromiseWrapper';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 
 export type UseImperativeReferenceResult<
-  TReadFromStore extends UnknownTReadFromStore,
-  TClientFieldValue,
-  TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
+  TEntrypoint extends
+    | IsographEntrypoint<any, any, NormalizationAst>
+    | IsographEntrypoint<any, any, NormalizationAstLoader>,
 > = {
   fragmentReference: FragmentReference<
-    TReadFromStore,
-    TClientFieldValue
+    ExtractReadFromStore<TEntrypoint>,
+    ExtractResolverResult<TEntrypoint>
   > | null;
   loadFragmentReference: (
-    variables: ExtractParameters<TReadFromStore>,
-    ...[fetchOptions]: NormalizationAstLoader extends TNormalizationAst
-      ? [fetchOptions: RequiredFetchOptions<TClientFieldValue>]
-      : [fetchOptions?: FetchOptions<TClientFieldValue>]
+    variables: ExtractParameters<ExtractReadFromStore<TEntrypoint>>,
+    ...[
+      fetchOptions,
+    ]: NormalizationAstLoader extends ExtractNormalizationAst<TEntrypoint>
+      ? [fetchOptions: RequiredFetchOptions<ExtractResolverResult<TEntrypoint>>]
+      : [fetchOptions?: FetchOptions<ExtractResolverResult<TEntrypoint>>]
   ) => void;
 };
 
 export function useImperativeReference<
-  TReadFromStore extends UnknownTReadFromStore,
-  TClientFieldValue,
-  TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
->(
-  entrypoint: IsographEntrypoint<
-    TReadFromStore,
-    TClientFieldValue,
-    TNormalizationAst
-  >,
-): UseImperativeReferenceResult<
-  TReadFromStore,
-  TClientFieldValue,
-  TNormalizationAst
-> {
+  TEntrypoint extends
+    | IsographEntrypoint<any, any, NormalizationAst>
+    | IsographEntrypoint<any, any, NormalizationAstLoader>,
+>(entrypoint: TEntrypoint): UseImperativeReferenceResult<TEntrypoint> {
+  type TReadFromStore = ExtractReadFromStore<TEntrypoint>;
+  type TClientFieldValue = ExtractResolverResult<TEntrypoint>;
+
   const { state, setState } =
     useUpdatableDisposableState<
       FragmentReference<TReadFromStore, TClientFieldValue>
@@ -87,4 +84,49 @@ export function useImperativeReference<
       ]);
     },
   };
+}
+
+// @ts-ignore
+function tsTests() {
+  let withAst!: IsographEntrypoint<any, 'Foo', NormalizationAst>;
+  let withAstLoader!: IsographEntrypoint<any, 'Bar', NormalizationAstLoader>;
+  let withAstOrLoader = Math.random() ? withAst : withAstLoader;
+
+  useImperativeReference(withAst).loadFragmentReference({});
+  useImperativeReference(withAst).loadFragmentReference(
+    {},
+    { shouldFetch: 'Yes' },
+  );
+  useImperativeReference(withAst).loadFragmentReference(
+    {},
+    { shouldFetch: 'IfNecessary' },
+  );
+
+  // @ts-expect-error if there's no ast, require `shouldFetch` to be specified
+  useImperativeReference(withAstLoader).loadFragmentReference({});
+  useImperativeReference(withAstLoader).loadFragmentReference(
+    {},
+    { shouldFetch: 'Yes' },
+  );
+  useImperativeReference(withAstLoader).loadFragmentReference(
+    {},
+    // @ts-expect-error if there's no ast, `shouldFetch` can't be `IfNecessary`
+    { shouldFetch: 'IfNecessary' },
+  );
+
+  // if the type is unknown there can be no ast so we should use the same rules
+  // @ts-expect-error if there's no ast, require `shouldFetch` to be specified
+  useImperativeReference(withAstOrLoader).loadFragmentReference({});
+  useImperativeReference(withAstOrLoader).loadFragmentReference(
+    {},
+    { shouldFetch: 'Yes' },
+  );
+  useImperativeReference(withAstOrLoader) satisfies {
+    readonly fragmentReference: FragmentReference<any, 'Foo' | 'Bar'> | null;
+  };
+  useImperativeReference(withAstOrLoader).loadFragmentReference(
+    {},
+    // @ts-expect-error if there's no ast, `shouldFetch` can't be `IfNecessary`
+    { shouldFetch: 'IfNecessary' },
+  );
 }

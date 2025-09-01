@@ -148,4 +148,6 @@ export type ExtractReadFromStore<Type> =
   Type extends IsographEntrypoint<infer X, any, any> ? X : never;
 export type ExtractResolverResult<Type> =
   Type extends IsographEntrypoint<any, infer X, any> ? X : never;
+export type ExtractNormalizationAst<Type> =
+  Type extends IsographEntrypoint<any, any, infer X> ? X : never;
 export type ExtractProps<Type> = Type extends React.FC<infer X> ? X : never;
