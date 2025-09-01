@@ -7,12 +7,10 @@ use graphql_network_protocol::GraphQLNetworkProtocol;
 use intern::string_key::Intern;
 use isograph_compiler::{compile_and_print, handle_watch_command};
 use isograph_config::create_config;
-use opentelemetry::KeyValue;
-use opentelemetry::sdk::Resource;
+use opentelemetry::{KeyValue, sdk::Resource};
 use opentelemetry_otlp::WithExportConfig;
 use opt::{Command, CompileCommand, LspCommand, Opt};
-use std::io;
-use std::path::PathBuf;
+use std::{io, path::PathBuf};
 use tracing::{error, info, level_filters::LevelFilter};
 use tracing_subscriber::{EnvFilter, prelude::*};
 
@@ -118,7 +116,7 @@ fn configure_logger(
     let fmt_layer =
         fmt_layer.with_filter(EnvFilter::from_default_env().add_directive(log_level.into()));
 
-    if let Some(options) = config.options.opentelemetry
+    if let Some(options) = config.options.open_telemetry
         && options.enable_tracing
     {
         let tracer =

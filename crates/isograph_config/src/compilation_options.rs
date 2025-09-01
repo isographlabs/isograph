@@ -40,7 +40,7 @@ pub struct CompilerConfigOptions {
     pub module: JavascriptModule,
     pub generated_file_header: Option<GeneratedFileHeader>,
     pub persisted_documents: Option<PersistedDocumentsOptions>,
-    pub opentelemetry: Option<OpenTelemetryOptions>,
+    pub open_telemetry: Option<OpenTelemetryOptions>,
 }
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
@@ -252,7 +252,7 @@ pub struct ConfigFileOptions {
     /// Persisted documents options
     persisted_documents: Option<ConfigFilePersistedDocumentsOptions>,
     /// OpenTelemetry tracing configuration
-    opentelemetry: Option<ConfigFileOpenTelemetryOptions>,
+    open_telemetry: Option<ConfigFileOpenTelemetryOptions>,
 }
 
 #[derive(Deserialize, Debug, Clone, Copy, JsonSchema)]
@@ -330,7 +330,7 @@ fn create_options(options: ConfigFileOptions) -> CompilerConfigOptions {
         module: create_module(options.module),
         generated_file_header,
         persisted_documents: create_persisted_documents(options.persisted_documents),
-        opentelemetry: create_opentelemetry(options.opentelemetry),
+        open_telemetry: create_open_telemetry(options.open_telemetry),
     }
 }
 
@@ -378,10 +378,10 @@ fn create_persisted_documents(
     })
 }
 
-fn create_opentelemetry(
-    opentelemetry: Option<ConfigFileOpenTelemetryOptions>,
+fn create_open_telemetry(
+    open_telemetry: Option<ConfigFileOpenTelemetryOptions>,
 ) -> Option<OpenTelemetryOptions> {
-    opentelemetry.map(|options| OpenTelemetryOptions {
+    open_telemetry.map(|options| OpenTelemetryOptions {
         enable_tracing: options.enable_tracing,
         collector_endpoint: options
             .collector_endpoint

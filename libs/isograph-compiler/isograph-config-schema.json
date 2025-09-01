@@ -145,7 +145,7 @@
             }
           ]
         },
-        "opentelemetry": {
+        "open_telemetry": {
           "description": "OpenTelemetry tracing configuration",
           "anyOf": [
             {
