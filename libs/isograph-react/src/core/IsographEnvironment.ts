@@ -88,6 +88,14 @@ export type IsographNetworkFunction = (
   variables: Variables,
 ) => Promise<any>;
 
+// @ts-ignore
+type Brand<A, B extends symbol | string> = infer _ extends B ? A : never;
+
+export type BrandedLink<T extends TypeName> = {
+  readonly __link: Brand<DataId, T>;
+  readonly __typename: T;
+};
+
 export type Link = {
   readonly __link: DataId;
   readonly __typename: TypeName;
