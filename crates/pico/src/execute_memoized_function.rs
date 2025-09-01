@@ -1,4 +1,5 @@
 use dashmap::Entry;
+use tracing::{Level, debug_span, event, trace_span};
 
 use crate::{
     Database, InnerFn,
@@ -67,33 +68,38 @@ pub fn execute_memoized_function<Db: Database>(
         db.get_storage().top_level_calls.push(derived_node_id);
     }
 
-    let (time_updated, did_recalculate) =
-        if let Some(derived_node) = db.get_storage().internal.get_derived_node(derived_node_id) {
-            if db
-                .get_storage()
+    let (time_updated, did_recalculate) = if let Some(derived_node) =
+        db.get_storage().internal.get_derived_node(derived_node_id)
+    {
+        if db
+            .get_storage()
+            .internal
+            .node_verified_in_current_epoch(derived_node_id)
+        {
+            event!(Level::TRACE, "epoch not changed");
+            (
+                db.get_storage().internal.current_epoch,
+                DidRecalculate::ReusedMemoizedValue,
+            )
+        } else {
+            db.get_storage()
                 .internal
-                .node_verified_in_current_epoch(derived_node_id)
-            {
+                .verify_derived_node(derived_node_id);
+            if any_dependency_changed(db, derived_node) {
+                let _recalc_span = trace_span!("recalculating_due_to_dependency_change").entered();
+                update_derived_node(db, derived_node_id, derived_node.value.as_ref(), inner_fn)
+            } else {
+                event!(Level::TRACE, "dependencies up-to-date");
                 (
                     db.get_storage().internal.current_epoch,
                     DidRecalculate::ReusedMemoizedValue,
                 )
-            } else {
-                db.get_storage()
-                    .internal
-                    .verify_derived_node(derived_node_id);
-                if any_dependency_changed(db, derived_node) {
-                    update_derived_node(db, derived_node_id, derived_node.value.as_ref(), inner_fn)
-                } else {
-                    (
-                        db.get_storage().internal.current_epoch,
-                        DidRecalculate::ReusedMemoizedValue,
-                    )
-                }
             }
-        } else {
-            create_derived_node(db, derived_node_id, inner_fn)
-        };
+        }
+    } else {
+        let _create_span = debug_span!("creating_new_derived_node").entered();
+        create_derived_node(db, derived_node_id, inner_fn)
+    };
     db.get_storage().register_dependency_in_parent_memoized_fn(
         NodeKind::Derived(derived_node_id),
         time_updated,
@@ -147,9 +153,11 @@ fn update_derived_node<Db: Database>(
             };
 
             let did_recalculate = if *prev_value != *value {
+                event!(Level::TRACE, "value changed");
                 occupied.get_mut().time_updated = tracked_dependencies.max_time_updated;
                 DidRecalculate::Recalculated
             } else {
+                event!(Level::TRACE, "value up-to-date");
                 DidRecalculate::ReusedMemoizedValue
             };
 

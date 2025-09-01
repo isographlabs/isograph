@@ -99,6 +99,7 @@ lazy_static! {
 /// output_type artifact.
 ///
 /// TODO this should go through OutputFormat
+#[tracing::instrument(skip(schema, config))]
 pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     config: &CompilerConfig,

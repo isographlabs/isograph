@@ -56,6 +56,33 @@
         "esmodule"
       ]
     },
+    "ConfigFileOpenTelemetryOptions": {
+      "type": "object",
+      "properties": {
+        "collector_endpoint": {
+          "description": "OTLP collector endpoint (e.g., http://localhost:4317)",
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "enable_tracing": {
+          "description": "Enable sending traces to a collector",
+          "default": false,
+          "type": "boolean"
+        },
+        "service_name": {
+          "description": "Service name for traces",
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "ConfigFileOptionalValidationLevel": {
       "oneOf": [
         {
@@ -115,6 +142,17 @@
           "allOf": [
             {
               "$ref": "#/definitions/ConfigFileOptionalValidationLevel"
+            }
+          ]
+        },
+        "opentelemetry": {
+          "description": "OpenTelemetry tracing configuration",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ConfigFileOpenTelemetryOptions"
+            },
+            {
+              "type": "null"
             }
           ]
         },

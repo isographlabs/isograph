@@ -6,10 +6,15 @@ use common_lang_types::CurrentWorkingDirectory;
 use graphql_network_protocol::GraphQLNetworkProtocol;
 use intern::string_key::Intern;
 use isograph_compiler::{compile_and_print, handle_watch_command};
+use isograph_config::create_config;
+use opentelemetry::KeyValue;
+use opentelemetry::sdk::Resource;
+use opentelemetry_otlp::WithExportConfig;
 use opt::{Command, CompileCommand, LspCommand, Opt};
 use std::io;
+use std::path::PathBuf;
 use tracing::{error, info, level_filters::LevelFilter};
-use tracing_subscriber::fmt::format::FmtSpan;
+use tracing_subscriber::{EnvFilter, prelude::*};
 
 #[tokio::main]
 async fn main() {
@@ -30,11 +35,14 @@ async fn start_compiler(
     compile_command: CompileCommand,
     current_working_directory: CurrentWorkingDirectory,
 ) {
-    configure_logger(compile_command.log_level);
     let config_location = compile_command
         .config
         .unwrap_or("./isograph.config.json".into());
-
+    configure_logger(
+        compile_command.log_level,
+        &config_location,
+        current_working_directory,
+    );
     if compile_command.watch {
         match handle_watch_command::<GraphQLNetworkProtocol>(
             &config_location,
@@ -67,6 +75,11 @@ async fn start_language_server(
     let config_location = lsp_command
         .config
         .unwrap_or("./isograph.config.json".into());
+    configure_logger(
+        lsp_command.log_level,
+        &config_location,
+        current_working_directory,
+    );
     info!("Starting language server");
     if let Err(_e) = isograph_lsp::start_language_server::<GraphQLNetworkProtocol>(
         &config_location,
@@ -83,24 +96,54 @@ async fn start_language_server(
     }
 }
 
-fn configure_logger(log_level: LevelFilter) {
-    let mut collector = tracing_subscriber::fmt()
+fn configure_logger(
+    log_level: LevelFilter,
+    config_location: &PathBuf,
+    current_working_directory: CurrentWorkingDirectory,
+) {
+    let config = create_config(config_location, current_working_directory);
+
+    let mut fmt_layer = tracing_subscriber::fmt::layer()
         .pretty()
         .without_time()
-        .with_max_level(log_level)
         .with_writer(io::stderr);
-    match log_level {
-        LevelFilter::DEBUG | LevelFilter::TRACE => {
-            collector = collector.with_span_events(FmtSpan::FULL);
-        }
-        _ => {
-            collector = collector
-                .with_file(false)
-                .with_line_number(false)
-                .with_target(false);
-        }
+
+    if !matches!(log_level, LevelFilter::DEBUG | LevelFilter::TRACE) {
+        fmt_layer = fmt_layer
+            .with_file(false)
+            .with_line_number(false)
+            .with_target(false);
     }
-    collector.init();
+
+    let fmt_layer =
+        fmt_layer.with_filter(EnvFilter::from_default_env().add_directive(log_level.into()));
+
+    if let Some(options) = config.options.opentelemetry
+        && options.enable_tracing
+    {
+        let tracer =
+            opentelemetry_otlp::new_pipeline()
+                .tracing()
+                .with_exporter(
+                    opentelemetry_otlp::new_exporter()
+                        .tonic()
+                        .with_endpoint(options.collector_endpoint),
+                )
+                .with_trace_config(opentelemetry::sdk::trace::config().with_resource(
+                    Resource::new(vec![KeyValue::new("service.name", options.service_name)]),
+                ))
+                .install_batch(opentelemetry::runtime::Tokio)
+                .expect("Failed to install OTLP tracer");
+
+        let otlp_layer = tracing_opentelemetry::layer().with_tracer(tracer);
+
+        tracing_subscriber::registry()
+            .with(fmt_layer)
+            .with(otlp_layer)
+            .init();
+    } else {
+        tracing_subscriber::registry().with(fmt_layer).init();
+    }
 }
 
 fn current_working_directory() -> CurrentWorkingDirectory {

@@ -22,3 +22,6 @@ notify-debouncer-full = { workspace = true }
 pretty-duration = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+tracing-opentelemetry = { workspace = true }
+opentelemetry = { workspace = true }
+opentelemetry-otlp = { workspace = true }
