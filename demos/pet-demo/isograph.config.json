@@ -5,6 +5,11 @@
   "schema_extensions": ["./backend/schema-extension.graphql"],
   "options": {
     "on_invalid_id_type": "error",
-    "module": "commonjs"
+    "module": "commonjs",
+    "open_telemetry": {
+      "service_name": "pet-demo",
+      "collector_endpoint": "http://localhost:4137",
+      "enable_tracing": true
+    }
   }
 }
