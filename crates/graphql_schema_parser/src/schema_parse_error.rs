@@ -11,10 +11,14 @@ pub enum SchemaParseError {
     #[error("{error}")]
     ParseError { error: LowLevelParseError },
 
-    #[error("Expected scalar, type, interface, union, enum, input object, schema or directive, found \"{found_text}\"")]
+    #[error(
+        "Expected scalar, type, interface, union, enum, input object, schema or directive, found \"{found_text}\""
+    )]
     TopLevelSchemaDeclarationExpected { found_text: String },
 
-    #[error("Expected extend, scalar, type, interface, union, enum, input object, schema or directive, found \"{found_text}\"")]
+    #[error(
+        "Expected extend, scalar, type, interface, union, enum, input object, schema or directive, found \"{found_text}\""
+    )]
     TopLevelSchemaDeclarationOrExtensionExpected { found_text: String },
 
     #[error("Unable to parse constant value")]
@@ -38,7 +42,9 @@ pub enum SchemaParseError {
     #[error("Expected schema, mutation or subscription")]
     ExpectedRootOperationType,
 
-    #[error("Root operation types (query, subscription and mutation) cannot be defined twice in a schema definition")]
+    #[error(
+        "Root operation types (query, subscription and mutation) cannot be defined twice in a schema definition"
+    )]
     RootOperationTypeRedefined,
 }
 

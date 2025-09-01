@@ -1,7 +1,7 @@
 use crate::IsographLangTokenKind;
 use common_lang_types::{Span, WithSpan};
 use intern::string_key::{Intern, StringKey};
-use isograph_lang_types::{semantic_token_legend, IsographSemanticToken};
+use isograph_lang_types::{IsographSemanticToken, semantic_token_legend};
 use logos::Logos;
 use thiserror::Error;
 

@@ -5,9 +5,9 @@ use dashmap::DashMap;
 use tracing::debug;
 
 use crate::{
+    Database, DerivedNode, DerivedNodeId, DerivedNodeRevision, InternalStorage, ParamId,
     dependency::{Dependency, NodeKind},
     index::Index,
-    Database, DerivedNode, DerivedNodeId, DerivedNodeRevision, InternalStorage, ParamId,
 };
 
 impl<Db: Database> InternalStorage<Db> {

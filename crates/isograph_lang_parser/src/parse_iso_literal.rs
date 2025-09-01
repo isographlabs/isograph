@@ -9,18 +9,18 @@ use graphql_lang_types::{
 };
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
-    from_isograph_field_directives, semantic_token_legend, ClientFieldDeclaration,
-    ClientPointerDeclaration, ConstantValue, EntrypointDeclaration, IsographFieldDirective,
-    IsographResolvedNode, IsographSemanticToken, NonConstantValue, ObjectSelection,
-    ScalarSelection, SelectionFieldArgument, SelectionTypeContainingSelections,
+    ClientFieldDeclaration, ClientPointerDeclaration, ConstantValue, EntrypointDeclaration,
+    IsographFieldDirective, IsographResolvedNode, IsographSemanticToken, NonConstantValue,
+    ObjectSelection, ScalarSelection, SelectionFieldArgument, SelectionTypeContainingSelections,
     ServerObjectEntityNameWrapper, UnvalidatedSelection, VariableDefinition,
+    from_isograph_field_directives, semantic_token_legend,
 };
 use resolve_position_macros::ResolvePosition;
 use std::{collections::HashSet, ops::ControlFlow};
 
 use crate::{
-    parse_optional_description, IsographLangTokenKind, IsographLiteralParseError,
-    ParseResultWithLocation, ParseResultWithSpan, PeekableLexer,
+    IsographLangTokenKind, IsographLiteralParseError, ParseResultWithLocation, ParseResultWithSpan,
+    PeekableLexer, parse_optional_description,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, ResolvePosition)]

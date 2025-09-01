@@ -2,15 +2,15 @@ use std::ops::Deref;
 
 use common_lang_types::WithLocation;
 use isograph_schema::{
-    validate_use_of_arguments, IsographDatabase, NetworkProtocol, Schema,
-    ValidateUseOfArgumentsError,
+    IsographDatabase, NetworkProtocol, Schema, ValidateUseOfArgumentsError,
+    validate_use_of_arguments,
 };
 use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
-    create_schema, process_iso_literals_for_schema, ContainsIsoStats, CreateSchemaError,
-    ProcessIsoLiteralsForSchemaError,
+    ContainsIsoStats, CreateSchemaError, ProcessIsoLiteralsForSchemaError, create_schema,
+    process_iso_literals_for_schema,
 };
 
 #[memo]

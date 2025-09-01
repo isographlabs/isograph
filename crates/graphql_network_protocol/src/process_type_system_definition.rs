@@ -15,8 +15,8 @@ use isograph_lang_types::Description;
 use isograph_schema::{
     CreateAdditionalFieldsError, ExposeAsFieldToInsert, ExposeFieldDirective, FieldMapItem,
     FieldToInsert, IsographObjectTypeDefinition, ProcessObjectTypeDefinitionOutcome,
-    ProcessTypeSystemDocumentOutcome, ServerObjectEntity, ServerScalarEntity,
-    STRING_JAVASCRIPT_TYPE, TYPENAME_FIELD_NAME,
+    ProcessTypeSystemDocumentOutcome, STRING_JAVASCRIPT_TYPE, ServerObjectEntity,
+    ServerScalarEntity, TYPENAME_FIELD_NAME,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
@@ -324,7 +324,9 @@ pub enum ProcessGraphqlTypeSystemDefinitionError {
     #[error("Attempted to extend {type_name}, but that type is not defined")]
     AttemptedToExtendUndefinedType { type_name: ServerObjectEntityName },
 
-    #[error("Type {subtype_name} claims to implement {supertype_name}, but {supertype_name} is not a type that has been defined.")]
+    #[error(
+        "Type {subtype_name} claims to implement {supertype_name}, but {supertype_name} is not a type that has been defined."
+    )]
     AttemptedToImplementNonExistentType {
         subtype_name: UnvalidatedTypeName,
         supertype_name: UnvalidatedTypeName,

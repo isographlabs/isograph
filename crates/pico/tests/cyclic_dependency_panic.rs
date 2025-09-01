@@ -1,5 +1,5 @@
 use pico::Storage;
-use pico_macros::{memo, Db};
+use pico_macros::{Db, memo};
 
 #[derive(Db, Default)]
 struct TestDatabase {

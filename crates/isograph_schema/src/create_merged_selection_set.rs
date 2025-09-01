@@ -1,4 +1,4 @@
-use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet, btree_map::Entry};
 
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, Location,
@@ -18,16 +18,16 @@ use isograph_lang_types::{
 use lazy_static::lazy_static;
 
 use crate::{
+    ClientFieldVariant, ClientObjectSelectable, ClientOrServerObjectSelectable,
+    ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, ClientSelectableId,
+    ImperativelyLoadedFieldVariant, NameAndArguments, NetworkProtocol, PathToRefetchField,
+    RootOperationName, Schema, ServerEntityName, ServerObjectEntity, ServerObjectEntityExtraInfo,
+    ServerObjectSelectable, ServerObjectSelectableVariant, ValidatedObjectSelection,
+    ValidatedScalarSelection, ValidatedSelection, VariableContext,
     create_transformed_name_and_arguments,
-    field_loadability::{categorize_field_loadability, Loadability},
+    field_loadability::{Loadability, categorize_field_loadability},
     initial_variable_context, transform_arguments_with_child_context,
-    transform_name_and_arguments_with_child_variable_context, ClientFieldVariant,
-    ClientObjectSelectable, ClientOrServerObjectSelectable, ClientScalarOrObjectSelectable,
-    ClientScalarSelectable, ClientSelectable, ClientSelectableId, ImperativelyLoadedFieldVariant,
-    NameAndArguments, NetworkProtocol, PathToRefetchField, RootOperationName, Schema,
-    ServerEntityName, ServerObjectEntity, ServerObjectEntityExtraInfo, ServerObjectSelectable,
-    ServerObjectSelectableVariant, ValidatedObjectSelection, ValidatedScalarSelection,
-    ValidatedSelection, VariableContext,
+    transform_name_and_arguments_with_child_variable_context,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -286,15 +286,17 @@ pub fn current_target_merged_selections<'a>(
             .expect("Expected linked field to exist by now. This is indicate of a bug in Isograph.")
         {
             MergedServerSelection::ScalarField(_) => {
-                panic!("Expected a linked field, found scalar. This is indicative of a bug in Isograph.")
+                panic!(
+                    "Expected a linked field, found scalar. This is indicative of a bug in Isograph."
+                )
             }
-            MergedServerSelection::LinkedField(ref linked_field) => {
+            MergedServerSelection::LinkedField(linked_field) => {
                 parent_selection_map = &linked_field.selection_map;
             }
-            MergedServerSelection::ClientPointer(ref client_pointer) => {
+            MergedServerSelection::ClientPointer(client_pointer) => {
                 parent_selection_map = &client_pointer.selection_map;
             }
-            MergedServerSelection::InlineFragment(ref inline_fragment) => {
+            MergedServerSelection::InlineFragment(inline_fragment) => {
                 parent_selection_map = &inline_fragment.selection_map;
             }
         }

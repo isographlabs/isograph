@@ -1,5 +1,5 @@
-use anyhow::{bail, Result};
-use isograph_config::{ConfigFileJavascriptModule, IsographProjectConfig, ISOGRAPH_FOLDER};
+use anyhow::{Result, bail};
+use isograph_config::{ConfigFileJavascriptModule, ISOGRAPH_FOLDER, IsographProjectConfig};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::Deserialize;
@@ -11,15 +11,15 @@ use std::{
 use swc_atoms::Atom;
 use swc_core::{
     common::{
-        errors::HANDLER, plugin::metadata::TransformPluginMetadataContextKind, Mark, Span, DUMMY_SP,
+        DUMMY_SP, Mark, Span, errors::HANDLER, plugin::metadata::TransformPluginMetadataContextKind,
     },
     ecma::{
         ast::*,
-        visit::{noop_fold_type, Fold, FoldWith},
+        visit::{Fold, FoldWith, noop_fold_type},
     },
     plugin::{plugin_transform, proxies::TransformPluginProgramMetadata},
 };
-use swc_ecma_utils::{prepend_stmts, quote_ident, ExprFactory};
+use swc_ecma_utils::{ExprFactory, prepend_stmts, quote_ident};
 use swc_trace_macro::swc_trace;
 
 use thiserror::Error;
@@ -198,12 +198,14 @@ impl ValidIsographTemplateLiteral {
                     "require"
                 )
                 .as_callee(),
-                args: vec![Lit::Str(Str {
-                    span: Default::default(),
-                    value: Atom::from(path),
-                    raw: None,
-                })
-                .as_arg()],
+                args: vec![
+                    Lit::Str(Str {
+                        span: Default::default(),
+                        value: Atom::from(path),
+                        raw: None,
+                    })
+                    .as_arg(),
+                ],
                 type_args: None,
             })),
             prop: MemberProp::Ident(Ident {
@@ -407,19 +409,19 @@ impl Fold for IsoLiteralCompilerVisitor<'_> {
                     span: child_span,
                     ..
                 }) => {
-                    if let Expr::Ident(ident) = &**child_callee {
-                        if ident.sym == "iso" {
-                            match self.compile_iso_call_statement(child_args, Some(args)) {
-                                Ok(build_expr) => {
-                                    // might have `iso` functions inside the build expr
-                                    let build_expr = build_expr.fold_children_with(self);
-                                    return build_expr;
-                                }
-                                Err(err) => {
-                                    let _ = show_error(*child_span, &err);
-                                    // On error, we keep the same expression and fail showing the error
-                                    return expr;
-                                }
+                    if let Expr::Ident(ident) = &**child_callee
+                        && ident.sym == "iso"
+                    {
+                        match self.compile_iso_call_statement(child_args, Some(args)) {
+                            Ok(build_expr) => {
+                                // might have `iso` functions inside the build expr
+                                let build_expr = build_expr.fold_children_with(self);
+                                return build_expr;
+                            }
+                            Err(err) => {
+                                let _ = show_error(*child_span, &err);
+                                // On error, we keep the same expression and fail showing the error
+                                return expr;
                             }
                         }
                     }

@@ -12,17 +12,17 @@ use isograph_config::CompilerConfigOptions;
 use isograph_lang_parser::{IsoLiteralExtractionResult, IsographLiteralParseError};
 use isograph_lang_types::{ConstantValue, SelectionType, TypeAnnotation, VariableDefinition};
 use isograph_schema::{
-    validate_entrypoints, CreateAdditionalFieldsError, FieldToInsert, IsographDatabase,
-    NetworkProtocol, ProcessClientFieldDeclarationError, ProcessObjectTypeDefinitionOutcome,
+    CreateAdditionalFieldsError, FieldToInsert, IsographDatabase, NetworkProtocol,
+    ProcessClientFieldDeclarationError, ProcessObjectTypeDefinitionOutcome,
     ProcessTypeSystemDocumentOutcome, Schema, ServerEntityName, ServerObjectSelectable,
     ServerObjectSelectableVariant, ServerScalarSelectable, UnprocessedClientFieldItem,
-    UnprocessedClientPointerItem, ValidateEntrypointDeclarationError,
+    UnprocessedClientPointerItem, ValidateEntrypointDeclarationError, validate_entrypoints,
 };
 use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
-    add_selection_sets::{add_selection_sets_to_client_selectables, AddSelectionSetsError},
+    add_selection_sets::{AddSelectionSetsError, add_selection_sets_to_client_selectables},
     get_iso_literal_map,
     isograph_literals::{parse_iso_literal_in_source, process_iso_literals},
 };

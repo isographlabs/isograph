@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Data, DeriveInput, Error, Fields};
+use syn::{Data, DeriveInput, Error, Fields, parse_macro_input};
 
 pub(crate) fn source_macro(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
@@ -12,13 +12,13 @@ pub(crate) fn source_macro(item: TokenStream) -> TokenStream {
             _ => {
                 return Error::new_spanned(&data.fields, "expected named fields")
                     .to_compile_error()
-                    .into()
+                    .into();
             }
         },
         _ => {
             return Error::new_spanned(&input, "expected a struct")
                 .to_compile_error()
-                .into()
+                .into();
         }
     };
 

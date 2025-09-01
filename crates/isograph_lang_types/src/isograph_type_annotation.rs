@@ -1,7 +1,7 @@
 #![allow(unused)]
 
 use std::{
-    collections::{btree_set::Union, BTreeSet},
+    collections::{BTreeSet, btree_set::Union},
     fmt::Debug,
 };
 

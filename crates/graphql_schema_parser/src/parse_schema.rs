@@ -6,8 +6,8 @@ use common_lang_types::{
 };
 use graphql_syntax::TokenKind;
 use intern::{
-    string_key::{Intern, StringKey},
     Lookup,
+    string_key::{Intern, StringKey},
 };
 
 use graphql_lang_types::{
@@ -532,7 +532,7 @@ fn parse_root_operation_type(
             return Err(WithSpan::new(
                 SchemaParseError::ExpectedRootOperationType,
                 name.span,
-            ))
+            ));
         }
     };
 

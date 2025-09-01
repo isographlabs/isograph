@@ -1,11 +1,11 @@
 use std::{ops::Deref, path::PathBuf};
 
 use crate::{
+    GetValidatedSchemaError, SourceError,
     compiler_state::CompilerState,
     get_validated_schema,
     with_duration::WithDuration,
-    write_artifacts::{write_artifacts_to_disk, GenerateArtifactsError},
-    GetValidatedSchemaError, SourceError,
+    write_artifacts::{GenerateArtifactsError, write_artifacts_to_disk},
 };
 use colored::Colorize;
 use common_lang_types::CurrentWorkingDirectory;

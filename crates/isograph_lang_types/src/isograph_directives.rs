@@ -1,8 +1,8 @@
 use common_lang_types::{IsographDirectiveName, WithLocation, WithSpan};
 use intern::Lookup;
 use serde::{
-    de::{self, IntoDeserializer, MapAccess},
     Deserialize, Deserializer,
+    de::{self, IntoDeserializer, MapAccess},
 };
 use thiserror::Error;
 

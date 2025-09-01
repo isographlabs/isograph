@@ -3,7 +3,7 @@ use std::{
     marker::PhantomData,
 };
 
-use crate::{dyn_eq::DynEq, epoch::Epoch, intern::Key, ParamId};
+use crate::{ParamId, dyn_eq::DynEq, epoch::Epoch, intern::Key};
 
 pub trait Source {
     fn get_key(&self) -> Key;

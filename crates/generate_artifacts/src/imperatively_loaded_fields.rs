@@ -6,13 +6,13 @@ use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::RefetchQueryIndex;
 use isograph_schema::{
-    Format, ImperativelyLoadedFieldArtifactInfo, NetworkProtocol, Schema, REFETCH_FIELD_NAME,
+    Format, ImperativelyLoadedFieldArtifactInfo, NetworkProtocol, REFETCH_FIELD_NAME, Schema,
 };
 
 use crate::{
     generate_artifacts::{NormalizationAstText, QUERY_TEXT},
     normalization_ast_text::generate_normalization_ast_text,
-    operation_text::{generate_operation_text, OperationText},
+    operation_text::{OperationText, generate_operation_text},
     persisted_documents::PersistedDocuments,
 };
 
@@ -107,16 +107,7 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
             {}concreteType: \"{concrete_type}\",\n\
             }};\n\n\
             export default artifact;\n",
-            "  ",
-            "  ",
-            "  ",
-            "  ",
-            "  ",
-            "  ",
-            "  ",
-            "  ",
-            "  ",
-
+            "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         )
     }
 }

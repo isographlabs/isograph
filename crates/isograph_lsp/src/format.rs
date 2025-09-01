@@ -1,20 +1,20 @@
 use std::ops::Deref;
 
 use common_lang_types::{
-    relative_path_from_absolute_and_working_directory, CurrentWorkingDirectory,
-    RelativePathToSourceFile,
+    CurrentWorkingDirectory, RelativePathToSourceFile,
+    relative_path_from_absolute_and_working_directory,
 };
 use isograph_compiler::{
-    extract_iso_literals_from_file_content, process_iso_literal_extraction,
-    read_iso_literals_source_from_relative_path, CompilerState, IsoLiteralExtraction,
+    CompilerState, IsoLiteralExtraction, extract_iso_literals_from_file_content,
+    process_iso_literal_extraction, read_iso_literals_source_from_relative_path,
 };
 use isograph_lang_types::{
-    semantic_token_legend::IndentChange, InlineBehavior, LineBehavior, SpaceAfter, SpaceBefore,
+    InlineBehavior, LineBehavior, SpaceAfter, SpaceBefore, semantic_token_legend::IndentChange,
 };
 use isograph_schema::{IsographDatabase, NetworkProtocol};
 use lsp_types::{
-    request::{Formatting, Request},
     Position, Range, TextEdit,
+    request::{Formatting, Request},
 };
 use pico_macros::memo;
 

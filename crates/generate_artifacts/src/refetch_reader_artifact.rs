@@ -3,14 +3,14 @@ use common_lang_types::{ArtifactPathAndContent, ParentObjectEntityNameAndSelecta
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
-    initial_variable_context, ClientScalarOrObjectSelectable, ClientScalarSelectable, FieldMapItem,
-    NetworkProtocol, RefetchedPathsMap, Schema,
+    ClientScalarOrObjectSelectable, ClientScalarSelectable, FieldMapItem, NetworkProtocol,
+    RefetchedPathsMap, Schema, initial_variable_context,
 };
 
 use crate::{
     generate_artifacts::{
-        generate_output_type, ClientFieldFunctionImportStatement, REFETCH_READER_FILE_NAME,
-        RESOLVER_OUTPUT_TYPE_FILE_NAME,
+        ClientFieldFunctionImportStatement, REFETCH_READER_FILE_NAME,
+        RESOLVER_OUTPUT_TYPE_FILE_NAME, generate_output_type,
     },
     import_statements::reader_imports_to_import_statement,
     reader_ast::generate_reader_ast,
@@ -58,19 +58,19 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
         reader_imports_to_import_statement(&reader_imports, file_extensions);
 
     let reader_content = format!(
-            "import type {{ RefetchReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact }} from '@isograph/react';\n\
-            {function_import_statement}\n\
-            {reader_import_statement}\n\
-            const readerAst: ReaderAst<unknown> = {reader_ast};\n\n\
-            const artifact: RefetchReaderArtifact = {{\n\
-            {}kind: \"RefetchReaderArtifact\",\n\
-            {}// @ts-ignore\n\
-            {}resolver,\n\
-            {}readerAst,\n\
-            }};\n\n\
-            export default artifact;\n",
-            "  ", "  ", "  ", "  "
-        );
+        "import type {{ RefetchReaderArtifact, ReaderAst, RefetchQueryNormalizationArtifact }} from '@isograph/react';\n\
+        {function_import_statement}\n\
+        {reader_import_statement}\n\
+        const readerAst: ReaderAst<unknown> = {reader_ast};\n\n\
+        const artifact: RefetchReaderArtifact = {{\n\
+        {}kind: \"RefetchReaderArtifact\",\n\
+        {}// @ts-ignore\n\
+        {}resolver,\n\
+        {}readerAst,\n\
+        }};\n\n\
+        export default artifact;\n",
+        "  ", "  ", "  ", "  "
+    );
 
     ArtifactPathAndContent {
         file_name: *REFETCH_READER_FILE_NAME,

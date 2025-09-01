@@ -2,8 +2,8 @@ use intern::string_key::{Intern, Lookup};
 use std::{error::Error, fmt, path::PathBuf};
 
 use crate::{
-    text_with_carats::text_with_carats, CurrentWorkingDirectory, RelativePathToSourceFile, Span,
-    WithSpan,
+    CurrentWorkingDirectory, RelativePathToSourceFile, Span, WithSpan,
+    text_with_carats::text_with_carats,
 };
 
 /// A source, which consists of a filename, and an optional span

@@ -1,5 +1,5 @@
 use intern::InternSerdes;
-use intern::{intern_struct, InternId};
+use intern::{InternId, intern_struct};
 use serde::{Deserialize, Serialize};
 use u64_newtypes::u64_newtype;
 

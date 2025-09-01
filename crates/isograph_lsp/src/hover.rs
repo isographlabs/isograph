@@ -1,20 +1,21 @@
 use std::ops::Deref;
 
 use common_lang_types::{
-    relative_path_from_absolute_and_working_directory, SelectableName, ServerObjectEntityName, Span,
+    SelectableName, ServerObjectEntityName, Span, relative_path_from_absolute_and_working_directory,
 };
 use isograph_compiler::{
-    extract_iso_literals_from_file_content, get_validated_schema, process_iso_literal_extraction,
-    read_iso_literals_source_from_relative_path, CompilerState, IsoLiteralExtraction,
+    CompilerState, IsoLiteralExtraction, extract_iso_literals_from_file_content,
+    get_validated_schema, process_iso_literal_extraction,
+    read_iso_literals_source_from_relative_path,
 };
 use isograph_lang_types::{Description, IsographResolvedNode, VariableDefinition};
 use isograph_schema::{
-    get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
     IsographDatabase, NetworkProtocol, SelectableTrait, ServerEntityName,
+    get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
 };
 use lsp_types::{
-    request::{HoverRequest, Request},
     Hover, HoverContents, MarkupContent, MarkupKind, Position, Uri,
+    request::{HoverRequest, Request},
 };
 use pico_macros::memo;
 use resolve_position::ResolvePosition;

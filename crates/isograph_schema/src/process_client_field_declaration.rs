@@ -16,9 +16,9 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    refetch_strategy::{generate_refetch_field_strategy, id_selection, RefetchStrategy},
-    ClientObjectSelectable, ClientScalarSelectable, FieldMapItem, NetworkProtocol, Schema,
-    ServerEntityName, ValidatedVariableDefinition, WrappedSelectionMapSelection, NODE_FIELD_NAME,
+    ClientObjectSelectable, ClientScalarSelectable, FieldMapItem, NODE_FIELD_NAME, NetworkProtocol,
+    Schema, ServerEntityName, ValidatedVariableDefinition, WrappedSelectionMapSelection,
+    refetch_strategy::{RefetchStrategy, generate_refetch_field_strategy, id_selection},
 };
 
 pub type UnprocessedSelection = WithSpan<UnvalidatedSelection>;

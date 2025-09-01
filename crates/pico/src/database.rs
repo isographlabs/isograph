@@ -1,6 +1,7 @@
 use std::{any::Any, hash::Hash, num::NonZeroUsize};
 
 use crate::{
+    InnerFn, MemoRef, Singleton,
     dependency::{Dependency, DependencyStack, NodeKind},
     dyn_eq::DynEq,
     epoch::Epoch,
@@ -9,7 +10,6 @@ use crate::{
     intern::{Key, ParamId},
     macro_fns::{get_param, init_param_vec, intern_borrowed_param, intern_owned_param},
     source::{Source, SourceId, SourceNode},
-    InnerFn, MemoRef, Singleton,
 };
 use boxcar::Vec as BoxcarVec;
 use dashmap::{DashMap, Entry};

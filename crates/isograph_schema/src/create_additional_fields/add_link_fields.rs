@@ -1,4 +1,4 @@
-use crate::{ClientFieldVariant, ClientScalarSelectable, NetworkProtocol, Schema, LINK_FIELD_NAME};
+use crate::{ClientFieldVariant, ClientScalarSelectable, LINK_FIELD_NAME, NetworkProtocol, Schema};
 use common_lang_types::{Location, ParentObjectEntityNameAndSelectableName, WithLocation};
 use intern::string_key::Intern;
 use isograph_lang_types::{DefinitionLocation, Description, SelectionType};

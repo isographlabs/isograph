@@ -8,8 +8,8 @@ use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation};
 use isograph_lang_types::Description;
 
 use crate::{
-    isograph_database::IsographDatabase, ExposeFieldDirective, MergedSelectionMap,
-    RootOperationName, Schema, ServerObjectEntity, ServerScalarEntity, ValidatedVariableDefinition,
+    ExposeFieldDirective, MergedSelectionMap, RootOperationName, Schema, ServerObjectEntity,
+    ServerScalarEntity, ValidatedVariableDefinition, isograph_database::IsographDatabase,
 };
 
 pub trait NetworkProtocol:

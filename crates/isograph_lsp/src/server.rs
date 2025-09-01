@@ -13,25 +13,25 @@ use crate::{
 use colored::Colorize;
 use common_lang_types::CurrentWorkingDirectory;
 use isograph_compiler::{
+    CompilerState, SourceError, WithDuration,
     batch_compile::BatchCompileError,
     update_sources,
     watch::{create_debounced_file_watcher, has_config_changes},
-    CompilerState, SourceError, WithDuration,
 };
 use isograph_lang_types::semantic_token_legend::semantic_token_legend;
 use isograph_schema::NetworkProtocol;
 use log::{info, warn};
 use lsp_server::{Connection, ErrorCode, ProtocolError, Response, ResponseError};
 use lsp_types::{
-    notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument},
-    request::{Formatting, GotoDefinition},
+    HoverProviderCapability,
+    request::{HoverRequest, SemanticTokensFullRequest},
+};
+use lsp_types::{
     InitializeParams, OneOf, SemanticTokensFullOptions, SemanticTokensOptions,
     SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentSyncCapability,
     TextDocumentSyncKind, WorkDoneProgressOptions,
-};
-use lsp_types::{
-    request::{HoverRequest, SemanticTokensFullRequest},
-    HoverProviderCapability,
+    notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument},
+    request::{Formatting, GotoDefinition},
 };
 use std::{ops::ControlFlow, path::PathBuf};
 use thiserror::Error;

@@ -1,12 +1,12 @@
 use common_lang_types::{
-    derive_display, ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent,
-    ClientScalarSelectableName, Location, ParentObjectEntityNameAndSelectableName,
-    SelectableNameOrAlias, ServerObjectEntityName, Span, WithLocation, WithSpan,
+    ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent, ClientScalarSelectableName,
+    Location, ParentObjectEntityNameAndSelectableName, SelectableNameOrAlias,
+    ServerObjectEntityName, Span, WithLocation, WithSpan, derive_display,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
 };
-use intern::{string_key::Intern, Lookup};
+use intern::{Lookup, string_key::Intern};
 
 use core::panic;
 use isograph_config::CompilerConfig;
@@ -17,12 +17,12 @@ use isograph_lang_types::{
     SelectionTypeContainingSelections, TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
+    ClientFieldVariant, ClientScalarSelectable, ClientSelectableId, FieldMapItem,
+    FieldTraversalResult, NameAndArguments, NetworkProtocol, NormalizationKey, ScalarSelectableId,
+    Schema, ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo,
+    ValidatedSelection, ValidatedVariableDefinition, WrappedSelectionMapSelection,
     accessible_client_fields, description, inline_fragment_reader_selection_set,
-    output_type_annotation, selection_map_wrapped, ClientFieldVariant, ClientScalarSelectable,
-    ClientSelectableId, FieldMapItem, FieldTraversalResult, NameAndArguments, NetworkProtocol,
-    NormalizationKey, ScalarSelectableId, Schema, ServerEntityName, ServerObjectSelectableVariant,
-    UserWrittenClientTypeInfo, ValidatedSelection, ValidatedVariableDefinition,
-    WrappedSelectionMapSelection,
+    output_type_annotation, selection_map_wrapped,
 };
 use lazy_static::lazy_static;
 use std::{

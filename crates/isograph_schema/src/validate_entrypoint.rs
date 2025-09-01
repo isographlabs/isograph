@@ -1,4 +1,4 @@
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::{HashMap, hash_map::Entry};
 
 use common_lang_types::{
     ClientScalarSelectableName, IsoLiteralText, Location, ServerObjectEntityName,
@@ -219,14 +219,16 @@ pub enum ValidateEntrypointDeclarationError {
         parent_type_name: ServerObjectEntityNameWrapper,
     },
 
-    #[error("Invalid parent type. `{parent_type_name}` is a {parent_type}, but it should be an object or interface.")]
+    #[error(
+        "Invalid parent type. `{parent_type_name}` is a {parent_type}, but it should be an object or interface."
+    )]
     InvalidParentType {
         parent_type: &'static str,
         parent_type_name: UnvalidatedTypeName,
     },
 
     #[error(
-        "The type `{parent_type_name}` is not fetchable. The following types are fetchable: {fetchable_types}.",
+        "The type `{parent_type_name}` is not fetchable. The following types are fetchable: {fetchable_types}."
     )]
     NonFetchableParentType {
         parent_type_name: ServerObjectEntityNameWrapper,
@@ -240,12 +242,16 @@ pub enum ValidateEntrypointDeclarationError {
     },
 
     // N.B. We could conceivably support fetching server fields, though!
-    #[error("The field `{parent_type_name}.{client_field_name}` is a server field. It must be a client defined field.")]
+    #[error(
+        "The field `{parent_type_name}.{client_field_name}` is a server field. It must be a client defined field."
+    )]
     FieldMustBeClientField {
         parent_type_name: ServerObjectEntityName,
         client_field_name: ServerScalarSelectableName,
     },
 
-    #[error("Entrypoint declared lazy in one location and declared eager in another location. Entrypoint must be either lazy or non-lazy in all instances.")]
+    #[error(
+        "Entrypoint declared lazy in one location and declared eager in another location. Entrypoint must be either lazy or non-lazy in all instances."
+    )]
     LazyLoadInconsistentEntrypoint,
 }

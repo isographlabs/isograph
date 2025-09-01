@@ -10,8 +10,8 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    get_reachable_variables, selection_map_wrapped, MergedSelectionMap, UnprocessedSelection,
-    WrappedSelectionMapSelection,
+    MergedSelectionMap, UnprocessedSelection, WrappedSelectionMapSelection,
+    get_reachable_variables, selection_map_wrapped,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -29,9 +29,9 @@ pub enum RefetchStrategy<
 }
 
 impl<
-        TSelectionTypeSelectionScalarFieldAssociatedData,
-        TSelectionTypeSelectionLinkedFieldAssociatedData,
-    >
+    TSelectionTypeSelectionScalarFieldAssociatedData,
+    TSelectionTypeSelectionLinkedFieldAssociatedData,
+>
     RefetchStrategy<
         TSelectionTypeSelectionScalarFieldAssociatedData,
         TSelectionTypeSelectionLinkedFieldAssociatedData,

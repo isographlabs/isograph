@@ -1,6 +1,6 @@
 use common_lang_types::{SelectableName, StringLiteralValue, TextSource};
 use graphql_lang_types::{
-    from_graphql_directive, DeserializationError, GraphQLConstantValue, GraphQLDirective,
+    DeserializationError, GraphQLConstantValue, GraphQLDirective, from_graphql_directive,
 };
 use intern::string_key::Intern;
 use isograph_schema::{ExposeFieldDirective, FieldMapItem};
@@ -102,7 +102,7 @@ fn match_failure_message(
         Err(e) => {
             if let Some(deserialization_error) = e.downcast_ref::<DeserializationError>() {
                 assert!(
-                    matches!(deserialization_error, DeserializationError::Custom(ref msg) if msg==message),
+                    matches!(deserialization_error, DeserializationError::Custom(msg) if msg==message),
                     "Expected DeserializationError::Custom, got {deserialization_error:?}"
                 );
             } else {

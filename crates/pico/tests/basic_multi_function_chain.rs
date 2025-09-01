@@ -1,10 +1,10 @@
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     LazyLock, Mutex,
+    atomic::{AtomicUsize, Ordering},
 };
 
 use pico::{Database, SourceId, Storage};
-use pico_macros::{memo, Db, Source};
+use pico_macros::{Db, Source, memo};
 
 static FIRST_LETTER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static CAPITALIZED_LETTER_COUNTER: AtomicUsize = AtomicUsize::new(0);

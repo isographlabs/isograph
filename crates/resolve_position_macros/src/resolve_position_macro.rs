@@ -2,7 +2,7 @@ use std::{collections::HashMap, ops::Deref};
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, spanned::Spanned, Error};
+use syn::{Error, parse_macro_input, spanned::Spanned};
 
 use crate::map_generics::{replace_generics_in_type, validate_and_map_generics};
 
@@ -215,41 +215,40 @@ fn parse_resolve_field_type(
                     last_segment,
                     generics_map,
                     ResolveFieldInfoType::WithLocation,
-                )
+                );
             }
             "WithEmbeddedLocation" => {
                 return handle_case(
                     last_segment,
                     generics_map,
                     ResolveFieldInfoType::WithEmbeddedLocation,
-                )
+                );
             }
             "GraphQLTypeAnnotation" => {
                 return handle_case(
                     last_segment,
                     generics_map,
                     ResolveFieldInfoType::GraphQLTypeAnnotation,
-                )
+                );
             }
             "WithSpan" => {
-                return handle_case(last_segment, generics_map, ResolveFieldInfoType::WithSpan)
+                return handle_case(last_segment, generics_map, ResolveFieldInfoType::WithSpan);
             }
             _ => {}
         }
 
         // Container types: Vec<T> or Option<T>
-        if last_segment.ident == "Vec" || last_segment.ident == "Option" {
-            if let Some(syn::Type::Path(syn::TypePath {
+        if (last_segment.ident == "Vec" || last_segment.ident == "Option")
+            && let Some(syn::Type::Path(syn::TypePath {
                 path: inner_path, ..
             })) = extract_single_generic_type(last_segment)
-            {
-                // Recursively parse the inner type
-                let inner_wrapper = parse_resolve_field_type(inner_path, generics_map)?;
+        {
+            // Recursively parse the inner type
+            let inner_wrapper = parse_resolve_field_type(inner_path, generics_map)?;
 
-                return Ok(ResolveFieldInfoTypeWrapper::IteratorWrapper(Box::new(
-                    inner_wrapper,
-                )));
-            }
+            return Ok(ResolveFieldInfoTypeWrapper::IteratorWrapper(Box::new(
+                inner_wrapper,
+            )));
         }
     }
 

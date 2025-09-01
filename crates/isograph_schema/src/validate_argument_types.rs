@@ -12,8 +12,8 @@ use graphql_lang_types::{
 use thiserror::Error;
 
 use isograph_lang_types::{
-    graphql_type_annotation_from_type_annotation, NonConstantValue, SelectionType,
-    VariableDefinition,
+    NonConstantValue, SelectionType, VariableDefinition,
+    graphql_type_annotation_from_type_annotation,
 };
 
 use crate::{
@@ -617,7 +617,9 @@ type ValidateArgumentTypesResult<T> = Result<T, WithLocation<ValidateArgumentTyp
 
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum ValidateArgumentTypesError {
-    #[error("Expected input of type {expected_type}, found variable {variable_name} of type {variable_type}")]
+    #[error(
+        "Expected input of type {expected_type}, found variable {variable_name} of type {variable_type}"
+    )]
     ExpectedTypeFoundVariable {
         expected_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
         variable_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,

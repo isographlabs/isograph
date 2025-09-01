@@ -1,6 +1,6 @@
 use common_lang_types::{
-    relative_path_from_absolute_and_working_directory, AbsolutePathAndRelativePath,
-    CurrentWorkingDirectory, GeneratedFileHeader,
+    AbsolutePathAndRelativePath, CurrentWorkingDirectory, GeneratedFileHeader,
+    relative_path_from_absolute_and_working_directory,
 };
 use intern::string_key::Intern;
 use pico_macros::Singleton;

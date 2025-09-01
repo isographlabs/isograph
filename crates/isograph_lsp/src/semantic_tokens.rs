@@ -6,19 +6,19 @@ use crate::{
     uri_file_path_ext::UriFilePathExt,
 };
 use common_lang_types::{
-    relative_path_from_absolute_and_working_directory, Span, TextSource, WithSpan,
+    Span, TextSource, WithSpan, relative_path_from_absolute_and_working_directory,
 };
 use isograph_compiler::{
-    parse_iso_literals_in_file_content_and_return_all, read_iso_literals_source_from_relative_path,
-    CompilerState,
+    CompilerState, parse_iso_literals_in_file_content_and_return_all,
+    read_iso_literals_source_from_relative_path,
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::IsographSemanticToken;
 use isograph_schema::{IsographDatabase, NetworkProtocol};
 use lsp_types::{
-    request::{Request, SemanticTokensFullRequest},
     SemanticToken as LspSemanticToken, SemanticTokens as LspSemanticTokens,
     SemanticTokensResult as LspSemanticTokensResult, Uri,
+    request::{Request, SemanticTokensFullRequest},
 };
 use pico_macros::memo;
 

@@ -5,8 +5,8 @@ use std::{
 };
 
 use common_lang_types::{
-    relative_path_from_absolute_and_working_directory, AbsolutePathAndRelativePath,
-    CurrentWorkingDirectory, RelativePathToSourceFile, TextSource,
+    AbsolutePathAndRelativePath, CurrentWorkingDirectory, RelativePathToSourceFile, TextSource,
+    relative_path_from_absolute_and_working_directory,
 };
 use intern::Lookup;
 use isograph_config::absolute_and_relative_paths;
@@ -18,7 +18,7 @@ use pico_macros::Singleton;
 use thiserror::Error;
 
 use crate::{
-    isograph_literals::{read_file, read_files_in_folder, ReadFileError},
+    isograph_literals::{ReadFileError, read_file, read_files_in_folder},
     watch::{ChangedFileKind, SourceEventKind, SourceFileEvent},
 };
 

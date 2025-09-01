@@ -3,7 +3,7 @@ use common_lang_types::{
     SelectableName, ServerObjectEntityName, StringLiteralValue, UnvalidatedTypeName, VariableName,
     WithLocation,
 };
-use intern::{string_key::Intern, Lookup};
+use intern::{Lookup, string_key::Intern};
 
 use serde::Deserialize;
 use thiserror::Error;

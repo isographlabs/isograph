@@ -3,7 +3,7 @@ use common_lang_types::{
     ServerObjectEntityName, ServerObjectSelectableName, Span, StringLiteralValue, WithLocation,
     WithSpan,
 };
-use intern::{string_key::Intern, Lookup};
+use intern::{Lookup, string_key::Intern};
 use isograph_lang_types::{
     DefinitionLocation, EmptyDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
     SelectionType, SelectionTypeContainingSelections, VariableDefinition,
@@ -12,10 +12,10 @@ use isograph_lang_types::{
 use serde::Deserialize;
 
 use crate::{
-    generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
     ClientFieldVariant, ClientScalarSelectable, ExposeAsFieldToInsert,
     ImperativelyLoadedFieldVariant, NetworkProtocol, RefetchStrategy, Schema, ServerEntityName,
     ServerObjectSelectableVariant, UnprocessedClientFieldItem, WrappedSelectionMapSelection,
+    generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
 };
 
 use super::{
@@ -333,10 +333,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .iter()
             .find_map(|(name, field_id)| {
                 if let DefinitionLocation::Server(SelectionType::Object(server_field_id)) = field_id
+                    && name.lookup() == field_arg
                 {
-                    if name.lookup() == field_arg {
-                        return Some(server_field_id);
-                    }
+                    return Some(server_field_id);
                 }
                 None
             })
