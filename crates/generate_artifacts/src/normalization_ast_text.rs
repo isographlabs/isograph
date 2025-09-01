@@ -3,7 +3,7 @@ use isograph_schema::{
     MergedServerSelection, NetworkProtocol, Schema,
 };
 
-use crate::generate_artifacts::{get_serialized_field_arguments, NormalizationAstText};
+use crate::generate_artifacts::{NormalizationAstText, get_serialized_field_arguments};
 
 pub(crate) fn generate_normalization_ast_text<'schema, 'a, TNetworkProtocol: NetworkProtocol>(
     schema: &'schema Schema<TNetworkProtocol>,

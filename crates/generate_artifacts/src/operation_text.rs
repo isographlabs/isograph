@@ -1,5 +1,5 @@
 use common_lang_types::{
-    derive_display, QueryExtraInfo, QueryOperationName, ServerObjectEntityName,
+    QueryExtraInfo, QueryOperationName, ServerObjectEntityName, derive_display,
 };
 use intern::string_key::Intern;
 use isograph_config::PersistedDocumentsHashAlgorithm;

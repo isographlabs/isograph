@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use pico::{Database, SourceId, Storage};
-use pico_macros::{memo, Db, Source};
+use pico_macros::{Db, Source, memo};
 
 static RETURN_VALUE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 

@@ -3,8 +3,8 @@ use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
 
 use crate::{
-    entrypoint_directive_set::EntrypointDirectiveSet, IsographResolvedNode, IsographSemanticToken,
-    ServerObjectEntityNameWrapper,
+    IsographResolvedNode, IsographSemanticToken, ServerObjectEntityNameWrapper,
+    entrypoint_directive_set::EntrypointDirectiveSet,
 };
 
 // TODO should this be ObjectTypeAndFieldNames?

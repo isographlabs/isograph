@@ -2,10 +2,10 @@ use common_lang_types::relative_path_from_absolute_and_working_directory;
 use isograph_compiler::CompilerState;
 use isograph_schema::{NetworkProtocol, OpenFileSource};
 use lsp_types::{
+    DidChangeTextDocumentParams, DidOpenTextDocumentParams, TextDocumentItem,
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification,
     },
-    DidChangeTextDocumentParams, DidOpenTextDocumentParams, TextDocumentItem,
 };
 use pico::Database;
 

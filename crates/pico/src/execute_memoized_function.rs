@@ -1,12 +1,12 @@
 use dashmap::Entry;
 
 use crate::{
+    Database, InnerFn,
     dependency::{NodeKind, TrackedDependencies},
     derived_node::{DerivedNode, DerivedNodeId},
     dyn_eq::DynEq,
     epoch::Epoch,
     intern::Key,
-    Database, InnerFn,
 };
 
 pub enum DidRecalculate {

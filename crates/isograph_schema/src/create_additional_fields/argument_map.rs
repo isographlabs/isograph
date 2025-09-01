@@ -298,7 +298,7 @@ impl ModifiedArgument {
                         field_name: first,
                     },
                     Location::generated(),
-                ))
+                ));
             }
         };
         Ok(())

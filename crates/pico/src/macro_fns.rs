@@ -6,7 +6,7 @@ use std::{
 use dashmap::Entry;
 use tinyvec::ArrayVec;
 
-use crate::{index::Index, Database, ParamId};
+use crate::{Database, ParamId, index::Index};
 
 pub fn init_param_vec() -> ArrayVec<[ParamId; 8]> {
     ArrayVec::<[ParamId; 8]>::default()

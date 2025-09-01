@@ -10,8 +10,8 @@ use common_lang_types::{
     UnvalidatedTypeName, WithLocation,
 };
 use graphql_lang_types::GraphQLNamedTypeAnnotation;
-use intern::string_key::Intern;
 use intern::Lookup;
+use intern::string_key::Intern;
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDirectiveSet, DefinitionLocation, EmptyDirectiveSet,
@@ -21,12 +21,12 @@ use isograph_lang_types::{
 use lazy_static::lazy_static;
 
 use crate::{
-    create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectableId,
     EntrypointDeclarationInfo, NetworkProtocol, NormalizationKey, ObjectSelectable,
     ObjectSelectableId, ScalarSelectable, Selectable, SelectableId, ServerEntity, ServerEntityName,
     ServerObjectEntity, ServerObjectEntityAvailableSelectables, ServerObjectSelectable,
     ServerScalarEntity, ServerScalarSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
+    create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
 };
 
 lazy_static! {
@@ -243,7 +243,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     return Err(CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
                         primary_type_name: current_entity.name.item,
                         field_name: selection_name.unchecked_conversion(),
-                    })
+                    });
                 }
             };
         }
@@ -334,7 +334,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     return Err(CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
                         primary_type_name: current_entity.name.item,
                         field_name: selection_name.unchecked_conversion(),
-                    })
+                    });
                 }
             };
         }

@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
 use syn::{
-    parse_macro_input, punctuated::Punctuated, Error, GenericParam, Ident, ItemTrait, TraitItem,
+    Error, GenericParam, Ident, ItemTrait, TraitItem, parse_macro_input, punctuated::Punctuated,
 };
 
 #[derive(Clone, Copy)]

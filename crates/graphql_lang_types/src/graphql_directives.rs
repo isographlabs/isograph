@@ -1,12 +1,12 @@
 use std::fmt;
 
-use super::{write::write_arguments, NameValuePair};
+use super::{NameValuePair, write::write_arguments};
 use crate::GraphQLConstantValue;
 use common_lang_types::{DirectiveArgumentName, DirectiveName, WithEmbeddedLocation};
 use intern::Lookup;
 use serde::{
-    de::{self, value::SeqDeserializer, IntoDeserializer, MapAccess},
     Deserialize, Deserializer,
+    de::{self, IntoDeserializer, MapAccess, value::SeqDeserializer},
 };
 use thiserror::Error;
 

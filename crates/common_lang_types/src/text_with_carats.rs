@@ -122,7 +122,7 @@ mod test {
     // Note: we use raw strings in this module, and the extra
     // spaces on lines with carats matter!
 
-    use crate::{text_with_carats::text_with_carats_and_line_count_buffer, Span};
+    use crate::{Span, text_with_carats::text_with_carats_and_line_count_buffer};
 
     fn input_with_lines(line_count: usize) -> String {
         // 9 is not present — this is so that every line has 10

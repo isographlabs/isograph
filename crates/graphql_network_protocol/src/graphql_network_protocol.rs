@@ -4,7 +4,7 @@ use common_lang_types::{
     DirectiveName, QueryExtraInfo, QueryOperationName, QueryText, ServerObjectEntityName,
     WithLocation,
 };
-use graphql_lang_types::{from_graphql_directive, DeserializationError};
+use graphql_lang_types::{DeserializationError, from_graphql_directive};
 use graphql_schema_parser::SchemaParseError;
 use intern::string_key::Intern;
 use isograph_schema::IsographDatabase;
@@ -19,8 +19,8 @@ use thiserror::Error;
 use crate::{
     parse_graphql_schema,
     process_type_system_definition::{
-        process_graphql_type_extension_document, process_graphql_type_system_document,
-        ProcessGraphqlTypeSystemDefinitionError,
+        ProcessGraphqlTypeSystemDefinitionError, process_graphql_type_extension_document,
+        process_graphql_type_system_document,
     },
     query_text::generate_query_text,
 };

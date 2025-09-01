@@ -6,7 +6,7 @@ use std::{
 use common_lang_types::{CurrentWorkingDirectory, RelativePathToSourceFile, TextSource};
 use isograph_config::CompilerConfig;
 use pico::{Database, SourceId, Storage};
-use pico_macros::{memo, Db, Singleton, Source};
+use pico_macros::{Db, Singleton, Source, memo};
 
 use crate::NetworkProtocol;
 

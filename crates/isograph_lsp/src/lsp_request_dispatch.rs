@@ -118,8 +118,8 @@ mod test {
     };
 
     use lsp_types::{
-        request::{GotoDefinition, HoverRequest, Request},
         Position, TextDocumentIdentifier, TextDocumentPositionParams, Uri,
+        request::{GotoDefinition, HoverRequest, Request},
     };
 
     use super::LSPRequestDispatch;

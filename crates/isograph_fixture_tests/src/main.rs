@@ -2,11 +2,11 @@ use std::{collections::HashMap, ffi::OsStr, fs, path::PathBuf};
 
 use clap::Parser;
 use common_lang_types::{
-    relative_path_from_absolute_and_working_directory, CurrentWorkingDirectory,
+    CurrentWorkingDirectory, relative_path_from_absolute_and_working_directory,
 };
 use graphql_network_protocol::GraphQLNetworkProtocol;
-use intern::{string_key::Intern, Lookup};
-use isograph_compiler::{parse_iso_literals_in_file_content, IsoLiteralMap};
+use intern::{Lookup, string_key::Intern};
+use isograph_compiler::{IsoLiteralMap, parse_iso_literals_in_file_content};
 use isograph_schema::{IsoLiteralsSource, IsographDatabase, OpenFileMap};
 use lazy_static::lazy_static;
 use pico::Database;

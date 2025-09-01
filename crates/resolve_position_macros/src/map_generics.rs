@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use syn::{
-    visit_mut::{self, VisitMut},
     Error,
+    visit_mut::{self, VisitMut},
 };
 
 struct GenericReplacer<'a> {

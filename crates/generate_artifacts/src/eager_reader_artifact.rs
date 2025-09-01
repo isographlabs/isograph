@@ -7,8 +7,8 @@ use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 
 use isograph_lang_types::{ClientFieldDirectiveSet, SelectionType};
 use isograph_schema::{
-    initial_variable_context, ClientScalarOrObjectSelectable, ClientSelectable, NetworkProtocol,
-    Schema, ServerObjectSelectable, ValidatedSelection,
+    ClientScalarOrObjectSelectable, ClientSelectable, NetworkProtocol, Schema,
+    ServerObjectSelectable, ValidatedSelection, initial_variable_context,
 };
 use isograph_schema::{RefetchedPathsMap, UserWrittenClientTypeInfo};
 
@@ -16,11 +16,11 @@ use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
 use crate::{
     generate_artifacts::{
+        ClientFieldFunctionImportStatement, ClientFieldOutputType, RESOLVER_OUTPUT_TYPE,
+        RESOLVER_OUTPUT_TYPE_FILE_NAME, RESOLVER_PARAM_TYPE, RESOLVER_PARAM_TYPE_FILE_NAME,
+        RESOLVER_PARAMETERS_TYPE_FILE_NAME, RESOLVER_READER_FILE_NAME,
         generate_client_field_parameter_type, generate_client_field_updatable_data_type,
         generate_output_type, generate_parameters, print_javascript_type_declaration,
-        ClientFieldFunctionImportStatement, ClientFieldOutputType, RESOLVER_OUTPUT_TYPE,
-        RESOLVER_OUTPUT_TYPE_FILE_NAME, RESOLVER_PARAMETERS_TYPE_FILE_NAME, RESOLVER_PARAM_TYPE,
-        RESOLVER_PARAM_TYPE_FILE_NAME, RESOLVER_READER_FILE_NAME,
     },
     import_statements::{
         param_type_imports_to_import_param_statement, param_type_imports_to_import_statement,
@@ -316,7 +316,9 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
             client_scalar_selectable.name()
         );
         (
-            format!("import type {{ {reader_parameters_type} }} from './parameters_type{ts_file_extension}';\n"),
+            format!(
+                "import type {{ {reader_parameters_type} }} from './parameters_type{ts_file_extension}';\n"
+            ),
             reader_parameters_type,
         )
     } else {

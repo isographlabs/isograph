@@ -1,8 +1,8 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use proc_macro::TokenStream;
-use quote::{quote, ToTokens};
-use syn::{parse_macro_input, parse_quote, Error, FnArg, ItemFn, PatType, ReturnType, Signature};
+use quote::{ToTokens, quote};
+use syn::{Error, FnArg, ItemFn, PatType, ReturnType, Signature, parse_macro_input, parse_quote};
 
 pub(crate) fn memo_macro(_args: TokenStream, item: TokenStream) -> TokenStream {
     let ItemFn {
@@ -174,10 +174,10 @@ fn type_is(ty: &syn::Type, target: &'static str) -> bool {
         syn::Type::Reference(r) => &*r.elem,
         _ => ty,
     };
-    if let syn::Type::Path(type_path) = inner {
-        if let Some(segment) = type_path.path.segments.last() {
-            return segment.ident == target;
-        }
+    if let syn::Type::Path(type_path) = inner
+        && let Some(segment) = type_path.path.segments.last()
+    {
+        return segment.ident == target;
     }
     false
 }

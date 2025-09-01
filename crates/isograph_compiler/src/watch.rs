@@ -3,18 +3,18 @@ use common_lang_types::CurrentWorkingDirectory;
 use isograph_config::CompilerConfig;
 use isograph_schema::NetworkProtocol;
 use notify::{
-    event::{CreateKind, ModifyKind, RemoveKind, RenameMode},
     Error, EventKind, RecommendedWatcher, RecursiveMode,
+    event::{CreateKind, ModifyKind, RemoveKind, RenameMode},
 };
 use notify_debouncer_full::{
-    new_debouncer, DebounceEventResult, DebouncedEvent, Debouncer, RecommendedCache,
+    DebounceEventResult, DebouncedEvent, Debouncer, RecommendedCache, new_debouncer,
 };
 use std::{path::PathBuf, time::Duration};
 use tokio::{runtime::Handle, sync::mpsc::Receiver};
 use tracing::info;
 
 use crate::{
-    batch_compile::{compile, print_result, BatchCompileError},
+    batch_compile::{BatchCompileError, compile, print_result},
     compiler_state::CompilerState,
     source_files::update_sources,
     with_duration::WithDuration,
@@ -105,7 +105,9 @@ fn process_create_event(
         // Now it's always Modify(Name(Any)) i.e. Rename
         CreateKind::File => {
             if paths.len() != 1 {
-                panic!("File create event should contain exactly one file. This is indicative of a bug in Isograph.")
+                panic!(
+                    "File create event should contain exactly one file. This is indicative of a bug in Isograph."
+                )
             }
             categorize_changed_file_and_filter_changes_in_artifact_directory(config, &paths[0])
                 .map(|file_kind| (SourceEventKind::CreateOrModify(paths[0].clone()), file_kind))
@@ -124,7 +126,9 @@ fn process_modify_event(
     match modify_kind {
         ModifyKind::Data(_) => {
             if paths.len() != 1 {
-                panic!("File modify event should contain exactly one file. This is indicative of a bug in Isograph.")
+                panic!(
+                    "File modify event should contain exactly one file. This is indicative of a bug in Isograph."
+                )
             }
             if paths[0].is_file() {
                 categorize_changed_file_and_filter_changes_in_artifact_directory(config, &paths[0])
@@ -138,7 +142,9 @@ fn process_modify_event(
                 // This event could be fired once on delete or twice on rename
                 RenameMode::Any => {
                     if paths.len() != 1 {
-                        panic!("File rename event should contain exactly one file. This is indicative of a bug in Isograph.")
+                        panic!(
+                            "File rename event should contain exactly one file. This is indicative of a bug in Isograph."
+                        )
                     }
                     categorize_changed_file_and_filter_changes_in_artifact_directory(
                         config, &paths[0],
@@ -153,7 +159,9 @@ fn process_modify_event(
                 }
                 RenameMode::Both => {
                     if paths.len() != 2 {
-                        panic!("Rename event should contain exactly two paths. This is indicative of a bug in Isograph.")
+                        panic!(
+                            "Rename event should contain exactly two paths. This is indicative of a bug in Isograph."
+                        )
                     }
                     categorize_changed_file_and_filter_changes_in_artifact_directory(
                         config, &paths[1],
@@ -180,7 +188,9 @@ fn process_remove_event(
     match remove_kind {
         RemoveKind::File | RemoveKind::Folder | RemoveKind::Any => {
             if paths.len() != 1 {
-                panic!("Remove event should contain exactly one path. This is indicative of a bug in Isograph.")
+                panic!(
+                    "Remove event should contain exactly one path. This is indicative of a bug in Isograph."
+                )
             }
             categorize_changed_file_and_filter_changes_in_artifact_directory(config, &paths[0])
                 .map(|file_kind| (SourceEventKind::Remove(paths[0].clone()), file_kind))

@@ -5,7 +5,7 @@ use common_lang_types::{
     ServerScalarSelectableName, WithLocation,
 };
 use isograph_lang_types::{
-    impl_with_target_id, Description, SelectionType, TypeAnnotation, VariableDefinition,
+    Description, SelectionType, TypeAnnotation, VariableDefinition, impl_with_target_id,
 };
 
 use crate::{NetworkProtocol, SelectableTrait, ServerEntityName, ServerObjectSelectableVariant};

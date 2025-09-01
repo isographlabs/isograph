@@ -1,16 +1,16 @@
 use std::{fmt, hash::Hash};
 
-use intern::{intern_struct, InternId};
+use intern::{InternId, intern_struct};
 use serde::{Deserialize, Serialize};
 use tinyvec::ArrayVec;
 
 use crate::{
+    Database,
     dependency::Dependency,
     dyn_eq::DynEq,
     epoch::Epoch,
     index::Index,
     intern::{Key, ParamId},
-    Database,
 };
 
 #[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]

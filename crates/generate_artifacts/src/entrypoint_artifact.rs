@@ -1,12 +1,12 @@
 use crate::{
     generate_artifacts::{
-        NormalizationAstText, RefetchQueryArtifactImport, ENTRYPOINT_FILE_NAME, NORMALIZATION_AST,
-        NORMALIZATION_AST_FILE_NAME, QUERY_TEXT, QUERY_TEXT_FILE_NAME, RESOLVER_OUTPUT_TYPE,
-        RESOLVER_PARAM_TYPE, RESOLVER_READER,
+        ENTRYPOINT_FILE_NAME, NORMALIZATION_AST, NORMALIZATION_AST_FILE_NAME, NormalizationAstText,
+        QUERY_TEXT, QUERY_TEXT_FILE_NAME, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE,
+        RESOLVER_READER, RefetchQueryArtifactImport,
     },
     imperatively_loaded_fields::get_artifact_for_imperatively_loaded_field,
     normalization_ast_text::generate_normalization_ast_text,
-    operation_text::{generate_operation_text, OperationText},
+    operation_text::{OperationText, generate_operation_text},
     persisted_documents::PersistedDocuments,
 };
 use common_lang_types::{
@@ -19,13 +19,13 @@ use isograph_lang_types::{
     SelectionType,
 };
 use isograph_schema::{
-    create_merged_selection_map_for_field_and_insert_into_global_map,
+    ClientScalarOrObjectSelectable, ClientScalarSelectable, EntrypointDeclarationInfo,
+    FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, Format, MergedSelectionMap,
+    NetworkProtocol, NormalizationKey, RootOperationName, RootRefetchedPath,
+    ScalarClientFieldTraversalState, Schema, ServerObjectEntity, ValidatedVariableDefinition,
+    WrappedSelectionMapSelection, create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
-    get_reachable_variables, initial_variable_context, ClientScalarOrObjectSelectable,
-    ClientScalarSelectable, EntrypointDeclarationInfo, FieldToCompletedMergeTraversalStateMap,
-    FieldTraversalResult, Format, MergedSelectionMap, NetworkProtocol, NormalizationKey,
-    RootOperationName, RootRefetchedPath, ScalarClientFieldTraversalState, Schema,
-    ServerObjectEntity, ValidatedVariableDefinition, WrappedSelectionMapSelection,
+    get_reachable_variables, initial_variable_context,
 };
 use std::collections::BTreeSet;
 
@@ -411,16 +411,20 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
     let (normalization_ast_type_name, normalization_ast_import, normalization_ast_code) = {
         let file_path = format!("'./{normalization_text_file_name}{ts_file_extension}'");
         match directive_set {
-            EntrypointDirectiveSet::LazyLoad(directive_set) if directive_set.lazy_load.normalization => (
-                "NormalizationAstLoader",
-                "".to_string(),
-                format!(
-                    "{indent}  normalizationAst: {{\n\
-                     {indent}    kind: \"NormalizationAstLoader\",\n\
-                     {indent}    loader: () => import({file_path}).then(module => module.default),\n\
-                     {indent}  }},"
-                ),
-            ),
+            EntrypointDirectiveSet::LazyLoad(directive_set)
+                if directive_set.lazy_load.normalization =>
+            {
+                (
+                    "NormalizationAstLoader",
+                    "".to_string(),
+                    format!(
+                        "{indent}  normalizationAst: {{\n\
+                         {indent}    kind: \"NormalizationAstLoader\",\n\
+                         {indent}    loader: () => import({file_path}).then(module => module.default),\n\
+                         {indent}  }},"
+                    ),
+                )
+            }
             _ => (
                 "NormalizationAst",
                 format!("import normalizationAst from {file_path};\n"),

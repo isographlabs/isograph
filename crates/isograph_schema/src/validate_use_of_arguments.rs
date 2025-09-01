@@ -14,9 +14,9 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    validate_argument_types::{value_satisfies_type, ValidateArgumentTypesError},
-    visit_selection_set::visit_selection_set,
     ClientScalarOrObjectSelectable, NetworkProtocol, Schema, ValidatedVariableDefinition,
+    validate_argument_types::{ValidateArgumentTypesError, value_satisfies_type},
+    visit_selection_set::visit_selection_set,
 };
 
 type UsedVariables = BTreeSet<VariableName>;

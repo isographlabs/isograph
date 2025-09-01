@@ -3,21 +3,21 @@ use crate::{
     lsp_runtime_error::LSPRuntimeResult, uri_file_path_ext::UriFilePathExt,
 };
 use common_lang_types::{
-    relative_path_from_absolute_and_working_directory, EmbeddedLocation, Location, Span,
+    EmbeddedLocation, Location, Span, relative_path_from_absolute_and_working_directory,
 };
 use intern::string_key::Lookup;
 use isograph_compiler::{
-    get_validated_schema, process_iso_literal_extraction,
-    read_iso_literals_source_from_relative_path, CompilerState,
+    CompilerState, get_validated_schema, process_iso_literal_extraction,
+    read_iso_literals_source_from_relative_path,
 };
 use isograph_lang_types::{DefinitionLocation, IsographResolvedNode};
 use isograph_schema::{
-    get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
     IsoLiteralsSource, IsographDatabase, NetworkProtocol,
+    get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
 };
 use lsp_types::{
-    request::{GotoDefinition, Request},
     GotoDefinitionResponse, Position, Range, Uri,
+    request::{GotoDefinition, Request},
 };
 use pico_macros::memo;
 use resolve_position::ResolvePosition;

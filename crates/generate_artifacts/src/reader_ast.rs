@@ -9,15 +9,15 @@ use isograph_lang_types::{
     SelectionTypeContainingSelections,
 };
 use isograph_schema::{
-    categorize_field_loadability, transform_arguments_with_child_context, ClientFieldVariant,
-    ClientScalarOrObjectSelectable, ClientScalarSelectable, Loadability, NameAndArguments,
-    NetworkProtocol, NormalizationKey, PathToRefetchField, RefetchedPathsMap, Schema,
-    ServerObjectSelectableVariant, ValidatedObjectSelection, ValidatedScalarSelection,
-    ValidatedSelection, VariableContext,
+    ClientFieldVariant, ClientScalarOrObjectSelectable, ClientScalarSelectable, Loadability,
+    NameAndArguments, NetworkProtocol, NormalizationKey, PathToRefetchField, RefetchedPathsMap,
+    Schema, ServerObjectSelectableVariant, ValidatedObjectSelection, ValidatedScalarSelection,
+    ValidatedSelection, VariableContext, categorize_field_loadability,
+    transform_arguments_with_child_context,
 };
 
 use crate::{
-    generate_artifacts::{get_serialized_field_arguments, ReaderAst},
+    generate_artifacts::{ReaderAst, get_serialized_field_arguments},
     import_statements::{ImportedFileCategory, ReaderImports},
 };
 

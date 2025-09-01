@@ -2,7 +2,7 @@ use std::{fmt, ops::Deref};
 
 use crate::{GraphQLDirective, GraphQLTypeAnnotation};
 
-use super::{write_arguments, write_directives, GraphQLConstantValue};
+use super::{GraphQLConstantValue, write_arguments, write_directives};
 use common_lang_types::{
     DescriptionValue, DirectiveName, EnumLiteralValue, GraphQLInterfaceTypeName,
     GraphQLObjectTypeName, GraphQLUnionTypeName, InputTypeName, InputValueName,
