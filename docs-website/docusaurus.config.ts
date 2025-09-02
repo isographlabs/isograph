@@ -136,7 +136,8 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} Isograph Labs.`,
+      copyright: `Isograph is copyright © ${new Date().getFullYear()} Isograph Labs.\n
+      Isograph™ is a trademark of Isograph Labs.`,
     },
     prism: {
       theme: lightTheme,
