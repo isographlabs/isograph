@@ -136,8 +136,8 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Isograph is copyright © ${new Date().getFullYear()} Isograph Labs.\n
-      Isograph™ is a trademark of Isograph Labs.`,
+      copyright: `Isograph is copyright © ${new Date().getFullYear()} Robert Balicki.\n
+      Isograph™ is a trademark of Robert Balicki.`,
     },
     prism: {
       theme: lightTheme,
