@@ -213,10 +213,10 @@ pub fn read_iso_literals_source<TNetworkProtocol: NetworkProtocol + 'static>(
         content,
     } = db.get(iso_literals_source_id);
 
-    let open_file = get_open_file(db, *relative_path).to_owned();
+    // let open_file = get_open_file(db, *relative_path).to_owned();
 
     // Use the open file's content, if it exists, otherwise use the content of the file from the file system
-    let content = open_file.map(|x| &db.get(x).content).unwrap_or(content);
+    // let content = open_file.map(|x| &db.get(x).content).unwrap_or(content);
 
     IsoLiteralsSource {
         relative_path: *relative_path,
