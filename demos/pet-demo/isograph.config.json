@@ -8,7 +8,7 @@
     "module": "commonjs",
     "open_telemetry": {
       "service_name": "pet-demo",
-      "collector_endpoint": "http://localhost:4137",
+      "collector_endpoint": "http://localhost:4317",
       "enable_tracing": false
     }
   }
