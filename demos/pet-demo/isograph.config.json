@@ -9,7 +9,7 @@
     "open_telemetry": {
       "service_name": "pet-demo",
       "collector_endpoint": "http://localhost:4317",
-      "enable_tracing": false
+      "enable_tracing": true
     }
   }
 }

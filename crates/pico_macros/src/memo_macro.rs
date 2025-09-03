@@ -118,7 +118,7 @@ pub(crate) fn memo_macro(_args: TokenStream, item: TokenStream) -> TokenStream {
     let output = quote! {
         #(#attrs)*
         #vis #new_sig {
-            let _memo_span = ::tracing::debug_span!(#fn_name).entered();
+            let memo_span = ::tracing::debug_span!(#fn_name, _recalculated = ::tracing::field::Empty).entered();
             let mut param_ids = ::pico::macro_fns::init_param_vec();
             #(
                 #param_ids_blocks
@@ -136,6 +136,7 @@ pub(crate) fn memo_macro(_args: TokenStream, item: TokenStream) -> TokenStream {
                     Some(Box::new(value))
                 })
             );
+            memo_span.record("_recalculated", format!("{:?}", did_recalculate));
             debug_assert!(
                 !matches!(did_recalculate, pico::DidRecalculate::Error),
                 "Unexpected memo result. This is indicative of a bug in Pico."
