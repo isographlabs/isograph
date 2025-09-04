@@ -35,6 +35,7 @@ export {
   type IsographNetworkFunction,
   type IsographStore,
   type MissingFieldHandler,
+  type StoreLink,
   type Link,
   type StoreRecord,
   type CacheMap,

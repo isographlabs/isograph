@@ -11,7 +11,7 @@ import {
   IsographEnvironment,
   IsographStore,
   StoreRecord,
-  type Link,
+  type StoreLink,
 } from './IsographEnvironment';
 import { ReadDataResult } from './read';
 import { Arguments } from './util';
@@ -38,7 +38,7 @@ export type LogMessage =
   | {
       kind: 'ComponentRerendered';
       componentName: string;
-      rootLink: Link;
+      rootLink: StoreLink;
     }
   | {
       kind: 'MakeNetworkRequest';
@@ -61,7 +61,7 @@ export type LogMessage =
     }
   | {
       kind: 'MissingFieldHandlerCalled';
-      root: Link;
+      root: StoreLink;
       storeRecord: StoreRecord;
       fieldName: string;
       arguments: Arguments | null;
@@ -71,7 +71,7 @@ export type LogMessage =
       kind: 'DoneReading';
       response: ReadDataResult<any>;
       fieldName: string;
-      root: Link;
+      root: StoreLink;
     }
   | {
       kind: 'NonEntrypointReceived';

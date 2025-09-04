@@ -6,7 +6,7 @@ export type Query__smartestPet__param = {
       /**
 A store Link for the Pet type.
       */
-      readonly link: Link,
+      readonly link: Link<"Pet">,
       readonly stats: ({
         readonly intelligence: (number | null),
       } | null),

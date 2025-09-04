@@ -1,6 +1,6 @@
 import { ReaderWithRefetchQueries } from '../core/entrypoint';
 import { stableCopy } from './cache';
-import { type Link } from './IsographEnvironment';
+import { type StoreLink } from './IsographEnvironment';
 import { PromiseWrapper } from './PromiseWrapper';
 import type { StartUpdate } from './reader';
 
@@ -52,7 +52,7 @@ export type FragmentReference<
   readonly readerWithRefetchQueries: PromiseWrapper<
     ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
   >;
-  readonly root: Link;
+  readonly root: StoreLink;
   // TODO we potentially stably copy and stringify variables a lot!
   // So, we should employ interior mutability: pretend that fragent reference
   // is immutable, but actually store something like

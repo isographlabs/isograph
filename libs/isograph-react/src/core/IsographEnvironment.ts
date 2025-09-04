@@ -15,6 +15,7 @@ import { LogFunction, WrappedLogFunction } from './logging';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { WithEncounteredRecords } from './read';
 import type { ReaderAst, StartUpdate } from './reader';
+import type { Brand } from './brand';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
@@ -38,7 +39,7 @@ export type FragmentSubscription<TReadFromStore extends UnknownTReadFromStore> =
 export type AnyChangesToRecordSubscription = {
   readonly kind: 'AnyChangesToRecord';
   readonly callback: () => void;
-  readonly recordLink: Link;
+  readonly recordLink: StoreLink;
 };
 
 export type AnyRecordSubscription = {
@@ -77,18 +78,23 @@ export type IsographEnvironment = {
 
 export type MissingFieldHandler = (
   storeRecord: StoreRecord,
-  root: Link,
+  root: StoreLink,
   fieldName: string,
   arguments_: { [index: string]: any } | null,
   variables: Variables | null,
-) => Link | undefined;
+) => StoreLink | undefined;
 
 export type IsographNetworkFunction = (
   operation: IsographOperation | IsographPersistedOperation,
   variables: Variables,
 ) => Promise<any>;
 
-export type Link = {
+export interface Link<T extends TypeName> extends StoreLink {
+  readonly __link: Brand<DataId, T>;
+  readonly __typename: T;
+}
+
+export type StoreLink = {
   readonly __link: DataId;
   readonly __typename: TypeName;
 };
@@ -103,7 +109,7 @@ export type DataTypeValue =
   | string
   | null
   // Singular linked fields:
-  | Link
+  | StoreLink
   // Plural scalar and linked fields:
   | DataTypeValue[];
 
@@ -162,7 +168,7 @@ export function createIsographStore(): IsographStore {
   };
 }
 
-export function assertLink(link: DataTypeValue): Link | null | undefined {
+export function assertLink(link: DataTypeValue): StoreLink | null | undefined {
   if (Array.isArray(link)) {
     throw new Error('Unexpected array');
   }
@@ -175,7 +181,7 @@ export function assertLink(link: DataTypeValue): Link | null | undefined {
   throw new Error('Invalid link');
 }
 
-export function getLink(maybeLink: DataTypeValue): Link | null {
+export function getLink(maybeLink: DataTypeValue): StoreLink | null {
   if (
     maybeLink != null &&
     typeof maybeLink === 'object' &&

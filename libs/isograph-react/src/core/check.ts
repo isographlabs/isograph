@@ -4,7 +4,7 @@ import { Variables } from './FragmentReference';
 import {
   getLink,
   IsographEnvironment,
-  Link,
+  StoreLink,
   StoreRecord,
 } from './IsographEnvironment';
 import { logMessage } from './logging';
@@ -30,14 +30,14 @@ export type CheckResult =
     }
   | {
       kind: 'MissingData';
-      record: Link;
+      record: StoreLink;
     };
 
 export function check(
   environment: IsographEnvironment,
   normalizationAst: NormalizationAstNodes,
   variables: Variables,
-  root: Link,
+  root: StoreLink,
 ): CheckResult {
   const recordsById = (environment.store[root.__typename] ??= {});
   const newStoreRecord = (recordsById[root.__link] ??= {});
@@ -61,7 +61,7 @@ function checkFromRecord(
   normalizationAst: NormalizationAstNodes,
   variables: Variables,
   record: StoreRecord,
-  recordLink: Link,
+  recordLink: StoreLink,
 ): CheckResult {
   normalizationAstLoop: for (const normalizationAstNode of normalizationAst) {
     switch (normalizationAstNode.kind) {
