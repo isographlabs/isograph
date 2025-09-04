@@ -1,4 +1,4 @@
-import type { IsographEntrypoint } from '@isograph/react';
+import type { IsographEntrypoint, Link } from '@isograph/react';
 import { type Actor__UserLink__param } from './Actor/UserLink/param_type';
 import { type IssueComment__formattedCommentCreationDate__param } from './IssueComment/formattedCommentCreationDate/param_type';
 import { type PullRequest__CommentList__param } from './PullRequest/CommentList/param_type';
@@ -29,7 +29,7 @@ import entrypoint_Query__UserPage from '../__isograph/Query/UserPage/entrypoint'
 // This means that the type of the exported iso literal is exactly
 // the type of the passed-in function, which takes one parameter
 // of type TParam.
-type IdentityWithParam<TParam extends object> = <TClientFieldReturn>(
+type IdentityWithParam<TParam extends object, TReturn = unknown> = <TClientFieldReturn extends TReturn>(
   clientField: (param: TParam) => TClientFieldReturn
 ) => (param: TParam) => TClientFieldReturn;
 

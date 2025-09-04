@@ -1,4 +1,4 @@
-import type { IsographEntrypoint } from '@isograph/react';
+import type { IsographEntrypoint, Link } from '@isograph/react';
 import { type AdItem__AdItemDisplay__param } from './AdItem/AdItemDisplay/param_type';
 import { type BlogItem__BlogItemDisplay__param } from './BlogItem/BlogItemDisplay/param_type';
 import { type BlogItem__BlogItemMoreDetail__param } from './BlogItem/BlogItemMoreDetail/param_type';
@@ -45,7 +45,7 @@ import entrypoint_Query__SmartestPetRoute from '../__isograph/Query/SmartestPetR
 // This means that the type of the exported iso literal is exactly
 // the type of the passed-in function, which takes one parameter
 // of type TParam.
-type IdentityWithParam<TParam extends object> = <TClientFieldReturn>(
+type IdentityWithParam<TParam extends object, TReturn = unknown> = <TClientFieldReturn extends TReturn>(
   clientField: (param: TParam) => TClientFieldReturn
 ) => (param: TParam) => TClientFieldReturn;
 
@@ -211,7 +211,7 @@ export function iso<T>(
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'pointer Query.smartestPet', T>
-): IdentityWithParam<Query__smartestPet__param>;
+): IdentityWithParam<Query__smartestPet__param, (Link<"Pet"> | null)>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Viewer.NewsfeedPaginationComponent', T>
