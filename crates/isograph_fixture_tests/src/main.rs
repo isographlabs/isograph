@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ffi::OsStr, fs, path::PathBuf};
+use std::{ffi::OsStr, fs, path::PathBuf};
 
 use clap::Parser;
 use common_lang_types::{
@@ -6,10 +6,9 @@ use common_lang_types::{
 };
 use graphql_network_protocol::GraphQLNetworkProtocol;
 use intern::{Lookup, string_key::Intern};
-use isograph_compiler::{IsoLiteralMap, parse_iso_literals_in_file_content};
-use isograph_schema::{IsoLiteralsSource, IsographDatabase, OpenFileMap};
+use isograph_compiler::parse_iso_literals_in_file_content;
+use isograph_schema::IsographDatabase;
 use lazy_static::lazy_static;
-use pico::Database;
 use regex::Regex;
 
 fn main() {
@@ -108,19 +107,10 @@ fn process_input_file(
     )
     .unwrap_or_else(|_| panic!("Content cannot be turned into string (path: {input_file:?})"));
 
-    let mut literal_map = HashMap::new();
     let relative_path =
         relative_path_from_absolute_and_working_directory(current_working_directory, &input_file);
 
-    let source_id = db.set(IsoLiteralsSource {
-        relative_path,
-        content: file_content,
-    });
-
-    literal_map.insert(relative_path, source_id);
-
-    db.set(IsoLiteralMap(literal_map));
-    db.set(OpenFileMap(HashMap::new()));
+    db.insert_iso_literal(relative_path, file_content);
 
     // N.B. for now, we are just parsing and printing those results.
     // But, we actually want to either just parse iso literals, or

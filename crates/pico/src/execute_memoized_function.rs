@@ -193,10 +193,7 @@ fn any_dependency_changed<Db: Database>(db: &Db, derived_node: &DerivedNode<Db>)
 fn source_node_changed_since<Db: Database>(db: &Db, key: Key, since: Epoch) -> bool {
     match db.get_storage().internal.get_source_node(key) {
         Some(source) => source.time_updated > since,
-        None => panic!(
-            "Source node not found. This may occur if \
-            a `SourceId` is used after the source node has been removed."
-        ),
+        None => true,
     }
 }
 
