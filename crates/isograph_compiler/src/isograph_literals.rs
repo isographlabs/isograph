@@ -8,7 +8,7 @@ use isograph_lang_parser::{
 use isograph_lang_types::{EntrypointDeclaration, SelectionType};
 use isograph_schema::{
     IsoLiteralsSource, IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError,
-    Schema, UnprocessedItem, get_open_file,
+    Schema, UnprocessedItem,
 };
 use lazy_static::lazy_static;
 use pico::SourceId;
@@ -23,7 +23,7 @@ use std::{
 };
 use thiserror::Error;
 
-use crate::{create_schema::ParsedIsoLiteralsMap, get_iso_literal_map};
+use crate::create_schema::ParsedIsoLiteralsMap;
 
 pub fn read_files_in_folder(
     folder: &Path,
@@ -194,11 +194,8 @@ pub fn read_iso_literals_source_from_relative_path<TNetworkProtocol: NetworkProt
     db: &IsographDatabase<TNetworkProtocol>,
     relative_path_to_source_file: RelativePathToSourceFile,
 ) -> Option<IsoLiteralsSource> {
-    let map = get_iso_literal_map(db);
-
-    let iso_literals_source_id = map.0.get(&relative_path_to_source_file)?;
-
-    Some(read_iso_literals_source(db, *iso_literals_source_id).to_owned())
+    let iso_literals_source_id = db.get_iso_literal(relative_path_to_source_file)?;
+    Some(read_iso_literals_source(db, iso_literals_source_id).to_owned())
 }
 
 /// We should (probably) never directly read SourceId<IsoLiteralsSource>, since if we do so,
@@ -213,7 +210,7 @@ pub fn read_iso_literals_source<TNetworkProtocol: NetworkProtocol + 'static>(
         content,
     } = db.get(iso_literals_source_id);
 
-    let open_file = get_open_file(db, *relative_path).to_owned();
+    let open_file = db.get_open_file(*relative_path);
 
     // Use the open file's content, if it exists, otherwise use the content of the file from the file system
     let content = open_file.map(|x| &db.get(x).content).unwrap_or(content);

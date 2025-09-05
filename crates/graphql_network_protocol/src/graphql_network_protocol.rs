@@ -10,7 +10,7 @@ use intern::string_key::Intern;
 use isograph_schema::IsographDatabase;
 use isograph_schema::{
     CreateAdditionalFieldsError, ExposeAsFieldToInsert, Format, MergedSelectionMap,
-    NetworkProtocol, ProcessTypeSystemDocumentOutcome, RootOperationName, Schema, StandardSources,
+    NetworkProtocol, ProcessTypeSystemDocumentOutcome, RootOperationName, Schema,
     ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -71,15 +71,10 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         ),
         ParseAndProcessGraphQLTypeSystemDocumentsError,
     > {
-        let StandardSources {
-            schema_source_id,
-            schema_extension_sources,
-        } = db.get_standard_sources();
-
         let mut graphql_root_types = None;
 
         let (type_system_document, type_system_extension_documents) =
-            parse_graphql_schema(db, *schema_source_id, schema_extension_sources).to_owned()?;
+            parse_graphql_schema(db).to_owned()?;
 
         let (mut result, mut directives, mut refetch_fields) =
             process_graphql_type_system_document(
