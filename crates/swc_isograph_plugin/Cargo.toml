@@ -25,6 +25,7 @@ serde_json = { workspace = true }
 swc_atoms = { workspace = true }
 swc_core = { workspace = true, features = ["ecma_plugin_transform"] }
 swc_ecma_utils = { workspace = true }
+swc_plugin_macro = { workspace = true }
 swc_trace_macro = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
