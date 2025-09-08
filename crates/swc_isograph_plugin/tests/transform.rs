@@ -3,7 +3,7 @@ use std::{
     fs::read_to_string,
     path::{Path, PathBuf},
 };
-use swc_ecma_parser::{EsConfig, Syntax};
+use swc_ecma_parser::{EsSyntax, Syntax};
 use swc_ecma_transforms_testing::{FixtureTestConfig, test_fixture};
 use swc_isograph_plugin::compile_iso_literal_visitor;
 
@@ -17,14 +17,17 @@ fn run(input: PathBuf) {
     let filename = format!("{}/src/components/HomeRoute.tsx", root_dir.display());
 
     test_fixture(
-        Syntax::Es(EsConfig {
+        Syntax::Es(EsSyntax {
             jsx: true,
             ..Default::default()
         }),
         &|_| compile_iso_literal_visitor(&config, Path::new(&filename), Path::new(root_dir), None),
         &input,
         &output,
-        Default::default(),
+        FixtureTestConfig {
+            module: Some(true),
+            ..Default::default()
+        },
     );
 }
 
@@ -38,7 +41,7 @@ fn isograph_errors(input: PathBuf) {
     let filename = format!("{}/src/components/HomeRoute.tsx", root_dir.display());
 
     test_fixture(
-        Syntax::Es(EsConfig {
+        Syntax::Es(EsSyntax {
             jsx: true,
             ..Default::default()
         }),
@@ -47,6 +50,7 @@ fn isograph_errors(input: PathBuf) {
         &output,
         FixtureTestConfig {
             allow_error: true,
+            module: Some(true),
             ..Default::default()
         },
     );

@@ -1,4 +1,3 @@
-
   x Invalid iso tag usage. The iso function should be passed exactly one argument.
    ,-[input.js:1:1]
  1 | ,-> export const HomeRoute = iso(`

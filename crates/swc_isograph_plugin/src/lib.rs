@@ -4,22 +4,23 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::Deserialize;
 use std::{
-    collections::BTreeMap,
     fmt,
     path::{Path, PathBuf},
 };
 use swc_atoms::Atom;
 use swc_core::{
     common::{
-        DUMMY_SP, Mark, Span, errors::HANDLER, plugin::metadata::TransformPluginMetadataContextKind,
+        DUMMY_SP, Mark, Span, SyntaxContext, errors::HANDLER,
+        plugin::metadata::TransformPluginMetadataContextKind,
     },
     ecma::{
         ast::*,
-        visit::{Fold, FoldWith, noop_fold_type},
+        visit::{Fold, FoldWith, fold_pass, noop_fold_type},
     },
-    plugin::{plugin_transform, proxies::TransformPluginProgramMetadata},
+    plugin::proxies::TransformPluginProgramMetadata,
 };
 use swc_ecma_utils::{ExprFactory, prepend_stmts, quote_ident};
+use swc_plugin_macro::plugin_transform;
 use swc_trace_macro::swc_trace;
 
 use thiserror::Error;
@@ -61,14 +62,14 @@ fn isograph_plugin_transform(
 
     let path = Path::new(file_name);
 
-    let mut isograph = compile_iso_literal_visitor(
+    let isograph = compile_iso_literal_visitor(
         &config,
         path,
         root_dir.as_path(),
         Some(metadata.unresolved_mark),
     );
 
-    program.fold_with(&mut isograph)
+    program.apply(isograph)
 }
 
 pub fn compile_iso_literal_visitor<'a>(
@@ -76,14 +77,14 @@ pub fn compile_iso_literal_visitor<'a>(
     filepath: &'a Path,
     root_dir: &'a Path,
     unresolved_mark: Option<Mark>,
-) -> impl Fold + 'a {
-    IsoLiteralCompilerVisitor {
+) -> impl Pass + 'a {
+    fold_pass(IsoLiteralCompilerVisitor {
         config,
         filepath,
         unresolved_mark,
-        imports: BTreeMap::new(),
+        imports: vec![],
         root_dir,
-    }
+    })
 }
 
 #[derive(Error, Clone, Debug, Eq, PartialEq)]
@@ -127,10 +128,11 @@ impl IsographImport {
             specifiers: vec![ImportSpecifier::Default(ImportDefaultSpecifier {
                 span: Default::default(),
                 local: Ident {
-                    span: self
+                    ctxt: self
                         .unresolved_mark
-                        .map(|m| DUMMY_SP.apply_mark(m))
+                        .map(|m| SyntaxContext::empty().apply_mark(m))
                         .unwrap_or_default(),
+                    span: DUMMY_SP,
                     sym: self.item.clone(),
                     optional: false,
                 },
@@ -172,11 +174,12 @@ impl From<&str> for ArtifactType {
 
 fn build_ident_expr_for_hoisted_import(ident_name: &str, unresolved_mark: Option<Mark>) -> Expr {
     Expr::Ident(Ident {
-        span: unresolved_mark
-            .map(|m| DUMMY_SP.apply_mark(m))
-            .unwrap_or_default(),
+        span: DUMMY_SP,
         sym: ident_name.into(),
         optional: false,
+        ctxt: unresolved_mark
+            .map(|m| SyntaxContext::empty().apply_mark(m))
+            .unwrap_or_default(),
     })
 }
 
@@ -194,7 +197,8 @@ impl ValidIsographTemplateLiteral {
             obj: Box::new(Expr::Call(CallExpr {
                 span: DUMMY_SP,
                 callee: quote_ident!(
-                    mark.map(|m| DUMMY_SP.apply_mark(m)).unwrap_or(DUMMY_SP),
+                    mark.map(|m| SyntaxContext::empty().apply_mark(m))
+                        .unwrap_or_default(),
                     "require"
                 )
                 .as_callee(),
@@ -207,11 +211,11 @@ impl ValidIsographTemplateLiteral {
                     .as_arg(),
                 ],
                 type_args: None,
+                ctxt: SyntaxContext::empty(),
             })),
-            prop: MemberProp::Ident(Ident {
+            prop: MemberProp::Ident(IdentName {
                 sym: "default".into(),
                 span: DUMMY_SP,
-                optional: false,
             }),
         })
     }
@@ -268,7 +272,7 @@ struct IsoLiteralCompilerVisitor<'a> {
     root_dir: &'a Path,
     config: &'a IsographProjectConfig,
     filepath: &'a Path,
-    imports: BTreeMap<(String, String), IsographImport>,
+    imports: Vec<IsographImport>,
     unresolved_mark: Option<Mark>,
 }
 
@@ -323,17 +327,11 @@ impl IsoLiteralCompilerVisitor<'_> {
                 );
 
                 // hoist import
-                self.imports.insert(
-                    (
-                        iso_template_literal.field_type,
-                        iso_template_literal.field_name,
-                    ),
-                    IsographImport {
-                        path: file_to_artifact.display().to_string().into(),
-                        item: ident_name.clone().into(),
-                        unresolved_mark: self.unresolved_mark,
-                    },
-                );
+                self.imports.push(IsographImport {
+                    path: file_to_artifact.display().to_string().into(),
+                    item: ident_name.clone().into(),
+                    unresolved_mark: self.unresolved_mark,
+                });
 
                 build_ident_expr_for_hoisted_import(&ident_name, self.unresolved_mark)
             }
@@ -353,6 +351,8 @@ impl IsoLiteralCompilerVisitor<'_> {
         };
 
         let iso_template_literal = self.parse_iso_template_literal(first)?;
+
+        debug!("iso_template_literal: {:#?}", iso_template_literal);
 
         match iso_template_literal.artifact_type {
             ArtifactType::Entrypoint => {
@@ -441,7 +441,7 @@ impl Fold for IsoLiteralCompilerVisitor<'_> {
 
         prepend_stmts(
             &mut items,
-            self.imports.values().map(|import| import.as_module_item()),
+            self.imports.iter().map(|import| import.as_module_item()),
         );
 
         items
@@ -450,12 +450,15 @@ impl Fold for IsoLiteralCompilerVisitor<'_> {
 
 fn build_arrow_identity_expr() -> Expr {
     Expr::Arrow(ArrowExpr {
-        params: vec![Pat::Ident(Ident::new("x".into(), DUMMY_SP).into())],
-        body: Box::new(Ident::new("x".into(), DUMMY_SP).into()),
+        params: vec![Pat::Ident(
+            Ident::new("x".into(), DUMMY_SP, SyntaxContext::empty()).into(),
+        )],
+        body: Box::new(Ident::new("x".into(), DUMMY_SP, SyntaxContext::empty()).into()),
         span: DUMMY_SP,
         is_async: false,
         is_generator: false,
         return_type: None,
         type_params: None,
+        ctxt: SyntaxContext::empty(),
     })
 }
