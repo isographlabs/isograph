@@ -10,7 +10,11 @@ export function FragmentReader<
   TResult,
   TEntrypoint extends IsographEntrypoint<any, TResult, any>,
   TChildrenResult,
->(props: {
+>({
+  fragmentReference,
+  networkRequestOptions,
+  children,
+}: {
   fragmentReference: FragmentReference<
     ExtractReadFromStore<TEntrypoint>,
     TResult
@@ -18,9 +22,6 @@ export function FragmentReader<
   networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
   children: (data: TResult) => TChildrenResult;
 }): TChildrenResult {
-  const result = useResult(
-    props.fragmentReference,
-    props.networkRequestOptions,
-  );
-  return props.children(result);
+  const result = useResult(fragmentReference, networkRequestOptions);
+  return children(result);
 }
