@@ -85,6 +85,10 @@ export type LogMessage =
       kind: 'EnvironmentCreated';
     }
   | {
+      kind: 'StartUpdateError';
+      error: any;
+    }
+  | {
       kind: 'StartUpdateComplete';
       updatedIds: EncounteredIds;
     };

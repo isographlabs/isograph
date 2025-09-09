@@ -66,6 +66,10 @@ export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
     try {
       updater(data);
     } catch (e) {
+      logMessage(environment, () => ({
+        kind: 'StartUpdateError',
+        error: e,
+      }));
       throw e;
     } finally {
       logMessage(environment, () => ({
