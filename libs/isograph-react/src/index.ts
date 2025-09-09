@@ -144,6 +144,7 @@ export {
   FragmentRenderer,
   type IsExactlyIntrinsicAttributes,
 } from './react/FragmentRenderer';
+export { FragmentReader } from './react/FragmentReader';
 export { LoadableFieldReader } from './react/LoadableFieldReader';
 export { useResult } from './react/useResult';
 export {
