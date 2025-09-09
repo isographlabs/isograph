@@ -13,7 +13,7 @@ export type IsExactlyIntrinsicAttributes<T> = T extends JSX.IntrinsicAttributes
     : false
   : false;
 
-export function FragmentReader<
+export function FragmentRenderer<
   TProps extends Record<any, any>,
   TEntrypoint extends IsographEntrypoint<any, React.FC<TProps>, any>,
 >(

@@ -141,9 +141,9 @@ export {
   type UseImperativeReferenceResult,
 } from './react/useImperativeReference';
 export {
-  FragmentReader,
+  FragmentRenderer,
   type IsExactlyIntrinsicAttributes,
-} from './react/FragmentReader';
+} from './react/FragmentRenderer';
 export { LoadableFieldReader } from './react/LoadableFieldReader';
 export { useResult } from './react/useResult';
 export {

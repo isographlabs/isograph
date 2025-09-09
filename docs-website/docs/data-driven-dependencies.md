@@ -101,7 +101,7 @@ export const TopSecretDisplayWrapper = iso(`
   const { fragmentReference } = useClientSideDefer(data.TopSecretDisplay);
   return (
     <Suspense fallback={null}>
-      <FragmentReader fragmentReference={fragmentReference} />
+      <FragmentRenderer fragmentReference={fragmentReference} />
     </Suspense>
   );
 });

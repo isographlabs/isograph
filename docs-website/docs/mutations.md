@@ -138,7 +138,7 @@ export const setTagline = iso(`
     </Button>
   ) : (
     <Suspense fallback="Mutation in flight">
-      <FragmentReader fragmentReference={mutationRef} />
+      <FragmentRenderer fragmentReference={mutationRef} />
     </Suspense>
   );
 });

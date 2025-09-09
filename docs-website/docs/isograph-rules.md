@@ -84,12 +84,12 @@ export const AGAIN_ANYTHING = iso(`
 
 - Client fields (i.e. those defined with `iso`), but not server fields (i.e. those defined in the graphql schema), can get the `@loadable` annotation.
 - This is called selecting the field loadably.
-- One thing you can do with a field that has the `@loadable` annotation is to pass it to `useClientSideDefer`, which gives us a fragment reference, which we then pass to `FragmentReader` as follows.
+- One thing you can do with a field that has the `@loadable` annotation is to pass it to `useClientSideDefer`, which gives us a fragment reference, which we then pass to `FragmentRenderer` as follows.
 - This will cause the loadable field to be fetched during the initial render of that component.
-- Do not import useClientSideDefer or FragmentReader from '@iso', but from '@isograph/react'!
+- Do not import useClientSideDefer or FragmentRenderer from '@iso', but from '@isograph/react'!
 
 ```tsx
-import { FragmentReader, useClientSideDefer } from '@isograph/react';
+import { FragmentRenderer, useClientSideDefer } from '@isograph/react';
 
 export const SomeComponent = iso(`
   field PARENT_TYPE.SomeComponent @component {
@@ -103,7 +103,7 @@ export const SomeComponent = iso(`
     <>
       <data.ImportantField />
       <React.Suspense fallback="Loading">
-        <FragmentReader
+        <FragmentRenderer
           fragmentReference={fragmentReference}
           additionalProps={{}}
         />

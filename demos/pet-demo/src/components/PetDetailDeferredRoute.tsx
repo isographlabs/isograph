@@ -1,6 +1,6 @@
 import { iso } from '@iso';
 import {
-  FragmentReader,
+  FragmentRenderer,
   useClientSideDefer,
   useLazyReference,
 } from '@isograph/react';
@@ -58,7 +58,7 @@ export const PetDetailDeferredRouteInnerComponent = iso(`
       <React.Suspense fallback={<h2>Loading pet details...</h2>}>
         <Stack direction="row" spacing={4}>
           <Stack direction="column" spacing={4}>
-            <FragmentReader fragmentReference={petCheckinsCard} />
+            <FragmentRenderer fragmentReference={petCheckinsCard} />
           </Stack>
         </Stack>
       </React.Suspense>
@@ -79,7 +79,7 @@ export function PetDetailDeferredRouteLoader({
   return (
     <ErrorBoundary>
       <React.Suspense fallback={<FullPageLoading />}>
-        <FragmentReader
+        <FragmentRenderer
           fragmentReference={fragmentReference}
           networkRequestOptions={{ suspendIfInFlight: false }}
         />
