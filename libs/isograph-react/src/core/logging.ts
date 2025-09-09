@@ -83,6 +83,10 @@ export type LogMessage =
     }
   | {
       kind: 'EnvironmentCreated';
+    }
+  | {
+      kind: 'StartUpdateComplete';
+      updatedIds: EncounteredIds;
     };
 
 export type LogFunction = (logMessage: LogMessage) => void;

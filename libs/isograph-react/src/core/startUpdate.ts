@@ -18,6 +18,7 @@ import {
   type IsographEnvironment,
   type Link,
 } from './IsographEnvironment';
+import { logMessage } from './logging';
 import { readPromise, type PromiseWrapper } from './PromiseWrapper';
 import {
   readImperativelyLoadedField,
@@ -67,6 +68,10 @@ export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
     } catch (e) {
       throw e;
     } finally {
+      logMessage(environment, () => ({
+        kind: 'StartUpdateComplete',
+        updatedIds: mutableUpdatedIds,
+      }));
       callSubscriptions(environment, mutableUpdatedIds);
     }
   };
