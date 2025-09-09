@@ -91,6 +91,10 @@ export type LogMessage =
   | {
       kind: 'StartUpdateComplete';
       updatedIds: EncounteredIds;
+    }
+  | {
+      kind: 'ErrorEncounteredInWithErrorHandling';
+      error: any;
     };
 
 export type LogFunction = (logMessage: LogMessage) => void;

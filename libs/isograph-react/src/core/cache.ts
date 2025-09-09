@@ -259,11 +259,19 @@ export function onNextChangeToRecord(
 //
 // That's probably okay to ignore. We don't, however, want to prevent
 // updating other subscriptions if one subscription had missing data.
-function withErrorHandling<T>(f: (t: T) => void): (t: T) => void {
+function withErrorHandling<T>(
+  environment: IsographEnvironment,
+  f: (t: T) => void,
+): (t: T) => void {
   return (t) => {
     try {
       return f(t);
-    } catch {}
+    } catch (e) {
+      logMessage(environment, () => ({
+        kind: 'ErrorEncounteredInWithErrorHandling',
+        error: e,
+      }));
+    }
   };
 }
 
@@ -272,7 +280,7 @@ export function callSubscriptions(
   recordsEncounteredWhenNormalizing: EncounteredIds,
 ) {
   environment.subscriptions.forEach(
-    withErrorHandling((subscription) => {
+    withErrorHandling(environment, (subscription) => {
       switch (subscription.kind) {
         case 'FragmentSubscription': {
           // TODO if there are multiple components subscribed to the same
