@@ -84,12 +84,14 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> IsographDatabase<TNetworkProto
         self.open_file_map.0.get(&file).cloned()
     }
 
-    pub fn remove_schema_extension(&mut self, relative_path: RelativePathToSourceFile) -> bool {
-        self.standard_sources
+    pub fn remove_schema_extension(
+        &mut self,
+        relative_path: RelativePathToSourceFile,
+    ) -> Option<SourceId<SchemaSource>> {
+        self.get_standard_sources_tracked_mut()
             .schema_extension_sources
             .remove(&relative_path)
-            .map(|source_id| self.remove(source_id))
-            .is_some()
+            .inspect(|&source_id| self.remove(source_id))
     }
 
     pub fn get_iso_literal(
@@ -104,20 +106,24 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> IsographDatabase<TNetworkProto
             relative_path,
             content,
         });
-        self.iso_literal_map.0.insert(relative_path, source_id);
+        self.get_iso_literal_map_tracked_mut()
+            .0
+            .insert(relative_path, source_id);
     }
 
-    pub fn remove_iso_literal(&mut self, relative_path: RelativePathToSourceFile) -> bool {
-        self.iso_literal_map
+    pub fn remove_iso_literal(
+        &mut self,
+        relative_path: RelativePathToSourceFile,
+    ) -> Option<SourceId<IsoLiteralsSource>> {
+        self.get_iso_literal_map_tracked_mut()
             .0
             .remove(&relative_path)
-            .map(|source_id| self.remove(source_id))
-            .is_some()
+            .inspect(|&source_id| self.remove(source_id))
     }
 
     pub fn remove_iso_literals_from_path(&mut self, relative_path: &str) {
         let removed_source_ids = self
-            .iso_literal_map
+            .get_iso_literal_map_tracked_mut()
             .0
             .extract_if(|k, _| k.to_string().starts_with(relative_path))
             .map(|(_, v)| v)
@@ -133,11 +139,13 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> IsographDatabase<TNetworkProto
             relative_path,
             content,
         });
-        self.open_file_map.0.insert(relative_path, source_id);
+        self.get_open_file_map_tracked_mut()
+            .0
+            .insert(relative_path, source_id);
     }
 
     pub fn remove_open_file(&mut self, relative_path: RelativePathToSourceFile) -> bool {
-        self.open_file_map
+        self.get_open_file_map_tracked_mut()
             .0
             .remove(&relative_path)
             .map(|source_id| self.remove(source_id))

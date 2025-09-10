@@ -215,7 +215,7 @@ fn parse_iso_literals<TNetworkProtocol: NetworkProtocol + 'static>(
     // fully rewrite everything to be incremental.
     let mut contains_iso = ParsedIsoLiteralsMap::default();
     let mut iso_literal_parse_errors = vec![];
-    for (relative_path, iso_literals_source_id) in db.iso_literal_map.0.iter() {
+    for (relative_path, iso_literals_source_id) in db.get_iso_literal_map_tracked().0.iter() {
         match parse_iso_literal_in_source(db, *iso_literals_source_id).to_owned() {
             Ok(iso_literals) => {
                 if !iso_literals.is_empty() {
