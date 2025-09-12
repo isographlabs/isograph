@@ -26,8 +26,8 @@ import {
   DataTypeValue,
   FragmentSubscription,
   getLink,
-  Link,
   ROOT_ID,
+  StoreLink,
   StoreRecord,
   type IsographEnvironment,
   type TypeName,
@@ -157,7 +157,7 @@ export function normalizeData(
   normalizationAst: NormalizationAstNodes,
   networkResponse: NetworkResponseObject,
   variables: Variables,
-  root: Link,
+  root: StoreLink,
 ): EncounteredIds {
   const encounteredIds: EncounteredIds = new Map();
 
@@ -205,7 +205,7 @@ export function subscribeToAnyChange(
 
 export function subscribeToAnyChangesToRecord(
   environment: IsographEnvironment,
-  recordLink: Link,
+  recordLink: StoreLink,
   callback: () => void,
 ): () => void {
   const subscription = {
@@ -240,7 +240,7 @@ export function subscribe<TReadFromStore extends UnknownTReadFromStore>(
 
 export function onNextChangeToRecord(
   environment: IsographEnvironment,
-  recordLink: Link,
+  recordLink: StoreLink,
 ): Promise<void> {
   return new Promise((resolve) => {
     const unsubscribe = subscribeToAnyChangesToRecord(
@@ -395,7 +395,7 @@ function normalizeDataIntoRecord(
   normalizationAst: NormalizationAstNodes,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
-  targetParentRecordLink: Link,
+  targetParentRecordLink: StoreLink,
   variables: Variables,
   mutableEncounteredIds: EncounteredIds,
 ): RecordHasBeenUpdated {
@@ -500,7 +500,7 @@ function normalizeLinkedField(
   astNode: NormalizationLinkedField,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
-  targetParentRecordLink: Link,
+  targetParentRecordLink: StoreLink,
   variables: Variables,
   mutableEncounteredIds: EncounteredIds,
 ): RecordHasBeenUpdated {
@@ -525,7 +525,7 @@ function normalizeLinkedField(
 
   if (Array.isArray(networkResponseData)) {
     // TODO check astNode.plural or the like
-    const dataIds: (Link | null)[] = [];
+    const dataIds: (StoreLink | null)[] = [];
     for (let i = 0; i < networkResponseData.length; i++) {
       const networkResponseObject = networkResponseData[i];
       if (networkResponseObject == null) {
@@ -596,7 +596,7 @@ function normalizeInlineFragment(
   astNode: NormalizationInlineFragment,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
-  targetParentRecordLink: Link,
+  targetParentRecordLink: StoreLink,
   variables: Variables,
   mutableEncounteredIds: EncounteredIds,
 ): RecordHasBeenUpdated {
@@ -618,7 +618,7 @@ function normalizeInlineFragment(
 
 function dataIdsAreTheSame(
   existingValue: DataTypeValue,
-  newDataIds: (Link | null)[],
+  newDataIds: (StoreLink | null)[],
 ): boolean {
   if (Array.isArray(existingValue)) {
     if (newDataIds.length !== existingValue.length) {
@@ -643,7 +643,7 @@ function normalizeNetworkResponseObject(
   environment: IsographEnvironment,
   astNode: NormalizationLinkedField,
   networkResponseData: NetworkResponseObject,
-  targetParentRecordLink: Link,
+  targetParentRecordLink: StoreLink,
   variables: Variables,
   index: number | null,
   mutableEncounteredIds: EncounteredIds,
@@ -838,7 +838,7 @@ export const THIRD_SPLIT_KEY = '__';
 
 // Returns a key to look up an item in the store
 function getDataIdOfNetworkResponse(
-  parentRecordLink: Link,
+  parentRecordLink: StoreLink,
   dataToNormalize: NetworkResponseObject,
   astNode: NormalizationLinkedField,
   variables: Variables,

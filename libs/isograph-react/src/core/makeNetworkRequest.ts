@@ -20,7 +20,7 @@ import {
   retainQuery,
   unretainQuery,
 } from './garbageCollection';
-import { IsographEnvironment, Link, ROOT_ID } from './IsographEnvironment';
+import { IsographEnvironment, ROOT_ID, StoreLink } from './IsographEnvironment';
 import { logMessage } from './logging';
 import {
   AnyError,
@@ -260,7 +260,7 @@ function readDataForOnComplete<
 >(
   artifact: TArtifact,
   environment: IsographEnvironment,
-  root: Link,
+  root: StoreLink,
   variables: ExtractParameters<TReadFromStore>,
   readerWithRefetchQueries:
     | ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>

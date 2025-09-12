@@ -3,7 +3,7 @@ import {
   createIsographStore,
   IsographEnvironmentProvider,
   IsographOperation,
-  type Link,
+  type StoreLink,
   type StoreRecord,
 } from '@isograph/react';
 import type { AppProps } from 'next/app';
@@ -46,11 +46,11 @@ function makeNetworkRequest<T>(
 }
 const missingFieldHandler = (
   storeRecord: StoreRecord,
-  root: Link,
+  root: StoreLink,
   fieldName: string,
   arguments_: { [index: string]: any } | null,
   variables: { [index: string]: any } | null,
-): Link | undefined => {
+): StoreLink | undefined => {
   // This is the custom missing field handler
   //
   // N.B. this **not** correct. We need to pass the correct variables/args here.

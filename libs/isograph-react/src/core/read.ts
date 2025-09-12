@@ -23,7 +23,7 @@ import {
   getOrLoadIsographArtifact,
   IsographEnvironment,
   type DataTypeValue,
-  type Link,
+  type StoreLink,
   type StoreRecord,
 } from './IsographEnvironment';
 import { logMessage } from './logging';
@@ -134,13 +134,13 @@ export type ReadDataResult<Data> =
       readonly kind: 'MissingData';
       readonly reason: string;
       readonly nestedReason?: ReadDataResult<unknown>;
-      readonly recordLink: Link;
+      readonly recordLink: StoreLink;
     };
 
 function readData<TReadFromStore>(
   environment: IsographEnvironment,
   ast: ReaderAst<TReadFromStore>,
-  root: Link,
+  root: StoreLink,
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   networkRequest: PromiseWrapper<void, any>,
@@ -281,7 +281,7 @@ function readData<TReadFromStore>(
 export function readLoadablySelectedFieldData(
   environment: IsographEnvironment,
   field: LoadablySelectedField,
-  root: Link,
+  root: StoreLink,
   variables: Variables,
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
@@ -534,7 +534,7 @@ function writeQueryArgsToVariables(
 export function readResolverFieldData(
   environment: IsographEnvironment,
   field: ReaderNonLoadableResolverField,
-  root: Link,
+  root: StoreLink,
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   networkRequest: PromiseWrapper<void, any>,
@@ -625,9 +625,11 @@ export function readResolverFieldData(
 export function readScalarFieldData(
   field: ReaderScalarField,
   storeRecord: StoreRecord,
-  root: Link,
+  root: StoreLink,
   variables: Variables,
-): ReadDataResult<string | number | boolean | Link | DataTypeValue[] | null> {
+): ReadDataResult<
+  string | number | boolean | StoreLink | DataTypeValue[] | null
+> {
   const storeRecordName = getParentRecordKey(field, variables);
   const value = storeRecord[storeRecordName];
   // TODO consider making scalars into discriminated unions. This probably has
@@ -646,14 +648,14 @@ export function readLinkedFieldData(
   environment: IsographEnvironment,
   field: ReaderLinkedField,
   storeRecord: StoreRecord,
-  root: Link,
+  root: StoreLink,
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
   readData: <TReadFromStore>(
     ast: ReaderAst<TReadFromStore>,
-    root: Link,
+    root: StoreLink,
   ) => ReadDataResult<object>,
 ): ReadDataResult<unknown> {
   const storeRecordName = getParentRecordKey(field, variables);
@@ -944,7 +946,7 @@ function stableStringifyArgs(args: object) {
 export function readImperativelyLoadedField(
   environment: IsographEnvironment,
   field: ReaderImperativelyLoadedField,
-  root: Link,
+  root: StoreLink,
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   networkRequest: PromiseWrapper<void, any>,

@@ -15,7 +15,7 @@ A client pointer for the Economist type.
       /**
 A store Link for the Node type.
       */
-      readonly link: Link,
+      readonly link: Link<"Economist">,
       /**
 A client pointer for the Economist type.
       */
@@ -34,12 +34,12 @@ A client pointer for the Economist type.
         name: string,
       } | null),
     } | null),
-    set node(value: ({ link: Link } | null)),
+    set node(value: ({ link: Link<"Economist"> } | null)),
     readonly john_stuart_mill: ({
       /**
 A store Link for the Node type.
       */
-      readonly link: Link,
+      readonly link: Link<"Economist">,
       /**
 A client pointer for the Economist type.
       */

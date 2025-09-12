@@ -7,14 +7,14 @@ import {
   IsographEnvironment,
   IsographStore,
   StoreRecord,
-  type Link,
+  type StoreLink,
   type TypeName,
 } from './IsographEnvironment';
 
 export type RetainedQuery = {
   readonly normalizationAst: NormalizationAstNodes;
   readonly variables: {};
-  readonly root: Link;
+  readonly root: StoreLink;
 };
 
 export type DidUnretainSomeQuery = boolean;
@@ -117,7 +117,7 @@ function recordReachableIdsFromRecord(
         const linkKey = getParentRecordKey(selection, variables ?? {});
         const linkedFieldOrFields = currentRecord[linkKey];
 
-        const links: Link[] = [];
+        const links: StoreLink[] = [];
         if (Array.isArray(linkedFieldOrFields)) {
           for (const maybeLink of linkedFieldOrFields) {
             const link = assertLink(maybeLink);

@@ -572,11 +572,15 @@ fn get_serialized_field_argument(
 }
 
 pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ClientFieldOutputType {
     let variant = &client_field.variant;
     match variant {
-        ClientFieldVariant::Link => ClientFieldOutputType("Link".to_string()),
+        ClientFieldVariant::Link => ClientFieldOutputType(TNetworkProtocol::generate_link_type(
+            schema,
+            &client_field.parent_object_entity_name,
+        )),
         ClientFieldVariant::UserWritten(info) => match info.client_field_directive_set {
             ClientFieldDirectiveSet::None(_) => {
                 ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
@@ -803,7 +807,8 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
     match client_field.variant {
         ClientFieldVariant::Link => {
             *link_fields = true;
-            let output_type = "Link";
+            let output_type =
+                TNetworkProtocol::generate_link_type(schema, &parent_object_entity_name);
             query_type_declaration.push_str(
                 &(format!(
                     "readonly {}: {},\n",
@@ -983,6 +988,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 ObjectSelectionDirectiveSet::Updatable(_) => {
                     *updatable_fields = true;
                     write_getter_and_setter(
+                        schema,
                         query_type_declaration,
                         indentation_level,
                         name_or_alias,
@@ -1002,7 +1008,8 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn write_getter_and_setter(
+fn write_getter_and_setter<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     query_type_declaration: &mut String,
     indentation_level: u8,
     name_or_alias: SelectableNameOrAlias,
@@ -1014,9 +1021,15 @@ fn write_getter_and_setter(
         name_or_alias,
         print_javascript_type_declaration(type_annotation),
     ));
-    let setter_type_annotation = output_type_annotation
-        .clone()
-        .map(&mut |_| "{ link: Link }");
+    let setter_type_annotation =
+        output_type_annotation
+            .clone()
+            .map(&mut |server_object_entity_name| {
+                format!(
+                    "{{ link: {} }}",
+                    TNetworkProtocol::generate_link_type(schema, &server_object_entity_name)
+                )
+            });
     query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
     query_type_declaration.push_str(&format!(
         "set {}(value: {}),\n",

@@ -83,6 +83,7 @@ pub fn process_graphql_type_system_document(
                     concrete_type,
                     GraphQLSchemaObjectAssociatedData {
                         original_definition_type: GraphQLSchemaOriginalDefinitionType::Object,
+                        subtypes: vec![],
                     },
                     GraphQLObjectDefinitionType::Object,
                     &mut refetch_fields,
@@ -108,6 +109,7 @@ pub fn process_graphql_type_system_document(
                         GraphQLSchemaObjectAssociatedData {
                             original_definition_type:
                                 GraphQLSchemaOriginalDefinitionType::Interface,
+                            subtypes: vec![],
                         },
                         GraphQLObjectDefinitionType::Interface,
                         &mut refetch_fields,
@@ -136,6 +138,7 @@ pub fn process_graphql_type_system_document(
                         GraphQLSchemaObjectAssociatedData {
                             original_definition_type:
                                 GraphQLSchemaOriginalDefinitionType::InputObject,
+                            subtypes: vec![],
                         },
                         GraphQLObjectDefinitionType::InputObject,
                         &mut refetch_fields,
@@ -177,6 +180,7 @@ pub fn process_graphql_type_system_document(
                         None,
                         GraphQLSchemaObjectAssociatedData {
                             original_definition_type: GraphQLSchemaOriginalDefinitionType::Union,
+                            subtypes: vec![],
                         },
                         GraphQLObjectDefinitionType::Union,
                         &mut refetch_fields,
@@ -222,44 +226,47 @@ pub fn process_graphql_type_system_document(
 
     // For each supertype (e.g. Node) and a subtype (e.g. Pet), we need to add an asConcreteType field.
     for (supertype_name, subtypes) in supertype_to_subtype_map.iter() {
-        if let Some((object_outcome, _)) = objects.iter_mut().find(|obj| {
-            let supertype_name: ServerObjectEntityName = supertype_name.unchecked_conversion();
+        let (object_outcome, _) = objects
+            .iter_mut()
+            .find(|obj| {
+                let supertype_name: ServerObjectEntityName = supertype_name.unchecked_conversion();
 
-            obj.0.server_object_entity.name.item == supertype_name
-        }) {
-            for subtype_name in subtypes.iter() {
-                object_outcome.fields_to_insert.push(WithLocation::new(
-                    FieldToInsert {
-                        description: Some(WithSpan::new(
-                            Description(
-                                format!("A client pointer for the {subtype_name} type.")
-                                    .intern()
-                                    .into(),
-                            ),
-                            Span::todo_generated(),
-                        )),
-                        name: WithLocation::new(
-                            format!("as{subtype_name}").intern().into(),
-                            Location::generated(),
+                obj.0.server_object_entity.name.item == supertype_name
+            })
+            .expect("Expected supertype to exist. This is indicative of a bug in Isograph.");
+
+        // add subtypes to associated_data
+        object_outcome
+            .server_object_entity
+            .network_protocol_associated_data
+            .subtypes
+            .extend(subtypes);
+
+        for subtype_name in subtypes.iter() {
+            object_outcome.fields_to_insert.push(WithLocation::new(
+                FieldToInsert {
+                    description: Some(WithSpan::new(
+                        Description(
+                            format!("A client pointer for the {subtype_name} type.")
+                                .intern()
+                                .into(),
                         ),
-                        type_: GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                            WithSpan::new(*subtype_name, Span::todo_generated()),
-                        )),
-                        arguments: vec![],
-                        is_inline_fragment: true,
-                    },
-                    Location::generated(),
-                ));
-            }
-        } else {
-            return Err(WithLocation::new(
-                ProcessGraphqlTypeSystemDefinitionError::AttemptedToImplementNonExistentType {
-                subtype_name: *subtypes.first().expect("Expected subtypes not to be empty. This is indicative of a bug in Isograph."),
-                    supertype_name: *supertype_name,
+                        Span::todo_generated(),
+                    )),
+                    name: WithLocation::new(
+                        format!("as{subtype_name}").intern().into(),
+                        Location::generated(),
+                    ),
+                    type_: GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(WithSpan::new(
+                        *subtype_name,
+                        Span::todo_generated(),
+                    ))),
+                    arguments: vec![],
+                    is_inline_fragment: true,
                 },
                 Location::generated(),
             ));
-        };
+        }
     }
 
     Ok((
