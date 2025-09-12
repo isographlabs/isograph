@@ -78,8 +78,52 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let primary_field_name_selection_parts =
             path.map(|x| x.intern().into()).collect::<Vec<_>>();
 
-        let (parent_object_entity_name, mutation_subfield_name) =
-            self.parse_mutation_subfield_id(field, parent_object_entity_name)?;
+        // Determine which root object to use for the top-level field segment.
+        // Historically, @exposeField only targeted Mutation fields. Newer usages
+        // also generate refetch fields via Query.node. In that case, the first
+        // segment will be "node" and should be resolved against the Query root,
+        // not the parent object on which we are adding the client field.
+        let starting_parent_for_top_level_field = if field == "node" {
+            if let Some((query_name, _)) = self.find_query() {
+                *query_name
+            } else {
+                // Fall back to the provided parent if Query is not present.
+                parent_object_entity_name
+            }
+        } else {
+            parent_object_entity_name
+        };
+
+        // If the field is `node`, ensure that the Query root has a corresponding field.
+        if field == "node" {
+            let Some((query_name, _)) = self.find_query() else {
+                return Err(WithLocation::new(
+                    CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
+                        primary_type_name: parent_object_entity_name,
+                        field_name: field.intern().into(),
+                    },
+                    Location::generated(),
+                ));
+            };
+            let has_node = self
+                .server_entity_data
+                .server_object_entity_extra_info
+                .get(query_name)
+                .and_then(|info| info.selectables.get(&SelectableName::from("node".intern())))
+                .is_some();
+            if !has_node {
+                return Err(WithLocation::new(
+                    CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
+                        primary_type_name: parent_object_entity_name,
+                        field_name: field.intern().into(),
+                    },
+                    Location::generated(),
+                ));
+            }
+        }
+
+        let (parent_object_entity_name, mutation_subfield_name) = self
+            .parse_mutation_subfield_id(field, starting_parent_for_top_level_field)?;
 
         // TODO do not use mutation naming here
         let mutation_field = self

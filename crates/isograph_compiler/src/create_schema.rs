@@ -86,10 +86,30 @@ pub fn create_schema<TNetworkProtocol: NetworkProtocol + 'static>(
 
     for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
         for expose_as_field in expose_as_fields_to_insert {
-            let unprocessed_scalar_item = unvalidated_isograph_schema
-                .create_new_exposed_field(expose_as_field, parent_object_entity_name)?;
-
-            unprocessed_items.push(SelectionType::Scalar(unprocessed_scalar_item));
+            match unvalidated_isograph_schema
+                .create_new_exposed_field(expose_as_field, parent_object_entity_name)
+            {
+                Ok(unprocessed_scalar_item) => {
+                    unprocessed_items.push(SelectionType::Scalar(unprocessed_scalar_item));
+                }
+                Err(err) => {
+                    // Gracefully skip generating refetch fields when the top-level
+                    // Query.node field does not exist. This can occur in schemas that
+                    // implement the Node interface but do not define Query.node.
+                    if let CreateSchemaError::ProcessTypeDefinition { error } =
+                        CreateSchemaError::from(err.clone())
+                    {
+                        if let isograph_schema::create_additional_fields::create_additional_fields_error::CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound { field_name, .. } =
+                            error.item
+                        {
+                            if field_name.lookup() == "node" {
+                                continue;
+                            }
+                        }
+                    }
+                    return Err(CreateSchemaError::from(err));
+                }
+            }
         }
     }
 
