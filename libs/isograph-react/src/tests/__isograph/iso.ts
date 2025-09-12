@@ -1,4 +1,4 @@
-import type { IsographEntrypoint } from '@isograph/react';
+import type { IsographEntrypoint, Link } from '@isograph/react';
 import { type Query__linkedUpdate__param } from './Query/linkedUpdate/param_type';
 import { type Query__meNameSuccessor__param } from './Query/meNameSuccessor/param_type';
 import { type Query__meName__param } from './Query/meName/param_type';
@@ -16,7 +16,7 @@ import entrypoint_Query__subquery from '../__isograph/Query/subquery/entrypoint'
 // This means that the type of the exported iso literal is exactly
 // the type of the passed-in function, which takes one parameter
 // of type TParam.
-type IdentityWithParam<TParam extends object> = <TClientFieldReturn>(
+type IdentityWithParam<TParam extends object, TReturn = unknown> = <TClientFieldReturn extends TReturn>(
   clientField: (param: TParam) => TClientFieldReturn
 ) => (param: TParam) => TClientFieldReturn;
 
