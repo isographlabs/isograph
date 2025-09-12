@@ -9,7 +9,7 @@ use isograph_schema::{
     EntrypointDeclarationInfo, NetworkProtocol, Schema,
 };
 
-use crate::generate_artifacts::ISO_TS_FILE_NAME;
+use crate::generate_artifacts::{ISO_TS_FILE_NAME, print_javascript_type_declaration};
 
 fn build_iso_overload_for_entrypoint<TNetworkProtocol: NetworkProtocol>(
     validated_client_field: &ClientScalarSelectable<TNetworkProtocol>,
@@ -41,6 +41,7 @@ export function iso<T>(
 }
 
 fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     client_type_and_variant: (ClientSelectable<TNetworkProtocol>, ClientFieldDirectiveSet),
     file_extensions: GenerateFileExtensionsOption,
 ) -> (String, String) {
@@ -71,6 +72,22 @@ export function iso<T>(
             formatted_field,
             client_type.type_and_field().underscore_separated(),
         ));
+    } else if let SelectionType::Object(client_pointer) = client_type {
+        s.push_str(&format!(
+            "
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'{}', T>
+): IdentityWithParam<{}__param, {}>;\n",
+            formatted_field,
+            client_type.type_and_field().underscore_separated(),
+            print_javascript_type_declaration(
+                &client_pointer.target_object_entity_name.clone().map(
+                    &mut |target_object_entity_name| {
+                        TNetworkProtocol::generate_link_type(schema, &target_object_entity_name)
+                    }
+                )
+            )
+        ));
     } else {
         s.push_str(&format!(
             "
@@ -89,14 +106,15 @@ pub(crate) fn build_iso_overload_artifact<TNetworkProtocol: NetworkProtocol>(
     file_extensions: GenerateFileExtensionsOption,
     no_babel_transform: bool,
 ) -> ArtifactPathAndContent {
-    let mut imports = "import type { IsographEntrypoint } from '@isograph/react';\n".to_string();
+    let mut imports =
+        "import type { IsographEntrypoint, Link } from '@isograph/react';\n".to_string();
     let mut content = String::from(
         "
 // This is the type given to regular client fields.
 // This means that the type of the exported iso literal is exactly
 // the type of the passed-in function, which takes one parameter
 // of type TParam.
-type IdentityWithParam<TParam extends object> = <TClientFieldReturn>(
+type IdentityWithParam<TParam extends object, TReturn = unknown> = <TClientFieldReturn extends TReturn>(
   clientField: (param: TParam) => TClientFieldReturn
 ) => (param: TParam) => TClientFieldReturn;
 
@@ -145,7 +163,7 @@ type MatchesWhitespaceAndString<
         sorted_user_written_types(schema)
             .into_iter()
             .map(|client_type| {
-                build_iso_overload_for_client_defined_type(client_type, file_extensions)
+                build_iso_overload_for_client_defined_type(schema, client_type, file_extensions)
             });
     for (import, client_type_overload) in client_defined_type_overloads {
         imports.push_str(&import);
