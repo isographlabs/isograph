@@ -5,6 +5,7 @@ pub mod generate_artifacts;
 mod imperatively_loaded_fields;
 mod import_statements;
 mod iso_overload_file;
+mod link_type;
 mod normalization_ast_text;
 mod operation_text;
 mod persisted_documents;

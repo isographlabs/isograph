@@ -12,6 +12,7 @@ use isograph_schema::{
 };
 use isograph_schema::{RefetchedPathsMap, UserWrittenClientTypeInfo};
 
+use std::collections::HashSet;
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
 use crate::{
@@ -256,7 +257,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
 
     let mut param_type_imports = BTreeSet::new();
     let mut loadable_fields = BTreeSet::new();
-    let mut link_fields = false;
+    let mut link_fields = HashSet::new();
     let mut updatable_fields = false;
     let client_field_parameter_type = generate_client_field_parameter_type(
         schema,
@@ -284,11 +285,13 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         client_scalar_selectable.name()
     );
 
-    let link_field_imports = if link_fields {
-        "import type { Link } from '@isograph/react';\n".to_string()
-    } else {
-        "".to_string()
-    };
+    let link_field_imports = link_fields
+        .iter()
+        .map(|link_field| {
+            format!("import type {{ {link_field}Link }} from '../../{link_field}/link_type.ts';\n")
+        })
+        .collect::<Vec<_>>()
+        .join("");
 
     let start_update_imports = if updatable_fields {
         "import type { StartUpdate } from '@isograph/react';\n".to_string()
@@ -377,13 +380,11 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
         SelectionType::Object(client_pointer) => {
             ClientFieldOutputType(print_javascript_type_declaration(
                 &client_pointer.target_object_entity_name.clone().map(
-                    &mut |target_object_entity_name| {
-                        TNetworkProtocol::generate_link_type(schema, &target_object_entity_name)
-                    },
+                    &mut |target_object_entity_name| format!("{target_object_entity_name}Link"),
                 ),
             ))
         }
-        SelectionType::Scalar(client_field) => generate_output_type(schema, client_field),
+        SelectionType::Scalar(client_field) => generate_output_type(client_field),
     };
 
     let output_type_text = format!(

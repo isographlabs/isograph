@@ -19,11 +19,12 @@ use isograph_lang_types::{
     SelectionType,
 };
 use isograph_schema::{
-    ClientScalarOrObjectSelectable, ClientScalarSelectable, EntrypointDeclarationInfo,
-    FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, Format, MergedSelectionMap,
-    NetworkProtocol, NormalizationKey, RootOperationName, RootRefetchedPath,
-    ScalarClientFieldTraversalState, Schema, ServerObjectEntity, ValidatedVariableDefinition,
-    WrappedSelectionMapSelection, create_merged_selection_map_for_field_and_insert_into_global_map,
+    ClientScalarOrObjectSelectable, ClientScalarSelectable, EncounteredLinkTypes,
+    EntrypointDeclarationInfo, FieldToCompletedMergeTraversalStateMap, FieldTraversalResult,
+    Format, MergedSelectionMap, NetworkProtocol, NormalizationKey, RootOperationName,
+    RootRefetchedPath, ScalarClientFieldTraversalState, Schema, ServerObjectEntity,
+    ValidatedVariableDefinition, WrappedSelectionMapSelection,
+    create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_imperatively_loaded_artifact_info,
     get_reachable_variables, initial_variable_context,
 };
@@ -49,6 +50,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     file_extensions: GenerateFileExtensionsOption,
     persisted_documents: &mut Option<PersistedDocuments>,
+    encountered_link_types: &mut EncounteredLinkTypes,
 ) -> Vec<ArtifactPathAndContent> {
     let entrypoint = schema
         .client_field(parent_object_entity_name, entrypoint_scalar_selectable_name)
@@ -77,6 +79,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
             entrypoint_scalar_selectable_name,
         ))),
         &initial_variable_context(&SelectionType::Scalar(entrypoint)),
+        encountered_link_types,
     );
 
     generate_entrypoint_artifacts_with_client_field_traversal_result(

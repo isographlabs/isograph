@@ -178,14 +178,19 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             return format!("Link<\"{concrete_type}\">");
         }
 
-        let subtypes = server_object_entity
+        let mut subtypes = server_object_entity
             .network_protocol_associated_data
             .subtypes
             .iter()
-            .map(|name| format!("Link<\"{name}\">"))
+            .map(|name| format!("\n  | Link<\"{name}\">"))
             .collect::<Vec<_>>();
 
-        subtypes.join(" | ")
+        subtypes.push(format!(
+            "\n  | {}LinkFutureType",
+            server_object_entity.name.item
+        ));
+
+        subtypes.join("")
     }
 
     fn generate_query_text<'a>(

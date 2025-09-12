@@ -1,6 +1,6 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 
-use common_lang_types::ParentObjectEntityNameAndSelectableName;
+use common_lang_types::{ParentObjectEntityNameAndSelectableName, ServerObjectEntityName};
 use isograph_config::GenerateFileExtensionsOption;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -25,7 +25,7 @@ pub(crate) type ReaderImports = BTreeSet<(
     ImportedFileCategory,
 )>;
 pub(crate) type ParamTypeImports = BTreeSet<ParentObjectEntityNameAndSelectableName>;
-pub(crate) type LinkImports = bool;
+pub(crate) type LinkImports = HashSet<ServerObjectEntityName>;
 pub(crate) type UpdatableImports = bool;
 
 pub(crate) fn reader_imports_to_import_statement(

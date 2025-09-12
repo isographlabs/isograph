@@ -1,4 +1,4 @@
-import type { Link } from '@isograph/react';
+import type { PetLink } from '../../Pet/link_type.ts';
 
 export type Query__smartestPet__param = {
   readonly data: {
@@ -6,7 +6,7 @@ export type Query__smartestPet__param = {
       /**
 A store Link for the Pet type.
       */
-      readonly link: Link<"Pet">,
+      readonly link: PetLink,
       readonly stats: ({
         readonly intelligence: (number | null),
       } | null),

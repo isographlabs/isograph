@@ -17,12 +17,12 @@ use isograph_lang_types::{
     SelectionTypeContainingSelections, TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
-    ClientFieldVariant, ClientScalarSelectable, ClientSelectableId, FieldMapItem,
-    FieldTraversalResult, NameAndArguments, NetworkProtocol, NormalizationKey, ScalarSelectableId,
-    Schema, ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo,
-    ValidatedSelection, ValidatedVariableDefinition, WrappedSelectionMapSelection,
-    accessible_client_fields, description, inline_fragment_reader_selection_set,
-    output_type_annotation, selection_map_wrapped,
+    ClientFieldVariant, ClientScalarSelectable, ClientSelectableId, EncounteredLinkTypes,
+    FieldMapItem, FieldTraversalResult, NameAndArguments, NetworkProtocol, NormalizationKey,
+    ScalarSelectableId, Schema, ServerEntityName, ServerObjectSelectableVariant,
+    UserWrittenClientTypeInfo, ValidatedSelection, ValidatedVariableDefinition,
+    WrappedSelectionMapSelection, accessible_client_fields, description,
+    inline_fragment_reader_selection_set, output_type_annotation, selection_map_wrapped,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -42,6 +42,7 @@ use crate::{
     format_parameter_type::format_parameter_type,
     import_statements::{LinkImports, ParamTypeImports, UpdatableImports},
     iso_overload_file::build_iso_overload_artifact,
+    link_type::generate_link_type_artifact,
     persisted_documents::PersistedDocuments,
     refetch_reader_artifact::{
         generate_refetch_output_type_artifact, generate_refetch_reader_artifact,
@@ -63,6 +64,8 @@ lazy_static! {
     pub static ref RESOLVER_OUTPUT_TYPE_FILE_NAME: ArtifactFileName =
         "output_type.ts".intern().into();
     pub static ref RESOLVER_OUTPUT_TYPE: ArtifactFilePrefix = "output_type".intern().into();
+    pub static ref LINK_TYPE_FILE_NAME: ArtifactFileName = "link_type.ts".intern().into();
+    pub static ref LINK_TYPE: ArtifactFilePrefix = "link_type".intern().into();
     pub static ref RESOLVER_PARAM_TYPE_FILE_NAME: ArtifactFileName =
         "param_type.ts".intern().into();
     pub static ref RESOLVER_PARAM_TYPE: ArtifactFilePrefix = "param_type".intern().into();
@@ -121,6 +124,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
     let mut encountered_client_type_map = BTreeMap::new();
     let mut path_and_contents = vec![];
     let mut encountered_output_types = HashSet::<ClientSelectableId>::new();
+    let mut encountered_link_types: EncounteredLinkTypes = HashSet::<_>::new();
     let mut persisted_documents =
         config
             .options
@@ -143,6 +147,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
             &mut encountered_client_type_map,
             config.options.include_file_extensions_in_import_statements,
             &mut persisted_documents,
+            &mut encountered_link_types,
         );
         path_and_contents.extend(entrypoint_path_and_content);
 
@@ -434,6 +439,10 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
         }
     }
 
+    for encountered_link_type in encountered_link_types {
+        path_and_contents.push(generate_link_type_artifact(schema, &encountered_link_type));
+    }
+
     path_and_contents.push(build_iso_overload_artifact(
         schema,
         config.options.include_file_extensions_in_import_statements,
@@ -572,15 +581,13 @@ fn get_serialized_field_argument(
 }
 
 pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
-    schema: &Schema<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ClientFieldOutputType {
     let variant = &client_field.variant;
     match variant {
-        ClientFieldVariant::Link => ClientFieldOutputType(TNetworkProtocol::generate_link_type(
-            schema,
-            &client_field.parent_object_entity_name,
-        )),
+        ClientFieldVariant::Link => {
+            ClientFieldOutputType(format!("{}Link", client_field.parent_object_entity_name))
+        }
         ClientFieldVariant::UserWritten(info) => match info.client_field_directive_set {
             ClientFieldDirectiveSet::None(_) => {
                 ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
@@ -787,7 +794,7 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
     nested_client_field_imports: &mut BTreeSet<ParentObjectEntityNameAndSelectableName>,
     loadable_fields: &mut BTreeSet<ParentObjectEntityNameAndSelectableName>,
     indentation_level: u8,
-    link_fields: &mut bool,
+    link_fields: &mut LinkImports,
     scalar_field_selection: &ScalarSelection<ScalarSelectableId>,
     parent_object_entity_name: ServerObjectEntityName,
     client_field_name: ClientScalarSelectableName,
@@ -806,9 +813,8 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
     query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
     match client_field.variant {
         ClientFieldVariant::Link => {
-            *link_fields = true;
-            let output_type =
-                TNetworkProtocol::generate_link_type(schema, &parent_object_entity_name);
+            link_fields.insert(parent_object_entity_name);
+            let output_type = format!("{parent_object_entity_name}Link");
             query_type_declaration.push_str(
                 &(format!(
                     "readonly {}: {},\n",
@@ -988,7 +994,6 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 ObjectSelectionDirectiveSet::Updatable(_) => {
                     *updatable_fields = true;
                     write_getter_and_setter(
-                        schema,
                         query_type_declaration,
                         indentation_level,
                         name_or_alias,
@@ -1008,8 +1013,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn write_getter_and_setter<TNetworkProtocol: NetworkProtocol>(
-    schema: &Schema<TNetworkProtocol>,
+fn write_getter_and_setter(
     query_type_declaration: &mut String,
     indentation_level: u8,
     name_or_alias: SelectableNameOrAlias,
@@ -1025,10 +1029,7 @@ fn write_getter_and_setter<TNetworkProtocol: NetworkProtocol>(
         output_type_annotation
             .clone()
             .map(&mut |server_object_entity_name| {
-                format!(
-                    "{{ link: {} }}",
-                    TNetworkProtocol::generate_link_type(schema, &server_object_entity_name)
-                )
+                format!("{{ link: {server_object_entity_name}Link }}")
             });
     query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
     query_type_declaration.push_str(&format!(
