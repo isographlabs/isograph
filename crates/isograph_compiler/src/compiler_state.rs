@@ -1,12 +1,11 @@
 use std::{
-    collections::HashMap,
     path::PathBuf,
     time::{Duration, Instant},
 };
 
 use common_lang_types::CurrentWorkingDirectory;
 use isograph_config::create_config;
-use isograph_schema::{IsographDatabase, NetworkProtocol, OpenFileMap};
+use isograph_schema::{IsographDatabase, NetworkProtocol};
 use pico::Database;
 
 use crate::{batch_compile::BatchCompileError, source_files::initialize_sources};
@@ -27,7 +26,6 @@ impl<TNetworkProtocol: NetworkProtocol> CompilerState<TNetworkProtocol> {
         let mut db = IsographDatabase::default();
         db.set(current_working_directory);
         db.set(create_config(config_location, current_working_directory));
-        db.set(OpenFileMap(HashMap::new()));
         initialize_sources(&mut db)?;
         Ok(Self {
             db,
