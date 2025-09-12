@@ -9,7 +9,7 @@ pub fn generate_link_type_artifact<TNetworkProtocol: isograph_schema::NetworkPro
     schema: &isograph_schema::Schema<TNetworkProtocol>,
     server_object_entity_name: &ServerObjectEntityName,
 ) -> ArtifactPathAndContent {
-    let link_type = TNetworkProtocol::generate_link_type(schema, &server_object_entity_name);
+    let link_type = TNetworkProtocol::generate_link_type(schema, server_object_entity_name);
 
     let link_type_content = format!(
         "import type {{ Link }} from '@isograph/react';\n

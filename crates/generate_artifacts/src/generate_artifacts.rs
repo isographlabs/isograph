@@ -581,7 +581,6 @@ fn get_serialized_field_argument(
 }
 
 pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
-    schema: &Schema<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ClientFieldOutputType {
     let variant = &client_field.variant;
@@ -995,7 +994,6 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 ObjectSelectionDirectiveSet::Updatable(_) => {
                     *updatable_fields = true;
                     write_getter_and_setter(
-                        schema,
                         query_type_declaration,
                         indentation_level,
                         name_or_alias,
@@ -1015,8 +1013,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn write_getter_and_setter<TNetworkProtocol: NetworkProtocol>(
-    schema: &Schema<TNetworkProtocol>,
+fn write_getter_and_setter(
     query_type_declaration: &mut String,
     indentation_level: u8,
     name_or_alias: SelectableNameOrAlias,
@@ -1032,7 +1029,7 @@ fn write_getter_and_setter<TNetworkProtocol: NetworkProtocol>(
         output_type_annotation
             .clone()
             .map(&mut |server_object_entity_name| {
-                format!("{{ link: {} }}", format!("{server_object_entity_name}Link"))
+                format!("{{ link: {server_object_entity_name}Link }}")
             });
     query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
     query_type_declaration.push_str(&format!(

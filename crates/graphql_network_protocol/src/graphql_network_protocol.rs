@@ -182,11 +182,11 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             .network_protocol_associated_data
             .subtypes
             .iter()
-            .map(|name| format!("\n| Link<\"{name}\">"))
+            .map(|name| format!("\n  | Link<\"{name}\">"))
             .collect::<Vec<_>>();
 
         subtypes.push(format!(
-            "\n| {}LinkFutureType",
+            "\n  | {}LinkFutureType",
             server_object_entity.name.item
         ));
 

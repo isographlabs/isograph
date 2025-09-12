@@ -384,7 +384,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
                 ),
             ))
         }
-        SelectionType::Scalar(client_field) => generate_output_type(schema, client_field),
+        SelectionType::Scalar(client_field) => generate_output_type(client_field),
     };
 
     let output_type_text = format!(
