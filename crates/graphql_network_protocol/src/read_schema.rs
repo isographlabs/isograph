@@ -28,8 +28,11 @@ pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol + 'static>(
         .map_err(|with_span| with_span.to_with_location(*text_source))?;
 
     let mut schema_extensions = BTreeMap::new();
-    for (relative_path, schema_extension_source_id) in
-        db.standard_sources.schema_extension_sources.iter()
+    for (relative_path, schema_extension_source_id) in db
+        .get_standard_sources()
+        .tracked()
+        .schema_extension_sources
+        .iter()
     {
         let extensions_document =
             parse_schema_extensions_file(db, *schema_extension_source_id).to_owned()?;

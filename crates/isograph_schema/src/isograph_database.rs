@@ -12,10 +12,13 @@ use crate::NetworkProtocol;
 
 #[derive(Default, Debug, Db)]
 pub struct IsographDatabase<TNetworkProtocol: NetworkProtocol> {
-    pub storage: Storage<Self>,
-    pub iso_literal_map: IsoLiteralMap,
-    pub standard_sources: StandardSources,
-    pub open_file_map: OpenFileMap,
+    storage: Storage<Self>,
+    #[tracked]
+    iso_literal_map: IsoLiteralMap,
+    #[tracked]
+    standard_sources: StandardSources,
+    #[tracked]
+    open_file_map: OpenFileMap,
     phantom_data: PhantomData<TNetworkProtocol>,
 }
 
@@ -88,7 +91,8 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> IsographDatabase<TNetworkProto
         &mut self,
         relative_path: RelativePathToSourceFile,
     ) -> Option<SourceId<SchemaSource>> {
-        self.get_standard_sources_tracked_mut()
+        self.get_standard_sources_mut()
+            .tracked()
             .schema_extension_sources
             .remove(&relative_path)
             .inspect(|&source_id| self.remove(source_id))
@@ -106,7 +110,8 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> IsographDatabase<TNetworkProto
             relative_path,
             content,
         });
-        self.get_iso_literal_map_tracked_mut()
+        self.get_iso_literal_map_mut()
+            .tracked()
             .0
             .insert(relative_path, source_id);
     }
@@ -115,7 +120,8 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> IsographDatabase<TNetworkProto
         &mut self,
         relative_path: RelativePathToSourceFile,
     ) -> Option<SourceId<IsoLiteralsSource>> {
-        self.get_iso_literal_map_tracked_mut()
+        self.get_iso_literal_map_mut()
+            .tracked()
             .0
             .remove(&relative_path)
             .inspect(|&source_id| self.remove(source_id))
@@ -123,7 +129,8 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> IsographDatabase<TNetworkProto
 
     pub fn remove_iso_literals_from_path(&mut self, relative_path: &str) {
         let removed_source_ids = self
-            .get_iso_literal_map_tracked_mut()
+            .get_iso_literal_map_mut()
+            .tracked()
             .0
             .extract_if(|k, _| k.to_string().starts_with(relative_path))
             .map(|(_, v)| v)
@@ -139,13 +146,15 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> IsographDatabase<TNetworkProto
             relative_path,
             content,
         });
-        self.get_open_file_map_tracked_mut()
+        self.get_open_file_map_mut()
+            .tracked()
             .0
             .insert(relative_path, source_id);
     }
 
     pub fn remove_open_file(&mut self, relative_path: RelativePathToSourceFile) -> bool {
-        self.get_open_file_map_tracked_mut()
+        self.get_open_file_map_mut()
+            .tracked()
             .0
             .remove(&relative_path)
             .map(|source_id| self.remove(source_id))

@@ -13,7 +13,7 @@ static RUN_SERIALLY: LazyLock<Mutex<()>> = LazyLock::new(Mutex::default);
 
 #[derive(Db, Default)]
 struct TestDatabase {
-    pub storage: Storage<Self>,
+    storage: Storage<Self>,
 }
 
 #[test]

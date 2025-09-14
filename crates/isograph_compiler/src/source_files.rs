@@ -25,7 +25,7 @@ pub fn initialize_sources<TNetworkProtocol: NetworkProtocol + 'static>(
     let schema = db.get_isograph_config().schema.clone();
     let schema_source_id = read_schema(db, &schema)?;
     let schema_extension_sources = read_schema_extensions(db)?;
-    db.standard_sources = StandardSources {
+    *db.get_standard_sources_mut().untracked() = StandardSources {
         schema_source_id,
         schema_extension_sources,
     };
@@ -62,19 +62,19 @@ fn handle_update_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     let schema = db.get_isograph_config().schema.clone();
     match event_kind {
         SourceEventKind::CreateOrModify(_) => {
-            db.standard_sources.schema_source_id = read_schema(db, &schema)?;
+            db.get_standard_sources_mut().untracked().schema_source_id = read_schema(db, &schema)?;
         }
         SourceEventKind::Rename((_, target_path)) => {
             if schema.absolute_path != *target_path {
-                db.remove(db.standard_sources.schema_source_id);
-                db.standard_sources.schema_source_id = SourceId::default();
+                db.remove(db.get_standard_sources().untracked().schema_source_id);
+                db.get_standard_sources_mut().untracked().schema_source_id = SourceId::default();
                 return Err(SourceError::SchemaNotFound);
             }
         }
         SourceEventKind::Remove(_) => {
             return {
-                db.remove(db.standard_sources.schema_source_id);
-                db.standard_sources.schema_source_id = SourceId::default();
+                db.remove(db.get_standard_sources().untracked().schema_source_id);
+                db.get_standard_sources_mut().untracked().schema_source_id = SourceId::default();
                 Err(SourceError::SchemaNotFound)
             };
         }
@@ -124,7 +124,8 @@ fn create_or_update_schema_extension<TNetworkProtocol: NetworkProtocol + 'static
     let absolute_and_relative =
         absolute_and_relative_paths(db.get_current_working_directory(), path.to_path_buf());
     let schema_id = read_schema(db, &absolute_and_relative)?;
-    db.standard_sources
+    db.get_standard_sources_mut()
+        .tracked()
         .schema_extension_sources
         .insert(absolute_and_relative.relative_path, schema_id);
     Ok(())

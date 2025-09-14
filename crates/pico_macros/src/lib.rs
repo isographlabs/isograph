@@ -22,7 +22,7 @@ pub fn singleton(input: TokenStream) -> TokenStream {
     singleton_macro::singleton_macro(input)
 }
 
-#[proc_macro_derive(Db)]
+#[proc_macro_derive(Db, attributes(tracked))]
 pub fn db(input: TokenStream) -> TokenStream {
     db_macro::db_macro(input)
 }

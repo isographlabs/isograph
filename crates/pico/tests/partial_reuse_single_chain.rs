@@ -8,7 +8,7 @@ static FIRST_LETTER_AND_EXCLAMATION_POINT_COUNTER: AtomicUsize = AtomicUsize::ne
 
 #[derive(Db, Default)]
 struct TestDatabase {
-    pub storage: Storage<Self>,
+    storage: Storage<Self>,
 }
 
 #[test]
