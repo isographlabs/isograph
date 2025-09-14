@@ -109,6 +109,13 @@ impl Location {
             Location::Generated => None,
         }
     }
+
+    pub fn as_embedded_location(self) -> Option<EmbeddedLocation> {
+        match self {
+            Location::Embedded(embedded_location) => Some(embedded_location),
+            Location::Generated => None,
+        }
+    }
 }
 impl EmbeddedLocation {
     pub fn new(text_source: TextSource, span: Span) -> Self {
