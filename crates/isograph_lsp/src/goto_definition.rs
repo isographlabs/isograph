@@ -1,11 +1,9 @@
 use crate::{
-    format::char_index_to_position, hover::get_iso_literal_extraction_from_text_position_params,
-    lsp_runtime_error::LSPRuntimeResult, uri_file_path_ext::UriFilePathExt,
+    hover::get_iso_literal_extraction_from_text_position_params,
+    location_utils::isograph_location_to_lsp_location, lsp_runtime_error::LSPRuntimeResult,
+    uri_file_path_ext::UriFilePathExt,
 };
-use common_lang_types::{
-    EmbeddedLocation, Location, Span, relative_path_from_absolute_and_working_directory,
-};
-use intern::string_key::Lookup;
+use common_lang_types::{Location, Span, relative_path_from_absolute_and_working_directory};
 use isograph_compiler::{
     CompilerState, get_validated_schema, process_iso_literal_extraction,
     read_iso_literals_source_from_relative_path,
@@ -16,12 +14,12 @@ use isograph_schema::{
     get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
 };
 use lsp_types::{
-    GotoDefinitionResponse, Position, Range, Uri,
+    GotoDefinitionResponse, Position, Uri,
     request::{GotoDefinition, Request},
 };
 use pico_macros::memo;
 use resolve_position::ResolvePosition;
-use std::{borrow::Cow, ops::Deref, path::PathBuf, str::FromStr};
+use std::ops::Deref;
 
 pub fn on_goto_definition<TNetworkProtocol: NetworkProtocol + 'static>(
     compiler_state: &CompilerState<TNetworkProtocol>,
@@ -189,48 +187,4 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
     };
 
     Ok(goto_location)
-}
-
-fn isograph_location_to_lsp_location<TNetworkProtocol: NetworkProtocol + 'static>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    location: &EmbeddedLocation,
-    content: &str,
-) -> Option<lsp_types::Location> {
-    let path_buf = PathBuf::from(db.get_current_working_directory().lookup())
-        .join(location.text_source.relative_path_to_source_file.lookup());
-
-    let path = path_buf.to_str()?;
-    let normalized_path = if cfg!(windows) {
-        Cow::Owned(format!(
-            "/{}",
-            path.strip_prefix(r"\\?\")
-                .unwrap_or(path)
-                .replace("\\", "/")
-        ))
-    } else {
-        Cow::Borrowed(path)
-    };
-    let uri = Uri::from_str(&format!("file://{normalized_path}")).ok()?;
-
-    let text_source_start = location
-        .text_source
-        .span
-        .map(|span| span.start)
-        .unwrap_or_default();
-
-    Some(lsp_types::Location {
-        uri,
-        range: Range {
-            start: char_index_to_position(
-                content,
-                (text_source_start + location.span.start)
-                    .try_into()
-                    .unwrap(),
-            ),
-            end: char_index_to_position(
-                content,
-                (text_source_start + location.span.end).try_into().unwrap(),
-            ),
-        },
-    })
 }
