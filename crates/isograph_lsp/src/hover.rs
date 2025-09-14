@@ -82,7 +82,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 {
                     Some(hover_text_for_selectable(
                         selectable.variant_name(),
-                        selectable.name(),
+                        selectable.name().item,
                         selectable.description(),
                         selectable.arguments(),
                         parent_object.name.item,
@@ -98,7 +98,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 {
                     Some(hover_text_for_selectable(
                         selectable.variant_name(),
-                        selectable.name(),
+                        selectable.name().item,
                         selectable.description(),
                         selectable.arguments(),
                         parent_object.name.item,

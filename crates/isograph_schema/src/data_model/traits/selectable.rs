@@ -1,4 +1,4 @@
-use common_lang_types::{SelectableName, ServerObjectEntityName};
+use common_lang_types::{SelectableName, ServerObjectEntityName, WithLocation};
 use impl_base_types_macro::{impl_for_definition_location, impl_for_selection_type};
 use isograph_lang_types::{DefinitionLocation, Description, VariableDefinition};
 
@@ -13,7 +13,7 @@ pub type Selectable<'a, TNetworkProtocol> = DefinitionLocation<
 #[impl_for_selection_type]
 pub trait SelectableTrait {
     fn description(&self) -> Option<Description>;
-    fn name(&self) -> SelectableName;
+    fn name(&self) -> WithLocation<SelectableName>;
     fn parent_object_entity_name(&self) -> ServerObjectEntityName;
     // TODO convert this to &[VariableDefinition] or &[WithSpan] or &[WithLocation]
     // i.e. settle on one!
@@ -25,7 +25,7 @@ impl<T: SelectableTrait> SelectableTrait for &T {
         (*self).description()
     }
 
-    fn name(&self) -> SelectableName {
+    fn name(&self) -> WithLocation<SelectableName> {
         (*self).name()
     }
 

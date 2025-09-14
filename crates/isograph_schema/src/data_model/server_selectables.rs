@@ -29,8 +29,8 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> SelectableTrait
         self.description
     }
 
-    fn name(&self) -> SelectableName {
-        self.name.item.into()
+    fn name(&self) -> WithLocation<SelectableName> {
+        self.name.map(|x| x.into())
     }
 
     fn parent_object_entity_name(&self) -> ServerObjectEntityName {
@@ -65,8 +65,8 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> SelectableTrait
         self.description
     }
 
-    fn name(&self) -> SelectableName {
-        self.name.item.into()
+    fn name(&self) -> WithLocation<SelectableName> {
+        self.name.map(|x| x.into())
     }
 
     fn parent_object_entity_name(&self) -> ServerObjectEntityName {
