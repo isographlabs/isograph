@@ -86,7 +86,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 let schema_source_id = db.get_standard_sources();
                 isograph_location_to_lsp_location(
                     db,
-                    &server_object_entity.name.location,
+                    server_object_entity.name.location,
                     &db.get(schema_source_id.schema_source_id).content,
                 )
             }
@@ -97,7 +97,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 {
                     match selectable {
                         DefinitionLocation::Server(server_selectable) => {
-                            match &server_selectable.name.location {
+                            match server_selectable.name.location {
                                 Location::Generated => None,
                                 Location::Embedded(location) => {
                                     let schema_source_id = db.get_standard_sources();
@@ -110,7 +110,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                             }
                         }
                         DefinitionLocation::Client(client_selectable) => {
-                            match &client_selectable.name.location {
+                            match client_selectable.name.location {
                                 Location::Generated => None,
                                 Location::Embedded(location) => {
                                     let memo_ref = read_iso_literals_source_from_relative_path(
@@ -140,7 +140,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 {
                     match selectable {
                         DefinitionLocation::Server(server_selectable) => {
-                            match &server_selectable.name.location {
+                            match server_selectable.name.location {
                                 Location::Generated => None,
                                 Location::Embedded(location) => {
                                     let schema_source_id = db.get_standard_sources();
@@ -154,7 +154,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                             }
                         }
                         DefinitionLocation::Client(client_selectable) => {
-                            match &client_selectable.name.location {
+                            match client_selectable.name.location {
                                 Location::Generated => None,
                                 Location::Embedded(location) => {
                                     let memo_ref = read_iso_literals_source_from_relative_path(

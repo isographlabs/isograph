@@ -25,7 +25,7 @@ pub(crate) fn uri_is_project_file<TNetworkProtocol: NetworkProtocol + 'static>(
 
 pub fn isograph_location_to_lsp_location<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
-    location: &EmbeddedLocation,
+    location: EmbeddedLocation,
     content: &str,
 ) -> Option<lsp_types::Location> {
     let path_buf = PathBuf::from(db.get_current_working_directory().lookup())
