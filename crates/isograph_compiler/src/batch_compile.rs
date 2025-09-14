@@ -17,6 +17,7 @@ use tracing::{error, info};
 
 pub struct CompilationStats {
     pub client_field_count: usize,
+    pub client_pointer_count: usize,
     pub entrypoint_count: usize,
     pub total_artifacts_written: usize,
 }
@@ -39,11 +40,28 @@ pub fn print_result<TNetworkProtocol: NetworkProtocol + 'static>(
             info!(
                 "{}",
                 format!(
-                    "Successfully compiled {} client fields and {} \
-                    entrypoints, and wrote {} artifacts, in {}.",
+                    "Successfully compiled {} client field{}, {} client pointer{}, {} \
+                    entrypoint{}, and wrote {} artifact{}, in {}.",
                     stats.client_field_count,
+                    if stats.client_field_count == 1 {
+                        ""
+                    } else {
+                        "s"
+                    },
+                    stats.client_pointer_count,
+                    if stats.client_pointer_count == 1 {
+                        ""
+                    } else {
+                        "s"
+                    },
                     stats.entrypoint_count,
+                    if stats.entrypoint_count == 1 { "" } else { "s" },
                     stats.total_artifacts_written,
+                    if stats.total_artifacts_written == 1 {
+                        ""
+                    } else {
+                        "s"
+                    },
                     pretty_duration(&elapsed_time, None)
                 )
             );
@@ -113,6 +131,7 @@ pub fn compile<TNetworkProtocol: NetworkProtocol + 'static>(
 
     Ok(CompilationStats {
         client_field_count: stats.client_field_count,
+        client_pointer_count: stats.client_pointer_count,
         entrypoint_count: stats.entrypoint_count,
         total_artifacts_written,
     })
