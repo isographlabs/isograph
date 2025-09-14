@@ -293,13 +293,11 @@ fn hover_text_for_selectable(
     };
 
     format!(
-        "{server_or_client} field **{selectable_name}**\n\
+        "{server_or_client} field **{parent_type_name}.{selectable_name}**\n\
         {argument_string}\
         \n\
         {selectable_description}\n\
         \n\
-        On type **{parent_type_name}**.\n\
-        \n\
-        {parent_description}",
+        **{parent_type_name}**: {parent_description}",
     )
 }
