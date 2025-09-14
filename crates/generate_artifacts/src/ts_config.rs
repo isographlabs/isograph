@@ -8,7 +8,9 @@ pub fn generate_ts_config() -> ArtifactPathAndContent {
         file_content: "{
     \"compilerOptions\": {
         \"noUnusedLocals\": false,
-        \"noUnusedParameters\": false
+        \"noUnusedParameters\": false,
+        \"jsx\": \"preserve\",
+        \"esModuleInterop\": true
     }
 }"
         .to_string(),
