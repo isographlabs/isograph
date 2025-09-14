@@ -699,17 +699,22 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     let output_type =
                         field
                             .target_scalar_entity
-                            .clone()
-                            .map(&mut |scalar_entity_name| {
-                                schema
-                                    .server_entity_data
-                                    .server_scalar_entity(scalar_entity_name)
-                                    .expect(
-                                        "Expected entity to exist. \
+                            .as_ref()
+                            .map(
+                                &mut |scalar_entity_name| match field.javascript_type_override {
+                                    Some(javascript_name) => javascript_name,
+                                    None => {
+                                        schema
+                                            .server_entity_data
+                                            .server_scalar_entity(*scalar_entity_name)
+                                            .expect(
+                                                "Expected entity to exist. \
                                         This is indicative of a bug in Isograph.",
-                                    )
-                                    .javascript_name
-                            });
+                                            )
+                                            .javascript_name
+                                    }
+                                },
+                            );
 
                     query_type_declaration.push_str(&format!(
                         "{}readonly {}: {},\n",

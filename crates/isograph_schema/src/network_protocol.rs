@@ -1,8 +1,8 @@
 use std::{collections::BTreeMap, error::Error, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
-    Location, QueryExtraInfo, QueryOperationName, QueryText, ServerObjectEntityName,
-    ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
+    JavascriptName, Location, QueryExtraInfo, QueryOperationName, QueryText,
+    ServerObjectEntityName, ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation};
 use isograph_lang_types::Description;
@@ -74,6 +74,11 @@ pub struct FieldToInsert {
     pub description: Option<WithSpan<Description>>,
     pub name: WithLocation<ServerSelectableName>,
     pub graphql_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+    /// An override type for the typename field. Normally, the JavaScript type is
+    /// acquired by going through graphql_type.inner(), but there is no separate
+    /// 'UserTypename' type in GraphQL. So we do this instead. This is horrible
+    /// data modeling, and should be fixed.
+    pub javascript_type_override: Option<JavascriptName>,
     pub arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
 
     // TODO we can probably restructure things to make this less awkward.

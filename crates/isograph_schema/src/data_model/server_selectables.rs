@@ -1,8 +1,8 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use common_lang_types::{
-    SelectableName, ServerObjectEntityName, ServerObjectSelectableName, ServerScalarEntityName,
-    ServerScalarSelectableName, WithLocation,
+    JavascriptName, SelectableName, ServerObjectEntityName, ServerObjectSelectableName,
+    ServerScalarEntityName, ServerScalarSelectableName, WithLocation,
 };
 use isograph_lang_types::{
     Description, SelectionType, TypeAnnotation, VariableDefinition, impl_with_target_id,
@@ -16,6 +16,9 @@ pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub name: WithLocation<ServerScalarSelectableName>,
 
     pub target_scalar_entity: TypeAnnotation<ServerScalarEntityName>,
+    /// Normally, we look up the JavaScript type to use by going through the
+    /// target scalar entity. However, there are
+    pub javascript_type_override: Option<JavascriptName>,
 
     pub parent_object_entity_name: ServerObjectEntityName,
     pub arguments: Vec<WithLocation<VariableDefinition<ServerEntityName>>>,

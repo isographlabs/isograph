@@ -358,6 +358,9 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
                                     server_field_to_insert.item.graphql_type.clone(),
                                 )
                                 .map(&mut |_| *scalar_entity_name),
+                                javascript_type_override: server_field_to_insert
+                                    .item
+                                    .javascript_type_override,
                                 parent_object_entity_name,
                                 arguments,
                                 phantom_data: std::marker::PhantomData,

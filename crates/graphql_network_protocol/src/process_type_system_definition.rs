@@ -260,6 +260,7 @@ pub fn process_graphql_type_system_document(
                     graphql_type: GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
                         WithSpan::new(*subtype_name, Span::todo_generated()),
                     )),
+                    javascript_type_override: None,
                     arguments: vec![],
                     is_inline_fragment: true,
                 },
@@ -369,6 +370,8 @@ fn process_object_type_definition(
                         .map(|with_span| with_span.map(|dv| dv.into())),
                     name: field_definition.item.name,
                     graphql_type: field_definition.item.type_,
+                    javascript_type_override: None,
+
                     arguments: field_definition.item.arguments,
                     is_inline_fragment: field_definition.item.is_inline_fragment,
                 },
@@ -389,6 +392,11 @@ fn process_object_type_definition(
                         Span::todo_generated(),
                     ))),
                 )),
+                // This is bad data modeling, and we should do better.
+                javascript_type_override: concrete_type.map(|parent_concrete_type| {
+                    format!("'{parent_concrete_type}'").intern().into()
+                }),
+
                 arguments: vec![],
                 is_inline_fragment: false,
             },
