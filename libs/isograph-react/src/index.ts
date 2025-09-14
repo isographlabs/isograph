@@ -147,6 +147,7 @@ export {
 } from './react/FragmentRenderer';
 export { FragmentReader } from './react/FragmentReader';
 export { LoadableFieldReader } from './react/LoadableFieldReader';
+export { LoadableFieldRenderer } from './react/LoadableFieldRenderer';
 export { useResult } from './react/useResult';
 export {
   useReadAndSubscribe,

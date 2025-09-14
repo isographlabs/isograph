@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { type FetchOptions } from '../core/check';
 import {
   ExtractParameters,
@@ -8,22 +9,22 @@ import { type LoadableField } from '../core/reader';
 import { useClientSideDefer } from '../loadable-hooks/useClientSideDefer';
 import { useResult } from './useResult';
 
-export function LoadableFieldReader<
+export function LoadableFieldRenderer<
   TReadFromStore extends UnknownTReadFromStore,
-  TResult,
   TProvidedArgs extends object,
   TChildrenResult,
+  TProps,
 >(props: {
   loadableField: LoadableField<
     TReadFromStore,
-    TResult,
+    React.FC<TProps>,
     Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
   >;
   // TODO we can improve this to not require args if its an empty object
   args: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>;
-  fetchOptions?: FetchOptions<TResult>;
+  fetchOptions?: FetchOptions<React.FC<TProps>>;
   networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
-  children: (arg: TResult) => TChildrenResult;
+  additionalProps: Omit<TProps, keyof JSX.IntrinsicAttributes>;
 }): TChildrenResult {
   const { fragmentReference } = useClientSideDefer(
     props.loadableField,
@@ -31,10 +32,10 @@ export function LoadableFieldReader<
     props.fetchOptions,
   );
 
-  const readOutFragmentData = useResult(
-    fragmentReference,
-    props.networkRequestOptions,
-  );
+  const Component = useResult(fragmentReference, props.networkRequestOptions);
 
-  return props.children(readOutFragmentData);
+  // TODO we probably can figure out a way to convince TypeScript of
+  // the validity of this.
+  // @ts-expect-error
+  return <Component {...props.additionalProps} />;
 }

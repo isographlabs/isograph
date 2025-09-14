@@ -1,7 +1,7 @@
 import { iso } from '@iso';
 import {
   FragmentRenderer,
-  LoadableFieldReader,
+  LoadableFieldRenderer,
   useLazyReference,
   useSkipLimitPagination,
 } from '@isograph/react';
@@ -100,14 +100,14 @@ export const NewsfeedAdOrBlog = iso(`
 
           LoadableFieldReader is a generic component that replaces the wrapper component.
         */}
-        <LoadableFieldReader
+        <LoadableFieldRenderer
           loadableField={newsfeedItem.asAdItem.AdItemDisplay}
           args={{}}
-        >
-          {(AdItemDisplay) => (
-            <AdItemDisplay onVisible={onVisible} index={index} />
-          )}
-        </LoadableFieldReader>
+          additionalProps={{
+            onVisible,
+            index,
+          }}
+        />
       </Suspense>
     );
   } else if (newsfeedItem.asBlogItem != null) {
