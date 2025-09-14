@@ -10,5 +10,6 @@ mod operation_text;
 mod persisted_documents;
 mod reader_ast;
 mod refetch_reader_artifact;
+mod ts_config;
 
 pub use generate_artifacts::get_artifact_path_and_content;

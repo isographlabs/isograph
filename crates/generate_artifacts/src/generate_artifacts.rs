@@ -46,6 +46,7 @@ use crate::{
     refetch_reader_artifact::{
         generate_refetch_output_type_artifact, generate_refetch_reader_artifact,
     },
+    ts_config::generate_ts_config,
 };
 
 lazy_static! {
@@ -439,6 +440,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
         config.options.include_file_extensions_in_import_statements,
         config.options.no_babel_transform,
     ));
+    path_and_contents.push(generate_ts_config());
 
     if let Some(persisted_documents) = persisted_documents {
         path_and_contents.push(persisted_documents.path_and_content());
