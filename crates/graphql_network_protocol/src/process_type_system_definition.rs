@@ -257,10 +257,9 @@ pub fn process_graphql_type_system_document(
                         format!("as{subtype_name}").intern().into(),
                         Location::generated(),
                     ),
-                    type_: GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(WithSpan::new(
-                        *subtype_name,
-                        Span::todo_generated(),
-                    ))),
+                    graphql_type: GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
+                        WithSpan::new(*subtype_name, Span::todo_generated()),
+                    )),
                     arguments: vec![],
                     is_inline_fragment: true,
                 },
@@ -369,7 +368,7 @@ fn process_object_type_definition(
                         .description
                         .map(|with_span| with_span.map(|dv| dv.into())),
                     name: field_definition.item.name,
-                    type_: field_definition.item.type_,
+                    graphql_type: field_definition.item.type_,
                     arguments: field_definition.item.arguments,
                     is_inline_fragment: field_definition.item.is_inline_fragment,
                 },
@@ -384,7 +383,7 @@ fn process_object_type_definition(
             FieldToInsert {
                 description: None,
                 name: WithLocation::new((*TYPENAME_FIELD_NAME).into(), Location::generated()),
-                type_: GraphQLTypeAnnotation::NonNull(Box::new(
+                graphql_type: GraphQLTypeAnnotation::NonNull(Box::new(
                     GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(WithSpan::new(
                         *STRING_TYPE_NAME,
                         Span::todo_generated(),

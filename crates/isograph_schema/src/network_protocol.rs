@@ -73,7 +73,7 @@ pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol>
 pub struct FieldToInsert {
     pub description: Option<WithSpan<Description>>,
     pub name: WithLocation<ServerSelectableName>,
-    pub type_: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+    pub graphql_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     pub arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
 
     // TODO we can probably restructure things to make this less awkward.
