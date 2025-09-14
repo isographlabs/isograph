@@ -1379,7 +1379,7 @@ fn merge_server_scalar_field(
 
     // HACK. We probably should filter these out in a better way.
     let scalar_field_name = scalar_field_selection.name.item;
-    let normalization_key = if scalar_field_name == "__typename" {
+    let normalization_key = if scalar_field_name == *TYPENAME_FIELD_NAME {
         NormalizationKey::Discriminator
     } else if scalar_field_name == "id" {
         NormalizationKey::Id
@@ -1589,7 +1589,7 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
             scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
             associated_data: DefinitionLocation::Server(
                 *selectables_map
-                    .get(&"__typename".intern().into())
+                    .get(&SelectableName::from(*TYPENAME_FIELD_NAME))
                     .expect("Expected __typename to exist")
                     .as_server()
                     .as_ref()
@@ -1598,7 +1598,10 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
                     .as_ref()
                     .expect("Expected __typename to be scalar"),
             ),
-            name: WithLocation::new("__typename".intern().into(), Location::generated()),
+            name: WithLocation::new(
+                ScalarSelectableName::from(*TYPENAME_FIELD_NAME),
+                Location::generated(),
+            ),
             reader_alias: None,
         }),
         Span::todo_generated(),
