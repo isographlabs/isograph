@@ -7,7 +7,7 @@ static RETURN_VALUE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Db, Default)]
 struct TestDatabase {
-    pub storage: Storage<Self>,
+    storage: Storage<Self>,
 }
 
 #[test]

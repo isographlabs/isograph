@@ -23,7 +23,6 @@ use thiserror::Error;
 
 use crate::{
     add_selection_sets::{AddSelectionSetsError, add_selection_sets_to_client_selectables},
-    get_iso_literal_map,
     isograph_literals::{parse_iso_literal_in_source, process_iso_literals},
 };
 
@@ -214,10 +213,9 @@ fn parse_iso_literals<TNetworkProtocol: NetworkProtocol + 'static>(
 ) -> Result<ParsedIsoLiteralsMap, Vec<WithLocation<IsographLiteralParseError>>> {
     // TODO we are not checking the open file map here. This will probably be fixed when we
     // fully rewrite everything to be incremental.
-    let iso_literal_map = get_iso_literal_map(db);
     let mut contains_iso = ParsedIsoLiteralsMap::default();
     let mut iso_literal_parse_errors = vec![];
-    for (relative_path, iso_literals_source_id) in iso_literal_map.0.iter() {
+    for (relative_path, iso_literals_source_id) in db.get_iso_literal_map().tracked().0.iter() {
         match parse_iso_literal_in_source(db, *iso_literals_source_id).to_owned() {
             Ok(iso_literals) => {
                 if !iso_literals.is_empty() {

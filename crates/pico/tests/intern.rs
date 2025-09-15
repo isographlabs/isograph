@@ -4,7 +4,7 @@ use thiserror::Error;
 
 #[derive(Db, Default)]
 struct TestDatabase {
-    pub storage: Storage<Self>,
+    storage: Storage<Self>,
 }
 
 #[test]

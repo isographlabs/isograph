@@ -3,7 +3,7 @@ use std::{
     marker::PhantomData,
 };
 
-use crate::{ParamId, dyn_eq::DynEq, epoch::Epoch, intern::Key};
+use crate::{HashId, ParamId, dyn_eq::DynEq, epoch::Epoch, intern::Key};
 
 pub trait Source {
     fn get_key(&self) -> Key;
@@ -37,12 +37,25 @@ impl<T> Hash for SourceId<T> {
     }
 }
 
+impl<T> Default for SourceId<T> {
+    fn default() -> Self {
+        Self {
+            key: Default::default(),
+            phantom: PhantomData,
+        }
+    }
+}
+
 impl<T> SourceId<T> {
     pub fn new(source: &impl Source) -> Self {
         Self {
             key: source.get_key(),
             phantom: PhantomData,
         }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.key.0 == HashId::EMPTY
     }
 }
 

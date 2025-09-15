@@ -83,11 +83,10 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                     }
                 };
 
-                let schema_source_id = db.get_standard_sources();
                 isograph_location_to_lsp_location(
                     db,
                     server_object_entity.name.location,
-                    &db.get(schema_source_id.schema_source_id).content,
+                    &db.get_schema().content,
                 )
             }
             IsographResolvedNode::Description(_) => None,
@@ -99,14 +98,11 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                         DefinitionLocation::Server(server_selectable) => {
                             match server_selectable.name.location {
                                 Location::Generated => None,
-                                Location::Embedded(location) => {
-                                    let schema_source_id = db.get_standard_sources();
-                                    isograph_location_to_lsp_location(
-                                        db,
-                                        location,
-                                        &db.get(schema_source_id.schema_source_id).content,
-                                    )
-                                }
+                                Location::Embedded(location) => isograph_location_to_lsp_location(
+                                    db,
+                                    location,
+                                    &db.get_schema().content,
+                                ),
                             }
                         }
                         DefinitionLocation::Client(client_selectable) => {
@@ -142,15 +138,11 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                         DefinitionLocation::Server(server_selectable) => {
                             match server_selectable.name.location {
                                 Location::Generated => None,
-                                Location::Embedded(location) => {
-                                    let schema_source_id = db.get_standard_sources();
-
-                                    isograph_location_to_lsp_location(
-                                        db,
-                                        location,
-                                        &db.get(schema_source_id.schema_source_id).content,
-                                    )
-                                }
+                                Location::Embedded(location) => isograph_location_to_lsp_location(
+                                    db,
+                                    location,
+                                    &db.get_schema().content,
+                                ),
                             }
                         }
                         DefinitionLocation::Client(client_selectable) => {

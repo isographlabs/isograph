@@ -8,7 +8,7 @@ static FIRST_LETTER_AS_MEMO_REF_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Db, Default)]
 struct TestDatabase {
-    pub storage: Storage<Self>,
+    storage: Storage<Self>,
 }
 
 #[test]

@@ -3,7 +3,7 @@ use pico_macros::{Db, memo};
 
 #[derive(Db, Default)]
 struct TestDatabase {
-    pub storage: Storage<Self>,
+    storage: Storage<Self>,
 }
 
 #[test]

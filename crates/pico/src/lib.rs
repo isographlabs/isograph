@@ -11,6 +11,7 @@ pub mod macro_fns;
 mod memo_ref;
 mod retained_query;
 mod source;
+mod view;
 
 pub use database::*;
 pub use derived_node::*;
@@ -20,3 +21,4 @@ pub use intern::*;
 pub use memo_ref::*;
 pub use retained_query::*;
 pub use source::*;
+pub use view::*;

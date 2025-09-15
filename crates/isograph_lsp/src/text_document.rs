@@ -1,13 +1,12 @@
 use common_lang_types::relative_path_from_absolute_and_working_directory;
 use isograph_compiler::CompilerState;
-use isograph_schema::{NetworkProtocol, OpenFileSource};
+use isograph_schema::NetworkProtocol;
 use lsp_types::{
     DidChangeTextDocumentParams, DidOpenTextDocumentParams, TextDocumentItem,
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, Notification,
     },
 };
-use pico::Database;
 
 use crate::{lsp_runtime_error::LSPRuntimeResult, uri_file_path_ext::UriFilePathExt};
 
@@ -25,19 +24,7 @@ pub fn on_did_open_text_document<TNetworkProtocol: NetworkProtocol + 'static>(
         current_working_directory,
         &uri.to_file_path().expect("Expected file path to be valid."),
     );
-
-    let source_id = db.set(OpenFileSource {
-        relative_path: relative_path_to_source_file,
-        content: text,
-    });
-
-    let mut open_file_map = db.get_open_file_map().clone();
-
-    open_file_map
-        .0
-        .insert(relative_path_to_source_file, source_id);
-
-    db.set(open_file_map);
+    db.insert_open_file(relative_path_to_source_file, text);
 
     Ok(())
 }
@@ -57,16 +44,7 @@ pub fn on_did_close_text_document<TNetworkProtocol: NetworkProtocol + 'static>(
         &uri.to_file_path().expect("Expected file path to be valid."),
     );
 
-    let mut open_file_map = db.get_open_file_map().clone();
-
-    let deleted_entry = open_file_map
-        .0
-        .remove(&relative_path_to_source_file)
-        .expect("Expected file to exist in OpenFileMap");
-
-    db.remove(deleted_entry);
-
-    db.set(open_file_map);
+    db.remove_open_file(relative_path_to_source_file);
 
     Ok(())
 }
@@ -94,10 +72,10 @@ pub fn on_did_change_text_document<TNetworkProtocol: NetworkProtocol + 'static>(
         &uri.to_file_path().expect("Expected file path to be valid."),
     );
 
-    db.set(OpenFileSource {
-        relative_path: relative_path_to_source_file,
-        content: content_changed.text.to_owned(),
-    });
+    db.insert_open_file(
+        relative_path_to_source_file,
+        content_changed.text.to_owned(),
+    );
 
     Ok(())
 }
