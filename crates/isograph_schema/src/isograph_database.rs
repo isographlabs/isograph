@@ -84,7 +84,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> IsographDatabase<TNetworkProto
         &self,
         file: RelativePathToSourceFile,
     ) -> Option<SourceId<OpenFileSource>> {
-        self.open_file_map.0.get(&file).cloned()
+        self.get_open_file_map().untracked().0.get(&file).cloned()
     }
 
     pub fn remove_schema_extension(
