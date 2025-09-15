@@ -33,10 +33,14 @@ pub(crate) fn write_artifacts_to_disk(
         // Is this better than materializing paths_and_contents sooner?
         count += 1;
 
-        let absolute_directory = match path_and_content.type_and_field {
-            Some(type_and_field) => artifact_directory
-                .join(type_and_field.type_name.lookup())
-                .join(type_and_field.field_name.lookup()),
+        let absolute_directory = match &path_and_content.type_and_field {
+            Some(type_and_field) => {
+                let base = artifact_directory.join(type_and_field.type_name.lookup());
+                match &type_and_field.field_name {
+                    Some(field_name) => base.join(field_name.lookup()),
+                    None => base,
+                }
+            }
             None => artifact_directory.clone(),
         };
         fs::create_dir_all(&absolute_directory).map_err(|e| {

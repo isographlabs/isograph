@@ -1,6 +1,6 @@
 use common_lang_types::{
-    ArtifactPathAndContent, ClientSelectableName, ParentObjectEntityNameAndSelectableName,
-    QueryText, ServerObjectEntityName,
+    ArtifactPathAndContent, ArtifactPathAndContentTypeAndField, ClientSelectableName, QueryText,
+    ServerObjectEntityName,
 };
 use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
@@ -58,17 +58,17 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
             ArtifactPathAndContent {
                 file_content: format!("export default '{query_text}';"),
                 file_name: query_text_file_name,
-                type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+                type_and_field: Some(ArtifactPathAndContentTypeAndField {
                     type_name,
-                    field_name: field_name.into(),
+                    field_name: Some(field_name.into()),
                 }),
             },
             ArtifactPathAndContent {
                 file_content: self.file_contents(file_extensions),
                 file_name: file_name_prefix,
-                type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+                type_and_field: Some(ArtifactPathAndContentTypeAndField {
                     type_name,
-                    field_name: field_name.into(),
+                    field_name: Some(field_name.into()),
                 }),
             },
         ]

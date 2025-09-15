@@ -10,7 +10,7 @@ use crate::{
     persisted_documents::PersistedDocuments,
 };
 use common_lang_types::{
-    ArtifactPathAndContent, ClientScalarSelectableName, ParentObjectEntityNameAndSelectableName,
+    ArtifactPathAndContent, ArtifactPathAndContentTypeAndField, ClientScalarSelectableName,
     QueryOperationName, QueryText, ServerObjectEntityName, VariableName,
 };
 use isograph_config::GenerateFileExtensionsOption;
@@ -355,9 +355,9 @@ impl<TNetworkProtocol: NetworkProtocol> EntrypointArtifactInfo<'_, TNetworkProto
             ArtifactPathAndContent {
                 file_content: format!("export default '{query_text}';"),
                 file_name: *QUERY_TEXT_FILE_NAME,
-                type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+                type_and_field: Some(ArtifactPathAndContentTypeAndField {
                     type_name,
-                    field_name,
+                    field_name: Some(field_name),
                 }),
             },
             ArtifactPathAndContent {
@@ -371,17 +371,17 @@ impl<TNetworkProtocol: NetworkProtocol> EntrypointArtifactInfo<'_, TNetworkProto
                     "  ", "  "
                 ),
                 file_name: *NORMALIZATION_AST_FILE_NAME,
-                type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+                type_and_field: Some(ArtifactPathAndContentTypeAndField {
                     type_name,
-                    field_name,
+                    field_name: Some(field_name),
                 }),
             },
             ArtifactPathAndContent {
                 file_content: entrypoint_file_content,
                 file_name: *ENTRYPOINT_FILE_NAME,
-                type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+                type_and_field: Some(ArtifactPathAndContentTypeAndField {
                     type_name,
-                    field_name,
+                    field_name: Some(field_name),
                 }),
             },
         ]

@@ -1,6 +1,4 @@
-use common_lang_types::{
-    ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName, WithSpan,
-};
+use common_lang_types::{ArtifactPathAndContent, ArtifactPathAndContentTypeAndField, WithSpan};
 use intern::Lookup;
 
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
@@ -133,9 +131,9 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
     let mut path_and_contents = vec![ArtifactPathAndContent {
         file_name: *RESOLVER_READER_FILE_NAME,
         file_content: reader_content,
-        type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+        type_and_field: Some(ArtifactPathAndContentTypeAndField {
             type_name: parent_object_entity.name.item,
-            field_name: client_selectable.name().into(),
+            field_name: Some(client_selectable.name().into()),
         }),
     }];
 
@@ -155,9 +153,9 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
         path_and_contents.push(ArtifactPathAndContent {
             file_name: *RESOLVER_PARAMETERS_TYPE_FILE_NAME,
             file_content: parameters_content,
-            type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+            type_and_field: Some(ArtifactPathAndContentTypeAndField {
                 type_name: parent_object_entity.name.item,
-                field_name: client_selectable.name().into(),
+                field_name: Some(client_selectable.name().into()),
             }),
         });
     }
@@ -233,9 +231,9 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
     ArtifactPathAndContent {
         file_name: *RESOLVER_READER_FILE_NAME,
         file_content: reader_content,
-        type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+        type_and_field: Some(ArtifactPathAndContentTypeAndField {
             type_name: parent_object_entity.name.item,
-            field_name: server_object_selectable_name.into(),
+            field_name: Some(server_object_selectable_name.into()),
         }),
     }
 }
@@ -348,9 +346,9 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     ArtifactPathAndContent {
         file_name: *RESOLVER_PARAM_TYPE_FILE_NAME,
         file_content: param_type_content,
-        type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+        type_and_field: Some(ArtifactPathAndContentTypeAndField {
             type_name: parent_type.name.item,
-            field_name: client_scalar_selectable.name().into(),
+            field_name: Some(client_scalar_selectable.name().into()),
         }),
     }
 }
@@ -414,9 +412,9 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
     ArtifactPathAndContent {
         file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
         file_content: final_output_type_text,
-        type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+        type_and_field: Some(ArtifactPathAndContentTypeAndField {
             type_name: parent_type.name.item,
-            field_name: client_field.name().into(),
+            field_name: Some(client_field.name().into()),
         }),
     }
 }
