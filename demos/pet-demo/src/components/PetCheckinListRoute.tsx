@@ -1,6 +1,6 @@
 import { iso } from '@iso';
 import {
-  FragmentReader,
+  FragmentRenderer,
   useLazyReference,
   useSkipLimitPagination,
 } from '@isograph/react';
@@ -86,7 +86,7 @@ export function PetCheckinListLoader({
   return (
     <ErrorBoundary>
       <React.Suspense fallback={<FullPageLoading />}>
-        <FragmentReader
+        <FragmentRenderer
           fragmentReference={fragmentReference}
           networkRequestOptions={{ suspendIfInFlight: false }}
         />

@@ -16,8 +16,9 @@ import {
 import {
   assertLink,
   type IsographEnvironment,
-  type Link,
+  type StoreLink,
 } from './IsographEnvironment';
+import { logMessage } from './logging';
 import { readPromise, type PromiseWrapper } from './PromiseWrapper';
 import {
   readImperativelyLoadedField,
@@ -65,8 +66,16 @@ export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
     try {
       updater(data);
     } catch (e) {
+      logMessage(environment, () => ({
+        kind: 'StartUpdateError',
+        error: e,
+      }));
       throw e;
     } finally {
+      logMessage(environment, () => ({
+        kind: 'StartUpdateComplete',
+        updatedIds: mutableUpdatedIds,
+      }));
       callSubscriptions(environment, mutableUpdatedIds);
     }
   };
@@ -146,7 +155,7 @@ function defineCachedProperty<T>(
 function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
   environment: IsographEnvironment,
   ast: ReaderAst<TReadFromStore>,
-  root: Link,
+  root: StoreLink,
   variables: ExtractParameters<TReadFromStore>,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
   networkRequest: PromiseWrapper<void, any>,

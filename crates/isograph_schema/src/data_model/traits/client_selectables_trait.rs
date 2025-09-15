@@ -1,6 +1,6 @@
 use common_lang_types::{
     ClientSelectableName, ParentObjectEntityNameAndSelectableName, SelectableName,
-    ServerObjectEntityName, WithSpan,
+    ServerObjectEntityName, WithLocation, WithSpan,
 };
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{Description, VariableDefinition};
@@ -123,8 +123,8 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
         self.description
     }
 
-    fn name(&self) -> SelectableName {
-        self.name.item.into()
+    fn name(&self) -> WithLocation<SelectableName> {
+        self.name.map(|x| x.into())
     }
 
     fn parent_object_entity_name(&self) -> ServerObjectEntityName {
@@ -143,8 +143,8 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
         self.description
     }
 
-    fn name(&self) -> SelectableName {
-        self.name.item.into()
+    fn name(&self) -> WithLocation<SelectableName> {
+        self.name.map(|x| x.into())
     }
 
     fn parent_object_entity_name(&self) -> ServerObjectEntityName {

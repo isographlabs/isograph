@@ -82,7 +82,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 {
                     Some(hover_text_for_selectable(
                         selectable.variant_name(),
-                        selectable.name(),
+                        selectable.name().item,
                         selectable.description(),
                         selectable.arguments(),
                         parent_object.name.item,
@@ -98,7 +98,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 {
                     Some(hover_text_for_selectable(
                         selectable.variant_name(),
-                        selectable.name(),
+                        selectable.name().item,
                         selectable.description(),
                         selectable.arguments(),
                         parent_object.name.item,
@@ -293,13 +293,11 @@ fn hover_text_for_selectable(
     };
 
     format!(
-        "{server_or_client} field **{selectable_name}**\n\
+        "{server_or_client} field **{parent_type_name}.{selectable_name}**\n\
         {argument_string}\
         \n\
         {selectable_description}\n\
         \n\
-        On type **{parent_type_name}**.\n\
-        \n\
-        {parent_description}",
+        **{parent_type_name}**: {parent_description}",
     )
 }

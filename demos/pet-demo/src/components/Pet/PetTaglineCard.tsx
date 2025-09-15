@@ -1,5 +1,5 @@
 import { iso } from '@iso';
-import { FragmentReader, useImperativeReference } from '@isograph/react';
+import { FragmentRenderer, useImperativeReference } from '@isograph/react';
 import { Button, Card, CardContent } from '@mui/material';
 import React, { Suspense } from 'react';
 
@@ -59,7 +59,7 @@ export const PetTaglineCard = iso(`
           <Suspense fallback="Updating tagline...">
             {button}
             <br />
-            <FragmentReader fragmentReference={mutationRef} />
+            <FragmentRenderer fragmentReference={mutationRef} />
           </Suspense>
         )}
       </CardContent>

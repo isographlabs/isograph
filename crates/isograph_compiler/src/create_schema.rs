@@ -310,7 +310,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
                     This is indicative of a bug in Isograph.",
                 );
 
-            let target_entity_type_name = server_field_to_insert.item.type_.inner();
+            let target_entity_type_name = server_field_to_insert.item.graphql_type.inner();
 
             let selection_type = schema
                 .server_entity_data
@@ -353,9 +353,12 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
                                     .name
                                     .map(|x| x.unchecked_conversion()),
                                 target_scalar_entity: TypeAnnotation::from_graphql_type_annotation(
-                                    server_field_to_insert.item.type_.clone(),
+                                    server_field_to_insert.item.graphql_type.clone(),
                                 )
                                 .map(&mut |_| *scalar_entity_name),
+                                javascript_type_override: server_field_to_insert
+                                    .item
+                                    .javascript_type_override,
                                 parent_object_entity_name,
                                 arguments,
                                 phantom_data: std::marker::PhantomData,
@@ -363,7 +366,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
                             options,
                             server_field_to_insert
                                 .item
-                                .type_
+                                .graphql_type
                                 .inner_non_null_named_type(),
                         )
                         .map_err(|e| WithLocation::new(e, server_field_to_insert.location))?;
@@ -374,7 +377,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
                             description,
                             name: server_field_to_insert.item.name.map(|x| x.unchecked_conversion()),
                             target_object_entity: TypeAnnotation::from_graphql_type_annotation(
-                                server_field_to_insert.item.type_.clone(),
+                                server_field_to_insert.item.graphql_type.clone(),
                             )
                             .map(&mut |_| *object_entity_name),
                             parent_object_entity_name,

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use common_lang_types::{
     DirectiveName, QueryExtraInfo, QueryOperationName, QueryText, ServerObjectEntityName,
-    WithLocation,
+    UnvalidatedTypeName, WithLocation,
 };
 use graphql_lang_types::{DeserializationError, from_graphql_directive};
 use graphql_schema_parser::SchemaParseError;
@@ -157,6 +157,32 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         Ok((result, graphql_root_types.into()))
     }
 
+    fn generate_link_type<'a>(
+        schema: &Schema<Self>,
+        server_object_entity: &ServerObjectEntityName,
+    ) -> String {
+        let server_object_entity = schema
+            .server_entity_data
+            .server_object_entity(*server_object_entity)
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            );
+
+        if let Some(concrete_type) = server_object_entity.concrete_type {
+            return format!("Link<\"{concrete_type}\">");
+        }
+
+        let subtypes = server_object_entity
+            .network_protocol_associated_data
+            .subtypes
+            .iter()
+            .map(|name| format!("Link<\"{name}\">"))
+            .collect::<Vec<_>>();
+
+        subtypes.join(" | ")
+    }
+
     fn generate_query_text<'a>(
         query_name: QueryOperationName,
         schema: &Schema<Self>,
@@ -194,6 +220,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct GraphQLSchemaObjectAssociatedData {
     pub original_definition_type: GraphQLSchemaOriginalDefinitionType,
+    pub subtypes: Vec<UnvalidatedTypeName>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

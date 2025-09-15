@@ -35,6 +35,7 @@ export {
   type IsographNetworkFunction,
   type IsographStore,
   type MissingFieldHandler,
+  type StoreLink,
   type Link,
   type StoreRecord,
   type CacheMap,
@@ -141,10 +142,12 @@ export {
   type UseImperativeReferenceResult,
 } from './react/useImperativeReference';
 export {
-  FragmentReader,
+  FragmentRenderer,
   type IsExactlyIntrinsicAttributes,
-} from './react/FragmentReader';
+} from './react/FragmentRenderer';
+export { FragmentReader } from './react/FragmentReader';
 export { LoadableFieldReader } from './react/LoadableFieldReader';
+export { LoadableFieldRenderer } from './react/LoadableFieldRenderer';
 export { useResult } from './react/useResult';
 export {
   useReadAndSubscribe,

@@ -61,11 +61,11 @@ The first thing we should do is to pass `blogPost.BlogBody` to `useClientSideDef
 
 We can pass this fragment reference to `useResult` to read its result. But, that would cause the component to suspend. Since we want to render the `BlogHeader` immediately, we shouldn't do that.
 
-So, instead let's pass it to `FragmentReader`, and wrap that in a `Suspense` boundary:
+So, instead let's pass it to `FragmentRenderer`, and wrap that in a `Suspense` boundary:
 
 ```tsx
 import { iso } from '@iso';
-import { FragmentReader, useClientSideDefer } from '@isograph/react';
+import { FragmentRenderer, useClientSideDefer } from '@isograph/react';
 
 export const BlogPostDisplay = iso(`
   field BlogPost.BlogPostDisplay {
@@ -84,7 +84,7 @@ export const BlogPostDisplay = iso(`
     <>
       <blogPost.BlogHeader />
       <React.Suspense fallback={'Loading...'}>
-        <FragmentReader fragmentReference={fragmentReference} />
+        <FragmentRenderer fragmentReference={fragmentReference} />
       </React.Suspense>
     </>
   );
@@ -97,7 +97,7 @@ The final step is to change `@loadable` to `@loadable(lazyLoadArtifact: true)`.
 
 ```tsx
 import { iso } from '@iso';
-import { FragmentReader, useClientSideDefer } from '@isograph/react';
+import { FragmentRenderer, useClientSideDefer } from '@isograph/react';
 
 export const BlogPostDisplay = iso(`
   field BlogPost.BlogPostDisplay {
@@ -116,7 +116,7 @@ export const BlogPostDisplay = iso(`
     <>
       <blogPost.BlogHeader />
       <React.Suspense fallback={'Loading...'}>
-        <FragmentReader fragmentReference={fragmentReference} />
+        <FragmentRenderer fragmentReference={fragmentReference} />
       </React.Suspense>
     </>
   );
@@ -131,7 +131,7 @@ In addition to fetching during render, you can also pass the loadable field to `
 
 ```tsx
 import { iso } from '@iso';
-import { FragmentReader, useImperativeLoadableField } from '@isograph/react';
+import { FragmentRenderer, useImperativeLoadableField } from '@isograph/react';
 
 export const BlogPostDisplay = iso(`
   field BlogPost.BlogPostDisplay {
@@ -160,7 +160,7 @@ export const BlogPostDisplay = iso(`
         </button>
       ) : (
         <React.Suspense fallback={'Loading...'}>
-          <FragmentReader fragmentReference={fragmentReference} />
+          <FragmentRenderer fragmentReference={fragmentReference} />
         </React.Suspense>
       )}
     </>

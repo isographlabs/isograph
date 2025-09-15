@@ -2,7 +2,7 @@ import React from 'react';
 import { iso } from './__isograph/iso';
 import { ErrorBoundary } from './ErrorBoundary';
 import { FullPageLoading } from './routes';
-import { FragmentReader, useLazyReference } from '@isograph/react';
+import { FragmentRenderer, useLazyReference } from '@isograph/react';
 
 export function SmartestPetLoader() {
   const { fragmentReference } = useLazyReference(
@@ -13,7 +13,7 @@ export function SmartestPetLoader() {
   return (
     <ErrorBoundary>
       <React.Suspense fallback={<FullPageLoading />}>
-        <FragmentReader
+        <FragmentRenderer
           fragmentReference={fragmentReference}
           networkRequestOptions={{ suspendIfInFlight: false }}
         />

@@ -46,6 +46,7 @@ use crate::{
     refetch_reader_artifact::{
         generate_refetch_output_type_artifact, generate_refetch_reader_artifact,
     },
+    ts_config::generate_ts_config,
 };
 
 lazy_static! {
@@ -439,6 +440,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
         config.options.include_file_extensions_in_import_statements,
         config.options.no_babel_transform,
     ));
+    path_and_contents.push(generate_ts_config());
 
     if let Some(persisted_documents) = persisted_documents {
         path_and_contents.push(persisted_documents.path_and_content());
@@ -572,11 +574,15 @@ fn get_serialized_field_argument(
 }
 
 pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ClientFieldOutputType {
     let variant = &client_field.variant;
     match variant {
-        ClientFieldVariant::Link => ClientFieldOutputType("Link".to_string()),
+        ClientFieldVariant::Link => ClientFieldOutputType(TNetworkProtocol::generate_link_type(
+            schema,
+            &client_field.parent_object_entity_name,
+        )),
         ClientFieldVariant::UserWritten(info) => match info.client_field_directive_set {
             ClientFieldDirectiveSet::None(_) => {
                 ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
@@ -693,17 +699,22 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     let output_type =
                         field
                             .target_scalar_entity
-                            .clone()
-                            .map(&mut |scalar_entity_name| {
-                                schema
-                                    .server_entity_data
-                                    .server_scalar_entity(scalar_entity_name)
-                                    .expect(
-                                        "Expected entity to exist. \
+                            .as_ref()
+                            .map(
+                                &mut |scalar_entity_name| match field.javascript_type_override {
+                                    Some(javascript_name) => javascript_name,
+                                    None => {
+                                        schema
+                                            .server_entity_data
+                                            .server_scalar_entity(*scalar_entity_name)
+                                            .expect(
+                                                "Expected entity to exist. \
                                         This is indicative of a bug in Isograph.",
-                                    )
-                                    .javascript_name
-                            });
+                                            )
+                                            .javascript_name
+                                    }
+                                },
+                            );
 
                     query_type_declaration.push_str(&format!(
                         "{}readonly {}: {},\n",
@@ -803,7 +814,8 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
     match client_field.variant {
         ClientFieldVariant::Link => {
             *link_fields = true;
-            let output_type = "Link";
+            let output_type =
+                TNetworkProtocol::generate_link_type(schema, &parent_object_entity_name);
             query_type_declaration.push_str(
                 &(format!(
                     "readonly {}: {},\n",
@@ -983,6 +995,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 ObjectSelectionDirectiveSet::Updatable(_) => {
                     *updatable_fields = true;
                     write_getter_and_setter(
+                        schema,
                         query_type_declaration,
                         indentation_level,
                         name_or_alias,
@@ -1002,7 +1015,8 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn write_getter_and_setter(
+fn write_getter_and_setter<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
     query_type_declaration: &mut String,
     indentation_level: u8,
     name_or_alias: SelectableNameOrAlias,
@@ -1014,9 +1028,15 @@ fn write_getter_and_setter(
         name_or_alias,
         print_javascript_type_declaration(type_annotation),
     ));
-    let setter_type_annotation = output_type_annotation
-        .clone()
-        .map(&mut |_| "{ link: Link }");
+    let setter_type_annotation =
+        output_type_annotation
+            .clone()
+            .map(&mut |server_object_entity_name| {
+                format!(
+                    "{{ link: {} }}",
+                    TNetworkProtocol::generate_link_type(schema, &server_object_entity_name)
+                )
+            });
     query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
     query_type_declaration.push_str(&format!(
         "set {}(value: {}),\n",

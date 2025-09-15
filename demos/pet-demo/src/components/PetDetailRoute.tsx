@@ -1,5 +1,5 @@
 import { iso } from '@iso';
-import { FragmentReader, useLazyReference } from '@isograph/react';
+import { FragmentRenderer, useLazyReference } from '@isograph/react';
 import { Button, Card, CardContent, Container, Stack } from '@mui/material';
 import React from 'react';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -86,7 +86,7 @@ export function PetDetailRouteLoader({ route }: { route: PetDetailRoute }) {
   return (
     <ErrorBoundary>
       <React.Suspense fallback={<FullPageLoading />}>
-        <FragmentReader
+        <FragmentRenderer
           fragmentReference={fragmentReference}
           networkRequestOptions={{ suspendIfInFlight: false }}
         />

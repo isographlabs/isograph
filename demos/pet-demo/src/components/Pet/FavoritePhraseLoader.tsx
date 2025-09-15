@@ -1,5 +1,5 @@
 import { iso } from '@iso';
-import { FragmentReader, useImperativeReference } from '@isograph/react';
+import { FragmentRenderer, useImperativeReference } from '@isograph/react';
 import React from 'react';
 import { ErrorBoundary } from '../ErrorBoundary';
 
@@ -39,7 +39,7 @@ export const FavoritePhraseLoader = iso(`
       ) : (
         <ErrorBoundary>
           <React.Suspense fallback="Loading favorite phrase...">
-            <FragmentReader fragmentReference={fragmentReference} />
+            <FragmentRenderer fragmentReference={fragmentReference} />
           </React.Suspense>
         </ErrorBoundary>
       )}

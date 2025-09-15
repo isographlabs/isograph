@@ -1,7 +1,7 @@
 import { iso } from '@iso';
 import {
-  FragmentReader,
-  LoadableFieldReader,
+  FragmentRenderer,
+  LoadableFieldRenderer,
   useLazyReference,
   useSkipLimitPagination,
 } from '@isograph/react';
@@ -62,7 +62,7 @@ export function NewsfeedLoader() {
   return (
     <ErrorBoundary>
       <React.Suspense fallback={<FullPageLoading />}>
-        <FragmentReader
+        <FragmentRenderer
           fragmentReference={fragmentReference}
           networkRequestOptions={{ suspendIfInFlight: false }}
         />
@@ -93,21 +93,21 @@ export const NewsfeedAdOrBlog = iso(`
     return (
       <Suspense fallback={fallback}>
         {/*
-          Why not use FragmentReader here? That's because in order to use FragmentReader,
+          Why not use FragmentRenderer here? That's because in order to use FragmentRenderer,
           we we would have to call useClientSideDefer, and that's a hook, so it must be
           called unconditionally. But AdItemDisplay is only present if asAdItem != null,
           hence the need for a wrapper component (AdItemDisplayWrapper, previously).
 
           LoadableFieldReader is a generic component that replaces the wrapper component.
         */}
-        <LoadableFieldReader
+        <LoadableFieldRenderer
           loadableField={newsfeedItem.asAdItem.AdItemDisplay}
           args={{}}
-        >
-          {(AdItemDisplay) => (
-            <AdItemDisplay onVisible={onVisible} index={index} />
-          )}
-        </LoadableFieldReader>
+          additionalProps={{
+            onVisible,
+            index,
+          }}
+        />
       </Suspense>
     );
   } else if (newsfeedItem.asBlogItem != null) {

@@ -94,7 +94,7 @@ pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkPro
             This is indicative of a bug in Isograph.",
         );
 
-    let client_field_output_type = generate_output_type(client_field);
+    let client_field_output_type = generate_output_type(schema, client_field);
 
     let output_type_text = {
         let parent_type_name = parent_type.name;
@@ -121,6 +121,7 @@ pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkPro
 
 fn generate_function_import_statement(read_out_data: String) -> ClientFieldFunctionImportStatement {
     let indent = "  ";
+    // TODO: use better type than Link<any>
     ClientFieldFunctionImportStatement(format!(
         "{read_out_data}\n\
         import {{ makeNetworkRequest, wrapResolvedValue, type IsographEnvironment, \
@@ -134,7 +135,7 @@ fn generate_function_import_statement(read_out_data: String) -> ClientFieldFunct
         {indent}artifact: RefetchQueryNormalizationArtifact,\n\
         {indent}readOutData: any,\n\
         {indent}filteredVariables: any,\n\
-        {indent}rootLink: Link,\n\
+        {indent}rootLink: Link<any>,\n\
         {indent}// If readerArtifact is null, the return value is undefined.\n\
         {indent}// TODO reflect this in the types.\n\
         {indent}readerArtifact: TopLevelReaderArtifact<any, any, any> | null,\n\
