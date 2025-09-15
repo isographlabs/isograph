@@ -25,7 +25,7 @@ pub fn initialize_sources<TNetworkProtocol: NetworkProtocol + 'static>(
     let schema = db.get_isograph_config().schema.clone();
     let schema_source_id = read_schema(db, &schema)?;
     let schema_extension_sources = read_schema_extensions(db)?;
-    *db.get_standard_sources_mut().untracked() = StandardSources {
+    *db.get_standard_sources_mut().tracked() = StandardSources {
         schema_source_id,
         schema_extension_sources,
     };
@@ -62,19 +62,19 @@ fn handle_update_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     let schema = db.get_isograph_config().schema.clone();
     match event_kind {
         SourceEventKind::CreateOrModify(_) => {
-            db.get_standard_sources_mut().untracked().schema_source_id = read_schema(db, &schema)?;
+            db.get_standard_sources_mut().tracked().schema_source_id = read_schema(db, &schema)?;
         }
         SourceEventKind::Rename((_, target_path)) => {
             if schema.absolute_path != *target_path {
                 db.remove(db.get_standard_sources().untracked().schema_source_id);
-                db.get_standard_sources_mut().untracked().schema_source_id = SourceId::default();
+                db.get_standard_sources_mut().tracked().schema_source_id = SourceId::default();
                 return Err(SourceError::SchemaNotFound);
             }
         }
         SourceEventKind::Remove(_) => {
             return {
                 db.remove(db.get_standard_sources().untracked().schema_source_id);
-                db.get_standard_sources_mut().untracked().schema_source_id = SourceId::default();
+                db.get_standard_sources_mut().tracked().schema_source_id = SourceId::default();
                 Err(SourceError::SchemaNotFound)
             };
         }

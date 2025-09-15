@@ -14,78 +14,53 @@ struct TestDatabase {
 }
 
 #[test]
-fn tracking_field() {
+fn tracking_field_correctness() {
     let mut db = TestDatabase::default();
 
+    // Seed the database
     let input_id_1 = db.set(Input {
         key: "key",
         value: "asdf".to_string(),
     });
     db.get_map_mut()
-        .untracked()
+        .tracked()
         .0
         .insert("key".to_string(), input_id_1);
-    // First calculation is always correct, because we call inner_fn here
+    // The first time we run a function, it will always have the correct value.
     assert_eq!(get_values_untracked(&db).len(), 1);
 
     let input_id_2 = db.set(Input {
         key: "key2",
         value: "isograph".to_string(),
     });
-    // If we insert a new node without tracking and call untracked iter()
-    // we got the previous value
+    // If we insert a new node without tracking and call untracked iter(),
+    // we get the previous value
     db.get_map_mut()
-        .untracked()
+        .tracked()
         .0
         .insert("key2".to_string(), input_id_2);
     assert_eq!(get_values_untracked(&db).len(), 1);
 
-    let input_id_3 = db.set(Input {
-        key: "key3",
-        value: "pico".to_string(),
-    });
-    // Using tracking insert is not enough
-    db.get_map_mut()
-        .tracked()
-        .0
-        .insert("key3".to_string(), input_id_3);
-    assert_eq!(get_values_untracked(&db).len(), 1);
+    // What? We're showing incorrect results? Why?!
+    // Note that you should never do an untracked iter! Untracked is for reading
+    // a single value in a Map<Key, SourceId>.
+    //
+    // See [super::efficiency] for correct usage of untracked.
 
     // Instead we have to use tracked iter together with tracked insert
     // (first call here, so value is correct anyway)
-    assert_eq!(get_values_tracked(&db).len(), 3);
+    assert_eq!(get_values_tracked(&db).len(), 2);
 
-    let input_id_4 = db.set(Input {
-        key: "key4",
+    let input_id_3 = db.set(Input {
+        key: "key3",
         value: "database".to_string(),
     });
     db.get_map_mut()
         .tracked()
         .0
-        .insert("key4".to_string(), input_id_4);
+        .insert("key3".to_string(), input_id_3);
     // and now we got a correct value!
-    assert_eq!(get_values_tracked(&db).len(), 4);
-
-    let input_id_5 = db.set(Input {
-        key: "key5",
-        value: "qwerty".to_string(),
-    });
-    // we should not use untracked insert even if we use tracked iter
-    db.get_map_mut()
-        .untracked()
-        .0
-        .insert("key5".to_string(), input_id_5);
-    assert_eq!(get_values_tracked(&db).len(), 4);
-
-    let input_id_6 = db.set(Input {
-        key: "key6",
-        value: "isographlabs".to_string(),
-    });
-    db.get_map_mut()
-        .tracked()
-        .0
-        .insert("key6".to_string(), input_id_6);
-    assert_eq!(get_values_tracked(&db).len(), 6);
+    assert_eq!(get_values_tracked(&db).len(), 3);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Source)]
