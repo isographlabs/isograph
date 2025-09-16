@@ -31,6 +31,7 @@ import { type Query__PetFavoritePhrase__param } from './Query/PetFavoritePhrase/
 import { type Query__SmartestPetRoute__param } from './Query/SmartestPetRoute/param_type';
 import { type Query__smartestPet__param } from './Query/smartestPet/param_type';
 import { type Viewer__NewsfeedPaginationComponent__param } from './Viewer/NewsfeedPaginationComponent/param_type';
+import { type Pet__link__output_type } from './Pet/link/output_type';
 import entrypoint_Mutation__SetTagline from '../__isograph/Mutation/SetTagline/entrypoint';
 import entrypoint_Query__HomeRoute from '../__isograph/Query/HomeRoute/entrypoint';
 import entrypoint_Query__Newsfeed from '../__isograph/Query/Newsfeed/entrypoint';
@@ -45,7 +46,7 @@ import entrypoint_Query__SmartestPetRoute from '../__isograph/Query/SmartestPetR
 // This means that the type of the exported iso literal is exactly
 // the type of the passed-in function, which takes one parameter
 // of type TParam.
-type IdentityWithParam<TParam extends object> = <TClientFieldReturn>(
+type IdentityWithParam<TParam extends object, TReturnConstraint = unknown> = <TClientFieldReturn extends TReturnConstraint>(
   clientField: (param: TParam) => TClientFieldReturn
 ) => (param: TParam) => TClientFieldReturn;
 
@@ -211,7 +212,7 @@ export function iso<T>(
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'pointer Query.smartestPet', T>
-): IdentityWithParam<Query__smartestPet__param>;
+): IdentityWithParam<Query__smartestPet__param, (Pet__link__output_type | null)>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Viewer.NewsfeedPaginationComponent', T>
