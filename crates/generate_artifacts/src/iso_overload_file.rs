@@ -1,15 +1,15 @@
 use intern::Lookup;
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{ClientFieldDirectiveSet, SelectionType};
-use std::cmp::Ordering;
+use std::{cmp::Ordering, collections::BTreeSet};
 
-use common_lang_types::{ArtifactPathAndContent, SelectableName};
+use common_lang_types::{ArtifactPathAndContent, SelectableName, ServerObjectEntityName};
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable,
     EntrypointDeclarationInfo, NetworkProtocol, Schema,
 };
 
-use crate::generate_artifacts::ISO_TS_FILE_NAME;
+use crate::generate_artifacts::{ISO_TS_FILE_NAME, print_javascript_type_declaration};
 
 fn build_iso_overload_for_entrypoint<TNetworkProtocol: NetworkProtocol>(
     validated_client_field: &ClientScalarSelectable<TNetworkProtocol>,
@@ -43,6 +43,7 @@ export function iso<T>(
 fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol>(
     client_type_and_variant: (ClientSelectable<TNetworkProtocol>, ClientFieldDirectiveSet),
     file_extensions: GenerateFileExtensionsOption,
+    link_types: &mut BTreeSet<ServerObjectEntityName>,
 ) -> (String, String) {
     let (client_type, variant) = client_type_and_variant;
     let mut s: String = "".to_string();
@@ -53,6 +54,7 @@ fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol>
         client_type.type_and_field().field_name,
         file_extensions.ts()
     );
+
     let formatted_field = format!(
         "{} {}.{}",
         match client_type {
@@ -70,6 +72,23 @@ export function iso<T>(
 ): IdentityWithParamComponent<{}__param>;\n",
             formatted_field,
             client_type.type_and_field().underscore_separated(),
+        ));
+    } else if let SelectionType::Object(client_pointer) = client_type {
+        link_types.insert(*client_pointer.target_object_entity_name.inner());
+        s.push_str(&format!(
+            "
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'{}', T>
+): IdentityWithParam<{}__param, {}>;\n",
+            formatted_field,
+            client_type.type_and_field().underscore_separated(),
+            print_javascript_type_declaration(
+                &client_pointer.target_object_entity_name.clone().map(
+                    &mut |target_object_entity_name| {
+                        format!("{}__link__output_type", &target_object_entity_name)
+                    }
+                )
+            )
         ));
     } else {
         s.push_str(&format!(
@@ -96,7 +115,7 @@ pub(crate) fn build_iso_overload_artifact<TNetworkProtocol: NetworkProtocol>(
 // This means that the type of the exported iso literal is exactly
 // the type of the passed-in function, which takes one parameter
 // of type TParam.
-type IdentityWithParam<TParam extends object> = <TClientFieldReturn>(
+type IdentityWithParam<TParam extends object, TReturnConstraint = unknown> = <TClientFieldReturn extends TReturnConstraint>(
   clientField: (param: TParam) => TClientFieldReturn
 ) => (param: TParam) => TClientFieldReturn;
 
@@ -141,15 +160,31 @@ type MatchesWhitespaceAndString<
 > = Whitespace<T> extends `${TString}${string}` ? T : never;\n",
     );
 
+    let mut target_object_entity_names = BTreeSet::new();
+
     let client_defined_type_overloads =
         sorted_user_written_types(schema)
             .into_iter()
             .map(|client_type| {
-                build_iso_overload_for_client_defined_type(client_type, file_extensions)
+                build_iso_overload_for_client_defined_type(
+                    client_type,
+                    file_extensions,
+                    &mut target_object_entity_names,
+                )
             });
+
     for (import, client_type_overload) in client_defined_type_overloads {
         imports.push_str(&import);
         content.push_str(&client_type_overload);
+    }
+
+    for target_object_entity_name in target_object_entity_names {
+        imports.push_str(&format!(
+            "import {{ type {}__link__output_type }} from './{}/link/output_type{}';\n",
+            target_object_entity_name,
+            target_object_entity_name,
+            file_extensions.ts()
+        ));
     }
 
     let entrypoint_overloads = sorted_entrypoints(schema)
