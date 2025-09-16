@@ -8,7 +8,8 @@ export type Route =
   | PetDetailDeferredRoute
   | PetByNameRoute
   | PetCheckinListRoute
-  | SmartestRoute;
+  | SmartestRoute
+  | RandomRoute;
 
 export type HomeRoute = {
   kind: 'Home';
@@ -38,6 +39,10 @@ export type SmartestRoute = {
   kind: 'Smartest';
 };
 
+export type RandomRoute = {
+  kind: 'Random';
+};
+
 export function useNavigateTo() {
   const router = useRouter();
   return (route: Route) => router.push(toRouteUrl(route));
@@ -62,6 +67,9 @@ function toRouteUrl(route: Route): string {
     }
     case 'Smartest': {
       return '/smartest';
+    }
+    case 'Random': {
+      return '/random';
     }
     default: {
       let _: never = route;
