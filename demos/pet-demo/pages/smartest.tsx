@@ -2,12 +2,9 @@ import { FullPageLoading } from '@/src/components/routes';
 import { SmartestPetLoader } from '@/src/components/SmartestPetLoader';
 import ThemeProvider from '@/src/theme';
 import Head from 'next/head';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense } from 'react';
 
 export default function Smartest() {
-  const [isMounted, setIsMounted] = useState(false);
-  useEffect(() => setIsMounted(true), []);
-  console.log('route level');
   return (
     <>
       <Head>
@@ -15,7 +12,7 @@ export default function Smartest() {
       </Head>
       <ThemeProvider>
         <Suspense fallback={<FullPageLoading />}>
-          {isMounted && <SmartestPetLoader />}
+          <SmartestPetLoader />
         </Suspense>
       </ThemeProvider>
     </>
