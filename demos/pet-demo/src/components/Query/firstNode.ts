@@ -1,9 +1,11 @@
 import { iso } from '@iso';
 
 export const firstNode = iso(`
-  pointer Query.firstNode to Node {
+  pointer Query.firstNode to Pet {
     node(id: 0) {
-      link
+      asPet {
+        link
+      }
     }
   }
-`)(({ data }) => data.node?.link);
+`)(({ data }) => data.node?.asPet?.link);

@@ -23,6 +23,22 @@ const normalizationAst: NormalizationAst = {
           fieldName: "id",
           arguments: null,
         },
+        {
+          kind: "InlineFragment",
+          type: "Pet",
+          selections: [
+            {
+              kind: "Scalar",
+              fieldName: "__typename",
+              arguments: null,
+            },
+            {
+              kind: "Scalar",
+              fieldName: "id",
+              arguments: null,
+            },
+          ],
+        },
       ],
     },
   ],

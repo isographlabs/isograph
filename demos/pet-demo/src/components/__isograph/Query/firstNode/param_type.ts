@@ -4,9 +4,14 @@ export type Query__firstNode__param = {
   readonly data: {
     readonly node: ({
       /**
-A store Link for the Node type.
+A client pointer for the Pet type.
       */
-      readonly link: Link<"Viewer"> | Link<"Pet"> | Link<"BlogItem"> | Link<"Image"> | Link<"AdItem">,
+      readonly asPet: ({
+        /**
+A store Link for the Pet type.
+        */
+        readonly link: Link<"Pet">,
+      } | null),
     } | null),
   },
   readonly parameters: Record<PropertyKey, never>,

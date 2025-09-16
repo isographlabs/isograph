@@ -17,7 +17,7 @@ const normalizationAst: NormalizationAst = {
       selections: [
         {
           kind: "InlineFragment",
-          type: "Node",
+          type: "Pet",
           selections: [
             {
               kind: "Scalar",
@@ -30,25 +30,9 @@ const normalizationAst: NormalizationAst = {
               arguments: null,
             },
             {
-              kind: "InlineFragment",
-              type: "Pet",
-              selections: [
-                {
-                  kind: "Scalar",
-                  fieldName: "__typename",
-                  arguments: null,
-                },
-                {
-                  kind: "Scalar",
-                  fieldName: "id",
-                  arguments: null,
-                },
-                {
-                  kind: "Scalar",
-                  fieldName: "nickname",
-                  arguments: null,
-                },
-              ],
+              kind: "Scalar",
+              fieldName: "nickname",
+              arguments: null,
             },
           ],
         },

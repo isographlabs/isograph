@@ -29,9 +29,7 @@ export function RandomLoader() {
 export const Random = iso(`
   field Query.Random @component {
     firstNode {
-      asPet {
         nickname
-      }
     }
   }
 `)(({ data }) => {
