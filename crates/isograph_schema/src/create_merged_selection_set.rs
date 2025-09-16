@@ -707,6 +707,7 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
         .collect::<Vec<_>>()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,

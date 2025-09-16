@@ -1,4 +1,4 @@
-import type { Link } from '@isograph/react';
+import { type Node__link__output_type } from '../../Node/link/output_type';
 import type { StartUpdate } from '@isograph/react';
 
 export type Query__linkedUpdate__param = {
@@ -15,7 +15,7 @@ A client pointer for the Economist type.
       /**
 A store Link for the Node type.
       */
-      readonly link: Link<"Economist">,
+      readonly link: Node__link__output_type,
       /**
 A client pointer for the Economist type.
       */
@@ -34,12 +34,12 @@ A client pointer for the Economist type.
         name: string,
       } | null),
     } | null),
-    set node(value: ({ link: Link<"Economist"> } | null)),
+    set node(value: ({ link: Node__link__output_type } | null)),
     readonly john_stuart_mill: ({
       /**
 A store Link for the Node type.
       */
-      readonly link: Link<"Economist">,
+      readonly link: Node__link__output_type,
       /**
 A client pointer for the Economist type.
       */

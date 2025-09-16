@@ -5,8 +5,8 @@ use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 use isograph_lang_types::{ClientFieldDirectiveSet, SelectionType};
 use isograph_schema::{
-    ClientScalarOrObjectSelectable, ClientSelectable, NetworkProtocol, Schema,
-    ServerObjectSelectable, ValidatedSelection, initial_variable_context,
+    ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, NetworkProtocol,
+    Schema, ServerObjectSelectable, ValidatedSelection, initial_variable_context,
 };
 use isograph_schema::{RefetchedPathsMap, UserWrittenClientTypeInfo};
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
@@ -253,7 +253,6 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
 
     let mut param_type_imports = BTreeSet::new();
     let mut loadable_fields = BTreeSet::new();
-    let mut link_fields = false;
     let mut updatable_fields = false;
     let client_field_parameter_type = generate_client_field_parameter_type(
         schema,
@@ -261,7 +260,6 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         &mut param_type_imports,
         &mut loadable_fields,
         1,
-        &mut link_fields,
     );
     let updatable_data_type = generate_client_field_updatable_data_type(
         schema,
@@ -269,7 +267,6 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         &mut param_type_imports,
         &mut loadable_fields,
         1,
-        &mut link_fields,
         &mut updatable_fields,
     );
 
@@ -280,12 +277,6 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         parent_type.name.item,
         client_scalar_selectable.name()
     );
-
-    let link_field_imports = if link_fields {
-        "import type { Link } from '@isograph/react';\n".to_string()
-    } else {
-        "".to_string()
-    };
 
     let start_update_imports = if updatable_fields {
         "import type { StartUpdate } from '@isograph/react';\n".to_string()
@@ -332,7 +323,6 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
 
     let param_type_content = format!(
         "{param_type_import_statement}\
-        {link_field_imports}\
         {start_update_imports}\
         {loadable_field_imports}\
         {parameters_import}\n\
@@ -400,6 +390,38 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
     ArtifactPathAndContent {
         file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
         file_content: final_output_type_text,
+        type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+            type_name: parent_type.name.item,
+            field_name: client_field.name().into(),
+        }),
+    }
+}
+
+pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtocol>(
+    schema: &Schema<TNetworkProtocol>,
+    client_field: &ClientScalarSelectable<TNetworkProtocol>,
+) -> ArtifactPathAndContent {
+    let parent_type = schema
+        .server_entity_data
+        .server_object_entity(client_field.parent_object_entity_name())
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        );
+
+    let client_field_output_type = generate_output_type(schema, client_field);
+
+    let output_type_text = format!(
+        "import type {{ Link }} from '@isograph/react';\n\
+        export type {}__{}__output_type = {};",
+        parent_type.name.item,
+        client_field.name(),
+        client_field_output_type
+    );
+
+    ArtifactPathAndContent {
+        file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
+        file_content: output_type_text,
         type_and_field: Some(ParentObjectEntityNameAndSelectableName {
             type_name: parent_type.name.item,
             field_name: client_field.name().into(),
