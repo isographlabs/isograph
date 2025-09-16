@@ -5,7 +5,6 @@ import { FullPageLoading } from './routes';
 import {
   FragmentRenderer,
   LoadableFieldReader,
-  useClientSideDefer,
   useLazyReference,
 } from '@isograph/react';
 
