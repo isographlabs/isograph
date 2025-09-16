@@ -3,12 +3,11 @@ use common_lang_types::{
     Location, ParentObjectEntityNameAndSelectableName, SelectableNameOrAlias,
     ServerObjectEntityName, Span, WithLocation, WithSpan, derive_display,
 };
+use core::panic;
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
 };
 use intern::{Lookup, string_key::Intern};
-
-use core::panic;
 use isograph_config::CompilerConfig;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDirectiveSet, DefinitionLocation, Description,
