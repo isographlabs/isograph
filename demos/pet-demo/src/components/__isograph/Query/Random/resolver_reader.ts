@@ -23,7 +23,7 @@ const readerAst: ReaderAst<Query__Random__param> = [
         selections: [
           {
             kind: "Scalar",
-            fieldName: "name",
+            fieldName: "nickname",
             alias: null,
             arguments: null,
             isUpdatable: false,

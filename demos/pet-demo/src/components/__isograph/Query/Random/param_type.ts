@@ -8,7 +8,7 @@ export type Query__Random__param = {
 A client pointer for the Pet type.
       */
       readonly asPet: ({
-        readonly name: string,
+        readonly nickname: (string | null),
       } | null),
     } | null)>,
   },

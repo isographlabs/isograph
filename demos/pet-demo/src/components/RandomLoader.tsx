@@ -31,7 +31,7 @@ export const Random = iso(`
   field Query.Random @component {
     firstNode {
       asPet {
-        name
+        nickname
       }
     }
   }
@@ -40,9 +40,10 @@ export const Random = iso(`
     <div>
       random page
       <br />
-      <React.Suspense fallback={<FullPageLoading />}>
+      <React.Suspense fallback={'loading firstNode'}>
         <LoadableFieldReader loadableField={data.firstNode} args={{}}>
           {(firstNode) => {
+            console.log('firstNode', { firstNode });
             return JSON.stringify(firstNode, null, 2);
           }}
         </LoadableFieldReader>

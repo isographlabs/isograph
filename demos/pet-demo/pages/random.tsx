@@ -2,9 +2,12 @@ import { RandomLoader } from '@/src/components/RandomLoader';
 import { FullPageLoading } from '@/src/components/routes';
 import ThemeProvider from '@/src/theme';
 import Head from 'next/head';
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 
 export default function Smartest() {
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => setIsMounted(true), []);
+  console.log('route level');
   return (
     <>
       <Head>
@@ -12,7 +15,7 @@ export default function Smartest() {
       </Head>
       <ThemeProvider>
         <Suspense fallback={<FullPageLoading />}>
-          <RandomLoader />
+          {isMounted && <RandomLoader />}
         </Suspense>
       </ThemeProvider>
     </>

@@ -6,7 +6,7 @@ export default 'query Query__firstNode($id: ID!) {\
       ... on Pet {\
         __typename,\
         id,\
-        name,\
+        nickname,\
       },\
     },\
   },\
