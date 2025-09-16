@@ -2,25 +2,22 @@ use common_lang_types::{
     ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName, WithSpan,
 };
 use intern::Lookup;
-
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
-
 use isograph_lang_types::{ClientFieldDirectiveSet, SelectionType};
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientSelectable, NetworkProtocol, Schema,
     ServerObjectSelectable, ValidatedSelection, initial_variable_context,
 };
 use isograph_schema::{RefetchedPathsMap, UserWrittenClientTypeInfo};
-
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
-use crate::generate_artifacts::ClientFieldOutputType;
 use crate::{
     generate_artifacts::{
-        ClientFieldFunctionImportStatement, RESOLVER_OUTPUT_TYPE, RESOLVER_OUTPUT_TYPE_FILE_NAME,
-        RESOLVER_PARAM_TYPE, RESOLVER_PARAM_TYPE_FILE_NAME, RESOLVER_PARAMETERS_TYPE_FILE_NAME,
-        RESOLVER_READER_FILE_NAME, generate_client_field_parameter_type,
-        generate_client_field_updatable_data_type, generate_output_type, generate_parameters,
+        ClientFieldFunctionImportStatement, ClientFieldOutputType, RESOLVER_OUTPUT_TYPE,
+        RESOLVER_OUTPUT_TYPE_FILE_NAME, RESOLVER_PARAM_TYPE, RESOLVER_PARAM_TYPE_FILE_NAME,
+        RESOLVER_PARAMETERS_TYPE_FILE_NAME, RESOLVER_READER_FILE_NAME,
+        generate_client_field_parameter_type, generate_client_field_updatable_data_type,
+        generate_output_type, generate_parameters,
     },
     import_statements::{
         param_type_imports_to_import_param_statement, param_type_imports_to_import_statement,
