@@ -279,6 +279,7 @@ export function callSubscriptions(
   environment: IsographEnvironment,
   recordsEncounteredWhenNormalizing: EncounteredIds,
 ) {
+  console.log('call subscriptions', recordsEncounteredWhenNormalizing);
   environment.subscriptions.forEach(
     withErrorHandling(environment, (subscription) => {
       switch (subscription.kind) {
@@ -399,6 +400,14 @@ function normalizeDataIntoRecord(
   variables: Variables,
   mutableEncounteredIds: EncounteredIds,
 ): RecordHasBeenUpdated {
+  console.log('normalize data into record\n\n', {
+    normalizationAst,
+    networkResponseParentRecord,
+    targetParentRecord,
+    targetParentRecordLink,
+    // variables,
+    // mutableEncounteredIds,
+  });
   let recordHasBeenUpdated = false;
   for (const normalizationNode of normalizationAst) {
     switch (normalizationNode.kind) {
