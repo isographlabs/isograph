@@ -3,13 +3,11 @@
   "version": "0.3.1",
   "description": "Common types for disposable items",
   "homepage": "https://isograph.dev",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "author": "Isograph Labs",
   "license": "MIT",
   "scripts": {
-    "compile-libs": "rimraf dist && tsc -p tsconfig.pkg.json",
-    "compile-watch": "tsc -p tsconfig.pkg.json --watch",
     "test": "echo this package has no tests",
     "test-watch": "echo this package has no tests",
     "coverage": "echo this package has no coverage",
@@ -26,5 +24,19 @@
     "url": "git+https://github.com/isographlabs/isograph.git",
     "directory": "libs/isograph-disposable-types"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "module": "./dist/index.mjs",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "import": "./dist/index.mjs",
+        "require": "./dist/index.js"
+      },
+      "./package.json": "./package.json"
+    }
+  }
 }
