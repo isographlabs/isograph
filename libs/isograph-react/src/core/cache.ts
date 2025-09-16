@@ -437,6 +437,9 @@ function normalizeDataIntoRecord(
         break;
       }
       case 'InlineFragment': {
+        // if (normalizationNode.type === 'Node') {
+        //   normalizationNode.type = 'Pet';
+        // }
         const inlineFragmentResultedInChange = normalizeInlineFragment(
           environment,
           normalizationNode,
