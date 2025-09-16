@@ -177,10 +177,10 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             .network_protocol_associated_data
             .subtypes
             .iter()
-            .map(|name| format!("Link<\"{name}\">"))
+            .map(|name| format!("\n  | Link<\"{name}\">"))
             .collect::<Vec<_>>();
 
-        subtypes.join(" | ")
+        subtypes.join("")
     }
 
     fn generate_query_text<'a>(

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use common_lang_types::{
     GraphQLInterfaceTypeName, Location, SelectableName, ServerObjectEntityName,
@@ -50,7 +50,7 @@ pub fn process_graphql_type_system_document(
     // with e.g. interfaces "simply" being objects that can be refined to other
     // concrete objects.
 
-    let mut supertype_to_subtype_map = HashMap::new();
+    let mut supertype_to_subtype_map = BTreeMap::new();
 
     let mut scalars = vec![];
     let mut objects = vec![];
@@ -499,7 +499,7 @@ fn insert_into_type_refinement_map(
         .push(subtype_name);
 }
 
-type UnvalidatedTypeRefinementMap = HashMap<UnvalidatedTypeName, Vec<UnvalidatedTypeName>>;
+type UnvalidatedTypeRefinementMap = BTreeMap<UnvalidatedTypeName, Vec<UnvalidatedTypeName>>;
 
 fn implements_node(object_type_definition: &IsographObjectTypeDefinition) -> bool {
     object_type_definition

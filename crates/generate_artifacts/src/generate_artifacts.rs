@@ -33,13 +33,14 @@ use crate::{
     eager_reader_artifact::{
         generate_eager_reader_artifacts, generate_eager_reader_condition_artifact,
         generate_eager_reader_output_type_artifact, generate_eager_reader_param_type_artifact,
+        generate_link_output_type_artifact,
     },
     entrypoint_artifact::{
         generate_entrypoint_artifacts,
         generate_entrypoint_artifacts_with_client_field_traversal_result,
     },
     format_parameter_type::format_parameter_type,
-    import_statements::{LinkImports, ParamTypeImports, UpdatableImports},
+    import_statements::{ParamTypeImports, UpdatableImports},
     iso_overload_file::build_iso_overload_artifact,
     persisted_documents::PersistedDocuments,
     refetch_reader_artifact::{
@@ -413,7 +414,9 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 ))
             }
             SelectionType::Scalar(client_field) => match client_field.variant {
-                ClientFieldVariant::Link => None,
+                ClientFieldVariant::Link => {
+                    Some(generate_link_output_type_artifact(schema, client_field))
+                }
                 ClientFieldVariant::UserWritten(info) => {
                     Some(generate_eager_reader_output_type_artifact(
                         schema,
@@ -606,7 +609,6 @@ pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProt
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
-    link_fields: &mut LinkImports,
 ) -> ClientFieldParameterType {
     // TODO use unwraps
     let mut client_field_parameter_type = "{\n".to_string();
@@ -619,7 +621,6 @@ pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProt
             nested_client_field_imports,
             loadable_fields,
             indentation_level + 1,
-            link_fields,
         );
     }
     client_field_parameter_type.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
@@ -634,7 +635,6 @@ pub(crate) fn generate_client_field_updatable_data_type<TNetworkProtocol: Networ
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
-    link_fields: &mut LinkImports,
     updatable_fields: &mut UpdatableImports,
 ) -> ClientFieldUpdatableDataType {
     // TODO use unwraps
@@ -649,7 +649,6 @@ pub(crate) fn generate_client_field_updatable_data_type<TNetworkProtocol: Networ
             nested_client_field_imports,
             loadable_fields,
             indentation_level + 1,
-            link_fields,
             updatable_fields,
         );
     }
@@ -668,7 +667,6 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
-    link_fields: &mut LinkImports,
 ) {
     match &selection.item {
         SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
@@ -729,7 +727,6 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         nested_client_field_imports,
                         loadable_fields,
                         indentation_level,
-                        link_fields,
                         scalar_field_selection,
                         parent_object_entity_name,
                         client_field_name,
@@ -760,7 +757,6 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     nested_client_field_imports,
                     loadable_fields,
                     indentation_level,
-                    link_fields,
                 )
             });
 
@@ -793,7 +789,6 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
     nested_client_field_imports: &mut BTreeSet<ParentObjectEntityNameAndSelectableName>,
     loadable_fields: &mut BTreeSet<ParentObjectEntityNameAndSelectableName>,
     indentation_level: u8,
-    link_fields: &mut bool,
     scalar_field_selection: &ScalarSelection<ScalarSelectableId>,
     parent_object_entity_name: ServerObjectEntityName,
     client_field_name: ClientScalarSelectableName,
@@ -811,19 +806,9 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
     );
     query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
     match client_field.variant {
-        ClientFieldVariant::Link => {
-            *link_fields = true;
-            let output_type =
-                TNetworkProtocol::generate_link_type(schema, &parent_object_entity_name);
-            query_type_declaration.push_str(
-                &(format!(
-                    "readonly {}: {},\n",
-                    scalar_field_selection.name_or_alias().item,
-                    output_type
-                )),
-            );
-        }
-        ClientFieldVariant::UserWritten(_) | ClientFieldVariant::ImperativelyLoadedField(_) => {
+        ClientFieldVariant::Link
+        | ClientFieldVariant::UserWritten(_)
+        | ClientFieldVariant::ImperativelyLoadedField(_) => {
             nested_client_field_imports.insert(client_field.type_and_field);
             let inner_output_type = format!(
                 "{}__output_type",
@@ -880,7 +865,6 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
-    link_fields: &mut LinkImports,
     updatable_fields: &mut UpdatableImports,
 ) {
     match &selection.item {
@@ -954,7 +938,6 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         nested_client_field_imports,
                         loadable_fields,
                         indentation_level,
-                        link_fields,
                         scalar_field_selection,
                         parent_object_entity_name,
                         client_field_id,
@@ -985,7 +968,6 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     nested_client_field_imports,
                     loadable_fields,
                     indentation_level,
-                    link_fields,
                     updatable_fields,
                 )
             });
@@ -994,7 +976,6 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 ObjectSelectionDirectiveSet::Updatable(_) => {
                     *updatable_fields = true;
                     write_getter_and_setter(
-                        schema,
                         query_type_declaration,
                         indentation_level,
                         name_or_alias,
@@ -1014,8 +995,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn write_getter_and_setter<TNetworkProtocol: NetworkProtocol>(
-    schema: &Schema<TNetworkProtocol>,
+fn write_getter_and_setter(
     query_type_declaration: &mut String,
     indentation_level: u8,
     name_or_alias: SelectableNameOrAlias,
@@ -1031,10 +1011,7 @@ fn write_getter_and_setter<TNetworkProtocol: NetworkProtocol>(
         output_type_annotation
             .clone()
             .map(&mut |server_object_entity_name| {
-                format!(
-                    "{{ link: {} }}",
-                    TNetworkProtocol::generate_link_type(schema, &server_object_entity_name)
-                )
+                format!("{{ link: {server_object_entity_name}__link__output_type }}")
             });
     query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
     query_type_declaration.push_str(&format!(
