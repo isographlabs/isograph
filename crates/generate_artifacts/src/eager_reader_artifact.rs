@@ -14,13 +14,13 @@ use isograph_schema::{RefetchedPathsMap, UserWrittenClientTypeInfo};
 
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
+use crate::generate_artifacts::ClientFieldOutputType;
 use crate::{
     generate_artifacts::{
-        ClientFieldFunctionImportStatement, ClientFieldOutputType, RESOLVER_OUTPUT_TYPE,
-        RESOLVER_OUTPUT_TYPE_FILE_NAME, RESOLVER_PARAM_TYPE, RESOLVER_PARAM_TYPE_FILE_NAME,
-        RESOLVER_PARAMETERS_TYPE_FILE_NAME, RESOLVER_READER_FILE_NAME,
-        generate_client_field_parameter_type, generate_client_field_updatable_data_type,
-        generate_output_type, generate_parameters, print_javascript_type_declaration,
+        ClientFieldFunctionImportStatement, RESOLVER_OUTPUT_TYPE, RESOLVER_OUTPUT_TYPE_FILE_NAME,
+        RESOLVER_PARAM_TYPE, RESOLVER_PARAM_TYPE_FILE_NAME, RESOLVER_PARAMETERS_TYPE_FILE_NAME,
+        RESOLVER_READER_FILE_NAME, generate_client_field_parameter_type,
+        generate_client_field_updatable_data_type, generate_output_type, generate_parameters,
     },
     import_statements::{
         param_type_imports_to_import_param_statement, param_type_imports_to_import_statement,
@@ -374,14 +374,8 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
         generate_function_import_statement(config, info, file_extensions);
 
     let client_field_output_type = match client_field {
-        SelectionType::Object(client_pointer) => {
-            ClientFieldOutputType(print_javascript_type_declaration(
-                &client_pointer.target_object_entity_name.clone().map(
-                    &mut |target_object_entity_name| {
-                        TNetworkProtocol::generate_link_type(schema, &target_object_entity_name)
-                    },
-                ),
-            ))
+        SelectionType::Object(_) => {
+            ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
         }
         SelectionType::Scalar(client_field) => generate_output_type(schema, client_field),
     };
@@ -395,21 +389,16 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
         client_field_output_type
     );
 
-    let final_output_type_text = if let SelectionType::Object(_) = client_field {
-        format!(
-            "import type {{ Link }} \
+    let final_output_type_text =
+        if let ClientFieldDirectiveSet::None(_) = info.client_field_directive_set {
+            output_type_text
+        } else {
+            format!(
+                "import type {{ ExtractSecondParam, CombineWithIntrinsicAttributes }} \
                 from '@isograph/react';\n\
                 {output_type_text}\n",
-        )
-    } else if let ClientFieldDirectiveSet::None(_) = info.client_field_directive_set {
-        output_type_text
-    } else {
-        format!(
-            "import type {{ ExtractSecondParam, CombineWithIntrinsicAttributes }} \
-                from '@isograph/react';\n\
-                {output_type_text}\n",
-        )
-    };
+            )
+        };
 
     ArtifactPathAndContent {
         file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
