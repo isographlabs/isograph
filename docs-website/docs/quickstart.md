@@ -142,20 +142,26 @@ import {
   createIsographEnvironment,
   createIsographStore,
   IsographEnvironmentProvider,
+  type IsographOperation,
+  type IsographPersistedOperation,
 } from '@isograph/react';
 import type { AppProps } from 'next/app';
 import { Suspense, useMemo } from 'react';
 
 function makeNetworkRequest<T>(
-  queryText: string,
+  operation: IsographOperation | IsographPersistedOperation,
   variables: unknown,
 ): Promise<T> {
+  if (operation.kind !== 'Operation') {
+    throw new Error('Persisted operations not supported.');
+  }
+
   const promise = fetch('https://graphql.org/graphql/', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ query: queryText, variables }),
+    body: JSON.stringify({ query: operation.text, variables }),
   }).then(async (response) => {
     const json = await response.json();
 
