@@ -1,7 +1,7 @@
 import type { StoreLink } from './IsographEnvironment';
 import type { ReaderAst, ReaderLinkedField, ReaderScalarField } from './reader';
 
-export function mergeUsingReaderAst(
+function mergeUsingReaderAst(
   field: ReaderScalarField | ReaderLinkedField,
   oldItem: unknown,
   newItem: unknown,
@@ -40,7 +40,7 @@ export function mergeUsingReaderAst(
   }
 }
 
-export function mergeArraysUsingReaderAst(
+function mergeArraysUsingReaderAst(
   field: ReaderScalarField | ReaderLinkedField,
   oldItems: ReadonlyArray<unknown>,
   newItems: Array<unknown>,
