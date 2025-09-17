@@ -108,7 +108,7 @@ module.exports = {
 ```
 
 :::note
-You can also use `swc`! See [this file](https://github.com/isographlabs/isograph/blob/7459c36ddd0c49b5386a7078db278ab84d5f9c83/demos/pet-demo/next.config.js#L7-L16). A good first issue would be actually publishing the swc plugin 😊
+You can also use `swc`! See [this next config](https://github.com/isographlabs/quickstart/blob/master/next.config.mjs). Our SWC plugin works with NextJS v15.0.0 - v15.0.2
 :::
 
 ## Download the schema
