@@ -1,4 +1,3 @@
-
   x Invalid iso tag usage. Expected 'entrypoint', 'field' or 'pointer'.
    ,-[input.js:1:1]
  1 | ,-> export const HomeRoute = iso(`
