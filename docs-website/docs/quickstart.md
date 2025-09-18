@@ -4,12 +4,6 @@ import DataTypeSrc from './assets/data-type.png';
 
 In this quickstart guide, we will create a new NextJS project and add Isograph to it. Then we'll use the free and publicly available Star Wars GraphQL API.
 
-:::warning
-
-The publicly available Star Wars API seems to be down, and has been for a few weeks. Hopefully that changes! In the mean time, try it out with your own GraphQL API, or check out [this repository](https://github.com/rbalicki2/follow-the-money).
-
-:::
-
 You can view the end result of following this quickstart guide in [this repository](https://github.com/isographlabs/quickstart).
 
 :::tip
