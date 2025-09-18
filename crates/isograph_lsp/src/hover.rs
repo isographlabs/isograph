@@ -274,7 +274,8 @@ fn hover_text_for_selectable(
     parent_description: Option<Description>,
 ) -> String {
     let parent_description = parent_description
-        .map(|x| x.to_string())
+        // Only show the colon if the description exists
+        .map(|x| format!(": {x}"))
         .unwrap_or_default();
     let selectable_description = selectable_description
         .map(|x| x.to_string())
@@ -298,6 +299,6 @@ fn hover_text_for_selectable(
         \n\
         {selectable_description}\n\
         \n\
-        **{parent_type_name}**: {parent_description}",
+        **{parent_type_name}**{parent_description}",
     )
 }
