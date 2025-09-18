@@ -32,16 +32,10 @@ This will install a NextJS app in this folder. Run it with `npm run dev`.
 ## Install the compiler, Babel plugin and runtime
 
 ```sh
-# We are installing a recently published main version. Old versions won't work
-# with the VSCode extension!
-yarn add --dev @isograph/compiler@0.0.0-main-620f4c6f
-yarn add --dev @isograph/babel-plugin@0.0.0-main-620f4c6f
-yarn add @isograph/react@0.0.0-main-620f4c6f
+yarn add --dev @isograph/compiler
+yarn add --dev @isograph/babel-plugin
+yarn add @isograph/react
 ```
-
-:::tip
-For each of these packages, you should install the latest version tagged with the `main` tag (**not the `deploy` tag**), which can be found [here](https://www.npmjs.com/package/@isograph/react?activeTab=versions). So e.g. `yarn add --dev @isograph/compiler@0.0.0-main-620f4c6f`. Lots of great features have shipped since we cut a release! And the language server will do nothing without a new release!
-:::
 
 Installing the compiler also adds the command `yarn iso` and `yarn iso --watch`. But hang tight — before this command works, you'll need to create a folder, download your schema and create an `isograph.config.json` file!
 
