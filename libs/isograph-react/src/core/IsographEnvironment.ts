@@ -31,7 +31,7 @@ export type FragmentSubscription<TReadFromStore extends UnknownTReadFromStore> =
       newEncounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
     ) => void;
     /** The value read out from the previous call to readButDoNotEvaluate */
-    readonly encounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>;
+    encounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>;
     readonly fragmentReference: FragmentReference<TReadFromStore, any>;
     readonly readerAst: ReaderAst<TReadFromStore>;
   };

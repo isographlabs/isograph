@@ -330,6 +330,8 @@ export function callSubscriptions(
 
             if (mergedItem !== subscription.encounteredDataAndRecords.item) {
               subscription.callback(newEncounteredDataAndRecords);
+              subscription.encounteredDataAndRecords =
+                newEncounteredDataAndRecords;
             }
           }
           return;
