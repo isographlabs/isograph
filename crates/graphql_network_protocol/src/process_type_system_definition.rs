@@ -350,7 +350,9 @@ fn process_object_type_definition(
     ProcessObjectTypeDefinitionOutcome<GraphQLNetworkProtocol>,
     Vec<GraphQLDirective<GraphQLConstantValue>>,
 )> {
-    let object_implements_node = implements_node(&object_type_definition);
+    let should_add_refetch_field = type_definition_type.is_concrete()
+        && type_definition_type.is_output_type()
+        && type_implements_node(&object_type_definition);
     let server_object_entity = ServerObjectEntity {
         description: object_type_definition.description.map(|d| d.item),
         name: object_type_definition.name,
@@ -404,7 +406,7 @@ fn process_object_type_definition(
         ));
     }
 
-    if object_implements_node {
+    if should_add_refetch_field {
         refetch_fields.push(ExposeAsFieldToInsert {
             expose_field_directive: ExposeFieldDirective {
                 expose_as: Some(*REFETCH_FIELD_NAME),
@@ -486,6 +488,24 @@ impl GraphQLObjectDefinitionType {
             GraphQLObjectDefinitionType::Interface => true,
         }
     }
+
+    pub fn is_concrete(&self) -> bool {
+        match self {
+            GraphQLObjectDefinitionType::InputObject => true,
+            GraphQLObjectDefinitionType::Union => false,
+            GraphQLObjectDefinitionType::Object => true,
+            GraphQLObjectDefinitionType::Interface => false,
+        }
+    }
+
+    pub fn is_output_type(&self) -> bool {
+        match self {
+            GraphQLObjectDefinitionType::InputObject => false,
+            GraphQLObjectDefinitionType::Union => true,
+            GraphQLObjectDefinitionType::Object => true,
+            GraphQLObjectDefinitionType::Interface => true,
+        }
+    }
 }
 
 fn insert_into_type_refinement_map(
@@ -501,7 +521,7 @@ fn insert_into_type_refinement_map(
 
 type UnvalidatedTypeRefinementMap = BTreeMap<UnvalidatedTypeName, Vec<UnvalidatedTypeName>>;
 
-fn implements_node(object_type_definition: &IsographObjectTypeDefinition) -> bool {
+fn type_implements_node(object_type_definition: &IsographObjectTypeDefinition) -> bool {
     object_type_definition
         .interfaces
         .iter()

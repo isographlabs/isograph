@@ -93,10 +93,18 @@ type Checkin implements ICheckin {
 }
 
 """
+This is an interface that exists solely to ensure that interfaces implementing interfaces
+continues to work
+"""
+type IFoo {
+  location: String!
+}
+
+"""
 This interface exists solely allow make_checkin_super to
 return an interface
 """
-interface ICheckin {
+interface ICheckin implements Node {
   id: ID!
   location: String!
   time: String!
