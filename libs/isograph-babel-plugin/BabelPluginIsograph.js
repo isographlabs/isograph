@@ -11,14 +11,6 @@ const configExplorer = cosmiconfig('isograph', {
 });
 /** @type {NonNullable<import("cosmiconfig").CosmiconfigResult>} */
 let IsographConfig;
-const result = configExplorer.searchSync();
-if (result) {
-  IsographConfig = result;
-} else {
-  throw new Error(
-    'No config found. Do you have a isograph.config.json file somewhere?',
-  );
-}
 
 /** @typedef {import("@babel/core")} babel*/
 
@@ -28,9 +20,24 @@ if (result) {
  * */
 
 /**
+ * @typedef {Object} Options
+ * @property  {string} [searchFrom]
+ * */
+
+/**
  * @param {Context} context
+ * @param {Options} options
  * @returns {babel.PluginObj} */
-module.exports = function BabelPluginIsograph(context) {
+module.exports = function BabelPluginIsograph(context, options) {
+  const result = configExplorer.searchSync(options.searchFrom);
+  if (result) {
+    IsographConfig = result;
+  } else {
+    throw new Error(
+      'No config found. Do you have a isograph.config.json file somewhere?',
+    );
+  }
+
   const { types } = context;
   if (!types) {
     throw new Error(
