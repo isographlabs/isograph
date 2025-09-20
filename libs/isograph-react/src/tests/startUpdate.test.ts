@@ -14,26 +14,35 @@ import type { Query__startUpdate__param } from './__isograph/Query/startUpdate/p
 const getDefaultStore = (): IsographStore => ({
   Query: {
     [ROOT_ID]: {
-      node____id___0: {
-        __link: '0',
-        __typename: 'Economist',
-      },
-      node____id___1: {
-        __link: '1',
-        __typename: 'Economist',
+      errors: {},
+      record: {
+        node____id___0: {
+          __link: '0',
+          __typename: 'Economist',
+        },
+        node____id___1: {
+          __link: '1',
+          __typename: 'Economist',
+        },
       },
     },
   },
   Economist: {
     0: {
-      __typename: 'Economist',
-      id: '0',
-      name: 'Jeremy Bentham',
+      errors: {},
+      record: {
+        __typename: 'Economist',
+        id: '0',
+        name: 'Jeremy Bentham',
+      },
     },
     1: {
-      __typename: 'Economist',
-      id: '1',
-      name: 'John Stuart Mill',
+      errors: {},
+      record: {
+        __typename: 'Economist',
+        id: '1',
+        name: 'John Stuart Mill',
+      },
     },
   },
 });
@@ -103,7 +112,10 @@ describe('startUpdate', () => {
       expect(environment.store).toMatchObject({
         Economist: {
           '0': {
-            name: 'Updated Jeremy Bentham',
+            errors: {},
+            record: {
+              name: 'Updated Jeremy Bentham',
+            },
           },
         },
       });
@@ -129,14 +141,20 @@ describe('startUpdate', () => {
       expect(environment.store).toMatchObject({
         Economist: {
           '0': {
-            name: 'Updated Jeremy Bentham',
+            errors: {},
+            record: {
+              name: 'Updated Jeremy Bentham',
+            },
           },
         },
         Query: {
           __ROOT: {
-            node____id___0: {
-              __link: '1',
-              __typename: 'Economist',
+            errors: {},
+            record: {
+              node____id___0: {
+                __link: '1',
+                __typename: 'Economist',
+              },
             },
           },
         },
@@ -184,7 +202,10 @@ describe('startUpdate', () => {
       expect(environment.store).toMatchObject({
         Economist: {
           0: {
-            name: 'Foo',
+            errors: {},
+            record: {
+              name: 'Foo',
+            },
           },
         },
       });
