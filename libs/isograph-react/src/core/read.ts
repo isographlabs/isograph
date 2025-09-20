@@ -23,10 +23,10 @@ import {
   getOrLoadIsographArtifact,
   IsographEnvironment,
   type DataTypeValue,
-  type PayloadError,
+  type PayloadErrors,
   type StoreLink,
   type StoreRecord,
-  type WithErrors,
+  type WithErrors
 } from './IsographEnvironment';
 import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
@@ -53,7 +53,7 @@ import { Arguments } from './util';
 export type WithEncounteredRecords<T> = {
   readonly encounteredRecords: EncounteredIds;
   readonly item: ExtractData<T>;
-  readonly errors: PayloadError[];
+  readonly errors: PayloadErrors | null;
 };
 
 export function readButDoNotEvaluate<
@@ -131,7 +131,7 @@ export function readButDoNotEvaluate<
 export type ReadDataResultSuccess<Data> = {
   readonly kind: 'Success';
   readonly data: Data;
-  readonly errors: PayloadError[];
+  readonly errors: PayloadErrors | null;
 };
 
 type ReadDataResultError = {
@@ -173,13 +173,13 @@ function readData<TReadFromStore>(
     return {
       kind: 'Success',
       data: null as any,
-      errors: [],
+      errors: null,
     };
   }
 
   let target: { [index: string]: any } = {};
 
-  const errors: PayloadError[] = [];
+  let errors: PayloadErrors | null = null;
   for (const field of ast) {
     switch (field.kind) {
       case 'Scalar': {
@@ -188,7 +188,11 @@ function readData<TReadFromStore>(
         if (data.kind === 'MissingData') {
           return data;
         }
-        errors.push(...data.errors);
+        if (errors === null) {
+          errors = data.errors;
+        } else if (data.errors) {
+          errors.push(...data.errors);
+        }
         target[field.alias ?? field.fieldName] = data.data;
         break;
       }
@@ -221,7 +225,11 @@ function readData<TReadFromStore>(
         if (data.kind === 'MissingData') {
           return data;
         }
-        errors.push(...data.errors);
+        if (errors === null) {
+          errors = data.errors;
+        } else if (data.errors) {
+          errors.push(...data.errors);
+        }
         target[field.alias ?? field.fieldName] = data.data;
         break;
       }
@@ -239,7 +247,11 @@ function readData<TReadFromStore>(
         if (data.kind === 'MissingData') {
           return data;
         }
-        errors.push(...data.errors);
+        if (errors === null) {
+          errors = data.errors;
+        } else if (data.errors) {
+          errors.push(...data.errors);
+        }
         target[field.alias] = data.data;
         break;
       }
@@ -257,7 +269,11 @@ function readData<TReadFromStore>(
         if (data.kind === 'MissingData') {
           return data;
         }
-        errors.push(...data.errors);
+        if (errors === null) {
+          errors = data.errors;
+        } else if (data.errors) {
+          errors.push(...data.errors);
+        }
         target[field.alias] = data.data;
         break;
       }
@@ -274,7 +290,11 @@ function readData<TReadFromStore>(
         if (data.kind === 'MissingData') {
           return data;
         }
-        errors.push(...data.errors);
+        if (errors === null) {
+          errors = data.errors;
+        } else if (data.errors) {
+          errors.push(...data.errors);
+        }
         target[field.alias] = data.data;
         break;
       }
@@ -624,7 +644,7 @@ export function readResolverFieldData(
     case 'ComponentReaderArtifact': {
       return {
         kind: 'Success',
-        errors: [],
+        errors: null,
         data: getOrCreateCachedComponent(
           environment,
           field.readerArtifact.fieldName,
@@ -652,9 +672,9 @@ export function readScalarFieldData(
   const storeRecordName = getParentRecordKey(field, variables);
   const value = storeRecord.record[storeRecordName];
 
-  const errors: PayloadError[] = [];
+  let errors: PayloadErrors | null = null;
   if (storeRecord.errors[storeRecordName] && value === null) {
-    errors.push(...storeRecord.errors[storeRecordName]);
+    errors = storeRecord.errors[storeRecordName];
   }
 
   // TODO consider making scalars into discriminated unions. This probably has
@@ -693,10 +713,7 @@ export function readLinkedFieldData(
   const storeRecordName = getParentRecordKey(field, variables);
   const value = storeRecord.record[storeRecordName];
 
-  const errors: PayloadError[] = [];
-  if (storeRecord.errors[storeRecordName] && value === null) {
-    errors.push(...storeRecord.errors[storeRecordName]);
-  }
+  let errors: PayloadErrors | null = null;
 
   if (Array.isArray(value)) {
     const results = [];
@@ -734,7 +751,11 @@ export function readLinkedFieldData(
           recordLink: result.recordLink,
         };
       }
-      errors.push(...result.errors);
+      if (errors === null) {
+        errors = result.errors;
+      } else if (result.errors) {
+        errors.push(...result.errors);
+      }
       results.push(result.data);
     }
     return {
@@ -758,9 +779,13 @@ export function readLinkedFieldData(
         recordLink: data.recordLink,
       };
     }
-    errors.push(...data.errors);
+    if (errors === null) {
+      errors = data.errors;
+    } else if (data.errors) {
+      errors.push(...data.errors);
+    }
 
-    if (data.errors.length < 1 && refetchQueryIndex === null) {
+    if (refetchQueryIndex === null || data.errors === null) {
       // we can't call `condition.resolver` for client pointers when there are errors,
       // for inline fragment this is fine
 
@@ -841,6 +866,9 @@ export function readLinkedFieldData(
       link = altLink;
     }
   } else if (link === null) {
+    if (storeRecord.errors[storeRecordName]) {
+      errors = storeRecord.errors[storeRecordName];
+    }
     return {
       kind: 'Success',
       data: null,
@@ -874,7 +902,11 @@ export function readLinkedFieldData(
         recordLink: refetchReaderParams.recordLink,
       };
     }
-    errors.push(...refetchReaderParams.errors);
+    if (errors === null) {
+      errors = refetchReaderParams.errors;
+    } else if (refetchReaderParams.errors) {
+      errors.push(...refetchReaderParams.errors);
+    }
 
     const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
     if (refetchQuery == null) {
@@ -962,7 +994,15 @@ export function readLinkedFieldData(
       recordLink: data.recordLink,
     };
   }
-  return { ...data, errors: errors.concat(data.errors) };
+  if (errors === null) {
+    errors = data.errors;
+  } else if (data.errors) {
+    errors.push(...data.errors);
+  }
+  return {
+    ...data,
+    errors: errors,
+  };
 }
 
 export type NetworkRequestReaderOptions = {

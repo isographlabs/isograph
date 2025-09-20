@@ -40,7 +40,7 @@ export function useReadAndSubscribe<
     setReadOutDataAndRecords,
     readerAst,
   );
-  if (readOutDataAndRecords.errors.length) {
+  if (readOutDataAndRecords.errors) {
     const errors = readOutDataAndRecords.errors.map(
       (error) => new GraphqlError(error),
     );
