@@ -8,7 +8,7 @@ pub trait DynEq: Any {
 
 impl<T> DynEq for T
 where
-    T: Any + Eq,
+    T: Any + PartialEq,
 {
     fn as_any(&self) -> &dyn Any {
         self
@@ -29,12 +29,6 @@ where
 impl PartialEq<dyn DynEq> for dyn DynEq {
     fn eq(&self, other: &dyn DynEq) -> bool {
         self.dyn_eq(other)
-    }
-}
-
-impl PartialEq<&Self> for Box<dyn DynEq> {
-    fn eq(&self, other: &&Self) -> bool {
-        <Self as PartialEq>::eq(self, *other)
     }
 }
 
