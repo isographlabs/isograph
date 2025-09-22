@@ -261,6 +261,7 @@ export function onNextChangeToRecord(
 // updating other subscriptions if one subscription had missing data.
 function withErrorHandling<T>(
   environment: IsographEnvironment,
+  context: any,
   f: (t: T) => void,
 ): (t: T) => void {
   return (t) => {
@@ -270,6 +271,7 @@ function withErrorHandling<T>(
       logMessage(environment, () => ({
         kind: 'ErrorEncounteredInWithErrorHandling',
         error: e,
+        context,
       }));
     }
   };
@@ -280,84 +282,102 @@ export function callSubscriptions(
   recordsEncounteredWhenNormalizing: EncounteredIds,
 ) {
   environment.subscriptions.forEach(
-    withErrorHandling(environment, (subscription) => {
-      switch (subscription.kind) {
-        case 'FragmentSubscription': {
-          // TODO if there are multiple components subscribed to the same
-          // fragment, we will call readButNotEvaluate multiple times. We
-          // should fix that.
-          if (
-            hasOverlappingIds(
-              recordsEncounteredWhenNormalizing,
-              subscription.encounteredDataAndRecords.encounteredRecords,
-            )
-          ) {
-            const newEncounteredDataAndRecords = readButDoNotEvaluate(
-              environment,
-              subscription.fragmentReference,
-              // Is this wrong?
-              // Reasons to think no:
-              // - we are only updating the read-out value, and the network
-              //   options only affect whether we throw.
-              // - the component will re-render, and re-throw on its own, anyway.
-              //
-              // Reasons to think not:
-              // - it seems more efficient to suspend here and not update state,
-              //   if we expect that the component will just throw anyway
-              // - consistency
-              // - it's also weird, this is called from makeNetworkRequest, where
-              //   we don't currently pass network request options
-              {
-                suspendIfInFlight: false,
-                throwOnNetworkError: false,
-              },
-            );
+    withErrorHandling(
+      environment,
+      { situation: 'calling subscriptions' },
+      (subscription) => {
+        switch (subscription.kind) {
+          case 'FragmentSubscription': {
+            // TODO if there are multiple components subscribed to the same
+            // fragment, we will call readButNotEvaluate multiple times. We
+            // should fix that.
+            if (
+              hasOverlappingIds(
+                recordsEncounteredWhenNormalizing,
+                subscription.encounteredDataAndRecords.encounteredRecords,
+              )
+            ) {
+              const newEncounteredDataAndRecords = readButDoNotEvaluate(
+                environment,
+                subscription.fragmentReference,
+                // Is this wrong?
+                // Reasons to think no:
+                // - we are only updating the read-out value, and the network
+                //   options only affect whether we throw.
+                // - the component will re-render, and re-throw on its own, anyway.
+                //
+                // Reasons to think not:
+                // - it seems more efficient to suspend here and not update state,
+                //   if we expect that the component will just throw anyway
+                // - consistency
+                // - it's also weird, this is called from makeNetworkRequest, where
+                //   we don't currently pass network request options
+                {
+                  suspendIfInFlight: false,
+                  throwOnNetworkError: false,
+                },
+              );
 
-            const mergedItem = mergeObjectsUsingReaderAst(
-              subscription.readerAst,
-              subscription.encounteredDataAndRecords.item,
-              newEncounteredDataAndRecords.item,
-            );
+              const mergedItem = mergeObjectsUsingReaderAst(
+                subscription.readerAst,
+                subscription.encounteredDataAndRecords.item,
+                newEncounteredDataAndRecords.item,
+              );
 
-            logMessage(environment, () => ({
-              kind: 'DeepEqualityCheck',
-              fragmentReference: subscription.fragmentReference,
-              old: subscription.encounteredDataAndRecords.item,
-              new: newEncounteredDataAndRecords.item,
-              deeplyEqual:
-                mergedItem === subscription.encounteredDataAndRecords.item,
-            }));
+              logMessage(environment, () => ({
+                kind: 'DeepEqualityCheck',
+                fragmentReference: subscription.fragmentReference,
+                old: subscription.encounteredDataAndRecords.item,
+                new: newEncounteredDataAndRecords.item,
+                deeplyEqual:
+                  mergedItem === subscription.encounteredDataAndRecords.item,
+              }));
 
-            if (mergedItem !== subscription.encounteredDataAndRecords.item) {
-              subscription.callback(newEncounteredDataAndRecords);
-              subscription.encounteredDataAndRecords =
-                newEncounteredDataAndRecords;
+              if (mergedItem !== subscription.encounteredDataAndRecords.item) {
+                withErrorHandling(
+                  environment,
+                  { situation: 'calling FragmentSubscription callback' },
+                  () => {
+                    subscription.callback(newEncounteredDataAndRecords);
+                  },
+                );
+                subscription.encounteredDataAndRecords =
+                  newEncounteredDataAndRecords;
+              }
             }
+            return;
           }
-          return;
-        }
-        case 'AnyRecords': {
-          subscription.callback();
-          return;
-        }
-        case 'AnyChangesToRecord': {
-          if (
-            recordsEncounteredWhenNormalizing
-              .get(subscription.recordLink.__typename)
-              ?.has(subscription.recordLink.__link)
-          ) {
-            subscription.callback();
+          case 'AnyRecords': {
+            withErrorHandling(
+              environment,
+              { situation: 'calling AnyRecords callback' },
+              () => subscription.callback(),
+            );
+            return;
           }
-          return;
+          case 'AnyChangesToRecord': {
+            if (
+              recordsEncounteredWhenNormalizing
+                .get(subscription.recordLink.__typename)
+                ?.has(subscription.recordLink.__link)
+            ) {
+              withErrorHandling(
+                environment,
+                { situation: 'calling AnyChangesToRecord callback' },
+                () => subscription.callback(),
+              );
+            }
+            return;
+          }
+          default: {
+            // Ensure we have covered all variants
+            const _: never = subscription;
+            _;
+            throw new Error('Unexpected case');
+          }
         }
-        default: {
-          // Ensure we have covered all variants
-          const _: never = subscription;
-          _;
-          throw new Error('Unexpected case');
-        }
-      }
-    }),
+      },
+    ),
   );
 }
 
