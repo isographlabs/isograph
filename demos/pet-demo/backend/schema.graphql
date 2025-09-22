@@ -86,7 +86,7 @@ type PetStats {
   energy: Int
 }
 
-type Checkin implements ICheckin {
+type Checkin implements ICheckin & Node {
   id: ID!
   location: String!
   time: String!
