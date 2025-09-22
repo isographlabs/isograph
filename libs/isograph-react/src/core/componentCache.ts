@@ -53,7 +53,8 @@ export function getOrCreateCachedComponent(
         additionalRuntimeProps,
       );
     }
-    Component.displayName = `${componentName} (id: ${fragmentReference.root}) @component`;
+    const idString = `(type: ${fragmentReference.root.__typename}, id: ${fragmentReference.root.__link})`;
+    Component.displayName = `${componentName} ${idString} @component`;
     return Component;
   })());
 }
