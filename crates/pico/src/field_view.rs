@@ -6,16 +6,16 @@ pub trait Counter: Singleton + Default + Copy + Eq + 'static {
     fn increment(self) -> Self;
 }
 
-pub type Projector<Db, T> = for<'a> fn(&'a Db) -> &'a T;
+pub type FieldProjector<Db, T> = for<'a> fn(&'a Db) -> &'a T;
 
-pub struct View<'a, Db: Database, T, C: Counter> {
+pub struct FieldView<'a, Db: Database, T, C: Counter> {
     db: &'a Db,
-    projector: Projector<Db, T>,
+    projector: FieldProjector<Db, T>,
     phantom: PhantomData<C>,
 }
 
-impl<'a, Db: Database, T, C: Counter> View<'a, Db, T, C> {
-    pub fn new(db: &'a Db, projector: Projector<Db, T>) -> Self {
+impl<'a, Db: Database, T, C: Counter> FieldView<'a, Db, T, C> {
+    pub fn new(db: &'a Db, projector: FieldProjector<Db, T>) -> Self {
         Self {
             db,
             projector,
@@ -44,16 +44,16 @@ impl<'a, Db: Database, T, C: Counter> View<'a, Db, T, C> {
     }
 }
 
-pub type ProjectorMut<Db, T> = for<'a> fn(&'a mut Db) -> &'a mut T;
+pub type FieldProjectorMut<Db, T> = for<'a> fn(&'a mut Db) -> &'a mut T;
 
-pub struct MutView<'a, Db: Database, T, C: Counter> {
+pub struct FieldViewMut<'a, Db: Database, T, C: Counter> {
     db: &'a mut Db,
-    projector: ProjectorMut<Db, T>,
+    projector: FieldProjectorMut<Db, T>,
     phantom: PhantomData<C>,
 }
 
-impl<'a, Db: Database, T, C: Counter> MutView<'a, Db, T, C> {
-    pub fn new(db: &'a mut Db, projector: ProjectorMut<Db, T>) -> Self {
+impl<'a, Db: Database, T, C: Counter> FieldViewMut<'a, Db, T, C> {
+    pub fn new(db: &'a mut Db, projector: FieldProjectorMut<Db, T>) -> Self {
         Self {
             db,
             projector,

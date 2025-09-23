@@ -74,7 +74,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         let mut graphql_root_types = None;
 
         let (type_system_document, type_system_extension_documents) =
-            parse_graphql_schema(db).to_owned()?;
+            parse_graphql_schema(db).try_ok()?.split();
 
         let (mut result, mut directives, mut refetch_fields) =
             process_graphql_type_system_document(
