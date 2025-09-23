@@ -8,6 +8,7 @@ license.workspace = true
 intern = { path = "../../relay-crates/intern" }
 pico_macros = { path = "../pico_macros" }
 u64_newtypes = { path = "../u64_newtypes" }
+bincode = { workspace = true }
 boxcar = { workspace = true }
 dashmap = { workspace = true }
 lru = { workspace = true }

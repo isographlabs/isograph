@@ -12,6 +12,7 @@ mod memo_ref;
 mod retained_query;
 mod source;
 mod view;
+mod with_serialize;
 
 pub use database::*;
 pub use derived_node::*;
@@ -22,3 +23,4 @@ pub use memo_ref::*;
 pub use retained_query::*;
 pub use source::*;
 pub use view::*;
+pub use with_serialize::*;
