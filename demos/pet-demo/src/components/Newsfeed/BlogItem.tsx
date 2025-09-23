@@ -29,9 +29,8 @@ export const BlogItem = iso(`
   const isIntersectingRef = useRef(null);
   useOnScreen(isIntersectingRef, onVisible);
 
-  const { fragmentReference, loadField } = useImperativeLoadableField(
-    blogItem.BlogItemMoreDetail,
-  );
+  const { fragmentReference, loadFragmentReference } =
+    useImperativeLoadableField(blogItem.BlogItemMoreDetail);
 
   return (
     <Card variant="outlined" ref={isIntersectingRef}>
@@ -49,7 +48,7 @@ export const BlogItem = iso(`
           {fragmentReference !== null ? (
             <FragmentRenderer fragmentReference={fragmentReference} />
           ) : (
-            <Button variant="contained" onClick={() => loadField()}>
+            <Button variant="contained" onClick={() => loadFragmentReference()}>
               Load more content...
             </Button>
           )}

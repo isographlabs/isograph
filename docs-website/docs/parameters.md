@@ -46,12 +46,11 @@ export const BlogItem = iso(`
     BlogItemMoreDetail @loadable(lazyLoadArtifact: true)
   }
 `)(({ data: blogItem }) => {
-  const { fragmentReference, loadField } = useImperativeLoadableField(
-    blogItem.BlogItemMoreDetail,
-  );
+  const { fragmentReference, loadFragmentReference } =
+    useImperativeLoadableField(blogItem.BlogItemMoreDetail);
 
   const loadBlogItem = () =>
-    loadField({
+    loadFragmentReference({
       // now, includeImages must be passed here:
       includeImages: true,
     });

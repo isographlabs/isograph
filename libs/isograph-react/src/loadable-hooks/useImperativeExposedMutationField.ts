@@ -1,5 +1,5 @@
 export type UseImperativeLoadableFieldReturn<TArgs> = {
-  loadField: (args: TArgs) => void;
+  loadFragmentReference: (args: TArgs) => void;
 };
 
 // Note: this function doesn't seem to work if there are additional arguments,
@@ -9,7 +9,7 @@ export function useImperativeExposedMutationField<TArgs>(
   exposedField: (args: TArgs) => [string, () => void],
 ): UseImperativeLoadableFieldReturn<TArgs> {
   return {
-    loadField: (args: TArgs) => {
+    loadFragmentReference: (args: TArgs) => {
       const [_id, loader] = exposedField(args);
       loader();
     },

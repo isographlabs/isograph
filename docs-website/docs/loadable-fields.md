@@ -139,16 +139,15 @@ export const BlogPostDisplay = iso(`
     BlogBody @loadable(lazyLoadArtifact: true)
   }
 `)((blogPost) => {
-  const { fragmentReference, loadField } = useImperativeLoadableField(
-    blogPost.BlogBody,
-  );
+  const { fragmentReference, loadFragmentReference } =
+    useImperativeLoadableField(blogPost.BlogBody);
   return (
     <>
       <blogPost.BlogHeader />
       {fragmentReference !== null ? (
         <button
           onClick={() =>
-            loadField(
+            loadFragmentReference(
               // any parameters that were not passed to BlogBody above
               // can we passed here. There are none, so we just pass an empty
               // object.

@@ -151,10 +151,13 @@ export const SomeComponent = iso(`
     reExposedMutationField
   }
 `)(({ data }) => {
-  const { loadField, fragmentReference } = useImperativeExposedMutationField(
-    data.reExposedMutationField,
+  const { loadFragmentReference, fragmentReference } =
+    useImperativeExposedMutationField(data.reExposedMutationField);
+  return (
+    <button
+      onClick={() => loadFragmentReference(OPTIONAL_REMAINING_ARGUMENTS)}
+    />
   );
-  return <button onClick={() => loadField(OPTIONAL_REMAINING_ARGUMENTS)} />;
 });
 ```
 

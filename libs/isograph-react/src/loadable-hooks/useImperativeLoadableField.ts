@@ -15,7 +15,7 @@ export type UseImperativeLoadableFieldReturn<
   TProvidedArgs extends object,
 > = {
   fragmentReference: FragmentReference<TReadFromStore, TResult> | null;
-  loadField: (
+  loadFragmentReference: (
     // TODO this should be void iff all args are provided by the query, like in
     // useClientSideDefer.
     args: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs> | void,
@@ -38,7 +38,7 @@ export function useImperativeLoadableField<
     useUpdatableDisposableState<FragmentReference<TReadFromStore, TResult>>();
 
   return {
-    loadField: (
+    loadFragmentReference: (
       args: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs> | void,
       fetchOptions?: FetchOptions<TResult>,
     ) => {

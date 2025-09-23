@@ -38,11 +38,13 @@ export const CheckinDisplay = iso(`
     make_super
   }
 `)(({ data: checkin }) => {
-  const { loadField } = useImperativeExposedMutationField(checkin.make_super);
+  const { loadFragmentReference } = useImperativeExposedMutationField(
+    checkin.make_super,
+  );
   return (
     <b>
       {checkin.location} at {checkin.time}&nbsp;
-      <Button onClick={() => loadField({})} variant="text">
+      <Button onClick={() => loadFragmentReference({})} variant="text">
         🎉
       </Button>
     </b>
