@@ -49,7 +49,7 @@ impl<Db: Database> StorageDyn for Storage<Db> {
     fn get_value_as_any(&self, id: DerivedNodeId) -> Option<&dyn Any> {
         self.internal
             .get_derived_node(id)
-            .map(|node| node.value.as_any())
+            .map(|node| node.value.as_ref().as_any())
     }
 }
 
@@ -124,10 +124,17 @@ impl<Db: Database> Storage<Db> {
             NodeKind::Source(key),
             source_node.time_updated,
         );
-        Some(source_node.value.as_any().downcast_ref::<T>().expect(
-            "unexpected struct type. \
+        Some(
+            source_node
+                .value
+                .as_ref()
+                .as_any()
+                .downcast_ref::<T>()
+                .expect(
+                    "unexpected struct type. \
             This is indicative of a bug in Pico.",
-        ))
+                ),
+        )
     }
 
     pub fn set<T: Source + DynEq>(&mut self, source: T) -> SourceId<T> {
@@ -284,7 +291,7 @@ impl<Db: Database> InternalStorage<Db> {
                         "indexes should always point to a non-empty source node. \
                         This is indicative of a bug in Pico.",
                     );
-                if !source_node.value.dyn_eq(&source) {
+                if !source_node.value.as_ref().dyn_eq(&source) {
                     // We cannot call self.increment_epoch() because that borrows
                     // the entire struct, but self.source_nodes is already borrowed
                     let next_epoch = self.current_epoch.increment();
