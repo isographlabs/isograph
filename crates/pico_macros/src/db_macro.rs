@@ -80,17 +80,17 @@ pub(crate) fn db_macro(item: TokenStream) -> TokenStream {
         });
 
         struct_impl.push(quote! {
-            const #proj_ident: ::pico::Projector<#struct_ident #type_generics, #field_ty> = |db: &#struct_ident #type_generics| &db.#field_ident;
-            const #proj_ident_mut: ::pico::ProjectorMut<#struct_ident #type_generics, #field_ty> = |db: &mut #struct_ident #type_generics| &mut db.#field_ident;
+            const #proj_ident: ::pico::FieldProjector<#struct_ident #type_generics, #field_ty> = |db: &#struct_ident #type_generics| &db.#field_ident;
+            const #proj_ident_mut: ::pico::FieldProjectorMut<#struct_ident #type_generics, #field_ty> = |db: &mut #struct_ident #type_generics| &mut db.#field_ident;
 
             #[inline]
-            pub fn #get_ident(&self) -> ::pico::View<'_, #struct_ident #type_generics, #field_ty, #counter_ident> {
-                ::pico::View::new(self, Self::#proj_ident)
+            pub fn #get_ident(&self) -> ::pico::FieldView<'_, #struct_ident #type_generics, #field_ty, #counter_ident> {
+                ::pico::FieldView::new(self, Self::#proj_ident)
             }
 
             #[inline]
-            pub fn #get_ident_mut(&mut self) -> ::pico::MutView<'_, #struct_ident #type_generics, #field_ty, #counter_ident> {
-                ::pico::MutView::new(self, Self::#proj_ident_mut)
+            pub fn #get_ident_mut(&mut self) -> ::pico::FieldViewMut<'_, #struct_ident #type_generics, #field_ty, #counter_ident> {
+                ::pico::FieldViewMut::new(self, Self::#proj_ident_mut)
             }
         });
     }

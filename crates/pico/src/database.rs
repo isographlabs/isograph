@@ -33,7 +33,12 @@ pub trait Database: DatabaseDyn + Sized {
 }
 
 pub trait StorageDyn {
-    fn get_value_as_any(&self, id: DerivedNodeId) -> Option<&dyn Any>;
+    fn get_derived_node_value_and_revision(
+        &self,
+        id: DerivedNodeId,
+    ) -> Option<(&dyn Any, DerivedNodeRevision)>;
+
+    fn register_dependency_in_parent_memoized_fn(&self, node: NodeKind, time_updated: Epoch);
 }
 
 #[derive(Debug)]
@@ -46,10 +51,17 @@ pub struct Storage<Db: Database> {
 }
 
 impl<Db: Database> StorageDyn for Storage<Db> {
-    fn get_value_as_any(&self, id: DerivedNodeId) -> Option<&dyn Any> {
+    fn get_derived_node_value_and_revision(
+        &self,
+        id: DerivedNodeId,
+    ) -> Option<(&dyn Any, DerivedNodeRevision)> {
         self.internal
-            .get_derived_node(id)
-            .map(|node| node.value.as_ref().as_any())
+            .get_derived_node_and_revision(id)
+            .map(|(node, revision)| (node.value.as_ref().as_any(), revision))
+    }
+
+    fn register_dependency_in_parent_memoized_fn(&self, node: NodeKind, time_updated: Epoch) {
+        Storage::register_dependency_in_parent_memoized_fn(self, node, time_updated);
     }
 }
 
@@ -201,14 +213,22 @@ impl<Db: Database> InternalStorage<Db> {
         &self,
         derived_node_id: DerivedNodeId,
     ) -> Option<&DerivedNode<Db>> {
-        let index = self
-            .derived_node_id_to_revision
-            .get(&derived_node_id)?
-            .index;
-        Some(self.derived_nodes.get(index.idx).expect(
+        self.get_derived_node_and_revision(derived_node_id)
+            .map(|(node, _)| node)
+    }
+
+    pub(crate) fn get_derived_node_and_revision(
+        &self,
+        derived_node_id: DerivedNodeId,
+    ) -> Option<(&DerivedNode<Db>, DerivedNodeRevision)> {
+        let revision = *self.derived_node_id_to_revision.get(&derived_node_id)?;
+
+        let node = self.derived_nodes.get(revision.index.idx).expect(
             "indexes should always be valid. \
             This is indicative of a bug in Pico.",
-        ))
+        );
+
+        Some((node, revision))
     }
 
     pub(crate) fn node_verified_in_current_epoch(&self, derived_node_id: DerivedNodeId) -> bool {

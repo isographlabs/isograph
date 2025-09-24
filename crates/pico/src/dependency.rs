@@ -32,6 +32,12 @@ impl TrackedDependencies {
 
     pub fn push(&mut self, dependency: Dependency, time_updated: Epoch) {
         self.max_time_updated = std::cmp::max(time_updated, self.max_time_updated);
+        if let Some(last_dependency) = self.dependencies.last_mut()
+            && last_dependency.node_to == dependency.node_to
+        {
+            last_dependency.time_verified_or_updated = dependency.time_verified_or_updated;
+            return;
+        };
         self.dependencies.push(dependency);
     }
 }

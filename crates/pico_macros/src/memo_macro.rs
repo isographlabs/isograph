@@ -34,7 +34,7 @@ pub(crate) fn memo_macro(_args: TokenStream, item: TokenStream) -> TokenStream {
     });
 
     let param_ids_blocks = args.clone().map(|(arg, ty)| match ArgType::parse(ty) {
-        ArgType::Source | ArgType::MemoRef => {
+        ArgType::Source => {
             let param_arg = match **ty {
                 syn::Type::Reference(_) => quote!((*(#arg))),
                 _ => quote!(#arg),
@@ -76,18 +76,6 @@ pub(crate) fn memo_macro(_args: TokenStream, item: TokenStream) -> TokenStream {
                     let binding_expr = match **ty {
                         syn::Type::Reference(_) => quote!(&param_id.into()),
                         _ => quote!(param_id.into()),
-                    };
-                    quote! {
-                        let #arg: #ty = {
-                            let param_id = derived_node_id.params[#i];
-                            #binding_expr
-                        };
-                    }
-                }
-                ArgType::MemoRef => {
-                    let binding_expr = match **ty {
-                        syn::Type::Reference(_) => quote!(&::pico::MemoRef::new(#db_arg, param_id.into())),
-                        _ => quote!(::pico::MemoRef::new(#db_arg, param_id.into())),
                     };
                     quote! {
                         let #arg: #ty = {
@@ -155,7 +143,6 @@ fn hash(input: &Signature) -> u64 {
 
 enum ArgType {
     Source,
-    MemoRef,
     Other,
 }
 
@@ -163,9 +150,6 @@ impl ArgType {
     pub fn parse(ty: &syn::Type) -> Self {
         if type_is(ty, "SourceId") {
             return ArgType::Source;
-        }
-        if type_is(ty, "MemoRef") {
-            return ArgType::MemoRef;
         }
         ArgType::Other
     }

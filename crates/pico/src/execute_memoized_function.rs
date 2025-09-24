@@ -68,8 +68,10 @@ pub fn execute_memoized_function<Db: Database>(
         db.get_storage().top_level_calls.push(derived_node_id);
     }
 
-    let (time_updated, did_recalculate) = if let Some(derived_node) =
-        db.get_storage().internal.get_derived_node(derived_node_id)
+    let (did_recalculate, time_updated) = if let Some((derived_node, revision)) = db
+        .get_storage()
+        .internal
+        .get_derived_node_and_revision(derived_node_id)
     {
         if db
             .get_storage()
@@ -77,10 +79,7 @@ pub fn execute_memoized_function<Db: Database>(
             .node_verified_in_current_epoch(derived_node_id)
         {
             event!(Level::TRACE, "epoch not changed");
-            (
-                db.get_storage().internal.current_epoch,
-                DidRecalculate::ReusedMemoizedValue,
-            )
+            (DidRecalculate::ReusedMemoizedValue, revision.time_updated)
         } else {
             db.get_storage()
                 .internal
@@ -90,10 +89,7 @@ pub fn execute_memoized_function<Db: Database>(
                 update_derived_node(db, derived_node_id, derived_node.value.as_ref(), inner_fn)
             } else {
                 event!(Level::TRACE, "dependencies up-to-date");
-                (
-                    db.get_storage().internal.current_epoch,
-                    DidRecalculate::ReusedMemoizedValue,
-                )
+                (DidRecalculate::ReusedMemoizedValue, revision.time_updated)
             }
         }
     } else {
@@ -111,7 +107,7 @@ fn create_derived_node<Db: Database>(
     db: &Db,
     derived_node_id: DerivedNodeId,
     inner_fn: InnerFn<Db>,
-) -> (Epoch, DidRecalculate) {
+) -> (DidRecalculate, Epoch) {
     let (value, tracked_dependencies) =
         invoke_with_dependency_tracking(db, derived_node_id, inner_fn).expect(
             "InnerFn call cannot fail for a new derived node. This is indicative of a bug in Pico.",
@@ -128,8 +124,8 @@ fn create_derived_node<Db: Database>(
         index,
     );
     (
-        tracked_dependencies.max_time_updated,
         DidRecalculate::Recalculated,
+        tracked_dependencies.max_time_updated,
     )
 }
 
@@ -138,7 +134,7 @@ fn update_derived_node<Db: Database>(
     derived_node_id: DerivedNodeId,
     prev_value: &dyn DynEq,
     inner_fn: InnerFn<Db>,
-) -> (Epoch, DidRecalculate) {
+) -> (DidRecalculate, Epoch) {
     match invoke_with_dependency_tracking(db, derived_node_id, inner_fn) {
         Some((value, tracked_dependencies)) => {
             let mut occupied = if let Entry::Occupied(occupied) = db
@@ -169,9 +165,9 @@ fn update_derived_node<Db: Database>(
 
             occupied.get_mut().index = index;
 
-            (tracked_dependencies.max_time_updated, did_recalculate)
+            (did_recalculate, tracked_dependencies.max_time_updated)
         }
-        None => (Epoch::new(), DidRecalculate::Error),
+        None => (DidRecalculate::Error, Epoch::new()),
     }
 }
 
