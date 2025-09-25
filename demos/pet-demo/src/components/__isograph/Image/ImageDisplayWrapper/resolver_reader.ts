@@ -17,7 +17,7 @@ const readerAst: ReaderAst<Image__ImageDisplayWrapper__param> = [
         isUpdatable: false,
       },
     ],
-    entrypoint: { 
+    entrypoint: {
       kind: "EntrypointLoader",
       typeAndField: "Image__ImageDisplay",
       loader: () => import("../../Image/ImageDisplay/entrypoint").then(module => module.default),

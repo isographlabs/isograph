@@ -506,7 +506,7 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         let indent_3 = "  ".repeat((indentation_level + 2) as usize);
         let field_parent_type = client_field.type_and_field.type_name;
         format!(
-            "{{ \n\
+            "{{\n\
             {indent_3}kind: \"EntrypointLoader\",\n\
             {indent_3}typeAndField: \"{type_and_field}\",\n\
             {indent_3}loader: () => import(\"../../{field_parent_type}/{name}/entrypoint\").then(module => module.default),\n\

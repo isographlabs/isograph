@@ -28,7 +28,7 @@ const readerAst: ReaderAst<NewsfeedItem__NewsfeedAdOrBlog__param> = [
             isUpdatable: false,
           },
         ],
-        entrypoint: { 
+        entrypoint: {
           kind: "EntrypointLoader",
           typeAndField: "AdItem__AdItemDisplay",
           loader: () => import("../../AdItem/AdItemDisplay/entrypoint").then(module => module.default),

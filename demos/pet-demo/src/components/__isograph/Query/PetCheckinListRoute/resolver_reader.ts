@@ -45,7 +45,7 @@ const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
             isUpdatable: false,
           },
         ],
-        entrypoint: { 
+        entrypoint: {
           kind: "EntrypointLoader",
           typeAndField: "Pet__PetCheckinsCardList",
           loader: () => import("../../Pet/PetCheckinsCardList/entrypoint").then(module => module.default),
