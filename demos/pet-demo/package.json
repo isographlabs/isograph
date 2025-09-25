@@ -1,6 +1,6 @@
 {
   "name": "pet-demo",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "scripts": {
     "build:swc-plugin": "cd ../../libs/isograph-swc-plugin && pnpm build && cd ../../demos/pet-demo",
