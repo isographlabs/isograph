@@ -335,8 +335,8 @@ jobs:
       github.event_name == 'push' &&
       github.repository == 'isographlabs/isograph' &&
       (
-        github.ref == 'refs/heads/main' ||
-        (github.ref_type == 'tag' && startsWith(github.ref_name, 'v')) ||
+        (github.ref == 'refs/heads/main' &&
+        github.ref_type != 'tag') ||
         startsWith(github.ref, 'refs/heads/deploy/')
       )
     needs: [all-checks-passed]
