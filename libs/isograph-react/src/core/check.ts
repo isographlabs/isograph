@@ -172,26 +172,25 @@ function checkFromRecord(
       case 'InlineFragment': {
         const existingRecordTypename = record['__typename'];
 
-        if (
-          existingRecordTypename == null ||
-          existingRecordTypename !== normalizationAstNode.type
-        ) {
+        if (existingRecordTypename == null) {
           return {
             kind: 'MissingData',
             record: recordLink,
           };
         }
 
-        const result = checkFromRecord(
-          environment,
-          normalizationAstNode.selections,
-          variables,
-          record,
-          recordLink,
-        );
+        if (existingRecordTypename === normalizationAstNode.type) {
+          const result = checkFromRecord(
+            environment,
+            normalizationAstNode.selections,
+            variables,
+            record,
+            recordLink,
+          );
 
-        if (result.kind === 'MissingData') {
-          return result;
+          if (result.kind === 'MissingData') {
+            return result;
+          }
         }
 
         continue normalizationAstLoop;
