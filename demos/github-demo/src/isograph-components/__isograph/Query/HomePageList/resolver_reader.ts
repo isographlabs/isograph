@@ -12,6 +12,7 @@ const readerAst: ReaderAst<Query__HomePageList__param> = [
     arguments: null,
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Scalar",
@@ -42,7 +43,6 @@ const readerAst: ReaderAst<Query__HomePageList__param> = [
         name: "__refetch",
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

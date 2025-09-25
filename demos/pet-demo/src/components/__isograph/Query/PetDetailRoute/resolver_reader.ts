@@ -21,6 +21,7 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
     ],
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "ImperativelyLoadedField",
@@ -77,7 +78,6 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
         usedRefetchQueries: [5, ],
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

@@ -17,6 +17,7 @@ const readerAst: ReaderAst<Query__linkedUpdate__param> = [
     ],
     condition: null,
     isUpdatable: true,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Linked",
@@ -25,6 +26,7 @@ const readerAst: ReaderAst<Query__linkedUpdate__param> = [
         arguments: null,
         condition: Node__asEconomist__resolver_reader,
         isUpdatable: false,
+        refetchQueryIndex: null,
         selections: [
           {
             kind: "Scalar",
@@ -34,10 +36,8 @@ const readerAst: ReaderAst<Query__linkedUpdate__param> = [
             isUpdatable: true,
           },
         ],
-        refetchQueryIndex: null,
       },
     ],
-    refetchQueryIndex: null,
   },
   {
     kind: "Linked",
@@ -51,6 +51,7 @@ const readerAst: ReaderAst<Query__linkedUpdate__param> = [
     ],
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Link",
@@ -63,6 +64,7 @@ const readerAst: ReaderAst<Query__linkedUpdate__param> = [
         arguments: null,
         condition: Node__asEconomist__resolver_reader,
         isUpdatable: false,
+        refetchQueryIndex: null,
         selections: [
           {
             kind: "Scalar",
@@ -72,10 +74,8 @@ const readerAst: ReaderAst<Query__linkedUpdate__param> = [
             isUpdatable: false,
           },
         ],
-        refetchQueryIndex: null,
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

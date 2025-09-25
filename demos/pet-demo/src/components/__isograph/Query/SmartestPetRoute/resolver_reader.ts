@@ -12,6 +12,7 @@ const readerAst: ReaderAst<Query__SmartestPetRoute__param> = [
     arguments: null,
     condition: Query__smartestPet__resolver_reader,
     isUpdatable: false,
+    refetchQueryIndex: 0,
     selections: [
       {
         kind: "Scalar",
@@ -41,6 +42,7 @@ const readerAst: ReaderAst<Query__SmartestPetRoute__param> = [
         arguments: null,
         condition: null,
         isUpdatable: false,
+        refetchQueryIndex: null,
         selections: [
           {
             kind: "Scalar",
@@ -50,7 +52,6 @@ const readerAst: ReaderAst<Query__SmartestPetRoute__param> = [
             isUpdatable: false,
           },
         ],
-        refetchQueryIndex: null,
       },
       {
         kind: "Scalar",
@@ -60,7 +61,6 @@ const readerAst: ReaderAst<Query__SmartestPetRoute__param> = [
         isUpdatable: false,
       },
     ],
-    refetchQueryIndex: 0,
   },
 ];
 

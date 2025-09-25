@@ -17,6 +17,7 @@ const readerAst: ReaderAst<Query__startUpdate__param> = [
     ],
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Linked",
@@ -25,6 +26,7 @@ const readerAst: ReaderAst<Query__startUpdate__param> = [
         arguments: null,
         condition: Node__asEconomist__resolver_reader,
         isUpdatable: false,
+        refetchQueryIndex: null,
         selections: [
           {
             kind: "Scalar",
@@ -34,10 +36,8 @@ const readerAst: ReaderAst<Query__startUpdate__param> = [
             isUpdatable: true,
           },
         ],
-        refetchQueryIndex: null,
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

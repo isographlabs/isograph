@@ -15,6 +15,7 @@ const readerAst: ReaderAst<Query__PetFavoritePhrase__param> = [
     ],
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Scalar",
@@ -31,7 +32,6 @@ const readerAst: ReaderAst<Query__PetFavoritePhrase__param> = [
         isUpdatable: false,
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

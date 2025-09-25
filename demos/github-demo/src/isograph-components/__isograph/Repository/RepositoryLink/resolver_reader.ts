@@ -24,6 +24,7 @@ const readerAst: ReaderAst<Repository__RepositoryLink__param> = [
     arguments: null,
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Scalar",
@@ -33,7 +34,6 @@ const readerAst: ReaderAst<Repository__RepositoryLink__param> = [
         isUpdatable: false,
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

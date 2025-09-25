@@ -11,6 +11,7 @@ const readerAst: ReaderAst<Query__subquery__param> = [
     arguments: null,
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Linked",
@@ -24,6 +25,7 @@ const readerAst: ReaderAst<Query__subquery__param> = [
         ],
         condition: null,
         isUpdatable: false,
+        refetchQueryIndex: null,
         selections: [
           {
             kind: "Scalar",
@@ -33,10 +35,8 @@ const readerAst: ReaderAst<Query__subquery__param> = [
             isUpdatable: false,
           },
         ],
-        refetchQueryIndex: null,
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

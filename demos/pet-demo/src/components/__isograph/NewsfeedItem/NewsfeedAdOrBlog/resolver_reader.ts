@@ -13,6 +13,7 @@ const readerAst: ReaderAst<NewsfeedItem__NewsfeedAdOrBlog__param> = [
     arguments: null,
     condition: NewsfeedItem__asAdItem__resolver_reader,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "LoadablySelectedField",
@@ -35,7 +36,6 @@ const readerAst: ReaderAst<NewsfeedItem__NewsfeedAdOrBlog__param> = [
         },
       },
     ],
-    refetchQueryIndex: null,
   },
   {
     kind: "Linked",
@@ -44,6 +44,7 @@ const readerAst: ReaderAst<NewsfeedItem__NewsfeedAdOrBlog__param> = [
     arguments: null,
     condition: NewsfeedItem__asBlogItem__resolver_reader,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Resolver",
@@ -53,7 +54,6 @@ const readerAst: ReaderAst<NewsfeedItem__NewsfeedAdOrBlog__param> = [
         usedRefetchQueries: [],
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

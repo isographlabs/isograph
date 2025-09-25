@@ -32,6 +32,7 @@ const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
     arguments: null,
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Scalar",
@@ -83,7 +84,6 @@ const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
         name: "refetch_pet_stats",
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

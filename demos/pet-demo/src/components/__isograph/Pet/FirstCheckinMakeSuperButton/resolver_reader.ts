@@ -21,6 +21,7 @@ const readerAst: ReaderAst<Pet__FirstCheckinMakeSuperButton__param> = [
     ],
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "ImperativelyLoadedField",
@@ -37,7 +38,6 @@ const readerAst: ReaderAst<Pet__FirstCheckinMakeSuperButton__param> = [
         isUpdatable: false,
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

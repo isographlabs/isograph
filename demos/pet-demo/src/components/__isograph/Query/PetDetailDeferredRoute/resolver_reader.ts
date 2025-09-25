@@ -16,6 +16,7 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
     ],
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Resolver",
@@ -25,7 +26,6 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
         usedRefetchQueries: [],
       },
     ],
-    refetchQueryIndex: null,
   },
   {
     kind: "Linked",
@@ -48,6 +48,7 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
     ],
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Scalar",
@@ -57,7 +58,6 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
         isUpdatable: false,
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

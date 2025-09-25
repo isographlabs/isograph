@@ -20,6 +20,7 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
     arguments: null,
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Scalar",
@@ -36,7 +37,6 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
         isUpdatable: false,
       },
     ],
-    refetchQueryIndex: null,
   },
   {
     kind: "ImperativelyLoadedField",

@@ -24,6 +24,7 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
     ],
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Linked",
@@ -32,6 +33,7 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
         arguments: null,
         condition: NewsfeedItem__asAdItem__resolver_reader,
         isUpdatable: false,
+        refetchQueryIndex: null,
         selections: [
           {
             kind: "Scalar",
@@ -41,7 +43,6 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
             isUpdatable: false,
           },
         ],
-        refetchQueryIndex: null,
       },
       {
         kind: "Linked",
@@ -50,6 +51,7 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
         arguments: null,
         condition: NewsfeedItem__asBlogItem__resolver_reader,
         isUpdatable: false,
+        refetchQueryIndex: null,
         selections: [
           {
             kind: "Scalar",
@@ -59,7 +61,6 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
             isUpdatable: false,
           },
         ],
-        refetchQueryIndex: null,
       },
       {
         kind: "Resolver",
@@ -69,7 +70,6 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
         usedRefetchQueries: [],
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

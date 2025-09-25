@@ -16,6 +16,7 @@ const readerAst: ReaderAst<Query__nodeField__param> = [
     ],
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Scalar",
@@ -25,7 +26,6 @@ const readerAst: ReaderAst<Query__nodeField__param> = [
         isUpdatable: false,
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 
