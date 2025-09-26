@@ -292,11 +292,10 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                             };
 
                             let (wrapped_map, variable_definitions_iter): (_, Vec<_>) =
-                                match client_scalar_selectable
-                                    .refetch_strategy
-                                    .as_ref()
-                                    .expect("TODO MAKE ERROR BETTER")
-                                {
+                                match client_scalar_selectable.refetch_strategy.as_ref().expect(
+                                    "Expedted a refetch strategy. \
+                                        This is indicative of a bug in Isograph.",
+                                ) {
                                     RefetchStrategy::RefetchFromRoot(_) => (
                                         selection_map_wrapped(merged_selection_map.clone(), vec![]),
                                         variable_definitions_iter.collect(),
