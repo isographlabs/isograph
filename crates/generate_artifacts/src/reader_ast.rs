@@ -525,6 +525,7 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         indentation_level + 1,
     );
 
+    let empty_selection_set = vec![];
     let (reader_ast, additional_reader_imports) = generate_reader_ast(
         schema,
         client_field
@@ -534,7 +535,8 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
                 "Expected refetch strategy. \
                     This is indicative of a bug in Isograph.",
             )
-            .refetch_selection_set(),
+            .refetch_selection_set()
+            .unwrap_or(&empty_selection_set),
         indentation_level + 1,
         // This is weird!
         &Default::default(),

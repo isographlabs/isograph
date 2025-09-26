@@ -17,11 +17,11 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, ClientSelectableId, FieldMapItem,
-    FieldTraversalResult, NameAndArguments, NetworkProtocol, NormalizationKey, ScalarSelectableId,
-    Schema, ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo,
-    ValidatedSelection, ValidatedVariableDefinition, WrappedSelectionMapSelection,
-    accessible_client_fields, description, inline_fragment_reader_selection_set,
-    output_type_annotation, selection_map_wrapped,
+    FieldTraversalResult, NameAndArguments, NetworkProtocol, NormalizationKey, RefetchStrategy,
+    ScalarSelectableId, Schema, ServerEntityName, ServerObjectSelectableVariant,
+    UserWrittenClientTypeInfo, ValidatedSelection, ValidatedVariableDefinition,
+    WrappedSelectionMapSelection, accessible_client_fields, description,
+    inline_fragment_reader_selection_set, output_type_annotation, selection_map_wrapped,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -271,26 +271,11 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                     This is indicative of a bug in Isograph.",
                                 );
 
-                            if schema
-                                .fetchable_types
-                                .contains_key(&client_scalar_selectable.parent_object_entity_name)
-                            {
-                                panic!("Loadable fields on root objects are not yet supported");
-                            }
+                            let variable_definitions_iter = client_scalar_selectable
+                                .variable_definitions
+                                .iter()
+                                .map(|variable_definition| &variable_definition.item);
 
-                            let wrapped_map = selection_map_wrapped(
-                                merged_selection_map.clone(),
-                                vec![
-                                    WrappedSelectionMapSelection::InlineFragment(
-                                        type_to_refine_to.name.item,
-                                    ),
-                                    WrappedSelectionMapSelection::LinkedField {
-                                        server_object_selectable_name: "node".intern().into(),
-                                        arguments: vec![id_arg.clone()],
-                                        concrete_type: None,
-                                    },
-                                ],
-                            );
                             let id_var = ValidatedVariableDefinition {
                                 name: WithLocation::new("id".intern().into(), Location::Generated),
                                 type_: GraphQLTypeAnnotation::NonNull(Box::new(
@@ -305,11 +290,43 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 )),
                                 default_value: None,
                             };
-                            let variable_definitions_iter = client_scalar_selectable
-                                .variable_definitions
-                                .iter()
-                                .map(|variable_definition| &variable_definition.item)
-                                .chain(std::iter::once(&id_var));
+
+                            let (wrapped_map, variable_definitions_iter): (_, Vec<_>) =
+                                match client_scalar_selectable
+                                    .refetch_strategy
+                                    .as_ref()
+                                    .expect("TODO MAKE ERROR BETTER")
+                                {
+                                    RefetchStrategy::RefetchFromRoot(_) => (
+                                        selection_map_wrapped(merged_selection_map.clone(), vec![]),
+                                        variable_definitions_iter.collect(),
+                                    ),
+                                    RefetchStrategy::UseRefetchField(_) => {
+                                        let wrapped_map = selection_map_wrapped(
+                                            merged_selection_map.clone(),
+                                            vec![
+                                                WrappedSelectionMapSelection::InlineFragment(
+                                                    type_to_refine_to.name.item,
+                                                ),
+                                                WrappedSelectionMapSelection::LinkedField {
+                                                    server_object_selectable_name: "node"
+                                                        .intern()
+                                                        .into(),
+                                                    arguments: vec![id_arg.clone()],
+                                                    concrete_type: None,
+                                                },
+                                            ],
+                                        );
+
+                                        (
+                                            wrapped_map,
+                                            variable_definitions_iter
+                                                .chain(std::iter::once(&id_var))
+                                                .collect(),
+                                        )
+                                    }
+                                };
+
                             let mut traversal_state = traversal_state.clone();
                             traversal_state.refetch_paths = traversal_state
                                 .refetch_paths

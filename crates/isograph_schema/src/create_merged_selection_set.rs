@@ -1177,6 +1177,8 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
         },
     );
 
+    let empty_selection_set = vec![];
+
     // Generate a merged selection set, but using the refetch strategy
     create_merged_selection_map_for_field_and_insert_into_global_map(
         schema,
@@ -1188,7 +1190,8 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
                 "Expected refetch strategy. \
                 This is indicative of a bug in Isograph.",
             )
-            .refetch_selection_set(),
+            .refetch_selection_set()
+            .unwrap_or(&empty_selection_set),
         encountered_client_type_map,
         DefinitionLocation::Client(SelectionType::Scalar((
             parent_object_entity_name,
