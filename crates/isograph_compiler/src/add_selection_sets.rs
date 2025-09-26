@@ -481,6 +481,9 @@ fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol + 'static>(
                 generate_refetch_query: use_refetch_field_strategy.generate_refetch_query,
             }),
         )),
+        Some(RefetchStrategy::RefetchFromRoot(root_operation_name)) => {
+            Ok(Some(RefetchStrategy::RefetchFromRoot(root_operation_name)))
+        }
         None => Ok(None),
     }
 }

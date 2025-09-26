@@ -274,30 +274,40 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         );
 
         let selections = client_field_declaration.item.selection_set;
-        let id_field = self
-            .server_entity_data
-            .server_object_entity_extra_info
-            .get(&parent_object_entity_name)
-            .expect(
-                "Expected parent_object_entity_name to exist in \
-                server_object_entity_available_selectables",
-            )
-            .id_field;
-        let refetch_strategy = id_field.map(|_| {
-            // Assume that if we have an id field, this implements Node
-            RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
-                vec![id_selection()],
-                query_id,
-                vec![
-                    WrappedSelectionMapSelection::InlineFragment(object.name.item),
-                    WrappedSelectionMapSelection::LinkedField {
-                        server_object_selectable_name: *NODE_FIELD_NAME,
-                        arguments: id_top_level_arguments(),
-                        concrete_type: None,
-                    },
-                ],
+
+        let refetch_strategy = if let Some(root_operation_name) =
+            self.fetchable_types.get(&parent_object_entity_name)
+        {
+            Some(RefetchStrategy::RefetchFromRoot(
+                root_operation_name.clone(),
             ))
-        });
+        } else {
+            let id_field = self
+                .server_entity_data
+                .server_object_entity_extra_info
+                .get(&parent_object_entity_name)
+                .expect(
+                    "Expected parent_object_entity_name to exist in \
+                server_object_entity_available_selectables",
+                )
+                .id_field;
+
+            id_field.map(|_| {
+                // Assume that if we have an id field, this implements Node
+                RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
+                    vec![id_selection()],
+                    query_id,
+                    vec![
+                        WrappedSelectionMapSelection::InlineFragment(object.name.item),
+                        WrappedSelectionMapSelection::LinkedField {
+                            server_object_selectable_name: *NODE_FIELD_NAME,
+                            arguments: id_top_level_arguments(),
+                            concrete_type: None,
+                        },
+                    ],
+                ))
+            })
+        };
 
         Ok(UnprocessedClientFieldItem {
             parent_object_entity_name,
@@ -351,40 +361,47 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let unprocessed_fields = client_pointer_declaration.item.selection_set;
 
         // TODO extract this into a helper function, probably on TNetworkProtocol
-        let id_field = self
-            .server_entity_data
-            .server_object_entity_extra_info
-            .get(to_object_name.inner())
-            .expect(
-                "Expected parent_object_entity_name \
+        let refetch_strategy = if let Some(root_operation_name) =
+            self.fetchable_types.get(to_object_name.inner())
+        {
+            RefetchStrategy::RefetchFromRoot(root_operation_name.clone())
+        } else {
+            let id_field = self
+                .server_entity_data
+                .server_object_entity_extra_info
+                .get(to_object_name.inner())
+                .expect(
+                    "Expected parent_object_entity_name \
                 to exist in server_object_entity_available_selectables",
-            )
-            .id_field;
-        let refetch_strategy = match id_field {
-            None => Err(WithSpan::new(
-                ProcessClientFieldDeclarationError::ClientPointerTargetTypeHasNoId {
-                    target_type_name: client_pointer_declaration.item.target_type.inner().0,
-                },
-                client_pointer_declaration.item.target_type.span(),
-            )),
-            Some(_) => {
-                // Assume that if we have an id field, this implements Node
-                Ok(RefetchStrategy::UseRefetchField(
-                    generate_refetch_field_strategy(
-                        vec![],
-                        query_id,
-                        vec![
-                            WrappedSelectionMapSelection::InlineFragment(to_object.name.item),
-                            WrappedSelectionMapSelection::LinkedField {
-                                server_object_selectable_name: *NODE_FIELD_NAME,
-                                arguments: id_top_level_arguments(),
-                                concrete_type: None,
-                            },
-                        ],
-                    ),
-                ))
-            }
-        }?;
+                )
+                .id_field;
+
+            match id_field {
+                None => Err(WithSpan::new(
+                    ProcessClientFieldDeclarationError::ClientPointerTargetTypeHasNoId {
+                        target_type_name: client_pointer_declaration.item.target_type.inner().0,
+                    },
+                    client_pointer_declaration.item.target_type.span(),
+                )),
+                Some(_) => {
+                    // Assume that if we have an id field, this implements Node
+                    Ok(RefetchStrategy::UseRefetchField(
+                        generate_refetch_field_strategy(
+                            vec![],
+                            query_id,
+                            vec![
+                                WrappedSelectionMapSelection::InlineFragment(to_object.name.item),
+                                WrappedSelectionMapSelection::LinkedField {
+                                    server_object_selectable_name: *NODE_FIELD_NAME,
+                                    arguments: id_top_level_arguments(),
+                                    concrete_type: None,
+                                },
+                            ],
+                        ),
+                    ))
+                }
+            }?
+        };
 
         self.client_object_selectables.insert(
             (parent_object_name, *client_object_selectable_name),

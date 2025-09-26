@@ -58,7 +58,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
             ClientFieldVariant::ImperativelyLoadedField(_) => self
                 .refetch_strategy
                 .as_ref()
-                .map(|strategy| strategy.refetch_selection_set())
+                .and_then(|strategy| strategy.refetch_selection_set())
                 .expect(
                     "Expected imperatively loaded field to have refetch selection set. \
                     This is indicative of a bug in Isograph.",

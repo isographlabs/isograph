@@ -34,6 +34,8 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
             This is indicative of a bug in Isograph.",
         );
 
+    let empty_selection_set = vec![];
+
     let (reader_ast, reader_imports) = generate_reader_ast(
         schema,
         if was_selected_loadably {
@@ -46,6 +48,7 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
                     This is indicative of a bug in Isograph.",
                 )
                 .refetch_selection_set()
+                .unwrap_or(&empty_selection_set)
         } else {
             client_field.selection_set_for_parent_query()
         },
