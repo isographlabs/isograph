@@ -144,7 +144,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         query_name,
         schema,
         merged_selection_map,
-        variable_definitions.iter().map(|item| *item),
+        variable_definitions.iter().copied(),
         root_operation_name,
         Format::Pretty,
     );
@@ -230,7 +230,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         query_name,
         schema,
         merged_selection_map,
-        variable_definitions.iter().map(|item| *item),
+        variable_definitions.iter().copied(),
         root_operation_name,
         concrete_type.name.item,
         persisted_documents,
