@@ -293,7 +293,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
 
                             let (wrapped_map, variable_definitions_iter): (_, Vec<_>) =
                                 match client_scalar_selectable.refetch_strategy.as_ref().expect(
-                                    "Expedted a refetch strategy. \
+                                    "Expected a refetch strategy. \
                                         This is indicative of a bug in Isograph.",
                                 ) {
                                     RefetchStrategy::RefetchFromRoot(_) => (
