@@ -23,6 +23,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
     ],
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Resolver",
@@ -45,6 +46,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
         arguments: null,
         condition: null,
         isUpdatable: false,
+        refetchQueryIndex: null,
         selections: [
           {
             kind: "Resolver",
@@ -61,7 +63,6 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
             isUpdatable: false,
           },
         ],
-        refetchQueryIndex: null,
       },
       {
         kind: "Linked",
@@ -75,6 +76,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
         ],
         condition: null,
         isUpdatable: false,
+        refetchQueryIndex: null,
         selections: [
           {
             kind: "Resolver",
@@ -84,10 +86,8 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
             usedRefetchQueries: [],
           },
         ],
-        refetchQueryIndex: null,
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

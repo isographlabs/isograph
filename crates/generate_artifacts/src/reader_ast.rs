@@ -287,8 +287,8 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         {indent_2}arguments: {arguments},\n\
         {indent_2}condition: {condition},\n\
         {indent_2}isUpdatable: {is_updatable},\n\
-        {indent_2}selections: {inner_reader_ast},\n\
         {indent_2}refetchQueryIndex: {refetch_query},\n\
+        {indent_2}selections: {inner_reader_ast},\n\
         {indent_1}}},\n",
     )
 }
@@ -506,7 +506,7 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         let indent_3 = "  ".repeat((indentation_level + 2) as usize);
         let field_parent_type = client_field.type_and_field.type_name;
         format!(
-            "{{ \n\
+            "{{\n\
             {indent_3}kind: \"EntrypointLoader\",\n\
             {indent_3}typeAndField: \"{type_and_field}\",\n\
             {indent_3}loader: () => import(\"../../{field_parent_type}/{name}/entrypoint\").then(module => module.default),\n\
@@ -532,7 +532,7 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
             .as_ref()
             .expect(
                 "Expected refetch strategy. \
-                    This is indicative of a bug in Isograph.",
+                This is indicative of a bug in Isograph.",
             )
             .refetch_selection_set(),
         indentation_level + 1,

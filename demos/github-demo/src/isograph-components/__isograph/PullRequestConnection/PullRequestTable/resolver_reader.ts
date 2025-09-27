@@ -13,6 +13,7 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
     arguments: null,
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Linked",
@@ -21,6 +22,7 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
         arguments: null,
         condition: null,
         isUpdatable: false,
+        refetchQueryIndex: null,
         selections: [
           {
             kind: "Scalar",
@@ -57,6 +59,7 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
             arguments: null,
             condition: null,
             isUpdatable: false,
+            refetchQueryIndex: null,
             selections: [
               {
                 kind: "Resolver",
@@ -73,7 +76,6 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
                 isUpdatable: false,
               },
             ],
-            refetchQueryIndex: null,
           },
           {
             kind: "Scalar",
@@ -97,10 +99,8 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
             usedRefetchQueries: [],
           },
         ],
-        refetchQueryIndex: null,
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

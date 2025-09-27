@@ -16,6 +16,7 @@ const readerAst: ReaderAst<Query__UserDetail__param> = [
     ],
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Scalar",
@@ -32,7 +33,6 @@ const readerAst: ReaderAst<Query__UserDetail__param> = [
         usedRefetchQueries: [],
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

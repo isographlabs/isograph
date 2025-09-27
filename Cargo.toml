@@ -3,12 +3,13 @@ members = ["./crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.4.0"
+version = "0.4.2"
 edition = "2024"
 license = "MIT"
 
 [workspace.dependencies]
 anyhow = "1.0.83"
+bincode = { version = "2", features = ["serde"] }
 boxcar = "0.2.8"
 clap = { version = "4.5.18", features = ["derive"] }
 colored = "2.0.4"

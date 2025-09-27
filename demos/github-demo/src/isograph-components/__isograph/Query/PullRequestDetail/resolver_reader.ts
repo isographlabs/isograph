@@ -21,6 +21,7 @@ const readerAst: ReaderAst<Query__PullRequestDetail__param> = [
     ],
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Linked",
@@ -34,6 +35,7 @@ const readerAst: ReaderAst<Query__PullRequestDetail__param> = [
         ],
         condition: null,
         isUpdatable: false,
+        refetchQueryIndex: null,
         selections: [
           {
             kind: "Scalar",
@@ -62,10 +64,8 @@ const readerAst: ReaderAst<Query__PullRequestDetail__param> = [
             usedRefetchQueries: [],
           },
         ],
-        refetchQueryIndex: null,
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

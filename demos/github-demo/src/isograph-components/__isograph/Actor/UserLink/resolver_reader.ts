@@ -18,6 +18,7 @@ const readerAst: ReaderAst<Actor__UserLink__param> = [
     arguments: null,
     condition: Actor__asUser__resolver_reader,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Scalar",
@@ -34,7 +35,6 @@ const readerAst: ReaderAst<Actor__UserLink__param> = [
         isUpdatable: false,
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

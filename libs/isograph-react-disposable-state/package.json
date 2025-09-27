@@ -1,6 +1,6 @@
 {
   "name": "@isograph/react-disposable-state",
-  "version": "0.4.0",
+  "version": "0.4.2",
   "description": "Primitives for managing disposable state in React",
   "homepage": "https://isograph.dev",
   "main": "dist/index.js",

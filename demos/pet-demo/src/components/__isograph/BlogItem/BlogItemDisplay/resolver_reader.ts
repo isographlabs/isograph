@@ -39,7 +39,7 @@ const readerAst: ReaderAst<BlogItem__BlogItemDisplay__param> = [
         isUpdatable: false,
       },
     ],
-    entrypoint: { 
+    entrypoint: {
       kind: "EntrypointLoader",
       typeAndField: "BlogItem__BlogItemMoreDetail",
       loader: () => import("../../BlogItem/BlogItemMoreDetail/entrypoint").then(module => module.default),
@@ -52,6 +52,7 @@ const readerAst: ReaderAst<BlogItem__BlogItemDisplay__param> = [
     arguments: null,
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Resolver",
@@ -61,7 +62,6 @@ const readerAst: ReaderAst<BlogItem__BlogItemDisplay__param> = [
         usedRefetchQueries: [],
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

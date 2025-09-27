@@ -1,6 +1,6 @@
 {
   "name": "@isograph/react",
-  "version": "0.4.0",
+  "version": "0.4.2",
   "description": "Use Isograph with React",
   "homepage": "https://isograph.dev",
   "main": "dist/index.js",

@@ -46,6 +46,7 @@ const readerAst: ReaderAst<Repository__RepositoryRow__param> = [
     arguments: null,
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Scalar",
@@ -55,7 +56,6 @@ const readerAst: ReaderAst<Repository__RepositoryRow__param> = [
         isUpdatable: false,
       },
     ],
-    refetchQueryIndex: null,
   },
   {
     kind: "Scalar",
@@ -71,6 +71,7 @@ const readerAst: ReaderAst<Repository__RepositoryRow__param> = [
     arguments: null,
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Scalar",
@@ -80,7 +81,6 @@ const readerAst: ReaderAst<Repository__RepositoryRow__param> = [
         isUpdatable: false,
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

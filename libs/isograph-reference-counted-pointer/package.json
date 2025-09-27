@@ -1,6 +1,6 @@
 {
   "name": "@isograph/reference-counted-pointer",
-  "version": "0.4.0",
+  "version": "0.4.2",
   "description": "Reference counted pointers enable sharing of disposable items.",
   "homepage": "https://isograph.dev",
   "main": "dist/index.js",

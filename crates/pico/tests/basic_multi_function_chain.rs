@@ -96,6 +96,7 @@ fn sequential_functions_with_memoref_param() {
         value: "bsdf".to_string(),
     });
 
+    assert_eq!(*first_letter(&db, id), 'b');
     assert_eq!(
         *capitalized_first_letter_from_memoref(&db, first_letter(&db, id)),
         'B',

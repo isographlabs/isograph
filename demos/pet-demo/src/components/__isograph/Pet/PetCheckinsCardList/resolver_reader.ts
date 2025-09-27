@@ -22,6 +22,7 @@ const readerAst: ReaderAst<Pet__PetCheckinsCardList__param> = [
     ],
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Resolver",
@@ -38,7 +39,6 @@ const readerAst: ReaderAst<Pet__PetCheckinsCardList__param> = [
         isUpdatable: false,
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

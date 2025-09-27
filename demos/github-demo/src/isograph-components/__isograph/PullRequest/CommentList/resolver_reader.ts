@@ -16,6 +16,7 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
     ],
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Linked",
@@ -24,6 +25,7 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
         arguments: null,
         condition: null,
         isUpdatable: false,
+        refetchQueryIndex: null,
         selections: [
           {
             kind: "Linked",
@@ -32,6 +34,7 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
             arguments: null,
             condition: null,
             isUpdatable: false,
+            refetchQueryIndex: null,
             selections: [
               {
                 kind: "Scalar",
@@ -61,6 +64,7 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
                 arguments: null,
                 condition: null,
                 isUpdatable: false,
+                refetchQueryIndex: null,
                 selections: [
                   {
                     kind: "Scalar",
@@ -70,16 +74,12 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
                     isUpdatable: false,
                   },
                 ],
-                refetchQueryIndex: null,
               },
             ],
-            refetchQueryIndex: null,
           },
         ],
-        refetchQueryIndex: null,
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

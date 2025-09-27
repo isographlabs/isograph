@@ -12,6 +12,7 @@ const readerAst: ReaderAst<Query__Newsfeed__param> = [
     arguments: null,
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Resolver",
@@ -47,7 +48,6 @@ const readerAst: ReaderAst<Query__Newsfeed__param> = [
         entrypoint: Viewer__NewsfeedPaginationComponent__entrypoint,
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

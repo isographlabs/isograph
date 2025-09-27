@@ -17,6 +17,7 @@ const readerAst: ReaderAst<PullRequest__PullRequestLink__param> = [
     arguments: null,
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Scalar",
@@ -32,6 +33,7 @@ const readerAst: ReaderAst<PullRequest__PullRequestLink__param> = [
         arguments: null,
         condition: null,
         isUpdatable: false,
+        refetchQueryIndex: null,
         selections: [
           {
             kind: "Scalar",
@@ -41,10 +43,8 @@ const readerAst: ReaderAst<PullRequest__PullRequestLink__param> = [
             isUpdatable: false,
           },
         ],
-        refetchQueryIndex: null,
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

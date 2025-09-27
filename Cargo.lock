@@ -274,6 +274,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "bincode"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36eaf5d7b090263e8150820482d5d93cd964a81e4019913c972f4edcc6edb740"
+dependencies = [
+ "bincode_derive",
+ "serde",
+ "unty",
+]
+
+[[package]]
+name = "bincode_derive"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bf95709a440f45e986983918d0e8a1f30a9b1df04918fc828670606804ac3c09"
+dependencies = [
+ "virtue",
+]
+
+[[package]]
 name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -541,7 +561,7 @@ dependencies = [
 
 [[package]]
 name = "common_lang_types"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
  "intern",
  "pathdiff",
@@ -1002,7 +1022,7 @@ dependencies = [
 
 [[package]]
 name = "generate_artifacts"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
@@ -1103,7 +1123,7 @@ dependencies = [
 
 [[package]]
 name = "graphql_lang_types"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
  "common_lang_types",
  "intern",
@@ -1114,7 +1134,7 @@ dependencies = [
 
 [[package]]
 name = "graphql_network_protocol"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
@@ -1134,7 +1154,7 @@ dependencies = [
 
 [[package]]
 name = "graphql_schema_parser"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
  "common_lang_types",
  "graphql-syntax",
@@ -1464,7 +1484,7 @@ checksum = "cb56e1aa765b4b4f3aadfab769793b7087bb03a4ea4920644a6d238e2df5b9ed"
 
 [[package]]
 name = "impl_base_types_macro"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1528,7 +1548,7 @@ dependencies = [
 name = "intern"
 version = "0.0.4"
 dependencies = [
- "bincode",
+ "bincode 1.3.3",
  "fnv",
  "hashbrown 0.12.3",
  "indexmap 2.10.0",
@@ -1582,7 +1602,7 @@ checksum = "7943c866cc5cd64cbc25b2e01621d07fa8eb2a1a23160ee81ce38704e97b8ecf"
 
 [[package]]
 name = "isograph_cli"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
  "clap 4.5.31",
  "colored",
@@ -1608,7 +1628,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_compiler"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
  "colored",
  "common_lang_types",
@@ -1634,7 +1654,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_config"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
  "colorize",
  "common_lang_types",
@@ -1649,7 +1669,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_fixture_tests"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
  "clap 4.5.31",
  "common_lang_types",
@@ -1666,7 +1686,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_lang_parser"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
@@ -1680,7 +1700,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_lang_types"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
@@ -1694,7 +1714,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_lsp"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
  "colored",
  "common_lang_types",
@@ -1721,7 +1741,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_schema"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
  "colorize",
  "common_lang_types",
@@ -2333,8 +2353,9 @@ dependencies = [
 
 [[package]]
 name = "pico"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
+ "bincode 2.0.1",
  "boxcar",
  "dashmap",
  "intern",
@@ -2351,7 +2372,7 @@ dependencies = [
 
 [[package]]
 name = "pico_macros"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
  "convert_case",
  "proc-macro2",
@@ -2646,14 +2667,14 @@ dependencies = [
 
 [[package]]
 name = "resolve_position"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
  "common_lang_types",
 ]
 
 [[package]]
 name = "resolve_position_macros"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
  "deluxe",
  "proc-macro2",
@@ -3041,7 +3062,7 @@ dependencies = [
 
 [[package]]
 name = "string_key_newtype"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
  "intern",
 ]
@@ -3432,7 +3453,7 @@ dependencies = [
 
 [[package]]
 name = "swc_isograph_plugin"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "isograph_config",
@@ -3635,7 +3656,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.4.0"
+version = "0.4.2"
 dependencies = [
  "colorize",
  "common_lang_types",
@@ -4026,7 +4047,7 @@ dependencies = [
 
 [[package]]
 name = "u64_newtypes"
-version = "0.4.0"
+version = "0.4.2"
 
 [[package]]
 name = "unicase"
@@ -4069,6 +4090,12 @@ name = "unicode-width"
 version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7dd6e30e90baa6f72411720665d41d89b9a3d039dc45b8faea1ddd07f617f6af"
+
+[[package]]
+name = "unty"
+version = "0.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d49784317cd0d1ee7ec5c716dd598ec5b4483ea832a2dced265471cc0f690ae"
 
 [[package]]
 name = "url"
@@ -4184,6 +4211,12 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "virtue"
+version = "0.0.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "051eb1abcf10076295e815102942cc58f9d5e3b4560e46e53c21e8ff6f3af7b1"
 
 [[package]]
 name = "vsimd"

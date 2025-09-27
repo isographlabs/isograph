@@ -26,6 +26,7 @@ const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
     arguments: null,
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Scalar",
@@ -41,6 +42,7 @@ const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
         arguments: null,
         condition: null,
         isUpdatable: false,
+        refetchQueryIndex: null,
         selections: [
           {
             kind: "Scalar",
@@ -64,10 +66,8 @@ const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
             usedRefetchQueries: [],
           },
         ],
-        refetchQueryIndex: null,
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

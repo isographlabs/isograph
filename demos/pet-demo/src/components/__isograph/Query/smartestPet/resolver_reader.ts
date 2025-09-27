@@ -11,6 +11,7 @@ const readerAst: ReaderAst<Query__smartestPet__param> = [
     arguments: null,
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Link",
@@ -23,6 +24,7 @@ const readerAst: ReaderAst<Query__smartestPet__param> = [
         arguments: null,
         condition: null,
         isUpdatable: false,
+        refetchQueryIndex: null,
         selections: [
           {
             kind: "Scalar",
@@ -32,10 +34,8 @@ const readerAst: ReaderAst<Query__smartestPet__param> = [
             isUpdatable: false,
           },
         ],
-        refetchQueryIndex: null,
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 

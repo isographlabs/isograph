@@ -11,7 +11,7 @@ Isograph makes it easy to build robust, performant, data-driven apps.
 
 ## What is Isograph?
 
-Isograph is a UI framework for building React apps that are powered by GraphQL data. It has ambitions to be a framework for apps powered by data.
+Isograph is a UI framework for building data-driven apps, currently limited to React and GraphQL data.
 
 It has four goals:
 

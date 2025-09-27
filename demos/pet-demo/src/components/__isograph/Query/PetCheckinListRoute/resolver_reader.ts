@@ -16,6 +16,7 @@ const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
     ],
     condition: null,
     isUpdatable: false,
+    refetchQueryIndex: null,
     selections: [
       {
         kind: "Resolver",
@@ -45,14 +46,13 @@ const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
             isUpdatable: false,
           },
         ],
-        entrypoint: { 
+        entrypoint: {
           kind: "EntrypointLoader",
           typeAndField: "Pet__PetCheckinsCardList",
           loader: () => import("../../Pet/PetCheckinsCardList/entrypoint").then(module => module.default),
         },
       },
     ],
-    refetchQueryIndex: null,
   },
 ];
 
