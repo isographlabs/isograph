@@ -2,7 +2,7 @@ use std::{marker::PhantomData, ops::Deref};
 
 use intern::InternId;
 
-use crate::{DatabaseDyn, DerivedNodeId, ParamId};
+use crate::{DatabaseDyn, DerivedNodeId, ParamId, dependency::NodeKind};
 
 #[derive(Debug)]
 pub struct MemoRef<T> {
@@ -55,10 +55,14 @@ impl<T: 'static> Deref for MemoRef<T> {
     fn deref(&self) -> &T {
         // SAFETY: Database outlives this MemoRef
         let db = unsafe { &*self.db };
-        db.get_storage_dyn()
-            .get_value_as_any(self.derived_node_id)
-            .unwrap()
-            .downcast_ref::<T>()
-            .unwrap()
+        let storage = db.get_storage_dyn();
+        let (value, revision) = storage
+            .get_derived_node_value_and_revision(self.derived_node_id)
+            .unwrap();
+        storage.register_dependency_in_parent_memoized_fn(
+            NodeKind::Derived(self.derived_node_id),
+            revision.time_updated,
+        );
+        value.downcast_ref::<T>().unwrap()
     }
 }

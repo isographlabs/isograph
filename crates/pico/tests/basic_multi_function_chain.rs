@@ -72,7 +72,6 @@ fn multi_function_chain_with_irrelevant_change() {
 }
 
 #[test]
-#[should_panic]
 fn sequential_functions_with_memoref_param() {
     let _serial_lock = RUN_SERIALLY.lock();
     FIRST_LETTER_COUNTER.store(0, Ordering::SeqCst);
