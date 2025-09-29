@@ -6,6 +6,7 @@ import Pet__PetCheckinsCard__resolver_reader from '../../Pet/PetCheckinsCard/res
 import Pet__PetPhraseCard__resolver_reader from '../../Pet/PetPhraseCard/resolver_reader';
 import Pet__PetStatsCard__resolver_reader from '../../Pet/PetStatsCard/resolver_reader';
 import Pet__PetTaglineCard__resolver_reader from '../../Pet/PetTaglineCard/resolver_reader';
+import Pet__PetTaglineTestCard__resolver_reader from '../../Pet/PetTaglineTestCard/resolver_reader';
 import Pet__custom_pet_refetch__refetch_reader from '../../Pet/custom_pet_refetch/refetch_reader';
 
 const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
@@ -63,6 +64,13 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
         alias: "PetTaglineCard",
         arguments: null,
         readerArtifact: Pet__PetTaglineCard__resolver_reader,
+        usedRefetchQueries: [],
+      },
+      {
+        kind: "Resolver",
+        alias: "PetTaglineTestCard",
+        arguments: null,
+        readerArtifact: Pet__PetTaglineTestCard__resolver_reader,
         usedRefetchQueries: [],
       },
       {

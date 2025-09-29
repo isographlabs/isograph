@@ -14,6 +14,7 @@ export const PetDetailRouteComponent = iso(`
       PetBestFriendCard
       PetPhraseCard
       PetTaglineCard
+      PetTaglineTestCard
       PetStatsCard(id: $id)
     }
   }
@@ -43,6 +44,7 @@ export const PetDetailRouteComponent = iso(`
 
             <pet.PetPhraseCard />
             <pet.PetTaglineCard />
+            <pet.PetTaglineTestCard />
 
             <Card
               variant="outlined"
