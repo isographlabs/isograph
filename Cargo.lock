@@ -35,7 +35,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e89da841a80418a9b391ebaea17f5c112ffaaa96f621d2c285b5174da76b9011"
 dependencies = [
  "cfg-if",
- "getrandom 0.2.15",
  "once_cell",
  "version_check",
  "zerocopy",
@@ -536,12 +535,6 @@ dependencies = [
  "lazy_static",
  "windows-sys 0.59.0",
 ]
-
-[[package]]
-name = "colorize"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc17e449bc7854c50b943d113a98bc0e01dc6585d2c66eaa09ca645ebd8a7e62"
 
 [[package]]
 name = "common"
@@ -1140,7 +1133,6 @@ dependencies = [
  "graphql_lang_types",
  "graphql_schema_parser",
  "intern",
- "isograph_compiler",
  "isograph_config",
  "isograph_lang_types",
  "isograph_schema",
@@ -1656,7 +1648,6 @@ dependencies = [
 name = "isograph_config"
 version = "0.4.2"
 dependencies = [
- "colorize",
  "common_lang_types",
  "intern",
  "pico",
@@ -1743,7 +1734,6 @@ dependencies = [
 name = "isograph_schema"
 version = "0.4.2"
 dependencies = [
- "colorize",
  "common_lang_types",
  "graphql_lang_types",
  "impl_base_types_macro",
@@ -2141,18 +2131,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "945462a4b81e43c4e3ba96bd7b49d834c6f61198356aa858733bc4acf3cbe62e"
 
 [[package]]
-name = "once_map"
-version = "0.4.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7bd2cae3bec3936bbed1ccc5a3343b3738858182419f9c0522c7260c80c430b0"
-dependencies = [
- "ahash 0.8.11",
- "hashbrown 0.15.2",
- "parking_lot",
- "stable_deref_trait",
-]
-
-[[package]]
 name = "opentelemetry"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2360,7 +2338,6 @@ dependencies = [
  "dashmap",
  "intern",
  "lru",
- "once_map",
  "pico_macros",
  "serde",
  "serde_derive",
@@ -3063,9 +3040,6 @@ dependencies = [
 [[package]]
 name = "string_key_newtype"
 version = "0.4.2"
-dependencies = [
- "intern",
-]
 
 [[package]]
 name = "strsim"
@@ -3658,7 +3632,6 @@ dependencies = [
 name = "tests"
 version = "0.4.2"
 dependencies = [
- "colorize",
  "common_lang_types",
  "graphql_lang_types",
  "graphql_schema_parser",

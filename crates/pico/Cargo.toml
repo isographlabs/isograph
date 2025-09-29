@@ -12,7 +12,6 @@ bincode = { workspace = true }
 boxcar = { workspace = true }
 dashmap = { workspace = true }
 lru = { workspace = true }
-once_map = { workspace = true }
 serde = { workspace = true }
 serde_derive = { workspace = true }
 thiserror = { workspace = true }
