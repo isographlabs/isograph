@@ -26,6 +26,7 @@ type Viewer implements Node {
 }
 
 type Mutation {
+  expose_field_on_mutation: String
   set_pet_best_friend(id: ID!, new_best_friend_id: ID!): SetBestFriendResponse!
   set_pet_tagline(input: SetPetTaglineParams!): SetPetTaglineResponse!
   make_checkin_super(checkin_id: ID!): MakeCheckinSuperResponse!
