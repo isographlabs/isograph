@@ -26,7 +26,7 @@ import {
   type PayloadErrors,
   type StoreLink,
   type StoreRecord,
-  type WithErrors
+  type WithErrors,
 } from './IsographEnvironment';
 import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
@@ -344,9 +344,17 @@ export function readLoadablySelectedFieldData(
     };
   }
 
+  if (refetchReaderParams.errors) {
+    return {
+      kind: 'Success',
+      errors: refetchReaderParams.errors,
+      data: null,
+    };
+  }
+
   return {
     kind: 'Success',
-    errors: refetchReaderParams.errors,
+    errors: null,
     data: (
       args: any,
       // TODO get the associated type for FetchOptions from the loadably selected field
@@ -623,6 +631,16 @@ export function readResolverFieldData(
           recordLink: data.recordLink,
         };
       }
+      if (data.errors) {
+        // We can't call the resolver when there are errors
+        // the resolvers are semanticly non null so we can
+        // return null when there's an error
+        return {
+          kind: 'Success',
+          data: null,
+          errors: data.errors,
+        };
+      }
       const firstParameter = {
         data: data.data,
         parameters: variables,
@@ -637,7 +655,7 @@ export function readResolverFieldData(
       };
       return {
         kind: 'Success',
-        errors: data.errors,
+        errors: null,
         data: field.readerArtifact.resolver(firstParameter),
       };
     }
@@ -713,9 +731,8 @@ export function readLinkedFieldData(
   const storeRecordName = getParentRecordKey(field, variables);
   const value = storeRecord.record[storeRecordName];
 
-  let errors: PayloadErrors | null = null;
-
   if (Array.isArray(value)) {
+    let errors: PayloadErrors | null = null;
     const results = [];
     for (const item of value) {
       const link = assertLink(item);
@@ -779,55 +796,55 @@ export function readLinkedFieldData(
         recordLink: data.recordLink,
       };
     }
-    if (errors === null) {
-      errors = data.errors;
-    } else if (data.errors) {
-      errors.push(...data.errors);
+
+    if (data.errors && refetchQueryIndex !== null) {
+      // we can't call resolver for client pointers when there are errors,
+      // but for inline fragments this is fine
+      return {
+        kind: 'Success',
+        data: null,
+        errors: data.errors,
+      };
     }
 
-    if (refetchQueryIndex === null || data.errors === null) {
-      // we can't call `condition.resolver` for client pointers when there are errors,
-      // for inline fragment this is fine
+    const readerWithRefetchQueries = {
+      kind: 'ReaderWithRefetchQueries',
+      readerArtifact: field.condition,
+      // TODO this is wrong
+      // should map field.condition.usedRefetchQueries
+      // but it doesn't exist
+      nestedRefetchQueries: [],
+    } satisfies ReaderWithRefetchQueries<any, any>;
 
-      const readerWithRefetchQueries = {
-        kind: 'ReaderWithRefetchQueries',
-        readerArtifact: field.condition,
+    const fragment = {
+      kind: 'FragmentReference',
+      readerWithRefetchQueries: wrapResolvedValue(readerWithRefetchQueries),
+      root,
+      variables: generateChildVariableMap(
+        variables,
         // TODO this is wrong
-        // should map field.condition.usedRefetchQueries
+        // should use field.arguments
         // but it doesn't exist
-        nestedRefetchQueries: [],
-      } satisfies ReaderWithRefetchQueries<any, any>;
+        [],
+      ),
+      networkRequest,
+    } satisfies FragmentReference<any, any>;
 
-      const fragment = {
-        kind: 'FragmentReference',
-        readerWithRefetchQueries: wrapResolvedValue(readerWithRefetchQueries),
-        root,
-        variables: generateChildVariableMap(
-          variables,
-          // TODO this is wrong
-          // should use field.arguments
-          // but it doesn't exist
-          [],
-        ),
-        networkRequest,
-      } satisfies FragmentReference<any, any>;
-
-      const condition = field.condition.resolver({
-        data: data.data,
-        parameters: {},
-        ...(field.condition.hasUpdatable
-          ? {
-              startUpdate: getOrCreateCachedStartUpdate(
-                environment,
-                fragment,
-                readerWithRefetchQueries.readerArtifact.fieldName,
-                networkRequestOptions,
-              ),
-            }
-          : undefined),
-      });
-      link = condition;
-    }
+    const condition = field.condition.resolver({
+      data: data.data,
+      parameters: {},
+      ...(field.condition.hasUpdatable
+        ? {
+            startUpdate: getOrCreateCachedStartUpdate(
+              environment,
+              fragment,
+              readerWithRefetchQueries.readerArtifact.fieldName,
+              networkRequestOptions,
+            ),
+          }
+        : undefined),
+    });
+    link = condition;
   }
 
   if (link === undefined) {
@@ -866,6 +883,7 @@ export function readLinkedFieldData(
       link = altLink;
     }
   } else if (link === null) {
+    let errors: PayloadErrors | null = null;
     if (storeRecord.errors[storeRecordName]) {
       errors = storeRecord.errors[storeRecordName];
     }
@@ -902,10 +920,12 @@ export function readLinkedFieldData(
         recordLink: refetchReaderParams.recordLink,
       };
     }
-    if (errors === null) {
-      errors = refetchReaderParams.errors;
-    } else if (refetchReaderParams.errors) {
-      errors.push(...refetchReaderParams.errors);
+    if (refetchReaderParams.errors) {
+      return {
+        kind: 'Success',
+        data: null,
+        errors: refetchReaderParams.errors,
+      };
     }
 
     const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
@@ -919,7 +939,7 @@ export function readLinkedFieldData(
 
     return {
       kind: 'Success',
-      errors,
+      errors: null,
       data: (
         args,
         // TODO get the associated type for FetchOptions from the loadably selected field
@@ -994,15 +1014,7 @@ export function readLinkedFieldData(
       recordLink: data.recordLink,
     };
   }
-  if (errors === null) {
-    errors = data.errors;
-  } else if (data.errors) {
-    errors.push(...data.errors);
-  }
-  return {
-    ...data,
-    errors: errors,
-  };
+  return data;
 }
 
 export type NetworkRequestReaderOptions = {
@@ -1068,6 +1080,14 @@ export function readImperativelyLoadedField(
     };
   }
 
+  if (data.errors) {
+    return {
+      kind: 'Success',
+      data: null,
+      errors: data.errors,
+    };
+  }
+
   const { refetchQueryIndex } = field;
   const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
   if (refetchQuery == null) {
@@ -1082,7 +1102,7 @@ export function readImperativelyLoadedField(
   // use the resolver reader AST to get the resolver parameters.
   return {
     kind: 'Success',
-    errors: data.errors,
+    errors: null,
     data: (args: any) => [
       // Stable id
       root.__typename + ':' + root.__link + '__' + field.name,
