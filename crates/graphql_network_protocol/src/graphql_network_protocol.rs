@@ -244,15 +244,13 @@ impl GraphQLSchemaOriginalDefinitionType {
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum ParseAndProcessGraphQLTypeSystemDocumentsError {
-    #[error("{message}")]
+    #[error("{}", message.for_display())]
     SchemaParse {
-        #[from]
         message: WithLocation<SchemaParseError>,
     },
 
-    #[error("{message}")]
+    #[error("{}", message.for_display())]
     ProcessGraphQLTypeSystemDefinitionWithLocation {
-        #[from]
         message: WithLocation<ProcessGraphqlTypeSystemDefinitionError>,
     },
 
@@ -262,9 +260,30 @@ pub enum ParseAndProcessGraphQLTypeSystemDocumentsError {
         message: ProcessGraphqlTypeSystemDefinitionError,
     },
 
-    #[error("{message}")]
+    #[error("{}", message.for_display())]
     CreateAdditionalFields {
-        #[from]
         message: WithLocation<CreateAdditionalFieldsError>,
     },
+}
+
+impl From<WithLocation<SchemaParseError>> for ParseAndProcessGraphQLTypeSystemDocumentsError {
+    fn from(value: WithLocation<SchemaParseError>) -> Self {
+        Self::SchemaParse { message: value }
+    }
+}
+
+impl From<WithLocation<ProcessGraphqlTypeSystemDefinitionError>>
+    for ParseAndProcessGraphQLTypeSystemDocumentsError
+{
+    fn from(value: WithLocation<ProcessGraphqlTypeSystemDefinitionError>) -> Self {
+        Self::ProcessGraphQLTypeSystemDefinitionWithLocation { message: value }
+    }
+}
+
+impl From<WithLocation<CreateAdditionalFieldsError>>
+    for ParseAndProcessGraphQLTypeSystemDocumentsError
+{
+    fn from(value: WithLocation<CreateAdditionalFieldsError>) -> Self {
+        Self::CreateAdditionalFields { message: value }
+    }
 }

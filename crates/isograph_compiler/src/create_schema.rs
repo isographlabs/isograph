@@ -132,7 +132,7 @@ pub enum ProcessIsoLiteralsForSchemaError {
         "{}{}",
         if messages.len() == 1 { "Unable to process Isograph literal:" } else { "Unable to process Isograph literals:" },
         messages.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{x}"));
+            output.push_str(&format!("\n\n{}", x.for_display()));
             output
         })
     )]
@@ -140,16 +140,15 @@ pub enum ProcessIsoLiteralsForSchemaError {
         messages: Vec<WithLocation<ProcessClientFieldDeclarationError>>,
     },
 
-    #[error("{error}")]
+    #[error("{}", error.for_display())]
     ProcessTypeDefinition {
-        #[from]
         error: WithLocation<CreateAdditionalFieldsError>,
     },
 
     #[error(
         "{}",
         messages.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{x}"));
+            output.push_str(&format!("\n\n{}", x.for_display()));
             output
         })
     )]
@@ -160,7 +159,7 @@ pub enum ProcessIsoLiteralsForSchemaError {
     #[error(
         "{}",
         messages.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{x}"));
+            output.push_str(&format!("\n\n{}", x.for_display()));
             output
         })
     )]
@@ -171,7 +170,7 @@ pub enum ProcessIsoLiteralsForSchemaError {
     #[error(
         "{}",
         messages.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{x}"));
+            output.push_str(&format!("\n\n{}", x.for_display()));
             output
         })
     )]
@@ -205,6 +204,12 @@ impl From<Vec<WithLocation<ValidateEntrypointDeclarationError>>>
 impl From<Vec<WithLocation<AddSelectionSetsError>>> for ProcessIsoLiteralsForSchemaError {
     fn from(messages: Vec<WithLocation<AddSelectionSetsError>>) -> Self {
         ProcessIsoLiteralsForSchemaError::AddSelectionSets { messages }
+    }
+}
+
+impl From<WithLocation<CreateAdditionalFieldsError>> for ProcessIsoLiteralsForSchemaError {
+    fn from(value: WithLocation<CreateAdditionalFieldsError>) -> Self {
+        ProcessIsoLiteralsForSchemaError::ProcessTypeDefinition { error: value }
     }
 }
 
@@ -500,9 +505,16 @@ pub enum CreateSchemaError<TNetworkProtocol: NetworkProtocol + 'static> {
         message: TNetworkProtocol::ParseAndProcessTypeSystemDocumentsError,
     },
 
-    #[error("{message}")]
+    #[error("{}", message.for_display())]
     CreateAdditionalFields {
-        #[from]
         message: WithLocation<CreateAdditionalFieldsError>,
     },
+}
+
+impl<TNetworkProtocol: NetworkProtocol> From<WithLocation<CreateAdditionalFieldsError>>
+    for CreateSchemaError<TNetworkProtocol>
+{
+    fn from(value: WithLocation<CreateAdditionalFieldsError>) -> Self {
+        CreateSchemaError::CreateAdditionalFields { message: value }
+    }
 }

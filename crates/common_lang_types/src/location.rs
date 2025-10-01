@@ -140,16 +140,10 @@ pub struct WithLocation<T> {
     pub item: T,
 }
 
-impl<T: Error> Error for WithLocation<T> {
+impl<T: Error> Error for WithLocationForDisplay<'_, T> {
     fn description(&self) -> &str {
         #[allow(deprecated)]
-        self.item.description()
-    }
-}
-
-impl<T: fmt::Display> fmt::Display for WithLocation<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}\n{}", self.item, self.location)
+        self.inner.item.description()
     }
 }
 
@@ -179,6 +173,25 @@ impl<T> WithLocation<T> {
             item: self.item,
             span,
         }
+    }
+
+    pub fn for_display(&self) -> WithLocationForDisplay<'_, T> {
+        WithLocationForDisplay { inner: self }
+    }
+}
+
+/// [WithLocation] does not implement Display. There have been a few bugs in which
+/// a field was initially T, and then changed to be WithLocation<T>, and as a result,
+/// what was printed changed unexpectedly. So, we require an explicit step to print
+/// a WithLocation, calling with_location.for_display().
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WithLocationForDisplay<'a, T> {
+    inner: &'a WithLocation<T>,
+}
+
+impl<T: fmt::Display> fmt::Display for WithLocationForDisplay<'_, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}\n{}", self.inner.item, self.inner.location)
     }
 }
 
