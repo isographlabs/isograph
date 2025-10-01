@@ -34,7 +34,6 @@ pub fn compile_and_print<TNetworkProtocol: NetworkProtocol + 'static>(
 pub fn print_result<TNetworkProtocol: NetworkProtocol + 'static>(
     result: WithDuration<Result<CompilationStats, BatchCompileError<TNetworkProtocol>>>,
 ) -> Result<(), BatchCompileError<TNetworkProtocol>> {
-    let elapsed_time = result.elapsed_time;
     match result.item {
         Ok(stats) => {
             let s_if_plural = |count: usize| {
@@ -52,7 +51,7 @@ pub fn print_result<TNetworkProtocol: NetworkProtocol + 'static>(
                 s_if_plural(stats.entrypoint_count),
                 stats.total_artifacts_written,
                 s_if_plural(stats.total_artifacts_written),
-                pretty_duration(&elapsed_time, None)
+                pretty_duration(&result.elapsed_time, None)
             );
             Ok(())
         }
@@ -61,7 +60,11 @@ pub fn print_result<TNetworkProtocol: NetworkProtocol + 'static>(
                 "{}\n{}\n{}",
                 "Error when compiling.\n".bright_red(),
                 err,
-                format!("Compilation took {}.", pretty_duration(&elapsed_time, None)).bright_red()
+                format!(
+                    "Compilation took {}.",
+                    pretty_duration(&result.elapsed_time, None)
+                )
+                .bright_red()
             );
             Err(err)
         }
