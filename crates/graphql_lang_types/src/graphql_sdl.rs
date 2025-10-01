@@ -279,9 +279,9 @@ pub struct GraphQLInputValueDefinition {
 
 impl fmt::Display for GraphQLInputValueDefinition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {}", self.name, self.type_)?;
+        write!(f, "{}: {}", self.name.item, self.type_)?;
         if let Some(v) = &self.default_value {
-            write!(f, " = {v}")?;
+            write!(f, " = {}", v.item)?;
         }
 
         write_directives(f, &self.directives)?;
