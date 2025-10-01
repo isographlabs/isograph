@@ -54,7 +54,7 @@ impl fmt::Display for GraphQLConstantValue {
                 "[{}]",
                 value
                     .iter()
-                    .map(|item| item.to_string())
+                    .map(|item| item.item.to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
             )),
