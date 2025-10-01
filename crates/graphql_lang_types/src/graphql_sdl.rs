@@ -257,8 +257,11 @@ pub struct GraphQLFieldDefinition {
 
 impl fmt::Display for GraphQLFieldDefinition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.name)?;
-        write_arguments(f, &self.arguments)?;
+        write!(f, "{}", self.name.item)?;
+        write_arguments(
+            f,
+            &self.arguments.iter().map(|x| &x.item).collect::<Vec<_>>(),
+        )?;
         write!(f, ": {}", self.type_)?;
         write_directives(f, &self.directives)?;
         Ok(())
