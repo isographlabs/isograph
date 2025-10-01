@@ -37,31 +37,23 @@ pub fn print_result<TNetworkProtocol: NetworkProtocol + 'static>(
     let elapsed_time = result.elapsed_time;
     match result.item {
         Ok(stats) => {
+            let s_if_plural = |count: usize| {
+                if count == 1 { "" } else { "s" }
+            };
+
             info!(
                 "{}",
                 format!(
                     "Successfully compiled {} client field{}, {} client pointer{}, {} \
                     entrypoint{}, and wrote {} artifact{}, in {}.",
                     stats.client_field_count,
-                    if stats.client_field_count == 1 {
-                        ""
-                    } else {
-                        "s"
-                    },
+                    s_if_plural(stats.client_field_count),
                     stats.client_pointer_count,
-                    if stats.client_pointer_count == 1 {
-                        ""
-                    } else {
-                        "s"
-                    },
+                    s_if_plural(stats.client_pointer_count),
                     stats.entrypoint_count,
-                    if stats.entrypoint_count == 1 { "" } else { "s" },
+                    s_if_plural(stats.entrypoint_count),
                     stats.total_artifacts_written,
-                    if stats.total_artifacts_written == 1 {
-                        ""
-                    } else {
-                        "s"
-                    },
+                    s_if_plural(stats.total_artifacts_written),
                     pretty_duration(&elapsed_time, None)
                 )
             );
