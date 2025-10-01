@@ -42,20 +42,17 @@ pub fn print_result<TNetworkProtocol: NetworkProtocol + 'static>(
             };
 
             info!(
-                "{}",
-                format!(
-                    "Successfully compiled {} client field{}, {} client pointer{}, {} \
-                    entrypoint{}, and wrote {} artifact{}, in {}.",
-                    stats.client_field_count,
-                    s_if_plural(stats.client_field_count),
-                    stats.client_pointer_count,
-                    s_if_plural(stats.client_pointer_count),
-                    stats.entrypoint_count,
-                    s_if_plural(stats.entrypoint_count),
-                    stats.total_artifacts_written,
-                    s_if_plural(stats.total_artifacts_written),
-                    pretty_duration(&elapsed_time, None)
-                )
+                "Successfully compiled {} client field{}, {} client pointer{}, {} \
+                entrypoint{}, and wrote {} artifact{}, in {}.",
+                stats.client_field_count,
+                s_if_plural(stats.client_field_count),
+                stats.client_pointer_count,
+                s_if_plural(stats.client_pointer_count),
+                stats.entrypoint_count,
+                s_if_plural(stats.entrypoint_count),
+                stats.total_artifacts_written,
+                s_if_plural(stats.total_artifacts_written),
+                pretty_duration(&elapsed_time, None)
             );
             Ok(())
         }
