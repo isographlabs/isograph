@@ -168,6 +168,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
     return {
       kind: 'Success',
       data: null as any,
+      errors: [],
     };
   }
 
@@ -196,7 +197,10 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
           },
           field.isUpdatable
             ? (newValue) => {
-                storeRecord[storeRecordName] = newValue;
+                storeRecord.record[storeRecordName] = newValue;
+                if (newValue === null) {
+                  delete storeRecord.errors[storeRecordName];
+                }
                 const updatedIds = insertEmptySetIfMissing(
                   mutableUpdatedIds,
                   root.__typename,
@@ -244,11 +248,16 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
           'isUpdatable' in field && field.isUpdatable
             ? (newValue) => {
                 if (Array.isArray(newValue)) {
-                  storeRecord[storeRecordName] = newValue.map((node) =>
+                  storeRecord.record[storeRecordName] = newValue.map((node) =>
                     assertLink(node?.link),
                   );
                 } else {
-                  storeRecord[storeRecordName] = assertLink(newValue?.link);
+                  storeRecord.record[storeRecordName] = assertLink(
+                    newValue?.link,
+                  );
+                  if (newValue === null) {
+                    delete storeRecord.errors[storeRecordName];
+                  }
                 }
                 const updatedIds = insertEmptySetIfMissing(
                   mutableUpdatedIds,
@@ -330,5 +339,6 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
   return {
     kind: 'Success',
     data: target as any,
+    errors: [],
   };
 }
