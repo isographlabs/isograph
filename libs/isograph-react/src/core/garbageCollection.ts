@@ -1,5 +1,5 @@
 import { getParentRecordKey } from './cache';
-import { NormalizationAstNodes } from './entrypoint';
+import { NormalizationAstNodes, type NormalizationAst } from './entrypoint';
 import { Variables } from './FragmentReference';
 import {
   assertLink,
@@ -12,10 +12,30 @@ import {
 } from './IsographEnvironment';
 
 export type RetainedQuery = {
-  readonly normalizationAst: NormalizationAstNodes;
+  normalizationAst:
+    | {
+        kind: 'Loading';
+      }
+    | {
+        kind: 'Ready';
+        value: NormalizationAst;
+      };
   readonly variables: {};
   readonly root: StoreLink;
 };
+
+export interface ReadyRetainedQuery extends RetainedQuery {
+  readonly normalizationAst: {
+    kind: 'Ready';
+    value: NormalizationAst;
+  };
+}
+
+function isRetainedQueryReady(
+  query: RetainedQuery,
+): query is ReadyRetainedQuery {
+  return query.normalizationAst.kind === 'Ready';
+}
 
 export type DidUnretainSomeQuery = boolean;
 export function unretainQuery(
@@ -23,9 +43,9 @@ export function unretainQuery(
   retainedQuery: RetainedQuery,
 ): DidUnretainSomeQuery {
   environment.retainedQueries.delete(retainedQuery);
-  environment.gcBuffer.push(retainedQuery);
-
-  if (environment.gcBuffer.length > environment.gcBufferSize) {
+  if (isRetainedQueryReady(retainedQuery)) {
+    environment.gcBuffer.push(retainedQuery);
+  } else if (environment.gcBuffer.length > environment.gcBufferSize) {
     environment.gcBuffer.shift();
     return true;
   }
@@ -47,7 +67,12 @@ export function garbageCollectEnvironment(environment: IsographEnvironment) {
   const retainedIds: RetainedIds = {};
 
   for (const query of environment.retainedQueries) {
-    recordReachableIds(environment.store, query, retainedIds);
+    if (isRetainedQueryReady(query)) {
+      recordReachableIds(environment.store, query, retainedIds);
+    } else {
+      // if we have any queries with loading normalizationAst, we can't garbage collect
+      return;
+    }
   }
   for (const query of environment.gcBuffer) {
     recordReachableIds(environment.store, query, retainedIds);
@@ -82,7 +107,7 @@ interface RetainedIds {
 
 function recordReachableIds(
   store: IsographStore,
-  retainedQuery: RetainedQuery,
+  retainedQuery: ReadyRetainedQuery,
   mutableRetainedIds: RetainedIds,
 ) {
   const record =
@@ -98,7 +123,7 @@ function recordReachableIds(
       store,
       record,
       mutableRetainedIds,
-      retainedQuery.normalizationAst,
+      retainedQuery.normalizationAst.value.selections,
       retainedQuery.variables,
     );
   }
