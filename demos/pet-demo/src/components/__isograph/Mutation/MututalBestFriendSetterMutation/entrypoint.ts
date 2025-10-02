@@ -1,14 +1,14 @@
 import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
-import {Mutation__TestLazyReference__param} from './param_type';
-import {Mutation__TestLazyReference__output_type} from './output_type';
+import {Mutation__MututalBestFriendSetterMutation__param} from './param_type';
+import {Mutation__MututalBestFriendSetterMutation__output_type} from './output_type';
 import readerResolver from './resolver_reader';
 import queryText from './query_text';
 import normalizationAst from './normalization_ast';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
 const artifact: IsographEntrypoint<
-  Mutation__TestLazyReference__param,
-  Mutation__TestLazyReference__output_type,
+  Mutation__MututalBestFriendSetterMutation__param,
+  Mutation__MututalBestFriendSetterMutation__output_type,
   NormalizationAst
 > = {
   kind: "Entrypoint",

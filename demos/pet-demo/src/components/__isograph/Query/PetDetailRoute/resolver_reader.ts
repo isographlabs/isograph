@@ -1,12 +1,12 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Query__PetDetailRoute__param } from './param_type';
 import { PetDetailRouteComponent as resolver } from '../../../PetDetailRoute';
+import Pet__MutualBestFriendSetter__resolver_reader from '../../Pet/MutualBestFriendSetter/resolver_reader';
 import Pet__PetBestFriendCard__resolver_reader from '../../Pet/PetBestFriendCard/resolver_reader';
 import Pet__PetCheckinsCard__resolver_reader from '../../Pet/PetCheckinsCard/resolver_reader';
 import Pet__PetPhraseCard__resolver_reader from '../../Pet/PetPhraseCard/resolver_reader';
 import Pet__PetStatsCard__resolver_reader from '../../Pet/PetStatsCard/resolver_reader';
 import Pet__PetTaglineCard__resolver_reader from '../../Pet/PetTaglineCard/resolver_reader';
-import Pet__PetTaglineTestCard__resolver_reader from '../../Pet/PetTaglineTestCard/resolver_reader';
 import Pet__custom_pet_refetch__refetch_reader from '../../Pet/custom_pet_refetch/refetch_reader';
 
 const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
@@ -68,9 +68,9 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
       },
       {
         kind: "Resolver",
-        alias: "PetTaglineTestCard",
+        alias: "MutualBestFriendSetter",
         arguments: null,
-        readerArtifact: Pet__PetTaglineTestCard__resolver_reader,
+        readerArtifact: Pet__MutualBestFriendSetter__resolver_reader,
         usedRefetchQueries: [],
       },
       {

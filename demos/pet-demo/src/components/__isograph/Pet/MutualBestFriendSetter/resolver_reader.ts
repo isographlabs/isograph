@@ -1,8 +1,8 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
-import { Pet__PetTaglineTestCard__param } from './param_type';
-import { SetTaglineTest as resolver } from '../../../Pet/PetTaglineCard2';
+import { Pet__MutualBestFriendSetter__param } from './param_type';
+import { MutualBestFriendSetter as resolver } from '../../../Pet/MutualBestFriendSetter';
 
-const readerAst: ReaderAst<Pet__PetTaglineTestCard__param> = [
+const readerAst: ReaderAst<Pet__MutualBestFriendSetter__param> = [
   {
     kind: "Scalar",
     fieldName: "id",
@@ -13,11 +13,11 @@ const readerAst: ReaderAst<Pet__PetTaglineTestCard__param> = [
 ];
 
 const artifact: ComponentReaderArtifact<
-  Pet__PetTaglineTestCard__param,
+  Pet__MutualBestFriendSetter__param,
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  fieldName: "Pet.PetTaglineTestCard",
+  fieldName: "Pet.MutualBestFriendSetter",
   resolver,
   readerAst,
   hasUpdatable: false,
