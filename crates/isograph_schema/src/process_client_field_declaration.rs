@@ -275,12 +275,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         let selections = client_field_declaration.item.selection_set;
 
-        let refetch_strategy = if let Some(root_operation_name) =
-            self.fetchable_types.get(&parent_object_entity_name)
+        let refetch_strategy = if self
+            .fetchable_types
+            .contains_key(&parent_object_entity_name)
         {
-            Some(RefetchStrategy::RefetchFromRoot(
-                root_operation_name.clone(),
-            ))
+            Some(RefetchStrategy::RefetchFromRoot)
         } else {
             let id_field = self
                 .server_entity_data
@@ -361,10 +360,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let unprocessed_fields = client_pointer_declaration.item.selection_set;
 
         // TODO extract this into a helper function, probably on TNetworkProtocol
-        let refetch_strategy = if let Some(root_operation_name) =
-            self.fetchable_types.get(to_object_name.inner())
-        {
-            RefetchStrategy::RefetchFromRoot(root_operation_name.clone())
+        let refetch_strategy = if self.fetchable_types.contains_key(to_object_name.inner()) {
+            RefetchStrategy::RefetchFromRoot
         } else {
             let id_field = self
                 .server_entity_data

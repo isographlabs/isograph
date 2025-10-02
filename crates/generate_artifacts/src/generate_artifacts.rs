@@ -296,7 +296,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                     "Expected a refetch strategy. \
                                         This is indicative of a bug in Isograph.",
                                 ) {
-                                    RefetchStrategy::RefetchFromRoot(_) => (
+                                    RefetchStrategy::RefetchFromRoot => (
                                         selection_map_wrapped(merged_selection_map.clone(), vec![]),
                                         variable_definitions_iter.collect(),
                                     ),

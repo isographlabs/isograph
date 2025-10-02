@@ -10,7 +10,7 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    MergedSelectionMap, RootOperationName, UnprocessedSelection, WrappedSelectionMapSelection,
+    MergedSelectionMap, UnprocessedSelection, WrappedSelectionMapSelection,
     get_reachable_variables, selection_map_wrapped,
 };
 
@@ -25,7 +25,7 @@ pub enum RefetchStrategy<
             TSelectionTypeSelectionLinkedFieldAssociatedData,
         >,
     ),
-    RefetchFromRoot(RootOperationName),
+    RefetchFromRoot,
 }
 
 impl<
@@ -53,7 +53,7 @@ impl<
             RefetchStrategy::UseRefetchField(used_refetch_field) => {
                 Some(&used_refetch_field.refetch_selection_set)
             }
-            RefetchStrategy::RefetchFromRoot(_) => None,
+            RefetchStrategy::RefetchFromRoot => None,
         }
     }
 }
