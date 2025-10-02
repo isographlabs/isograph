@@ -72,6 +72,11 @@ export function mergeObjectsUsingReaderAst(
     switch (field.kind) {
       case 'Scalar':
       case 'Linked':
+        if (field.kind === 'Linked' && field.refetchQueryIndex != null) {
+          // client pointers are functions, so we can't merge them
+          canRecycle = false;
+          break;
+        }
         const key = field.alias ?? field.fieldName;
         // @ts-expect-error
         const oldValue = oldItemObject[key];

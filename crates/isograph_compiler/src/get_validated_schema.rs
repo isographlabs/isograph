@@ -31,7 +31,7 @@ pub enum GetValidatedSchemaError<TNetworkProtocol: NetworkProtocol + 'static> {
     #[error(
         "{}",
         messages.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{x}"));
+            output.push_str(&format!("\n\n{}", x.for_display()));
             output
         })
     )]

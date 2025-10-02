@@ -18,5 +18,4 @@ pico_macros = { path = "../pico_macros" }
 schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-colorize = { workspace = true }
 tracing = { workspace = true }

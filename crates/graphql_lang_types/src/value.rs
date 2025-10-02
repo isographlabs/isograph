@@ -54,7 +54,7 @@ impl fmt::Display for GraphQLConstantValue {
                 "[{}]",
                 value
                     .iter()
-                    .map(|item| item.to_string())
+                    .map(|item| item.item.to_string())
                     .collect::<Vec<String>>()
                     .join(", ")
             )),
@@ -131,6 +131,6 @@ impl<TName, TValue> NameValuePair<TName, TValue> {
 
 impl<TName: fmt::Display, TValue: fmt::Display> fmt::Display for NameValuePair<TName, TValue> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_fmt(format_args!("{}: {}", self.name, self.value))
+        f.write_fmt(format_args!("{}: {}", self.name.item, self.value.item))
     }
 }

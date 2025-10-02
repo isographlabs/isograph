@@ -34,36 +34,24 @@ pub fn compile_and_print<TNetworkProtocol: NetworkProtocol + 'static>(
 pub fn print_result<TNetworkProtocol: NetworkProtocol + 'static>(
     result: WithDuration<Result<CompilationStats, BatchCompileError<TNetworkProtocol>>>,
 ) -> Result<(), BatchCompileError<TNetworkProtocol>> {
-    let elapsed_time = result.elapsed_time;
     match result.item {
         Ok(stats) => {
+            let s_if_plural = |count: usize| {
+                if count == 1 { "" } else { "s" }
+            };
+
             info!(
-                "{}",
-                format!(
-                    "Successfully compiled {} client field{}, {} client pointer{}, {} \
-                    entrypoint{}, and wrote {} artifact{}, in {}.",
-                    stats.client_field_count,
-                    if stats.client_field_count == 1 {
-                        ""
-                    } else {
-                        "s"
-                    },
-                    stats.client_pointer_count,
-                    if stats.client_pointer_count == 1 {
-                        ""
-                    } else {
-                        "s"
-                    },
-                    stats.entrypoint_count,
-                    if stats.entrypoint_count == 1 { "" } else { "s" },
-                    stats.total_artifacts_written,
-                    if stats.total_artifacts_written == 1 {
-                        ""
-                    } else {
-                        "s"
-                    },
-                    pretty_duration(&elapsed_time, None)
-                )
+                "Successfully compiled {} client field{}, {} client pointer{}, {} \
+                entrypoint{}, and wrote {} artifact{}, in {}.",
+                stats.client_field_count,
+                s_if_plural(stats.client_field_count),
+                stats.client_pointer_count,
+                s_if_plural(stats.client_pointer_count),
+                stats.entrypoint_count,
+                s_if_plural(stats.entrypoint_count),
+                stats.total_artifacts_written,
+                s_if_plural(stats.total_artifacts_written),
+                pretty_duration(&result.elapsed_time, None)
             );
             Ok(())
         }
@@ -72,7 +60,11 @@ pub fn print_result<TNetworkProtocol: NetworkProtocol + 'static>(
                 "{}\n{}\n{}",
                 "Error when compiling.\n".bright_red(),
                 err,
-                format!("Compilation took {}.", pretty_duration(&elapsed_time, None)).bright_red()
+                format!(
+                    "Compilation took {}.",
+                    pretty_duration(&result.elapsed_time, None)
+                )
+                .bright_red()
             );
             Err(err)
         }

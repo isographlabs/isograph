@@ -147,7 +147,7 @@ fn generate_content_for_output_file(
         Err(errs) => {
             let mut s = String::new();
             for err in errs {
-                let err_printed = format!("{err}");
+                let err_printed = format!("{}", err.for_display());
                 let wrapped_err: Result<(), _> = Err(err);
                 s.push_str(&format!("{wrapped_err:#?}\n\n{err_printed}\n---\n"));
             }

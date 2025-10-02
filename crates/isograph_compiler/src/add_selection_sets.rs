@@ -260,14 +260,14 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                             )
                             .expect(
                                 "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
+                                This is indicative of a bug in Isograph.",
                             );
                         let object = schema
                             .server_entity_data
                             .server_object_entity(*object_selectable.target_object_entity.inner())
                             .expect(
                                 "Expected entity to exist. \
-                            This is indicative of a bug in Isograph.",
+                                This is indicative of a bug in Isograph.",
                             );
 
                         WithLocation::new(
@@ -294,16 +294,16 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                 *client_type.as_scalar().as_ref().ok_or_else(|| {
                     WithLocation::new(
                     AddSelectionSetsError::SelectionTypeSelectionClientPointerSelectedAsScalar {
-                        client_field_parent_type_name: top_level_field_or_pointer
-                            .type_and_field()
-                            .type_name,
-                        client_field_name: top_level_field_or_pointer.type_and_field().field_name,
-                        field_parent_type_name: selection_parent_object.name.item,
-                        field_name: scalar_selection.name.item.into(),
-                        client_type: top_level_field_or_pointer.client_type().to_string(),
-                    },
-                    scalar_selection.name.location,
-                )
+                            client_field_parent_type_name: top_level_field_or_pointer
+                                .type_and_field()
+                                .type_name,
+                            client_field_name: top_level_field_or_pointer.type_and_field().field_name,
+                            field_parent_type_name: selection_parent_object.name.item,
+                            field_name: scalar_selection.name.item.into(),
+                            client_type: top_level_field_or_pointer.client_type().to_string(),
+                        },
+                        scalar_selection.name.location,
+                    )
                 })?;
             DefinitionLocation::Client((parent_object_entity_name, client_field_name))
         }
@@ -408,17 +408,17 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol + 'static>(
             let (parent_object_entity_name, client_pointer_name) =
                 *client_type.as_object().as_ref().ok_or_else(|| {
                     vec![WithLocation::new(
-                    AddSelectionSetsError::SelectionTypeSelectionClientPointerSelectedAsScalar {
-                        client_field_parent_type_name: top_level_field_or_pointer
-                            .type_and_field()
-                            .type_name,
-                        client_field_name: top_level_field_or_pointer.type_and_field().field_name,
-                        field_parent_type_name: selection_parent_object.name.item,
-                        field_name: object_selection.name.item.into(),
-                        client_type: top_level_field_or_pointer.client_type().to_string(),
-                    },
-                    Location::generated(),
-                )]
+                        AddSelectionSetsError::SelectionTypeSelectionClientPointerSelectedAsScalar {
+                            client_field_parent_type_name: top_level_field_or_pointer
+                                .type_and_field()
+                                .type_name,
+                            client_field_name: top_level_field_or_pointer.type_and_field().field_name,
+                            field_parent_type_name: selection_parent_object.name.item,
+                            field_name: object_selection.name.item.into(),
+                            client_type: top_level_field_or_pointer.client_type().to_string(),
+                        },
+                        Location::generated(),
+                    )]
                 })?;
             let client_pointer = schema
                 .client_pointer(parent_object_entity_name, client_pointer_name)

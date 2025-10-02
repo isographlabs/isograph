@@ -17,6 +17,5 @@ pico = { path = "../pico" }
 pico_macros = { path = "../pico_macros" }
 thiserror = { workspace = true }
 lazy_static = { workspace = true }
-colorize = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }

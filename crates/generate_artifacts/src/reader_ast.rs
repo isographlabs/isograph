@@ -533,7 +533,7 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
             .as_ref()
             .expect(
                 "Expected refetch strategy. \
-                    This is indicative of a bug in Isograph.",
+                This is indicative of a bug in Isograph.",
             )
             .refetch_selection_set()
             .unwrap_or(&empty_selection_set),
