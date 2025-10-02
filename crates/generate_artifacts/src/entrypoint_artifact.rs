@@ -89,7 +89,8 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
         entrypoint
             .variable_definitions
             .iter()
-            .map(|variable_definition| &variable_definition.item),
+            .map(|variable_definition| &variable_definition.item)
+            .collect(),
         &schema.find_mutation(),
         file_extensions,
         persisted_documents,
@@ -98,7 +99,6 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
-    'a,
     TNetworkProtocol: NetworkProtocol,
 >(
     schema: &Schema<TNetworkProtocol>,
@@ -107,7 +107,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     merged_selection_map: &MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,
     encountered_client_type_map: &FieldToCompletedMergeTraversalStateMap,
-    variable_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + Clone + 'a,
+    variable_definitions: Vec<&ValidatedVariableDefinition>,
     default_root_operation: &Option<(&ServerObjectEntityName, &RootOperationName)>,
     file_extensions: GenerateFileExtensionsOption,
     persisted_documents: &mut Option<PersistedDocuments>,
@@ -144,7 +144,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         query_name,
         schema,
         merged_selection_map,
-        variable_definitions.clone(),
+        variable_definitions.iter().copied(),
         root_operation_name,
         Format::Pretty,
     );
@@ -230,7 +230,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         query_name,
         schema,
         merged_selection_map,
-        variable_definitions,
+        variable_definitions.iter().copied(),
         root_operation_name,
         concrete_type.name.item,
         persisted_documents,

@@ -5,11 +5,14 @@ import { type BlogItem__BlogItemMoreDetail__param } from './BlogItem/BlogItemMor
 import { type Checkin__CheckinDisplay__param } from './Checkin/CheckinDisplay/param_type';
 import { type Image__ImageDisplayWrapper__param } from './Image/ImageDisplayWrapper/param_type';
 import { type Image__ImageDisplay__param } from './Image/ImageDisplay/param_type';
+import { type Mutation__MutualBestFriendSetterOtherSide__param } from './Mutation/MutualBestFriendSetterOtherSide/param_type';
+import { type Mutation__MututalBestFriendSetterMutation__param } from './Mutation/MututalBestFriendSetterMutation/param_type';
 import { type Mutation__SetTagline__param } from './Mutation/SetTagline/param_type';
 import { type NewsfeedItem__NewsfeedAdOrBlog__param } from './NewsfeedItem/NewsfeedAdOrBlog/param_type';
 import { type Pet__Avatar__param } from './Pet/Avatar/param_type';
 import { type Pet__FavoritePhraseLoader__param } from './Pet/FavoritePhraseLoader/param_type';
 import { type Pet__FirstCheckinMakeSuperButton__param } from './Pet/FirstCheckinMakeSuperButton/param_type';
+import { type Pet__MutualBestFriendSetter__param } from './Pet/MutualBestFriendSetter/param_type';
 import { type Pet__PetBestFriendCard__param } from './Pet/PetBestFriendCard/param_type';
 import { type Pet__PetCheckinsCardList__param } from './Pet/PetCheckinsCardList/param_type';
 import { type Pet__PetCheckinsCard__param } from './Pet/PetCheckinsCard/param_type';
@@ -32,6 +35,7 @@ import { type Query__SmartestPetRoute__param } from './Query/SmartestPetRoute/pa
 import { type Query__smartestPet__param } from './Query/smartestPet/param_type';
 import { type Viewer__NewsfeedPaginationComponent__param } from './Viewer/NewsfeedPaginationComponent/param_type';
 import { type Pet__link__output_type } from './Pet/link/output_type';
+import entrypoint_Mutation__MututalBestFriendSetterMutation from '../__isograph/Mutation/MututalBestFriendSetterMutation/entrypoint';
 import entrypoint_Mutation__SetTagline from '../__isograph/Mutation/SetTagline/entrypoint';
 import entrypoint_Query__HomeRoute from '../__isograph/Query/HomeRoute/entrypoint';
 import entrypoint_Query__Newsfeed from '../__isograph/Query/Newsfeed/entrypoint';
@@ -115,6 +119,14 @@ export function iso<T>(
 ): IdentityWithParamComponent<Image__ImageDisplay__param>;
 
 export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Mutation.MutualBestFriendSetterOtherSide', T>
+): IdentityWithParamComponent<Mutation__MutualBestFriendSetterOtherSide__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Mutation.MututalBestFriendSetterMutation', T>
+): IdentityWithParamComponent<Mutation__MututalBestFriendSetterMutation__param>;
+
+export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Mutation.SetTagline', T>
 ): IdentityWithParamComponent<Mutation__SetTagline__param>;
 
@@ -133,6 +145,10 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.FirstCheckinMakeSuperButton', T>
 ): IdentityWithParamComponent<Pet__FirstCheckinMakeSuperButton__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Pet.MutualBestFriendSetter', T>
+): IdentityWithParamComponent<Pet__MutualBestFriendSetter__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.PetBestFriendCard', T>
@@ -217,6 +233,10 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Viewer.NewsfeedPaginationComponent', T>
 ): IdentityWithParam<Viewer__NewsfeedPaginationComponent__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Mutation.MututalBestFriendSetterMutation', T>
+): typeof entrypoint_Mutation__MututalBestFriendSetterMutation;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Mutation.SetTagline', T>

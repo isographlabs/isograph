@@ -1,3 +1,4 @@
+import { type Pet__MutualBestFriendSetter__output_type } from '../../Pet/MutualBestFriendSetter/output_type';
 import { type Pet__PetBestFriendCard__output_type } from '../../Pet/PetBestFriendCard/output_type';
 import { type Pet__PetCheckinsCard__output_type } from '../../Pet/PetCheckinsCard/output_type';
 import { type Pet__PetPhraseCard__output_type } from '../../Pet/PetPhraseCard/output_type';
@@ -15,6 +16,7 @@ export type Query__PetDetailRoute__param = {
       readonly PetBestFriendCard: Pet__PetBestFriendCard__output_type,
       readonly PetPhraseCard: Pet__PetPhraseCard__output_type,
       readonly PetTaglineCard: Pet__PetTaglineCard__output_type,
+      readonly MutualBestFriendSetter: Pet__MutualBestFriendSetter__output_type,
       readonly PetStatsCard: Pet__PetStatsCard__output_type,
     } | null),
   },

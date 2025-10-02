@@ -6,15 +6,22 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { FullPageLoading, PetDetailRoute, useNavigateTo } from './routes';
 
 export const PetDetailRouteComponent = iso(`
-  field Query.PetDetailRoute($id: ID!) @component {
-    pet(id: $id) {
+  field Query.PetDetailRoute(
+    $id: ID !
+  ) @component {
+    pet(
+      id: $id
+    ) {
       custom_pet_refetch
       name
       PetCheckinsCard
       PetBestFriendCard
       PetPhraseCard
       PetTaglineCard
-      PetStatsCard(id: $id)
+      MutualBestFriendSetter
+      PetStatsCard(
+        id: $id
+      )
     }
   }
 `)(function PetDetailRouteComponent({ data, parameters }) {
@@ -43,6 +50,7 @@ export const PetDetailRouteComponent = iso(`
 
             <pet.PetPhraseCard />
             <pet.PetTaglineCard />
+            <pet.MutualBestFriendSetter />
 
             <Card
               variant="outlined"
