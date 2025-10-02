@@ -4,7 +4,15 @@ import {
   useImperativeReference,
 } from '@isograph/react';
 import { iso } from '../__isograph/iso';
-import { Button } from '@mui/material';
+import { Button, Card, CardContent } from '@mui/material';
+
+/**
+ * This is a bit of a contrived demo that shows that @loadable fields on
+ * root mutations work.
+ *
+ * Note that we are fetching some additional, unused, fields, so that
+ * the PetBestFriendCard continues to work. This is somewhat awkward!
+ */
 
 export const setMututalBestFriend = iso(`
   field Mutation.MututalBestFriendSetterMutation(
@@ -18,8 +26,11 @@ export const setMututalBestFriend = iso(`
       pet {
         id
         best_friend_relationship {
+          picture_together
           best_friend {
             id
+            name
+            Avatar
           }
         }
       }
@@ -27,7 +38,7 @@ export const setMututalBestFriend = iso(`
     MutualBestFriendSetterOtherSide @loadable
   }
 `)(({ data }) => {
-  if (!data.set_pet_best_friend.pet.best_friend_relationship?.best_friend.id) {
+  if (!data.set_pet_best_friend.pet.best_friend_relationship) {
     throw new Error('Somehow the new best friend id was not set');
   }
 
@@ -86,21 +97,33 @@ export const MutualBestFriendSetter = iso(`
     iso(`entrypoint Mutation.MututalBestFriendSetterMutation`),
   );
 
-  if (!mutationRef) {
-    return (
-      <Button
-        onClick={() => {
-          loadMutation({
+  const cardContent = !mutationRef ? (
+    <Button
+      onClick={() => {
+        loadMutation(
+          {
             id: data.id,
             new_best_friend_id: '0',
-          });
-        }}
-        variant="contained"
-      >
-        Set best friend to Makayla
-      </Button>
-    );
-  } else {
-    return <FragmentRenderer fragmentReference={mutationRef} />;
-  }
+          },
+          {
+            shouldFetch: 'Yes',
+          },
+        );
+      }}
+      variant="contained"
+    >
+      Set best friend to Makayla
+    </Button>
+  ) : (
+    <FragmentRenderer fragmentReference={mutationRef} />
+  );
+
+  return (
+    <Card
+      variant="outlined"
+      sx={{ width: 450, boxShadow: 3, backgroundColor: '#BBB' }}
+    >
+      <CardContent>{cardContent}</CardContent>
+    </Card>
+  );
 });

@@ -46,7 +46,22 @@ const normalizationAst: NormalizationAst = {
                       fieldName: "id",
                       arguments: null,
                     },
+                    {
+                      kind: "Scalar",
+                      fieldName: "name",
+                      arguments: null,
+                    },
+                    {
+                      kind: "Scalar",
+                      fieldName: "picture",
+                      arguments: null,
+                    },
                   ],
+                },
+                {
+                  kind: "Scalar",
+                  fieldName: "picture_together",
+                  arguments: null,
                 },
               ],
             },

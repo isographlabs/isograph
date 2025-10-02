@@ -5,7 +5,10 @@ export default 'mutation MututalBestFriendSetterMutation($id: ID!, $new_best_fri
       best_friend_relationship {\
         best_friend {\
           id,\
+          name,\
+          picture,\
         },\
+        picture_together,\
       },\
     },\
   },\

@@ -2,6 +2,7 @@ import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@iso
 import { Mutation__MututalBestFriendSetterMutation__param } from './param_type';
 import { setMututalBestFriend as resolver } from '../../../Pet/MutualBestFriendSetter';
 import Mutation__MutualBestFriendSetterOtherSide__entrypoint from '../../Mutation/MutualBestFriendSetterOtherSide/entrypoint';
+import Pet__Avatar__resolver_reader from '../../Pet/Avatar/resolver_reader';
 
 const readerAst: ReaderAst<Mutation__MututalBestFriendSetterMutation__param> = [
   {
@@ -49,6 +50,13 @@ const readerAst: ReaderAst<Mutation__MututalBestFriendSetterMutation__param> = [
             refetchQueryIndex: null,
             selections: [
               {
+                kind: "Scalar",
+                fieldName: "picture_together",
+                alias: null,
+                arguments: null,
+                isUpdatable: false,
+              },
+              {
                 kind: "Linked",
                 fieldName: "best_friend",
                 alias: null,
@@ -63,6 +71,20 @@ const readerAst: ReaderAst<Mutation__MututalBestFriendSetterMutation__param> = [
                     alias: null,
                     arguments: null,
                     isUpdatable: false,
+                  },
+                  {
+                    kind: "Scalar",
+                    fieldName: "name",
+                    alias: null,
+                    arguments: null,
+                    isUpdatable: false,
+                  },
+                  {
+                    kind: "Resolver",
+                    alias: "Avatar",
+                    arguments: null,
+                    readerArtifact: Pet__Avatar__resolver_reader,
+                    usedRefetchQueries: [],
                   },
                 ],
               },
