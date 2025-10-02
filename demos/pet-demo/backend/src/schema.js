@@ -218,9 +218,6 @@ export const schema = createSchema({
       },
     },
     Mutation: {
-      expose_field_on_mutation: ()=>{
-        return 'some string here';
-      },
       set_pet_best_friend: (_obj, params) => {
         const modifiedPet = pets[params.id];
         const min =
