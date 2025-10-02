@@ -8,7 +8,7 @@ const normalizationAst: NormalizationAst = {
       arguments: [
         [
           "id",
-          { kind: "Variable", name: "id" },
+          { kind: "Variable", name: "pet_id" },
         ],
 
         [

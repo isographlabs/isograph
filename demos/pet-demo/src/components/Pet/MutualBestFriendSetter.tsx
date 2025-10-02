@@ -34,7 +34,8 @@ export const setMututalBestFriend = iso(`
   const { fragmentReference } = useClientSideDefer(
     data.MutualBestFriendSetterOtherSide,
     {
-      id: data.set_pet_best_friend.pet.best_friend_relationship?.best_friend.id,
+      pet_id:
+        data.set_pet_best_friend.pet.best_friend_relationship?.best_friend.id,
       new_best_friend_id: data.set_pet_best_friend.pet.id,
     },
   );
@@ -44,11 +45,11 @@ export const setMututalBestFriend = iso(`
 
 export const SomeThing = iso(`
   field Mutation.MutualBestFriendSetterOtherSide(
-    $id: ID !,
+    $pet_id: ID !,
     $new_best_friend_id: ID !
   ) @component {
     set_pet_best_friend(
-      id: $id,
+      id: $pet_id,
       new_best_friend_id: $new_best_friend_id
     ) {
       pet {
