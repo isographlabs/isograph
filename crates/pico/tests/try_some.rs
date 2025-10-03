@@ -15,9 +15,9 @@ fn try_some_projects_some_value() {
         value: "asdf".to_string(),
     });
 
-    let Some(result) = maybe_first_letter(&db, id).try_some() else {
-        panic!("expected Some")
-    };
+    let result = maybe_first_letter(&db, id)
+        .try_some()
+        .expect("expected Some");
     assert_eq!(*result, 'a');
 }
 
@@ -50,9 +50,7 @@ fn try_some_never_clones_value() {
     let db = TestDatabase::default();
 
     let some_ref = some_value(&db);
-    let Some(inner) = some_ref.try_some() else {
-        panic!("expected Some")
-    };
+    let inner = some_ref.try_some().expect("expected Some");
     let _ = &*inner;
 
     assert!(none_value(&db).try_some().is_none());

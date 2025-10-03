@@ -127,7 +127,12 @@ impl<T: 'static> Deref for MemoRef<T> {
             NodeKind::Derived(self.derived_node_id),
             revision.time_updated,
         );
-        let mut any_ref: &dyn Any = value;
+        if self.projectors_len == 0 {
+            return value
+                .downcast_ref::<T>()
+                .expect("MemoRef: projector chain produced unexpected type");
+        }
+        let mut any_ref = value;
         let len = self.projectors_len as usize;
         for step in &self.projectors[..len] {
             any_ref = (step)(any_ref);
@@ -146,12 +151,11 @@ impl<T: 'static, E: 'static + Clone> MemoRef<Result<T, E>> {
                     db: self.db,
                     derived_node_id: self.derived_node_id,
                     projectors: self.projectors,
-                    projectors_len: self.projectors_len,
+                    projectors_len: self.projectors_len + 1,
                     phantom: PhantomData,
                 };
-                let idx = next.projectors_len as usize;
+                let idx = self.projectors_len as usize;
                 next.projectors[idx] = step_result_ok::<T, E>;
-                next.projectors_len += 1;
                 Ok(next)
             }
             Err(err) => Err(err.clone()),
@@ -167,12 +171,11 @@ impl<T: 'static> MemoRef<Option<T>> {
                     db: self.db,
                     derived_node_id: self.derived_node_id,
                     projectors: self.projectors,
-                    projectors_len: self.projectors_len,
+                    projectors_len: self.projectors_len + 1,
                     phantom: PhantomData,
                 };
-                let idx = next.projectors_len as usize;
+                let idx = self.projectors_len as usize;
                 next.projectors[idx] = step_option_some::<T>;
-                next.projectors_len += 1;
                 Some(next)
             }
             None => None,
@@ -186,23 +189,21 @@ impl<T0: 'static, T1: 'static> MemoRef<(T0, T1)> {
             db: self.db,
             derived_node_id: self.derived_node_id,
             projectors: self.projectors,
-            projectors_len: self.projectors_len,
+            projectors_len: self.projectors_len + 1,
             phantom: PhantomData,
         };
-        let idx = left.projectors_len as usize;
+        let idx = self.projectors_len as usize;
         left.projectors[idx] = step_tuple_0::<T0, T1>;
-        left.projectors_len += 1;
 
         let mut right = MemoRef::<T1> {
             db: self.db,
             derived_node_id: self.derived_node_id,
             projectors: self.projectors,
-            projectors_len: self.projectors_len,
+            projectors_len: self.projectors_len + 1,
             phantom: PhantomData,
         };
-        let idx = right.projectors_len as usize;
+        let idx = self.projectors_len as usize;
         right.projectors[idx] = step_tuple_1::<T0, T1>;
-        right.projectors_len += 1;
 
         (left, right)
     }
