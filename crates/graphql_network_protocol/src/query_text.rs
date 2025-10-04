@@ -27,7 +27,7 @@ pub(crate) fn generate_query_text<'a>(
         Format::Pretty => query_text.push_str("\\\n"),
         Format::Compact => query_text.push(' '),
     }
-    write_selections_for_query_text(&mut query_text, selection_map.values(), 1, format);
+    write_selections_for_query_text(&mut query_text, selection_map, 1, format);
     query_text.push('}');
     QueryText(query_text)
 }
@@ -77,9 +77,9 @@ fn write_variables_to_string<'a>(
 }
 
 #[allow(clippy::only_used_in_recursion)]
-fn write_selections_for_query_text<'a>(
+fn write_selections_for_query_text(
     query_text: &mut String,
-    items: impl Iterator<Item = &'a MergedServerSelection> + 'a,
+    items: &MergedSelectionMap,
     indentation_level: u8,
     format: Format,
 ) {
@@ -87,48 +87,57 @@ fn write_selections_for_query_text<'a>(
         Format::Pretty => ("\\\n", &"  ".repeat(indentation_level as usize).to_string()),
         Format::Compact => (" ", &"".to_string()),
     };
-    for item in items {
-        match &item {
-            MergedServerSelection::ScalarField(scalar_field) => {
-                query_text.push_str(indent);
-                if let Some(alias) = scalar_field.normalization_alias() {
-                    query_text.push_str(&format!("{alias}: "));
+
+    if items.is_empty() {
+        query_text.push_str(indent);
+        query_text.push_str("__typename,");
+        query_text.push_str(new_line);
+    } else {
+        for item in items.values() {
+            match &item {
+                MergedServerSelection::ScalarField(scalar_field) => {
+                    query_text.push_str(indent);
+                    if let Some(alias) = scalar_field.normalization_alias() {
+                        query_text.push_str(&format!("{alias}: "));
+                    }
+                    let name = scalar_field.name;
+                    let arguments =
+                        get_serialized_arguments_for_query_text(&scalar_field.arguments);
+                    query_text.push_str(&format!("{name}{arguments},{new_line}"));
                 }
-                let name = scalar_field.name;
-                let arguments = get_serialized_arguments_for_query_text(&scalar_field.arguments);
-                query_text.push_str(&format!("{name}{arguments},{new_line}"));
-            }
-            MergedServerSelection::LinkedField(linked_field) => {
-                query_text.push_str(indent);
-                if let Some(alias) = linked_field.normalization_alias() {
-                    // This is bad, alias is WithLocation
-                    query_text.push_str(&format!("{alias}: "));
+                MergedServerSelection::LinkedField(linked_field) => {
+                    query_text.push_str(indent);
+                    if let Some(alias) = linked_field.normalization_alias() {
+                        // This is bad, alias is WithLocation
+                        query_text.push_str(&format!("{alias}: "));
+                    }
+                    let name = linked_field.name;
+                    let arguments =
+                        get_serialized_arguments_for_query_text(&linked_field.arguments);
+                    query_text.push_str(&format!("{name}{arguments} {{{new_line}"));
+                    write_selections_for_query_text(
+                        query_text,
+                        &linked_field.selection_map,
+                        indentation_level + 1,
+                        format,
+                    );
+                    query_text.push_str(&format!("{indent}}},{new_line}"));
                 }
-                let name = linked_field.name;
-                let arguments = get_serialized_arguments_for_query_text(&linked_field.arguments);
-                query_text.push_str(&format!("{name}{arguments} {{{new_line}"));
-                write_selections_for_query_text(
-                    query_text,
-                    linked_field.selection_map.values(),
-                    indentation_level + 1,
-                    format,
-                );
-                query_text.push_str(&format!("{indent}}},{new_line}"));
-            }
-            MergedServerSelection::ClientPointer(_) => {}
-            MergedServerSelection::InlineFragment(inline_fragment) => {
-                query_text.push_str(indent);
-                query_text.push_str(&format!(
-                    "... on {} {{{}",
-                    inline_fragment.type_to_refine_to, new_line,
-                ));
-                write_selections_for_query_text(
-                    query_text,
-                    inline_fragment.selection_map.values(),
-                    indentation_level + 1,
-                    format,
-                );
-                query_text.push_str(&format!("{indent}}},{new_line}"));
+                MergedServerSelection::ClientPointer(_) => {}
+                MergedServerSelection::InlineFragment(inline_fragment) => {
+                    query_text.push_str(indent);
+                    query_text.push_str(&format!(
+                        "... on {} {{{}",
+                        inline_fragment.type_to_refine_to, new_line,
+                    ));
+                    write_selections_for_query_text(
+                        query_text,
+                        &inline_fragment.selection_map,
+                        indentation_level + 1,
+                        format,
+                    );
+                    query_text.push_str(&format!("{indent}}},{new_line}"));
+                }
             }
         }
     }
