@@ -1,13 +1,19 @@
 import type { IsographEntrypoint } from '@isograph/react';
+import { type Query__errorsSecond__param } from './Query/errorsSecond/param_type';
+import { type Query__errors__param } from './Query/errors/param_type';
 import { type Query__linkedUpdate__param } from './Query/linkedUpdate/param_type';
 import { type Query__meNameSuccessor__param } from './Query/meNameSuccessor/param_type';
 import { type Query__meName__param } from './Query/meName/param_type';
+import { type Query__nicknameErrors__param } from './Query/nicknameErrors/param_type';
 import { type Query__nodeField__param } from './Query/nodeField/param_type';
 import { type Query__startUpdate__param } from './Query/startUpdate/param_type';
 import { type Query__subquery__param } from './Query/subquery/param_type';
+import entrypoint_Query__errorsSecond from '../__isograph/Query/errorsSecond/entrypoint';
+import entrypoint_Query__errors from '../__isograph/Query/errors/entrypoint';
 import entrypoint_Query__linkedUpdate from '../__isograph/Query/linkedUpdate/entrypoint';
 import entrypoint_Query__meNameSuccessor from '../__isograph/Query/meNameSuccessor/entrypoint';
 import entrypoint_Query__meName from '../__isograph/Query/meName/entrypoint';
+import entrypoint_Query__nicknameErrors from '../__isograph/Query/nicknameErrors/entrypoint';
 import entrypoint_Query__nodeField from '../__isograph/Query/nodeField/entrypoint';
 import entrypoint_Query__startUpdate from '../__isograph/Query/startUpdate/entrypoint';
 import entrypoint_Query__subquery from '../__isograph/Query/subquery/entrypoint';
@@ -61,6 +67,14 @@ type MatchesWhitespaceAndString<
 > = Whitespace<T> extends `${TString}${string}` ? T : never;
 
 export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.errorsSecond', T>
+): IdentityWithParam<Query__errorsSecond__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.errors', T>
+): IdentityWithParam<Query__errors__param>;
+
+export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.linkedUpdate', T>
 ): IdentityWithParam<Query__linkedUpdate__param>;
 
@@ -71,6 +85,10 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.meName', T>
 ): IdentityWithParam<Query__meName__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.nicknameErrors', T>
+): IdentityWithParam<Query__nicknameErrors__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.nodeField', T>
@@ -85,6 +103,14 @@ export function iso<T>(
 ): IdentityWithParam<Query__subquery__param>;
 
 export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.errorsSecond', T>
+): typeof entrypoint_Query__errorsSecond;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.errors', T>
+): typeof entrypoint_Query__errors;
+
+export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.linkedUpdate', T>
 ): typeof entrypoint_Query__linkedUpdate;
 
@@ -95,6 +121,10 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.meName', T>
 ): typeof entrypoint_Query__meName;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.nicknameErrors', T>
+): typeof entrypoint_Query__nicknameErrors;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.nodeField', T>
