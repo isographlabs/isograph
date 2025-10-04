@@ -71,7 +71,7 @@ pub enum MergedServerSelection {
 }
 
 impl MergedServerSelection {
-    pub fn reachable_variables(&self) -> Vec<VariableName> {
+    pub fn reachable_variables(&self) -> BTreeSet<VariableName> {
         match self {
             MergedServerSelection::ScalarField(field) => get_variables(&field.arguments).collect(),
             MergedServerSelection::ClientPointer(field)
