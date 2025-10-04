@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use common_lang_types::{QueryOperationName, QueryText, UnvalidatedTypeName};
 use graphql_lang_types::GraphQLTypeAnnotation;
 use isograph_lang_types::{ArgumentKeyAndValue, NonConstantValue};
@@ -79,7 +77,7 @@ fn write_variables_to_string<'a>(
 }
 
 #[allow(clippy::only_used_in_recursion)]
-fn write_selections_for_query_text<'a>(
+fn write_selections_for_query_text(
     query_text: &mut String,
     items: &MergedSelectionMap,
     indentation_level: u8,
