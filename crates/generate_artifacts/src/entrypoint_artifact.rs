@@ -140,11 +140,26 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
             "Expected entity to exist. \
             This is indicative of a bug in Isograph.",
         );
+
+    let reachable_variables = merged_selection_map
+        .values()
+        .flat_map(|selection| selection.reachable_variables())
+        .map(|variable_name| {
+            *variable_definitions
+                .iter()
+                .find(|definition| definition.name.item == variable_name)
+                .unwrap_or_else(|| panic!(
+                    "Expected to find a variable defined at the root with name {variable_name}.\n\
+                    This is indicative of a bug in Isograph."
+                ))
+        })
+        .collect::<Vec<_>>();
+
     let query_text = TNetworkProtocol::generate_query_text(
         query_name,
         schema,
         merged_selection_map,
-        variable_definitions.iter().copied(),
+        reachable_variables.iter().copied(),
         root_operation_name,
         Format::Pretty,
     );
@@ -230,7 +245,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         query_name,
         schema,
         merged_selection_map,
-        variable_definitions.iter().copied(),
+        reachable_variables.iter().copied(),
         root_operation_name,
         concrete_type.name.item,
         persisted_documents,
