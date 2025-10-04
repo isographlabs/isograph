@@ -3,7 +3,9 @@ import { Button, Card, CardContent } from '@mui/material';
 import React from 'react';
 
 export const PetStatsCard = iso(`
-  field Pet.PetStatsCard($id: ID!) @component {
+  field Pet.PetStatsCard(
+    $id: ID !
+  ) @component {
     id
     nickname
     age
@@ -14,7 +16,9 @@ export const PetStatsCard = iso(`
       hunger
       sociability
       energy
-      refetch_pet_stats(id: $id)
+      refetch_pet_stats(
+        id: $id
+      )
     }
   }
 `)(function PetStatsCardComponent({ data: pet }) {

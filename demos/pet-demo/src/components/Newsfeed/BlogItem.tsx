@@ -17,7 +17,9 @@ export const BlogItem = iso(`
     author
     title
     content
-    BlogItemMoreDetail @loadable(lazyLoadArtifact: true)
+    BlogItemMoreDetail @loadable(
+      lazyLoadArtifact: true
+    )
     image {
       ImageDisplayWrapper
     }
@@ -60,7 +62,9 @@ export const BlogItem = iso(`
 
 export const ImageDisplayWrapper = iso(`
   field Image.ImageDisplayWrapper @component {
-    ImageDisplay @loadable(lazyLoadArtifact: true)
+    ImageDisplay @loadable(
+      lazyLoadArtifact: true
+    )
   }
 `)(({ data: image }) => {
   const { fragmentReference } = useClientSideDefer(image.ImageDisplay);

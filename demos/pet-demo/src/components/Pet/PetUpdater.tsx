@@ -16,10 +16,8 @@ export const PetUpdater = iso(`
       id
       name
     }
-
     set_pet_tagline
     tagline @updatable
-
     __refetch
   }
 `)(function PetUpdaterComponent({ data: pet, startUpdate }) {

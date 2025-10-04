@@ -2,8 +2,14 @@ import { iso } from '@iso';
 import React from 'react';
 
 export const NewsfeedPaginationComponent = iso(`
-  field Viewer.NewsfeedPaginationComponent($skip: Int!, $limit: Int!) {
-    newsfeed(skip: $skip, limit: $limit) {
+  field Viewer.NewsfeedPaginationComponent(
+    $skip: Int !,
+    $limit: Int !
+  ) {
+    newsfeed(
+      skip: $skip,
+      limit: $limit
+    ) {
       asAdItem {
         id
       }

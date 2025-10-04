@@ -4,7 +4,10 @@ import React from 'react';
 
 export const FirstCheckinMakeSuperButton = iso(`
   field Pet.FirstCheckinMakeSuperButton @component {
-    checkins(skip: 0, limit: 1) {
+    checkins(
+      skip: 0,
+      limit: 1
+    ) {
       make_super
       location
     }
