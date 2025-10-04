@@ -12,7 +12,10 @@ import {
   type NormalizationAstLoader,
   type NormalizationAstNodes,
 } from '../core/entrypoint';
-import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
+import {
+  mergeArrays,
+  mergeObjectsUsingReaderAst,
+} from './areEqualWithDeepComparison';
 import { FetchOptions } from './check';
 import {
   ExtractParameters,
@@ -359,11 +362,18 @@ export function callSubscriptions(
                 mergedItem === subscription.encounteredDataAndRecords.item,
             }));
 
+            const mergedErrors =
+              subscription.encounteredDataAndRecords.errors &&
+              newEncounteredDataAndRecords.errors
+                ? mergeArrays(
+                    subscription.encounteredDataAndRecords.errors,
+                    newEncounteredDataAndRecords.errors,
+                  )
+                : newEncounteredDataAndRecords.errors;
+
             if (
-              mergedItem !== subscription.encounteredDataAndRecords.item &&
-              // TODO: compare and recycle errors
-              subscription.encounteredDataAndRecords.errors !==
-                newEncounteredDataAndRecords.errors
+              mergedItem !== subscription.encounteredDataAndRecords.item ||
+              mergedErrors !== subscription.encounteredDataAndRecords.errors
             ) {
               logAnyError(
                 environment,
@@ -571,22 +581,27 @@ function normalizeScalarField(
   const parentRecordKey = getParentRecordKey(astNode, variables);
   const existingValue = targetStoreRecord.record[parentRecordKey];
 
-  if (networkResponseData === null) {
+  if (networkResponseData == null) {
+    targetStoreRecord.record[parentRecordKey] = null;
+
+    const existingErrors = targetStoreRecord.errors[parentRecordKey];
     const errors = findErrors(errorsByPath, path.join('.'));
     if (errors) {
       targetStoreRecord.errors[parentRecordKey] = errors;
-    } else {
+      return (
+        existingValue !== null ||
+        existingErrors === undefined ||
+        JSON.stringify(stableCopy(existingErrors)) !==
+          JSON.stringify(stableCopy(errors))
+      );
+    } else if (existingErrors != null) {
       delete targetStoreRecord.errors[parentRecordKey];
+      return true;
     }
-    targetStoreRecord.record[parentRecordKey] = null;
-    // TODO: compare errors
-    return true;
+    return existingValue !== null;
   }
 
-  if (
-    networkResponseData == null ||
-    isScalarOrEmptyArray(networkResponseData)
-  ) {
+  if (isScalarOrEmptyArray(networkResponseData)) {
     targetStoreRecord.record[parentRecordKey] = networkResponseData;
     return existingValue !== networkResponseData;
   } else {
@@ -614,15 +629,23 @@ function normalizeLinkedField(
   const existingValue = targetParentRecord.record[parentRecordKey];
 
   if (networkResponseData == null) {
+    targetParentRecord.record[parentRecordKey] = null;
+
+    const existingErrors = targetParentRecord.errors[parentRecordKey];
     const errors = findErrors(errorsByPath, path.join('.'));
     if (errors) {
       targetParentRecord.errors[parentRecordKey] = errors;
-    } else {
+      return (
+        existingValue !== null ||
+        existingErrors === undefined ||
+        JSON.stringify(stableCopy(existingErrors)) !==
+          JSON.stringify(stableCopy(errors))
+      );
+    } else if (existingErrors != null) {
       delete targetParentRecord.errors[parentRecordKey];
+      return true;
     }
-    targetParentRecord.record[parentRecordKey] = null;
-    // TODO: compare errors
-    return true;
+    return existingValue !== null;
   }
 
   if (
