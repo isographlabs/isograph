@@ -1,0 +1,12 @@
+{
+  "search.exclude": {
+    "out/": true,
+    "tsconfig.tsbuildinfo": true,
+    "*.vsix": true
+  },
+  "files.exclude": {
+    "out/": true,
+    "tsconfig.tsbuildinfo": true,
+    "*.vsix": true
+  }
+}
