@@ -31,30 +31,32 @@ export const SmartestPetRoute = iso(`
       >
         <CardContent>
           <Stack direction="row" spacing={4}>
-            <LoadableFieldReader loadableField={data.smartestPet} args={{}}>
-              {(smartestPet) => {
-                if (smartestPet == null) {
-                  return <h2>No smart pets in this bunch!</h2>;
-                }
-                return (
-                  <>
-                    <smartestPet.Avatar
-                      onClick={() =>
-                        navigateTo({
-                          kind: 'PetDetail',
-                          id: smartestPet.id,
-                        })
-                      }
-                    />
-                    <div style={{ width: 300 }}>
-                      <h2>#1: {smartestPet.name}</h2>
-                      Intelligence level:{' '}
-                      <b>{smartestPet.stats?.intelligence}</b>
-                    </div>
-                  </>
-                );
-              }}
-            </LoadableFieldReader>
+            {data.smartestPet && (
+              <LoadableFieldReader loadableField={data.smartestPet} args={{}}>
+                {(smartestPet) => {
+                  if (smartestPet == null) {
+                    return <h2>No smart pets in this bunch!</h2>;
+                  }
+                  return (
+                    <>
+                      <smartestPet.Avatar
+                        onClick={() =>
+                          navigateTo({
+                            kind: 'PetDetail',
+                            id: smartestPet.id,
+                          })
+                        }
+                      />
+                      <div style={{ width: 300 }}>
+                        <h2>#1: {smartestPet.name}</h2>
+                        Intelligence level:{' '}
+                        <b>{smartestPet.stats?.intelligence}</b>
+                      </div>
+                    </>
+                  );
+                }}
+              </LoadableFieldReader>
+            )}
           </Stack>
         </CardContent>
       </Card>
