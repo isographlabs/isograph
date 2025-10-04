@@ -1,6 +1,9 @@
-import { OnlyOneRootLoadable } from '@/src/components/Pet/PetWithOneRootLoadable';
+import OnlyOneRootLoadableRoute, {
+  OnlyOneRootLoadable,
+} from '@/src/components/Pet/PetWithOneRootLoadable';
 import { iso } from '@iso';
 import { useLazyReference } from '@isograph/react';
+import { useRouter } from 'next/router';
 
 export default function OnlyOneRootLoadablePage() {
   const router = useRouter();
@@ -13,6 +16,8 @@ export default function OnlyOneRootLoadablePage() {
   }
 
   return (
-    <OnlyOneRootLoadable route={{ kind: 'OnlyOneRootLoadableRoute', id: id }} />
+    <OnlyOneRootLoadableRoute
+      route={{ kind: 'OnlyOneRootLoadableRoute', id: id }}
+    />
   );
 }

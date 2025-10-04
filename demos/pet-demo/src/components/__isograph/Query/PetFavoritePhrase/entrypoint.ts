@@ -1,13 +1,15 @@
-import type {IsographEntrypoint, NormalizationAstLoader, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
+import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
 import {Query__PetFavoritePhrase__param} from './param_type';
 import {Query__PetFavoritePhrase__output_type} from './output_type';
+import readerResolver from './resolver_reader';
 import queryText from './query_text';
+import normalizationAst from './normalization_ast';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
 const artifact: IsographEntrypoint<
   Query__PetFavoritePhrase__param,
   Query__PetFavoritePhrase__output_type,
-  NormalizationAstLoader
+  NormalizationAst
 > = {
   kind: "Entrypoint",
   networkRequestInfo: {
@@ -16,21 +18,14 @@ const artifact: IsographEntrypoint<
       kind: "Operation",
       text: queryText,
     },
-    normalizationAst: {
-      kind: "NormalizationAstLoader",
-      loader: () => import('./normalization_ast').then(module => module.default),
-    },
+    normalizationAst,
   },
   concreteType: "Query",
   readerWithRefetchQueries: {
-    kind: "ReaderWithRefetchQueriesLoader",
-    loader: () => import('./resolver_reader')
-      .then(module => ({
-        kind: "ReaderWithRefetchQueries",
-        nestedRefetchQueries,
-        readerArtifact: module.default,
-      }))
-  }
+    kind: "ReaderWithRefetchQueries",
+    nestedRefetchQueries,
+    readerArtifact: readerResolver,
+  },
 };
 
 export default artifact;
