@@ -8,7 +8,8 @@ export type Route =
   | PetDetailDeferredRoute
   | PetByNameRoute
   | PetCheckinListRoute
-  | SmartestRoute;
+  | SmartestRoute
+  | OnlyOneRootLoadableRoute;
 
 export type HomeRoute = {
   kind: 'Home';
@@ -38,6 +39,11 @@ export type SmartestRoute = {
   kind: 'Smartest';
 };
 
+export type OnlyOneRootLoadableRoute = {
+  kind: 'OnlyOneRootLoadableRoute';
+  id: PetId;
+};
+
 export function useNavigateTo() {
   const router = useRouter();
   return (route: Route) => router.push(toRouteUrl(route));
@@ -63,6 +69,8 @@ function toRouteUrl(route: Route): string {
     case 'Smartest': {
       return '/smartest';
     }
+    case 'OnlyOneRootLoadableRoute':
+      return `/only-one-root-loadble/${route.id}`;
     default: {
       let _: never = route;
       throw new Error('Unhandled route');

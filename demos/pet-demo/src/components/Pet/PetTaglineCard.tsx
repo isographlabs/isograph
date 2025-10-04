@@ -68,8 +68,12 @@ export const PetTaglineCard = iso(`
 });
 
 export const setTagline = iso(`
-  field Mutation.SetTagline($input: SetPetTaglineParams!) @component {
-    set_pet_tagline(input: $input) {
+  field Mutation.SetTagline(
+    $input: SetPetTaglineParams !
+  ) @component {
+    set_pet_tagline(
+      input: $input
+    ) {
       pet {
         tagline
       }
