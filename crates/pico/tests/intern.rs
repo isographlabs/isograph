@@ -39,16 +39,12 @@ enum ProcessInputError {
 }
 
 #[memo]
-fn first_letter(
-    db: &TestDatabase,
-    input_id: SourceId<Input>,
-) -> Result<MemoRef<char>, FirstLetterError> {
+fn first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> Result<char, FirstLetterError> {
     db.get(input_id)
         .value
         .chars()
         .next()
         .ok_or(FirstLetterError::EmptyString)
-        .map(|v| db.intern(v))
 }
 
 #[memo]
@@ -56,6 +52,6 @@ fn process_input(
     db: &TestDatabase,
     input_id: SourceId<Input>,
 ) -> Result<MemoRef<char>, ProcessInputError> {
-    let result = first_letter(db, input_id).to_owned()?;
+    let result = first_letter(db, input_id).try_ok()?;
     Ok(result)
 }
