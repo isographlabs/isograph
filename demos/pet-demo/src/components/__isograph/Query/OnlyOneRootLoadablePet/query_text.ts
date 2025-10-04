@@ -1,3 +1,3 @@
-export default 'query OnlyOneRootLoadablePet($id: ID!) {\
+export default 'query OnlyOneRootLoadablePet {\
   __typename,\
 }';
