@@ -153,7 +153,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
                     This is indicative of a bug in Isograph."
                 ))
         })
-        .collect::<Vec<_>>();
+        .collect::<BTreeSet<_>>();
 
     let query_text = TNetworkProtocol::generate_query_text(
         query_name,
