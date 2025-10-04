@@ -4,7 +4,7 @@ import { type Query__smartestPet__param } from '../../Query/smartestPet/param_ty
 
 export type Query__SmartestPetRoute__param = {
   readonly data: {
-    readonly smartestPet: LoadableField<Query__smartestPet__param, ({
+    readonly smartestPet: (LoadableField<Query__smartestPet__param, {
       readonly id: string,
       readonly name: string,
       readonly Avatar: Pet__Avatar__output_type,
@@ -12,7 +12,7 @@ export type Query__SmartestPetRoute__param = {
         readonly intelligence: (number | null),
       } | null),
       readonly picture: string,
-    } | null)>,
+    }> | null),
   },
   readonly parameters: Record<PropertyKey, never>,
 };

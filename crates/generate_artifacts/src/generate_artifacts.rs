@@ -783,12 +783,12 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     DefinitionLocation::Client(client_pointer) => {
                         loadable_fields.insert(client_pointer.type_and_field);
 
-                        let inner_output_type = print_javascript_type_declaration(&type_annotation);
-
-                        format!(
-                            "LoadableField<{}__param, {inner_output_type}>",
-                            client_pointer.type_and_field.underscore_separated(),
-                        )
+                        print_javascript_type_declaration(&type_annotation.map(&mut |target| {
+                            format!(
+                                "LoadableField<{}__param, {target}>",
+                                client_pointer.type_and_field.underscore_separated(),
+                            )
+                        }))
                     }
                     DefinitionLocation::Server(_) =>
                         print_javascript_type_declaration(&type_annotation),
