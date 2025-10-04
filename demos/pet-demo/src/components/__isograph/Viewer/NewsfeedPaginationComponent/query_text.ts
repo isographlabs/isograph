@@ -1,4 +1,4 @@
-export default 'query NewsfeedPaginationComponent($skip: Int!, $limit: Int!, $id: ID!) {\
+export default 'query NewsfeedPaginationComponent($id: ID!, $skip: Int!, $limit: Int!) {\
   node____id___v_id: node(id: $id) {\
     ... on Viewer {\
       __typename,\
