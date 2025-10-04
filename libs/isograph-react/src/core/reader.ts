@@ -119,6 +119,10 @@ export type ReaderLinkedField = {
   readonly refetchQueryIndex: number | null;
 };
 
+export interface ReaderClientPointer extends ReaderLinkedField {
+  readonly refetchQueryIndex: number;
+}
+
 export type ReaderNonLoadableResolverField = {
   readonly kind: 'Resolver';
   readonly alias: string;
