@@ -4,8 +4,12 @@ import React from 'react';
 console.log('Query.PetFavoritePhrase bundle being loaded!');
 
 export const PetFavoritePhrase = iso(`
-  field Query.PetFavoritePhrase($id: ID!) @component {
-    pet(id: $id) {
+  field Query.PetFavoritePhrase(
+    $id: ID !
+  ) @component {
+    pet(
+      id: $id
+    ) {
       name
       favorite_phrase
     }

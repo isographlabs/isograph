@@ -13,7 +13,10 @@ import { FullPageLoading } from '../routes';
 export const Newsfeed = iso(`
   field Query.Newsfeed @component {
     viewer {
-      initial: NewsfeedPaginationComponent(skip: 0, limit: 6)
+      initial: NewsfeedPaginationComponent(
+        skip: 0,
+        limit: 6
+      )
       NewsfeedPaginationComponent @loadable
     }
   }
@@ -74,7 +77,9 @@ export function NewsfeedLoader() {
 export const NewsfeedAdOrBlog = iso(`
   field NewsfeedItem.NewsfeedAdOrBlog @component {
     asAdItem {
-      AdItemDisplay @loadable(lazyLoadArtifact: true)
+      AdItemDisplay @loadable(
+        lazyLoadArtifact: true
+      )
     }
     asBlogItem {
       BlogItemDisplay

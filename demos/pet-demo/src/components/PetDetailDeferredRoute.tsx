@@ -14,11 +14,19 @@ import {
 } from './routes';
 
 export const PetDetailDeferredRouteComponent = iso(`
-  field Query.PetDetailDeferredRoute($id: ID!) @component {
-    pet(id: $id) {
+  field Query.PetDetailDeferredRoute(
+    $id: ID !
+  ) @component {
+    pet(
+      id: $id
+    ) {
       PetDetailDeferredRouteInnerComponent
     }
-    topLevelField(input: { name: "ThisIsJustHereToTestObjectLiterals" }) {
+    topLevelField(
+      input: {
+        name: "ThisIsJustHereToTestObjectLiterals"
+      }
+    ) {
       __typename
     }
   }

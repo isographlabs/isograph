@@ -1,6 +1,5 @@
 **/dist/**
 **/node_modules/**
-.vscode
 **/yarn-error.log
 **/*.tsbuildinfo
 **/*.tgz

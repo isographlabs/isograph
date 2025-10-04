@@ -4,8 +4,12 @@ import React from 'react';
 import { PetByNameRoute } from './routes';
 
 export const PetByNameRouteComponent = iso(`
-  field Query.PetByName($name: String!) @component {
-    pet: petByName(name: $name) {
+  field Query.PetByName(
+    $name: String !
+  ) @component {
+    pet: petByName(
+      name: $name
+    ) {
       PetDetailDeferredRouteInnerComponent
     }
   }

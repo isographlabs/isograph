@@ -10,11 +10,17 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { FullPageLoading, PetCheckinListRoute, useNavigateTo } from './routes';
 
 export const PetDetailDeferredRouteComponent = iso(`
-  field Query.PetCheckinListRoute($id: ID!) @component {
-    pet(id: $id) {
+  field Query.PetCheckinListRoute(
+    $id: ID !
+  ) @component {
+    pet(
+      id: $id
+    ) {
       FirstCheckinMakeSuperButton
       name
-      PetCheckinsCardList @loadable(lazyLoadArtifact: true)
+      PetCheckinsCardList @loadable(
+        lazyLoadArtifact: true
+      )
     }
   }
 `)(function PetDetailRouteComponent({ data }) {

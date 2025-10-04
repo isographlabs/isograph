@@ -3,10 +3,10 @@ import { Card, CardContent } from '@mui/material';
 import React from 'react';
 
 export const PetPhraseCard = iso(`
-field Pet.PetPhraseCard @component {
-  id
-  favorite_phrase
-}
+  field Pet.PetPhraseCard @component {
+    id
+    favorite_phrase
+  }
 `)(function PetPhraseCardComponent({ data }) {
   return (
     <Card
