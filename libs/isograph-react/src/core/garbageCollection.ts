@@ -96,7 +96,7 @@ function recordReachableIds(
   if (record) {
     recordReachableIdsFromRecord(
       store,
-      record,
+      record.record,
       mutableRetainedIds,
       retainedQuery.normalizationAst,
       retainedQuery.variables,
@@ -157,7 +157,7 @@ function recordReachableIdsFromRecord(
             retainedRecordsIds.add(nextRecordLink.__link);
             recordReachableIdsFromRecord(
               store,
-              nextRecord,
+              nextRecord.record,
               mutableRetainedIds,
               selection.selections,
               variables,

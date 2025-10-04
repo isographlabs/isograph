@@ -155,13 +155,10 @@ export function makeNetworkRequest<
         networkRequestId: myNetworkRequestId,
       }));
 
-      if (networkResponse.errors != null) {
+      if ('errors' in networkResponse) {
         try {
           fetchOptions?.onError?.();
         } catch {}
-        throw new Error('GraphQL network response had errors', {
-          cause: networkResponse,
-        });
       }
 
       const root = { __link: ROOT_ID, __typename: artifact.concreteType };
@@ -172,6 +169,8 @@ export function makeNetworkRequest<
           networkResponse.data ?? {},
           variables,
           root,
+          'errors' in networkResponse ? networkResponse.errors : undefined,
+          [],
         );
         const retainedQuery = {
           normalizationAst: normalizationAst.selections,

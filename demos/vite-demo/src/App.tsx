@@ -30,9 +30,6 @@ function makeNetworkRequest<T>(
             cause: json,
           });
         }
-        throw new Error('GraphQLError', {
-          cause: json.errors,
-        });
       }
       return json;
     }
