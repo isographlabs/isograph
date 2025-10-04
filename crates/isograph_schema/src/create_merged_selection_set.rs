@@ -83,7 +83,11 @@ impl MergedServerSelection {
                         .flat_map(|x| x.reachable_variables()),
                 )
                 .collect(),
-            MergedServerSelection::InlineFragment(_) => vec![],
+            MergedServerSelection::InlineFragment(inline_fragment) => inline_fragment
+                .selection_map
+                .values()
+                .flat_map(|selection| selection.reachable_variables())
+                .collect(),
         }
     }
 }
