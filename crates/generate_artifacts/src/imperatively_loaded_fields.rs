@@ -1,17 +1,16 @@
 use std::collections::BTreeSet;
 
 use common_lang_types::{
-    ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName, ServerObjectEntityName,
-    VariableName,
+    ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName, VariableName,
 };
 use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{RefetchQueryIndex, VariableDefinition};
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, Format,
-    ImperativelyLoadedFieldArtifactInfo, ImperativelyLoadedFieldVariant, MergedSelectionMap,
-    NetworkProtocol, PathToRefetchFieldInfo, REFETCH_FIELD_NAME, RootRefetchedPath, Schema,
-    ServerEntityName, WrappedSelectionMapSelection, selection_map_wrapped,
+    ImperativelyLoadedFieldVariant, MergedSelectionMap, NetworkProtocol, PathToRefetchFieldInfo,
+    REFETCH_FIELD_NAME, RootRefetchedPath, Schema, ServerEntityName, WrappedSelectionMapSelection,
+    selection_map_wrapped,
 };
 
 use crate::{
@@ -46,25 +45,85 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field<TNetworkProtocol: Netwo
         This is indicative of a bug in Isograph.",
     );
 
-    let ImperativelyLoadedFieldArtifactInfo {
-        merged_selection_set,
-        root_fetchable_field,
-        root_parent_object,
-        refetch_query_index,
-        variable_definitions,
-        root_operation_name,
-        query_name,
-        concrete_type,
-    } = process_imperatively_loaded_field(
-        schema,
-        imperatively_loaded_field_variant,
-        refetch_field_parent_object_entity_name,
-        nested_selection_map,
-        entrypoint,
-        index,
-        reachable_variables,
-        &client_selectable,
-    );
+    let client_selectable: &ClientSelectable<TNetworkProtocol> = &client_selectable;
+    let ImperativelyLoadedFieldVariant {
+        client_selection_name,
+        root_object_entity_name,
+        mut subfields_or_inline_fragments,
+        top_level_schema_field_arguments,
+        ..
+    } = imperatively_loaded_field_variant;
+
+    // If the field (e.g. icheckin) returns an abstract type (ICheckin) that is different than
+    // the concrete type we want (Checkin), then we refine to that concrete type.
+    // TODO investigate whether this can be done when the ImperativelyLoadedFieldVariant is created
+    if refetch_field_parent_object_entity_name != client_selectable.parent_object_entity_name() {
+        let refetch_field_parent_type_name = schema
+            .server_entity_data
+            .server_object_entity(refetch_field_parent_object_entity_name)
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            )
+            .name;
+        // This could be Pet
+        subfields_or_inline_fragments.insert(
+            0,
+            WrappedSelectionMapSelection::InlineFragment(refetch_field_parent_type_name.item),
+        );
+    }
+
+    // TODO we need to extend this with variables used in subfields_or_inline_fragments
+    let mut definitions_of_used_variables =
+        get_used_variable_definitions(reachable_variables, client_selectable);
+
+    for variable_definition in top_level_schema_field_arguments.iter() {
+        definitions_of_used_variables.push(VariableDefinition {
+            name: variable_definition.name,
+            type_: variable_definition.type_.clone(),
+            default_value: variable_definition.default_value.clone(),
+        });
+    }
+
+    let wrapped_selection_map =
+        selection_map_wrapped(nested_selection_map.clone(), subfields_or_inline_fragments);
+
+    let root_parent_object = schema
+        .server_entity_data
+        .server_object_entity(entrypoint.parent_object_entity_name())
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        )
+        .name
+        .item;
+
+    let root_operation_name = schema
+        .fetchable_types
+        .get(&root_object_entity_name)
+        .expect(
+            "Expected root type to be fetchable here.\
+            This is indicative of a bug in Isograph.",
+        )
+        .clone();
+
+    let query_name = format!("{root_parent_object}__{client_selection_name}")
+        .intern()
+        .into();
+
+    let merged_selection_set = wrapped_selection_map;
+    let variable_definitions = definitions_of_used_variables;
+    let root_fetchable_field = entrypoint.name();
+    let refetch_query_index = RefetchQueryIndex(index as u32);
+    let concrete_type = schema
+        .server_entity_data
+        .server_object_entity(root_object_entity_name)
+        .expect(
+            "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+        )
+        .name
+        .item;
 
     let query_text = TNetworkProtocol::generate_query_text(
         query_name,
@@ -140,104 +199,6 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field<TNetworkProtocol: Netwo
             }),
         },
     ]
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
-    schema: &Schema<TNetworkProtocol>,
-    variant: ImperativelyLoadedFieldVariant,
-    // ID of e.g. Pet, Checkin, etc. i.e. the field on which e.g. __refetch or make_super is selected
-    refetch_field_parent_object_entity_name: ServerObjectEntityName,
-    selection_map: &MergedSelectionMap,
-    entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
-    index: usize,
-    reachable_variables: &BTreeSet<VariableName>,
-    client_selectable: &ClientSelectable<TNetworkProtocol>,
-) -> ImperativelyLoadedFieldArtifactInfo {
-    let ImperativelyLoadedFieldVariant {
-        client_selection_name,
-        root_object_entity_name,
-        mut subfields_or_inline_fragments,
-        top_level_schema_field_arguments,
-        ..
-    } = variant;
-
-    // If the field (e.g. icheckin) returns an abstract type (ICheckin) that is different than
-    // the concrete type we want (Checkin), then we refine to that concrete type.
-    // TODO investigate whether this can be done when the ImperativelyLoadedFieldVariant is created
-    if refetch_field_parent_object_entity_name != client_selectable.parent_object_entity_name() {
-        let refetch_field_parent_type_name = schema
-            .server_entity_data
-            .server_object_entity(refetch_field_parent_object_entity_name)
-            .expect(
-                "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-            )
-            .name;
-        // This could be Pet
-        subfields_or_inline_fragments.insert(
-            0,
-            WrappedSelectionMapSelection::InlineFragment(refetch_field_parent_type_name.item),
-        );
-    }
-
-    // TODO we need to extend this with variables used in subfields_or_inline_fragments
-    let mut definitions_of_used_variables =
-        get_used_variable_definitions(reachable_variables, client_selectable);
-
-    for variable_definition in top_level_schema_field_arguments.iter() {
-        definitions_of_used_variables.push(VariableDefinition {
-            name: variable_definition.name,
-            type_: variable_definition.type_.clone(),
-            default_value: variable_definition.default_value.clone(),
-        });
-    }
-
-    let wrapped_selection_map =
-        selection_map_wrapped(selection_map.clone(), subfields_or_inline_fragments);
-
-    let root_parent_object = schema
-        .server_entity_data
-        .server_object_entity(entrypoint.parent_object_entity_name())
-        .expect(
-            "Expected entity to exist. \
-            This is indicative of a bug in Isograph.",
-        )
-        .name
-        .item;
-
-    let root_operation_name = schema
-        .fetchable_types
-        .get(&root_object_entity_name)
-        .expect(
-            "Expected root type to be fetchable here.\
-            This is indicative of a bug in Isograph.",
-        )
-        .clone();
-
-    let query_name = format!("{root_parent_object}__{client_selection_name}")
-        .intern()
-        .into();
-
-    ImperativelyLoadedFieldArtifactInfo {
-        // TODO don't clone, have lifetime parameter
-        merged_selection_set: wrapped_selection_map,
-        root_parent_object,
-        variable_definitions: definitions_of_used_variables,
-        root_fetchable_field: entrypoint.name(),
-        refetch_query_index: RefetchQueryIndex(index as u32),
-        root_operation_name,
-        query_name,
-        concrete_type: schema
-            .server_entity_data
-            .server_object_entity(root_object_entity_name)
-            .expect(
-                "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-            )
-            .name
-            .item,
-    }
 }
 
 fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(

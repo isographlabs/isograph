@@ -2,9 +2,8 @@ use std::collections::{BTreeMap, BTreeSet, HashSet, btree_map::Entry};
 
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, Location,
-    QueryOperationName, ScalarSelectableName, SelectableName, ServerObjectEntityName,
-    ServerObjectSelectableName, ServerScalarEntityName, ServerScalarSelectableName, Span,
-    VariableName, WithLocation, WithSpan,
+    ScalarSelectableName, SelectableName, ServerObjectEntityName, ServerObjectSelectableName,
+    ServerScalarEntityName, ServerScalarSelectableName, Span, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
@@ -12,7 +11,7 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
-    ObjectSelectionDirectiveSet, RefetchQueryIndex, ScalarSelection, ScalarSelectionDirectiveSet,
+    ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
     SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, VariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -20,11 +19,10 @@ use lazy_static::lazy_static;
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientOrServerObjectSelectable,
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, ClientSelectableId,
-    ImperativelyLoadedFieldVariant, NameAndArguments, NetworkProtocol, PathToRefetchField,
-    RootOperationName, Schema, ServerEntityName, ServerObjectEntity, ServerObjectEntityExtraInfo,
-    ServerObjectSelectable, ServerObjectSelectableVariant, ValidatedObjectSelection,
-    ValidatedScalarSelection, ValidatedSelection, VariableContext,
-    create_transformed_name_and_arguments,
+    ImperativelyLoadedFieldVariant, NameAndArguments, NetworkProtocol, PathToRefetchField, Schema,
+    ServerEntityName, ServerObjectEntity, ServerObjectEntityExtraInfo, ServerObjectSelectable,
+    ServerObjectSelectableVariant, ValidatedObjectSelection, ValidatedScalarSelection,
+    ValidatedSelection, VariableContext, create_transformed_name_and_arguments,
     field_loadability::{Loadability, categorize_field_loadability},
     initial_variable_context, transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context,
@@ -185,21 +183,6 @@ impl NormalizationKey {
             NormalizationKey::InlineFragment(o) => NormalizationKey::InlineFragment(*o),
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct ImperativelyLoadedFieldArtifactInfo {
-    pub merged_selection_set: MergedSelectionMap,
-    /// Used to look up what type to narrow on in the generated refetch query,
-    /// among other things.
-    pub variable_definitions: Vec<VariableDefinition<ServerEntityName>>,
-    pub root_parent_object: ServerObjectEntityName,
-    pub root_fetchable_field: ClientSelectableName,
-    pub refetch_query_index: RefetchQueryIndex,
-
-    pub root_operation_name: RootOperationName,
-    pub query_name: QueryOperationName,
-    pub concrete_type: ServerObjectEntityName,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
