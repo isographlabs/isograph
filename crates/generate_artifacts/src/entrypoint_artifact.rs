@@ -113,10 +113,9 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
                 .unwrap_or_else(|| {
                     schema
                         .fetchable_types
-                        .iter()
+                        .values()
                         .next()
                         .expect("Expected at least one fetchable type to exist")
-                        .1
                 })
         });
 
@@ -206,10 +205,9 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
                     .unwrap_or_else(|| {
                         schema
                             .fetchable_types
-                            .iter()
+                            .keys()
                             .next()
                             .expect("Expected at least one fetchable type to exist")
-                            .0
                     })
             },
         )
