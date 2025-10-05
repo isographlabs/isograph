@@ -55,27 +55,24 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
         .intern()
         .into();
 
-        let type_name = *root_fetchable_field_parent_object;
-        let field_name = *root_fetchable_field;
+        let imperatively_loaded_field_file_contents =
+            imperatively_loaded_field_artifact_file_contents(&self, file_extensions);
 
         vec![
             ArtifactPathAndContent {
                 file_content: format!("export default '{query_text}';"),
                 file_name: query_text_file_name,
                 type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-                    type_name,
-                    field_name: field_name.into(),
+                    type_name: *root_fetchable_field_parent_object,
+                    field_name: (*root_fetchable_field).into(),
                 }),
             },
             ArtifactPathAndContent {
-                file_content: imperatively_loaded_field_artifact_file_contents(
-                    &self,
-                    file_extensions,
-                ),
+                file_content: imperatively_loaded_field_file_contents,
                 file_name: file_name_prefix,
                 type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-                    type_name,
-                    field_name: field_name.into(),
+                    type_name: *root_fetchable_field_parent_object,
+                    field_name: (*root_fetchable_field).into(),
                 }),
             },
         ]
