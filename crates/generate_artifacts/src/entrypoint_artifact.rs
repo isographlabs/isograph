@@ -333,11 +333,9 @@ fn generate_refetch_query_artifact_import(
     // with indexes.
     let mut output = String::new();
     let mut array_syntax = String::new();
-    for (query_index, item) in root_refetched_paths.iter().enumerate() {
-        let RootRefetchedPath {
-            path_to_refetch_field_info,
-            ..
-        } = &item.0;
+    for (query_index, (root_refetched_path, _merged_selection_set, variable_names)) in
+        root_refetched_paths.iter().enumerate()
+    {
         output.push_str(&format!(
             "import refetchQuery{} from './__refetch__{}{}';\n",
             query_index,
@@ -346,9 +344,10 @@ fn generate_refetch_query_artifact_import(
         ));
 
         let variable_names_str = variable_names_to_string(
-            &item.2,
+            variable_names,
             get_used_variables_for_refetch_query_import(
-                &path_to_refetch_field_info
+                &root_refetched_path
+                    .path_to_refetch_field_info
                     .imperatively_loaded_field_variant
                     .subfields_or_inline_fragments,
             )
