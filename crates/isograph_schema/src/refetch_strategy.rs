@@ -125,7 +125,7 @@ impl GenerateRefetchQueryImpl {
         let new_selection_map = selection_map_wrapped(inner_selection_map, self.subfields.clone());
 
         // TODO this seems like a bunch of extra work, and we shouldn't need to do it
-        let variables = get_reachable_variables(&new_selection_map);
+        let variables = get_reachable_variables(&new_selection_map).collect();
 
         (new_selection_map, variables)
     }

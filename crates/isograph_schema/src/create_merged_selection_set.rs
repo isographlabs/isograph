@@ -497,11 +497,10 @@ fn create_field_traversal_result<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-pub fn get_reachable_variables(selection_map: &MergedSelectionMap) -> BTreeSet<VariableName> {
-    selection_map
-        .values()
-        .flat_map(|x| x.reachable_variables())
-        .collect()
+pub fn get_reachable_variables(
+    selection_map: &MergedSelectionMap,
+) -> impl Iterator<Item = VariableName> {
+    selection_map.values().flat_map(|x| x.reachable_variables())
 }
 
 pub fn imperative_field_subfields_or_inline_fragments(

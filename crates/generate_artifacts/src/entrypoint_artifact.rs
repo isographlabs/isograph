@@ -176,7 +176,8 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
                 }
             };
 
-            let reachable_variables = get_reachable_variables(current_target_merged_selections);
+            let reachable_variables =
+                get_reachable_variables(current_target_merged_selections).collect();
             (
                 root_refetch_path.clone(),
                 current_target_merged_selections,
@@ -306,9 +307,7 @@ fn get_used_variable_definitions<'a>(
     merged_selection_map: &MergedSelectionMap,
     variable_definitions: Vec<&'a ValidatedVariableDefinition>,
 ) -> BTreeSet<&'a ValidatedVariableDefinition> {
-    merged_selection_map
-        .values()
-        .flat_map(|selection| selection.reachable_variables())
+    get_reachable_variables(merged_selection_map)
         .map(|variable_name| {
             *variable_definitions
                 .iter()
@@ -318,7 +317,7 @@ fn get_used_variable_definitions<'a>(
                     This is indicative of a bug in Isograph."
                 ))
         })
-        .collect::<BTreeSet<_>>()
+        .collect()
 }
 
 fn generate_refetch_query_artifact_import(
