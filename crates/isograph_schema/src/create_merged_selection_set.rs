@@ -514,42 +514,6 @@ fn create_field_traversal_result<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-pub fn get_imperatively_loaded_artifact_info<TNetworkProtocol: NetworkProtocol>(
-    schema: &Schema<TNetworkProtocol>,
-    entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
-    root_refetch_path: RootRefetchedPath,
-    nested_selection_map: &MergedSelectionMap,
-    reachable_variables: &BTreeSet<VariableName>,
-    index: usize,
-) -> ImperativelyLoadedFieldArtifactInfo {
-    let RootRefetchedPath {
-        path_to_refetch_field_info,
-        ..
-    } = root_refetch_path;
-    let PathToRefetchFieldInfo {
-        refetch_field_parent_object_entity_name,
-        imperatively_loaded_field_variant,
-        extra_selections: _,
-        client_selectable_id,
-    } = path_to_refetch_field_info;
-
-    let client_selectable = schema.client_type(client_selectable_id).expect(
-        "Expected selectable to exist. \
-        This is indicative of a bug in Isograph.",
-    );
-
-    process_imperatively_loaded_field(
-        schema,
-        imperatively_loaded_field_variant,
-        refetch_field_parent_object_entity_name,
-        nested_selection_map,
-        entrypoint,
-        index,
-        reachable_variables,
-        &client_selectable,
-    )
-}
-
 pub fn get_reachable_variables(selection_map: &MergedSelectionMap) -> BTreeSet<VariableName> {
     selection_map
         .values()
@@ -558,7 +522,7 @@ pub fn get_reachable_variables(selection_map: &MergedSelectionMap) -> BTreeSet<V
 }
 
 #[allow(clippy::too_many_arguments)]
-fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
+pub fn process_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     variant: ImperativelyLoadedFieldVariant,
     // ID of e.g. Pet, Checkin, etc. i.e. the field on which e.g. __refetch or make_super is selected

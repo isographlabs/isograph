@@ -9,8 +9,8 @@ use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::RefetchQueryIndex;
 use isograph_schema::{
     ClientScalarSelectable, Format, ImperativelyLoadedFieldArtifactInfo, MergedSelectionMap,
-    NetworkProtocol, REFETCH_FIELD_NAME, RootRefetchedPath, Schema,
-    get_imperatively_loaded_artifact_info,
+    NetworkProtocol, PathToRefetchFieldInfo, REFETCH_FIELD_NAME, RootRefetchedPath, Schema,
+    process_imperatively_loaded_field,
 };
 
 use crate::{
@@ -126,14 +126,22 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field<TNetworkProtocol: Netwo
     reachable_variables: &BTreeSet<VariableName>,
     index: usize,
 ) -> Vec<ArtifactPathAndContent> {
-    let imperatively_loaded_field_artifact_info = get_imperatively_loaded_artifact_info(
-        schema,
-        entrypoint,
-        root_refetch_path,
-        nested_selection_map,
-        reachable_variables,
-        index,
+    let RootRefetchedPath {
+        path_to_refetch_field_info,
+        ..
+    } = root_refetch_path;
+    let PathToRefetchFieldInfo {
+        refetch_field_parent_object_entity_name,
+        imperatively_loaded_field_variant,
+        client_selectable_id,
+        ..
+    } = path_to_refetch_field_info;
+
+    let client_selectable = schema.client_type(client_selectable_id).expect(
+        "Expected selectable to exist. \
+        This is indicative of a bug in Isograph.",
     );
+
     let ImperativelyLoadedFieldArtifactInfo {
         merged_selection_set,
         root_fetchable_field,
@@ -143,7 +151,16 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field<TNetworkProtocol: Netwo
         root_operation_name,
         query_name,
         concrete_type,
-    } = imperatively_loaded_field_artifact_info;
+    } = process_imperatively_loaded_field(
+        schema,
+        imperatively_loaded_field_variant,
+        refetch_field_parent_object_entity_name,
+        nested_selection_map,
+        entrypoint,
+        index,
+        reachable_variables,
+        &client_selectable,
+    );
 
     let query_text = TNetworkProtocol::generate_query_text(
         query_name,
