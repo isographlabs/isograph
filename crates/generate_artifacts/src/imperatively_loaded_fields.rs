@@ -153,17 +153,23 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field<TNetworkProtocol: Netwo
         .into();
 
     let query_text_file_name = format!(
+        "{}__{}__{}{}",
+        *REFETCH_FIELD_NAME,
+        *QUERY_TEXT,
+        refetch_query_index.0,
+        file_extensions.ts()
+    );
+
+    let query_text_file_name_with_extension = format!(
         "{}__{}__{}.ts",
         *REFETCH_FIELD_NAME, *QUERY_TEXT, refetch_query_index.0
     )
     .intern()
     .into();
 
-    let ts_file_extension = file_extensions.ts();
-
     let imperatively_loaded_field_file_contents = format!(
         "import type {{ IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryNormalizationArtifact }} from '@isograph/react';\n\
-        import queryText from './{query_text_file_name}{ts_file_extension}';\n\n\
+        import queryText from './{query_text_file_name}';\n\n\
         const normalizationAst: NormalizationAst = {{\n\
         {}kind: \"NormalizationAst\",\n\
         {}selections: {normalization_ast_text},\n\
@@ -184,7 +190,7 @@ pub(crate) fn get_artifact_for_imperatively_loaded_field<TNetworkProtocol: Netwo
     vec![
         ArtifactPathAndContent {
             file_content: format!("export default '{query_text}';"),
-            file_name: query_text_file_name,
+            file_name: query_text_file_name_with_extension,
             type_and_field: Some(ParentObjectEntityNameAndSelectableName {
                 type_name: root_parent_object,
                 field_name: root_fetchable_field.into(),
