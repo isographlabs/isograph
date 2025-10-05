@@ -128,19 +128,8 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
             This is indicative of a bug in Isograph.",
         );
 
-    let reachable_variables = merged_selection_map
-        .values()
-        .flat_map(|selection| selection.reachable_variables())
-        .map(|variable_name| {
-            *variable_definitions
-                .iter()
-                .find(|definition| definition.name.item == variable_name)
-                .unwrap_or_else(|| panic!(
-                    "Expected to find a variable defined at the root with name {variable_name}.\n\
-                    This is indicative of a bug in Isograph."
-                ))
-        })
-        .collect::<BTreeSet<_>>();
+    let reachable_variables =
+        get_used_variable_definitions(merged_selection_map, variable_definitions);
 
     let query_text = TNetworkProtocol::generate_query_text(
         query_name,
@@ -311,6 +300,25 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     );
 
     path_and_contents
+}
+
+fn get_used_variable_definitions<'a>(
+    merged_selection_map: &MergedSelectionMap,
+    variable_definitions: Vec<&'a ValidatedVariableDefinition>,
+) -> BTreeSet<&'a ValidatedVariableDefinition> {
+    merged_selection_map
+        .values()
+        .flat_map(|selection| selection.reachable_variables())
+        .map(|variable_name| {
+            *variable_definitions
+                .iter()
+                .find(|definition| definition.name.item == variable_name)
+                .unwrap_or_else(|| panic!(
+                    "Expected to find a variable defined at the root with name {variable_name}.\n\
+                    This is indicative of a bug in Isograph."
+                ))
+        })
+        .collect::<BTreeSet<_>>()
 }
 
 fn generate_refetch_query_artifact_import(
