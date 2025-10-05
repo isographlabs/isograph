@@ -258,11 +258,11 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     path_and_contents.push(ArtifactPathAndContent {
         file_content: format!(
             "import type {{NormalizationAst}} from '@isograph/react';\n\
-                const normalizationAst: NormalizationAst = {{\n\
-                {}kind: \"NormalizationAst\",\n\
-                {}selections: {normalization_ast_text},\n\
-                }};\n\
-                export default normalizationAst;\n",
+            const normalizationAst: NormalizationAst = {{\n\
+            {}kind: \"NormalizationAst\",\n\
+            {}selections: {normalization_ast_text},\n\
+            }};\n\
+            export default normalizationAst;\n",
             "  ", "  "
         ),
         file_name: *NORMALIZATION_AST_FILE_NAME,
