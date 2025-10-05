@@ -68,7 +68,10 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
                 }),
             },
             ArtifactPathAndContent {
-                file_content: self.file_contents(file_extensions),
+                file_content: imperatively_loaded_field_artifact_file_contents(
+                    &self,
+                    file_extensions,
+                ),
                 file_name: file_name_prefix,
                 type_and_field: Some(ParentObjectEntityNameAndSelectableName {
                     type_name,
@@ -79,41 +82,42 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
     }
 }
 
-impl ImperativelyLoadedEntrypointArtifactInfo {
-    pub(crate) fn file_contents(self, file_extensions: GenerateFileExtensionsOption) -> String {
-        let ImperativelyLoadedEntrypointArtifactInfo {
-            normalization_ast_text: normalization_ast,
-            concrete_type,
-            refetch_query_index,
-            operation_text,
-            ..
-        } = self;
-        let ts_file_extension = file_extensions.ts();
-        let query_text_file_name = format!(
-            "{}__{}__{}",
-            *REFETCH_FIELD_NAME, *QUERY_TEXT, refetch_query_index.0,
-        );
+pub(crate) fn imperatively_loaded_field_artifact_file_contents(
+    artifact: &ImperativelyLoadedEntrypointArtifactInfo,
+    file_extensions: GenerateFileExtensionsOption,
+) -> String {
+    let ImperativelyLoadedEntrypointArtifactInfo {
+        normalization_ast_text: normalization_ast,
+        concrete_type,
+        refetch_query_index,
+        operation_text,
+        ..
+    } = artifact;
+    let ts_file_extension = file_extensions.ts();
+    let query_text_file_name = format!(
+        "{}__{}__{}",
+        *REFETCH_FIELD_NAME, *QUERY_TEXT, refetch_query_index.0,
+    );
 
-        format!(
-            "import type {{ IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryNormalizationArtifact }} from '@isograph/react';\n\
-            import queryText from './{query_text_file_name}{ts_file_extension}';\n\n\
-            const normalizationAst: NormalizationAst = {{\n\
-            {}kind: \"NormalizationAst\",\n\
-            {}selections: {normalization_ast},\n\
-            }};\n\
-            const artifact: RefetchQueryNormalizationArtifact = {{\n\
-            {}kind: \"RefetchQuery\",\n\
-            {}networkRequestInfo: {{\n\
-            {}  kind: \"NetworkRequestInfo\",\n\
-            {}  operation: {operation_text},\n\
-            {}  normalizationAst,\n\
-            {}}},\n\
-            {}concreteType: \"{concrete_type}\",\n\
-            }};\n\n\
-            export default artifact;\n",
-            "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ",
-        )
-    }
+    format!(
+        "import type {{ IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryNormalizationArtifact }} from '@isograph/react';\n\
+        import queryText from './{query_text_file_name}{ts_file_extension}';\n\n\
+        const normalizationAst: NormalizationAst = {{\n\
+        {}kind: \"NormalizationAst\",\n\
+        {}selections: {normalization_ast},\n\
+        }};\n\
+        const artifact: RefetchQueryNormalizationArtifact = {{\n\
+        {}kind: \"RefetchQuery\",\n\
+        {}networkRequestInfo: {{\n\
+        {}  kind: \"NetworkRequestInfo\",\n\
+        {}  operation: {operation_text},\n\
+        {}  normalizationAst,\n\
+        {}}},\n\
+        {}concreteType: \"{concrete_type}\",\n\
+        }};\n\n\
+        export default artifact;\n",
+        "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ",
+    )
 }
 
 pub(crate) fn get_artifact_for_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
