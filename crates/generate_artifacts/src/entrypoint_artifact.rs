@@ -4,7 +4,7 @@ use crate::{
         QUERY_TEXT_FILE_NAME, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
         RefetchQueryArtifactImport,
     },
-    imperatively_loaded_fields::get_artifact_for_imperatively_loaded_field,
+    imperatively_loaded_fields::get_paths_and_contents_for_imperatively_loaded_field,
     normalization_ast_text::generate_normalization_ast_text,
     operation_text::{OperationText, generate_operation_text},
     persisted_documents::PersistedDocuments,
@@ -284,7 +284,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
             .enumerate()
             .flat_map(
                 |(index, (root_refetch_path, nested_selection_map, reachable_variables))| {
-                    get_artifact_for_imperatively_loaded_field(
+                    get_paths_and_contents_for_imperatively_loaded_field(
                         schema,
                         file_extensions,
                         persisted_documents,

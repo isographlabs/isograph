@@ -19,7 +19,9 @@ use crate::{
 };
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn get_artifact_for_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
+    TNetworkProtocol: NetworkProtocol,
+>(
     schema: &Schema<TNetworkProtocol>,
     file_extensions: GenerateFileExtensionsOption,
     persisted_documents: &mut Option<PersistedDocuments>,
