@@ -1,12 +1,16 @@
+use std::collections::BTreeSet;
+
 use common_lang_types::{
     ArtifactPathAndContent, ClientSelectableName, ParentObjectEntityNameAndSelectableName,
-    QueryText, ServerObjectEntityName,
+    QueryText, ServerObjectEntityName, VariableName,
 };
 use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::RefetchQueryIndex;
 use isograph_schema::{
-    Format, ImperativelyLoadedFieldArtifactInfo, NetworkProtocol, REFETCH_FIELD_NAME, Schema,
+    ClientScalarSelectable, Format, ImperativelyLoadedFieldArtifactInfo, MergedSelectionMap,
+    NetworkProtocol, REFETCH_FIELD_NAME, RootRefetchedPath, Schema,
+    get_imperatively_loaded_artifact_info,
 };
 
 use crate::{
@@ -114,10 +118,22 @@ impl ImperativelyLoadedEntrypointArtifactInfo {
 
 pub(crate) fn get_artifact_for_imperatively_loaded_field<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    imperatively_loaded_field_artifact_info: ImperativelyLoadedFieldArtifactInfo,
     file_extensions: GenerateFileExtensionsOption,
     persisted_documents: &mut Option<PersistedDocuments>,
+    entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
+    root_refetch_path: RootRefetchedPath,
+    nested_selection_map: &MergedSelectionMap,
+    reachable_variables: &BTreeSet<VariableName>,
+    index: usize,
 ) -> Vec<ArtifactPathAndContent> {
+    let imperatively_loaded_field_artifact_info = get_imperatively_loaded_artifact_info(
+        schema,
+        entrypoint,
+        root_refetch_path,
+        nested_selection_map,
+        reachable_variables,
+        index,
+    );
     let ImperativelyLoadedFieldArtifactInfo {
         merged_selection_set,
         root_fetchable_field,

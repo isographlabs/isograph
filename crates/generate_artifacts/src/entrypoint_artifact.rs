@@ -24,8 +24,7 @@ use isograph_schema::{
     NetworkProtocol, NormalizationKey, RootOperationName, RootRefetchedPath,
     ScalarClientFieldTraversalState, Schema, ServerObjectEntity, ValidatedVariableDefinition,
     WrappedSelectionMapSelection, create_merged_selection_map_for_field_and_insert_into_global_map,
-    current_target_merged_selections, get_imperatively_loaded_artifact_info,
-    get_reachable_variables, initial_variable_context,
+    current_target_merged_selections, get_reachable_variables, initial_variable_context,
 };
 use std::collections::BTreeSet;
 
@@ -297,20 +296,15 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
             .enumerate()
             .flat_map(
                 |(index, (root_refetch_path, nested_selection_map, reachable_variables))| {
-                    let artifact_info = get_imperatively_loaded_artifact_info(
+                    get_artifact_for_imperatively_loaded_field(
                         schema,
+                        file_extensions,
+                        persisted_documents,
                         entrypoint,
                         root_refetch_path,
                         nested_selection_map,
                         &reachable_variables,
                         index,
-                    );
-
-                    get_artifact_for_imperatively_loaded_field(
-                        schema,
-                        artifact_info,
-                        file_extensions,
-                        persisted_documents,
                     )
                 },
             ),

@@ -535,7 +535,7 @@ pub fn get_imperatively_loaded_artifact_info<TNetworkProtocol: NetworkProtocol>(
 
     let client_selectable = schema.client_type(client_selectable_id).expect(
         "Expected selectable to exist. \
-                This is indicative of a bug in Isograph.",
+        This is indicative of a bug in Isograph.",
     );
 
     process_imperatively_loaded_field(
