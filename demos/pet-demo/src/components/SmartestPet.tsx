@@ -31,7 +31,7 @@ export const SmartestPetRoute = iso(`
       >
         <CardContent>
           <Stack direction="row" spacing={4}>
-            {data.smartestPet && (
+            {data.smartestPet != null ? (
               <LoadableFieldReader loadableField={data.smartestPet} args={{}}>
                 {(smartestPet) => (
                   <>
@@ -51,6 +51,8 @@ export const SmartestPetRoute = iso(`
                   </>
                 )}
               </LoadableFieldReader>
+            ) : (
+              'No pets found!'
             )}
           </Stack>
         </CardContent>
