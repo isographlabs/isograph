@@ -358,11 +358,11 @@ impl<TNetworkProtocol: NetworkProtocol> EntrypointArtifactInfo<'_, TNetworkProto
 
         let entrypoint_file_content = entrypoint_file_content(
             file_extensions,
-            query_name,
+            *query_name,
             operation_text,
             parent_type,
             refetch_query_artifact_import,
-            concrete_type,
+            *concrete_type,
             directive_set,
         );
 
@@ -405,11 +405,11 @@ impl<TNetworkProtocol: NetworkProtocol> EntrypointArtifactInfo<'_, TNetworkProto
 
 fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
     file_extensions: GenerateFileExtensionsOption,
-    query_name: &QueryOperationName,
+    query_name: QueryOperationName,
     operation_text: &OperationText,
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
     refetch_query_artifact_import: &RefetchQueryArtifactImport,
-    concrete_type: &ServerObjectEntityName,
+    concrete_type: ServerObjectEntityName,
     directive_set: &EntrypointDirectiveSet,
 ) -> String {
     let ts_file_extension = file_extensions.ts();
