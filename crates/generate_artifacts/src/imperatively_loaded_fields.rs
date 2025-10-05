@@ -39,7 +39,6 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         refetch_field_parent_object_entity_name,
         imperatively_loaded_field_variant,
         client_selectable_id,
-        ..
     } = path_to_refetch_field_info;
 
     let client_selectable = schema.client_type(client_selectable_id).expect(

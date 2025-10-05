@@ -189,7 +189,6 @@ impl NormalizationKey {
 pub struct PathToRefetchFieldInfo {
     pub refetch_field_parent_object_entity_name: ServerObjectEntityName,
     pub imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant,
-    extra_selections: MergedSelectionMap,
     pub client_selectable_id: ClientSelectableId,
 }
 
@@ -977,7 +976,6 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
     let info = PathToRefetchFieldInfo {
         refetch_field_parent_object_entity_name: parent_object_entity_name,
         imperatively_loaded_field_variant: variant.clone(),
-        extra_selections: BTreeMap::new(),
         client_selectable_id: SelectionType::Scalar((
             newly_encountered_client_scalar_selectable.parent_object_entity_name,
             newly_encountered_scalar_client_selectable_name,
@@ -1082,7 +1080,6 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
             subfields_or_inline_fragments,
             root_object_entity_name: schema.query_id(),
         },
-        extra_selections: BTreeMap::new(),
         client_selectable_id: SelectionType::Object((
             parent_object_entity_name,
             newly_encountered_client_object_selectable_name,
