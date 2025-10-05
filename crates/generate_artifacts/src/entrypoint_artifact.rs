@@ -1,8 +1,8 @@
 use crate::{
     generate_artifacts::{
-        ENTRYPOINT_FILE_NAME, NORMALIZATION_AST, NORMALIZATION_AST_FILE_NAME, NormalizationAstText,
-        QUERY_TEXT, QUERY_TEXT_FILE_NAME, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE,
-        RESOLVER_READER, RefetchQueryArtifactImport,
+        ENTRYPOINT_FILE_NAME, NORMALIZATION_AST, NORMALIZATION_AST_FILE_NAME, QUERY_TEXT,
+        QUERY_TEXT_FILE_NAME, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
+        RefetchQueryArtifactImport,
     },
     imperatively_loaded_fields::get_artifact_for_imperatively_loaded_field,
     normalization_ast_text::generate_normalization_ast_text,
@@ -11,7 +11,7 @@ use crate::{
 };
 use common_lang_types::{
     ArtifactPathAndContent, ClientScalarSelectableName, ParentObjectEntityNameAndSelectableName,
-    QueryOperationName, QueryText, ServerObjectEntityName, VariableName,
+    QueryOperationName, ServerObjectEntityName, VariableName,
 };
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
@@ -28,18 +28,6 @@ use isograph_schema::{
     get_reachable_variables, initial_variable_context,
 };
 use std::collections::BTreeSet;
-
-#[derive(Debug)]
-struct EntrypointArtifactInfo<'schema, TNetworkProtocol: NetworkProtocol> {
-    query_name: QueryOperationName,
-    parent_type: &'schema ServerObjectEntity<TNetworkProtocol>,
-    query_text: QueryText,
-    operation_text: OperationText,
-    normalization_ast_text: NormalizationAstText,
-    refetch_query_artifact_import: RefetchQueryArtifactImport,
-    concrete_type: ServerObjectEntityName,
-    directive_set: EntrypointDirectiveSet,
-}
 
 pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
@@ -252,19 +240,57 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         1,
     );
 
-    let mut paths_and_contents = EntrypointArtifactInfo {
-        query_text,
-        operation_text,
+    let directive_set = info
+        .map(|info| info.directive_set)
+        .unwrap_or(EntrypointDirectiveSet::None(EmptyDirectiveSet {}));
+
+    let field_name = query_name.into();
+    let type_name = parent_object.name.item;
+
+    let entrypoint_file_content = entrypoint_file_content(
+        file_extensions,
         query_name,
-        parent_type: parent_object,
-        normalization_ast_text,
-        refetch_query_artifact_import,
-        concrete_type: concrete_type.name.item,
-        directive_set: info
-            .map(|info| info.directive_set)
-            .unwrap_or(EntrypointDirectiveSet::None(EmptyDirectiveSet {})),
-    }
-    .path_and_content(file_extensions);
+        &operation_text,
+        &parent_object,
+        &refetch_query_artifact_import,
+        concrete_type.name.item,
+        &directive_set,
+    );
+
+    let mut paths_and_contents = vec![
+        ArtifactPathAndContent {
+            file_content: format!("export default '{query_text}';"),
+            file_name: *QUERY_TEXT_FILE_NAME,
+            type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+                type_name,
+                field_name,
+            }),
+        },
+        ArtifactPathAndContent {
+            file_content: format!(
+                "import type {{NormalizationAst}} from '@isograph/react';\n\
+                const normalizationAst: NormalizationAst = {{\n\
+                {}kind: \"NormalizationAst\",\n\
+                {}selections: {normalization_ast_text},\n\
+                }};\n\
+                export default normalizationAst;\n",
+                "  ", "  "
+            ),
+            file_name: *NORMALIZATION_AST_FILE_NAME,
+            type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+                type_name,
+                field_name,
+            }),
+        },
+        ArtifactPathAndContent {
+            file_content: entrypoint_file_content,
+            file_name: *ENTRYPOINT_FILE_NAME,
+            type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+                type_name,
+                field_name,
+            }),
+        },
+    ];
 
     for (index, (root_refetch_path, nested_selection_map, reachable_variables)) in
         refetch_paths_with_variables.into_iter().enumerate()
@@ -336,71 +362,6 @@ fn generate_refetch_query_artifact_import(
         array_syntax
     ));
     RefetchQueryArtifactImport(output)
-}
-
-impl<TNetworkProtocol: NetworkProtocol> EntrypointArtifactInfo<'_, TNetworkProtocol> {
-    fn path_and_content(
-        self,
-        file_extensions: GenerateFileExtensionsOption,
-    ) -> Vec<ArtifactPathAndContent> {
-        let EntrypointArtifactInfo {
-            query_name,
-            parent_type,
-            query_text,
-            operation_text,
-            normalization_ast_text,
-            refetch_query_artifact_import,
-            concrete_type,
-            directive_set,
-        } = &self;
-        let field_name = (*query_name).into();
-        let type_name = parent_type.name.item;
-
-        let entrypoint_file_content = entrypoint_file_content(
-            file_extensions,
-            *query_name,
-            operation_text,
-            parent_type,
-            refetch_query_artifact_import,
-            *concrete_type,
-            directive_set,
-        );
-
-        vec![
-            ArtifactPathAndContent {
-                file_content: format!("export default '{query_text}';"),
-                file_name: *QUERY_TEXT_FILE_NAME,
-                type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-                    type_name,
-                    field_name,
-                }),
-            },
-            ArtifactPathAndContent {
-                file_content: format!(
-                    "import type {{NormalizationAst}} from '@isograph/react';\n\
-                    const normalizationAst: NormalizationAst = {{\n\
-                    {}kind: \"NormalizationAst\",\n\
-                    {}selections: {normalization_ast_text},\n\
-                    }};\n\
-                    export default normalizationAst;\n",
-                    "  ", "  "
-                ),
-                file_name: *NORMALIZATION_AST_FILE_NAME,
-                type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-                    type_name,
-                    field_name,
-                }),
-            },
-            ArtifactPathAndContent {
-                file_content: entrypoint_file_content,
-                file_name: *ENTRYPOINT_FILE_NAME,
-                type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-                    type_name,
-                    field_name,
-                }),
-            },
-        ]
-    }
 }
 
 fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
