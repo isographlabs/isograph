@@ -347,7 +347,7 @@ fn generate_refetch_query_artifact_import(
 
         let variable_names_str = variable_names_to_string(
             &item.2,
-            get_used_variables(
+            get_used_variables_for_refetch_query_import(
                 &path_to_refetch_field_info
                     .imperatively_loaded_field_variant
                     .subfields_or_inline_fragments,
@@ -491,7 +491,7 @@ fn variable_names_to_string(
     s
 }
 
-fn get_used_variables(
+fn get_used_variables_for_refetch_query_import(
     inline_fragments_or_linked_fields: &[WrappedSelectionMapSelection],
 ) -> BTreeSet<VariableName> {
     // TODO return impl iterator
