@@ -250,7 +250,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         file_extensions,
         query_name,
         &operation_text,
-        &parent_object,
+        parent_object,
         &refetch_query_artifact_import,
         concrete_type.name.item,
         &directive_set,
