@@ -31,12 +31,9 @@ export const SmartestPetRoute = iso(`
       >
         <CardContent>
           <Stack direction="row" spacing={4}>
-            <LoadableFieldReader loadableField={data.smartestPet} args={{}}>
-              {(smartestPet) => {
-                if (smartestPet == null) {
-                  return <h2>No smart pets in this bunch!</h2>;
-                }
-                return (
+            {data.smartestPet != null ? (
+              <LoadableFieldReader loadableField={data.smartestPet} args={{}}>
+                {(smartestPet) => (
                   <>
                     <smartestPet.Avatar
                       onClick={() =>
@@ -52,9 +49,11 @@ export const SmartestPetRoute = iso(`
                       <b>{smartestPet.stats?.intelligence}</b>
                     </div>
                   </>
-                );
-              }}
-            </LoadableFieldReader>
+                )}
+              </LoadableFieldReader>
+            ) : (
+              'No pets found!'
+            )}
           </Stack>
         </CardContent>
       </Card>
