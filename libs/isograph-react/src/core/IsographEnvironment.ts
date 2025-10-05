@@ -1,4 +1,6 @@
 import { ParentCache } from '@isograph/react-disposable-state';
+import type { Brand } from './brand';
+import type { NetworkResponseValue } from './cache';
 import {
   IsographEntrypoint,
   IsographOperation,
@@ -15,7 +17,6 @@ import { LogFunction, WrappedLogFunction } from './logging';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { WithEncounteredRecords } from './read';
 import type { ReaderAst, StartUpdate } from './reader';
-import type { Brand } from './brand';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
@@ -48,7 +49,7 @@ export type AnyRecordSubscription = {
 };
 
 export type Subscription =
-  | FragmentSubscription<any>
+  | FragmentSubscription<UnknownTReadFromStore>
   | AnyChangesToRecordSubscription
   | AnyRecordSubscription;
 export type Subscriptions = Set<Subscription>;
@@ -84,10 +85,47 @@ export type MissingFieldHandler = (
   variables: Variables | null,
 ) => StoreLink | undefined;
 
+export type PayloadData = Record<string, NetworkResponseValue>;
+export interface PayloadExtensions {}
+export interface PayloadErrorExtensions {}
+
+export interface GraphQLResponseWithExtensionsOnly {
+  data: null;
+  extensions: PayloadExtensions;
+}
+export interface PayloadError {
+  message: string;
+  locations?: { line: number; column: number }[];
+  path?: (string | number)[];
+  extensions?: PayloadErrorExtensions;
+}
+
+export type PayloadErrors = [PayloadError, ...PayloadError[]];
+
+interface GraphQLResponseWithoutData {
+  data: PayloadData;
+  extensions?: PayloadExtensions;
+  errors?: PayloadErrors;
+  label?: 'string';
+  path?: '(string|number)[]';
+}
+interface GraphQLResponseWithData {
+  data: PayloadData;
+  extensions?: PayloadExtensions;
+  label?: string | undefined;
+  path?: (string | number)[] | undefined;
+  errors?: PayloadErrors;
+}
+
+export type GraphqlResponse =
+  | GraphQLResponseWithExtensionsOnly
+  | GraphQLResponseWithoutData
+  | GraphQLResponseWithData;
+
 export type IsographNetworkFunction = (
   operation: IsographOperation | IsographPersistedOperation,
   variables: Variables,
-) => Promise<any>;
+) => Promise<GraphqlResponse>;
 
 export interface Link<T extends TypeName> extends StoreLink {
   readonly __link: Brand<DataId, T>;
@@ -125,12 +163,17 @@ export type DataId = string;
 
 export const ROOT_ID: DataId & '__ROOT' = '__ROOT';
 
+export interface WithErrors<T> {
+  readonly record: T;
+  readonly errors: Record<DataId | string, PayloadErrors>;
+}
+
 export type IsographStore = {
   [index: TypeName]: {
-    [index: DataId]: StoreRecord | null;
+    [index: DataId]: WithErrors<StoreRecord>;
   } | null;
   readonly Query: {
-    readonly __ROOT: StoreRecord;
+    readonly __ROOT: WithErrors<StoreRecord>;
   };
 };
 
@@ -163,7 +206,10 @@ export function createIsographEnvironment(
 export function createIsographStore(): IsographStore {
   return {
     Query: {
-      [ROOT_ID]: {},
+      [ROOT_ID]: {
+        errors: {},
+        record: {},
+      },
     },
   };
 }
