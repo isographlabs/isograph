@@ -257,62 +257,66 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         &directive_set,
     );
 
-    let mut paths_and_contents = vec![
-        ArtifactPathAndContent {
-            file_content: format!("export default '{query_text}';"),
-            file_name: *QUERY_TEXT_FILE_NAME,
-            type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-                type_name,
-                field_name,
-            }),
-        },
-        ArtifactPathAndContent {
-            file_content: format!(
-                "import type {{NormalizationAst}} from '@isograph/react';\n\
+    let mut path_and_contents = Vec::with_capacity(refetch_paths_with_variables.len() + 3);
+    path_and_contents.push(ArtifactPathAndContent {
+        file_content: format!("export default '{query_text}';"),
+        file_name: *QUERY_TEXT_FILE_NAME,
+        type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+            type_name,
+            field_name,
+        }),
+    });
+    path_and_contents.push(ArtifactPathAndContent {
+        file_content: format!(
+            "import type {{NormalizationAst}} from '@isograph/react';\n\
                 const normalizationAst: NormalizationAst = {{\n\
                 {}kind: \"NormalizationAst\",\n\
                 {}selections: {normalization_ast_text},\n\
                 }};\n\
                 export default normalizationAst;\n",
-                "  ", "  "
+            "  ", "  "
+        ),
+        file_name: *NORMALIZATION_AST_FILE_NAME,
+        type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+            type_name,
+            field_name,
+        }),
+    });
+    path_and_contents.push(ArtifactPathAndContent {
+        file_content: entrypoint_file_content,
+        file_name: *ENTRYPOINT_FILE_NAME,
+        type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+            type_name,
+            field_name,
+        }),
+    });
+
+    path_and_contents.extend(
+        refetch_paths_with_variables
+            .into_iter()
+            .enumerate()
+            .flat_map(
+                |(index, (root_refetch_path, nested_selection_map, reachable_variables))| {
+                    let artifact_info = get_imperatively_loaded_artifact_info(
+                        schema,
+                        entrypoint,
+                        root_refetch_path,
+                        nested_selection_map,
+                        &reachable_variables,
+                        index,
+                    );
+
+                    get_artifact_for_imperatively_loaded_field(
+                        schema,
+                        artifact_info,
+                        file_extensions,
+                        persisted_documents,
+                    )
+                },
             ),
-            file_name: *NORMALIZATION_AST_FILE_NAME,
-            type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-                type_name,
-                field_name,
-            }),
-        },
-        ArtifactPathAndContent {
-            file_content: entrypoint_file_content,
-            file_name: *ENTRYPOINT_FILE_NAME,
-            type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-                type_name,
-                field_name,
-            }),
-        },
-    ];
+    );
 
-    for (index, (root_refetch_path, nested_selection_map, reachable_variables)) in
-        refetch_paths_with_variables.into_iter().enumerate()
-    {
-        let artifact_info = get_imperatively_loaded_artifact_info(
-            schema,
-            entrypoint,
-            root_refetch_path,
-            nested_selection_map,
-            &reachable_variables,
-            index,
-        );
-
-        paths_and_contents.extend(get_artifact_for_imperatively_loaded_field(
-            schema,
-            artifact_info,
-            file_extensions,
-            persisted_documents,
-        ))
-    }
-
-    paths_and_contents
+    path_and_contents
 }
 
 fn generate_refetch_query_artifact_import(
