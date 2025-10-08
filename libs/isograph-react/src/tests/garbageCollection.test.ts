@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   garbageCollectEnvironment,
   retainQuery,
+  type RetainedQuery,
 } from '../core/garbageCollection';
 import {
   createIsographEnvironment,
@@ -55,9 +56,11 @@ export const meNameField = iso(`
 `)(() => {});
 
 const meNameEntrypoint = iso(`entrypoint Query.meName`);
-const meNameRetainedQuery = {
-  normalizationAst:
-    meNameEntrypoint.networkRequestInfo.normalizationAst.selections,
+const meNameRetainedQuery: RetainedQuery = {
+  normalizationAst: {
+    kind: 'Ready',
+    value: meNameEntrypoint.networkRequestInfo.normalizationAst,
+  },
   variables: {},
   root: { __link: ROOT_ID, __typename: 'Query' },
 };

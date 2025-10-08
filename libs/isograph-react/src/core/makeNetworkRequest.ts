@@ -60,7 +60,11 @@ export function maybeMakeNetworkRequest<
       );
     }
     case 'No': {
-      return [wrapResolvedValue(undefined), () => {}];
+      return loadNormalizationAstAndRetainQuery(
+        environment,
+        artifact,
+        variables,
+      );
     }
     case 'IfNecessary': {
       if (
@@ -82,7 +86,11 @@ export function maybeMakeNetworkRequest<
       );
 
       if (result.kind === 'EnoughData') {
-        return [wrapResolvedValue(undefined), () => {}];
+        return loadNormalizationAstAndRetainQuery(
+          environment,
+          artifact,
+          variables,
+        );
       } else {
         return makeNetworkRequest(
           environment,
@@ -107,6 +115,90 @@ function loadNormalizationAst(
       return normalizationAst.loader();
     }
   }
+}
+
+type NormalizationAstRequestStatus =
+  | {
+      readonly kind: 'Disposed';
+    }
+  | {
+      readonly kind: 'Undisposed';
+      readonly retainedQuery: RetainedQuery;
+    };
+
+function loadNormalizationAstAndRetainQuery<
+  TReadFromStore extends UnknownTReadFromStore,
+  TClientFieldValue,
+  TArtifact extends
+    | RefetchQueryNormalizationArtifact
+    | IsographEntrypoint<TReadFromStore, TClientFieldValue, TNormalizationAst>,
+  TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
+>(
+  environment: IsographEnvironment,
+  artifact: TArtifact,
+  variables: ExtractParameters<TReadFromStore>,
+): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
+  const root = { __link: ROOT_ID, __typename: artifact.concreteType };
+
+  const retainedQuery: RetainedQuery = {
+    normalizationAst: {
+      kind: 'Loading',
+    },
+    variables,
+    root,
+  };
+  let status: NormalizationAstRequestStatus = {
+    kind: 'Undisposed',
+    retainedQuery,
+  };
+  retainQuery(environment, retainedQuery);
+
+  switch (artifact.networkRequestInfo.normalizationAst.kind) {
+    case 'NormalizationAst': {
+      retainedQuery.normalizationAst = {
+        kind: 'Ready',
+        value: artifact.networkRequestInfo.normalizationAst,
+      };
+      break;
+    }
+    case 'NormalizationAstLoader': {
+      artifact.networkRequestInfo.normalizationAst
+        .loader()
+        .then((normalizationAst) => {
+          retainedQuery.normalizationAst = {
+            kind: 'Ready',
+            value: normalizationAst,
+          };
+        })
+        .catch(() => {
+          const didUnretainSomeQuery = unretainQuery(
+            environment,
+            retainedQuery,
+          );
+          if (didUnretainSomeQuery) {
+            garbageCollectEnvironment(environment);
+          }
+        });
+    }
+  }
+
+  return [
+    wrapResolvedValue(undefined),
+    () => {
+      if (status.kind === 'Undisposed') {
+        const didUnretainSomeQuery = unretainQuery(
+          environment,
+          status.retainedQuery,
+        );
+        if (didUnretainSomeQuery) {
+          garbageCollectEnvironment(environment);
+        }
+      }
+      status = {
+        kind: 'Disposed',
+      };
+    },
+  ];
 }
 
 export function makeNetworkRequest<
@@ -173,8 +265,11 @@ export function makeNetworkRequest<
           variables,
           root,
         );
-        const retainedQuery = {
-          normalizationAst: normalizationAst.selections,
+        const retainedQuery: RetainedQuery = {
+          normalizationAst: {
+            kind: 'Ready',
+            value: normalizationAst,
+          },
           variables,
           root,
         };
