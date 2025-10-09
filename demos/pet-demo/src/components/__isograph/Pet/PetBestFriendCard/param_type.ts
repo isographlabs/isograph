@@ -1,5 +1,6 @@
 import { type Pet__Avatar__output_type } from '../../Pet/Avatar/output_type';
 import { type Pet__PetUpdater__output_type } from '../../Pet/PetUpdater/output_type';
+import { type Pet__fullName__output_type } from '../../Pet/fullName/output_type';
 
 export type Pet__PetBestFriendCard__param = {
   readonly data: {
@@ -14,7 +15,7 @@ You can update the best friend and the tagline.
       readonly picture_together: (string | null),
       readonly best_friend: {
         readonly id: string,
-        readonly name: string,
+        readonly fullName: Pet__fullName__output_type,
         readonly Avatar: Pet__Avatar__output_type,
       },
     } | null),

@@ -20,7 +20,12 @@ const normalizationAst: NormalizationAst = {
         },
         {
           kind: "Scalar",
-          fieldName: "name",
+          fieldName: "firstName",
+          arguments: null,
+        },
+        {
+          kind: "Scalar",
+          fieldName: "lastName",
           arguments: null,
         },
       ],

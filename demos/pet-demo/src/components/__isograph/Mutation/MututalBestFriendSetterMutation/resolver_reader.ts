@@ -3,6 +3,7 @@ import { Mutation__MututalBestFriendSetterMutation__param } from './param_type';
 import { setMututalBestFriend as resolver } from '../../../Pet/MutualBestFriendSetter';
 import Mutation__MutualBestFriendSetterOtherSide__entrypoint from '../../Mutation/MutualBestFriendSetterOtherSide/entrypoint';
 import Pet__Avatar__resolver_reader from '../../Pet/Avatar/resolver_reader';
+import Pet__fullName__resolver_reader from '../../Pet/fullName/resolver_reader';
 
 const readerAst: ReaderAst<Mutation__MututalBestFriendSetterMutation__param> = [
   {
@@ -73,11 +74,11 @@ const readerAst: ReaderAst<Mutation__MututalBestFriendSetterMutation__param> = [
                     isUpdatable: false,
                   },
                   {
-                    kind: "Scalar",
-                    fieldName: "name",
-                    alias: null,
+                    kind: "Resolver",
+                    alias: "fullName",
                     arguments: null,
-                    isUpdatable: false,
+                    readerArtifact: Pet__fullName__resolver_reader,
+                    usedRefetchQueries: [],
                   },
                   {
                     kind: "Resolver",

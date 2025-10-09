@@ -6,7 +6,8 @@ export default 'mutation Query__set_pet_tagline($input: SetPetTaglineParams!) {\
       best_friend_relationship {\
         best_friend {\
           id,\
-          name,\
+          firstName,\
+          lastName,\
           picture,\
         },\
         picture_together,\
@@ -17,11 +18,13 @@ export default 'mutation Query__set_pet_tagline($input: SetPetTaglineParams!) {\
         time,\
       },\
       favorite_phrase,\
-      name,\
+      firstName,\
+      lastName,\
       nickname,\
       potential_new_best_friends {\
         id,\
-        name,\
+        firstName,\
+        lastName,\
       },\
       stats {\
         cuteness,\

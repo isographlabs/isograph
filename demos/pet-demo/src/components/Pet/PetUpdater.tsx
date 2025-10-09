@@ -14,7 +14,7 @@ export const PetUpdater = iso(`
     set_best_friend
     potential_new_best_friends {
       id
-      name
+      fullName
     }
     set_pet_tagline
     tagline @updatable
@@ -56,7 +56,7 @@ export const PetUpdater = iso(`
             value={potentialNewBestFriend.id}
             key={potentialNewBestFriend.id}
           >
-            {potentialNewBestFriend.name}
+            {potentialNewBestFriend.fullName}
           </MenuItem>
         ))}
       </Select>

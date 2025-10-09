@@ -157,8 +157,7 @@ export const schema = createSchema({
       pet: (_obj, args) => getPet(args.id),
       petByName: (_obj, args) =>
         pets.find(
-          (pet) =>
-            pet.name.split(' ')[0].toLowerCase() === args.name.toLowerCase(),
+          (pet) => pet.firstName === args.name.split(' ')[0].toLowerCase(),
         ),
       pets: () => pets,
       node: (_obj, args) => {
@@ -274,7 +273,8 @@ const pets = [
   {
     __typename: 'Pet',
     id: '0',
-    name: 'Makayla Balicka',
+    firstName: 'Makayla',
+    lastName: 'Balicka',
     nickname: 'Princess',
     picture: 'http://localhost:3000/makayla.jpg',
     best_friend_relationship: {
@@ -297,7 +297,8 @@ const pets = [
   {
     __typename: 'Pet',
     id: '1',
-    name: 'Mimi Balicka',
+    firstName: 'Mimi',
+    lastName: 'Balicka',
     nickname: 'Mimcia',
     picture: 'http://localhost:3000/mimi.jpg',
     age: 21,
@@ -315,7 +316,8 @@ const pets = [
   {
     __typename: 'Pet',
     id: '2',
-    name: 'Henry Balicki',
+    firstName: 'Henry',
+    lastName: 'Balicki',
     nickname: 'Booboo',
     picture: 'http://localhost:3000/henry.jpg',
     age: 7,
@@ -333,7 +335,8 @@ const pets = [
   {
     __typename: 'Pet',
     id: '3',
-    name: 'Tiberius Balicki',
+    firstName: 'Tiberius',
+    lastName: 'Balicki',
     nickname: null,
     picture: 'http://localhost:3000/tiberius.jpg',
     age: 3,
@@ -351,7 +354,8 @@ const pets = [
   {
     __typename: 'Pet',
     id: '4',
-    name: 'Kiki Balicka',
+    firstName: 'Kiki',
+    lastName: 'Balicka',
     nickname: null,
     picture: 'http://localhost:3000/kiki.jpg',
     age: 8,
@@ -361,7 +365,8 @@ const pets = [
   {
     __typename: 'Pet',
     id: '5',
-    name: 'Rezor Balicki',
+    firstName: 'Rezor',
+    lastName: 'Balicki',
     nickname: null,
     picture: 'http://localhost:3000/rezor.jpg',
     age: 12,

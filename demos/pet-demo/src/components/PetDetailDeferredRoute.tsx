@@ -42,7 +42,7 @@ export const PetDetailDeferredRouteComponent = iso(`
 // TODO split into separate files!
 export const PetDetailDeferredRouteInnerComponent = iso(`
   field Pet.PetDetailDeferredRouteInnerComponent @component {
-    name
+    fullName
     PetCheckinsCard @loadable
   }
 `)(({ data: pet }) => {
@@ -56,7 +56,7 @@ export const PetDetailDeferredRouteInnerComponent = iso(`
 
   return (
     <Container maxWidth="md">
-      <h1>Pet Detail for {pet.name}</h1>
+      <h1>Pet Detail for {pet.fullName}</h1>
       <h3
         onClick={() => navigateTo({ kind: 'Home' })}
         style={{ cursor: 'pointer' }}

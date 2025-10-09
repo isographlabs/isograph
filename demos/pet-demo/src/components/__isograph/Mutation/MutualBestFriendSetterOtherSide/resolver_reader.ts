@@ -1,6 +1,7 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Mutation__MutualBestFriendSetterOtherSide__param } from './param_type';
 import { SomeThing as resolver } from '../../../Pet/MutualBestFriendSetter';
+import Pet__fullName__resolver_reader from '../../Pet/fullName/resolver_reader';
 
 const readerAst: ReaderAst<Mutation__MutualBestFriendSetterOtherSide__param> = [
   {
@@ -39,11 +40,11 @@ const readerAst: ReaderAst<Mutation__MutualBestFriendSetterOtherSide__param> = [
             isUpdatable: false,
           },
           {
-            kind: "Scalar",
-            fieldName: "name",
-            alias: null,
+            kind: "Resolver",
+            alias: "fullName",
             arguments: null,
-            isUpdatable: false,
+            readerArtifact: Pet__fullName__resolver_reader,
+            usedRefetchQueries: [],
           },
           {
             kind: "Linked",
@@ -71,11 +72,11 @@ const readerAst: ReaderAst<Mutation__MutualBestFriendSetterOtherSide__param> = [
                     isUpdatable: false,
                   },
                   {
-                    kind: "Scalar",
-                    fieldName: "name",
-                    alias: null,
+                    kind: "Resolver",
+                    alias: "fullName",
                     arguments: null,
-                    isUpdatable: false,
+                    readerArtifact: Pet__fullName__resolver_reader,
+                    usedRefetchQueries: [],
                   },
                 ],
               },

@@ -2,6 +2,7 @@ import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@iso
 import { Query__PetCheckinListRoute__param } from './param_type';
 import { PetDetailDeferredRouteComponent as resolver } from '../../../PetCheckinListRoute';
 import Pet__FirstCheckinMakeSuperButton__resolver_reader from '../../Pet/FirstCheckinMakeSuperButton/resolver_reader';
+import Pet__fullName__resolver_reader from '../../Pet/fullName/resolver_reader';
 
 const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
   {
@@ -26,11 +27,11 @@ const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
         usedRefetchQueries: [0, ],
       },
       {
-        kind: "Scalar",
-        fieldName: "name",
-        alias: null,
+        kind: "Resolver",
+        alias: "fullName",
         arguments: null,
-        isUpdatable: false,
+        readerArtifact: Pet__fullName__resolver_reader,
+        usedRefetchQueries: [],
       },
       {
         kind: "LoadablySelectedField",

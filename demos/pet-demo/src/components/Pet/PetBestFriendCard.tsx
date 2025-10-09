@@ -11,7 +11,7 @@ export const PetBestFriendCard = iso(`
       picture_together
       best_friend {
         id
-        name
+        fullName
         Avatar
       }
     }
@@ -49,7 +49,9 @@ export const PetBestFriendCard = iso(`
               }
             />
             <div style={{ width: 300 }}>
-              <h2>Best friend: {bestFriendRelationship.best_friend.name}</h2>
+              <h2>
+                Best friend: {bestFriendRelationship.best_friend.fullName}
+              </h2>
             </div>
           </Stack>
           <data.PetUpdater />

@@ -1,6 +1,7 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Query__PetFavoritePhrase__param } from './param_type';
 import { PetFavoritePhrase as resolver } from '../../../Pet/FavoritePhrase';
+import Pet__fullName__resolver_reader from '../../Pet/fullName/resolver_reader';
 
 const readerAst: ReaderAst<Query__PetFavoritePhrase__param> = [
   {
@@ -18,11 +19,11 @@ const readerAst: ReaderAst<Query__PetFavoritePhrase__param> = [
     refetchQueryIndex: null,
     selections: [
       {
-        kind: "Scalar",
-        fieldName: "name",
-        alias: null,
+        kind: "Resolver",
+        alias: "fullName",
         arguments: null,
-        isUpdatable: false,
+        readerArtifact: Pet__fullName__resolver_reader,
+        usedRefetchQueries: [],
       },
       {
         kind: "Scalar",

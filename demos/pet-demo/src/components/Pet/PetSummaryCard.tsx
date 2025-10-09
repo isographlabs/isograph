@@ -6,7 +6,7 @@ import { useNavigateTo } from '../routes';
 export const PetSummaryCard = iso(`
   field Pet.PetSummaryCard @component {
     id
-    name
+    fullName
     Avatar
     tagline
     FavoritePhraseLoader
@@ -38,7 +38,7 @@ export const PetSummaryCard = iso(`
               }
               style={{ cursor: 'pointer' }}
             >
-              {pet.name}
+              {pet.fullName}
             </h2>
             <div>
               <i>{pet.tagline}</i>

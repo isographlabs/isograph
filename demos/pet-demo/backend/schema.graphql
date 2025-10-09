@@ -55,7 +55,8 @@ type SetPetTaglineResponse {
 
 type Pet implements Node {
   id: ID!
-  name: String!
+  firstName: String!
+  lastName: String!
   best_friend_relationship: BestFriendRelationship
 
   picture: Url!

@@ -24,6 +24,7 @@ import { type Pet__PetTaglineCard__param } from './Pet/PetTaglineCard/param_type
 import { type Pet__PetUpdater__param } from './Pet/PetUpdater/param_type';
 import { type Pet__Unreachable2__param } from './Pet/Unreachable2/param_type';
 import { type Pet__UnreachableFromEntrypoint__param } from './Pet/UnreachableFromEntrypoint/param_type';
+import { type Pet__fullName__param } from './Pet/fullName/param_type';
 import { type Query__HomeRoute__param } from './Query/HomeRoute/param_type';
 import { type Query__Newsfeed__param } from './Query/Newsfeed/param_type';
 import { type Query__OnlyOneRootLoadablePet__param } from './Query/OnlyOneRootLoadablePet/param_type';
@@ -195,6 +196,10 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.UnreachableFromEntrypoint', T>
 ): IdentityWithParam<Pet__UnreachableFromEntrypoint__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Pet.fullName', T>
+): IdentityWithParam<Pet__fullName__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.HomeRoute', T>

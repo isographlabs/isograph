@@ -1,7 +1,8 @@
 export default 'query HomeRoute {\
   pets {\
     id,\
-    name,\
+    firstName,\
+    lastName,\
     picture,\
     tagline,\
   },\

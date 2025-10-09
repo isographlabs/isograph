@@ -17,7 +17,7 @@ export const PetDetailDeferredRouteComponent = iso(`
       id: $id
     ) {
       FirstCheckinMakeSuperButton
-      name
+      fullName
       PetCheckinsCardList @loadable(
         lazyLoadArtifact: true
       )
@@ -41,7 +41,7 @@ export const PetDetailDeferredRouteComponent = iso(`
   return (
     <Container maxWidth="md">
       <Stack direction="column" spacing={4}>
-        <h1>{pet.name} Checkins List</h1>
+        <h1>{pet.fullName} Checkins List</h1>
         <pet.FirstCheckinMakeSuperButton />
         <h3
           onClick={() => navigateTo({ kind: 'Home' })}

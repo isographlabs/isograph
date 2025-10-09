@@ -7,7 +7,7 @@ export const SmartestPetRoute = iso(`
   field Query.SmartestPetRoute @component {
     smartestPet {
       id
-      name
+      fullName
       Avatar
       stats {
         intelligence
@@ -44,7 +44,7 @@ export const SmartestPetRoute = iso(`
                       }
                     />
                     <div style={{ width: 300 }}>
-                      <h2>#1: {smartestPet.name}</h2>
+                      <h2>#1: {smartestPet.fullName}</h2>
                       Intelligence level:{' '}
                       <b>{smartestPet.stats?.intelligence}</b>
                     </div>

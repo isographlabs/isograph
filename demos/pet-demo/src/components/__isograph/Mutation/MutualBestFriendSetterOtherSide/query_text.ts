@@ -5,10 +5,12 @@ export default 'mutation MutualBestFriendSetterOtherSide($pet_id: ID!, $new_best
       best_friend_relationship {\
         best_friend {\
           id,\
-          name,\
+          firstName,\
+          lastName,\
         },\
       },\
-      name,\
+      firstName,\
+      lastName,\
     },\
   },\
 }';

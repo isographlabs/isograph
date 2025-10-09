@@ -29,7 +29,7 @@ export const setMututalBestFriend = iso(`
           picture_together
           best_friend {
             id
-            name
+            fullName
             Avatar
           }
         }
@@ -65,11 +65,11 @@ export const SomeThing = iso(`
     ) {
       pet {
         id
-        name
+        fullName
         best_friend_relationship {
           best_friend {
             id
-            name
+            fullName
           }
         }
       }
@@ -78,8 +78,11 @@ export const SomeThing = iso(`
 `)(({ data }) => {
   return (
     <div>
-      Congrats, you set {data.set_pet_best_friend.pet.name} best friend to{' '}
-      {data.set_pet_best_friend.pet.best_friend_relationship?.best_friend.name}{' '}
+      Congrats, you set {data.set_pet_best_friend.pet.fullName} best friend to{' '}
+      {
+        data.set_pet_best_friend.pet.best_friend_relationship?.best_friend
+          .fullName
+      }{' '}
       and vice versa
     </div>
   );

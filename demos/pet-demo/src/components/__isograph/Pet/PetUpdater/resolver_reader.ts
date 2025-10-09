@@ -2,6 +2,7 @@ import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@iso
 import { Pet__PetUpdater__param } from './param_type';
 import { PetUpdater as resolver } from '../../../Pet/PetUpdater';
 import Pet____refetch__refetch_reader from '../../Pet/__refetch/refetch_reader';
+import Pet__fullName__resolver_reader from '../../Pet/fullName/resolver_reader';
 import Pet__set_best_friend__refetch_reader from '../../Pet/set_best_friend/refetch_reader';
 import Pet__set_pet_tagline__refetch_reader from '../../Pet/set_pet_tagline/refetch_reader';
 
@@ -30,11 +31,11 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
         isUpdatable: false,
       },
       {
-        kind: "Scalar",
-        fieldName: "name",
-        alias: null,
+        kind: "Resolver",
+        alias: "fullName",
         arguments: null,
-        isUpdatable: false,
+        readerArtifact: Pet__fullName__resolver_reader,
+        usedRefetchQueries: [],
       },
     ],
   },

@@ -10,7 +10,7 @@ export const PetFavoritePhrase = iso(`
     pet(
       id: $id
     ) {
-      name
+      fullName
       favorite_phrase
     }
   }
@@ -20,9 +20,9 @@ export const PetFavoritePhrase = iso(`
 
   return !!pet.favorite_phrase ? (
     <p>
-      {pet.name} likes to say: &quot;{pet.favorite_phrase}&quot;
+      {pet.fullName} likes to say: &quot;{pet.favorite_phrase}&quot;
     </p>
   ) : (
-    <p>{pet.name} has no favorite phrase!</p>
+    <p>{pet.fullName} has no favorite phrase!</p>
   );
 });

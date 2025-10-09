@@ -3,6 +3,7 @@ import { Pet__PetBestFriendCard__param } from './param_type';
 import { PetBestFriendCard as resolver } from '../../../Pet/PetBestFriendCard';
 import Pet__Avatar__resolver_reader from '../../Pet/Avatar/resolver_reader';
 import Pet__PetUpdater__resolver_reader from '../../Pet/PetUpdater/resolver_reader';
+import Pet__fullName__resolver_reader from '../../Pet/fullName/resolver_reader';
 
 const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
   {
@@ -52,11 +53,11 @@ const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
             isUpdatable: false,
           },
           {
-            kind: "Scalar",
-            fieldName: "name",
-            alias: null,
+            kind: "Resolver",
+            alias: "fullName",
             arguments: null,
-            isUpdatable: false,
+            readerArtifact: Pet__fullName__resolver_reader,
+            usedRefetchQueries: [],
           },
           {
             kind: "Resolver",

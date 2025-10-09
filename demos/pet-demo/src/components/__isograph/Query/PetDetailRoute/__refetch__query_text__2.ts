@@ -6,7 +6,8 @@ export default 'mutation Query__set_best_friend($id: ID!, $new_best_friend_id: I
       best_friend_relationship {\
         best_friend {\
           id,\
-          name,\
+          firstName,\
+          lastName,\
           picture,\
         },\
         picture_together,\
@@ -17,11 +18,13 @@ export default 'mutation Query__set_best_friend($id: ID!, $new_best_friend_id: I
         time,\
       },\
       favorite_phrase,\
-      name,\
+      firstName,\
+      lastName,\
       nickname,\
       potential_new_best_friends {\
         id,\
-        name,\
+        firstName,\
+        lastName,\
       },\
       stats {\
         cuteness,\

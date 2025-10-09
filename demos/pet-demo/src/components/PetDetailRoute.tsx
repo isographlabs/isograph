@@ -13,7 +13,7 @@ export const PetDetailRouteComponent = iso(`
       id: $id
     ) {
       custom_pet_refetch
-      name
+      fullName
       PetCheckinsCard
       PetBestFriendCard
       PetPhraseCard
@@ -32,7 +32,7 @@ export const PetDetailRouteComponent = iso(`
   }
   return (
     <Container maxWidth="md">
-      <h1>Pet Detail for {pet.name}</h1>
+      <h1>Pet Detail for {pet.fullName}</h1>
       <h3
         onClick={() => navigateTo({ kind: 'Home' })}
         style={{ cursor: 'pointer' }}

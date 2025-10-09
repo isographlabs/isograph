@@ -2,14 +2,15 @@ import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@iso
 import { Pet__PetDetailDeferredRouteInnerComponent__param } from './param_type';
 import { PetDetailDeferredRouteInnerComponent as resolver } from '../../../PetDetailDeferredRoute';
 import Pet__PetCheckinsCard__entrypoint from '../../Pet/PetCheckinsCard/entrypoint';
+import Pet__fullName__resolver_reader from '../../Pet/fullName/resolver_reader';
 
 const readerAst: ReaderAst<Pet__PetDetailDeferredRouteInnerComponent__param> = [
   {
-    kind: "Scalar",
-    fieldName: "name",
-    alias: null,
+    kind: "Resolver",
+    alias: "fullName",
     arguments: null,
-    isUpdatable: false,
+    readerArtifact: Pet__fullName__resolver_reader,
+    usedRefetchQueries: [],
   },
   {
     kind: "LoadablySelectedField",

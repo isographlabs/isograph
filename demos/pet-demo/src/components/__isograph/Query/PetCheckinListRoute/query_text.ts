@@ -5,6 +5,7 @@ export default 'query PetCheckinListRoute($id: ID!) {\
       id,\
       location,\
     },\
-    name,\
+    firstName,\
+    lastName,\
   },\
 }';

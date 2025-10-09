@@ -8,6 +8,7 @@ import Pet__PetPhraseCard__resolver_reader from '../../Pet/PetPhraseCard/resolve
 import Pet__PetStatsCard__resolver_reader from '../../Pet/PetStatsCard/resolver_reader';
 import Pet__PetTaglineCard__resolver_reader from '../../Pet/PetTaglineCard/resolver_reader';
 import Pet__custom_pet_refetch__refetch_reader from '../../Pet/custom_pet_refetch/refetch_reader';
+import Pet__fullName__resolver_reader from '../../Pet/fullName/resolver_reader';
 
 const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
   {
@@ -32,11 +33,11 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
         name: "custom_pet_refetch",
       },
       {
-        kind: "Scalar",
-        fieldName: "name",
-        alias: null,
+        kind: "Resolver",
+        alias: "fullName",
         arguments: null,
-        isUpdatable: false,
+        readerArtifact: Pet__fullName__resolver_reader,
+        usedRefetchQueries: [],
       },
       {
         kind: "Resolver",

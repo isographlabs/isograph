@@ -3,7 +3,8 @@ export default 'query Query__smartestPet($id: ID!) {\
     ... on Pet {\
       __typename,\
       id,\
-      name,\
+      firstName,\
+      lastName,\
       picture,\
       stats {\
         intelligence,\
