@@ -119,26 +119,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         let unprocessed_client_pointer_items = match parent_type_id {
             ServerEntityName::Object(object_entity_name) => match target_type_id {
-                ServerEntityName::Object(to_object_entity_name) => {
-                    let target_entity = self
-                        .server_entity_data
-                        .server_object_entity(*to_object_entity_name)
-                        .expect(
-                            "Expected entity to exist. \
-                            This is indicative of a bug in Isograph.",
-                        );
-
-                    if target_entity.concrete_type.is_none() {
-                        return Err(WithLocation::new(
-                            ProcessClientFieldDeclarationError::ClientPointerCannotPointToAbstractType,
-                            Location::new(
-                                text_source,
-                                client_pointer_declaration.item.target_type.span(),
-                            ),
-                        ));
-                    }
-
-                    self.add_client_pointer_to_object(
+                ServerEntityName::Object(to_object_entity_name) => self
+                    .add_client_pointer_to_object(
                         *object_entity_name,
                         TypeAnnotation::from_graphql_type_annotation(
                             client_pointer_declaration
@@ -149,8 +131,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                         ),
                         client_pointer_declaration,
                     )
-                    .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?
-                }
+                    .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?,
                 ServerEntityName::Scalar(scalar_entity_name) => {
                     let scalar_name = self
                         .server_entity_data
@@ -546,9 +527,6 @@ pub enum ProcessClientFieldDeclarationError {
         field_name: SelectableName,
         argument_type: UnvalidatedTypeName,
     },
-
-    #[error("Client pointers cannot point to abstract types")]
-    ClientPointerCannotPointToAbstractType,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

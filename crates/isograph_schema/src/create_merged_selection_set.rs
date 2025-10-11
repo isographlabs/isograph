@@ -1056,20 +1056,26 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
         field_name: SelectionType::Object(name_and_arguments.clone()),
     };
 
-    let subfields_or_inline_fragments = vec![
-        WrappedSelectionMapSelection::InlineFragment(parent_type.name.item),
-        WrappedSelectionMapSelection::LinkedField {
-            server_object_selectable_name: *NODE_FIELD_NAME,
-            arguments: vec![ArgumentKeyAndValue {
-                key: "id".intern().into(),
-                value: NonConstantValue::Variable("id".intern().into()),
-            }],
-            concrete_type: None,
-        },
-    ];
+    let mut subfields_or_inline_fragments = vec![WrappedSelectionMapSelection::LinkedField {
+        server_object_selectable_name: *NODE_FIELD_NAME,
+        arguments: vec![ArgumentKeyAndValue {
+            key: "id".intern().into(),
+            value: NonConstantValue::Variable("id".intern().into()),
+        }],
+        concrete_type: None,
+    }];
+
+    if parent_type.concrete_type.is_some() {
+        subfields_or_inline_fragments.insert(
+            0,
+            WrappedSelectionMapSelection::InlineFragment(parent_type.name.item),
+        );
+    }
 
     let info = PathToRefetchFieldInfo {
-        refetch_field_parent_object_entity_name: parent_object_entity_name,
+        refetch_field_parent_object_entity_name: *newly_encountered_client_object_selectable
+            .target_object_entity_name
+            .inner(),
         imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant {
             client_selection_name: newly_encountered_client_object_selectable.name.item.into(),
             top_level_schema_field_arguments: id_arguments(schema.server_entity_data.id_type_id),

@@ -24,6 +24,7 @@ import { type Pet__PetTaglineCard__param } from './Pet/PetTaglineCard/param_type
 import { type Pet__PetUpdater__param } from './Pet/PetUpdater/param_type';
 import { type Pet__Unreachable2__param } from './Pet/Unreachable2/param_type';
 import { type Pet__UnreachableFromEntrypoint__param } from './Pet/UnreachableFromEntrypoint/param_type';
+import { type Pet__firstCheckin__param } from './Pet/firstCheckin/param_type';
 import { type Pet__fullName__param } from './Pet/fullName/param_type';
 import { type Query__HomeRoute__param } from './Query/HomeRoute/param_type';
 import { type Query__Newsfeed__param } from './Query/Newsfeed/param_type';
@@ -36,6 +37,7 @@ import { type Query__PetFavoritePhrase__param } from './Query/PetFavoritePhrase/
 import { type Query__SmartestPetRoute__param } from './Query/SmartestPetRoute/param_type';
 import { type Query__smartestPet__param } from './Query/smartestPet/param_type';
 import { type Viewer__NewsfeedPaginationComponent__param } from './Viewer/NewsfeedPaginationComponent/param_type';
+import { type ICheckin__link__output_type } from './ICheckin/link/output_type';
 import { type Pet__link__output_type } from './Pet/link/output_type';
 import entrypoint_Mutation__MututalBestFriendSetterMutation from '../__isograph/Mutation/MututalBestFriendSetterMutation/entrypoint';
 import entrypoint_Mutation__SetTagline from '../__isograph/Mutation/SetTagline/entrypoint';
@@ -196,6 +198,10 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.UnreachableFromEntrypoint', T>
 ): IdentityWithParam<Pet__UnreachableFromEntrypoint__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'pointer Pet.firstCheckin', T>
+): IdentityWithParam<Pet__firstCheckin__param, (ICheckin__link__output_type | null)>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.fullName', T>

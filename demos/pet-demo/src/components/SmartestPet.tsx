@@ -1,6 +1,6 @@
 import { LoadableFieldReader } from '@isograph/react';
-import { iso } from './__isograph/iso';
 import { Card, CardContent, Container, Stack } from '@mui/material';
+import { iso } from './__isograph/iso';
 import { useNavigateTo } from './routes';
 
 export const SmartestPetRoute = iso(`
@@ -13,6 +13,9 @@ export const SmartestPetRoute = iso(`
         intelligence
       }
       picture
+      firstCheckin {
+        location
+      }
     }
   }
 `)(function SmartestRouteComponent({ data }) {
@@ -59,6 +62,16 @@ export const SmartestPetRoute = iso(`
       </Card>
     </Container>
   );
+});
+
+export const firstCheckin = iso(`
+  pointer Pet.firstCheckin to ICheckin {
+    checkins(limit: 1) {
+      link
+    }
+  }
+`)(({ data }) => {
+  return data.checkins[0].link ?? null;
 });
 
 export const SmartestPet = iso(`

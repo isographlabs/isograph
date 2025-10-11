@@ -55,6 +55,11 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         ..
     } = imperatively_loaded_field_variant;
 
+    let normalization_ast_wrapped_selection_map = selection_map_wrapped(
+        nested_selection_map.clone(),
+        subfields_or_inline_fragments.clone(),
+    );
+
     // If the field (e.g. icheckin) returns an abstract type (ICheckin) that is different than
     // the concrete type we want (Checkin), then we refine to that concrete type.
     // TODO investigate whether this can be done when the ImperativelyLoadedFieldVariant is created
@@ -146,8 +151,11 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         1,
     );
 
-    let normalization_ast_text =
-        generate_normalization_ast_text(schema, merged_selection_set.values(), 1);
+    let normalization_ast_text = generate_normalization_ast_text(
+        schema,
+        normalization_ast_wrapped_selection_map.values(),
+        1,
+    );
 
     let file_name_prefix = format!("{}__{}.ts", *REFETCH_FIELD_NAME, refetch_query_index.0)
         .intern()
