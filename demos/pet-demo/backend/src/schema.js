@@ -171,7 +171,8 @@ export const schema = createSchema({
           getPet(args.id) ??
           getBlogItem(args.id) ??
           getAdItem(args.id) ??
-          getImage(args.id)
+          getImage(args.id) ??
+          getCheckin(args.id)
         );
       },
       viewer: () => {
