@@ -17,8 +17,8 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, ClientSelectableId, FieldMapItem,
-    FieldTraversalResult, NameAndArguments, NetworkProtocol, NormalizationKey, RefetchStrategy,
-    ScalarSelectableId, Schema, ServerEntityName, ServerObjectSelectableVariant,
+    FieldTraversalResult, LINK_FIELD_NAME, NameAndArguments, NetworkProtocol, NormalizationKey,
+    RefetchStrategy, ScalarSelectableId, Schema, ServerEntityName, ServerObjectSelectableVariant,
     UserWrittenClientTypeInfo, ValidatedSelection, ValidatedVariableDefinition,
     WrappedSelectionMapSelection, accessible_client_fields, description,
     inline_fragment_reader_selection_set, output_type_annotation, selection_map_wrapped,
@@ -1027,7 +1027,8 @@ fn write_getter_and_setter(
         output_type_annotation
             .clone()
             .map(&mut |server_object_entity_name| {
-                format!("{{ link: {server_object_entity_name}__link__output_type }}")
+                let link_field_name = *LINK_FIELD_NAME;
+                format!("{{ {link_field_name}: {server_object_entity_name}__link__output_type }}")
             });
     query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
     query_type_declaration.push_str(&format!(
