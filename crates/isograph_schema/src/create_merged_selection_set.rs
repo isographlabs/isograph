@@ -863,6 +863,17 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
             parent_object_entity_name,
             newly_encountered_client_object_selectable_id,
         )));
+
+    // this is theoretically wrong, we should be adding this to the client pointer
+    // traversal state instead of it's parent, but it works out the same
+    merge_traversal_state
+        .accessible_client_fields
+        .insert(SelectionType::Scalar((
+            *newly_encountered_client_object_selectable
+                .target_object_entity_name
+                .inner(),
+            *LINK_FIELD_NAME,
+        )));
 }
 
 #[allow(clippy::too_many_arguments)]
