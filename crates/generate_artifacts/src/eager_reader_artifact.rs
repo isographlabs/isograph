@@ -5,8 +5,8 @@ use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 use isograph_lang_types::{ClientFieldDirectiveSet, SelectionType};
 use isograph_schema::{
-    ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, NetworkProtocol,
-    Schema, ServerObjectSelectable, ValidatedSelection, initial_variable_context,
+    ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, LINK_FIELD_NAME,
+    NetworkProtocol, Schema, ServerObjectSelectable, ValidatedSelection, initial_variable_context,
 };
 use isograph_schema::{RefetchedPathsMap, UserWrittenClientTypeInfo};
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
@@ -209,6 +209,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
         parent_object_entity.name.item, server_object_selectable_name
     );
 
+    let link_field_name = *LINK_FIELD_NAME;
     let reader_content = format!(
         "import type {{ EagerReaderArtifact, ReaderAst, Link }} from '@isograph/react';\n\
         {reader_import_statement}\n\
@@ -219,7 +220,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
         > = {{\n\
         {}kind: \"EagerReaderArtifact\",\n\
         {}fieldName: \"{eager_reader_name}\",\n\
-        {}resolver: ({{ data }}) => data.__typename === \"{concrete_type}\" ? data.link : null,\n\
+        {}resolver: ({{ data }}) => data.__typename === \"{concrete_type}\" ? data.{link_field_name} : null,\n\
         {}readerAst,\n\
         {}hasUpdatable: false,\n\
         }};\n\n\
