@@ -6,6 +6,10 @@ import {
   stableIdForFragmentReference,
   type UnknownTReadFromStore,
 } from '../core/FragmentReference';
+import type {
+  PayloadError,
+  PayloadErrorExtensions,
+} from '../core/IsographEnvironment';
 import { readPromise } from '../core/PromiseWrapper';
 import {
   NetworkRequestReaderOptions,
@@ -36,7 +40,30 @@ export function useReadAndSubscribe<
     setReadOutDataAndRecords,
     readerAst,
   );
+  if (readOutDataAndRecords.errors.length) {
+    const errors = readOutDataAndRecords.errors.map(
+      (error) => new GraphqlError(error),
+    );
+    if (errors.length > 1) {
+      throw new AggregateError(errors);
+    }
+    throw errors[0];
+  }
   return readOutDataAndRecords.item;
+}
+
+class GraphqlError extends Error implements PayloadError {
+  locations?: { line: number; column: number }[];
+  path?: (string | number)[];
+  extensions?: PayloadErrorExtensions;
+
+  constructor(error: PayloadError) {
+    super(error.message);
+    this.name = 'GraphqlError';
+    if (error.path) this.path = error.path;
+    if (error.locations) this.locations = error.locations;
+    if (error.extensions) this.extensions = error.extensions;
+  }
 }
 
 export function useSubscribeToMultiple<

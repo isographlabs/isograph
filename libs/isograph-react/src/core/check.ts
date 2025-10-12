@@ -40,13 +40,16 @@ export function check(
   root: StoreLink,
 ): CheckResult {
   const recordsById = (environment.store[root.__typename] ??= {});
-  const newStoreRecord = (recordsById[root.__link] ??= {});
+  const newStoreRecord = (recordsById[root.__link] ??= {
+    errors: {},
+    record: {},
+  });
 
   const checkResult = checkFromRecord(
     environment,
     normalizationAst,
     variables,
-    newStoreRecord,
+    newStoreRecord.record,
     root,
   );
   logMessage(environment, () => ({
@@ -123,7 +126,7 @@ function checkFromRecord(
                 environment,
                 normalizationAstNode.selections,
                 variables,
-                linkedRecord,
+                linkedRecord.record,
                 link,
               );
 
@@ -157,7 +160,7 @@ function checkFromRecord(
               environment,
               normalizationAstNode.selections,
               variables,
-              linkedRecord,
+              linkedRecord.record,
               link,
             );
 

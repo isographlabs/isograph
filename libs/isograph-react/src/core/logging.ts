@@ -12,6 +12,7 @@ import {
   IsographStore,
   StoreRecord,
   type StoreLink,
+  type WithErrors,
 } from './IsographEnvironment';
 import { ReadDataResult } from './read';
 import { Arguments } from './util';
@@ -62,7 +63,7 @@ export type LogMessage =
   | {
       kind: 'MissingFieldHandlerCalled';
       root: StoreLink;
-      storeRecord: StoreRecord;
+      storeRecord: WithErrors<StoreRecord>;
       fieldName: string;
       arguments: Arguments | null;
       variables: Variables;

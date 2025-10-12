@@ -23,8 +23,10 @@ import {
   getOrLoadIsographArtifact,
   IsographEnvironment,
   type DataTypeValue,
+  type PayloadError,
   type StoreLink,
   type StoreRecord,
+  type WithErrors,
 } from './IsographEnvironment';
 import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
@@ -38,6 +40,7 @@ import {
 } from './PromiseWrapper';
 import {
   ReaderAst,
+  type LoadableField,
   type LoadablySelectedField,
   type ReaderImperativelyLoadedField,
   type ReaderLinkedField,
@@ -50,6 +53,7 @@ import { Arguments } from './util';
 export type WithEncounteredRecords<T> = {
   readonly encounteredRecords: EncounteredIds;
   readonly item: ExtractData<T>;
+  readonly errors: PayloadError[];
 };
 
 export function readButDoNotEvaluate<
@@ -119,6 +123,7 @@ export function readButDoNotEvaluate<
     return {
       encounteredRecords: mutableEncounteredRecords,
       item: response.data,
+      errors: response.errors,
     };
   }
 }
@@ -126,16 +131,19 @@ export function readButDoNotEvaluate<
 export type ReadDataResultSuccess<Data> = {
   readonly kind: 'Success';
   readonly data: Data;
+  readonly errors: PayloadError[];
+};
+
+type ReadDataResultError = {
+  readonly kind: 'MissingData';
+  readonly reason: string;
+  readonly nestedReason?: ReadDataResultError;
+  readonly recordLink: StoreLink;
 };
 
 export type ReadDataResult<Data> =
   | ReadDataResultSuccess<Data>
-  | {
-      readonly kind: 'MissingData';
-      readonly reason: string;
-      readonly nestedReason?: ReadDataResult<unknown>;
-      readonly recordLink: StoreLink;
-    };
+  | ReadDataResultError;
 
 function readData<TReadFromStore>(
   environment: IsographEnvironment,
@@ -165,11 +173,13 @@ function readData<TReadFromStore>(
     return {
       kind: 'Success',
       data: null as any,
+      errors: [],
     };
   }
 
   let target: { [index: string]: any } = {};
 
+  const errors: PayloadError[] = [];
   for (const field of ast) {
     switch (field.kind) {
       case 'Scalar': {
@@ -178,6 +188,7 @@ function readData<TReadFromStore>(
         if (data.kind === 'MissingData') {
           return data;
         }
+        errors.push(...data.errors);
         target[field.alias ?? field.fieldName] = data.data;
         break;
       }
@@ -210,6 +221,7 @@ function readData<TReadFromStore>(
         if (data.kind === 'MissingData') {
           return data;
         }
+        errors.push(...data.errors);
         target[field.alias ?? field.fieldName] = data.data;
         break;
       }
@@ -227,6 +239,7 @@ function readData<TReadFromStore>(
         if (data.kind === 'MissingData') {
           return data;
         }
+        errors.push(...data.errors);
         target[field.alias] = data.data;
         break;
       }
@@ -244,6 +257,7 @@ function readData<TReadFromStore>(
         if (data.kind === 'MissingData') {
           return data;
         }
+        errors.push(...data.errors);
         target[field.alias] = data.data;
         break;
       }
@@ -260,6 +274,7 @@ function readData<TReadFromStore>(
         if (data.kind === 'MissingData') {
           return data;
         }
+        errors.push(...data.errors);
         target[field.alias] = data.data;
         break;
       }
@@ -275,6 +290,7 @@ function readData<TReadFromStore>(
   return {
     kind: 'Success',
     data: target as any,
+    errors,
   };
 }
 
@@ -310,6 +326,7 @@ export function readLoadablySelectedFieldData(
 
   return {
     kind: 'Success',
+    errors: refetchReaderParams.errors,
     data: (
       args: any,
       // TODO get the associated type for FetchOptions from the loadably selected field
@@ -600,12 +617,14 @@ export function readResolverFieldData(
       };
       return {
         kind: 'Success',
+        errors: data.errors,
         data: field.readerArtifact.resolver(firstParameter),
       };
     }
     case 'ComponentReaderArtifact': {
       return {
         kind: 'Success',
+        errors: [],
         data: getOrCreateCachedComponent(
           environment,
           field.readerArtifact.fieldName,
@@ -624,14 +643,20 @@ export function readResolverFieldData(
 
 export function readScalarFieldData(
   field: ReaderScalarField,
-  storeRecord: StoreRecord,
+  storeRecord: WithErrors<StoreRecord>,
   root: StoreLink,
   variables: Variables,
 ): ReadDataResult<
   string | number | boolean | StoreLink | DataTypeValue[] | null
 > {
   const storeRecordName = getParentRecordKey(field, variables);
-  const value = storeRecord[storeRecordName];
+  const value = storeRecord.record[storeRecordName];
+
+  const errors: PayloadError[] = [];
+  if (storeRecord.errors[storeRecordName] && value === null) {
+    errors.push(...storeRecord.errors[storeRecordName]);
+  }
+
   // TODO consider making scalars into discriminated unions. This probably has
   // to happen for when we handle errors.
   if (value === undefined) {
@@ -641,13 +666,18 @@ export function readScalarFieldData(
       recordLink: root,
     };
   }
-  return { kind: 'Success', data: value };
+
+  return {
+    kind: 'Success',
+    data: value,
+    errors,
+  };
 }
 
 export function readLinkedFieldData(
   environment: IsographEnvironment,
   field: ReaderLinkedField,
-  storeRecord: StoreRecord,
+  storeRecord: WithErrors<StoreRecord>,
   root: StoreLink,
   variables: Variables,
   nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[],
@@ -657,9 +687,17 @@ export function readLinkedFieldData(
     ast: ReaderAst<TReadFromStore>,
     root: StoreLink,
   ) => ReadDataResult<object>,
-): ReadDataResult<unknown> {
+): ReadDataResult<
+  null | object | LoadableField<UnknownTReadFromStore, object, Variables>
+> {
   const storeRecordName = getParentRecordKey(field, variables);
-  const value = storeRecord[storeRecordName];
+  const value = storeRecord.record[storeRecordName];
+
+  const errors: PayloadError[] = [];
+  if (storeRecord.errors[storeRecordName] && value === null) {
+    errors.push(...storeRecord.errors[storeRecordName]);
+  }
+
   if (Array.isArray(value)) {
     const results = [];
     for (const item of value) {
@@ -696,14 +734,18 @@ export function readLinkedFieldData(
           recordLink: result.recordLink,
         };
       }
+      errors.push(...result.errors);
       results.push(result.data);
     }
     return {
       kind: 'Success',
       data: results,
+      errors,
     };
   }
   let link = assertLink(value);
+
+  const { refetchQueryIndex } = field;
 
   if (field.condition) {
     const data = readData(field.condition.readerAst, root);
@@ -716,45 +758,51 @@ export function readLinkedFieldData(
         recordLink: data.recordLink,
       };
     }
+    errors.push(...data.errors);
 
-    const readerWithRefetchQueries = {
-      kind: 'ReaderWithRefetchQueries',
-      readerArtifact: field.condition,
-      // TODO this is wrong
-      // should map field.condition.usedRefetchQueries
-      // but it doesn't exist
-      nestedRefetchQueries: [],
-    } satisfies ReaderWithRefetchQueries<any, any>;
+    if (data.errors.length < 1 && refetchQueryIndex === null) {
+      // we can't call `condition.resolver` for client pointers when there are errors,
+      // for inline fragment this is fine
 
-    const fragment = {
-      kind: 'FragmentReference',
-      readerWithRefetchQueries: wrapResolvedValue(readerWithRefetchQueries),
-      root,
-      variables: generateChildVariableMap(
-        variables,
+      const readerWithRefetchQueries = {
+        kind: 'ReaderWithRefetchQueries',
+        readerArtifact: field.condition,
         // TODO this is wrong
-        // should use field.arguments
+        // should map field.condition.usedRefetchQueries
         // but it doesn't exist
-        [],
-      ),
-      networkRequest,
-    } satisfies FragmentReference<any, any>;
+        nestedRefetchQueries: [],
+      } satisfies ReaderWithRefetchQueries<any, any>;
 
-    const condition = field.condition.resolver({
-      data: data.data,
-      parameters: {},
-      ...(field.condition.hasUpdatable
-        ? {
-            startUpdate: getOrCreateCachedStartUpdate(
-              environment,
-              fragment,
-              readerWithRefetchQueries.readerArtifact.fieldName,
-              networkRequestOptions,
-            ),
-          }
-        : undefined),
-    });
-    link = condition;
+      const fragment = {
+        kind: 'FragmentReference',
+        readerWithRefetchQueries: wrapResolvedValue(readerWithRefetchQueries),
+        root,
+        variables: generateChildVariableMap(
+          variables,
+          // TODO this is wrong
+          // should use field.arguments
+          // but it doesn't exist
+          [],
+        ),
+        networkRequest,
+      } satisfies FragmentReference<any, any>;
+
+      const condition = field.condition.resolver({
+        data: data.data,
+        parameters: {},
+        ...(field.condition.hasUpdatable
+          ? {
+              startUpdate: getOrCreateCachedStartUpdate(
+                environment,
+                fragment,
+                readerWithRefetchQueries.readerArtifact.fieldName,
+                networkRequestOptions,
+              ),
+            }
+          : undefined),
+      });
+      link = condition;
+    }
   }
 
   if (link === undefined) {
@@ -762,7 +810,7 @@ export function readLinkedFieldData(
     const missingFieldHandler = environment.missingFieldHandler;
 
     const altLink = missingFieldHandler?.(
-      storeRecord,
+      storeRecord.record,
       root,
       field.fieldName,
       field.arguments,
@@ -796,10 +844,11 @@ export function readLinkedFieldData(
     return {
       kind: 'Success',
       data: null,
+      errors,
     };
   }
   const targetId = link;
-  const { refetchQueryIndex } = field;
+
   if (refetchQueryIndex != null) {
     // if field.refetchQueryIndex is not null, then the field is a client pointer, i.e.
     // it is like a loadable field that returns the selections.
@@ -825,6 +874,7 @@ export function readLinkedFieldData(
         recordLink: refetchReaderParams.recordLink,
       };
     }
+    errors.push(...refetchReaderParams.errors);
 
     const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
     if (refetchQuery == null) {
@@ -837,10 +887,11 @@ export function readLinkedFieldData(
 
     return {
       kind: 'Success',
+      errors,
       data: (
-        args: any,
+        args,
         // TODO get the associated type for FetchOptions from the loadably selected field
-        fetchOptions?: FetchOptions<any>,
+        fetchOptions,
       ) => {
         const includeReadOutData = (variables: any, readOutData: any) => {
           variables.id = readOutData.id;
@@ -911,7 +962,7 @@ export function readLinkedFieldData(
       recordLink: data.recordLink,
     };
   }
-  return data;
+  return { ...data, errors: errors.concat(data.errors) };
 }
 
 export type NetworkRequestReaderOptions = {
@@ -975,36 +1026,37 @@ export function readImperativelyLoadedField(
       nestedReason: data,
       recordLink: data.recordLink,
     };
-  } else {
-    const { refetchQueryIndex } = field;
-    const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
-    if (refetchQuery == null) {
-      throw new Error(
-        'Refetch query not found. This is indicative of a bug in Isograph.',
-      );
-    }
-    const refetchQueryArtifact = refetchQuery.artifact;
-    const allowedVariables = refetchQuery.allowedVariables;
-
-    // Second, we allow the user to call the resolver, which will ultimately
-    // use the resolver reader AST to get the resolver parameters.
-    return {
-      kind: 'Success',
-      data: (args: any) => [
-        // Stable id
-        root.__typename + ':' + root.__link + '__' + field.name,
-        // Fetcher
-        field.refetchReaderArtifact.resolver(
-          environment,
-          refetchQueryArtifact,
-          data.data,
-          filterVariables({ ...args, ...variables }, allowedVariables),
-          root,
-          // TODO these params should be removed
-          null,
-          [],
-        ),
-      ],
-    };
   }
+
+  const { refetchQueryIndex } = field;
+  const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
+  if (refetchQuery == null) {
+    throw new Error(
+      'Refetch query not found. This is indicative of a bug in Isograph.',
+    );
+  }
+  const refetchQueryArtifact = refetchQuery.artifact;
+  const allowedVariables = refetchQuery.allowedVariables;
+
+  // Second, we allow the user to call the resolver, which will ultimately
+  // use the resolver reader AST to get the resolver parameters.
+  return {
+    kind: 'Success',
+    errors: data.errors,
+    data: (args: any) => [
+      // Stable id
+      root.__typename + ':' + root.__link + '__' + field.name,
+      // Fetcher
+      field.refetchReaderArtifact.resolver(
+        environment,
+        refetchQueryArtifact,
+        data.data,
+        filterVariables({ ...args, ...variables }, allowedVariables),
+        root,
+        // TODO these params should be removed
+        null,
+        [],
+      ),
+    ],
+  };
 }
