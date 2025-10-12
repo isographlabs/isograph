@@ -1,5 +1,6 @@
 import { LoadableFieldReader } from '@isograph/react';
 import { Card, CardContent, Container, Stack } from '@mui/material';
+import { Suspense } from 'react';
 import { iso } from './__isograph/iso';
 import { useNavigateTo } from './routes';
 
@@ -48,8 +49,29 @@ export const SmartestPetRoute = iso(`
                     />
                     <div style={{ width: 300 }}>
                       <h2>#1: {smartestPet.fullName}</h2>
-                      Intelligence level:{' '}
-                      <b>{smartestPet.stats?.intelligence}</b>
+                      <p>
+                        Intelligence level:{' '}
+                        <b>{smartestPet.stats?.intelligence}</b>
+                      </p>
+                      <p>
+                        {smartestPet.firstCheckin ? (
+                          <Suspense>
+                            <LoadableFieldReader
+                              loadableField={smartestPet.firstCheckin}
+                              args={{}}
+                            >
+                              {(firstCheckin) => (
+                                <>
+                                  Next checkin location:{' '}
+                                  <b>{firstCheckin.location}</b>
+                                </>
+                              )}
+                            </LoadableFieldReader>
+                          </Suspense>
+                        ) : (
+                          'No checkins yet!'
+                        )}
+                      </p>
                     </div>
                   </>
                 )}
