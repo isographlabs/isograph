@@ -6,7 +6,7 @@ use std::{cmp::Ordering, collections::BTreeSet};
 use common_lang_types::{ArtifactPathAndContent, SelectableName, ServerObjectEntityName};
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable,
-    EntrypointDeclarationInfo, NetworkProtocol, Schema,
+    EntrypointDeclarationInfo, LINK_FIELD_NAME, NetworkProtocol, Schema,
 };
 
 use crate::generate_artifacts::{ISO_TS_FILE_NAME, print_javascript_type_declaration};
@@ -179,8 +179,9 @@ type MatchesWhitespaceAndString<
     }
 
     for target_object_entity_name in target_object_entity_names {
+        let link_field_name = *LINK_FIELD_NAME;
         imports.push_str(&format!(
-            "import {{ type {}__link__output_type }} from './{}/link/output_type{}';\n",
+            "import {{ type {}__link__output_type }} from './{}/{link_field_name}/output_type{}';\n",
             target_object_entity_name,
             target_object_entity_name,
             file_extensions.ts()
