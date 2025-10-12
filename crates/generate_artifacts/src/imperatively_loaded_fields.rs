@@ -5,7 +5,7 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
-use isograph_lang_types::{RefetchQueryIndex, VariableDefinition};
+use isograph_lang_types::VariableDefinition;
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, Format,
     ImperativelyLoadedFieldVariant, MergedSelectionMap, NetworkProtocol, PathToRefetchFieldInfo,
@@ -114,7 +114,6 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     let query_text_selection_map_wrapped =
         selection_map_wrapped(nested_selection_map.clone(), subfields_or_inline_fragments);
     let root_fetchable_field = entrypoint.name();
-    let refetch_query_index = RefetchQueryIndex(index as u32);
     let concrete_type = schema
         .server_entity_data
         .server_object_entity(root_object_entity_name)
@@ -151,7 +150,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         1,
     );
 
-    let file_name_prefix = format!("{}__{}.ts", *REFETCH_FIELD_NAME, refetch_query_index.0)
+    let file_name_prefix = format!("{}__{}.ts", *REFETCH_FIELD_NAME, index)
         .intern()
         .into();
 
@@ -159,16 +158,14 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         "{}__{}__{}{}",
         *REFETCH_FIELD_NAME,
         *QUERY_TEXT,
-        refetch_query_index.0,
+        index,
         file_extensions.ts()
     );
 
-    let query_text_file_name_with_extension = format!(
-        "{}__{}__{}.ts",
-        *REFETCH_FIELD_NAME, *QUERY_TEXT, refetch_query_index.0
-    )
-    .intern()
-    .into();
+    let query_text_file_name_with_extension =
+        format!("{}__{}__{}.ts", *REFETCH_FIELD_NAME, *QUERY_TEXT, index)
+            .intern()
+            .into();
 
     let imperatively_loaded_field_file_contents = format!(
         "import type {{ IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryNormalizationArtifact }} from '@isograph/react';\n\
