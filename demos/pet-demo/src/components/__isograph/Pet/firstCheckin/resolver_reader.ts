@@ -20,7 +20,7 @@ const readerAst: ReaderAst<Pet__firstCheckin__param> = [
     selections: [
       {
         kind: "Link",
-        alias: "link",
+        alias: "__link",
       },
     ],
   },

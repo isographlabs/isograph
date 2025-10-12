@@ -10,7 +10,7 @@ const readerAst: ReaderAst<{ data: any, parameters: Record<PropertyKey, never> }
   },
   {
     kind: "Link",
-    alias: "link",
+    alias: "__link",
   },
 ];
 
@@ -20,7 +20,7 @@ const artifact: EagerReaderArtifact<
 > = {
   kind: "EagerReaderArtifact",
   fieldName: "Actor.asUser",
-  resolver: ({ data }) => data.__typename === "User" ? data.link : null,
+  resolver: ({ data }) => data.__typename === "User" ? data.__link : null,
   readerAst,
   hasUpdatable: false,
 };

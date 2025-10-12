@@ -49,7 +49,7 @@ lazy_static! {
     pub static ref REFETCH_FIELD_NAME: ClientScalarSelectableName = "__refetch".intern().into();
     pub static ref NODE_FIELD_NAME: ServerObjectSelectableName = "node".intern().into();
     pub static ref TYPENAME_FIELD_NAME: ServerScalarSelectableName = "__typename".intern().into();
-    pub static ref LINK_FIELD_NAME: ClientScalarSelectableName = "link".intern().into();
+    pub static ref LINK_FIELD_NAME: ClientScalarSelectableName = "__link".intern().into();
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]

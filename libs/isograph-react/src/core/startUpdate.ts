@@ -245,10 +245,10 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             ? (newValue) => {
                 if (Array.isArray(newValue)) {
                   storeRecord[storeRecordName] = newValue.map((node) =>
-                    assertLink(node?.link),
+                    assertLink(node?.__link),
                   );
                 } else {
-                  storeRecord[storeRecordName] = assertLink(newValue?.link);
+                  storeRecord[storeRecordName] = assertLink(newValue?.__link);
                 }
                 const updatedIds = insertEmptySetIfMissing(
                   mutableUpdatedIds,

@@ -55,7 +55,7 @@ const readerAst: ReaderAst<Query__linkedUpdate__param> = [
     selections: [
       {
         kind: "Link",
-        alias: "link",
+        alias: "__link",
       },
       {
         kind: "Linked",

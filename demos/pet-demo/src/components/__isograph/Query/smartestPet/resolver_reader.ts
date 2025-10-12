@@ -15,7 +15,7 @@ const readerAst: ReaderAst<Query__smartestPet__param> = [
     selections: [
       {
         kind: "Link",
-        alias: "link",
+        alias: "__link",
       },
       {
         kind: "Linked",

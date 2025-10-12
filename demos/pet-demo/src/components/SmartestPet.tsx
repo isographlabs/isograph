@@ -89,17 +89,17 @@ export const SmartestPetRoute = iso(`
 export const firstCheckin = iso(`
   pointer Pet.firstCheckin to ICheckin {
     checkins(limit: 1) {
-      link
+      __link
     }
   }
 `)(({ data }) => {
-  return data.checkins[0].link ?? null;
+  return data.checkins[0].__link ?? null;
 });
 
 export const SmartestPet = iso(`
   pointer Query.smartestPet to Pet {
     pets {
-      link
+      __link
       stats {
         intelligence
       }
@@ -110,7 +110,7 @@ export const SmartestPet = iso(`
   let maxIntelligenceLink = null;
   for (const pet of data.pets) {
     if ((pet.stats?.intelligence ?? 0) > maxIntelligence) {
-      maxIntelligenceLink = pet.link;
+      maxIntelligenceLink = pet.__link;
       maxIntelligence = pet.stats?.intelligence ?? 0;
     }
   }

@@ -1,4 +1,4 @@
-import { type Checkin__link__output_type } from '../../Checkin/link/output_type';
+import { type Checkin____link__output_type } from '../../Checkin/__link/output_type';
 
 export type Pet__firstCheckin__param = {
   readonly data: {
@@ -6,7 +6,7 @@ export type Pet__firstCheckin__param = {
       /**
 A store Link for the Checkin type.
       */
-      readonly link: Checkin__link__output_type,
+      readonly __link: Checkin____link__output_type,
     }>,
   },
   readonly parameters: Record<PropertyKey, never>,

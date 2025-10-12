@@ -56,7 +56,7 @@ export const linkedUpdate = iso(`
       }
     }
     john_stuart_mill: node(id: 1) {
-      link
+      __link
       asEconomist {
         name
       }
