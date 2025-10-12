@@ -592,7 +592,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             )
                             .expect(
                                 "Expected selectable to exist. \
-                                      This is indicative of a bug in Isograph.",
+                                This is indicative of a bug in Isograph.",
                             );
                         merge_client_object_field(
                             schema,
@@ -1076,21 +1076,20 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
         field_name: SelectionType::Object(name_and_arguments.clone()),
     };
 
-    let mut subfields_or_inline_fragments = vec![WrappedSelectionMapSelection::LinkedField {
+    let mut subfields_or_inline_fragments = vec![];
+    if target_type.concrete_type.is_some() {
+        subfields_or_inline_fragments.push(WrappedSelectionMapSelection::InlineFragment(
+            target_type.name.item,
+        ));
+    }
+    subfields_or_inline_fragments.push(WrappedSelectionMapSelection::LinkedField {
         server_object_selectable_name: *NODE_FIELD_NAME,
         arguments: vec![ArgumentKeyAndValue {
             key: "id".intern().into(),
             value: NonConstantValue::Variable("id".intern().into()),
         }],
         concrete_type: None,
-    }];
-
-    if target_type.concrete_type.is_some() {
-        subfields_or_inline_fragments.insert(
-            0,
-            WrappedSelectionMapSelection::InlineFragment(target_type.name.item),
-        );
-    }
+    });
 
     let info = PathToRefetchFieldInfo {
         wrap_refetch_field_with_inline_fragment: target_type.concrete_type.map_or(

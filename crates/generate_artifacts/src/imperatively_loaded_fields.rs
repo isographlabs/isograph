@@ -88,9 +88,6 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         });
     }
 
-    let wrapped_selection_map =
-        selection_map_wrapped(nested_selection_map.clone(), subfields_or_inline_fragments);
-
     let root_parent_object = schema
         .server_entity_data
         .server_object_entity(entrypoint.parent_object_entity_name())
@@ -114,8 +111,8 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         .intern()
         .into();
 
-    let merged_selection_set = wrapped_selection_map;
-    let variable_definitions = definitions_of_used_variables;
+    let query_text_selection_map_wrapped =
+        selection_map_wrapped(nested_selection_map.clone(), subfields_or_inline_fragments);
     let root_fetchable_field = entrypoint.name();
     let refetch_query_index = RefetchQueryIndex(index as u32);
     let concrete_type = schema
@@ -131,8 +128,8 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     let query_text = TNetworkProtocol::generate_query_text(
         query_name,
         schema,
-        &merged_selection_set,
-        variable_definitions.iter(),
+        &query_text_selection_map_wrapped,
+        definitions_of_used_variables.iter(),
         &root_operation_name,
         Format::Pretty,
     );
@@ -140,8 +137,8 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     let operation_text = generate_operation_text(
         query_name,
         schema,
-        &merged_selection_set,
-        variable_definitions.iter(),
+        &query_text_selection_map_wrapped,
+        definitions_of_used_variables.iter(),
         &root_operation_name,
         concrete_type,
         persisted_documents,
