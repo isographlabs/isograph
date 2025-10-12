@@ -1,7 +1,7 @@
 import { LoadableFieldReader } from '@isograph/react';
 import { Card, CardContent, Container, Stack } from '@mui/material';
 import { Suspense } from 'react';
-import { iso } from './__isograph/iso';
+import { iso } from '@iso';
 import { useNavigateTo } from './routes';
 
 export const SmartestPetRoute = iso(`
