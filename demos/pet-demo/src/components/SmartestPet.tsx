@@ -1,6 +1,7 @@
 import { LoadableFieldReader } from '@isograph/react';
-import { iso } from './__isograph/iso';
 import { Card, CardContent, Container, Stack } from '@mui/material';
+import { Suspense } from 'react';
+import { iso } from '@iso';
 import { useNavigateTo } from './routes';
 
 export const SmartestPetRoute = iso(`
@@ -13,6 +14,9 @@ export const SmartestPetRoute = iso(`
         intelligence
       }
       picture
+      firstCheckin {
+        location
+      }
     }
   }
 `)(function SmartestRouteComponent({ data }) {
@@ -45,8 +49,29 @@ export const SmartestPetRoute = iso(`
                     />
                     <div style={{ width: 300 }}>
                       <h2>#1: {smartestPet.fullName}</h2>
-                      Intelligence level:{' '}
-                      <b>{smartestPet.stats?.intelligence}</b>
+                      <p>
+                        Intelligence level:{' '}
+                        <b>{smartestPet.stats?.intelligence}</b>
+                      </p>
+                      <p>
+                        {smartestPet.firstCheckin ? (
+                          <Suspense>
+                            <LoadableFieldReader
+                              loadableField={smartestPet.firstCheckin}
+                              args={{}}
+                            >
+                              {(firstCheckin) => (
+                                <>
+                                  Next checkin location:{' '}
+                                  <b>{firstCheckin.location}</b>
+                                </>
+                              )}
+                            </LoadableFieldReader>
+                          </Suspense>
+                        ) : (
+                          'No checkins yet!'
+                        )}
+                      </p>
                     </div>
                   </>
                 )}
@@ -59,6 +84,16 @@ export const SmartestPetRoute = iso(`
       </Card>
     </Container>
   );
+});
+
+export const firstCheckin = iso(`
+  pointer Pet.firstCheckin to ICheckin {
+    checkins(limit: 1) {
+      link
+    }
+  }
+`)(({ data }) => {
+  return data.checkins[0].link ?? null;
 });
 
 export const SmartestPet = iso(`

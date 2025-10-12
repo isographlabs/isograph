@@ -30,6 +30,24 @@ const normalizationAst: NormalizationAst = {
               arguments: null,
             },
             {
+              kind: "Linked",
+              fieldName: "checkins",
+              arguments: [
+                [
+                  "limit",
+                  { kind: "Literal", value: 1 },
+                ],
+              ],
+              concreteType: "Checkin",
+              selections: [
+                {
+                  kind: "Scalar",
+                  fieldName: "id",
+                  arguments: null,
+                },
+              ],
+            },
+            {
               kind: "Scalar",
               fieldName: "firstName",
               arguments: null,

@@ -76,6 +76,8 @@ impl<TNetworkProtocol: NetworkProtocol> Iterator
 
                         match linked_field.associated_data {
                             DefinitionLocation::Client(client_pointer_id) => {
+                                // TODO: include pointer target link type
+                                // https://github.com/isographlabs/isograph/issues/719
                                 self.sub_iterator = Some(Box::new(iterator));
                                 self.index += 1;
                                 return Some(SelectionType::Object(client_pointer_id));

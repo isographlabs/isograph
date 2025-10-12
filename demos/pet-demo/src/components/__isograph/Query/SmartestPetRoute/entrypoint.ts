@@ -5,8 +5,10 @@ import readerResolver from './resolver_reader';
 import queryText from './query_text';
 import normalizationAst from './normalization_ast';
 import refetchQuery0 from './__refetch__0';
+import refetchQuery1 from './__refetch__1';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [
   { artifact: refetchQuery0, allowedVariables: ["id", ] },
+  { artifact: refetchQuery1, allowedVariables: ["id", ] },
 ];
 
 const artifact: IsographEntrypoint<

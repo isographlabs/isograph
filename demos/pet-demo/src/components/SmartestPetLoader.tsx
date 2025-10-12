@@ -1,5 +1,5 @@
 import React from 'react';
-import { iso } from './__isograph/iso';
+import { iso } from '@iso';
 import { ErrorBoundary } from './ErrorBoundary';
 import { FullPageLoading } from './routes';
 import { FragmentRenderer, useLazyReference } from '@isograph/react';
