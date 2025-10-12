@@ -5,7 +5,7 @@ use common_lang_types::{
 };
 use isograph_lang_types::{
     DefinitionLocation, EmptyDirectiveSet, LoadableDirectiveParameters,
-    ObjectSelectionDirectiveSet, RefetchQueryIndex, ScalarSelectionDirectiveSet, SelectionType,
+    ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionType,
     SelectionTypeContainingSelections,
 };
 use isograph_schema::{
@@ -271,8 +271,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
                 root_refetched_paths,
                 path,
                 linked_field.name.item.unchecked_conversion(),
-            )
-            .0;
+            );
 
             format!("{refetch_query_index}")
         }
@@ -462,8 +461,7 @@ fn imperatively_loaded_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
         root_refetched_paths,
         path,
         scalar_field_selection.name.item.unchecked_conversion(),
-    )
-    .0;
+    );
 
     // TODO we also need to account for arguments here.
     // Note that scalar_field_selection.arguments includes an id argument, which
@@ -662,7 +660,7 @@ fn find_imperatively_fetchable_query_index(
     paths: &RefetchedPathsMap,
     outer_path: &[NormalizationKey],
     imperatively_fetchable_field_name: ClientScalarSelectableName,
-) -> RefetchQueryIndex {
+) -> usize {
     paths
         .iter()
         .enumerate()
@@ -670,7 +668,7 @@ fn find_imperatively_fetchable_query_index(
             if path.linked_fields == outer_path
                 && root_refetch_path.field_name == imperatively_fetchable_field_name
             {
-                Some(RefetchQueryIndex(index as u32))
+                Some(index)
             } else {
                 None
             }
