@@ -187,7 +187,10 @@ impl NormalizationKey {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PathToRefetchFieldInfo {
-    pub refetch_field_parent_object_entity_name: ServerObjectEntityName,
+    // If the field (e.g. icheckin) returns an abstract type (ICheckin) that is different than
+    // the concrete type we want (Checkin), then we refine to that concrete type.
+    // TODO investigate whether this can be done when the ImperativelyLoadedFieldVariant is created
+    pub wrap_refetch_field_with_inline_fragment: Option<ServerObjectEntityName>,
     pub imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant,
     pub client_selectable_id: ClientSelectableId,
 }
@@ -974,7 +977,13 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
     };
 
     let info = PathToRefetchFieldInfo {
-        refetch_field_parent_object_entity_name: parent_object_entity_name,
+        wrap_refetch_field_with_inline_fragment: if parent_object_entity_name
+            != newly_encountered_client_scalar_selectable.parent_object_entity_name()
+        {
+            Some(parent_object_entity_name)
+        } else {
+            None
+        },
         imperatively_loaded_field_variant: variant.clone(),
         client_selectable_id: SelectionType::Scalar((
             newly_encountered_client_scalar_selectable.parent_object_entity_name,
@@ -1030,12 +1039,12 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
     object_selection: &ValidatedObjectSelection,
     variable_context: &VariableContext,
 ) {
-    let parent_object_entity_id = *newly_encountered_client_object_selectable
+    let target_object_entity_id = *newly_encountered_client_object_selectable
         .target_object_entity_name
         .inner();
-    let parent_type = schema
+    let target_type = schema
         .server_entity_data
-        .server_object_entity(parent_object_entity_id)
+        .server_object_entity(target_object_entity_id)
         .expect(
             "Expected entity to exist. \
                      This is indicative of a bug in Isograph.",
@@ -1065,17 +1074,22 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
         concrete_type: None,
     }];
 
-    if parent_type.concrete_type.is_some() {
+    if target_type.concrete_type.is_some() {
         subfields_or_inline_fragments.insert(
             0,
-            WrappedSelectionMapSelection::InlineFragment(parent_type.name.item),
+            WrappedSelectionMapSelection::InlineFragment(target_type.name.item),
         );
     }
 
     let info = PathToRefetchFieldInfo {
-        refetch_field_parent_object_entity_name: *newly_encountered_client_object_selectable
-            .target_object_entity_name
-            .inner(),
+        wrap_refetch_field_with_inline_fragment: target_type.concrete_type.map_or(
+            Some(
+                *newly_encountered_client_object_selectable
+                    .target_object_entity_name
+                    .inner(),
+            ),
+            |_| None,
+        ),
         imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant {
             client_selection_name: newly_encountered_client_object_selectable.name.item.into(),
             top_level_schema_field_arguments: id_arguments(schema.server_entity_data.id_type_id),
@@ -1111,7 +1125,7 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
 
     let client_pointer = parent_map.entry(normalization_key).or_insert_with(|| {
         MergedServerSelection::ClientPointer(MergedLinkedFieldSelection {
-            concrete_type: parent_type.concrete_type,
+            concrete_type: target_type.concrete_type,
             name: object_selection.name.item,
             selection_map: BTreeMap::new(),
             arguments: transform_arguments_with_child_context(
@@ -1129,7 +1143,7 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
             merge_validated_selections_into_selection_map(
                 schema,
                 &mut existing_client_pointer.selection_map,
-                parent_type,
+                target_type,
                 &object_selection.selection_set,
                 merge_traversal_state,
                 encountered_client_field_map,

@@ -36,7 +36,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         ..
     } = root_refetch_path;
     let PathToRefetchFieldInfo {
-        refetch_field_parent_object_entity_name,
+        wrap_refetch_field_with_inline_fragment: refetch_field_parent_object_entity_name,
         imperatively_loaded_field_variant,
         client_selectable_id,
     } = path_to_refetch_field_info;
@@ -60,10 +60,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         subfields_or_inline_fragments.clone(),
     );
 
-    // If the field (e.g. icheckin) returns an abstract type (ICheckin) that is different than
-    // the concrete type we want (Checkin), then we refine to that concrete type.
-    // TODO investigate whether this can be done when the ImperativelyLoadedFieldVariant is created
-    if refetch_field_parent_object_entity_name != client_selectable.parent_object_entity_name() {
+    if let Some(refetch_field_parent_object_entity_name) = refetch_field_parent_object_entity_name {
         let refetch_field_parent_type_name = schema
             .server_entity_data
             .server_object_entity(refetch_field_parent_object_entity_name)
