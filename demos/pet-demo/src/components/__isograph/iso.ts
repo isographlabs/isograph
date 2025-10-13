@@ -201,7 +201,7 @@ export function iso<T>(
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'pointer Pet.firstCheckin', T>
-): IdentityWithParam<Pet__firstCheckin__param, (ICheckin__link__output_type | null)>;
+): IdentityWithParam<Pet__firstCheckin__param, (ICheckin____link__output_type | null)>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.fullName', T>
@@ -245,7 +245,7 @@ export function iso<T>(
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'pointer Query.smartestPet', T>
-): IdentityWithParam<Query__smartestPet__param, (Pet__link__output_type | null)>;
+): IdentityWithParam<Query__smartestPet__param, (Pet____link__output_type | null)>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Viewer.NewsfeedPaginationComponent', T>

@@ -85,7 +85,11 @@ export function iso<T>(
             print_javascript_type_declaration(
                 &client_pointer.target_object_entity_name.clone().map(
                     &mut |target_object_entity_name| {
-                        format!("{}__link__output_type", &target_object_entity_name)
+                        let link_field_name = *LINK_FIELD_NAME;
+                        format!(
+                            "{}__{link_field_name}__output_type",
+                            &target_object_entity_name
+                        )
                     }
                 )
             )
