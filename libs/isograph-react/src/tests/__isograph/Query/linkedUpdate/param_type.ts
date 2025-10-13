@@ -34,7 +34,7 @@ A client pointer for the Economist type.
         name: string,
       } | null),
     } | null),
-    set node(value: ({ __link: Node__link__output_type } | null)),
+    set node(value: ({ __link: Node____link__output_type } | null)),
     readonly john_stuart_mill: ({
       /**
 A store Link for the Node type.

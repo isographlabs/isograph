@@ -185,7 +185,7 @@ type MatchesWhitespaceAndString<
     for target_object_entity_name in target_object_entity_names {
         let link_field_name = *LINK_FIELD_NAME;
         imports.push_str(&format!(
-            "import {{ type {}__link__output_type }} from './{}/{link_field_name}/output_type{}';\n",
+            "import {{ type {}__{link_field_name}__output_type }} from './{}/{link_field_name}/output_type{}';\n",
             target_object_entity_name,
             target_object_entity_name,
             file_extensions.ts()

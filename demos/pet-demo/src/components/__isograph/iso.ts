@@ -37,8 +37,8 @@ import { type Query__PetFavoritePhrase__param } from './Query/PetFavoritePhrase/
 import { type Query__SmartestPetRoute__param } from './Query/SmartestPetRoute/param_type';
 import { type Query__smartestPet__param } from './Query/smartestPet/param_type';
 import { type Viewer__NewsfeedPaginationComponent__param } from './Viewer/NewsfeedPaginationComponent/param_type';
-import { type ICheckin__link__output_type } from './ICheckin/__link/output_type';
-import { type Pet__link__output_type } from './Pet/__link/output_type';
+import { type ICheckin____link__output_type } from './ICheckin/__link/output_type';
+import { type Pet____link__output_type } from './Pet/__link/output_type';
 import entrypoint_Mutation__MututalBestFriendSetterMutation from '../__isograph/Mutation/MututalBestFriendSetterMutation/entrypoint';
 import entrypoint_Mutation__SetTagline from '../__isograph/Mutation/SetTagline/entrypoint';
 import entrypoint_Query__HomeRoute from '../__isograph/Query/HomeRoute/entrypoint';

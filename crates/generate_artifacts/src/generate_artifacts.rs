@@ -1028,7 +1028,7 @@ fn write_getter_and_setter(
             .clone()
             .map(&mut |server_object_entity_name| {
                 let link_field_name = *LINK_FIELD_NAME;
-                format!("{{ {link_field_name}: {server_object_entity_name}__link__output_type }}")
+                format!("{{ {link_field_name}: {server_object_entity_name}__{link_field_name}__output_type }}")
             });
     query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
     query_type_declaration.push_str(&format!(
