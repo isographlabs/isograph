@@ -1,6 +1,6 @@
 {
   "name": "@isograph/disposable-types",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Common types for disposable items",
   "homepage": "https://isograph.dev",
   "main": "dist/index.js",
