@@ -964,7 +964,7 @@ export function readClientPointerData(
           const fragmentReference: FragmentReference<any, any> = {
             kind: 'FragmentReference',
             readerWithRefetchQueries: readerWithRefetchQueries,
-            root: root,
+            root,
             variables,
             networkRequest,
           };
