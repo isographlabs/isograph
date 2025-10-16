@@ -414,7 +414,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
     }
 
     for output_type_id in encountered_output_types {
-        let client_type = schema.client_type(output_type_id).expect(
+        let client_type = schema.client_selectable(output_type_id).expect(
             "Expected selectable to exist. \
             This is indicative of a bug in Isograph.",
         );

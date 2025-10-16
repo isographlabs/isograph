@@ -617,12 +617,12 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 self.server_selectable(server_selectable_id)?,
             )),
             DefinitionLocation::Client(client_selectable_id) => Some(DefinitionLocation::Client(
-                self.client_type(client_selectable_id)?,
+                self.client_selectable(client_selectable_id)?,
             )),
         }
     }
 
-    pub fn client_type(
+    pub fn client_selectable(
         &self,
         client_type_id: ClientSelectableId,
     ) -> Option<
