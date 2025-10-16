@@ -3,7 +3,7 @@ use crate::{
     location_utils::isograph_location_to_lsp_location, lsp_runtime_error::LSPRuntimeResult,
     uri_file_path_ext::UriFilePathExt,
 };
-use common_lang_types::{Location, Span, relative_path_from_absolute_and_working_directory};
+use common_lang_types::{Span, relative_path_from_absolute_and_working_directory};
 use isograph_compiler::{
     CompilerState, get_validated_schema, process_iso_literal_extraction,
     read_iso_literals_source_from_relative_path,
@@ -135,37 +135,37 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                     get_parent_and_selectable_for_object_path(&object_path, validated_schema)
                 {
                     match selectable {
-                        DefinitionLocation::Server(server_selectable) => {
-                            match server_selectable.name.location {
-                                Location::Generated => None,
-                                Location::Embedded(location) => isograph_location_to_lsp_location(
+                        DefinitionLocation::Server(server_selectable) => server_selectable
+                            .name
+                            .location
+                            .as_embedded_location()
+                            .and_then(|location| {
+                                isograph_location_to_lsp_location(
                                     db,
                                     location,
                                     &db.get_schema().content,
-                                ),
-                            }
-                        }
-                        DefinitionLocation::Client(client_selectable) => {
-                            match client_selectable.name.location {
-                                Location::Generated => None,
-                                Location::Embedded(location) => {
-                                    let memo_ref = read_iso_literals_source_from_relative_path(
-                                        db,
-                                        location.text_source.relative_path_to_source_file,
-                                    );
+                                )
+                            }),
+                        DefinitionLocation::Client(client_selectable) => client_selectable
+                            .name
+                            .location
+                            .as_embedded_location()
+                            .and_then(|location| {
+                                let memo_ref = read_iso_literals_source_from_relative_path(
+                                    db,
+                                    location.text_source.relative_path_to_source_file,
+                                );
 
-                                    let IsoLiteralsSource {
-                                        relative_path: _,
-                                        content,
-                                    } = memo_ref
-                                        .deref()
-                                        .as_ref()
-                                        .expect("Expected relative path to exist");
+                                let IsoLiteralsSource {
+                                    relative_path: _,
+                                    content,
+                                } = memo_ref
+                                    .deref()
+                                    .as_ref()
+                                    .expect("Expected relative path to exist");
 
-                                    isograph_location_to_lsp_location(db, location, content)
-                                }
-                            }
-                        }
+                                isograph_location_to_lsp_location(db, location, content)
+                            }),
                     }
                 } else {
                     None
