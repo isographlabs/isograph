@@ -56,7 +56,7 @@ export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
   return (updater) => {
     let mutableUpdatedIds: EncounteredIds = new Map();
 
-    let data = createUpdatableProxy(
+    let updatableData = createUpdatableProxy(
       environment,
       fragmentReference,
       networkRequestOptions,
@@ -64,7 +64,7 @@ export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
     );
 
     try {
-      updater(data);
+      updater({ updatableData });
     } catch (e) {
       logMessage(environment, () => ({
         kind: 'StartUpdateError',

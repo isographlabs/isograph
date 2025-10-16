@@ -63,7 +63,7 @@ export const PetPhraseCard = iso(`
       </p>
       <Button
         onClick={() => {
-          startUpdate((updatableData) => {
+          startUpdate(({ updatableData }) => {
             updatableData.favorite_phrase = 'GIVE ME KIBBLE';
             // The following line would give a TypeScript error, and not do anything at runtime:
             // updatableData.name = 'Oops';
@@ -104,7 +104,7 @@ export const HomeRoute = iso(`
       p1: {data.p1?.stats?.weight}
       <Button
         onClick={() => {
-          startUpdate((updatableData) => {
+          startUpdate(({ updatableData }) => {
             const p0 = updatableData.p0;
             const p1Stats = updatableData.p1?.stats;
             if (p0 == null || p1Stats == null) {return;}

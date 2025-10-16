@@ -27,7 +27,7 @@ export const PetUpdater = iso(`
   // We should find a way to work around this.
 
   const updateTagline = () => {
-    startUpdate((updatableData) => {
+    startUpdate(({ updatableData }) => {
       updatableData.tagline = tagline;
     });
     pet.set_pet_tagline({ input: { tagline } })[1]();

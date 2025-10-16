@@ -19,8 +19,8 @@ export const PetTaglineCard = iso(`
         const oldTagline = pet.tagline;
         const newTagline = getRandomTagline();
 
-        startUpdate((data) => {
-          data.tagline = newTagline;
+        startUpdate(({ updatableData }) => {
+          updatableData.tagline = newTagline;
         });
         loadMutation(
           {
@@ -32,8 +32,8 @@ export const PetTaglineCard = iso(`
           {
             onError: () => {
               console.log('Reverting');
-              startUpdate((data) => {
-                data.tagline = oldTagline;
+              startUpdate(({ updatableData }) => {
+                updatableData.tagline = oldTagline;
               });
             },
           },
@@ -99,6 +99,6 @@ function getRandomTagline(): string {
     'Woof',
     'Ruff',
     'Rub my belly',
-    "I'm a good boy, aren't I?",
+    "I'm a good dog, aren't I?",
   ][index];
 }

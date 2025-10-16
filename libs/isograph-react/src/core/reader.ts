@@ -58,7 +58,7 @@ export type ResolverFirstParameter<
 > = Pick<TReadFromStore, 'data' | 'parameters' | 'startUpdate'>;
 
 export type StartUpdate<UpdatableData> = (
-  updater: (updatableData: UpdatableData) => void,
+  updater: (startUpdateParams: { updatableData: UpdatableData }) => void,
 ) => void;
 
 export type RefetchReaderArtifact = {
