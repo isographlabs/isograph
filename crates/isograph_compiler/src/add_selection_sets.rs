@@ -55,7 +55,7 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol + 'st
     unprocessed_item: UnprocessedClientFieldItem,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
     let client_field = schema
-        .client_field(
+        .client_scalar_selectable(
             unprocessed_item.parent_object_entity_name,
             unprocessed_item.client_field_name,
         )
@@ -88,7 +88,7 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol + 'st
     )?;
 
     let client_field = schema
-        .client_field_mut(
+        .client_scalar_selectable_mut(
             unprocessed_item.parent_object_entity_name,
             unprocessed_item.client_field_name,
         )
@@ -110,7 +110,7 @@ fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol + '
     unprocessed_item: UnprocessedClientPointerItem,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
     let client_pointer = schema
-        .client_pointer(
+        .client_object_selectable(
             unprocessed_item.parent_object_entity_name,
             unprocessed_item.client_object_selectable_name,
         )
@@ -135,7 +135,7 @@ fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol + '
     )?;
 
     let client_pointer = schema
-        .client_pointer_mut(
+        .client_object_selectable_mut(
             unprocessed_item.parent_object_entity_name,
             unprocessed_item.client_object_selectable_name,
         )
@@ -421,7 +421,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                     )]
                 })?;
             let client_pointer = schema
-                .client_pointer(parent_object_entity_name, client_pointer_name)
+                .client_object_selectable(parent_object_entity_name, client_pointer_name)
                 .expect(
                     "Expected selectable to exist. \
                     This is indicative of a bug in Isograph.",

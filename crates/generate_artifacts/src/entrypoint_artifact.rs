@@ -38,7 +38,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     persisted_documents: &mut Option<PersistedDocuments>,
 ) -> Vec<ArtifactPathAndContent> {
     let entrypoint = schema
-        .client_field(parent_object_entity_name, entrypoint_scalar_selectable_name)
+        .client_scalar_selectable(parent_object_entity_name, entrypoint_scalar_selectable_name)
         .expect(
             "Expected selectable to exist. \
             This is indicative of a bug in Isograph.",

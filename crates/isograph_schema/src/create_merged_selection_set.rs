@@ -586,7 +586,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                         newly_encountered_client_object_selectable_id,
                     )) => {
                         let newly_encountered_client_object_selectable = schema
-                            .client_pointer(
+                            .client_object_selectable(
                                 parent_object_entity_name,
                                 newly_encountered_client_object_selectable_id,
                             )
@@ -833,7 +833,7 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
     newly_encountered_client_object_selectable_id: ClientObjectSelectableName,
 ) {
     let newly_encountered_client_object_selectable = schema
-        .client_pointer(
+        .client_object_selectable(
             parent_object_entity_name,
             newly_encountered_client_object_selectable_id,
         )
@@ -889,7 +889,7 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
     newly_encountered_scalar_client_selectable_id: &ClientScalarSelectableName,
 ) {
     let newly_encountered_scalar_client_selectable = schema
-        .client_field(
+        .client_scalar_selectable(
             *parent_object_entity_name,
             *newly_encountered_scalar_client_selectable_id,
         )

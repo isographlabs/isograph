@@ -42,7 +42,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                 ),
                 DefinitionLocation::Client((parent_object_entity_name, client_field_name)) => {
                     let client_field = schema
-                        .client_field(parent_object_entity_name, client_field_name)
+                        .client_scalar_selectable(parent_object_entity_name, client_field_name)
                         .expect(
                             "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
@@ -208,7 +208,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     let condition = match linked_field.associated_data {
         DefinitionLocation::Client((parent_object_entity_name, client_pointer_name)) => {
             let client_pointer = schema
-                .client_pointer(parent_object_entity_name, client_pointer_name)
+                .client_object_selectable(parent_object_entity_name, client_pointer_name)
                 .expect(
                     "Expected selectable to exist. \
                     This is indicative of a bug in Isograph.",
@@ -742,7 +742,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                     }
                     DefinitionLocation::Client((parent_object_entity_name, client_field_name)) => {
                         let client_field = schema
-                            .client_field(parent_object_entity_name, client_field_name)
+                            .client_scalar_selectable(parent_object_entity_name, client_field_name)
                             .expect(
                                 "Expected selectable to exist. \
                                 This is indicative of a bug in Isograph.",
@@ -785,7 +785,10 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                         client_pointer_name,
                     )) => {
                         let client_pointer = schema
-                            .client_pointer(parent_object_entity_name, client_pointer_name)
+                            .client_object_selectable(
+                                parent_object_entity_name,
+                                client_pointer_name,
+                            )
                             .expect(
                                 "Expected selectable to exist. \
                                 This is indicative of a bug in Isograph.",

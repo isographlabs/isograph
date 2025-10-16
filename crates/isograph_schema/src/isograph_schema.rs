@@ -207,7 +207,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                                 parent_object_entity_name,
                                 client_object_selectable_id,
                             )) => {
-                                let pointer = self.client_pointer(
+                                let pointer = self.client_object_selectable(
                                     *parent_object_entity_name,
                                     *client_object_selectable_id,
                                 );
@@ -533,9 +533,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         Ok(())
     }
 
-    /// Get a reference to a given client field by its field name and parent name.
-    ///
-    pub fn client_field(
+    pub fn client_scalar_selectable(
         &self,
         parent_type_name: ServerObjectEntityName,
         client_field_name: ClientScalarSelectableName,
@@ -545,7 +543,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     }
 
     // TODO this function should not exist
-    pub fn client_field_mut(
+    pub fn client_scalar_selectable_mut(
         &mut self,
         parent_type_name: ServerObjectEntityName,
         client_field_name: ClientScalarSelectableName,
@@ -569,7 +567,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 parent_object_entity_name,
                 client_object_selectable_name,
             )) => self
-                .client_pointer(parent_object_entity_name, client_object_selectable_name)
+                .client_object_selectable(parent_object_entity_name, client_object_selectable_name)
                 .map(DefinitionLocation::Client),
         }
     }
@@ -589,12 +587,12 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 parent_object_entity_name,
                 client_scalar_selectable_name,
             )) => self
-                .client_field(parent_object_entity_name, client_scalar_selectable_name)
+                .client_scalar_selectable(parent_object_entity_name, client_scalar_selectable_name)
                 .map(DefinitionLocation::Client),
         }
     }
 
-    pub fn client_pointer(
+    pub fn client_object_selectable(
         &self,
         parent_object_entity_name: ServerObjectEntityName,
         client_object_selectable_name: ClientObjectSelectableName,
@@ -604,7 +602,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     }
 
     // TODO this function should not exist
-    pub fn client_pointer_mut(
+    pub fn client_object_selectable_mut(
         &mut self,
         parent_object_entity_name: ServerObjectEntityName,
         client_object_selectable_name: ClientObjectSelectableName,
@@ -635,10 +633,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     > {
         match client_type_id {
             SelectionType::Scalar((parent_entity_object_name, client_field_name)) => self
-                .client_field(parent_entity_object_name, client_field_name)
+                .client_scalar_selectable(parent_entity_object_name, client_field_name)
                 .map(SelectionType::Scalar),
             SelectionType::Object((parent_entity_object_name, client_pointer_name)) => self
-                .client_pointer(parent_entity_object_name, client_pointer_name)
+                .client_object_selectable(parent_entity_object_name, client_pointer_name)
                 .map(SelectionType::Object),
         }
     }

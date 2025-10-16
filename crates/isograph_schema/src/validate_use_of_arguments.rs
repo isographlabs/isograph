@@ -93,7 +93,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         parent_object_entity_name,
                         client_selectable_name,
                     )) => schema
-                        .client_field(parent_object_entity_name, client_selectable_name)
+                        .client_scalar_selectable(parent_object_entity_name, client_selectable_name)
                         .expect(
                             "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
@@ -143,7 +143,10 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         parent_object_entity_name,
                         client_object_selectable_name,
                     )) => schema
-                        .client_pointer(parent_object_entity_name, client_object_selectable_name)
+                        .client_object_selectable(
+                            parent_object_entity_name,
+                            client_object_selectable_name,
+                        )
                         .expect(
                             "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
