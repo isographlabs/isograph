@@ -188,14 +188,14 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             }
         }
         NonConstantValue::Integer(_) => scalar_literal_satisfies_type(
-            &schema_data.int_type_id,
+            &schema_data.int_type_name,
             field_argument_definition_type,
             schema_data,
             selection_supplied_argument_value.location,
         )
         .or_else(|error| {
             scalar_literal_satisfies_type(
-                &schema_data.float_type_id,
+                &schema_data.float_type_name,
                 field_argument_definition_type,
                 schema_data,
                 selection_supplied_argument_value.location,
@@ -204,7 +204,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
         })
         .or_else(|error| {
             scalar_literal_satisfies_type(
-                &schema_data.id_type_id,
+                &schema_data.id_type_name,
                 field_argument_definition_type,
                 schema_data,
                 selection_supplied_argument_value.location,
@@ -212,20 +212,20 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             .map_err(|_| error)
         }),
         NonConstantValue::Boolean(_) => scalar_literal_satisfies_type(
-            &schema_data.boolean_type_id,
+            &schema_data.boolean_type_name,
             field_argument_definition_type,
             schema_data,
             selection_supplied_argument_value.location,
         ),
         NonConstantValue::String(_) => scalar_literal_satisfies_type(
-            &schema_data.string_type_id,
+            &schema_data.string_type_name,
             field_argument_definition_type,
             schema_data,
             selection_supplied_argument_value.location,
         )
         .or_else(|error| {
             scalar_literal_satisfies_type(
-                &schema_data.id_type_id,
+                &schema_data.id_type_name,
                 field_argument_definition_type,
                 schema_data,
                 selection_supplied_argument_value.location,
@@ -233,7 +233,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             .map_err(|_| error)
         }),
         NonConstantValue::Float(_) => scalar_literal_satisfies_type(
-            &schema_data.float_type_id,
+            &schema_data.float_type_name,
             field_argument_definition_type,
             schema_data,
             selection_supplied_argument_value.location,

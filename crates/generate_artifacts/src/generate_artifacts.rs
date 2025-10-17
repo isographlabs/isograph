@@ -288,7 +288,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                     GraphQLNonNullTypeAnnotation::Named(
                                         GraphQLNamedTypeAnnotation(WithSpan::new(
                                             ServerEntityName::Scalar(
-                                                schema.server_entity_data.id_type_id,
+                                                schema.server_entity_data.id_type_name,
                                             ),
                                             Span::todo_generated(),
                                         )),

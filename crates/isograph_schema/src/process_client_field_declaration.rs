@@ -181,7 +181,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         parent_object_entity_name: ServerObjectEntityName,
         client_field_declaration: WithSpan<ClientFieldDeclaration>,
     ) -> ProcessClientFieldDeclarationResult<UnprocessedClientFieldItem> {
-        let query_id = self.query_id();
+        let query_id = self.query_type_name();
         let object = &mut self
             .server_entity_data
             .server_objects
@@ -303,7 +303,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         to_object_name: TypeAnnotation<ServerObjectEntityName>,
         client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
     ) -> ProcessClientFieldDeclarationResult<UnprocessedClientPointerItem> {
-        let query_id = self.query_id();
+        let query_id = self.query_type_name();
         let to_object = self
             .server_entity_data
             .server_object_entity(*to_object_name.inner())

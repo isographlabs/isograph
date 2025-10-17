@@ -1102,13 +1102,13 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
         ),
         imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant {
             client_selection_name: newly_encountered_client_object_selectable.name.item.into(),
-            top_level_schema_field_arguments: id_arguments(schema.server_entity_data.id_type_id),
+            top_level_schema_field_arguments: id_arguments(schema.server_entity_data.id_type_name),
             // top_level_schema_field_name: *NODE_FIELD_NAME,
             // top_level_schema_field_concrete_type: None,
             // primary_field_info: None,
             field_map: vec![],
             subfields_or_inline_fragments,
-            root_object_entity_name: schema.query_id(),
+            root_object_entity_name: schema.query_type_name(),
         },
         client_selectable_id: SelectionType::Object((
             parent_object_entity_name,

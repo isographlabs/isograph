@@ -77,31 +77,31 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let mut scalars = HashMap::new();
         let mut defined_types = HashMap::new();
 
-        let id_type_id = add_schema_defined_scalar_type(
+        let id_type_name = add_schema_defined_scalar_type(
             &mut scalars,
             &mut defined_types,
             "ID",
             *STRING_JAVASCRIPT_TYPE,
         );
-        let string_type_id = add_schema_defined_scalar_type(
+        let string_type_name = add_schema_defined_scalar_type(
             &mut scalars,
             &mut defined_types,
             "String",
             *STRING_JAVASCRIPT_TYPE,
         );
-        let boolean_type_id = add_schema_defined_scalar_type(
+        let boolean_type_name = add_schema_defined_scalar_type(
             &mut scalars,
             &mut defined_types,
             "Boolean",
             "boolean".intern().into(),
         );
-        let float_type_id = add_schema_defined_scalar_type(
+        let float_type_name = add_schema_defined_scalar_type(
             &mut scalars,
             &mut defined_types,
             "Float",
             "number".intern().into(),
         );
-        let int_type_id = add_schema_defined_scalar_type(
+        let int_type_name = add_schema_defined_scalar_type(
             &mut scalars,
             &mut defined_types,
             "Int",
@@ -121,11 +121,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 defined_entities: defined_types,
                 server_object_entity_extra_info: HashMap::new(),
 
-                id_type_id,
-                string_type_id,
-                int_type_id,
-                float_type_id,
-                boolean_type_id,
+                id_type_name,
+                string_type_name,
+                int_type_name,
+                float_type_name,
+                boolean_type_name,
             },
             fetchable_types: BTreeMap::new(),
         }
@@ -133,7 +133,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     /// This is a smell, and we should refactor away from it, or all schema's
     /// should have a root type.
-    pub fn query_id(&self) -> ServerObjectEntityName {
+    pub fn query_type_name(&self) -> ServerObjectEntityName {
         *self
             .fetchable_types
             .iter()
@@ -205,11 +205,11 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                             }
                             DefinitionLocation::Client((
                                 parent_object_entity_name,
-                                client_object_selectable_id,
+                                client_object_selectable_name,
                             )) => {
                                 let pointer = self.client_object_selectable(
                                     *parent_object_entity_name,
-                                    *client_object_selectable_id,
+                                    *client_object_selectable_name,
                                 );
                                 pointer
                                     .expect(
@@ -367,11 +367,11 @@ pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
     // TODO remove. These are GraphQL-isms. And we can just hard code them, they're
     // just interned strings!
     // Well known types
-    pub id_type_id: ServerScalarEntityName,
-    pub string_type_id: ServerScalarEntityName,
-    pub float_type_id: ServerScalarEntityName,
-    pub boolean_type_id: ServerScalarEntityName,
-    pub int_type_id: ServerScalarEntityName,
+    pub id_type_name: ServerScalarEntityName,
+    pub string_type_name: ServerScalarEntityName,
+    pub float_type_name: ServerScalarEntityName,
+    pub boolean_type_name: ServerScalarEntityName,
+    pub int_type_name: ServerScalarEntityName,
 }
 
 impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
@@ -624,14 +624,14 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
     pub fn client_selectable(
         &self,
-        client_type_id: ClientSelectableId,
+        client_selectable_id: ClientSelectableId,
     ) -> Option<
         SelectionType<
             &ClientScalarSelectable<TNetworkProtocol>,
             &ClientObjectSelectable<TNetworkProtocol>,
         >,
     > {
-        match client_type_id {
+        match client_selectable_id {
             SelectionType::Scalar((parent_entity_object_name, client_field_name)) => self
                 .client_scalar_selectable(parent_entity_object_name, client_field_name)
                 .map(SelectionType::Scalar),
@@ -688,9 +688,9 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
 
     pub fn server_entity(
         &self,
-        type_id: ServerEntityName,
+        server_entity_name: ServerEntityName,
     ) -> Option<ServerEntity<'_, TNetworkProtocol>> {
-        match type_id {
+        match server_entity_name {
             ServerEntityName::Object(object_entity_name) => self
                 .server_object_entity(object_entity_name)
                 .map(ServerEntity::Object),
@@ -848,7 +848,7 @@ pub type ScalarSelectableId = DefinitionLocation<
 /// - set the id field
 fn set_and_validate_id_field(
     id_field: &mut Option<ServerScalarIdSelectableName>,
-    current_field_id: ServerScalarSelectableName,
+    current_field_selectable_name: ServerScalarSelectableName,
     parent_object_entity_name: ServerObjectEntityName,
     options: &CompilerConfigOptions,
     inner_non_null_named_type: Option<&GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
@@ -859,7 +859,7 @@ fn set_and_validate_id_field(
 
     // We should change the type here! It should not be ID! It should be a
     // type specific to the concrete type, e.g. UserID.
-    *id_field = Some(current_field_id.unchecked_conversion());
+    *id_field = Some(current_field_selectable_name.unchecked_conversion());
 
     match inner_non_null_named_type {
         Some(type_) => {
