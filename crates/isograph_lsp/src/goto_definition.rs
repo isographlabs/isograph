@@ -8,7 +8,9 @@ use isograph_compiler::{
     CompilerState, get_validated_schema, process_iso_literal_extraction,
     read_iso_literals_source_from_relative_path,
 };
-use isograph_lang_types::{DefinitionLocation, IsographResolvedNode};
+use isograph_lang_types::{
+    ClientScalarSelectableNameWrapperParent, DefinitionLocation, IsographResolvedNode,
+};
 use isograph_schema::{
     IsoLiteralsSource, IsographDatabase, NetworkProtocol,
     get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
@@ -171,7 +173,43 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                     None
                 }
             }
-            IsographResolvedNode::ClientScalarSelectableNameWrapper(_) => None,
+            IsographResolvedNode::ClientScalarSelectableNameWrapper(wrapper) => {
+                let parent_type_name = match wrapper.parent {
+                    ClientScalarSelectableNameWrapperParent::EntrypointDeclaration(
+                        position_resolution_path,
+                    ) => position_resolution_path.inner.parent_type.item,
+                    ClientScalarSelectableNameWrapperParent::ClientFieldDeclaration(
+                        position_resolution_path,
+                    ) => position_resolution_path.inner.parent_type.item,
+                };
+
+                validated_schema
+                    .client_scalar_selectable(
+                        parent_type_name.0.unchecked_conversion(),
+                        wrapper.inner.0.into(),
+                    )
+                    .and_then(|referenced_selectable| {
+                        referenced_selectable
+                            .name
+                            .location
+                            .as_embedded_location()
+                            .and_then(|location| {
+                                let memo_ref = read_iso_literals_source_from_relative_path(
+                                    db,
+                                    location.text_source.relative_path_to_source_file,
+                                );
+
+                                let IsoLiteralsSource {
+                                    relative_path: _,
+                                    content,
+                                } = memo_ref
+                                    .deref()
+                                    .as_ref()
+                                    .expect("Expected relative path to exist");
+                                isograph_location_to_lsp_location(db, location, content)
+                            })
+                    })
+            }
             IsographResolvedNode::ClientObjectSelectableNameWrapper(_) => None,
         }
     } else {
