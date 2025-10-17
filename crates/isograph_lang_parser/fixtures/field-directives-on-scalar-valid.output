@@ -9,7 +9,7 @@ Ok(
                         ),
                         parent_type: WithSpan {
                             item: ServerObjectEntityNameWrapper(
-                                UnvalidatedTypeName(
+                                ServerObjectEntityName(
                                     "Type",
                                 ),
                             ),
@@ -310,7 +310,7 @@ Ok(
                         ),
                         parent_type: WithSpan {
                             item: ServerObjectEntityNameWrapper(
-                                UnvalidatedTypeName(
+                                ServerObjectEntityName(
                                     "Type",
                                 ),
                             ),
@@ -712,7 +712,7 @@ Ok(
                         ),
                         parent_type: WithSpan {
                             item: ServerObjectEntityNameWrapper(
-                                UnvalidatedTypeName(
+                                ServerObjectEntityName(
                                     "Type",
                                 ),
                             ),
@@ -1114,7 +1114,7 @@ Ok(
                         ),
                         parent_type: WithSpan {
                             item: ServerObjectEntityNameWrapper(
-                                UnvalidatedTypeName(
+                                ServerObjectEntityName(
                                     "Type",
                                 ),
                             ),

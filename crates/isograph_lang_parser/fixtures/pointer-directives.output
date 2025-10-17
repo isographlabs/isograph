@@ -101,7 +101,7 @@ Ok(
                         ),
                         parent_type: WithSpan {
                             item: ServerObjectEntityNameWrapper(
-                                UnvalidatedTypeName(
+                                ServerObjectEntityName(
                                     "User",
                                 ),
                             ),
@@ -114,7 +114,7 @@ Ok(
                             GraphQLNamedTypeAnnotation(
                                 WithSpan {
                                     item: ServerObjectEntityNameWrapper(
-                                        UnvalidatedTypeName(
+                                        ServerObjectEntityName(
                                             "User",
                                         ),
                                     ),

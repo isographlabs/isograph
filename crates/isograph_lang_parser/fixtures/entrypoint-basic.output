@@ -6,7 +6,7 @@ Ok(
                     item: EntrypointDeclaration {
                         parent_type: WithSpan {
                             item: ServerObjectEntityNameWrapper(
-                                UnvalidatedTypeName(
+                                ServerObjectEntityName(
                                     "Type",
                                 ),
                             ),
@@ -16,8 +16,10 @@ Ok(
                             },
                         },
                         client_field_name: WithSpan {
-                            item: ServerScalarSelectableName(
-                                "Name",
+                            item: ClientScalarSelectableNameWrapper(
+                                ClientScalarSelectableName(
+                                    "Name",
+                                ),
                             ),
                             span: Span {
                                 start: 16,
