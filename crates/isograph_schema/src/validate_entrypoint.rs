@@ -1,8 +1,8 @@
 use std::collections::{HashMap, hash_map::Entry};
 
 use common_lang_types::{
-    ClientScalarSelectableName, IsoLiteralText, Location, ServerObjectEntityName,
-    ServerScalarSelectableName, TextSource, UnvalidatedTypeName, WithLocation, WithSpan,
+    ClientScalarSelectableName, IsoLiteralText, Location, ServerObjectEntityName, TextSource,
+    UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use isograph_lang_types::{
     DefinitionLocation, EntrypointDeclaration, EntrypointDirectiveSet, SelectionType,
@@ -165,7 +165,7 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
 
 fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    field_name: WithSpan<ServerScalarSelectableName>,
+    field_name: WithSpan<ClientScalarSelectableName>,
     text_source: TextSource,
     parent_object_name: ServerObjectEntityName,
 ) -> Result<ClientScalarSelectableName, WithLocation<ValidateEntrypointDeclarationError>> {
@@ -238,7 +238,7 @@ pub enum ValidateEntrypointDeclarationError {
     #[error("The client field `{parent_type_name}.{client_field_name}` is not defined.")]
     ClientFieldMustExist {
         parent_type_name: ServerObjectEntityName,
-        client_field_name: ServerScalarSelectableName,
+        client_field_name: ClientScalarSelectableName,
     },
 
     // N.B. We could conceivably support fetching server fields, though!
@@ -247,7 +247,7 @@ pub enum ValidateEntrypointDeclarationError {
     )]
     FieldMustBeClientField {
         parent_type_name: ServerObjectEntityName,
-        client_field_name: ServerScalarSelectableName,
+        client_field_name: ClientScalarSelectableName,
     },
 
     #[error(
