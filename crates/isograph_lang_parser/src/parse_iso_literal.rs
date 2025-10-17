@@ -9,11 +9,12 @@ use graphql_lang_types::{
 };
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
-    ClientFieldDeclaration, ClientPointerDeclaration, ConstantValue, EntrypointDeclaration,
-    IsographFieldDirective, IsographResolvedNode, IsographSemanticToken, NonConstantValue,
-    ObjectSelection, ScalarSelection, SelectionFieldArgument, SelectionTypeContainingSelections,
-    ServerObjectEntityNameWrapper, UnvalidatedSelection, VariableDefinition,
-    from_isograph_field_directives, semantic_token_legend,
+    ClientFieldDeclaration, ClientPointerDeclaration, ClientScalarSelectableNameWrapper,
+    ConstantValue, EntrypointDeclaration, IsographFieldDirective, IsographResolvedNode,
+    IsographSemanticToken, NonConstantValue, ObjectSelection, ScalarSelection,
+    SelectionFieldArgument, SelectionTypeContainingSelections, ServerObjectEntityNameWrapper,
+    UnvalidatedSelection, VariableDefinition, from_isograph_field_directives,
+    semantic_token_legend,
 };
 use resolve_position_macros::ResolvePosition;
 use std::{collections::HashSet, ops::ControlFlow};
@@ -137,6 +138,7 @@ fn parse_iso_entrypoint_declaration(
                     IsographLangTokenKind::Identifier,
                     semantic_token_legend::ST_CLIENT_SELECTABLE_NAME,
                 )
+                .map(|with_span| with_span.map(ClientScalarSelectableNameWrapper))
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
             let directives = parse_directives(tokens, text_source)?;

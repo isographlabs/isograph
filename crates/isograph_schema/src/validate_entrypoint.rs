@@ -5,8 +5,8 @@ use common_lang_types::{
     UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use isograph_lang_types::{
-    DefinitionLocation, EntrypointDeclaration, EntrypointDirectiveSet, SelectionType,
-    ServerObjectEntityNameWrapper,
+    ClientScalarSelectableNameWrapper, DefinitionLocation, EntrypointDeclaration,
+    EntrypointDirectiveSet, SelectionType, ServerObjectEntityNameWrapper,
 };
 
 use thiserror::Error;
@@ -165,7 +165,7 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
 
 fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
-    field_name: WithSpan<ClientScalarSelectableName>,
+    field_name: WithSpan<ClientScalarSelectableNameWrapper>,
     text_source: TextSource,
     parent_object_name: ServerObjectEntityName,
 ) -> Result<ClientScalarSelectableName, WithLocation<ValidateEntrypointDeclarationError>> {
@@ -186,7 +186,7 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
             in server_object_entity_available_selectables",
         )
         .selectables
-        .get(&field_name.item.into())
+        .get(&field_name.item.0.into())
     {
         Some(defined_field) => match defined_field {
             DefinitionLocation::Client(SelectionType::Object(_))
@@ -238,7 +238,7 @@ pub enum ValidateEntrypointDeclarationError {
     #[error("The client field `{parent_type_name}.{client_field_name}` is not defined.")]
     ClientFieldMustExist {
         parent_type_name: ServerObjectEntityName,
-        client_field_name: ClientScalarSelectableName,
+        client_field_name: ClientScalarSelectableNameWrapper,
     },
 
     // N.B. We could conceivably support fetching server fields, though!
@@ -247,7 +247,7 @@ pub enum ValidateEntrypointDeclarationError {
     )]
     FieldMustBeClientField {
         parent_type_name: ServerObjectEntityName,
-        client_field_name: ClientScalarSelectableName,
+        client_field_name: ClientScalarSelectableNameWrapper,
     },
 
     #[error(
