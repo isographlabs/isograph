@@ -49,7 +49,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let parent_type_id = self
             .server_entity_data
             .defined_entities
-            .get(&client_field_declaration.item.parent_type.item.0)
+            .get(&client_field_declaration.item.parent_type.item.0.into())
             .ok_or(WithLocation::new(
                 ProcessClientFieldDeclarationError::ParentTypeNotDefined {
                     parent_type_name: client_field_declaration.item.parent_type.item,
@@ -92,7 +92,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let parent_type_id = self
             .server_entity_data
             .defined_entities
-            .get(&client_pointer_declaration.item.parent_type.item.0)
+            .get(&client_pointer_declaration.item.parent_type.item.0.into())
             .ok_or(WithLocation::new(
                 ProcessClientFieldDeclarationError::ParentTypeNotDefined {
                     parent_type_name: client_pointer_declaration.item.parent_type.item,
@@ -106,7 +106,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let target_type_id = self
             .server_entity_data
             .defined_entities
-            .get(client_pointer_declaration.item.target_type.inner())
+            .get(&client_pointer_declaration.item.target_type.inner().0.into())
             .ok_or(WithLocation::new(
                 ProcessClientFieldDeclarationError::ParentTypeNotDefined {
                     parent_type_name: *client_pointer_declaration.item.target_type.inner(),
@@ -357,7 +357,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             match id_field {
                 None => Err(WithSpan::new(
                     ProcessClientFieldDeclarationError::ClientPointerTargetTypeHasNoId {
-                        target_type_name: client_pointer_declaration.item.target_type.inner().0,
+                        target_type_name: *client_pointer_declaration.item.target_type.inner(),
                     },
                     client_pointer_declaration.item.target_type.span(),
                 )),
@@ -503,7 +503,7 @@ pub enum ProcessClientFieldDeclarationError {
         In order to do so, the target must be an object implementing the `Node` interface."
     )]
     ClientPointerTargetTypeHasNoId {
-        target_type_name: UnvalidatedTypeName,
+        target_type_name: ServerObjectEntityNameWrapper,
     },
 
     #[error(

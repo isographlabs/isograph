@@ -60,7 +60,7 @@ pub enum DescriptionParent<'a> {
 
 define_wrapper!(
     ServerObjectEntityNameWrapper,
-    common_lang_types::UnvalidatedTypeName,
+    common_lang_types::ServerObjectEntityName,
     ServerObjectEntityNameWrapperParent<'a>,
     ServerObjectEntityNameWrapperPath
 );

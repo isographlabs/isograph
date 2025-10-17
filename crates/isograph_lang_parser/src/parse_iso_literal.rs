@@ -311,7 +311,8 @@ fn parse_client_pointer_target_type(
         ));
     }
 
-    parse_type_annotation(tokens).map(|with_span| with_span.map(ServerObjectEntityNameWrapper))
+    parse_type_annotation(tokens)
+        .map(|with_span| with_span.map(|x| ServerObjectEntityNameWrapper(x.unchecked_conversion())))
 }
 
 fn parse_client_pointer_declaration_inner(

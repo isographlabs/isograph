@@ -105,7 +105,7 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
     let parent_type_id = schema
         .server_entity_data
         .defined_entities
-        .get(&parent_type.item.0)
+        .get(&parent_type.item.0.into())
         .ok_or(WithLocation::new(
             ValidateEntrypointDeclarationError::ParentTypeNotDefined {
                 parent_type_name: parent_type.item,

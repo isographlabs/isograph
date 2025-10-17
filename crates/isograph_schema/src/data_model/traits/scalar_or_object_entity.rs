@@ -1,6 +1,4 @@
-use common_lang_types::{
-    SelectableName, ServerObjectEntityName, ServerScalarEntityName, UnvalidatedTypeName,
-};
+use common_lang_types::{SelectableName, ServerObjectEntityName, ServerScalarEntityName};
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
     Description, ObjectSelectionPath, ScalarSelectionPath, SelectionParentType, SelectionType,
@@ -69,8 +67,7 @@ pub fn get_parent_and_selectable_for_scalar_path<
         selectable
             .as_scalar()
             .ok_or_else(|| GetParentAndSelectableError::FieldWrongType {
-                // TODO cleanup
-                parent_type_name: UnvalidatedTypeName::from(parent.name.item).into(),
+                parent_type_name: parent.name.item.into(),
                 field_name: scalar_selectable_name.into(),
                 must_be: "a scalar",
                 is: "an object",
@@ -105,8 +102,7 @@ pub fn get_parent_and_selectable_for_object_path<
         selectable
             .as_object()
             .ok_or_else(|| GetParentAndSelectableError::FieldWrongType {
-                // TODO clean up the use of ServerObjectEntityNameWrapper
-                parent_type_name: UnvalidatedTypeName::from(parent.name.item).into(),
+                parent_type_name: parent.name.item.into(),
                 field_name: object_selectable_name.into(),
                 must_be: "an object",
                 is: "a scalar",
@@ -138,8 +134,7 @@ pub fn get_parent_and_selectable_for_selection_parent<
 
             parent_object_entity_and_selectable(
                 validated_schema,
-                // HACK - we should clean up our use of ServerObjectEntityNameWrapper etc
-                UnvalidatedTypeName::from(object_parent_entity_name).into(),
+                object_parent_entity_name.into(),
                 selectable_name,
             )
         }
