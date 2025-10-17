@@ -191,7 +191,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 validated_schema
                     .client_scalar_selectable(
                         parent_type_name.0.unchecked_conversion(),
-                        wrapper.inner.0.into(),
+                        wrapper.inner.0,
                     )
                     .and_then(|referenced_selectable| {
                         referenced_selectable
@@ -226,7 +226,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 validated_schema
                     .client_object_selectable(
                         parent_type_name.0.unchecked_conversion(),
-                        object_wrapper_path.inner.0.into(),
+                        object_wrapper_path.inner.0,
                     )
                     .and_then(|referenced_selectable| {
                         referenced_selectable
