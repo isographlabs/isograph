@@ -15,12 +15,13 @@ import {
 
 export const PetDetailDeferredRouteComponent = iso(`
   field Query.PetDetailDeferredRoute(
-    $id: ID !
+    $id: ID !,
+    $_bar: Int
   ) @component {
     pet(
       id: $id
     ) {
-      PetDetailDeferredRouteInnerComponent
+      PetDetailDeferredRouteInnerComponent(_foo: $_bar)
     }
     topLevelField(
       input: {
@@ -41,7 +42,7 @@ export const PetDetailDeferredRouteComponent = iso(`
 
 // TODO split into separate files!
 export const PetDetailDeferredRouteInnerComponent = iso(`
-  field Pet.PetDetailDeferredRouteInnerComponent @component {
+  field Pet.PetDetailDeferredRouteInnerComponent($_foo: Int) @component {
     fullName
     PetCheckinsCard @loadable
   }
