@@ -12,6 +12,7 @@ use common_lang_types::{
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation};
 use isograph_lang_types::Description;
+use pico::MemoRef;
 
 use crate::{
     ExposeFieldDirective, MergedSelectionMap, RootOperationName, Schema, ServerObjectEntity,
@@ -29,12 +30,14 @@ where
     #[allow(clippy::type_complexity)]
     fn parse_and_process_type_system_documents(
         db: &IsographDatabase<Self>,
-    ) -> Result<
-        (
-            ProcessTypeSystemDocumentOutcome<Self>,
-            BTreeMap<ServerObjectEntityName, RootOperationName>,
-        ),
-        Self::ParseAndProcessTypeSystemDocumentsError,
+    ) -> MemoRef<
+        Result<
+            (
+                ProcessTypeSystemDocumentOutcome<Self>,
+                BTreeMap<ServerObjectEntityName, RootOperationName>,
+            ),
+            Self::ParseAndProcessTypeSystemDocumentsError,
+        >,
     >;
 
     fn generate_query_text<'a>(
@@ -59,6 +62,7 @@ where
     ) -> QueryExtraInfo;
 }
 
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct ProcessTypeSystemDocumentOutcome<TNetworkProtocol: NetworkProtocol> {
     pub scalars:
         HashMap<ServerScalarEntityName, Vec<(ServerScalarEntity<TNetworkProtocol>, Location)>>,
@@ -71,7 +75,7 @@ pub struct ProcessTypeSystemDocumentOutcome<TNetworkProtocol: NetworkProtocol> {
     >,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol> {
     pub server_object_entity: ServerObjectEntity<TNetworkProtocol>,
     pub fields_to_insert: Vec<WithLocation<FieldToInsert>>,

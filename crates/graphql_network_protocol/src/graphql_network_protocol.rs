@@ -14,6 +14,7 @@ use isograph_schema::{
     ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
+use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
@@ -62,6 +63,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
     type SchemaObjectAssociatedData = GraphQLSchemaObjectAssociatedData;
     type ParseAndProcessTypeSystemDocumentsError = ParseAndProcessGraphQLTypeSystemDocumentsError;
 
+    #[memo]
     fn parse_and_process_type_system_documents(
         db: &IsographDatabase<Self>,
     ) -> Result<
