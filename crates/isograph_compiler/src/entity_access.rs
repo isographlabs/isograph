@@ -21,10 +21,10 @@ pub fn server_object_entity<TNetworkProtocol: NetworkProtocol + 'static>(
 
     let outcome = outcome.objects.get(&server_object_entity_name)?;
 
-    if let Some((entity, rest)) = outcome.split_first() {
-        if rest.is_empty() {
-            return Some(entity.0.server_object_entity.clone());
-        }
+    if let Some((entity, rest)) = outcome.split_first()
+        && rest.is_empty()
+    {
+        return Some(entity.0.server_object_entity.clone());
     }
 
     None
