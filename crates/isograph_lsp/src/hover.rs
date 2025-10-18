@@ -58,12 +58,6 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
         None => return Ok(None),
     };
 
-    let memo_ref = get_validated_schema(db);
-    let (validated_schema, _stats) = match memo_ref.deref() {
-        Ok(schema) => schema,
-        Err(_) => return Ok(None),
-    };
-
     let hover_markup = if let Ok((result, _text_source)) = process_iso_literal_extraction(
         db,
         &extraction,
@@ -77,6 +71,11 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
             IsographResolvedNode::ServerObjectEntityNameWrapper(_) => None,
             IsographResolvedNode::Description(_) => None,
             IsographResolvedNode::ScalarSelection(scalar_path) => {
+                let memo_ref = get_validated_schema(db);
+                let (validated_schema, _stats) = match memo_ref.deref() {
+                    Ok(schema) => schema,
+                    Err(_) => return Ok(None),
+                };
                 if let Ok((parent_object, selectable)) =
                     get_parent_and_selectable_for_scalar_path(&scalar_path, validated_schema)
                 {
@@ -93,6 +92,11 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 }
             }
             IsographResolvedNode::ObjectSelection(object_path) => {
+                let memo_ref = get_validated_schema(db);
+                let (validated_schema, _stats) = match memo_ref.deref() {
+                    Ok(schema) => schema,
+                    Err(_) => return Ok(None),
+                };
                 if let Ok((parent_object, selectable)) =
                     get_parent_and_selectable_for_object_path(&object_path, validated_schema)
                 {
