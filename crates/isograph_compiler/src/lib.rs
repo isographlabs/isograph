@@ -14,6 +14,7 @@ mod write_artifacts;
 pub use batch_compile::compile_and_print;
 pub use compiler_state::*;
 pub use create_type_system_schema::*;
+pub use entity_access::*;
 pub use get_validated_schema::*;
 pub use isograph_literals::*;
 pub use source_files::*;
