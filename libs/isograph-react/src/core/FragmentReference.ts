@@ -17,8 +17,8 @@ export type VariableValue =
 
 export type Variables = { readonly [index: string]: VariableValue };
 
-export type UnknownTReadFromStore<TParameters extends object = object> = {
-  parameters: TParameters;
+export type UnknownTReadFromStore = {
+  parameters: object;
   data: object;
   startUpdate?: StartUpdate<object>;
 };
