@@ -88,7 +88,9 @@ export const SmartestPetRoute = iso(`
 
 export const firstCheckin = iso(`
   pointer Pet.firstCheckin to ICheckin {
-    checkins(limit: 1) {
+    checkins(
+      limit: 1
+    ) {
       __link
     }
   }

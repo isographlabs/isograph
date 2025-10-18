@@ -53,6 +53,9 @@ type SetPetTaglineResponse {
   pet: Pet!
 }
 
+"""
+A pet is the joy in life
+"""
 type Pet implements Node {
   id: ID!
   firstName: String!
