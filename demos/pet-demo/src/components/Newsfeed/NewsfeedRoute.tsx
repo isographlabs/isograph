@@ -107,7 +107,6 @@ export const NewsfeedAdOrBlog = iso(`
         */}
         <LoadableFieldRenderer
           loadableField={newsfeedItem.asAdItem.AdItemDisplay}
-          args={{}}
           additionalProps={{
             onVisible,
             index,
