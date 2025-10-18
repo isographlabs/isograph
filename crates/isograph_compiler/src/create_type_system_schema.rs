@@ -26,9 +26,14 @@ use crate::{
     isograph_literals::{parse_iso_literal_in_source, process_iso_literals},
 };
 
+/// Create a schema from the type system document, i.e. avoid parsing any
+/// iso literals. That is done in a future step.
+///
+/// This is sufficient for some queries, like answering "Where is an entity
+/// defined".
 #[memo]
 #[allow(clippy::type_complexity)]
-pub fn create_schema<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
     (
