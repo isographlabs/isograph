@@ -6,11 +6,11 @@ use common_lang_types::{
 use isograph_compiler::{
     CompilerState, IsoLiteralExtraction, extract_iso_literals_from_file_content,
     get_validated_schema, process_iso_literal_extraction,
-    read_iso_literals_source_from_relative_path,
+    read_iso_literals_source_from_relative_path, server_object_entity,
 };
 use isograph_lang_types::{Description, IsographResolvedNode, VariableDefinition};
 use isograph_schema::{
-    IsographDatabase, NetworkProtocol, SelectableTrait, ServerEntityName,
+    IsographDatabase, NetworkProtocol, SelectableTrait, ServerEntityName, ServerObjectEntity,
     get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
 };
 use lsp_types::{
@@ -68,7 +68,15 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
             IsographResolvedNode::ClientFieldDeclaration(_) => None,
             IsographResolvedNode::ClientPointerDeclaration(_) => None,
             IsographResolvedNode::EntrypointDeclaration(_) => None,
-            IsographResolvedNode::ServerObjectEntityNameWrapper(_) => None,
+            IsographResolvedNode::ServerObjectEntityNameWrapper(entity) => {
+                let memo_ref = server_object_entity(db, entity.inner.0);
+                let server_object_entity = match memo_ref.deref() {
+                    Some(entity) => entity,
+                    None => return Ok(None),
+                };
+
+                Some(format_hover_for_entity(server_object_entity))
+            }
             IsographResolvedNode::Description(_) => None,
             IsographResolvedNode::ScalarSelection(scalar_path) => {
                 let memo_ref = get_validated_schema(db);
@@ -305,4 +313,15 @@ fn hover_text_for_selectable(
         \n\
         **{parent_type_name}**{parent_description}",
     )
+}
+
+fn format_hover_for_entity<TNetworkProtocol: NetworkProtocol>(
+    entity: &ServerObjectEntity<TNetworkProtocol>,
+) -> String {
+    let object_entity_name = entity.name.item;
+    let description = match entity.description {
+        Some(description) => format!("\n\n{description}"),
+        None => "".to_string(),
+    };
+    format!("Object **{object_entity_name}**{description}")
 }
