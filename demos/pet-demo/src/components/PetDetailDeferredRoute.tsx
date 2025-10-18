@@ -49,9 +49,7 @@ export const PetDetailDeferredRouteInnerComponent = iso(`
   const navigateTo = useNavigateTo();
   const { fragmentReference: petCheckinsCard } = useClientSideDefer(
     pet.PetCheckinsCard,
-    {
-      limit: 2,
-    },
+    { limit: 2 },
   );
 
   return (

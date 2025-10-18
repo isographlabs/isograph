@@ -9,18 +9,10 @@ import {
 import { LoadableField } from '../core/reader';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 
-export function useClientSideDefer<
+type ArgsWithoutProvidedArgs<
   TReadFromStore extends UnknownTReadFromStore,
-  TResult,
->(
-  loadableField: LoadableField<
-    TReadFromStore,
-    TResult,
-    ExtractParameters<TReadFromStore>
-  >,
-  args?: Record<PropertyKey, never>,
-  fetchOptions?: FetchOptions<TResult>,
-): { fragmentReference: FragmentReference<TReadFromStore, TResult> };
+  TProvidedArgs extends object,
+> = Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>;
 
 export function useClientSideDefer<
   TReadFromStore extends UnknownTReadFromStore,
@@ -32,23 +24,21 @@ export function useClientSideDefer<
     TResult,
     Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
   >,
-  args: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>,
-  fetchOptions?: FetchOptions<TResult>,
-): { fragmentReference: FragmentReference<TReadFromStore, TResult> };
-
-export function useClientSideDefer<
-  TReadFromStore extends UnknownTReadFromStore,
-  TResult,
-  TProvidedArgs extends object,
->(
-  loadableField: LoadableField<
+  ...maybeRequiredArgs: ArgsWithoutProvidedArgs<
     TReadFromStore,
-    TResult,
-    Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
-  >,
-  args?: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>,
-  fetchOptions?: FetchOptions<TResult>,
+    TProvidedArgs
+  > extends Record<PropertyKey, never>
+    ? [
+        args?: ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs>,
+        fetchOptions?: FetchOptions<TResult>,
+      ]
+    : [
+        args: ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs>,
+        fetchOptions?: FetchOptions<TResult>,
+      ]
 ): { fragmentReference: FragmentReference<TReadFromStore, TResult> } {
+  const [args, fetchOptions] = maybeRequiredArgs;
+
   const [id, loader] = loadableField(args, fetchOptions ?? {});
   const environment = useIsographEnvironment();
   const cache = getOrCreateItemInSuspenseCache(environment, id, loader);
