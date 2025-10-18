@@ -9,7 +9,7 @@ use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
-    CreateSchemaError, create_type_system_schema,
+    CreateSchemaError, create_type_system_schema_with_server_selectables,
     process_iso_literals::{
         ContainsIsoStats, ProcessIsoLiteralsForSchemaError, process_iso_literals_for_schema,
     },
@@ -21,7 +21,7 @@ pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol + 'static>(
 ) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), GetValidatedSchemaError<TNetworkProtocol>>
 {
     let (unvalidated_isograph_schema, unprocessed_items) =
-        create_type_system_schema::<TNetworkProtocol>(db)
+        create_type_system_schema_with_server_selectables::<TNetworkProtocol>(db)
             .deref()
             .clone()?;
     let (isograph_schema, stats) =

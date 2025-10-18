@@ -12,7 +12,7 @@ pub fn server_object_entity<TNetworkProtocol: NetworkProtocol + 'static>(
     server_object_entity_name: ServerObjectEntityName,
 ) -> Option<ServerObjectEntity<TNetworkProtocol>> {
     let memo_ref = create_type_system_schema(db);
-    let (schema, _unprocessed_field_items) = match memo_ref.deref() {
+    let (schema, _expose_as_fields_to_insert, _fields_to_insert) = match memo_ref.deref() {
         Ok(s) => s,
         Err(_) => return None,
     };
@@ -31,7 +31,7 @@ pub fn server_scalar_entity<TNetworkProtocol: NetworkProtocol + 'static>(
     server_scalar_entity_name: ServerScalarEntityName,
 ) -> Option<ServerScalarEntity<TNetworkProtocol>> {
     let memo_ref = create_type_system_schema(db);
-    let (schema, _unprocessed_field_items) = match memo_ref.deref() {
+    let (schema, _expose_as_fields_to_insert, _fields_to_insert) = match memo_ref.deref() {
         Ok(s) => s,
         Err(_) => return None,
     };

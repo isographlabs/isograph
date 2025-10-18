@@ -7,16 +7,16 @@ use graphql_lang_types::{GraphQLConstantValue, GraphQLInputValueDefinition, Name
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{ConstantValue, SelectionType, TypeAnnotation, VariableDefinition};
 use isograph_schema::{
-    CreateAdditionalFieldsError, FieldToInsert, IsographDatabase, NetworkProtocol,
-    ProcessObjectTypeDefinitionOutcome, ProcessTypeSystemDocumentOutcome, Schema, ServerEntityName,
-    ServerObjectSelectable, ServerObjectSelectableVariant, ServerScalarSelectable,
-    UnprocessedClientFieldItem, UnprocessedClientPointerItem,
+    CreateAdditionalFieldsError, ExposeAsFieldToInsert, FieldToInsert, IsographDatabase,
+    NetworkProtocol, ProcessObjectTypeDefinitionOutcome, ProcessTypeSystemDocumentOutcome, Schema,
+    ServerEntityName, ServerObjectSelectable, ServerObjectSelectableVariant,
+    ServerScalarSelectable, UnprocessedClientFieldItem, UnprocessedClientPointerItem,
 };
 use pico_macros::memo;
 use thiserror::Error;
 
 /// Create a schema from the type system document, i.e. avoid parsing any
-/// iso literals. That is done in a future step.
+/// iso literals. It also doesn't set any server fields. That is done in a future step.
 ///
 /// This is sufficient for some queries, like answering "Where is an entity
 /// defined".
@@ -27,7 +27,9 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
 ) -> Result<
     (
         Schema<TNetworkProtocol>,
-        Vec<SelectionType<UnprocessedClientFieldItem, UnprocessedClientPointerItem>>,
+        // TODO combine these into one hashmap?
+        HashMap<ServerObjectEntityName, Vec<ExposeAsFieldToInsert>>,
+        HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
     ),
     CreateSchemaError<TNetworkProtocol>,
 > {
@@ -63,6 +65,33 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
 
         expose_as_field_queue.insert(new_object_id, expose_as_fields_to_insert);
     }
+
+    Ok((
+        unvalidated_isograph_schema,
+        expose_as_field_queue,
+        field_queue,
+    ))
+}
+
+/// Create a schema from the type system document, i.e. avoid parsing any
+/// iso literals. It *does* set server fields. Parsing iso literals is done in a future step.
+///
+/// This is sufficient for some queries, like answering "Where is a server field defined."
+#[memo]
+#[allow(clippy::type_complexity)]
+pub fn create_type_system_schema_with_server_selectables<
+    TNetworkProtocol: NetworkProtocol + 'static,
+>(
+    db: &IsographDatabase<TNetworkProtocol>,
+) -> Result<
+    (
+        Schema<TNetworkProtocol>,
+        Vec<SelectionType<UnprocessedClientFieldItem, UnprocessedClientPointerItem>>,
+    ),
+    CreateSchemaError<TNetworkProtocol>,
+> {
+    let (mut unvalidated_isograph_schema, expose_as_field_queue, field_queue) =
+        create_type_system_schema(db).to_owned()?;
 
     process_field_queue(
         &mut unvalidated_isograph_schema,

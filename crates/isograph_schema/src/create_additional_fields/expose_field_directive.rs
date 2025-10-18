@@ -27,7 +27,7 @@ use super::{
 };
 
 // TODO move to graphql_network_protocol crate
-#[derive(Deserialize, Eq, PartialEq, Debug)]
+#[derive(Deserialize, Eq, PartialEq, Debug, Hash, Clone)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ExposeFieldDirective {
     // TODO make this a ScalarSelectableName

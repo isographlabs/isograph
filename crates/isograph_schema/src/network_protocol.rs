@@ -69,7 +69,7 @@ pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol>
     pub expose_as_fields_to_insert: Vec<ExposeAsFieldToInsert>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct FieldToInsert {
     pub description: Option<WithSpan<Description>>,
     pub name: WithLocation<ServerSelectableName>,
@@ -94,7 +94,7 @@ pub struct FieldToInsert {
     pub is_inline_fragment: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct ExposeAsFieldToInsert {
     pub expose_field_directive: ExposeFieldDirective,
     // e.g. Query or Mutation
