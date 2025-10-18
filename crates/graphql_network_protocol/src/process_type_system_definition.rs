@@ -52,7 +52,7 @@ pub fn process_graphql_type_system_document(
 
     let mut supertype_to_subtype_map = BTreeMap::new();
 
-    let mut scalars = vec![];
+    let mut scalars = HashMap::new();
     let mut objects = vec![];
     let mut directives = HashMap::<_, Vec<_>>::new();
 
@@ -97,7 +97,13 @@ pub fn process_graphql_type_system_document(
                 objects.push((object_definition_outcome, location));
             }
             GraphQLTypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
-                scalars.push((process_scalar_definition(scalar_type_definition), location));
+                let scalar_definitions: &mut Vec<_> =
+                    scalars.entry(scalar_type_definition.name.item).or_default();
+                let name_location = scalar_type_definition.name.location;
+                scalar_definitions.push((
+                    process_scalar_definition(scalar_type_definition),
+                    name_location,
+                ));
                 // N.B. we assume that Mutation will be an object, not a scalar
             }
             GraphQLTypeSystemDefinition::InterfaceTypeDefinition(interface_type_definition) => {
@@ -155,13 +161,15 @@ pub fn process_graphql_type_system_document(
             }
             GraphQLTypeSystemDefinition::EnumDefinition(enum_definition) => {
                 // TODO Do not do this
-                scalars.push((
+                let scalar_definitions: &mut Vec<_> =
+                    scalars.entry(enum_definition.name.item).or_default();
+                scalar_definitions.push((
                     process_scalar_definition(GraphQLScalarTypeDefinition {
                         description: enum_definition.description,
                         name: enum_definition.name.map(|x| x.unchecked_conversion()),
                         directives: enum_definition.directives,
                     }),
-                    location,
+                    enum_definition.name.location,
                 ));
             }
             GraphQLTypeSystemDefinition::UnionTypeDefinition(union_definition) => {

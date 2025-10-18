@@ -1,8 +1,14 @@
-use std::{collections::BTreeMap, error::Error, fmt::Debug, hash::Hash};
+use std::{
+    collections::{BTreeMap, HashMap},
+    error::Error,
+    fmt::Debug,
+    hash::Hash,
+};
 
 use common_lang_types::{
     JavascriptName, Location, QueryExtraInfo, QueryOperationName, QueryText,
-    ServerObjectEntityName, ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
+    ServerObjectEntityName, ServerScalarEntityName, ServerSelectableName, UnvalidatedTypeName,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation};
 use isograph_lang_types::Description;
@@ -54,7 +60,8 @@ where
 }
 
 pub struct ProcessTypeSystemDocumentOutcome<TNetworkProtocol: NetworkProtocol> {
-    pub scalars: Vec<(ServerScalarEntity<TNetworkProtocol>, Location)>,
+    pub scalars:
+        HashMap<ServerScalarEntityName, Vec<(ServerScalarEntity<TNetworkProtocol>, Location)>>,
     pub objects: Vec<(
         ProcessObjectTypeDefinitionOutcome<TNetworkProtocol>,
         Location,

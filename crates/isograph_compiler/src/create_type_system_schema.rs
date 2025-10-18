@@ -41,10 +41,12 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
 
     unvalidated_isograph_schema.fetchable_types = fetchable_types;
 
-    for (server_scalar_entity, name_location) in scalars {
-        unvalidated_isograph_schema
-            .server_entity_data
-            .insert_server_scalar_entity(server_scalar_entity, name_location)?;
+    for (_server_scalar_entity_name, server_scalar_entities) in scalars {
+        for (server_scalar_entity, name_location) in server_scalar_entities {
+            unvalidated_isograph_schema
+                .server_entity_data
+                .insert_server_scalar_entity(server_scalar_entity, name_location)?;
+        }
     }
 
     let mut field_queue = HashMap::new();
