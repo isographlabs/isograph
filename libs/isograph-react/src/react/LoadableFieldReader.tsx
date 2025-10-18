@@ -8,25 +8,53 @@ import { type LoadableField } from '../core/reader';
 import { useClientSideDefer } from '../loadable-hooks/useClientSideDefer';
 import { useResult } from './useResult';
 
+type FinalArgs<
+  TReadFromStore extends UnknownTReadFromStore,
+  TProvidedArgs extends object,
+> = Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>;
+
+type MaybeRequiredArgs<
+  TReadFromStore extends UnknownTReadFromStore,
+  TProvidedArgs extends object,
+  TResult,
+  TChildrenResult,
+> =
+  FinalArgs<TReadFromStore, TProvidedArgs> extends Record<PropertyKey, never>
+    ? {
+        args?: FinalArgs<TReadFromStore, TProvidedArgs>;
+        fetchOptions?: FetchOptions<TResult>;
+        networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
+        children: (arg: TResult) => TChildrenResult;
+      }
+    : {
+        args: FinalArgs<TReadFromStore, TProvidedArgs>;
+        fetchOptions?: FetchOptions<TResult>;
+        networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
+        children: (arg: TResult) => TChildrenResult;
+      };
+
 export function LoadableFieldReader<
   TReadFromStore extends UnknownTReadFromStore,
   TResult,
   TProvidedArgs extends object,
   TChildrenResult,
->(props: {
-  loadableField: LoadableField<
+>(
+  props: {
+    loadableField: LoadableField<
+      TReadFromStore,
+      TResult,
+      Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
+    >;
+  } & MaybeRequiredArgs<
     TReadFromStore,
+    TProvidedArgs,
     TResult,
-    Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
-  >;
-  // TODO we can improve this to not require args if its an empty object
-  args: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>;
-  fetchOptions?: FetchOptions<TResult>;
-  networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
-  children: (arg: TResult) => TChildrenResult;
-}): TChildrenResult {
+    TChildrenResult
+  >,
+): TChildrenResult {
   const { fragmentReference } = useClientSideDefer(
     props.loadableField,
+    // @ts-expect-error
     props.args,
     props.fetchOptions,
   );

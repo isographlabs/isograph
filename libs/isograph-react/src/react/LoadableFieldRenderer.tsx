@@ -9,25 +9,57 @@ import { type LoadableField } from '../core/reader';
 import { useClientSideDefer } from '../loadable-hooks/useClientSideDefer';
 import { useResult } from './useResult';
 
+type FinalArgs<
+  TReadFromStore extends UnknownTReadFromStore,
+  TProvidedArgs extends object,
+> = Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>;
+
+type MaybeRequiredArgs<
+  TReadFromStore extends UnknownTReadFromStore,
+  TProvidedArgs extends object,
+  TResult,
+  TChildrenResult,
+  TProps,
+> =
+  FinalArgs<TReadFromStore, TProvidedArgs> extends Record<PropertyKey, never>
+    ? {
+        args?: FinalArgs<TReadFromStore, TProvidedArgs>;
+        fetchOptions?: FetchOptions<TResult>;
+        networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
+        children?: (arg: TResult) => TChildrenResult;
+        additionalProps: Omit<TProps, keyof JSX.IntrinsicAttributes>;
+      }
+    : {
+        args: FinalArgs<TReadFromStore, TProvidedArgs>;
+        fetchOptions?: FetchOptions<TResult>;
+        networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
+        children?: (arg: TResult) => TChildrenResult;
+        additionalProps: Omit<TProps, keyof JSX.IntrinsicAttributes>;
+      };
+
 export function LoadableFieldRenderer<
   TReadFromStore extends UnknownTReadFromStore,
   TProvidedArgs extends object,
   TChildrenResult,
   TProps,
->(props: {
-  loadableField: LoadableField<
+>(
+  props: {
+    loadableField: LoadableField<
+      TReadFromStore,
+      React.FC<TProps>,
+      Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
+    >;
+  } & MaybeRequiredArgs<
     TReadFromStore,
+    TProvidedArgs,
     React.FC<TProps>,
-    Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
-  >;
-  // TODO we can improve this to not require args if its an empty object
-  args: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>;
-  fetchOptions?: FetchOptions<React.FC<TProps>>;
-  networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
-  additionalProps: Omit<TProps, keyof JSX.IntrinsicAttributes>;
-}): TChildrenResult {
+    TChildrenResult,
+    TProps
+  >,
+): TChildrenResult {
   const { fragmentReference } = useClientSideDefer(
     props.loadableField,
+    // @ts-expect-error
     props.args,
     props.fetchOptions,
   );
