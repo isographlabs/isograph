@@ -24,7 +24,7 @@ import { type Pet__PetTaglineCard__param } from './Pet/PetTaglineCard/param_type
 import { type Pet__PetUpdater__param } from './Pet/PetUpdater/param_type';
 import { type Pet__Unreachable2__param } from './Pet/Unreachable2/param_type';
 import { type Pet__UnreachableFromEntrypoint__param } from './Pet/UnreachableFromEntrypoint/param_type';
-import { type Pet__firstCheckin__param } from './Pet/firstCheckin/param_type';
+import { type Pet__checkinsPointer__param } from './Pet/checkinsPointer/param_type';
 import { type Pet__fullName__param } from './Pet/fullName/param_type';
 import { type Query__HomeRoute__param } from './Query/HomeRoute/param_type';
 import { type Query__Newsfeed__param } from './Query/Newsfeed/param_type';
@@ -200,8 +200,8 @@ export function iso<T>(
 ): IdentityWithParam<Pet__UnreachableFromEntrypoint__param>;
 
 export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'pointer Pet.firstCheckin', T>
-): IdentityWithParam<Pet__firstCheckin__param, (ICheckin____link__output_type | null)>;
+  param: T & MatchesWhitespaceAndString<'pointer Pet.checkinsPointer', T>
+): IdentityWithParam<Pet__checkinsPointer__param, ReadonlyArray<ICheckin____link__output_type>>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Pet.fullName', T>

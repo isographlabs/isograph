@@ -3,7 +3,7 @@ export default 'query Query__smartestPet($id: ID!) {\
     ... on Pet {\
       __typename,\
       id,\
-      checkins____limit___l_1: checkins(limit: 1) {\
+      checkins____limit___l_2: checkins(limit: 2) {\
         id,\
       },\
       firstName,\

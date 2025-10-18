@@ -1,7 +1,7 @@
 import { type Pet__Avatar__output_type } from '../../Pet/Avatar/output_type';
 import { type Pet__fullName__output_type } from '../../Pet/fullName/output_type';
 import { type LoadableField, type ExtractParameters } from '@isograph/react';
-import { type Pet__firstCheckin__param } from '../../Pet/firstCheckin/param_type';
+import { type Pet__checkinsPointer__param } from '../../Pet/checkinsPointer/param_type';
 import { type Query__smartestPet__param } from '../../Query/smartestPet/param_type';
 
 export type Query__SmartestPetRoute__param = {
@@ -14,9 +14,9 @@ export type Query__SmartestPetRoute__param = {
         readonly intelligence: (number | null),
       } | null),
       readonly picture: string,
-      readonly firstCheckin: (LoadableField<Pet__firstCheckin__param, {
+      readonly checkinsPointer: ReadonlyArray<LoadableField<Pet__checkinsPointer__param, {
         readonly location: string,
-      }> | null),
+      }>>,
     }> | null),
   },
   readonly parameters: Record<PropertyKey, never>,

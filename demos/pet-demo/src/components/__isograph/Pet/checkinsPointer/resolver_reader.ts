@@ -1,9 +1,9 @@
 import type { EagerReaderArtifact, ReaderAst } from '@isograph/react';
-import { Pet__firstCheckin__param } from './param_type';
-import { Pet__firstCheckin__output_type } from './output_type';
-import { firstCheckin as resolver } from '../../../SmartestPet';
+import { Pet__checkinsPointer__param } from './param_type';
+import { Pet__checkinsPointer__output_type } from './output_type';
+import { checkinsPointer as resolver } from '../../../SmartestPet';
 
-const readerAst: ReaderAst<Pet__firstCheckin__param> = [
+const readerAst: ReaderAst<Pet__checkinsPointer__param> = [
   {
     kind: "Linked",
     fieldName: "checkins",
@@ -11,7 +11,7 @@ const readerAst: ReaderAst<Pet__firstCheckin__param> = [
     arguments: [
       [
         "limit",
-        { kind: "Literal", value: 1 },
+        { kind: "Literal", value: 2 },
       ],
     ],
     condition: null,
@@ -27,11 +27,11 @@ const readerAst: ReaderAst<Pet__firstCheckin__param> = [
 ];
 
 const artifact: EagerReaderArtifact<
-  Pet__firstCheckin__param,
-  Pet__firstCheckin__output_type
+  Pet__checkinsPointer__param,
+  Pet__checkinsPointer__output_type
 > = {
   kind: "EagerReaderArtifact",
-  fieldName: "Pet.firstCheckin",
+  fieldName: "Pet.checkinsPointer",
   resolver,
   readerAst,
   hasUpdatable: false,
