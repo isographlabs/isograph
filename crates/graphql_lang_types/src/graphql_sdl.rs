@@ -198,7 +198,7 @@ pub struct GraphQLDirectiveDefinition {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLEnumDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub name: WithLocation<DirectiveName>,
+    pub name: WithLocation<ServerScalarEntityName>,
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
     pub enum_value_definitions: Vec<WithLocation<GraphQLEnumValueDefinition>>,
 }
