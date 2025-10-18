@@ -59,12 +59,6 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
         None => return Ok(None),
     };
 
-    let memo_ref = get_validated_schema(db);
-    let (validated_schema, _stats) = match memo_ref.deref() {
-        Ok(schema) => schema,
-        Err(_) => return Ok(None),
-    };
-
     let goto_location = if let Ok((result, _text_source)) = process_iso_literal_extraction(
         db,
         &extraction,
@@ -76,6 +70,12 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
             IsographResolvedNode::ClientPointerDeclaration(_) => None,
             IsographResolvedNode::EntrypointDeclaration(_) => None,
             IsographResolvedNode::ServerObjectEntityNameWrapper(entity) => {
+                let memo_ref = get_validated_schema(db);
+                let (validated_schema, _stats) = match memo_ref.deref() {
+                    Ok(schema) => schema,
+                    Err(_) => return Ok(None),
+                };
+
                 let server_object_entity = match validated_schema
                     .server_entity_data
                     .server_object_entity(entity.inner.0.unchecked_conversion())
@@ -94,6 +94,12 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
             }
             IsographResolvedNode::Description(_) => None,
             IsographResolvedNode::ScalarSelection(scalar_path) => {
+                let memo_ref = get_validated_schema(db);
+                let (validated_schema, _stats) = match memo_ref.deref() {
+                    Ok(schema) => schema,
+                    Err(_) => return Ok(None),
+                };
+
                 if let Ok((_, selectable)) =
                     get_parent_and_selectable_for_scalar_path(&scalar_path, validated_schema)
                 {
@@ -134,6 +140,12 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 }
             }
             IsographResolvedNode::ObjectSelection(object_path) => {
+                let memo_ref = get_validated_schema(db);
+                let (validated_schema, _stats) = match memo_ref.deref() {
+                    Ok(schema) => schema,
+                    Err(_) => return Ok(None),
+                };
+
                 if let Ok((_, selectable)) =
                     get_parent_and_selectable_for_object_path(&object_path, validated_schema)
                 {
@@ -175,6 +187,12 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 }
             }
             IsographResolvedNode::ClientScalarSelectableNameWrapper(wrapper) => {
+                let memo_ref = get_validated_schema(db);
+                let (validated_schema, _stats) = match memo_ref.deref() {
+                    Ok(schema) => schema,
+                    Err(_) => return Ok(None),
+                };
+
                 let parent_type_name = match wrapper.parent {
                     ClientScalarSelectableNameWrapperParent::EntrypointDeclaration(
                         position_resolution_path,
@@ -216,6 +234,12 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                     })
             }
             IsographResolvedNode::ClientObjectSelectableNameWrapper(object_wrapper_path) => {
+                let memo_ref = get_validated_schema(db);
+                let (validated_schema, _stats) = match memo_ref.deref() {
+                    Ok(schema) => schema,
+                    Err(_) => return Ok(None),
+                };
+
                 // This is a pretty useless goto def! It just takes the user to the pointer that they're currently hovering on.
                 // But, (pre-adding this), the behavior was to say that "No definition found", which is a bad UX.
                 let parent_type_name = match object_wrapper_path.parent {
