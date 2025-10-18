@@ -9,7 +9,7 @@ import {
 import { LoadableField } from '../core/reader';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 
-type FinalArgs<
+type ArgsWithoutProvidedArgs<
   TReadFromStore extends UnknownTReadFromStore,
   TProvidedArgs extends object,
 > = Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>;
@@ -24,16 +24,16 @@ export function useClientSideDefer<
     TResult,
     Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
   >,
-  ...maybeRequiredArgs: FinalArgs<TReadFromStore, TProvidedArgs> extends Record<
-    PropertyKey,
-    never
-  >
+  ...maybeRequiredArgs: ArgsWithoutProvidedArgs<
+    TReadFromStore,
+    TProvidedArgs
+  > extends Record<PropertyKey, never>
     ? [
-        args?: FinalArgs<TReadFromStore, TProvidedArgs>,
+        args?: ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs>,
         fetchOptions?: FetchOptions<TResult>,
       ]
     : [
-        args: FinalArgs<TReadFromStore, TProvidedArgs>,
+        args: ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs>,
         fetchOptions?: FetchOptions<TResult>,
       ]
 ): { fragmentReference: FragmentReference<TReadFromStore, TResult> } {
