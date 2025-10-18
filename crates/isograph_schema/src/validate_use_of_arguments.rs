@@ -1,11 +1,10 @@
-use std::collections::BTreeSet;
-
 use common_lang_types::{
     FieldArgumentName, Location, ParentObjectEntityNameAndSelectableName, SelectableName,
     ServerObjectEntityName, VariableName, WithLocation, WithSpan,
 };
+use std::collections::BTreeSet;
 
-use intern::string_key::Intern;
+use intern::string_key::{Intern, Lookup};
 use isograph_lang_types::{
     DefinitionLocation, NonConstantValue, ScalarSelectionDirectiveSet, SelectionFieldArgument,
     SelectionType,
@@ -250,7 +249,7 @@ fn validate_all_variables_are_used(
         .filter_map(|variable| {
             let is_used = used_variables.contains(&variable.item.name.item);
 
-            if !is_used {
+            if !is_used && !variable.item.name.item.lookup().starts_with("_") {
                 return Some(variable.clone());
             }
             None
@@ -413,7 +412,7 @@ pub enum ValidateUseOfArgumentsError {
     },
 
     #[error(
-        "The field `{type_name}.{field_name}` has unused variables: {0}",
+        "The field `{type_name}.{field_name}` has unused variables: {0}. Unused variables should start with a '_'",
         unused_variables.iter().map(|variable| format!("${}", variable.item.name.item)).collect::<Vec<_>>().join(", ")
     )]
     UnusedVariables {
