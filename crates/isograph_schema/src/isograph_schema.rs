@@ -683,9 +683,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
     pub fn server_scalar_entity(
         &self,
-        scalar_entity_name: ServerScalarEntityName,
+        server_scalar_entity_name: ServerScalarEntityName,
     ) -> Option<&ServerScalarEntity<TNetworkProtocol>> {
-        self.server_scalar_entities.get(&scalar_entity_name)
+        self.server_scalar_entities.get(&server_scalar_entity_name)
     }
 
     pub fn server_entity(
@@ -704,9 +704,9 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
 
     pub fn server_object_entity(
         &self,
-        object_entity_name: ServerObjectEntityName,
+        server_object_entity_name: ServerObjectEntityName,
     ) -> Option<&ServerObjectEntity<TNetworkProtocol>> {
-        self.server_object_entities.get(&object_entity_name)
+        self.server_object_entities.get(&server_object_entity_name)
     }
 
     // TODO this function should not exist
@@ -746,29 +746,31 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
     // TODO this function should not exist
     pub fn insert_server_object_entity(
         &mut self,
-        server_object_entity: ServerObjectEntity<TNetworkProtocol>,
+        server_server_object_entity: ServerObjectEntity<TNetworkProtocol>,
         name_location: Location,
     ) -> Result<ServerObjectEntityName, WithLocation<CreateAdditionalFieldsError>> {
-        let name = server_object_entity.name;
+        let name = server_server_object_entity.name;
         if self
             .defined_entities
             .insert(
-                server_object_entity.name.item.into(),
-                SelectionType::Object(server_object_entity.name.item),
+                server_server_object_entity.name.item.into(),
+                SelectionType::Object(server_server_object_entity.name.item),
             )
             .is_some()
         {
             return Err(WithLocation::new(
                 CreateAdditionalFieldsError::DuplicateTypeDefinition {
                     type_definition_type: "object",
-                    type_name: server_object_entity.name.item.into(),
+                    type_name: server_server_object_entity.name.item.into(),
                 },
                 name_location,
             ));
         }
 
-        self.server_object_entities
-            .insert(server_object_entity.name.item, server_object_entity);
+        self.server_object_entities.insert(
+            server_server_object_entity.name.item,
+            server_server_object_entity,
+        );
         Ok(name.item)
     }
 }

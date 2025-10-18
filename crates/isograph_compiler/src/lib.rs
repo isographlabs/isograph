@@ -2,6 +2,7 @@ mod add_selection_sets;
 pub mod batch_compile;
 mod compiler_state;
 mod create_type_system_schema;
+mod entity_access;
 mod get_validated_schema;
 mod isograph_literals;
 mod process_iso_literals;
