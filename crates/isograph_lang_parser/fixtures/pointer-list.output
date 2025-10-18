@@ -15,8 +15,8 @@ Ok(
                                 ),
                             ),
                             span: Span {
-                                start: 12,
-                                end: 16,
+                                start: 11,
+                                end: 15,
                             },
                         },
                         target_type: List(
@@ -30,8 +30,8 @@ Ok(
                                                 ),
                                             ),
                                             span: Span {
-                                                start: 32,
-                                                end: 36,
+                                                start: 31,
+                                                end: 35,
                                             },
                                         },
                                     ),
@@ -48,13 +48,13 @@ Ok(
                                     span: Some(
                                         Span {
                                             start: 28,
-                                            end: 123,
+                                            end: 116,
                                         },
                                     ),
                                 },
                                 span: Span {
-                                    start: 17,
-                                    end: 27,
+                                    start: 16,
+                                    end: 26,
                                 },
                             },
                             item: ClientObjectSelectableNameWrapper(
@@ -79,13 +79,13 @@ Ok(
                                                         span: Some(
                                                             Span {
                                                                 start: 28,
-                                                                end: 123,
+                                                                end: 116,
                                                             },
                                                         ),
                                                     },
                                                     span: Span {
-                                                        start: 45,
-                                                        end: 52,
+                                                        start: 43,
+                                                        end: 50,
                                                     },
                                                 },
                                             ),
@@ -110,13 +110,13 @@ Ok(
                                                                         span: Some(
                                                                             Span {
                                                                                 start: 28,
-                                                                                end: 123,
+                                                                                end: 116,
                                                                             },
                                                                         ),
                                                                     },
                                                                     span: Span {
-                                                                        start: 62,
-                                                                        end: 64,
+                                                                        start: 59,
+                                                                        end: 61,
                                                                     },
                                                                 },
                                                             ),
@@ -133,8 +133,8 @@ Ok(
                                                     },
                                                 ),
                                                 span: Span {
-                                                    start: 62,
-                                                    end: 64,
+                                                    start: 59,
+                                                    end: 61,
                                                 },
                                             },
                                             WithSpan {
@@ -151,13 +151,13 @@ Ok(
                                                                         span: Some(
                                                                             Span {
                                                                                 start: 28,
-                                                                                end: 123,
+                                                                                end: 116,
                                                                             },
                                                                         ),
                                                                     },
                                                                     span: Span {
-                                                                        start: 72,
-                                                                        end: 81,
+                                                                        start: 68,
+                                                                        end: 77,
                                                                     },
                                                                 },
                                                             ),
@@ -174,8 +174,8 @@ Ok(
                                                     },
                                                 ),
                                                 span: Span {
-                                                    start: 72,
-                                                    end: 81,
+                                                    start: 68,
+                                                    end: 77,
                                                 },
                                             },
                                         ],
@@ -186,8 +186,8 @@ Ok(
                                     },
                                 ),
                                 span: Span {
-                                    start: 45,
-                                    end: 88,
+                                    start: 43,
+                                    end: 83,
                                 },
                             },
                         ],
@@ -211,8 +211,8 @@ Ok(
                                     indent_change: Same,
                                 },
                                 span: Span {
-                                    start: 4,
-                                    end: 11,
+                                    start: 3,
+                                    end: 10,
                                 },
                             },
                             WithSpan {
@@ -233,8 +233,8 @@ Ok(
                                     indent_change: Same,
                                 },
                                 span: Span {
-                                    start: 12,
-                                    end: 16,
+                                    start: 11,
+                                    end: 15,
                                 },
                             },
                             WithSpan {
@@ -255,8 +255,8 @@ Ok(
                                     indent_change: Same,
                                 },
                                 span: Span {
-                                    start: 16,
-                                    end: 17,
+                                    start: 15,
+                                    end: 16,
                                 },
                             },
                             WithSpan {
@@ -277,8 +277,8 @@ Ok(
                                     indent_change: Same,
                                 },
                                 span: Span {
-                                    start: 17,
-                                    end: 27,
+                                    start: 16,
+                                    end: 26,
                                 },
                             },
                             WithSpan {
@@ -299,8 +299,30 @@ Ok(
                                     indent_change: Same,
                                 },
                                 span: Span {
-                                    start: 28,
-                                    end: 30,
+                                    start: 27,
+                                    end: 29,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        1,
+                                    ),
+                                    line_behavior: Inline(
+                                        InlineBehavior {
+                                            space_before: SpaceBefore(
+                                                true,
+                                            ),
+                                            space_after: SpaceAfter(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Same,
+                                },
+                                span: Span {
+                                    start: 30,
+                                    end: 31,
                                 },
                             },
                             WithSpan {
@@ -322,7 +344,7 @@ Ok(
                                 },
                                 span: Span {
                                     start: 31,
-                                    end: 32,
+                                    end: 35,
                                 },
                             },
                             WithSpan {
@@ -343,35 +365,13 @@ Ok(
                                     indent_change: Same,
                                 },
                                 span: Span {
-                                    start: 32,
+                                    start: 35,
                                     end: 36,
                                 },
                             },
                             WithSpan {
                                 item: IsographSemanticToken {
                                     lsp_semantic_token: LspSemanticToken(
-                                        1,
-                                    ),
-                                    line_behavior: Inline(
-                                        InlineBehavior {
-                                            space_before: SpaceBefore(
-                                                true,
-                                            ),
-                                            space_after: SpaceAfter(
-                                                true,
-                                            ),
-                                        },
-                                    ),
-                                    indent_change: Same,
-                                },
-                                span: Span {
-                                    start: 36,
-                                    end: 37,
-                                },
-                            },
-                            WithSpan {
-                                item: IsographSemanticToken {
-                                    lsp_semantic_token: LspSemanticToken(
                                         21,
                                     ),
                                     line_behavior: EndsLine(
@@ -384,8 +384,8 @@ Ok(
                                     indent_change: Indent,
                                 },
                                 span: Span {
-                                    start: 38,
-                                    end: 39,
+                                    start: 37,
+                                    end: 38,
                                 },
                             },
                             WithSpan {
@@ -403,27 +403,46 @@ Ok(
                                     indent_change: Same,
                                 },
                                 span: Span {
-                                    start: 45,
+                                    start: 43,
+                                    end: 50,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        21,
+                                    ),
+                                    line_behavior: EndsLine(
+                                        EndsLineBehavior {
+                                            space_before: SpaceBefore(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Indent,
+                                },
+                                span: Span {
+                                    start: 51,
                                     end: 52,
                                 },
                             },
                             WithSpan {
                                 item: IsographSemanticToken {
                                     lsp_semantic_token: LspSemanticToken(
-                                        21,
+                                        9,
                                     ),
-                                    line_behavior: EndsLine(
-                                        EndsLineBehavior {
-                                            space_before: SpaceBefore(
+                                    line_behavior: StartsNewLine(
+                                        StartsNewLineBehavior {
+                                            space_after: SpaceAfter(
                                                 true,
                                             ),
                                         },
                                     ),
-                                    indent_change: Indent,
+                                    indent_change: Same,
                                 },
                                 span: Span {
-                                    start: 53,
-                                    end: 54,
+                                    start: 59,
+                                    end: 61,
                                 },
                             },
                             WithSpan {
@@ -441,27 +460,8 @@ Ok(
                                     indent_change: Same,
                                 },
                                 span: Span {
-                                    start: 62,
-                                    end: 64,
-                                },
-                            },
-                            WithSpan {
-                                item: IsographSemanticToken {
-                                    lsp_semantic_token: LspSemanticToken(
-                                        9,
-                                    ),
-                                    line_behavior: StartsNewLine(
-                                        StartsNewLineBehavior {
-                                            space_after: SpaceAfter(
-                                                true,
-                                            ),
-                                        },
-                                    ),
-                                    indent_change: Same,
-                                },
-                                span: Span {
-                                    start: 72,
-                                    end: 81,
+                                    start: 68,
+                                    end: 77,
                                 },
                             },
                             WithSpan {
@@ -473,8 +473,8 @@ Ok(
                                     indent_change: Dedent,
                                 },
                                 span: Span {
-                                    start: 87,
-                                    end: 88,
+                                    start: 82,
+                                    end: 83,
                                 },
                             },
                             WithSpan {
@@ -486,15 +486,15 @@ Ok(
                                     indent_change: Dedent,
                                 },
                                 span: Span {
-                                    start: 92,
-                                    end: 93,
+                                    start: 86,
+                                    end: 87,
                                 },
                             },
                         ],
                     },
                     span: Span {
-                        start: 12,
-                        end: 93,
+                        start: 11,
+                        end: 87,
                     },
                 },
             ),
@@ -506,7 +506,7 @@ Ok(
                 span: Some(
                     Span {
                         start: 28,
-                        end: 123,
+                        end: 116,
                     },
                 ),
             },
