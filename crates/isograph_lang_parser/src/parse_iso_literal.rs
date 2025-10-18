@@ -342,9 +342,9 @@ fn parse_client_pointer_declaration_inner(
             .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?
             .to_with_embedded_location(text_source);
 
-        let target_type = parse_client_pointer_target_type(tokens)?;
-
         let variable_definitions = parse_variable_definitions(tokens, text_source)?;
+
+        let target_type = parse_client_pointer_target_type(tokens)?;
 
         let directives = parse_directives(tokens, text_source)?;
 
