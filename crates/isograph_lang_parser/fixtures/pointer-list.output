@@ -1,0 +1,515 @@
+Ok(
+    [
+        (
+            ClientPointerDeclaration(
+                WithSpan {
+                    item: ClientPointerDeclaration {
+                        directives: [],
+                        const_export_name: ConstExportName(
+                            "pointer",
+                        ),
+                        parent_type: WithSpan {
+                            item: ServerObjectEntityNameWrapper(
+                                ServerObjectEntityName(
+                                    "User",
+                                ),
+                            ),
+                            span: Span {
+                                start: 12,
+                                end: 16,
+                            },
+                        },
+                        target_type: List(
+                            GraphQLListTypeAnnotation(
+                                Named(
+                                    GraphQLNamedTypeAnnotation(
+                                        WithSpan {
+                                            item: ServerObjectEntityNameWrapper(
+                                                ServerObjectEntityName(
+                                                    "User",
+                                                ),
+                                            ),
+                                            span: Span {
+                                                start: 32,
+                                                end: 36,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            ),
+                        ),
+                        client_pointer_name: WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-list.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 123,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 17,
+                                    end: 27,
+                                },
+                            },
+                            item: ClientObjectSelectableNameWrapper(
+                                ClientObjectSelectableName(
+                                    "bestFriend",
+                                ),
+                            ),
+                        },
+                        description: None,
+                        selection_set: [
+                            WithSpan {
+                                item: Object(
+                                    ObjectSelection {
+                                        name: WithLocation {
+                                            location: Embedded(
+                                                EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/pointer-list.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 28,
+                                                                end: 123,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 45,
+                                                        end: 52,
+                                                    },
+                                                },
+                                            ),
+                                            item: ServerObjectSelectableName(
+                                                "friends",
+                                            ),
+                                        },
+                                        reader_alias: None,
+                                        associated_data: (),
+                                        selection_set: [
+                                            WithSpan {
+                                                item: Scalar(
+                                                    ScalarSelection {
+                                                        name: WithLocation {
+                                                            location: Embedded(
+                                                                EmbeddedLocation {
+                                                                    text_source: TextSource {
+                                                                        current_working_directory: CurrentWorkingDirectory,
+                                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                                            "crates/isograph_lang_parser/fixtures/pointer-list.input.js",
+                                                                        ),
+                                                                        span: Some(
+                                                                            Span {
+                                                                                start: 28,
+                                                                                end: 123,
+                                                                            },
+                                                                        ),
+                                                                    },
+                                                                    span: Span {
+                                                                        start: 62,
+                                                                        end: 64,
+                                                                    },
+                                                                },
+                                                            ),
+                                                            item: ScalarSelectableName(
+                                                                "id",
+                                                            ),
+                                                        },
+                                                        reader_alias: None,
+                                                        associated_data: (),
+                                                        arguments: [],
+                                                        scalar_selection_directive_set: None(
+                                                            EmptyDirectiveSet,
+                                                        ),
+                                                    },
+                                                ),
+                                                span: Span {
+                                                    start: 62,
+                                                    end: 64,
+                                                },
+                                            },
+                                            WithSpan {
+                                                item: Scalar(
+                                                    ScalarSelection {
+                                                        name: WithLocation {
+                                                            location: Embedded(
+                                                                EmbeddedLocation {
+                                                                    text_source: TextSource {
+                                                                        current_working_directory: CurrentWorkingDirectory,
+                                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                                            "crates/isograph_lang_parser/fixtures/pointer-list.input.js",
+                                                                        ),
+                                                                        span: Some(
+                                                                            Span {
+                                                                                start: 28,
+                                                                                end: 123,
+                                                                            },
+                                                                        ),
+                                                                    },
+                                                                    span: Span {
+                                                                        start: 72,
+                                                                        end: 81,
+                                                                    },
+                                                                },
+                                                            ),
+                                                            item: ScalarSelectableName(
+                                                                "closeness",
+                                                            ),
+                                                        },
+                                                        reader_alias: None,
+                                                        associated_data: (),
+                                                        arguments: [],
+                                                        scalar_selection_directive_set: None(
+                                                            EmptyDirectiveSet,
+                                                        ),
+                                                    },
+                                                ),
+                                                span: Span {
+                                                    start: 72,
+                                                    end: 81,
+                                                },
+                                            },
+                                        ],
+                                        arguments: [],
+                                        object_selection_directive_set: None(
+                                            EmptyDirectiveSet,
+                                        ),
+                                    },
+                                ),
+                                span: Span {
+                                    start: 45,
+                                    end: 88,
+                                },
+                            },
+                        ],
+                        variable_definitions: [],
+                        definition_path: RelativePathToSourceFile(
+                            "crates/isograph_lang_parser/fixtures/pointer-list.input.js",
+                        ),
+                        semantic_tokens: [
+                            WithSpan {
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        15,
+                                    ),
+                                    line_behavior: StartsNewLine(
+                                        StartsNewLineBehavior {
+                                            space_after: SpaceAfter(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Same,
+                                },
+                                span: Span {
+                                    start: 4,
+                                    end: 11,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        2,
+                                    ),
+                                    line_behavior: Inline(
+                                        InlineBehavior {
+                                            space_before: SpaceBefore(
+                                                true,
+                                            ),
+                                            space_after: SpaceAfter(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Same,
+                                },
+                                span: Span {
+                                    start: 12,
+                                    end: 16,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        21,
+                                    ),
+                                    line_behavior: Inline(
+                                        InlineBehavior {
+                                            space_before: SpaceBefore(
+                                                false,
+                                            ),
+                                            space_after: SpaceAfter(
+                                                false,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Same,
+                                },
+                                span: Span {
+                                    start: 16,
+                                    end: 17,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        13,
+                                    ),
+                                    line_behavior: Inline(
+                                        InlineBehavior {
+                                            space_before: SpaceBefore(
+                                                true,
+                                            ),
+                                            space_after: SpaceAfter(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Same,
+                                },
+                                span: Span {
+                                    start: 17,
+                                    end: 27,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        15,
+                                    ),
+                                    line_behavior: Inline(
+                                        InlineBehavior {
+                                            space_before: SpaceBefore(
+                                                true,
+                                            ),
+                                            space_after: SpaceAfter(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Same,
+                                },
+                                span: Span {
+                                    start: 28,
+                                    end: 30,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        1,
+                                    ),
+                                    line_behavior: Inline(
+                                        InlineBehavior {
+                                            space_before: SpaceBefore(
+                                                true,
+                                            ),
+                                            space_after: SpaceAfter(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Same,
+                                },
+                                span: Span {
+                                    start: 31,
+                                    end: 32,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        1,
+                                    ),
+                                    line_behavior: Inline(
+                                        InlineBehavior {
+                                            space_before: SpaceBefore(
+                                                true,
+                                            ),
+                                            space_after: SpaceAfter(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Same,
+                                },
+                                span: Span {
+                                    start: 32,
+                                    end: 36,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        1,
+                                    ),
+                                    line_behavior: Inline(
+                                        InlineBehavior {
+                                            space_before: SpaceBefore(
+                                                true,
+                                            ),
+                                            space_after: SpaceAfter(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Same,
+                                },
+                                span: Span {
+                                    start: 36,
+                                    end: 37,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        21,
+                                    ),
+                                    line_behavior: EndsLine(
+                                        EndsLineBehavior {
+                                            space_before: SpaceBefore(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Indent,
+                                },
+                                span: Span {
+                                    start: 38,
+                                    end: 39,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        9,
+                                    ),
+                                    line_behavior: StartsNewLine(
+                                        StartsNewLineBehavior {
+                                            space_after: SpaceAfter(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Same,
+                                },
+                                span: Span {
+                                    start: 45,
+                                    end: 52,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        21,
+                                    ),
+                                    line_behavior: EndsLine(
+                                        EndsLineBehavior {
+                                            space_before: SpaceBefore(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Indent,
+                                },
+                                span: Span {
+                                    start: 53,
+                                    end: 54,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        9,
+                                    ),
+                                    line_behavior: StartsNewLine(
+                                        StartsNewLineBehavior {
+                                            space_after: SpaceAfter(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Same,
+                                },
+                                span: Span {
+                                    start: 62,
+                                    end: 64,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        9,
+                                    ),
+                                    line_behavior: StartsNewLine(
+                                        StartsNewLineBehavior {
+                                            space_after: SpaceAfter(
+                                                true,
+                                            ),
+                                        },
+                                    ),
+                                    indent_change: Same,
+                                },
+                                span: Span {
+                                    start: 72,
+                                    end: 81,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        21,
+                                    ),
+                                    line_behavior: IsOwnLine,
+                                    indent_change: Dedent,
+                                },
+                                span: Span {
+                                    start: 87,
+                                    end: 88,
+                                },
+                            },
+                            WithSpan {
+                                item: IsographSemanticToken {
+                                    lsp_semantic_token: LspSemanticToken(
+                                        21,
+                                    ),
+                                    line_behavior: IsOwnLine,
+                                    indent_change: Dedent,
+                                },
+                                span: Span {
+                                    start: 92,
+                                    end: 93,
+                                },
+                            },
+                        ],
+                    },
+                    span: Span {
+                        start: 12,
+                        end: 93,
+                    },
+                },
+            ),
+            TextSource {
+                current_working_directory: CurrentWorkingDirectory,
+                relative_path_to_source_file: RelativePathToSourceFile(
+                    "crates/isograph_lang_parser/fixtures/pointer-list.input.js",
+                ),
+                span: Some(
+                    Span {
+                        start: 28,
+                        end: 123,
+                    },
+                ),
+            },
+        ),
+    ],
+)
