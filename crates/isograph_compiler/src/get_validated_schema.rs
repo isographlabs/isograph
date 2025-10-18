@@ -9,8 +9,10 @@ use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
-    ContainsIsoStats, CreateSchemaError, ProcessIsoLiteralsForSchemaError,
-    create_type_system_schema, process_iso_literals_for_schema,
+    CreateSchemaError, create_type_system_schema,
+    process_iso_literals::{
+        ContainsIsoStats, ProcessIsoLiteralsForSchemaError, process_iso_literals_for_schema,
+    },
 };
 
 #[memo]

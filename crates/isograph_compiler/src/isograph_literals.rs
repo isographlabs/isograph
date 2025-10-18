@@ -23,7 +23,7 @@ use std::{
 };
 use thiserror::Error;
 
-use crate::create_type_system_schema::ParsedIsoLiteralsMap;
+use crate::process_iso_literals::ParsedIsoLiteralsMap;
 
 pub fn read_files_in_folder(
     folder: &Path,
