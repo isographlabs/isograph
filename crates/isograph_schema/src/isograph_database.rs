@@ -76,7 +76,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> IsographDatabase<TNetworkProto
             .expect("Expected CompilerConfig to have been set")
     }
 
-    pub fn get_schema(&self) -> &SchemaSource {
+    pub fn get_schema_source(&self) -> &SchemaSource {
         self.get(self.standard_sources.schema_source_id)
     }
 

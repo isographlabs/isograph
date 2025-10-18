@@ -89,7 +89,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 isograph_location_to_lsp_location(
                     db,
                     server_object_entity.name.location,
-                    &db.get_schema().content,
+                    &db.get_schema_source().content,
                 )
             }
             IsographResolvedNode::Description(_) => None,
@@ -112,7 +112,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                                 isograph_location_to_lsp_location(
                                     db,
                                     location,
-                                    &db.get_schema().content,
+                                    &db.get_schema_source().content,
                                 )
                             }),
                         DefinitionLocation::Client(client_selectable) => client_selectable
@@ -158,7 +158,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                                 isograph_location_to_lsp_location(
                                     db,
                                     location,
-                                    &db.get_schema().content,
+                                    &db.get_schema_source().content,
                                 )
                             }),
                         DefinitionLocation::Client(client_selectable) => client_selectable

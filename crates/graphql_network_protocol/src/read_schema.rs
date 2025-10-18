@@ -22,7 +22,7 @@ pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol + 'static>(
         content,
         text_source,
         ..
-    } = db.get_schema();
+    } = db.get_schema_source();
 
     let schema = parse_schema(content, *text_source)
         .map_err(|with_span| with_span.to_with_location(*text_source))?;
