@@ -759,6 +759,7 @@ export function readLinkedFieldData(
           };
         }
         results.push(result.data);
+        continue;
       }
 
       const result = readData(field.selections, link);
