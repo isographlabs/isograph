@@ -62,10 +62,13 @@ where
 pub struct ProcessTypeSystemDocumentOutcome<TNetworkProtocol: NetworkProtocol> {
     pub scalars:
         HashMap<ServerScalarEntityName, Vec<(ServerScalarEntity<TNetworkProtocol>, Location)>>,
-    pub objects: Vec<(
-        ProcessObjectTypeDefinitionOutcome<TNetworkProtocol>,
-        Location,
-    )>,
+    pub objects: HashMap<
+        ServerObjectEntityName,
+        Vec<(
+            ProcessObjectTypeDefinitionOutcome<TNetworkProtocol>,
+            Location,
+        )>,
+    >,
 }
 
 #[derive(Debug)]

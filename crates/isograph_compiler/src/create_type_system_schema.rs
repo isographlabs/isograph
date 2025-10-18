@@ -51,21 +51,23 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
 
     let mut field_queue = HashMap::new();
     let mut expose_as_field_queue = HashMap::new();
-    for (
-        ProcessObjectTypeDefinitionOutcome {
-            server_object_entity,
-            fields_to_insert,
-            expose_as_fields_to_insert,
-        },
-        name_location,
-    ) in objects
-    {
-        let new_object_id = unvalidated_isograph_schema
-            .server_entity_data
-            .insert_server_object_entity(server_object_entity, name_location)?;
-        field_queue.insert(new_object_id, fields_to_insert);
+    for (_, definitions) in objects {
+        for (
+            ProcessObjectTypeDefinitionOutcome {
+                server_object_entity,
+                fields_to_insert,
+                expose_as_fields_to_insert,
+            },
+            name_location,
+        ) in definitions
+        {
+            let new_object_id = unvalidated_isograph_schema
+                .server_entity_data
+                .insert_server_object_entity(server_object_entity, name_location)?;
+            field_queue.insert(new_object_id, fields_to_insert);
 
-        expose_as_field_queue.insert(new_object_id, expose_as_fields_to_insert);
+            expose_as_field_queue.insert(new_object_id, expose_as_fields_to_insert);
+        }
     }
 
     Ok((

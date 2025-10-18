@@ -53,7 +53,7 @@ pub fn process_graphql_type_system_document(
     let mut supertype_to_subtype_map = BTreeMap::new();
 
     let mut scalars = HashMap::new();
-    let mut objects = vec![];
+    let mut objects = HashMap::new();
     let mut directives = HashMap::<_, Vec<_>>::new();
 
     let mut refetch_fields = vec![];
@@ -94,7 +94,8 @@ pub fn process_graphql_type_system_document(
                     .or_default()
                     .extend(new_directives);
 
-                objects.push((object_definition_outcome, location));
+                let object_definitions: &mut Vec<_> = objects.entry(object_name).or_default();
+                object_definitions.push((object_definition_outcome, location));
             }
             GraphQLTypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
                 let scalar_definitions: &mut Vec<_> =
@@ -120,7 +121,9 @@ pub fn process_graphql_type_system_document(
                         GraphQLObjectDefinitionType::Interface,
                         &mut refetch_fields,
                     )?;
-                objects.push((process_object_type_definition_outcome, location));
+
+                let object_definitions = objects.entry(interface_name).or_default();
+                object_definitions.push((process_object_type_definition_outcome, location));
 
                 directives
                     .entry(interface_name)
@@ -149,7 +152,10 @@ pub fn process_graphql_type_system_document(
                         GraphQLObjectDefinitionType::InputObject,
                         &mut refetch_fields,
                     )?;
-                objects.push((process_object_type_definition_outcome, location));
+
+                let object_definitions = objects.entry(input_object_name).or_default();
+                object_definitions.push((process_object_type_definition_outcome, location));
+
                 directives
                     .entry(input_object_name)
                     .or_default()
@@ -193,7 +199,12 @@ pub fn process_graphql_type_system_document(
                         GraphQLObjectDefinitionType::Union,
                         &mut refetch_fields,
                     )?;
-                objects.push((process_object_type_definition_outcome, location));
+
+                let object_definitions = objects
+                    .entry(union_definition.name.item.into())
+                    .or_default();
+                object_definitions.push((process_object_type_definition_outcome, location));
+
                 directives
                     .entry(union_definition.name.item.unchecked_conversion())
                     .or_default()
@@ -236,10 +247,13 @@ pub fn process_graphql_type_system_document(
     for (supertype_name, subtypes) in supertype_to_subtype_map.iter() {
         let (object_outcome, _) = objects
             .iter_mut()
-            .find(|obj| {
-                let supertype_name: ServerObjectEntityName = supertype_name.unchecked_conversion();
+            .find_map(|(_, object_definitions)| {
+                object_definitions.iter_mut().find(|obj| {
+                    let supertype_name: ServerObjectEntityName =
+                        supertype_name.unchecked_conversion();
 
-                obj.0.server_object_entity.name.item == supertype_name
+                    obj.0.server_object_entity.name.item == supertype_name
+                })
             })
             .expect("Expected supertype to exist. This is indicative of a bug in Isograph.");
 

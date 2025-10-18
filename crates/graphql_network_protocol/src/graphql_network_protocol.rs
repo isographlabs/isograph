@@ -108,7 +108,11 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         let query = result
             .objects
             .iter_mut()
-            .find(|(object, _)| object.server_object_entity.name.item == graphql_root_types.query)
+            .find_map(|(_, definitions)| {
+                definitions.iter_mut().find(|(object, _)| {
+                    object.server_object_entity.name.item == graphql_root_types.query
+                })
+            })
             .expect("Expected query type to be found.");
         query.0.expose_as_fields_to_insert.extend(refetch_fields);
 
@@ -121,8 +125,11 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             match result
                 .objects
                 .iter_mut()
-                .find(|(result, _)| result.server_object_entity.name.item == name)
-            {
+                .find_map(|(_, object_definitions)| {
+                    object_definitions
+                        .iter_mut()
+                        .find(|object| object.0.server_object_entity.name.item == name)
+                }) {
                 Some((object, _)) => {
                     for directive in directives {
                         if directive.name.item == *EXPOSE_FIELD_DIRECTIVE {
