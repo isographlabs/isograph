@@ -184,7 +184,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let query_id = self.query_type_name();
         let object = &mut self
             .server_entity_data
-            .server_objects
+            .server_object_entities
             .get(&parent_object_entity_name)
             .expect("Expected type to exist");
         let client_field_field_name_ws = client_field_declaration.item.client_field_name;

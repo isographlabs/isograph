@@ -116,8 +116,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
             entrypoints: Default::default(),
             server_entity_data: ServerEntityData {
-                server_objects: HashMap::new(),
-                server_scalars: scalars,
+                server_object_entities: HashMap::new(),
+                server_scalar_entities: scalars,
                 defined_entities: defined_types,
                 server_object_entity_extra_info: HashMap::new(),
 
@@ -352,8 +352,10 @@ pub struct ServerObjectEntityExtraInfo {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
     // TODO consider combining these.
-    pub server_objects: HashMap<ServerObjectEntityName, ServerObjectEntity<TNetworkProtocol>>,
-    pub server_scalars: HashMap<ServerScalarEntityName, ServerScalarEntity<TNetworkProtocol>>,
+    pub server_object_entities:
+        HashMap<ServerObjectEntityName, ServerObjectEntity<TNetworkProtocol>>,
+    pub server_scalar_entities:
+        HashMap<ServerScalarEntityName, ServerScalarEntity<TNetworkProtocol>>,
 
     // TODO consider whether this is needed. Especially when server_objects and server_scalars
     // are combined, this seems pretty useless.
@@ -683,7 +685,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
         &self,
         scalar_entity_name: ServerScalarEntityName,
     ) -> Option<&ServerScalarEntity<TNetworkProtocol>> {
-        self.server_scalars.get(&scalar_entity_name)
+        self.server_scalar_entities.get(&scalar_entity_name)
     }
 
     pub fn server_entity(
@@ -704,14 +706,14 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
         &self,
         object_entity_name: ServerObjectEntityName,
     ) -> Option<&ServerObjectEntity<TNetworkProtocol>> {
-        self.server_objects.get(&object_entity_name)
+        self.server_object_entities.get(&object_entity_name)
     }
 
     // TODO this function should not exist
     pub fn server_object_entities_mut(
         &mut self,
     ) -> impl Iterator<Item = &mut ServerObjectEntity<TNetworkProtocol>> + '_ {
-        self.server_objects.values_mut()
+        self.server_object_entities.values_mut()
     }
 
     // TODO this function should not exist
@@ -736,7 +738,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
                 name_location,
             ));
         }
-        self.server_scalars
+        self.server_scalar_entities
             .insert(server_scalar_entity.name.item, server_scalar_entity);
         Ok(())
     }
@@ -765,7 +767,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
             ));
         }
 
-        self.server_objects
+        self.server_object_entities
             .insert(server_object_entity.name.item, server_object_entity);
         Ok(name.item)
     }
