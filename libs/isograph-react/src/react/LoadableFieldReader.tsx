@@ -16,8 +16,6 @@ type ArgsWithoutProvidedArgs<
 type MaybeRequiredArgs<
   TReadFromStore extends UnknownTReadFromStore,
   TProvidedArgs extends object,
-  TResult,
-  TChildrenResult,
 > =
   ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs> extends Record<
     PropertyKey,
@@ -25,15 +23,9 @@ type MaybeRequiredArgs<
   >
     ? {
         args?: ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs>;
-        fetchOptions?: FetchOptions<TResult>;
-        networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
-        children: (arg: TResult) => TChildrenResult;
       }
     : {
         args: ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs>;
-        fetchOptions?: FetchOptions<TResult>;
-        networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
-        children: (arg: TResult) => TChildrenResult;
       };
 
 export function LoadableFieldReader<
@@ -48,12 +40,10 @@ export function LoadableFieldReader<
       TResult,
       Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
     >;
-  } & MaybeRequiredArgs<
-    TReadFromStore,
-    TProvidedArgs,
-    TResult,
-    TChildrenResult
-  >,
+    fetchOptions?: FetchOptions<TResult>;
+    networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
+    children: (arg: TResult) => TChildrenResult;
+  } & MaybeRequiredArgs<TReadFromStore, TProvidedArgs>,
 ): TChildrenResult {
   const { fragmentReference } = useClientSideDefer(
     props.loadableField,

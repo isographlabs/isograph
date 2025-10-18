@@ -17,9 +17,6 @@ type ArgsWithoutProvidedArgs<
 type MaybeRequiredArgs<
   TReadFromStore extends UnknownTReadFromStore,
   TProvidedArgs extends object,
-  TResult,
-  TChildrenResult,
-  TProps,
 > =
   ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs> extends Record<
     PropertyKey,
@@ -27,17 +24,9 @@ type MaybeRequiredArgs<
   >
     ? {
         args?: ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs>;
-        fetchOptions?: FetchOptions<TResult>;
-        networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
-        children?: (arg: TResult) => TChildrenResult;
-        additionalProps: Omit<TProps, keyof JSX.IntrinsicAttributes>;
       }
     : {
         args: ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs>;
-        fetchOptions?: FetchOptions<TResult>;
-        networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
-        children?: (arg: TResult) => TChildrenResult;
-        additionalProps: Omit<TProps, keyof JSX.IntrinsicAttributes>;
       };
 
 export function LoadableFieldRenderer<
@@ -52,13 +41,10 @@ export function LoadableFieldRenderer<
       React.FC<TProps>,
       Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
     >;
-  } & MaybeRequiredArgs<
-    TReadFromStore,
-    TProvidedArgs,
-    React.FC<TProps>,
-    TChildrenResult,
-    TProps
-  >,
+    fetchOptions?: FetchOptions<React.FC<TProps>>;
+    networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
+    additionalProps: Omit<TProps, keyof JSX.IntrinsicAttributes>;
+  } & MaybeRequiredArgs<TReadFromStore, TProvidedArgs>,
 ): TChildrenResult {
   const { fragmentReference } = useClientSideDefer(
     props.loadableField,
