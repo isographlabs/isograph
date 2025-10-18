@@ -9,7 +9,7 @@ import { type LoadableField } from '../core/reader';
 import { useClientSideDefer } from '../loadable-hooks/useClientSideDefer';
 import { useResult } from './useResult';
 
-type FinalArgs<
+type ArgsWithoutProvidedArgs<
   TReadFromStore extends UnknownTReadFromStore,
   TProvidedArgs extends object,
 > = Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>;
@@ -21,16 +21,19 @@ type MaybeRequiredArgs<
   TChildrenResult,
   TProps,
 > =
-  FinalArgs<TReadFromStore, TProvidedArgs> extends Record<PropertyKey, never>
+  ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs> extends Record<
+    PropertyKey,
+    never
+  >
     ? {
-        args?: FinalArgs<TReadFromStore, TProvidedArgs>;
+        args?: ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs>;
         fetchOptions?: FetchOptions<TResult>;
         networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
         children?: (arg: TResult) => TChildrenResult;
         additionalProps: Omit<TProps, keyof JSX.IntrinsicAttributes>;
       }
     : {
-        args: FinalArgs<TReadFromStore, TProvidedArgs>;
+        args: ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs>;
         fetchOptions?: FetchOptions<TResult>;
         networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
         children?: (arg: TResult) => TChildrenResult;
