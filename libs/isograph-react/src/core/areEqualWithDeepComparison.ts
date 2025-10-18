@@ -6,12 +6,8 @@ function mergeUsingReaderAst(
   oldItem: unknown,
   newItem: unknown,
 ): unknown {
-  if (newItem === null) {
-    return oldItem === null ? oldItem : newItem;
-  }
-
-  if (newItem === undefined) {
-    return oldItem === undefined ? oldItem : newItem;
+  if (newItem == null || oldItem == undefined) {
+    return newItem;
   }
 
   if (Array.isArray(newItem)) {
@@ -134,4 +130,63 @@ export function mergeObjectsUsingReaderAst(
   }
 
   return canRecycle ? oldItemObject : newItemObject;
+}
+
+export function mergeArrays<T extends unknown[]>(oldArray: T, newArray: T): T {
+  if (newArray.length !== oldArray.length) {
+    return newArray;
+  }
+
+  let canRecycle = true;
+  for (let i = 0; i < newArray.length; i++) {
+    const mergedItem = mergeValues(oldArray[i], newArray[i]);
+    if (mergedItem !== oldArray[i]) {
+      canRecycle = false;
+    } else {
+      newArray[i] = mergedItem;
+    }
+  }
+
+  return canRecycle ? oldArray : newArray;
+}
+
+function mergeValues<T>(oldObject: T, newObject: T): T {
+  if (newObject == null || oldObject == null) {
+    return newObject;
+  }
+
+  if (Array.isArray(newObject)) {
+    if (!Array.isArray(oldObject)) {
+      return newObject;
+    }
+    return mergeArrays(oldObject, newObject);
+  }
+
+  if (typeof newObject === 'object') {
+    if (typeof oldObject !== 'object') {
+      return newObject;
+    }
+
+    if (Object.keys(oldObject).length !== Object.keys(newObject).length) {
+      return newObject;
+    }
+
+    let canRecycle = true;
+
+    for (const key of Object.keys(newObject)) {
+      // @ts-expect-error
+      const mergedValue = mergeValues(oldObject[key], newObject[key]);
+      // @ts-expect-error
+      if (mergedValue !== oldObject[key]) {
+        canRecycle = false;
+      } else {
+        // @ts-expect-error
+        newObject[key] = mergedValue;
+      }
+    }
+
+    return canRecycle ? oldObject : newObject;
+  }
+
+  return newObject;
 }
