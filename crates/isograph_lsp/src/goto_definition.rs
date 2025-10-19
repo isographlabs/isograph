@@ -7,7 +7,7 @@ use crate::{
 use common_lang_types::{Span, relative_path_from_absolute_and_working_directory};
 use isograph_compiler::{
     CompilerState, get_validated_schema, process_iso_literal_extraction,
-    read_iso_literals_source_from_relative_path, server_entities,
+    read_iso_literals_source_from_relative_path, server_entities_named,
 };
 use isograph_lang_types::{
     ClientObjectSelectableNameWrapperParent, ClientScalarSelectableNameWrapperParent,
@@ -70,7 +70,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
             IsographResolvedNode::ClientPointerDeclaration(_) => None,
             IsographResolvedNode::EntrypointDeclaration(_) => None,
             IsographResolvedNode::ServerObjectEntityNameWrapper(entity) => {
-                let memo_ref = server_entities(db, entity.inner.0.into());
+                let memo_ref = server_entities_named(db, entity.inner.0.into());
                 let server_entities = match memo_ref.deref() {
                     Ok(s) => s,
                     Err(_) => return Err(LSPRuntimeError::ExpectedError),

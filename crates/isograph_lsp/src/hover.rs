@@ -6,7 +6,7 @@ use common_lang_types::{
 use isograph_compiler::{
     CompilerState, IsoLiteralExtraction, extract_iso_literals_from_file_content,
     get_validated_schema, process_iso_literal_extraction,
-    read_iso_literals_source_from_relative_path, server_entities,
+    read_iso_literals_source_from_relative_path, server_entities_named,
 };
 use isograph_lang_types::{Description, IsographResolvedNode, SelectionType, VariableDefinition};
 use isograph_schema::{
@@ -70,7 +70,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
             IsographResolvedNode::ClientPointerDeclaration(_) => None,
             IsographResolvedNode::EntrypointDeclaration(_) => None,
             IsographResolvedNode::ServerObjectEntityNameWrapper(entity) => {
-                let memo_ref = server_entities(db, entity.inner.0.into());
+                let memo_ref = server_entities_named(db, entity.inner.0.into());
                 let entities = memo_ref
                     .deref()
                     .as_ref()

@@ -6,7 +6,7 @@ use isograph_schema::{IsographDatabase, NetworkProtocol, OwnedServerEntity};
 use pico_macros::memo;
 
 #[memo]
-pub fn server_entities<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn server_entities_named<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: UnvalidatedTypeName,
 ) -> Result<Vec<OwnedServerEntity<TNetworkProtocol>>, TNetworkProtocol::ParseTypeSystemDocumentsError>
