@@ -70,17 +70,20 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
             IsographResolvedNode::EntrypointDeclaration(_) => None,
             IsographResolvedNode::ServerObjectEntityNameWrapper(entity) => {
                 let memo_ref = server_object_entity(db, entity.inner.0);
-                let server_object_entity = match memo_ref.deref() {
-                    Some(entity) => entity,
-                    None => return Ok(None),
-                };
+                let server_object_entities = memo_ref.deref();
 
-                isograph_location_to_lsp_location(
-                    db,
-                    server_object_entity.name.location,
-                    &db.get_schema_source().content,
-                )
-                .map(lsp_location_to_scalar_response)
+                Some(GotoDefinitionResponse::Array(
+                    server_object_entities
+                        .iter()
+                        .flat_map(|entity| {
+                            isograph_location_to_lsp_location(
+                                db,
+                                entity.name.location,
+                                &db.get_schema_source().content,
+                            )
+                        })
+                        .collect(),
+                ))
             }
             IsographResolvedNode::Description(_) => None,
             IsographResolvedNode::ScalarSelection(scalar_path) => {

@@ -70,8 +70,15 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
             IsographResolvedNode::EntrypointDeclaration(_) => None,
             IsographResolvedNode::ServerObjectEntityNameWrapper(entity) => {
                 let memo_ref = server_object_entity(db, entity.inner.0);
-                let server_object_entity = match memo_ref.deref() {
-                    Some(entity) => entity,
+                let server_object_entity = match memo_ref.deref().split_first() {
+                    // TODO have an only_server_object_entity method
+                    Some((entity, rest)) => {
+                        if rest.is_empty() {
+                            entity
+                        } else {
+                            return Ok(None);
+                        }
+                    }
                     None => return Ok(None),
                 };
 

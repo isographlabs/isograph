@@ -10,26 +10,22 @@ use crate::create_type_system_schema;
 pub fn server_object_entity<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_object_entity_name: ServerObjectEntityName,
-    // TODO this should return a Option<Vec<...>>, and the caller should enforce that it is length one.
-    // Goto def, for example, can support multiple!
-) -> Option<ServerObjectEntity<TNetworkProtocol>> {
+) -> Vec<ServerObjectEntity<TNetworkProtocol>> {
     let memo_ref = TNetworkProtocol::parse_and_process_type_system_documents(db);
     let (outcome, _) = match memo_ref.deref() {
         Ok(s) => s,
-        Err(_) => return None,
+        Err(_) => return vec![],
     };
 
-    let outcome = outcome.objects.get(&server_object_entity_name)?;
+    let outcome = outcome.objects.get(&server_object_entity_name);
 
-    if let Some((entity, rest)) = outcome.split_first()
-        && rest.is_empty()
-    {
-        return Some(entity.0.server_object_entity.clone());
+    match outcome {
+        Some(vec) => vec
+            .iter()
+            .map(|x| x.0.server_object_entity.clone())
+            .collect(),
+        None => vec![],
     }
-
-    None
-
-    // TODO return Option<&ServerObjectEntity> when this is supported
 }
 
 #[memo]
