@@ -69,14 +69,15 @@ pub fn server_scalar_entities<TNetworkProtocol: NetworkProtocol + 'static>(
 pub fn server_entities<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: UnvalidatedTypeName,
-) -> Vec<OwnedServerEntity<TNetworkProtocol>> {
+) -> Result<Vec<OwnedServerEntity<TNetworkProtocol>>, TNetworkProtocol::ParseTypeSystemDocumentsError>
+{
     let memo_ref = TNetworkProtocol::parse_type_system_documents(db);
     let (outcome, _) = match memo_ref.deref() {
         Ok(outcome) => outcome,
-        Err(_) => return vec![],
+        Err(e) => return Err(e.clone()),
     };
 
-    outcome
+    Ok(outcome
         .iter()
         .filter_map(|x| match x {
             SelectionType::Object(o) => {
@@ -99,5 +100,5 @@ pub fn server_entities<TNetworkProtocol: NetworkProtocol + 'static>(
                 }
             }
         })
-        .collect::<Vec<_>>()
+        .collect::<Vec<_>>())
 }

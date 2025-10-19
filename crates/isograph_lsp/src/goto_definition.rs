@@ -1,6 +1,7 @@
 use crate::{
     hover::get_iso_literal_extraction_from_text_position_params,
-    location_utils::isograph_location_to_lsp_location, lsp_runtime_error::LSPRuntimeResult,
+    location_utils::isograph_location_to_lsp_location,
+    lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult},
     uri_file_path_ext::UriFilePathExt,
 };
 use common_lang_types::{Span, relative_path_from_absolute_and_working_directory};
@@ -70,7 +71,10 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
             IsographResolvedNode::EntrypointDeclaration(_) => None,
             IsographResolvedNode::ServerObjectEntityNameWrapper(entity) => {
                 let memo_ref = server_entities(db, entity.inner.0.into());
-                let server_entities = memo_ref.deref();
+                let server_entities = match memo_ref.deref() {
+                    Ok(s) => s,
+                    Err(_) => return Err(LSPRuntimeError::ExpectedError),
+                };
 
                 Some(GotoDefinitionResponse::Array(
                     server_entities

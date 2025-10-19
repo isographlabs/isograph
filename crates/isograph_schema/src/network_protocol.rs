@@ -32,6 +32,7 @@ where
     fn parse_type_system_documents(
         db: &IsographDatabase<Self>,
     ) -> MemoRef<
+        // TODO this should return a Vec<Result<...>>, not a Result<Vec<...>>, probably
         Result<
             (
                 ParseTypeSystemOutcome<Self>,
