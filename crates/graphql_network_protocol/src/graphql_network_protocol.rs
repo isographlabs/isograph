@@ -61,10 +61,10 @@ pub struct GraphQLNetworkProtocol {}
 
 impl NetworkProtocol for GraphQLNetworkProtocol {
     type SchemaObjectAssociatedData = GraphQLSchemaObjectAssociatedData;
-    type ParseAndProcessTypeSystemDocumentsError = ParseAndProcessGraphQLTypeSystemDocumentsError;
+    type ParseTypeSystemDocumentsError = ParseAndProcessGraphQLTypeSystemDocumentsError;
 
     #[memo]
-    fn parse_and_process_type_system_documents(
+    fn parse_type_system_documents(
         db: &IsographDatabase<Self>,
     ) -> Result<
         (

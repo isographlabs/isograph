@@ -26,10 +26,10 @@ where
     Self: Sized,
 {
     type SchemaObjectAssociatedData: Debug + PartialEq + Eq + Clone;
-    type ParseAndProcessTypeSystemDocumentsError: Error + PartialEq + Eq + Clone + 'static;
+    type ParseTypeSystemDocumentsError: Error + PartialEq + Eq + Clone + 'static;
 
     #[allow(clippy::type_complexity)]
-    fn parse_and_process_type_system_documents(
+    fn parse_type_system_documents(
         db: &IsographDatabase<Self>,
     ) -> MemoRef<
         Result<
@@ -37,7 +37,7 @@ where
                 ParseTypeSystemOutcome<Self>,
                 BTreeMap<ServerObjectEntityName, RootOperationName>,
             ),
-            Self::ParseAndProcessTypeSystemDocumentsError,
+            Self::ParseTypeSystemDocumentsError,
         >,
     >;
 

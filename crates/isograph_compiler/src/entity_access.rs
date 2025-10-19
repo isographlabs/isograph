@@ -9,12 +9,14 @@ use isograph_schema::{
 };
 use pico_macros::memo;
 
+// TODO go through server_entities
+// TODO what to do about scalars with the same name. Should this return an Err? Should it ignore them?
 #[memo]
 pub fn server_object_entities<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_object_entity_name: ServerObjectEntityName,
 ) -> Vec<WithLocation<ServerObjectEntity<TNetworkProtocol>>> {
-    let memo_ref = TNetworkProtocol::parse_and_process_type_system_documents(db);
+    let memo_ref = TNetworkProtocol::parse_type_system_documents(db);
     let (outcome, _) = match memo_ref.deref() {
         Ok(outcome) => outcome,
         Err(_) => return vec![],
@@ -35,12 +37,14 @@ pub fn server_object_entities<TNetworkProtocol: NetworkProtocol + 'static>(
         .collect::<Vec<_>>()
 }
 
+// TODO go through server_entities
+// TODO what to do about objects with the same name. Should this return an Err? Should it ignore them?
 #[memo]
 pub fn server_scalar_entities<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_scalar_entity_name: ServerScalarEntityName,
 ) -> Vec<WithLocation<ServerScalarEntity<TNetworkProtocol>>> {
-    let memo_ref = TNetworkProtocol::parse_and_process_type_system_documents(db);
+    let memo_ref = TNetworkProtocol::parse_type_system_documents(db);
     let (outcome, _) = match memo_ref.deref() {
         Ok(outcome) => outcome,
         Err(_) => return vec![],
@@ -66,7 +70,7 @@ pub fn server_entities<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: UnvalidatedTypeName,
 ) -> Vec<OwnedServerEntity<TNetworkProtocol>> {
-    let memo_ref = TNetworkProtocol::parse_and_process_type_system_documents(db);
+    let memo_ref = TNetworkProtocol::parse_type_system_documents(db);
     let (outcome, _) = match memo_ref.deref() {
         Ok(outcome) => outcome,
         Err(_) => return vec![],

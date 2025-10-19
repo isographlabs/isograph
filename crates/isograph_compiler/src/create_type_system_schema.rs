@@ -33,7 +33,7 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     ),
     CreateSchemaError<TNetworkProtocol>,
 > {
-    let memo_ref = TNetworkProtocol::parse_and_process_type_system_documents(db);
+    let memo_ref = TNetworkProtocol::parse_type_system_documents(db);
     let (items, fetchable_types) = match memo_ref.to_owned() {
         Ok(x) => x,
         Err(e) => {
@@ -333,7 +333,7 @@ fn convert_graphql_constant_value_to_isograph_constant_value(
 pub enum CreateSchemaError<TNetworkProtocol: NetworkProtocol + 'static> {
     #[error("{message}")]
     ParseAndProcessTypeSystemDocument {
-        message: TNetworkProtocol::ParseAndProcessTypeSystemDocumentsError,
+        message: TNetworkProtocol::ParseTypeSystemDocumentsError,
     },
 
     #[error("{}", message.for_display())]
