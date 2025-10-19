@@ -24,10 +24,10 @@ export function useClientSideDefer<
     TResult,
     Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
   >,
-  ...maybeRequiredArgs: ArgsWithoutProvidedArgs<
+  ...maybeRequiredArgs: {} extends ArgsWithoutProvidedArgs<
     TReadFromStore,
     TProvidedArgs
-  > extends Record<PropertyKey, never>
+  >
     ? [
         args?: ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs>,
         fetchOptions?: FetchOptions<TResult>,
@@ -46,4 +46,49 @@ export function useClientSideDefer<
   const fragmentReference = useLazyDisposableState(cache).state;
 
   return { fragmentReference };
+}
+
+// @ts-ignore
+function tsTests() {
+  let optionalArgs!: LoadableField<
+    {
+      parameters: {
+        foo?: string;
+      };
+      data: {};
+    },
+    unknown
+  >;
+
+  let requiredArgs!: LoadableField<
+    {
+      parameters: {
+        foo: string;
+      };
+      data: {};
+    },
+    unknown
+  >;
+
+  useClientSideDefer(optionalArgs);
+  useClientSideDefer(optionalArgs, {});
+  useClientSideDefer(optionalArgs, {
+    foo: 'bar',
+  });
+  useClientSideDefer(optionalArgs, {
+    // @ts-expect-error
+    foo: 12,
+  });
+
+  // @ts-expect-error
+  useClientSideDefer(requiredArgs);
+  // @ts-expect-error
+  useClientSideDefer(requiredArgs, {});
+  useClientSideDefer(requiredArgs, {
+    foo: 'bar',
+  });
+  useClientSideDefer(requiredArgs, {
+    // @ts-expect-error
+    foo: 12,
+  });
 }

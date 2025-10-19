@@ -18,10 +18,7 @@ type MaybeRequiredArgs<
   TReadFromStore extends UnknownTReadFromStore,
   TProvidedArgs extends object,
 > =
-  ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs> extends Record<
-    PropertyKey,
-    never
-  >
+  {} extends ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs>
     ? {
         args?: ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs>;
       }
@@ -59,4 +56,73 @@ export function LoadableFieldRenderer<
   // the validity of this.
   // @ts-expect-error
   return <Component {...props.additionalProps} />;
+}
+
+// @ts-ignore
+function tsTests() {
+  let optionalArgs!: LoadableField<
+    {
+      parameters: {
+        foo?: string;
+      };
+      data: {};
+    },
+    () => React.ReactNode
+  >;
+
+  let requiredArgs!: LoadableField<
+    {
+      parameters: {
+        foo: string;
+      };
+      data: {};
+    },
+    () => React.ReactNode
+  >;
+
+  <LoadableFieldRenderer loadableField={optionalArgs} additionalProps={{}} />;
+  <LoadableFieldRenderer
+    loadableField={optionalArgs}
+    additionalProps={{}}
+    args={{}}
+  />;
+  <LoadableFieldRenderer
+    loadableField={optionalArgs}
+    additionalProps={{}}
+    args={{
+      foo: 'bar',
+    }}
+  />;
+  <LoadableFieldRenderer
+    loadableField={optionalArgs}
+    additionalProps={{}}
+    args={{
+      // @ts-expect-error
+      foo: 12,
+    }}
+  />;
+
+  // @ts-expect-error
+  <LoadableFieldRenderer loadableField={requiredArgs} additionalProps={{}} />;
+  <LoadableFieldRenderer
+    loadableField={requiredArgs}
+    additionalProps={{}}
+    // @ts-expect-error
+    args={{}}
+  />;
+  <LoadableFieldRenderer
+    loadableField={requiredArgs}
+    additionalProps={{}}
+    args={{
+      foo: 'bar',
+    }}
+  />;
+  <LoadableFieldRenderer
+    loadableField={requiredArgs}
+    additionalProps={{}}
+    args={{
+      // @ts-expect-error
+      foo: 12,
+    }}
+  />;
 }

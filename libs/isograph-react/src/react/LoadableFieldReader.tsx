@@ -1,3 +1,4 @@
+import React from 'react';
 import { type FetchOptions } from '../core/check';
 import {
   ExtractParameters,
@@ -17,10 +18,7 @@ type MaybeRequiredArgs<
   TReadFromStore extends UnknownTReadFromStore,
   TProvidedArgs extends object,
 > =
-  ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs> extends Record<
-    PropertyKey,
-    never
-  >
+  {} extends ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs>
     ? {
         args?: ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs>;
       }
@@ -58,4 +56,73 @@ export function LoadableFieldReader<
   );
 
   return props.children(readOutFragmentData);
+}
+
+// @ts-ignore
+function tsTests() {
+  let optionalArgs!: LoadableField<
+    {
+      parameters: {
+        foo?: string;
+      };
+      data: {};
+    },
+    unknown
+  >;
+
+  let requiredArgs!: LoadableField<
+    {
+      parameters: {
+        foo: string;
+      };
+      data: {};
+    },
+    unknown
+  >;
+
+  <LoadableFieldReader loadableField={optionalArgs} children={() => {}} />;
+  <LoadableFieldReader
+    loadableField={optionalArgs}
+    children={() => {}}
+    args={{}}
+  />;
+  <LoadableFieldReader
+    loadableField={optionalArgs}
+    children={() => {}}
+    args={{
+      foo: 'bar',
+    }}
+  />;
+  <LoadableFieldReader
+    loadableField={optionalArgs}
+    children={() => {}}
+    args={{
+      // @ts-expect-error
+      foo: 12,
+    }}
+  />;
+
+  // @ts-expect-error
+  <LoadableFieldReader loadableField={requiredArgs} children={() => {}} />;
+  <LoadableFieldReader
+    loadableField={requiredArgs}
+    children={() => {}}
+    // @ts-expect-error
+    args={{}}
+  />;
+  <LoadableFieldReader
+    loadableField={requiredArgs}
+    children={() => {}}
+    args={{
+      foo: 'bar',
+    }}
+  />;
+  <LoadableFieldReader
+    loadableField={requiredArgs}
+    children={() => {}}
+    args={{
+      // @ts-expect-error
+      foo: 12,
+    }}
+  />;
 }
