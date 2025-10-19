@@ -233,7 +233,13 @@ export function subscribe<TReadFromStore extends UnknownTReadFromStore>(
     fragmentReference,
     readerAst,
   };
+
+  // subscribe is called in an effect. (We should actually subscribe during the
+  // initial render.) Because it's called in an effect, we might have missed some
+  // changes since the initial render! So, at this point, we re-read and call the
+  // subscription (i.e. re-render) if the fragment data has changed.
   callSubscriptionIfDataChanged(environment, fragmentSubscription);
+
   environment.subscriptions.add(fragmentSubscription);
   return () => environment.subscriptions.delete(fragmentSubscription);
 }
