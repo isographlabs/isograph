@@ -2,7 +2,7 @@
 
 use std::fmt::Display;
 
-use common_lang_types::{SelectableName, UnvalidatedTypeName};
+use common_lang_types::{Location, SelectableName, UnvalidatedTypeName, WithLocation};
 use intern::Lookup;
 use resolve_position::ResolvePosition;
 
@@ -210,6 +210,15 @@ impl<TScalar, TObject> SelectionType<TScalar, TObject> {
         match self {
             SelectionType::Scalar(s) => Err(s),
             SelectionType::Object(o) => Ok(o),
+        }
+    }
+}
+
+impl<TScalar, TObject> SelectionType<WithLocation<TScalar>, WithLocation<TObject>> {
+    pub fn location(&self) -> Location {
+        match self {
+            SelectionType::Scalar(s) => s.location,
+            SelectionType::Object(o) => o.location,
         }
     }
 }
