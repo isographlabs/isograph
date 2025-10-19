@@ -27,15 +27,14 @@ use std::ops::Deref;
 pub fn on_goto_definition<TNetworkProtocol: NetworkProtocol + 'static>(
     compiler_state: &CompilerState<TNetworkProtocol>,
     params: <GotoDefinition as Request>::Params,
-) -> LSPRuntimeResult<<GotoDefinition as Request>::Result> {
+) -> LSPRuntimeResult<Option<GotoDefinitionResponse>> {
     let db = &compiler_state.db;
-    Ok(on_goto_definition_impl(
+    on_goto_definition_impl(
         db,
         params.text_document_position_params.text_document.uri,
         params.text_document_position_params.position,
     )
-    .to_owned()?
-    .map(GotoDefinitionResponse::Scalar))
+    .to_owned()
 }
 
 #[memo]
@@ -43,7 +42,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     url: Uri,
     position: Position,
-) -> LSPRuntimeResult<Option<lsp_types::Location>> {
+) -> LSPRuntimeResult<Option<GotoDefinitionResponse>> {
     let current_working_directory = db.get_current_working_directory();
 
     let relative_path_to_source_file = relative_path_from_absolute_and_working_directory(
@@ -59,7 +58,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
         None => return Ok(None),
     };
 
-    let goto_location = if let Ok((result, _text_source)) = process_iso_literal_extraction(
+    let goto_response = if let Ok((result, _text_source)) = process_iso_literal_extraction(
         db,
         &extraction,
         relative_path_to_source_file,
@@ -81,6 +80,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                     server_object_entity.name.location,
                     &db.get_schema_source().content,
                 )
+                .map(lsp_location_to_scalar_response)
             }
             IsographResolvedNode::Description(_) => None,
             IsographResolvedNode::ScalarSelection(scalar_path) => {
@@ -104,7 +104,8 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                                     location,
                                     &db.get_schema_source().content,
                                 )
-                            }),
+                            })
+                            .map(lsp_location_to_scalar_response),
                         DefinitionLocation::Client(client_selectable) => client_selectable
                             .name
                             .location
@@ -123,7 +124,8 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                                     .as_ref()
                                     .expect("Expected relative path to exist");
                                 isograph_location_to_lsp_location(db, location, content)
-                            }),
+                            })
+                            .map(lsp_location_to_scalar_response),
                     }
                 } else {
                     None
@@ -150,7 +152,8 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                                     location,
                                     &db.get_schema_source().content,
                                 )
-                            }),
+                            })
+                            .map(lsp_location_to_scalar_response),
                         DefinitionLocation::Client(client_selectable) => client_selectable
                             .name
                             .location
@@ -170,7 +173,8 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                                     .expect("Expected relative path to exist");
 
                                 isograph_location_to_lsp_location(db, location, content)
-                            }),
+                            })
+                            .map(lsp_location_to_scalar_response),
                     }
                 } else {
                     None
@@ -222,6 +226,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                                 isograph_location_to_lsp_location(db, location, content)
                             })
                     })
+                    .map(lsp_location_to_scalar_response)
             }
             IsographResolvedNode::ClientObjectSelectableNameWrapper(object_wrapper_path) => {
                 let memo_ref = get_validated_schema(db);
@@ -263,11 +268,16 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                                 isograph_location_to_lsp_location(db, location, content)
                             })
                     })
+                    .map(lsp_location_to_scalar_response)
             }
         }
     } else {
         None
     };
 
-    Ok(goto_location)
+    Ok(goto_response)
+}
+
+fn lsp_location_to_scalar_response(location: lsp_types::Location) -> GotoDefinitionResponse {
+    GotoDefinitionResponse::Scalar(location)
 }
