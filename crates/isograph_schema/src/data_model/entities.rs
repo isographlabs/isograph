@@ -35,4 +35,9 @@ pub type ServerEntity<'a, TNetworkProtocol> = SelectionType<
     &'a ServerObjectEntity<TNetworkProtocol>,
 >;
 
+pub type OwnedServerEntity<TNetworkProtocol> = SelectionType<
+    WithLocation<ServerScalarEntity<TNetworkProtocol>>,
+    WithLocation<ServerObjectEntity<TNetworkProtocol>>,
+>;
+
 pub type ServerEntityName = SelectionType<ServerScalarEntityName, ServerObjectEntityName>;
