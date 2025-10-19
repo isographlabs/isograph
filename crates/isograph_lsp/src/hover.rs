@@ -6,9 +6,9 @@ use common_lang_types::{
 use isograph_compiler::{
     CompilerState, IsoLiteralExtraction, extract_iso_literals_from_file_content,
     get_validated_schema, process_iso_literal_extraction,
-    read_iso_literals_source_from_relative_path, server_object_entities,
+    read_iso_literals_source_from_relative_path, server_entities,
 };
-use isograph_lang_types::{Description, IsographResolvedNode, VariableDefinition};
+use isograph_lang_types::{Description, IsographResolvedNode, SelectionType, VariableDefinition};
 use isograph_schema::{
     IsographDatabase, NetworkProtocol, SelectableTrait, ServerEntityName, ServerObjectEntity,
     get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
@@ -70,7 +70,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
             IsographResolvedNode::ClientPointerDeclaration(_) => None,
             IsographResolvedNode::EntrypointDeclaration(_) => None,
             IsographResolvedNode::ServerObjectEntityNameWrapper(entity) => {
-                let memo_ref = server_object_entities(db, entity.inner.0);
+                let memo_ref = server_entities(db, entity.inner.0.into());
                 let entities = memo_ref
                     .deref()
                     .as_ref()
@@ -80,12 +80,17 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                     // TODO have an only_server_object_entity method
                     Some((entity, rest)) => {
                         if rest.is_empty() {
-                            entity
+                            match entity {
+                                SelectionType::Object(o) => o,
+                                SelectionType::Scalar(_) => {
+                                    return Err(LSPRuntimeError::ExpectedError);
+                                }
+                            }
                         } else {
-                            return Ok(None);
+                            return Err(LSPRuntimeError::ExpectedError);
                         }
                     }
-                    None => return Ok(None),
+                    None => return Err(LSPRuntimeError::ExpectedError),
                 };
 
                 Some(format_hover_for_entity(&server_object_entity.item))

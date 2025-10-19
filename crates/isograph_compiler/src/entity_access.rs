@@ -1,55 +1,9 @@
 use std::ops::Deref;
 
-use common_lang_types::{
-    ServerObjectEntityName, ServerScalarEntityName, UnvalidatedTypeName, WithLocation,
-};
+use common_lang_types::UnvalidatedTypeName;
 use isograph_lang_types::SelectionType;
-use isograph_schema::{
-    IsographDatabase, NetworkProtocol, OwnedServerEntity, ServerObjectEntity, ServerScalarEntity,
-};
+use isograph_schema::{IsographDatabase, NetworkProtocol, OwnedServerEntity};
 use pico_macros::memo;
-
-// TODO what to do about scalars with the same name. Should this return an Err? Should it ignore them?
-#[memo]
-pub fn server_object_entities<TNetworkProtocol: NetworkProtocol + 'static>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    server_object_entity_name: ServerObjectEntityName,
-) -> Result<
-    Vec<WithLocation<ServerObjectEntity<TNetworkProtocol>>>,
-    TNetworkProtocol::ParseTypeSystemDocumentsError,
-> {
-    let memo_ref = server_entities(db, server_object_entity_name.into());
-    let server_entities = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
-
-    Ok(server_entities
-        .iter()
-        .filter_map(|x| match x {
-            SelectionType::Scalar(_) => None,
-            SelectionType::Object(o) => Some(o.clone()),
-        })
-        .collect())
-}
-
-// TODO what to do about objects with the same name. Should this return an Err? Should it ignore them?
-#[memo]
-pub fn server_scalar_entities<TNetworkProtocol: NetworkProtocol + 'static>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    server_scalar_entity_name: ServerScalarEntityName,
-) -> Result<
-    Vec<WithLocation<ServerScalarEntity<TNetworkProtocol>>>,
-    TNetworkProtocol::ParseTypeSystemDocumentsError,
-> {
-    let memo_ref = server_entities(db, server_scalar_entity_name.into());
-    let server_entities = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
-
-    Ok(server_entities
-        .iter()
-        .filter_map(|x| match x {
-            SelectionType::Scalar(s) => Some(s.clone()),
-            SelectionType::Object(_) => None,
-        })
-        .collect())
-}
 
 #[memo]
 pub fn server_entities<TNetworkProtocol: NetworkProtocol + 'static>(
