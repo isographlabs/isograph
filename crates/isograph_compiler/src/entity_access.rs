@@ -1,12 +1,16 @@
 use std::ops::Deref;
 
-use common_lang_types::{ServerObjectEntityName, ServerScalarEntityName, WithLocation};
+use common_lang_types::{
+    ServerObjectEntityName, ServerScalarEntityName, UnvalidatedTypeName, WithLocation,
+};
 use isograph_lang_types::SelectionType;
-use isograph_schema::{IsographDatabase, NetworkProtocol, ServerObjectEntity, ServerScalarEntity};
+use isograph_schema::{
+    IsographDatabase, NetworkProtocol, OwnedServerEntity, ServerObjectEntity, ServerScalarEntity,
+};
 use pico_macros::memo;
 
 #[memo]
-pub fn server_object_entity<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn server_object_entities<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_object_entity_name: ServerObjectEntityName,
 ) -> Vec<WithLocation<ServerObjectEntity<TNetworkProtocol>>> {
@@ -32,7 +36,7 @@ pub fn server_object_entity<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[memo]
-pub fn server_scalar_entity<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn server_scalar_entities<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_scalar_entity_name: ServerScalarEntityName,
 ) -> Vec<WithLocation<ServerScalarEntity<TNetworkProtocol>>> {
@@ -49,6 +53,43 @@ pub fn server_scalar_entity<TNetworkProtocol: NetworkProtocol + 'static>(
             SelectionType::Scalar(s) => {
                 if s.item.name.item == server_scalar_entity_name {
                     Some(s.clone())
+                } else {
+                    None
+                }
+            }
+        })
+        .collect::<Vec<_>>()
+}
+
+#[memo]
+pub fn server_entities<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    entity_name: UnvalidatedTypeName,
+) -> Vec<OwnedServerEntity<TNetworkProtocol>> {
+    let memo_ref = TNetworkProtocol::parse_and_process_type_system_documents(db);
+    let (outcome, _) = match memo_ref.deref() {
+        Ok(outcome) => outcome,
+        Err(_) => return vec![],
+    };
+
+    outcome
+        .iter()
+        .filter_map(|x| match x {
+            SelectionType::Object(o) => {
+                // Why??
+                let name: UnvalidatedTypeName =
+                    o.server_object_entity.item.name.item.unchecked_conversion();
+                if name == entity_name {
+                    Some(SelectionType::Object(o.server_object_entity.clone()))
+                } else {
+                    None
+                }
+            }
+            SelectionType::Scalar(s) => {
+                // Why??
+                let name: UnvalidatedTypeName = s.item.name.item.unchecked_conversion();
+                if name == entity_name {
+                    Some(SelectionType::Scalar(s.clone()))
                 } else {
                     None
                 }
