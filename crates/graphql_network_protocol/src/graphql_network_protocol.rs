@@ -111,12 +111,17 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             .objects
             .iter_mut()
             .find_map(|(_, definitions)| {
-                definitions.iter_mut().find(|(object, _)| {
-                    object.server_object_entity.name.item == graphql_root_types.query
-                })
+                definitions.iter_mut().find(
+                    |WithLocation {
+                         location: _,
+                         item: object,
+                     }| {
+                        object.server_object_entity.name.item == graphql_root_types.query
+                    },
+                )
             })
             .expect("Expected query type to be found.");
-        query.0.expose_as_fields_to_insert.extend(refetch_fields);
+        query.item.expose_as_fields_to_insert.extend(refetch_fields);
 
         // - in the extension document, you may have added directives to objects, e.g. @exposeAs
         // - we need to transfer those to the original objects.
@@ -128,11 +133,17 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 .objects
                 .iter_mut()
                 .find_map(|(_, object_definitions)| {
-                    object_definitions
-                        .iter_mut()
-                        .find(|object| object.0.server_object_entity.name.item == name)
+                    object_definitions.iter_mut().find(
+                        |WithLocation {
+                             location: _,
+                             item: outcome,
+                         }| outcome.server_object_entity.name.item == name,
+                    )
                 }) {
-                Some((object, _)) => {
+                Some(WithLocation {
+                    location: _,
+                    item: outcome,
+                }) => {
                     for directive in directives {
                         if directive.name.item == *EXPOSE_FIELD_DIRECTIVE {
                             let expose_field_directive = from_graphql_directive(&directive)
@@ -143,11 +154,11 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                     ),
                                 })?;
 
-                            object
+                            outcome
                                 .expose_as_fields_to_insert
                                 .push(ExposeAsFieldToInsert {
                                     expose_field_directive,
-                                    parent_object_name: object.server_object_entity.name.item,
+                                    parent_object_name: outcome.server_object_entity.name.item,
                                     description: None,
                                 });
                         }

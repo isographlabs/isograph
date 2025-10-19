@@ -47,7 +47,11 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     unvalidated_isograph_schema.fetchable_types = fetchable_types;
 
     for (_server_scalar_entity_name, server_scalar_entities) in scalars {
-        for (server_scalar_entity, name_location) in server_scalar_entities {
+        for WithLocation {
+            location: name_location,
+            item: server_scalar_entity,
+        } in server_scalar_entities
+        {
             unvalidated_isograph_schema
                 .server_entity_data
                 .insert_server_scalar_entity(server_scalar_entity, name_location)?;
@@ -56,15 +60,16 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
 
     let mut field_queue = HashMap::new();
     let mut expose_as_field_queue = HashMap::new();
-    for (_, definitions) in objects {
-        for (
-            ProcessObjectTypeDefinitionOutcome {
-                server_object_entity,
-                fields_to_insert,
-                expose_as_fields_to_insert,
-            },
-            name_location,
-        ) in definitions
+    for (_server_object_entity_name, definitions) in objects {
+        for WithLocation {
+            location: name_location,
+            item:
+                ProcessObjectTypeDefinitionOutcome {
+                    server_object_entity,
+                    fields_to_insert,
+                    expose_as_fields_to_insert,
+                },
+        } in definitions
         {
             let new_object_id = unvalidated_isograph_schema
                 .server_entity_data

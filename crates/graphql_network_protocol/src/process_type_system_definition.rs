@@ -95,13 +95,13 @@ pub fn process_graphql_type_system_document(
                     .extend(new_directives);
 
                 let object_definitions: &mut Vec<_> = objects.entry(object_name).or_default();
-                object_definitions.push((object_definition_outcome, location));
+                object_definitions.push(WithLocation::new(object_definition_outcome, location));
             }
             GraphQLTypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
                 let scalar_definitions: &mut Vec<_> =
                     scalars.entry(scalar_type_definition.name.item).or_default();
                 let name_location = scalar_type_definition.name.location;
-                scalar_definitions.push((
+                scalar_definitions.push(WithLocation::new(
                     process_scalar_definition(scalar_type_definition),
                     name_location,
                 ));
@@ -123,7 +123,10 @@ pub fn process_graphql_type_system_document(
                     )?;
 
                 let object_definitions = objects.entry(interface_name).or_default();
-                object_definitions.push((process_object_type_definition_outcome, location));
+                object_definitions.push(WithLocation::new(
+                    process_object_type_definition_outcome,
+                    location,
+                ));
 
                 directives
                     .entry(interface_name)
@@ -154,7 +157,10 @@ pub fn process_graphql_type_system_document(
                     )?;
 
                 let object_definitions = objects.entry(input_object_name).or_default();
-                object_definitions.push((process_object_type_definition_outcome, location));
+                object_definitions.push(WithLocation::new(
+                    process_object_type_definition_outcome,
+                    location,
+                ));
 
                 directives
                     .entry(input_object_name)
@@ -169,7 +175,7 @@ pub fn process_graphql_type_system_document(
                 // TODO Do not do this
                 let scalar_definitions: &mut Vec<_> =
                     scalars.entry(enum_definition.name.item).or_default();
-                scalar_definitions.push((
+                scalar_definitions.push(WithLocation::new(
                     process_scalar_definition(GraphQLScalarTypeDefinition {
                         description: enum_definition.description,
                         name: enum_definition.name.map(|x| x.unchecked_conversion()),
@@ -203,7 +209,10 @@ pub fn process_graphql_type_system_document(
                 let object_definitions = objects
                     .entry(union_definition.name.item.into())
                     .or_default();
-                object_definitions.push((process_object_type_definition_outcome, location));
+                object_definitions.push(WithLocation::new(
+                    process_object_type_definition_outcome,
+                    location,
+                ));
 
                 directives
                     .entry(union_definition.name.item.unchecked_conversion())
@@ -245,14 +254,17 @@ pub fn process_graphql_type_system_document(
 
     // For each supertype (e.g. Node) and a subtype (e.g. Pet), we need to add an asConcreteType field.
     for (supertype_name, subtypes) in supertype_to_subtype_map.iter() {
-        let (object_outcome, _) = objects
-            .iter_mut()
-            .find_map(|(_, object_definitions)| {
+        let WithLocation {
+            location: _,
+            item: object_outcome,
+        } = objects
+            .values_mut()
+            .find_map(|object_definitions| {
                 object_definitions.iter_mut().find(|obj| {
                     let supertype_name: ServerObjectEntityName =
                         supertype_name.unchecked_conversion();
 
-                    obj.0.server_object_entity.name.item == supertype_name
+                    obj.item.server_object_entity.name.item == supertype_name
                 })
             })
             .expect("Expected supertype to exist. This is indicative of a bug in Isograph.");

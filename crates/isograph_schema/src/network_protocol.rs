@@ -6,9 +6,8 @@ use std::{
 };
 
 use common_lang_types::{
-    JavascriptName, Location, QueryExtraInfo, QueryOperationName, QueryText,
-    ServerObjectEntityName, ServerScalarEntityName, ServerSelectableName, UnvalidatedTypeName,
-    WithLocation, WithSpan,
+    JavascriptName, QueryExtraInfo, QueryOperationName, QueryText, ServerObjectEntityName,
+    ServerScalarEntityName, ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation};
 use isograph_lang_types::Description;
@@ -65,13 +64,10 @@ where
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct ProcessTypeSystemDocumentOutcome<TNetworkProtocol: NetworkProtocol> {
     pub scalars:
-        HashMap<ServerScalarEntityName, Vec<(ServerScalarEntity<TNetworkProtocol>, Location)>>,
+        HashMap<ServerScalarEntityName, Vec<WithLocation<ServerScalarEntity<TNetworkProtocol>>>>,
     pub objects: HashMap<
         ServerObjectEntityName,
-        Vec<(
-            ProcessObjectTypeDefinitionOutcome<TNetworkProtocol>,
-            Location,
-        )>,
+        Vec<WithLocation<ProcessObjectTypeDefinitionOutcome<TNetworkProtocol>>>,
     >,
 }
 

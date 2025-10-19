@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use common_lang_types::{ServerObjectEntityName, ServerScalarEntityName};
+use common_lang_types::{ServerObjectEntityName, ServerScalarEntityName, WithLocation};
 use isograph_schema::{IsographDatabase, NetworkProtocol, ServerObjectEntity, ServerScalarEntity};
 use pico_macros::memo;
 
@@ -20,7 +20,12 @@ pub fn server_object_entity<TNetworkProtocol: NetworkProtocol + 'static>(
     match outcome {
         Some(vec) => vec
             .iter()
-            .map(|x| x.0.server_object_entity.clone())
+            .map(
+                |WithLocation {
+                     location: _,
+                     item: x,
+                 }| x.server_object_entity.clone(),
+            )
             .collect(),
         None => vec![],
     }
@@ -40,7 +45,7 @@ pub fn server_scalar_entity<TNetworkProtocol: NetworkProtocol + 'static>(
     let outcome = outcome.scalars.get(&server_scalar_entity_name);
 
     match outcome {
-        Some(vec) => vec.iter().map(|x| x.0.clone()).collect(),
+        Some(vec) => vec.iter().map(|x| x.item.clone()).collect(),
         None => vec![],
     }
 }
