@@ -60,6 +60,14 @@ export function LoadableFieldReader<
 
 // @ts-ignore
 function tsTests() {
+  let neverArgs!: LoadableField<
+    {
+      parameters: Record<string, never>;
+      data: {};
+    },
+    unknown
+  >;
+
   let optionalArgs!: LoadableField<
     {
       parameters: {
@@ -79,6 +87,21 @@ function tsTests() {
     },
     unknown
   >;
+
+  <LoadableFieldReader loadableField={neverArgs} children={() => {}} />;
+  <LoadableFieldReader
+    loadableField={neverArgs}
+    children={() => {}}
+    args={{}}
+  />;
+  <LoadableFieldReader
+    loadableField={neverArgs}
+    children={() => {}}
+    args={{
+      // @ts-expect-error
+      foo: 'bar',
+    }}
+  />;
 
   <LoadableFieldReader loadableField={optionalArgs} children={() => {}} />;
   <LoadableFieldReader

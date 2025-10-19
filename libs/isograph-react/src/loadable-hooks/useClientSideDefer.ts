@@ -50,6 +50,14 @@ export function useClientSideDefer<
 
 // @ts-ignore
 function tsTests() {
+  let neverArgs!: LoadableField<
+    {
+      parameters: Record<string, never>;
+      data: {};
+    },
+    unknown
+  >;
+
   let optionalArgs!: LoadableField<
     {
       parameters: {
@@ -69,6 +77,13 @@ function tsTests() {
     },
     unknown
   >;
+
+  useClientSideDefer(neverArgs);
+  useClientSideDefer(neverArgs, {});
+  useClientSideDefer(neverArgs, {
+    // @ts-expect-error
+    foo: 'bar',
+  });
 
   useClientSideDefer(optionalArgs);
   useClientSideDefer(optionalArgs, {});

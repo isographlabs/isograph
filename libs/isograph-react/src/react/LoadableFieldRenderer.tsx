@@ -60,6 +60,14 @@ export function LoadableFieldRenderer<
 
 // @ts-ignore
 function tsTests() {
+  let neverArgs!: LoadableField<
+    {
+      parameters: Record<string, never>;
+      data: {};
+    },
+    () => React.ReactNode
+  >;
+
   let optionalArgs!: LoadableField<
     {
       parameters: {
@@ -79,6 +87,21 @@ function tsTests() {
     },
     () => React.ReactNode
   >;
+
+  <LoadableFieldRenderer loadableField={neverArgs} additionalProps={{}} />;
+  <LoadableFieldRenderer
+    loadableField={neverArgs}
+    additionalProps={{}}
+    args={{}}
+  />;
+  <LoadableFieldRenderer
+    loadableField={neverArgs}
+    additionalProps={{}}
+    args={{
+      // @ts-expect-error
+      foo: 'bar',
+    }}
+  />;
 
   <LoadableFieldRenderer loadableField={optionalArgs} additionalProps={{}} />;
   <LoadableFieldRenderer
