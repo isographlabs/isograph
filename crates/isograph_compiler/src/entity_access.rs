@@ -20,12 +20,7 @@ pub fn server_object_entity<TNetworkProtocol: NetworkProtocol + 'static>(
     match outcome {
         Some(vec) => vec
             .iter()
-            .map(
-                |WithLocation {
-                     location: _,
-                     item: x,
-                 }| x.server_object_entity.clone(),
-            )
+            .map(|WithLocation { location: _, item }| item.server_object_entity.clone())
             .collect(),
         None => vec![],
     }
@@ -45,7 +40,10 @@ pub fn server_scalar_entity<TNetworkProtocol: NetworkProtocol + 'static>(
     let outcome = outcome.scalars.get(&server_scalar_entity_name);
 
     match outcome {
-        Some(vec) => vec.iter().map(|x| x.item.clone()).collect(),
+        Some(vec) => vec
+            .iter()
+            .map(|scalar_entity| scalar_entity.item.clone())
+            .collect(),
         None => vec![],
     }
 }
