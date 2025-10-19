@@ -9,60 +9,46 @@ use isograph_schema::{
 };
 use pico_macros::memo;
 
-// TODO go through server_entities
 // TODO what to do about scalars with the same name. Should this return an Err? Should it ignore them?
 #[memo]
 pub fn server_object_entities<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_object_entity_name: ServerObjectEntityName,
-) -> Vec<WithLocation<ServerObjectEntity<TNetworkProtocol>>> {
-    let memo_ref = TNetworkProtocol::parse_type_system_documents(db);
-    let (outcome, _) = match memo_ref.deref() {
-        Ok(outcome) => outcome,
-        Err(_) => return vec![],
-    };
+) -> Result<
+    Vec<WithLocation<ServerObjectEntity<TNetworkProtocol>>>,
+    TNetworkProtocol::ParseTypeSystemDocumentsError,
+> {
+    let memo_ref = server_entities(db, server_object_entity_name.into());
+    let server_entities = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
 
-    outcome
+    Ok(server_entities
         .iter()
         .filter_map(|x| match x {
-            SelectionType::Object(o) => {
-                if o.server_object_entity.item.name.item == server_object_entity_name {
-                    Some(o.server_object_entity.clone())
-                } else {
-                    None
-                }
-            }
             SelectionType::Scalar(_) => None,
+            SelectionType::Object(o) => Some(o.clone()),
         })
-        .collect::<Vec<_>>()
+        .collect())
 }
 
-// TODO go through server_entities
 // TODO what to do about objects with the same name. Should this return an Err? Should it ignore them?
 #[memo]
 pub fn server_scalar_entities<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_scalar_entity_name: ServerScalarEntityName,
-) -> Vec<WithLocation<ServerScalarEntity<TNetworkProtocol>>> {
-    let memo_ref = TNetworkProtocol::parse_type_system_documents(db);
-    let (outcome, _) = match memo_ref.deref() {
-        Ok(outcome) => outcome,
-        Err(_) => return vec![],
-    };
+) -> Result<
+    Vec<WithLocation<ServerScalarEntity<TNetworkProtocol>>>,
+    TNetworkProtocol::ParseTypeSystemDocumentsError,
+> {
+    let memo_ref = server_entities(db, server_scalar_entity_name.into());
+    let server_entities = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
 
-    outcome
+    Ok(server_entities
         .iter()
         .filter_map(|x| match x {
+            SelectionType::Scalar(s) => Some(s.clone()),
             SelectionType::Object(_) => None,
-            SelectionType::Scalar(s) => {
-                if s.item.name.item == server_scalar_entity_name {
-                    Some(s.clone())
-                } else {
-                    None
-                }
-            }
         })
-        .collect::<Vec<_>>()
+        .collect())
 }
 
 #[memo]

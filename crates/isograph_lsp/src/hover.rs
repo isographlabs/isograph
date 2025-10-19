@@ -21,7 +21,8 @@ use pico_macros::memo;
 use resolve_position::ResolvePosition;
 
 use crate::{
-    lsp_runtime_error::LSPRuntimeResult, semantic_tokens::delta_line_delta_start,
+    lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult},
+    semantic_tokens::delta_line_delta_start,
     uri_file_path_ext::UriFilePathExt,
 };
 
@@ -70,7 +71,12 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
             IsographResolvedNode::EntrypointDeclaration(_) => None,
             IsographResolvedNode::ServerObjectEntityNameWrapper(entity) => {
                 let memo_ref = server_object_entities(db, entity.inner.0);
-                let server_object_entity = match memo_ref.deref().split_first() {
+                let entities = memo_ref
+                    .deref()
+                    .as_ref()
+                    .map_err(|_| LSPRuntimeError::ExpectedError)?;
+
+                let server_object_entity = match entities.split_first() {
                     // TODO have an only_server_object_entity method
                     Some((entity, rest)) => {
                         if rest.is_empty() {
