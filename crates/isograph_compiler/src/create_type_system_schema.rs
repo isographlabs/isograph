@@ -8,9 +8,9 @@ use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{ConstantValue, SelectionType, TypeAnnotation, VariableDefinition};
 use isograph_schema::{
     CreateAdditionalFieldsError, ExposeAsFieldToInsert, FieldToInsert, IsographDatabase,
-    NetworkProtocol, ProcessObjectTypeDefinitionOutcome, ProcessTypeSystemDocumentOutcome, Schema,
-    ServerEntityName, ServerObjectSelectable, ServerObjectSelectableVariant,
-    ServerScalarSelectable, UnprocessedClientFieldItem, UnprocessedClientPointerItem,
+    NetworkProtocol, Schema, ServerEntityName, ServerObjectSelectable,
+    ServerObjectSelectableVariant, ServerScalarSelectable, UnprocessedClientFieldItem,
+    UnprocessedClientPointerItem,
 };
 use pico_macros::memo;
 use thiserror::Error;
@@ -34,49 +34,40 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     CreateSchemaError<TNetworkProtocol>,
 > {
     let memo_ref = TNetworkProtocol::parse_and_process_type_system_documents(db);
-    let (ProcessTypeSystemDocumentOutcome { scalars, objects }, fetchable_types) =
-        match memo_ref.to_owned() {
-            Ok(x) => x,
-            Err(e) => {
-                return Err(CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e });
-            }
-        };
+    let (items, fetchable_types) = match memo_ref.to_owned() {
+        Ok(x) => x,
+        Err(e) => {
+            return Err(CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e });
+        }
+    };
 
     let mut unvalidated_isograph_schema = Schema::<TNetworkProtocol>::new();
-
     unvalidated_isograph_schema.fetchable_types = fetchable_types;
-
-    for (_server_scalar_entity_name, server_scalar_entities) in scalars {
-        for WithLocation {
-            location: name_location,
-            item: server_scalar_entity,
-        } in server_scalar_entities
-        {
-            unvalidated_isograph_schema
-                .server_entity_data
-                .insert_server_scalar_entity(server_scalar_entity, name_location)?;
-        }
-    }
 
     let mut field_queue = HashMap::new();
     let mut expose_as_field_queue = HashMap::new();
-    for (_server_object_entity_name, definitions) in objects {
-        for WithLocation {
-            location: name_location,
-            item:
-                ProcessObjectTypeDefinitionOutcome {
-                    server_object_entity,
-                    fields_to_insert,
-                    expose_as_fields_to_insert,
-                },
-        } in definitions
-        {
-            let new_object_id = unvalidated_isograph_schema
-                .server_entity_data
-                .insert_server_object_entity(server_object_entity, name_location)?;
-            field_queue.insert(new_object_id, fields_to_insert);
 
-            expose_as_field_queue.insert(new_object_id, expose_as_fields_to_insert);
+    for item in items {
+        match item {
+            SelectionType::Object(outcome) => {
+                let new_object_id = unvalidated_isograph_schema
+                    .server_entity_data
+                    .insert_server_object_entity(
+                        outcome.server_object_entity.item,
+                        outcome.server_object_entity.location,
+                    )?;
+                field_queue.insert(new_object_id, outcome.fields_to_insert);
+
+                expose_as_field_queue.insert(new_object_id, outcome.expose_as_fields_to_insert);
+            }
+            SelectionType::Scalar(server_scalar_entity) => {
+                unvalidated_isograph_schema
+                    .server_entity_data
+                    .insert_server_scalar_entity(
+                        server_scalar_entity.item,
+                        server_scalar_entity.location,
+                    )?;
+            }
         }
     }
 

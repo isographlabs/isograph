@@ -1,22 +1,24 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    error::Error,
-    fmt::Debug,
-    hash::Hash,
-};
+use std::{collections::BTreeMap, error::Error, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
     JavascriptName, QueryExtraInfo, QueryOperationName, QueryText, ServerObjectEntityName,
-    ServerScalarEntityName, ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
+    ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation};
-use isograph_lang_types::Description;
+use isograph_lang_types::{Description, SelectionType};
 use pico::MemoRef;
 
 use crate::{
     ExposeFieldDirective, MergedSelectionMap, RootOperationName, Schema, ServerObjectEntity,
     ServerScalarEntity, ValidatedVariableDefinition, isograph_database::IsographDatabase,
 };
+
+pub type ParseTypeSystemOutcome<TNetworkProtocol> = Vec<
+    SelectionType<
+        WithLocation<ServerScalarEntity<TNetworkProtocol>>,
+        ProcessObjectTypeDefinitionOutcome<TNetworkProtocol>,
+    >,
+>;
 
 pub trait NetworkProtocol:
     Debug + Clone + Copy + Eq + PartialEq + Ord + PartialOrd + Hash + Default
@@ -32,7 +34,7 @@ where
     ) -> MemoRef<
         Result<
             (
-                ProcessTypeSystemDocumentOutcome<Self>,
+                ParseTypeSystemOutcome<Self>,
                 BTreeMap<ServerObjectEntityName, RootOperationName>,
             ),
             Self::ParseAndProcessTypeSystemDocumentsError,
@@ -62,18 +64,8 @@ where
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct ProcessTypeSystemDocumentOutcome<TNetworkProtocol: NetworkProtocol> {
-    pub scalars:
-        HashMap<ServerScalarEntityName, Vec<WithLocation<ServerScalarEntity<TNetworkProtocol>>>>,
-    pub objects: HashMap<
-        ServerObjectEntityName,
-        Vec<WithLocation<ProcessObjectTypeDefinitionOutcome<TNetworkProtocol>>>,
-    >,
-}
-
-#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol> {
-    pub server_object_entity: ServerObjectEntity<TNetworkProtocol>,
+    pub server_object_entity: WithLocation<ServerObjectEntity<TNetworkProtocol>>,
     pub fields_to_insert: Vec<WithLocation<FieldToInsert>>,
     // TODO this seems sketch
     pub expose_as_fields_to_insert: Vec<ExposeAsFieldToInsert>,

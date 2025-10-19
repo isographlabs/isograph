@@ -82,7 +82,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                     None => return Ok(None),
                 };
 
-                Some(format_hover_for_entity(server_object_entity))
+                Some(format_hover_for_entity(&server_object_entity.item))
             }
             IsographResolvedNode::Description(_) => None,
             IsographResolvedNode::ScalarSelection(scalar_path) => {

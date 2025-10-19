@@ -78,7 +78,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                         .flat_map(|entity| {
                             isograph_location_to_lsp_location(
                                 db,
-                                entity.name.location,
+                                entity.item.name.location,
                                 &db.get_schema_source().content,
                             )
                         })

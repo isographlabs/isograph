@@ -744,6 +744,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
     }
 
     // TODO this function should not exist
+    // TODO accept WithLocation instead of name_location
     pub fn insert_server_object_entity(
         &mut self,
         server_server_object_entity: ServerObjectEntity<TNetworkProtocol>,

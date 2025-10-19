@@ -178,6 +178,13 @@ impl<TScalar, TObject> SelectionType<TScalar, TObject> {
         }
     }
 
+    pub fn as_ref_mut(&mut self) -> SelectionType<&mut TScalar, &mut TObject> {
+        match self {
+            SelectionType::Scalar(s) => SelectionType::Scalar(s),
+            SelectionType::Object(o) => SelectionType::Object(o),
+        }
+    }
+
     pub fn as_scalar(self) -> Option<TScalar> {
         match self {
             SelectionType::Scalar(s) => Some(s),

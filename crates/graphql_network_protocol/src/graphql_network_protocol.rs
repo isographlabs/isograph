@@ -10,7 +10,7 @@ use intern::string_key::Intern;
 use isograph_schema::IsographDatabase;
 use isograph_schema::{
     CreateAdditionalFieldsError, ExposeAsFieldToInsert, Format, MergedSelectionMap,
-    NetworkProtocol, ProcessTypeSystemDocumentOutcome, RootOperationName, Schema,
+    NetworkProtocol, ParseTypeSystemOutcome, RootOperationName, Schema,
     ValidatedVariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -68,7 +68,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         db: &IsographDatabase<Self>,
     ) -> Result<
         (
-            ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>,
+            ParseTypeSystemOutcome<Self>,
             BTreeMap<ServerObjectEntityName, RootOperationName>,
         ),
         ParseAndProcessGraphQLTypeSystemDocumentsError,
@@ -95,33 +95,29 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 directives.entry(name).or_default().extend(new_directives);
             }
 
-            let ProcessTypeSystemDocumentOutcome { scalars, objects } = outcome;
-
             // Note: we process all newly-defined types in schema extensions.
             // However, we ignore a bunch of things, like newly-defined fields on existing types, etc.
             // We should probably fix that!
-            result.objects.extend(objects);
-            result.scalars.extend(scalars);
+            result.extend(outcome);
             refetch_fields.extend(new_refetch_fields);
         }
 
         let graphql_root_types = graphql_root_types.unwrap_or_default();
 
         let query = result
-            .objects
             .iter_mut()
-            .find_map(|(_, definitions)| {
-                definitions.iter_mut().find(
-                    |WithLocation {
-                         location: _,
-                         item: object,
-                     }| {
-                        object.server_object_entity.name.item == graphql_root_types.query
-                    },
-                )
+            .find_map(|item| match item.as_ref_mut().as_object() {
+                Some(outcome) => {
+                    if outcome.server_object_entity.item.name.item == graphql_root_types.query {
+                        Some(outcome)
+                    } else {
+                        None
+                    }
+                }
+                None => None,
             })
             .expect("Expected query type to be found.");
-        query.item.expose_as_fields_to_insert.extend(refetch_fields);
+        query.expose_as_fields_to_insert.extend(refetch_fields);
 
         // - in the extension document, you may have added directives to objects, e.g. @exposeAs
         // - we need to transfer those to the original objects.
@@ -130,20 +126,18 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         for (name, directives) in directives {
             // TODO don't do O(n^2) here
             match result
-                .objects
                 .iter_mut()
-                .find_map(|(_, object_definitions)| {
-                    object_definitions.iter_mut().find(
-                        |WithLocation {
-                             location: _,
-                             item: outcome,
-                         }| outcome.server_object_entity.name.item == name,
-                    )
+                .find_map(|item| match item.as_ref_mut().as_object() {
+                    Some(x) => {
+                        if x.server_object_entity.item.name.item == name {
+                            Some(x)
+                        } else {
+                            None
+                        }
+                    }
+                    None => None,
                 }) {
-                Some(WithLocation {
-                    location: _,
-                    item: outcome,
-                }) => {
+                Some(outcome) => {
                     for directive in directives {
                         if directive.name.item == *EXPOSE_FIELD_DIRECTIVE {
                             let expose_field_directive = from_graphql_directive(&directive)
@@ -158,7 +152,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                 .expose_as_fields_to_insert
                                 .push(ExposeAsFieldToInsert {
                                     expose_field_directive,
-                                    parent_object_name: outcome.server_object_entity.name.item,
+                                    parent_object_name: outcome.server_object_entity.item.name.item,
                                     description: None,
                                 });
                         }
