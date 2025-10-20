@@ -7,7 +7,7 @@ use crate::{
 use common_lang_types::{Span, relative_path_from_absolute_and_working_directory};
 use isograph_compiler::{
     CompilerState, get_validated_schema, process_iso_literal_extraction,
-    read_iso_literals_source_from_relative_path, server_entities_named,
+    read_iso_literals_source_from_relative_path,
 };
 use isograph_lang_types::{
     ClientObjectSelectableNameWrapperParent, ClientScalarSelectableNameWrapperParent,
@@ -16,6 +16,7 @@ use isograph_lang_types::{
 use isograph_schema::{
     IsoLiteralsSource, IsographDatabase, NetworkProtocol,
     get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
+    server_entities_named,
 };
 use lsp_types::{
     GotoDefinitionResponse, Position, Uri,

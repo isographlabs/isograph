@@ -2,10 +2,13 @@ use std::ops::Deref;
 
 use common_lang_types::{ServerObjectEntityName, UnvalidatedTypeName, WithLocation};
 use isograph_lang_types::SelectionType;
-use isograph_schema::{IsographDatabase, NetworkProtocol, OwnedServerEntity, ServerObjectEntity};
 use pico_macros::memo;
 use thiserror::Error;
 
+use crate::{IsographDatabase, NetworkProtocol, OwnedServerEntity, ServerObjectEntity};
+
+// TODO consider adding a memoized function that creates a map of entities (maybe
+// with untracked access?) and going through that.
 #[memo]
 pub fn server_entities_named<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,

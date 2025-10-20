@@ -6,12 +6,13 @@ use common_lang_types::{
 use isograph_compiler::{
     CompilerState, IsoLiteralExtraction, extract_iso_literals_from_file_content,
     get_validated_schema, process_iso_literal_extraction,
-    read_iso_literals_source_from_relative_path, server_object_entity_named,
+    read_iso_literals_source_from_relative_path,
 };
 use isograph_lang_types::{Description, IsographResolvedNode, VariableDefinition};
 use isograph_schema::{
     IsographDatabase, NetworkProtocol, SelectableTrait, ServerEntityName, ServerObjectEntity,
     get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
+    server_object_entity_named,
 };
 use lsp_types::{
     Hover, HoverContents, MarkupContent, MarkupKind, Position, Uri,
