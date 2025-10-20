@@ -8,7 +8,8 @@ use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
-    IsographDatabase, NetworkProtocol, OwnedServerEntity, ServerObjectEntity, ServerScalarEntity,
+    IsographDatabase, NetworkProtocol, OwnedServerEntity, ServerEntityName, ServerObjectEntity,
+    ServerScalarEntity,
 };
 
 // TODO consider adding a memoized function that creates a map of entities (maybe
@@ -136,5 +137,35 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
             }
         }
         None => Ok(None),
+    }
+}
+
+#[memo]
+pub fn server_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    name: ServerEntityName,
+) -> Result<
+    Option<OwnedServerEntity<TNetworkProtocol>>,
+    EntityAccessError<TNetworkProtocol::ParseTypeSystemDocumentsError>,
+> {
+    match name {
+        SelectionType::Object(server_object_entity_name) => {
+            let server_object_entity =
+                server_object_entity_named(db, server_object_entity_name).to_owned()?;
+            if let Some(server_object_entity) = server_object_entity {
+                Ok(Some(SelectionType::Object(server_object_entity)))
+            } else {
+                Ok(None)
+            }
+        }
+        SelectionType::Scalar(server_scalar_entity_name) => {
+            let server_scalar_entity =
+                server_scalar_entity_named(db, server_scalar_entity_name).to_owned()?;
+            if let Some(server_scalar_entity) = server_scalar_entity {
+                Ok(Some(SelectionType::Scalar(server_scalar_entity)))
+            } else {
+                Ok(None)
+            }
+        }
     }
 }
