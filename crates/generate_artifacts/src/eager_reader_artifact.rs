@@ -246,6 +246,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<
 pub(crate) fn generate_eager_reader_param_type_artifact<
     TNetworkProtocol: NetworkProtocol + 'static,
 >(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     client_scalar_selectable: &ClientSelectable<TNetworkProtocol>,
     file_extensions: GenerateFileExtensionsOption,
@@ -263,6 +264,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<
     let mut loadable_fields = BTreeSet::new();
     let mut updatable_fields = false;
     let client_field_parameter_type = generate_client_field_parameter_type(
+        db,
         schema,
         client_scalar_selectable.selection_set_for_parent_query(),
         &mut param_type_imports,

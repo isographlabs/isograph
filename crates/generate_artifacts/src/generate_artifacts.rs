@@ -22,12 +22,13 @@ use isograph_schema::{
     ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo, ValidatedSelection,
     ValidatedVariableDefinition, WrappedSelectionMapSelection, accessible_client_fields,
     description, inline_fragment_reader_selection_set, output_type_annotation,
-    selection_map_wrapped,
+    selection_map_wrapped, server_scalar_entity_named,
 };
 use lazy_static::lazy_static;
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
     fmt::{Debug, Display},
+    ops::Deref,
 };
 
 use crate::{
@@ -393,6 +394,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol + 'stati
     for (client_type_name, user_written_client_type, _) in schema.user_written_client_types() {
         // For each user-written client types, generate a param type artifact
         path_and_contents.push(generate_eager_reader_param_type_artifact(
+            db,
             schema,
             &user_written_client_type,
             config.options.include_file_extensions_in_import_statements,
@@ -631,6 +633,7 @@ pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol + 'static>(
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     selection_map: &[WithSpan<ValidatedSelection>],
     nested_client_field_imports: &mut ParamTypeImports,
@@ -642,6 +645,7 @@ pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProt
 
     for selection in selection_map.iter() {
         write_param_type_from_selection(
+            db,
             schema,
             &mut client_field_parameter_type,
             selection,
@@ -690,6 +694,7 @@ pub(crate) fn generate_client_field_updatable_data_type<
 
 #[allow(clippy::too_many_arguments)]
 fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
@@ -730,13 +735,21 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                                 &mut |scalar_entity_name| match field.javascript_type_override {
                                     Some(javascript_name) => javascript_name,
                                     None => {
-                                        schema
-                                            .server_entity_data
-                                            .server_scalar_entity(*scalar_entity_name)
+                                        let memo_ref =
+                                            server_scalar_entity_named(db, *scalar_entity_name);
+                                        memo_ref
+                                            .deref()
+                                            .as_ref()
+                                            .expect(
+                                                "Expected validation to have worked. \
+                                                This is indicative of a bug in Isograph.",
+                                            )
+                                            .as_ref()
                                             .expect(
                                                 "Expected entity to exist. \
-                                        This is indicative of a bug in Isograph.",
+                                                This is indicative of a bug in Isograph.",
                                             )
+                                            .item
                                             .javascript_name
                                     }
                                 },
@@ -781,6 +794,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol + 'static>(
 
             let type_annotation = output_type_annotation(&field).clone().map(&mut |_| {
                 generate_client_field_parameter_type(
+                    db,
                     schema,
                     &linked_field.selection_set,
                     nested_client_field_imports,
