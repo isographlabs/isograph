@@ -78,41 +78,6 @@ impl<TNetworkProtocol: NetworkProtocol> Default for Schema<TNetworkProtocol> {
 
 impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn new() -> Self {
-        // TODO add __typename
-        let mut scalars = HashMap::new();
-        let mut defined_types = HashMap::new();
-
-        let _id_type_name = add_schema_defined_scalar_type(
-            &mut scalars,
-            &mut defined_types,
-            "ID",
-            *STRING_JAVASCRIPT_TYPE,
-        );
-        let _string_type_name = add_schema_defined_scalar_type(
-            &mut scalars,
-            &mut defined_types,
-            "String",
-            *STRING_JAVASCRIPT_TYPE,
-        );
-        let _boolean_type_name = add_schema_defined_scalar_type(
-            &mut scalars,
-            &mut defined_types,
-            "Boolean",
-            "boolean".intern().into(),
-        );
-        let _float_type_name = add_schema_defined_scalar_type(
-            &mut scalars,
-            &mut defined_types,
-            "Float",
-            "number".intern().into(),
-        );
-        let _int_type_name = add_schema_defined_scalar_type(
-            &mut scalars,
-            &mut defined_types,
-            "Int",
-            "number".intern().into(),
-        );
-
         Self {
             server_scalar_selectables: HashMap::new(),
             server_object_selectables: HashMap::new(),
@@ -122,8 +87,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             entrypoints: Default::default(),
             server_entity_data: ServerEntityData {
                 server_object_entities: HashMap::new(),
-                server_scalar_entities: scalars,
-                defined_entities: defined_types,
+                server_scalar_entities: HashMap::new(),
+                defined_entities: HashMap::new(),
                 server_object_entity_extra_info: HashMap::new(),
             },
             fetchable_types: BTreeMap::new(),
@@ -786,32 +751,6 @@ impl NameAndArguments {
             NormalizationKey::ServerField(self.clone())
         }
     }
-}
-
-fn add_schema_defined_scalar_type<TNetworkProtocol: NetworkProtocol>(
-    scalars: &mut HashMap<ServerScalarEntityName, ServerScalarEntity<TNetworkProtocol>>,
-    defined_types: &mut HashMap<UnvalidatedTypeName, ServerEntityName>,
-    field_name: &'static str,
-    javascript_name: JavascriptName,
-) -> ServerScalarEntityName {
-    // TODO this is problematic, we have no span (or really, no location) associated with this
-    // schema-defined scalar, so we will not be able to properly show error messages if users
-    // e.g. have Foo implements String
-    let typename = WithLocation::new(field_name.intern().into(), Location::generated());
-    scalars.insert(
-        typename.item,
-        ServerScalarEntity {
-            description: None,
-            name: typename,
-            javascript_name,
-            network_protocol: std::marker::PhantomData,
-        },
-    );
-    defined_types.insert(
-        typename.item.into(),
-        ServerEntityName::Scalar(typename.item),
-    );
-    typename.item
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
