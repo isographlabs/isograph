@@ -17,8 +17,9 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    NetworkProtocol, ServerEntityData, ServerEntityName, ServerObjectEntityAvailableSelectables,
-    ServerObjectSelectable, ServerScalarSelectable, ValidatedVariableDefinition,
+    ID_ENTITY_NAME, NetworkProtocol, ServerEntityData, ServerEntityName,
+    ServerObjectEntityAvailableSelectables, ServerObjectSelectable, ServerScalarSelectable,
+    ValidatedVariableDefinition,
 };
 
 fn graphql_type_to_non_null_type<TValue>(
@@ -41,7 +42,7 @@ fn graphql_type_to_nullable_type<TValue>(
 }
 
 fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
-    scalar_literal_name: &ServerScalarEntityName,
+    scalar_literal_name: ServerScalarEntityName,
     type_: &GraphQLTypeAnnotation<ServerEntityName>,
     schema_data: &ServerEntityData<TNetworkProtocol>,
     location: Location,
@@ -49,7 +50,7 @@ fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     match graphql_type_to_non_null_type(type_.clone()) {
         GraphQLNonNullTypeAnnotation::List(_) => {
             let actual = schema_data
-                .server_scalar_entity(*scalar_literal_name)
+                .server_scalar_entity(scalar_literal_name)
                 .expect(
                     "Expected entity to exist. \
                     This is indicative of a bug in Isograph.",
@@ -67,11 +68,11 @@ fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
         }
         GraphQLNonNullTypeAnnotation::Named(named_type) => match named_type.item {
             SelectionType::Scalar(expected_scalar_entity_name) => {
-                if expected_scalar_entity_name == *scalar_literal_name {
+                if expected_scalar_entity_name == scalar_literal_name {
                     return Ok(());
                 }
                 let actual = schema_data
-                    .server_scalar_entity(*scalar_literal_name)
+                    .server_scalar_entity(scalar_literal_name)
                     .expect(
                         "Expected entity to exist. \
                         This is indicative of a bug in Isograph.",
@@ -88,7 +89,7 @@ fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             }
             SelectionType::Object(_) => {
                 let actual = schema_data
-                    .server_scalar_entity(*scalar_literal_name)
+                    .server_scalar_entity(scalar_literal_name)
                     .expect(
                         "Expected entity to exist. \
                         This is indicative of a bug in Isograph.",
@@ -188,14 +189,14 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             }
         }
         NonConstantValue::Integer(_) => scalar_literal_satisfies_type(
-            &schema_data.int_type_name,
+            schema_data.int_type_name,
             field_argument_definition_type,
             schema_data,
             selection_supplied_argument_value.location,
         )
         .or_else(|error| {
             scalar_literal_satisfies_type(
-                &schema_data.float_type_name,
+                schema_data.float_type_name,
                 field_argument_definition_type,
                 schema_data,
                 selection_supplied_argument_value.location,
@@ -204,7 +205,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
         })
         .or_else(|error| {
             scalar_literal_satisfies_type(
-                &schema_data.id_type_name,
+                *ID_ENTITY_NAME,
                 field_argument_definition_type,
                 schema_data,
                 selection_supplied_argument_value.location,
@@ -212,20 +213,20 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             .map_err(|_| error)
         }),
         NonConstantValue::Boolean(_) => scalar_literal_satisfies_type(
-            &schema_data.boolean_type_name,
+            schema_data.boolean_type_name,
             field_argument_definition_type,
             schema_data,
             selection_supplied_argument_value.location,
         ),
         NonConstantValue::String(_) => scalar_literal_satisfies_type(
-            &schema_data.string_type_name,
+            schema_data.string_type_name,
             field_argument_definition_type,
             schema_data,
             selection_supplied_argument_value.location,
         )
         .or_else(|error| {
             scalar_literal_satisfies_type(
-                &schema_data.id_type_name,
+                *ID_ENTITY_NAME,
                 field_argument_definition_type,
                 schema_data,
                 selection_supplied_argument_value.location,
@@ -233,7 +234,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             .map_err(|_| error)
         }),
         NonConstantValue::Float(_) => scalar_literal_satisfies_type(
-            &schema_data.float_type_name,
+            schema_data.float_type_name,
             field_argument_definition_type,
             schema_data,
             selection_supplied_argument_value.location,

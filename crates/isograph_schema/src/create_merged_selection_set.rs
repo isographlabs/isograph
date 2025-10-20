@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet, HashSet, btree_map::Entry};
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, Location,
     ScalarSelectableName, SelectableName, ServerObjectEntityName, ServerObjectSelectableName,
-    ServerScalarEntityName, ServerScalarSelectableName, Span, VariableName, WithLocation, WithSpan,
+    ServerScalarSelectableName, Span, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
@@ -19,10 +19,11 @@ use lazy_static::lazy_static;
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientOrServerObjectSelectable,
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, ClientSelectableId,
-    ImperativelyLoadedFieldVariant, NameAndArguments, NetworkProtocol, PathToRefetchField, Schema,
-    ServerEntityName, ServerObjectEntity, ServerObjectEntityExtraInfo, ServerObjectSelectable,
-    ServerObjectSelectableVariant, ValidatedObjectSelection, ValidatedScalarSelection,
-    ValidatedSelection, VariableContext, create_transformed_name_and_arguments,
+    ID_ENTITY_NAME, ID_FIELD_NAME, ImperativelyLoadedFieldVariant, NameAndArguments,
+    NetworkProtocol, PathToRefetchField, Schema, ServerEntityName, ServerObjectEntity,
+    ServerObjectEntityExtraInfo, ServerObjectSelectable, ServerObjectSelectableVariant,
+    ValidatedObjectSelection, ValidatedScalarSelection, ValidatedSelection, VariableContext,
+    create_transformed_name_and_arguments,
     field_loadability::{Loadability, categorize_field_loadability},
     initial_variable_context, transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context,
@@ -1102,7 +1103,7 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
         ),
         imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant {
             client_selection_name: newly_encountered_client_object_selectable.name.item.into(),
-            top_level_schema_field_arguments: id_arguments(schema.server_entity_data.id_type_name),
+            top_level_schema_field_arguments: id_arguments(),
             // top_level_schema_field_name: *NODE_FIELD_NAME,
             // top_level_schema_field_concrete_type: None,
             // primary_field_info: None,
@@ -1404,14 +1405,12 @@ fn get_aliased_mutation_field_name(
     s
 }
 
-pub fn id_arguments(
-    id_type_name: ServerScalarEntityName,
-) -> Vec<VariableDefinition<ServerEntityName>> {
+pub fn id_arguments() -> Vec<VariableDefinition<ServerEntityName>> {
     vec![VariableDefinition {
-        name: WithLocation::new("id".intern().into(), Location::generated()),
+        name: WithLocation::new(ID_FIELD_NAME.unchecked_conversion(), Location::generated()),
         type_: GraphQLTypeAnnotation::NonNull(Box::new(GraphQLNonNullTypeAnnotation::Named(
             GraphQLNamedTypeAnnotation(WithSpan::new(
-                SelectionType::Scalar(id_type_name),
+                SelectionType::Scalar(*ID_ENTITY_NAME),
                 Span::todo_generated(),
             )),
         ))),

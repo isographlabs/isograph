@@ -17,11 +17,12 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, ClientSelectableId, FieldMapItem,
-    FieldTraversalResult, LINK_FIELD_NAME, NameAndArguments, NetworkProtocol, NormalizationKey,
-    RefetchStrategy, ScalarSelectableId, Schema, ServerEntityName, ServerObjectSelectableVariant,
-    UserWrittenClientTypeInfo, ValidatedSelection, ValidatedVariableDefinition,
-    WrappedSelectionMapSelection, accessible_client_fields, description,
-    inline_fragment_reader_selection_set, output_type_annotation, selection_map_wrapped,
+    FieldTraversalResult, ID_ENTITY_NAME, LINK_FIELD_NAME, NameAndArguments, NetworkProtocol,
+    NormalizationKey, RefetchStrategy, ScalarSelectableId, Schema, ServerEntityName,
+    ServerObjectSelectableVariant, UserWrittenClientTypeInfo, ValidatedSelection,
+    ValidatedVariableDefinition, WrappedSelectionMapSelection, accessible_client_fields,
+    description, inline_fragment_reader_selection_set, output_type_annotation,
+    selection_map_wrapped,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -287,9 +288,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 type_: GraphQLTypeAnnotation::NonNull(Box::new(
                                     GraphQLNonNullTypeAnnotation::Named(
                                         GraphQLNamedTypeAnnotation(WithSpan::new(
-                                            ServerEntityName::Scalar(
-                                                schema.server_entity_data.id_type_name,
-                                            ),
+                                            ServerEntityName::Scalar(*ID_ENTITY_NAME),
                                             Span::todo_generated(),
                                         )),
                                     ),
