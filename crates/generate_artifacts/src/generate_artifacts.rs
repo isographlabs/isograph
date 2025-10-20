@@ -17,9 +17,9 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, ClientSelectableId, FieldMapItem,
-    FieldTraversalResult, ID_ENTITY_NAME, LINK_FIELD_NAME, NameAndArguments, NetworkProtocol,
-    NormalizationKey, RefetchStrategy, ScalarSelectableId, Schema, ServerEntityName,
-    ServerObjectSelectableVariant, UserWrittenClientTypeInfo, ValidatedSelection,
+    FieldTraversalResult, ID_ENTITY_NAME, IsographDatabase, LINK_FIELD_NAME, NameAndArguments,
+    NetworkProtocol, NormalizationKey, RefetchStrategy, ScalarSelectableId, Schema,
+    ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo, ValidatedSelection,
     ValidatedVariableDefinition, WrappedSelectionMapSelection, accessible_client_fields,
     description, inline_fragment_reader_selection_set, output_type_annotation,
     selection_map_wrapped,
@@ -103,10 +103,11 @@ lazy_static! {
 /// TODO this should go through OutputFormat
 #[tracing::instrument(skip(schema, config))]
 pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     config: &CompilerConfig,
 ) -> Vec<ArtifactPathAndContent> {
-    let mut artifact_path_and_content = get_artifact_path_and_content_impl(schema, config);
+    let mut artifact_path_and_content = get_artifact_path_and_content_impl(db, schema, config);
     if let Some(header) = config.options.generated_file_header {
         for artifact_path_and_content in artifact_path_and_content.iter_mut() {
             artifact_path_and_content.file_content =
@@ -117,6 +118,7 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
 }
 
 fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     config: &CompilerConfig,
 ) -> Vec<ArtifactPathAndContent> {
@@ -138,6 +140,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
         &schema.entrypoints
     {
         let entrypoint_path_and_content = generate_entrypoint_artifacts(
+            db,
             schema,
             *parent_object_entity_name,
             *entrypoint_selectable_name,
@@ -355,6 +358,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
 
                             path_and_contents.extend(
                                 generate_entrypoint_artifacts_with_client_field_traversal_result(
+                                    db,
                                     schema,
                                     client_scalar_selectable,
                                     None,

@@ -201,16 +201,16 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
     }
 
     fn generate_query_text<'a>(
+        db: &IsographDatabase<Self>,
         query_name: QueryOperationName,
-        schema: &Schema<Self>,
         selection_map: &MergedSelectionMap,
         query_variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
         root_operation_name: &RootOperationName,
         format: Format,
     ) -> QueryText {
         generate_query_text(
+            db,
             query_name,
-            schema,
             selection_map,
             query_variables,
             root_operation_name,

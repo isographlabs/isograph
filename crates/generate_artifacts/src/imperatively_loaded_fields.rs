@@ -8,9 +8,9 @@ use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::VariableDefinition;
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, Format,
-    ImperativelyLoadedFieldVariant, MergedSelectionMap, NetworkProtocol, PathToRefetchFieldInfo,
-    REFETCH_FIELD_NAME, RootRefetchedPath, Schema, ServerEntityName, WrappedSelectionMapSelection,
-    selection_map_wrapped,
+    ImperativelyLoadedFieldVariant, IsographDatabase, MergedSelectionMap, NetworkProtocol,
+    PathToRefetchFieldInfo, REFETCH_FIELD_NAME, RootRefetchedPath, Schema, ServerEntityName,
+    WrappedSelectionMapSelection, selection_map_wrapped,
 };
 
 use crate::{
@@ -22,6 +22,7 @@ use crate::{
 pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     TNetworkProtocol: NetworkProtocol,
 >(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     file_extensions: GenerateFileExtensionsOption,
     persisted_documents: &mut Option<PersistedDocuments>,
@@ -125,8 +126,8 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         .item;
 
     let query_text = TNetworkProtocol::generate_query_text(
+        db,
         query_name,
-        schema,
         &query_text_selection_map_wrapped,
         definitions_of_used_variables.iter(),
         &root_operation_name,
@@ -134,8 +135,8 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     );
 
     let operation_text = generate_operation_text(
+        db,
         query_name,
-        schema,
         &query_text_selection_map_wrapped,
         definitions_of_used_variables.iter(),
         &root_operation_name,

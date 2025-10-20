@@ -23,7 +23,7 @@ use lazy_static::lazy_static;
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectableId,
     EntrypointDeclarationInfo, NetworkProtocol, NormalizationKey, ObjectSelectable,
-    ObjectSelectableId, ScalarSelectable, Selectable, SelectableId, ServerEntity, ServerEntityName,
+    ObjectSelectableId, ScalarSelectable, Selectable, SelectableId, ServerEntityName,
     ServerObjectEntity, ServerObjectEntityAvailableSelectables, ServerObjectSelectable,
     ServerScalarEntity, ServerScalarSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
@@ -641,20 +641,6 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
         server_scalar_entity_name: ServerScalarEntityName,
     ) -> Option<&ServerScalarEntity<TNetworkProtocol>> {
         self.server_scalar_entities.get(&server_scalar_entity_name)
-    }
-
-    pub fn server_entity(
-        &self,
-        server_entity_name: ServerEntityName,
-    ) -> Option<ServerEntity<'_, TNetworkProtocol>> {
-        match server_entity_name {
-            ServerEntityName::Object(object_entity_name) => self
-                .server_object_entity(object_entity_name)
-                .map(ServerEntity::Object),
-            ServerEntityName::Scalar(scalar_entity_name) => self
-                .server_scalar_entity(scalar_entity_name)
-                .map(ServerEntity::Scalar),
-        }
     }
 
     pub fn server_object_entity(
