@@ -766,6 +766,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                 }
                 DefinitionLocation::Client((parent_object_entity_name, client_field_name)) => {
                     write_param_type_from_client_field(
+                        db,
                         schema,
                         query_type_declaration,
                         nested_client_field_imports,
@@ -829,6 +830,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol + 'static>(
 
 #[allow(clippy::too_many_arguments)]
 fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     query_type_declaration: &mut String,
     nested_client_field_imports: &mut BTreeSet<ParentObjectEntityNameAndSelectableName>,
@@ -876,7 +878,7 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol + 'stati
                         format!(
                             ",\n{indent}Omit<ExtractParameters<{}__param>, keyof {}>",
                             client_field.type_and_field.underscore_separated(),
-                            get_loadable_field_type_from_arguments(schema, provided_arguments)
+                            get_loadable_field_type_from_arguments(db, provided_arguments)
                         )
                     };
 
@@ -985,6 +987,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol + 
                 }
                 DefinitionLocation::Client((parent_object_entity_name, client_field_id)) => {
                     write_param_type_from_client_field(
+                        db,
                         schema,
                         query_type_declaration,
                         nested_client_field_imports,
@@ -1076,7 +1079,7 @@ fn write_getter_and_setter(
 }
 
 fn get_loadable_field_type_from_arguments<TNetworkProtocol: NetworkProtocol + 'static>(
-    schema: &Schema<TNetworkProtocol>,
+    db: &IsographDatabase<TNetworkProtocol>,
     arguments: Vec<ValidatedVariableDefinition>,
 ) -> String {
     let mut loadable_field_type = "{".to_string();
@@ -1091,7 +1094,7 @@ fn get_loadable_field_type_from_arguments<TNetworkProtocol: NetworkProtocol + 's
             "readonly {}{}: {}",
             arg.name.item,
             if is_optional { "?" } else { "" },
-            format_type_for_js(schema, arg.type_.clone())
+            format_type_for_js(db, arg.type_.clone())
         ));
     }
     loadable_field_type.push('}');
@@ -1099,7 +1102,7 @@ fn get_loadable_field_type_from_arguments<TNetworkProtocol: NetworkProtocol + 's
 }
 
 fn format_type_for_js<TNetworkProtocol: NetworkProtocol + 'static>(
-    schema: &Schema<TNetworkProtocol>,
+    db: &IsographDatabase<TNetworkProtocol>,
     type_: GraphQLTypeAnnotation<ServerEntityName>,
 ) -> String {
     let new_type = type_.map(
@@ -1111,13 +1114,19 @@ fn format_type_for_js<TNetworkProtocol: NetworkProtocol + 'static>(
                 )
             }
             ServerEntityName::Scalar(scalar_entity_name) => {
-                schema
-                    .server_entity_data
-                    .server_scalar_entity(scalar_entity_name)
+                let memo_ref = server_scalar_entity_named(db, scalar_entity_name);
+                memo_ref
+                    .as_ref()
+                    .expect(
+                        "Expected validation to have worked. \
+                        This is indicative of a bug in Isograph.",
+                    )
+                    .as_ref()
                     .expect(
                         "Expected entity to exist. \
                         This is indicative of a bug in Isograph.",
                     )
+                    .item
                     .javascript_name
             }
         },
