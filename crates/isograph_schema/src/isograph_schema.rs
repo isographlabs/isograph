@@ -25,7 +25,7 @@ use crate::{
     EntrypointDeclarationInfo, NetworkProtocol, NormalizationKey, ObjectSelectable,
     ObjectSelectableId, ScalarSelectable, Selectable, SelectableId, ServerEntityName,
     ServerObjectEntity, ServerObjectEntityAvailableSelectables, ServerObjectSelectable,
-    ServerScalarEntity, ServerScalarSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
+    ServerScalarSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
 };
 
@@ -87,7 +87,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             entrypoints: Default::default(),
             server_entity_data: ServerEntityData {
                 server_object_entities: HashMap::new(),
-                server_scalar_entities: HashMap::new(),
                 defined_entities: HashMap::new(),
                 server_object_entity_extra_info: HashMap::new(),
             },
@@ -318,8 +317,6 @@ pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol + 'static> {
     // TODO consider combining these.
     pub server_object_entities:
         HashMap<ServerObjectEntityName, ServerObjectEntity<TNetworkProtocol>>,
-    pub server_scalar_entities:
-        HashMap<ServerScalarEntityName, ServerScalarEntity<TNetworkProtocol>>,
 
     // TODO consider whether this is needed. Especially when server_objects and server_scalars
     // are combined, this seems pretty useless.
@@ -636,13 +633,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 }
 
 impl<TNetworkProtocol: NetworkProtocol + 'static> ServerEntityData<TNetworkProtocol> {
-    pub fn server_scalar_entity(
-        &self,
-        server_scalar_entity_name: ServerScalarEntityName,
-    ) -> Option<&ServerScalarEntity<TNetworkProtocol>> {
-        self.server_scalar_entities.get(&server_scalar_entity_name)
-    }
-
     pub fn server_object_entity(
         &self,
         server_object_entity_name: ServerObjectEntityName,
@@ -660,27 +650,28 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> ServerEntityData<TNetworkProto
     // TODO this function should not exist ... maybe soon!
     pub fn insert_server_scalar_entity(
         &mut self,
-        server_scalar_entity: ServerScalarEntity<TNetworkProtocol>,
+        server_scalar_entity_name: ServerScalarEntityName,
         name_location: Location,
     ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
         if self
             .defined_entities
             .insert(
-                server_scalar_entity.name.item.into(),
-                SelectionType::Scalar(server_scalar_entity.name.item),
+                server_scalar_entity_name.into(),
+                SelectionType::Scalar(server_scalar_entity_name),
             )
             .is_some()
         {
             return Err(WithLocation::new(
                 CreateAdditionalFieldsError::DuplicateTypeDefinition {
                     type_definition_type: "scalar",
-                    type_name: server_scalar_entity.name.item.into(),
+                    type_name: server_scalar_entity_name.into(),
                 },
                 name_location,
             ));
         }
-        self.server_scalar_entities
-            .insert(server_scalar_entity.name.item, server_scalar_entity);
+
+        // there are no scalar entities anymore... so we don't actually insert anything
+
         Ok(())
     }
 

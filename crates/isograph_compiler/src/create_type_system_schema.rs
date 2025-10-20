@@ -64,7 +64,7 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
                 unvalidated_isograph_schema
                     .server_entity_data
                     .insert_server_scalar_entity(
-                        server_scalar_entity.item,
+                        server_scalar_entity.item.name.item,
                         server_scalar_entity.location,
                     )?;
             }
