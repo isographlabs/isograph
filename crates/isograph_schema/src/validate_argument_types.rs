@@ -48,59 +48,37 @@ fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol + 'static>(
     location: Location,
 ) -> Result<(), WithLocation<ValidateArgumentTypesError>> {
     match graphql_type_to_non_null_type(type_.clone()) {
-        GraphQLNonNullTypeAnnotation::List(_) => {
-            let actual = schema_data
-                .server_scalar_entity(scalar_literal_name)
-                .expect(
-                    "Expected entity to exist. \
-                    This is indicative of a bug in Isograph.",
-                )
-                .name
-                .item;
-
-            Err(WithLocation::new(
-                ValidateArgumentTypesError::ExpectedTypeFoundScalar {
-                    expected: id_annotation_to_typename_annotation(type_, schema_data),
-                    actual,
-                },
-                location,
-            ))
-        }
+        GraphQLNonNullTypeAnnotation::List(_) => Err(WithLocation::new(
+            ValidateArgumentTypesError::ExpectedTypeFoundScalar {
+                expected: id_annotation_to_typename_annotation(type_, schema_data),
+                actual: scalar_literal_name,
+            },
+            location,
+        )),
         GraphQLNonNullTypeAnnotation::Named(named_type) => match named_type.item {
             SelectionType::Scalar(expected_scalar_entity_name) => {
                 if expected_scalar_entity_name == scalar_literal_name {
                     return Ok(());
                 }
-                let actual = schema_data
-                    .server_scalar_entity(scalar_literal_name)
-                    .expect(
-                        "Expected entity to exist. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .name
-                    .item;
 
                 let expected = id_annotation_to_typename_annotation(type_, schema_data);
 
                 Err(WithLocation::new(
-                    ValidateArgumentTypesError::ExpectedTypeFoundScalar { expected, actual },
+                    ValidateArgumentTypesError::ExpectedTypeFoundScalar {
+                        expected,
+                        actual: scalar_literal_name,
+                    },
                     location,
                 ))
             }
             SelectionType::Object(_) => {
-                let actual = schema_data
-                    .server_scalar_entity(scalar_literal_name)
-                    .expect(
-                        "Expected entity to exist. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .name
-                    .item;
-
                 let expected = id_annotation_to_typename_annotation(type_, schema_data);
 
                 Err(WithLocation::new(
-                    ValidateArgumentTypesError::ExpectedTypeFoundScalar { expected, actual },
+                    ValidateArgumentTypesError::ExpectedTypeFoundScalar {
+                        expected,
+                        actual: scalar_literal_name,
+                    },
                     location,
                 ))
             }
