@@ -1,7 +1,8 @@
 use std::ops::Deref;
 
 use common_lang_types::{
-    ServerObjectEntityName, ServerScalarEntityName, UnvalidatedTypeName, WithLocation,
+    JavascriptName, ServerObjectEntityName, ServerScalarEntityName, UnvalidatedTypeName,
+    WithLocation,
 };
 use isograph_lang_types::SelectionType;
 use pico_macros::memo;
@@ -138,6 +139,25 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
         }
         None => Ok(None),
     }
+}
+
+#[memo]
+pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    server_scalar_entity_name: ServerScalarEntityName,
+) -> Result<
+    Option<JavascriptName>,
+    EntityAccessError<TNetworkProtocol::ParseTypeSystemDocumentsError>,
+> {
+    let memo_ref = server_scalar_entity_named(db, server_scalar_entity_name);
+    let value = memo_ref.deref().as_ref().map_err(|e| e.clone())?.as_ref();
+
+    let entity = match value {
+        Some(entity) => entity,
+        None => return Ok(None),
+    };
+
+    Ok(Some(entity.item.javascript_name))
 }
 
 #[memo]

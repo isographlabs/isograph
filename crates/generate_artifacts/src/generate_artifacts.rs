@@ -22,13 +22,12 @@ use isograph_schema::{
     ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo, ValidatedSelection,
     ValidatedVariableDefinition, WrappedSelectionMapSelection, accessible_client_fields,
     description, inline_fragment_reader_selection_set, output_type_annotation,
-    selection_map_wrapped, server_scalar_entity_named,
+    selection_map_wrapped, server_scalar_entity_javascript_name,
 };
 use lazy_static::lazy_static;
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
     fmt::{Debug, Display},
-    ops::Deref,
 };
 
 use crate::{
@@ -736,24 +735,19 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                             .map(
                                 &mut |scalar_entity_name| match field.javascript_type_override {
                                     Some(javascript_name) => javascript_name,
-                                    None => {
-                                        let memo_ref =
-                                            server_scalar_entity_named(db, *scalar_entity_name);
-                                        memo_ref
-                                            .deref()
-                                            .as_ref()
-                                            .expect(
-                                                "Expected validation to have worked. \
-                                                This is indicative of a bug in Isograph.",
-                                            )
-                                            .as_ref()
-                                            .expect(
-                                                "Expected entity to exist. \
-                                                This is indicative of a bug in Isograph.",
-                                            )
-                                            .item
-                                            .javascript_name
-                                    }
+                                    None => server_scalar_entity_javascript_name(
+                                        db,
+                                        *scalar_entity_name,
+                                    )
+                                    .to_owned()
+                                    .expect(
+                                        "Expected parsing to not have failed. \
+                                        This is indicative of a bug in Isograph.",
+                                    )
+                                    .expect(
+                                        "Expected entity to exist. \
+                                        This is indicative of a bug in Isograph.",
+                                    ),
                                 },
                             );
 
@@ -945,20 +939,16 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol + 
                             .target_scalar_entity
                             .clone()
                             .map(&mut |scalar_entity_name| {
-                                let memo_ref = server_scalar_entity_named(db, scalar_entity_name);
-                                memo_ref
-                                    .as_ref()
+                                server_scalar_entity_javascript_name(db, scalar_entity_name)
+                                    .to_owned()
                                     .expect(
-                                        "Expected validation to have worked. \
+                                        "Expected parsing to not have failed. \
                                         This is indicative of a bug in Isograph.",
                                     )
-                                    .as_ref()
                                     .expect(
                                         "Expected entity to exist. \
                                         This is indicative of a bug in Isograph.",
                                     )
-                                    .item
-                                    .javascript_name
                             });
 
                     match scalar_field_selection.scalar_selection_directive_set {
@@ -1114,20 +1104,16 @@ fn format_type_for_js<TNetworkProtocol: NetworkProtocol + 'static>(
                 )
             }
             ServerEntityName::Scalar(scalar_entity_name) => {
-                let memo_ref = server_scalar_entity_named(db, scalar_entity_name);
-                memo_ref
-                    .as_ref()
+                server_scalar_entity_javascript_name(db, scalar_entity_name)
+                    .to_owned()
                     .expect(
-                        "Expected validation to have worked. \
+                        "Expected parsing to not have failed. \
                         This is indicative of a bug in Isograph.",
                     )
-                    .as_ref()
                     .expect(
                         "Expected entity to exist. \
                         This is indicative of a bug in Isograph.",
                     )
-                    .item
-                    .javascript_name
             }
         },
     );

@@ -1,4 +1,4 @@
-use std::{fmt::Debug, ops::Deref};
+use std::fmt::Debug;
 
 use common_lang_types::SelectableName;
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
@@ -6,7 +6,7 @@ use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 use isograph_lang_types::{DefinitionLocation, SelectionType, TypeAnnotation, UnionVariant};
 use isograph_schema::{
     IsographDatabase, NetworkProtocol, Schema, ServerEntityName, ServerSelectableId,
-    server_scalar_entity_named,
+    server_scalar_entity_javascript_name,
 };
 
 pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol + 'static>(
@@ -81,21 +81,16 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol + 'static>(
             s
         }
         ServerEntityName::Scalar(scalar_entity_name) => {
-            let memo_ref = server_scalar_entity_named(db, scalar_entity_name);
-            memo_ref
-                .deref()
-                .as_ref()
+            server_scalar_entity_javascript_name(db, scalar_entity_name)
+                .to_owned()
                 .expect(
                     "Expected parsing to not have failed. \
                     This is indicative of a bug in Isograph.",
                 )
-                .as_ref()
                 .expect(
                     "Expected entity to exist. \
                     This is indicative of a bug in Isograph.",
                 )
-                .item
-                .javascript_name
                 .to_string()
         }
     }
