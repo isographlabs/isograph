@@ -364,15 +364,8 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                                 "Expected selectable to exist. \
                                 This is indicative of a bug in Isograph.",
                             );
-                        let server_scalar = schema
-                            .server_entity_data
-                            .server_scalar_entity(
-                                *server_scalar_selectable.target_scalar_entity.inner(),
-                            )
-                            .expect(
-                                "Expected entity to exist. \
-                                This is indicative of a bug in Isograph.",
-                            );
+                        let server_scalar_entity_name =
+                            *server_scalar_selectable.target_scalar_entity.inner();
 
                         vec![WithLocation::new(
                             AddSelectionSetsError::SelectionTypeSelectionFieldIsScalar {
@@ -382,7 +375,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                                 client_field_name: top_level_field_or_pointer.name().into(),
                                 field_parent_type_name: selection_parent_object.name.item,
                                 field_name: object_selection.name.item.into(),
-                                target_type_name: server_scalar.name.item.into(),
+                                target_type_name: server_scalar_entity_name.into(),
                                 client_type: top_level_field_or_pointer.client_type().to_string(),
                             },
                             Location::generated(),

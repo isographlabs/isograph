@@ -125,17 +125,9 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                     )
                     .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?,
                 ServerEntityName::Scalar(scalar_entity_name) => {
-                    let scalar_name = self
-                        .server_entity_data
-                        .server_scalar_entity(*scalar_entity_name)
-                        .expect(
-                            "Expected entity to exist. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .name;
                     return Err(WithLocation::new(
                         ProcessClientFieldDeclarationError::ClientPointerInvalidTargetType {
-                            target_type_name: scalar_name.item.into(),
+                            target_type_name: (*scalar_entity_name).into(),
                         },
                         Location::new(
                             text_source,
@@ -145,18 +137,10 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                 }
             },
             ServerEntityName::Scalar(scalar_entity_name) => {
-                let scalar_name = self
-                    .server_entity_data
-                    .server_scalar_entity(*scalar_entity_name)
-                    .expect(
-                        "Expected entity to exist. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .name;
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
                         literal_type: "pointer".to_string(),
-                        parent_type_name: scalar_name.item.into(),
+                        parent_type_name: (*scalar_entity_name).into(),
                     },
                     Location::new(
                         text_source,
