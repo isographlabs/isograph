@@ -663,6 +663,7 @@ pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProt
 pub(crate) fn generate_client_field_updatable_data_type<
     TNetworkProtocol: NetworkProtocol + 'static,
 >(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     selection_map: &[WithSpan<ValidatedSelection>],
     nested_client_field_imports: &mut ParamTypeImports,
@@ -676,6 +677,7 @@ pub(crate) fn generate_client_field_updatable_data_type<
 
     for selection in selection_map.iter() {
         write_updatable_data_type_from_selection(
+            db,
             schema,
             &mut client_field_updatable_data_type,
             selection,
@@ -902,6 +904,7 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol + 'stati
 
 #[allow(clippy::too_many_arguments)]
 fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
@@ -940,13 +943,19 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol + 
                             .target_scalar_entity
                             .clone()
                             .map(&mut |scalar_entity_name| {
-                                schema
-                                    .server_entity_data
-                                    .server_scalar_entity(scalar_entity_name)
+                                let memo_ref = server_scalar_entity_named(db, scalar_entity_name);
+                                memo_ref
+                                    .as_ref()
+                                    .expect(
+                                        "Expected validation to have worked. \
+                                        This is indicative of a bug in Isograph.",
+                                    )
+                                    .as_ref()
                                     .expect(
                                         "Expected entity to exist. \
                                         This is indicative of a bug in Isograph.",
                                     )
+                                    .item
                                     .javascript_name
                             });
 
@@ -1006,6 +1015,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol + 
 
             let type_annotation = output_type_annotation(&field).clone().map(&mut |_| {
                 generate_client_field_updatable_data_type(
+                    db,
                     schema,
                     &linked_field.selection_set,
                     nested_client_field_imports,

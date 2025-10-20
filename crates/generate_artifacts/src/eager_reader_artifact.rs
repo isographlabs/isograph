@@ -272,6 +272,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<
         1,
     );
     let updatable_data_type = generate_client_field_updatable_data_type(
+        db,
         schema,
         client_scalar_selectable.selection_set_for_parent_query(),
         &mut param_type_imports,
