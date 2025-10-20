@@ -28,7 +28,7 @@ use isograph_schema::{
 };
 use std::collections::BTreeSet;
 
-pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
@@ -370,7 +370,7 @@ fn generate_refetch_query_artifact_import(
     RefetchQueryArtifactImport(output)
 }
 
-fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
+fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol + 'static>(
     file_extensions: GenerateFileExtensionsOption,
     query_name: QueryOperationName,
     operation_text: &OperationText,

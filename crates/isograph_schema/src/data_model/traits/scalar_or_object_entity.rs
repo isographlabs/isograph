@@ -29,7 +29,7 @@ impl<T: ServerScalarOrObjectEntity> ServerScalarOrObjectEntity for WithLocation<
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
+impl<TNetworkProtocol: NetworkProtocol + 'static> ServerScalarOrObjectEntity
     for ServerScalarEntity<TNetworkProtocol>
 {
     fn name(&self) -> SelectionType<ServerScalarEntityName, ServerObjectEntityName> {
@@ -41,7 +41,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
+impl<TNetworkProtocol: NetworkProtocol + 'static> ServerScalarOrObjectEntity
     for ServerObjectEntity<TNetworkProtocol>
 {
     fn name(&self) -> SelectionType<ServerScalarEntityName, ServerObjectEntityName> {

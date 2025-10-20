@@ -22,7 +22,7 @@ use crate::{
 };
 
 // Can we do this when visiting the client field in when generating entrypoints?
-fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
+fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
     selection: &WithSpan<ValidatedSelection>,
     schema: &Schema<TNetworkProtocol>,
     indentation_level: u8,
@@ -176,7 +176,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
+fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     linked_field: &ValidatedObjectSelection,
     indentation_level: u8,
@@ -293,7 +293,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn scalar_client_defined_field_ast_node<TNetworkProtocol: NetworkProtocol>(
+fn scalar_client_defined_field_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
     scalar_field_selection: &ValidatedScalarSelection,
     schema: &Schema<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
@@ -370,7 +370,7 @@ fn link_variant_ast_node(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
+fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
     scalar_field_selection: &ValidatedScalarSelection,
     indentation_level: u8,
     nested_client_field: &ClientScalarSelectable<TNetworkProtocol>,
@@ -435,7 +435,7 @@ fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn imperatively_loaded_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
+fn imperatively_loaded_variant_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
     nested_client_field: &ClientScalarSelectable<TNetworkProtocol>,
     reader_imports: &mut ReaderImports,
     root_refetched_paths: &RefetchedPathsMap,
@@ -479,7 +479,7 @@ fn imperatively_loaded_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
     )
 }
 
-fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
+fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
     reader_imports: &mut ReaderImports,
@@ -597,7 +597,7 @@ fn server_defined_scalar_field_ast_node(
     )
 }
 
-fn generate_reader_ast_with_path<'schema, TNetworkProtocol: NetworkProtocol>(
+fn generate_reader_ast_with_path<'schema, TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &'schema Schema<TNetworkProtocol>,
     selection_set: &'schema [WithSpan<ValidatedSelection>],
     indentation_level: u8,
@@ -679,7 +679,7 @@ fn find_imperatively_fetchable_query_index(
         )
 }
 
-pub(crate) fn generate_reader_ast<'schema, TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_reader_ast<'schema, TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &'schema Schema<TNetworkProtocol>,
     selection_set: &'schema [WithSpan<ValidatedSelection>],
     indentation_level: u8,
@@ -703,7 +703,7 @@ pub(crate) fn generate_reader_ast<'schema, TNetworkProtocol: NetworkProtocol>(
     (reader_ast, client_field_imports)
 }
 
-fn refetched_paths_for_client_field<TNetworkProtocol: NetworkProtocol>(
+fn refetched_paths_for_client_field<TNetworkProtocol: NetworkProtocol + 'static>(
     nested_client_field: &ClientScalarSelectable<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     path: &mut Vec<NormalizationKey>,
@@ -725,7 +725,7 @@ fn refetched_paths_for_client_field<TNetworkProtocol: NetworkProtocol>(
     paths
 }
 
-fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
+fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol + 'static>(
     selection_set: &[WithSpan<ValidatedSelection>],
     schema: &Schema<TNetworkProtocol>,
     path: &mut Vec<NormalizationKey>,

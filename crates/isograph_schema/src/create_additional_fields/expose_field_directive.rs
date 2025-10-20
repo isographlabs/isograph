@@ -53,7 +53,7 @@ impl ExposeFieldDirective {
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     pub fn create_new_exposed_field(
         &mut self,
         expose_field_to_insert: ExposeAsFieldToInsert,
@@ -353,7 +353,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     }
 }
 
-fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol>(
+fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol + 'static>(
     // TODO move this to impl Schema
     schema: &mut Schema<TNetworkProtocol>,
     arguments: Vec<WithLocation<VariableDefinition<ServerEntityName>>>,

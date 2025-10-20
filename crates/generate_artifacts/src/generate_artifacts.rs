@@ -102,7 +102,7 @@ lazy_static! {
 ///
 /// TODO this should go through OutputFormat
 #[tracing::instrument(skip(schema, config))]
-pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
+pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     config: &CompilerConfig,
@@ -117,7 +117,7 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
     artifact_path_and_content
 }
 
-fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
+fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     config: &CompilerConfig,
@@ -600,7 +600,7 @@ fn get_serialized_field_argument(
     }
 }
 
-pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ClientFieldOutputType {
@@ -628,7 +628,7 @@ pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     selection_map: &[WithSpan<ValidatedSelection>],
     nested_client_field_imports: &mut ParamTypeImports,
@@ -654,7 +654,9 @@ pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProt
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn generate_client_field_updatable_data_type<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_client_field_updatable_data_type<
+    TNetworkProtocol: NetworkProtocol + 'static,
+>(
     schema: &Schema<TNetworkProtocol>,
     selection_map: &[WithSpan<ValidatedSelection>],
     nested_client_field_imports: &mut ParamTypeImports,
@@ -685,7 +687,7 @@ pub(crate) fn generate_client_field_updatable_data_type<TNetworkProtocol: Networ
 }
 
 #[allow(clippy::too_many_arguments)]
-fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
+fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
@@ -808,7 +810,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
+fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     query_type_declaration: &mut String,
     nested_client_field_imports: &mut BTreeSet<ParentObjectEntityNameAndSelectableName>,
@@ -883,7 +885,7 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
+fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
@@ -1047,7 +1049,7 @@ fn write_getter_and_setter(
     ));
 }
 
-fn get_loadable_field_type_from_arguments<TNetworkProtocol: NetworkProtocol>(
+fn get_loadable_field_type_from_arguments<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     arguments: Vec<ValidatedVariableDefinition>,
 ) -> String {
@@ -1070,7 +1072,7 @@ fn get_loadable_field_type_from_arguments<TNetworkProtocol: NetworkProtocol>(
     loadable_field_type
 }
 
-fn format_type_for_js<TNetworkProtocol: NetworkProtocol>(
+fn format_type_for_js<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     type_: GraphQLTypeAnnotation<ServerEntityName>,
 ) -> String {
@@ -1119,7 +1121,7 @@ fn format_type_for_js_inner(
     }
 }
 
-pub(crate) fn generate_parameters<'a, TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_parameters<'a, TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     argument_definitions: impl Iterator<Item = &'a VariableDefinition<ServerEntityName>>,
 ) -> String {

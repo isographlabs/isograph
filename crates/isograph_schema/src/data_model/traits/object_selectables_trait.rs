@@ -25,7 +25,7 @@ pub trait ClientOrServerObjectSelectable {
     fn target_object_entity_name(&self) -> TypeAnnotation<ServerObjectEntityName>;
 }
 
-impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
+impl<TNetworkProtocol: NetworkProtocol + 'static> ClientOrServerObjectSelectable
     for &ClientObjectSelectable<TNetworkProtocol>
 {
     fn description(&self) -> Option<Description> {
@@ -45,7 +45,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
+impl<TNetworkProtocol: NetworkProtocol + 'static> ClientOrServerObjectSelectable
     for &ServerObjectSelectable<TNetworkProtocol>
 {
     fn description(&self) -> Option<Description> {

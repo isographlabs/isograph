@@ -319,7 +319,7 @@ fn hover_text_for_selectable(
     )
 }
 
-fn format_hover_for_entity<TNetworkProtocol: NetworkProtocol>(
+fn format_hover_for_entity<TNetworkProtocol: NetworkProtocol + 'static>(
     entity: &ServerObjectEntity<TNetworkProtocol>,
 ) -> String {
     let object_entity_name = entity.name.item;

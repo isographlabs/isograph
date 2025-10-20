@@ -8,7 +8,7 @@ use intern::{Lookup, string_key::Intern};
 use serde::Deserialize;
 use thiserror::Error;
 
-impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {}
+impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {}
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, PartialOrd, Ord, Hash)]
 #[serde(deny_unknown_fields)]

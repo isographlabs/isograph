@@ -41,7 +41,7 @@ fn graphql_type_to_nullable_type<TValue>(
     }
 }
 
-fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
+fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol + 'static>(
     scalar_literal_name: ServerScalarEntityName,
     type_: &GraphQLTypeAnnotation<ServerEntityName>,
     schema_data: &ServerEntityData<TNetworkProtocol>,
@@ -147,7 +147,7 @@ fn variable_type_satisfies_argument_type(
     }
 }
 
-pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
+pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol + 'static>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
     field_argument_definition_type: &GraphQLTypeAnnotation<ServerEntityName>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
@@ -331,7 +331,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
+fn object_satisfies_type<TNetworkProtocol: NetworkProtocol + 'static>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
     variable_definitions: &[WithSpan<VariableDefinition<ServerEntityName>>],
     server_entity_data: &ServerEntityData<TNetworkProtocol>,
@@ -406,7 +406,7 @@ enum ObjectLiteralFieldType {
     Missing(SelectableName),
 }
 
-fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtocol>(
+fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtocol + 'static>(
     server_entity_data: &ServerEntityData<TNetworkProtocol>,
     server_scalar_selectables: &HashMap<
         (ServerObjectEntityName, ServerScalarSelectableName),
@@ -507,7 +507,7 @@ fn validate_no_extraneous_fields(
     Ok(())
 }
 
-fn id_annotation_to_typename_annotation<TNetworkProtocol: NetworkProtocol>(
+fn id_annotation_to_typename_annotation<TNetworkProtocol: NetworkProtocol + 'static>(
     type_: &GraphQLTypeAnnotation<ServerEntityName>,
     schema_data: &ServerEntityData<TNetworkProtocol>,
 ) -> GraphQLTypeAnnotation<UnvalidatedTypeName> {
@@ -533,7 +533,7 @@ fn id_annotation_to_typename_annotation<TNetworkProtocol: NetworkProtocol>(
     })
 }
 
-fn enum_satisfies_type<TNetworkProtocol: NetworkProtocol>(
+fn enum_satisfies_type<TNetworkProtocol: NetworkProtocol + 'static>(
     enum_literal_value: &EnumLiteralValue,
     enum_type: &GraphQLNamedTypeAnnotation<ServerEntityName>,
     schema_data: &ServerEntityData<TNetworkProtocol>,
@@ -569,7 +569,7 @@ fn enum_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
+fn list_satisfies_type<TNetworkProtocol: NetworkProtocol + 'static>(
     list: &[WithLocation<NonConstantValue>],
     list_type: GraphQLListTypeAnnotation<ServerEntityName>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],

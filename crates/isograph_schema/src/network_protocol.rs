@@ -65,7 +65,7 @@ where
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol> {
+pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol + 'static> {
     pub server_object_entity: WithLocation<ServerObjectEntity<TNetworkProtocol>>,
     pub fields_to_insert: Vec<WithLocation<FieldToInsert>>,
     // TODO this seems sketch

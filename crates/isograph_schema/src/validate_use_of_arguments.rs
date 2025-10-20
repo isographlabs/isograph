@@ -35,7 +35,7 @@ lazy_static! {
 /// This should not be validated here, and can be fixed with better modeling (i.e.
 /// have different associated data for fields that points to server objects and
 /// fields that point to client objects.)
-pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
+pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol + 'static>(
     validated_schema: &Schema<TNetworkProtocol>,
 ) -> Result<(), Vec<WithLocation<ValidateUseOfArgumentsError>>> {
     let mut errors = vec![];
@@ -61,7 +61,7 @@ pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
+fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     client_type: impl ClientScalarOrObjectSelectable,
     errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError>>,
@@ -184,7 +184,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
+fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError>>,
     reachable_variables: &mut BTreeSet<VariableName>,

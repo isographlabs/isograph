@@ -208,7 +208,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     ]
 }
 
-fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
+fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol + 'static>(
     reachable_variables: &BTreeSet<VariableName>,
     entrypoint: &ClientSelectable<TNetworkProtocol>,
 ) -> Vec<VariableDefinition<ServerEntityName>> {

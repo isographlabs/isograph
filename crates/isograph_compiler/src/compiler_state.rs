@@ -13,12 +13,12 @@ use crate::{batch_compile::BatchCompileError, source_files::initialize_sources};
 const GC_DURATION_SECONDS: u64 = 60;
 
 #[derive(Debug)]
-pub struct CompilerState<TNetworkProtocol: NetworkProtocol> {
+pub struct CompilerState<TNetworkProtocol: NetworkProtocol + 'static> {
     pub db: IsographDatabase<TNetworkProtocol>,
     pub last_gc_run: Instant,
 }
 
-impl<TNetworkProtocol: NetworkProtocol> CompilerState<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol + 'static> CompilerState<TNetworkProtocol> {
     pub fn new(
         config_location: &PathBuf,
         current_working_directory: CurrentWorkingDirectory,

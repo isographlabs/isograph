@@ -44,7 +44,7 @@ pub struct RootOperationName(pub &'static str);
 
 /// The in-memory representation of a schema.
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Schema<TNetworkProtocol: NetworkProtocol> {
+pub struct Schema<TNetworkProtocol: NetworkProtocol + 'static> {
     pub server_scalar_selectables: HashMap<
         (ServerObjectEntityName, ServerScalarSelectableName),
         ServerScalarSelectable<TNetworkProtocol>,
@@ -70,13 +70,13 @@ pub struct Schema<TNetworkProtocol: NetworkProtocol> {
     pub fetchable_types: BTreeMap<ServerObjectEntityName, RootOperationName>,
 }
 
-impl<TNetworkProtocol: NetworkProtocol> Default for Schema<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol + 'static> Default for Schema<TNetworkProtocol> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     pub fn new() -> Self {
         Self {
             server_scalar_selectables: HashMap::new(),
@@ -314,7 +314,7 @@ pub struct ServerObjectEntityExtraInfo {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
+pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol + 'static> {
     // TODO consider combining these.
     pub server_object_entities:
         HashMap<ServerObjectEntityName, ServerObjectEntity<TNetworkProtocol>>,
@@ -331,7 +331,7 @@ pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
         HashMap<ServerObjectEntityName, ServerObjectEntityExtraInfo>,
 }
 
-impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     pub fn server_scalar_selectable(
         &self,
         parent_object_entity_name: ServerObjectEntityName,
@@ -635,7 +635,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol + 'static> ServerEntityData<TNetworkProtocol> {
     pub fn server_scalar_entity(
         &self,
         server_scalar_entity_name: ServerScalarEntityName,

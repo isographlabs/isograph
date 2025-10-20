@@ -473,7 +473,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     }
 }
 
-fn create_field_traversal_result<TNetworkProtocol: NetworkProtocol>(
+fn create_field_traversal_result<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     validated_selections: &[WithSpan<ValidatedSelection>],
@@ -529,7 +529,7 @@ pub fn imperative_field_subfields_or_inline_fragments(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtocol>(
+fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
@@ -650,7 +650,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
 }
 
 #[allow(clippy::too_many_arguments)]
-fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
+fn merge_server_object_field<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut BTreeMap<NormalizationKey, MergedServerSelection>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
@@ -822,7 +822,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
+fn merge_client_object_field<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut BTreeMap<NormalizationKey, MergedServerSelection>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
@@ -878,7 +878,7 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
+fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut BTreeMap<NormalizationKey, MergedServerSelection>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
@@ -973,7 +973,7 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
+fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
@@ -1041,7 +1041,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
 }
 
 #[allow(clippy::too_many_arguments)]
-fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
+fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
@@ -1173,7 +1173,7 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
+fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol + 'static>(
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
@@ -1276,7 +1276,9 @@ fn merge_server_scalar_field(
     }
 }
 
-fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkProtocol>(
+fn select_typename_and_id_fields_in_merged_selection<
+    TNetworkProtocol: NetworkProtocol + 'static,
+>(
     schema: &Schema<TNetworkProtocol>,
     merged_selection_map: &mut MergedSelectionMap,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
@@ -1418,7 +1420,7 @@ pub fn id_arguments() -> Vec<VariableDefinition<ServerEntityName>> {
     }]
 }
 
-pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
+pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     server_object_selectable: &ServerObjectSelectable<TNetworkProtocol>,
 ) -> Vec<WithSpan<ValidatedSelection>> {

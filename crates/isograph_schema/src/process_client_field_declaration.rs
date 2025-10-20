@@ -40,7 +40,7 @@ pub struct UnprocessedClientPointerItem {
 }
 pub type UnprocessedItem = SelectionType<UnprocessedClientFieldItem, UnprocessedClientPointerItem>;
 
-impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     pub fn process_client_field_declaration(
         &mut self,
         client_field_declaration: WithSpan<ClientFieldDeclaration>,

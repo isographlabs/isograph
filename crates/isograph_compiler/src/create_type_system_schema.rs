@@ -342,7 +342,7 @@ pub enum CreateSchemaError<TNetworkProtocol: NetworkProtocol + 'static> {
     },
 }
 
-impl<TNetworkProtocol: NetworkProtocol> From<WithLocation<CreateAdditionalFieldsError>>
+impl<TNetworkProtocol: NetworkProtocol + 'static> From<WithLocation<CreateAdditionalFieldsError>>
     for CreateSchemaError<TNetworkProtocol>
 {
     fn from(value: WithLocation<CreateAdditionalFieldsError>) -> Self {

@@ -11,7 +11,7 @@ use isograph_schema::{
 
 use crate::generate_artifacts::{ISO_TS_FILE_NAME, print_javascript_type_declaration};
 
-fn build_iso_overload_for_entrypoint<TNetworkProtocol: NetworkProtocol>(
+fn build_iso_overload_for_entrypoint<TNetworkProtocol: NetworkProtocol + 'static>(
     validated_client_field: &ClientScalarSelectable<TNetworkProtocol>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> (String, String) {
@@ -40,7 +40,7 @@ export function iso<T>(
     (import, s)
 }
 
-fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol>(
+fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol + 'static>(
     client_type_and_variant: (ClientSelectable<TNetworkProtocol>, ClientFieldDirectiveSet),
     file_extensions: GenerateFileExtensionsOption,
     link_types: &mut BTreeSet<ServerObjectEntityName>,
@@ -107,7 +107,7 @@ export function iso<T>(
     (import, s)
 }
 
-pub(crate) fn build_iso_overload_artifact<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn build_iso_overload_artifact<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     file_extensions: GenerateFileExtensionsOption,
     no_babel_transform: bool,
@@ -255,7 +255,7 @@ export function iso(isographLiteralText: string):
     }
 }
 
-fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
+fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
 ) -> Vec<(
     ClientSelectable<'_, TNetworkProtocol>,
@@ -283,7 +283,7 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
     client_types
 }
 
-fn sorted_entrypoints<TNetworkProtocol: NetworkProtocol>(
+fn sorted_entrypoints<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
 ) -> Vec<(
     &ClientScalarSelectable<TNetworkProtocol>,

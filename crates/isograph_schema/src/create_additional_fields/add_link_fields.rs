@@ -7,7 +7,7 @@ use super::create_additional_fields_error::{
     CreateAdditionalFieldsError, ProcessTypeDefinitionResult,
 };
 
-impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     pub fn add_link_fields(&mut self) -> ProcessTypeDefinitionResult<()> {
         let mut selectables_to_process = vec![];
         for object in &mut self.server_entity_data.server_object_entities_mut() {

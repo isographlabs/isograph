@@ -26,7 +26,7 @@ use crate::{
     reader_ast::generate_reader_ast,
 };
 
-pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     client_selectable: &ClientSelectable<TNetworkProtocol>,
     config: &CompilerConfig,
@@ -162,7 +162,9 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
     path_and_contents
 }
 
-pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_eager_reader_condition_artifact<
+    TNetworkProtocol: NetworkProtocol + 'static,
+>(
     schema: &Schema<TNetworkProtocol>,
     server_object_selectable: &ServerObjectSelectable<TNetworkProtocol>,
     inline_fragment_reader_selections: &[WithSpan<ValidatedSelection>],
@@ -238,7 +240,9 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
     }
 }
 
-pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_eager_reader_param_type_artifact<
+    TNetworkProtocol: NetworkProtocol + 'static,
+>(
     schema: &Schema<TNetworkProtocol>,
     client_scalar_selectable: &ClientSelectable<TNetworkProtocol>,
     file_extensions: GenerateFileExtensionsOption,
@@ -343,7 +347,9 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     }
 }
 
-pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_eager_reader_output_type_artifact<
+    TNetworkProtocol: NetworkProtocol + 'static,
+>(
     schema: &Schema<TNetworkProtocol>,
     client_field: &ClientSelectable<TNetworkProtocol>,
     config: &CompilerConfig,
@@ -398,7 +404,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
     }
 }
 
-pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ArtifactPathAndContent {

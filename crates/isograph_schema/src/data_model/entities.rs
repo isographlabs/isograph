@@ -9,7 +9,7 @@ use isograph_lang_types::{DefinitionLocation, Description, SelectionType};
 use crate::{ClientSelectableId, NetworkProtocol, ServerSelectableId};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct ServerScalarEntity<TNetworkProtocol: NetworkProtocol> {
+pub struct ServerScalarEntity<TNetworkProtocol: NetworkProtocol + 'static> {
     // TODO make this a WithLocation or just an Option<Description>
     pub description: Option<WithSpan<Description>>,
     pub name: WithLocation<ServerScalarEntityName>,
@@ -22,7 +22,7 @@ pub type SelectableId = DefinitionLocation<ServerSelectableId, ClientSelectableI
 pub type ServerObjectEntityAvailableSelectables = BTreeMap<SelectableName, SelectableId>;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct ServerObjectEntity<TNetworkProtocol: NetworkProtocol> {
+pub struct ServerObjectEntity<TNetworkProtocol: NetworkProtocol + 'static> {
     pub description: Option<Description>,
     pub name: WithEmbeddedLocation<ServerObjectEntityName>,
     /// Some if the object is concrete; None otherwise.

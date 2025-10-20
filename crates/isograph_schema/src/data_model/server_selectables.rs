@@ -11,7 +11,7 @@ use isograph_lang_types::{
 use crate::{NetworkProtocol, SelectableTrait, ServerEntityName, ServerObjectSelectableVariant};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
+pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol + 'static> {
     pub description: Option<Description>,
     pub name: WithLocation<ServerScalarSelectableName>,
 
@@ -48,7 +48,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> SelectableTrait
 impl_with_target_id!(ServerScalarSelectable<TNetworkProtocol: NetworkProtocol>, ServerEntityName);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
+pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol + 'static> {
     pub description: Option<Description>,
     pub name: WithLocation<ServerObjectSelectableName>,
 

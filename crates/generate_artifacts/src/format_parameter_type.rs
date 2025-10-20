@@ -6,7 +6,7 @@ use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 use isograph_lang_types::{DefinitionLocation, SelectionType, TypeAnnotation, UnionVariant};
 use isograph_schema::{NetworkProtocol, Schema, ServerEntityName, ServerSelectableId};
 
-pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     type_: GraphQLTypeAnnotation<ServerEntityName>,
     indentation_level: u8,
@@ -38,7 +38,7 @@ pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
+fn format_server_field_type<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     field: ServerEntityName,
     indentation_level: u8,
@@ -86,7 +86,7 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
+fn format_field_definition<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     name: &SelectableName,
     server_selectable_id: ServerSelectableId,
@@ -129,7 +129,7 @@ fn is_nullable<T: Ord + Debug>(type_annotation: &TypeAnnotation<T>) -> bool {
     }
 }
 
-fn format_type_annotation<TNetworkProtocol: NetworkProtocol>(
+fn format_type_annotation<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     type_annotation: &TypeAnnotation<ServerEntityName>,
     indentation_level: u8,

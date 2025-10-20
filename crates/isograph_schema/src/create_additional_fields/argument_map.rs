@@ -31,7 +31,7 @@ impl ArgumentMap {
         }
     }
 
-    pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol>(
+    pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol + 'static>(
         &mut self,
         field_map_item: FieldMapItem,
         primary_type_name: ServerObjectEntityName,
@@ -185,7 +185,7 @@ impl ModifiedArgument {
     /// an existing object.
     ///
     /// This panics if unmodified's type is a scalar.
-    pub fn from_unmodified<TNetworkProtocol: NetworkProtocol>(
+    pub fn from_unmodified<TNetworkProtocol: NetworkProtocol + 'static>(
         unmodified: &VariableDefinition<ServerEntityName>,
         schema: &Schema<TNetworkProtocol>,
     ) -> Self {
