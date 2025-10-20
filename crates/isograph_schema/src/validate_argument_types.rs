@@ -17,9 +17,9 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ID_ENTITY_NAME, NetworkProtocol, ServerEntityData, ServerEntityName,
-    ServerObjectEntityAvailableSelectables, ServerObjectSelectable, ServerScalarSelectable,
-    ValidatedVariableDefinition,
+    BOOLEAN_ENTITY_NAME, FLOAT_ENTITY_NAME, ID_ENTITY_NAME, INT_ENTITY_NAME, NetworkProtocol,
+    STRING_ENTITY_NAME, ServerEntityData, ServerEntityName, ServerObjectEntityAvailableSelectables,
+    ServerObjectSelectable, ServerScalarSelectable, ValidatedVariableDefinition,
 };
 
 fn graphql_type_to_non_null_type<TValue>(
@@ -189,14 +189,14 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             }
         }
         NonConstantValue::Integer(_) => scalar_literal_satisfies_type(
-            schema_data.int_type_name,
+            *INT_ENTITY_NAME,
             field_argument_definition_type,
             schema_data,
             selection_supplied_argument_value.location,
         )
         .or_else(|error| {
             scalar_literal_satisfies_type(
-                schema_data.float_type_name,
+                *FLOAT_ENTITY_NAME,
                 field_argument_definition_type,
                 schema_data,
                 selection_supplied_argument_value.location,
@@ -213,13 +213,13 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             .map_err(|_| error)
         }),
         NonConstantValue::Boolean(_) => scalar_literal_satisfies_type(
-            schema_data.boolean_type_name,
+            *BOOLEAN_ENTITY_NAME,
             field_argument_definition_type,
             schema_data,
             selection_supplied_argument_value.location,
         ),
         NonConstantValue::String(_) => scalar_literal_satisfies_type(
-            schema_data.string_type_name,
+            *STRING_ENTITY_NAME,
             field_argument_definition_type,
             schema_data,
             selection_supplied_argument_value.location,
@@ -234,7 +234,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             .map_err(|_| error)
         }),
         NonConstantValue::Float(_) => scalar_literal_satisfies_type(
-            schema_data.float_type_name,
+            *FLOAT_ENTITY_NAME,
             field_argument_definition_type,
             schema_data,
             selection_supplied_argument_value.location,

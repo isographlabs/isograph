@@ -31,6 +31,10 @@ use crate::{
 
 lazy_static! {
     pub static ref ID_ENTITY_NAME: ServerScalarEntityName = "ID".intern().into();
+    pub static ref STRING_ENTITY_NAME: ServerScalarEntityName = "String".intern().into();
+    pub static ref INT_ENTITY_NAME: ServerScalarEntityName = "Int".intern().into();
+    pub static ref FLOAT_ENTITY_NAME: ServerScalarEntityName = "Float".intern().into();
+    pub static ref BOOLEAN_ENTITY_NAME: ServerScalarEntityName = "Boolean".intern().into();
     pub static ref ID_FIELD_NAME: ServerScalarSelectableName = "id".intern().into();
     pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
 }
@@ -84,25 +88,25 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             "ID",
             *STRING_JAVASCRIPT_TYPE,
         );
-        let string_type_name = add_schema_defined_scalar_type(
+        let _string_type_name = add_schema_defined_scalar_type(
             &mut scalars,
             &mut defined_types,
             "String",
             *STRING_JAVASCRIPT_TYPE,
         );
-        let boolean_type_name = add_schema_defined_scalar_type(
+        let _boolean_type_name = add_schema_defined_scalar_type(
             &mut scalars,
             &mut defined_types,
             "Boolean",
             "boolean".intern().into(),
         );
-        let float_type_name = add_schema_defined_scalar_type(
+        let _float_type_name = add_schema_defined_scalar_type(
             &mut scalars,
             &mut defined_types,
             "Float",
             "number".intern().into(),
         );
-        let int_type_name = add_schema_defined_scalar_type(
+        let _int_type_name = add_schema_defined_scalar_type(
             &mut scalars,
             &mut defined_types,
             "Int",
@@ -121,11 +125,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 server_scalar_entities: scalars,
                 defined_entities: defined_types,
                 server_object_entity_extra_info: HashMap::new(),
-
-                string_type_name,
-                int_type_name,
-                float_type_name,
-                boolean_type_name,
             },
             fetchable_types: BTreeMap::new(),
         }
@@ -365,14 +364,6 @@ pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
     // we don't need a server_object_entity_mut method, which is incompatible with pico.
     pub server_object_entity_extra_info:
         HashMap<ServerObjectEntityName, ServerObjectEntityExtraInfo>,
-
-    // TODO remove. These are GraphQL-isms. And we can just hard code them, they're
-    // just interned strings!
-    // Well known types
-    pub string_type_name: ServerScalarEntityName,
-    pub float_type_name: ServerScalarEntityName,
-    pub boolean_type_name: ServerScalarEntityName,
-    pub int_type_name: ServerScalarEntityName,
 }
 
 impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
