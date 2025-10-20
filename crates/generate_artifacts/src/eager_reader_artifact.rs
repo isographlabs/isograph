@@ -5,8 +5,9 @@ use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 use isograph_lang_types::{ClientFieldDirectiveSet, SelectionType};
 use isograph_schema::{
-    ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, LINK_FIELD_NAME,
-    NetworkProtocol, Schema, ServerObjectSelectable, ValidatedSelection, initial_variable_context,
+    ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, IsographDatabase,
+    LINK_FIELD_NAME, NetworkProtocol, Schema, ServerObjectSelectable, ValidatedSelection,
+    initial_variable_context,
 };
 use isograph_schema::{RefetchedPathsMap, UserWrittenClientTypeInfo};
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
@@ -26,7 +27,9 @@ use crate::{
     reader_ast::generate_reader_ast,
 };
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     client_selectable: &ClientSelectable<TNetworkProtocol>,
     config: &CompilerConfig,
@@ -146,7 +149,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol 
             .variable_definitions()
             .iter()
             .map(|x| &x.item);
-        let parameters_types = generate_parameters(schema, parameters);
+        let parameters_types = generate_parameters(db, schema, parameters);
         let parameters_content =
             format!("export type {reader_parameters_type} = {parameters_types}\n");
         path_and_contents.push(ArtifactPathAndContent {

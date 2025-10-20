@@ -1,12 +1,16 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, ops::Deref};
 
 use common_lang_types::SelectableName;
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 
 use isograph_lang_types::{DefinitionLocation, SelectionType, TypeAnnotation, UnionVariant};
-use isograph_schema::{NetworkProtocol, Schema, ServerEntityName, ServerSelectableId};
+use isograph_schema::{
+    IsographDatabase, NetworkProtocol, Schema, ServerEntityName, ServerSelectableId,
+    server_scalar_entity_named,
+};
 
 pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     type_: GraphQLTypeAnnotation<ServerEntityName>,
     indentation_level: u8,
@@ -15,23 +19,23 @@ pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol + 'static>
         GraphQLTypeAnnotation::Named(named_inner_type) => {
             format!(
                 "{} | null | void",
-                format_server_field_type(schema, named_inner_type.item, indentation_level)
+                format_server_field_type(db, schema, named_inner_type.item, indentation_level)
             )
         }
         GraphQLTypeAnnotation::List(list) => {
             format!(
                 "ReadonlyArray<{}> | null",
-                format_server_field_type(schema, *list.inner(), indentation_level)
+                format_server_field_type(db, schema, *list.inner(), indentation_level)
             )
         }
         GraphQLTypeAnnotation::NonNull(non_null) => match *non_null {
             GraphQLNonNullTypeAnnotation::Named(named_inner_type) => {
-                format_server_field_type(schema, named_inner_type.item, indentation_level)
+                format_server_field_type(db, schema, named_inner_type.item, indentation_level)
             }
             GraphQLNonNullTypeAnnotation::List(list) => {
                 format!(
                     "ReadonlyArray<{}>",
-                    format_server_field_type(schema, *list.inner(), indentation_level)
+                    format_server_field_type(db, schema, *list.inner(), indentation_level)
                 )
             }
         },
@@ -39,6 +43,7 @@ pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol + 'static>
 }
 
 fn format_server_field_type<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     field: ServerEntityName,
     indentation_level: u8,
@@ -64,6 +69,7 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol + 'static>(
                 )
             {
                 let field_type = format_field_definition(
+        db,
                     schema,
                     name,
                     server_selectable_id,
@@ -74,19 +80,29 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol + 'static>(
             s.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
             s
         }
-        ServerEntityName::Scalar(scalar_entity_name) => schema
-            .server_entity_data
-            .server_scalar_entity(scalar_entity_name)
-            .expect(
-                "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-            )
-            .javascript_name
-            .to_string(),
+        ServerEntityName::Scalar(scalar_entity_name) => {
+            let memo_ref = server_scalar_entity_named(db, scalar_entity_name);
+            memo_ref
+                .deref()
+                .as_ref()
+                .expect(
+                    "Expected parsing to not have failed. \
+                    This is indicative of a bug in Isograph.",
+                )
+                .as_ref()
+                .expect(
+                    "Expected entity to exist. \
+                    This is indicative of a bug in Isograph.",
+                )
+                .item
+                .javascript_name
+                .to_string()
+        }
     }
 }
 
 fn format_field_definition<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     name: &SelectableName,
     server_selectable_id: ServerSelectableId,
@@ -117,7 +133,7 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol + 'static>(
         "  ".repeat(indentation_level as usize),
         name,
         if is_optional { "?" } else { "" },
-        format_type_annotation(schema, &selection_type, indentation_level + 1),
+        format_type_annotation(db, schema, &selection_type, indentation_level + 1),
     )
 }
 
@@ -130,13 +146,14 @@ fn is_nullable<T: Ord + Debug>(type_annotation: &TypeAnnotation<T>) -> bool {
 }
 
 fn format_type_annotation<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     type_annotation: &TypeAnnotation<ServerEntityName>,
     indentation_level: u8,
 ) -> String {
     match &type_annotation {
         TypeAnnotation::Scalar(scalar) => {
-            format_server_field_type(schema, *scalar, indentation_level + 1)
+            format_server_field_type(db, schema, *scalar, indentation_level + 1)
         }
         TypeAnnotation::Union(union_type_annotation) => {
             if union_type_annotation.variants.is_empty() {
@@ -154,6 +171,7 @@ fn format_type_annotation<TNetworkProtocol: NetworkProtocol + 'static>(
                     match variant {
                         UnionVariant::Scalar(scalar) => {
                             s.push_str(&format_server_field_type(
+                                db,
                                 schema,
                                 *scalar,
                                 indentation_level + 1,
@@ -162,6 +180,7 @@ fn format_type_annotation<TNetworkProtocol: NetworkProtocol + 'static>(
                         UnionVariant::Plural(type_annotation) => {
                             s.push_str("ReadonlyArray<");
                             s.push_str(&format_type_annotation(
+                                db,
                                 schema,
                                 type_annotation,
                                 indentation_level + 1,
@@ -182,12 +201,13 @@ fn format_type_annotation<TNetworkProtocol: NetworkProtocol + 'static>(
                     .expect("Expected variant to exist");
                 match variant {
                     UnionVariant::Scalar(scalar) => {
-                        format_server_field_type(schema, *scalar, indentation_level + 1)
+                        format_server_field_type(db, schema, *scalar, indentation_level + 1)
                     }
                     UnionVariant::Plural(type_annotation) => {
                         format!(
                             "ReadonlyArray<{}>",
                             format_server_field_type(
+                                db,
                                 schema,
                                 *type_annotation.inner(),
                                 indentation_level + 1
@@ -200,7 +220,12 @@ fn format_type_annotation<TNetworkProtocol: NetworkProtocol + 'static>(
         TypeAnnotation::Plural(type_annotation) => {
             format!(
                 "ReadonlyArray<{}>",
-                format_server_field_type(schema, *type_annotation.inner(), indentation_level + 1)
+                format_server_field_type(
+                    db,
+                    schema,
+                    *type_annotation.inner(),
+                    indentation_level + 1
+                )
             )
         }
     }

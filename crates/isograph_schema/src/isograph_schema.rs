@@ -657,7 +657,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> ServerEntityData<TNetworkProto
         self.server_object_entities.values_mut()
     }
 
-    // TODO this function should not exist
+    // TODO this function should not exist ... maybe soon!
     pub fn insert_server_scalar_entity(
         &mut self,
         server_scalar_entity: ServerScalarEntity<TNetworkProtocol>,

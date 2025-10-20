@@ -28,6 +28,7 @@ use isograph_schema::{
 };
 use std::collections::BTreeSet;
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,

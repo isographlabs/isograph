@@ -210,6 +210,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol + 'stati
                         This is indicative of a bug in Isograph.",
                     );
                 path_and_contents.extend(generate_eager_reader_artifacts(
+                    db,
                     schema,
                     &SelectionType::Object(client_object_selectable),
                     config,
@@ -243,6 +244,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol + 'stati
                     ClientFieldVariant::Link => (),
                     ClientFieldVariant::UserWritten(info) => {
                         path_and_contents.extend(generate_eager_reader_artifacts(
+                            db,
                             schema,
                             &SelectionType::Scalar(client_scalar_selectable),
                             config,
@@ -1122,6 +1124,7 @@ fn format_type_for_js_inner(
 }
 
 pub(crate) fn generate_parameters<'a, TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     argument_definitions: impl Iterator<Item = &'a VariableDefinition<ServerEntityName>>,
 ) -> String {
@@ -1133,7 +1136,7 @@ pub(crate) fn generate_parameters<'a, TNetworkProtocol: NetworkProtocol + 'stati
             "{indent}readonly {}{}: {},\n",
             arg.name.item,
             if is_optional { "?" } else { "" },
-            format_parameter_type(schema, arg.type_.clone(), 1)
+            format_parameter_type(db, schema, arg.type_.clone(), 1)
         ));
     }
     s.push_str("};");
