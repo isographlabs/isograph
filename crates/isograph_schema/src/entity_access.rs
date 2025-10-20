@@ -1,11 +1,15 @@
 use std::ops::Deref;
 
-use common_lang_types::{ServerObjectEntityName, UnvalidatedTypeName, WithLocation};
+use common_lang_types::{
+    ServerObjectEntityName, ServerScalarEntityName, UnvalidatedTypeName, WithLocation,
+};
 use isograph_lang_types::SelectionType;
 use pico_macros::memo;
 use thiserror::Error;
 
-use crate::{IsographDatabase, NetworkProtocol, OwnedServerEntity, ServerObjectEntity};
+use crate::{
+    IsographDatabase, NetworkProtocol, OwnedServerEntity, ServerObjectEntity, ServerScalarEntity,
+};
 
 // TODO consider adding a memoized function that creates a map of entities (maybe
 // with untracked access?) and going through that.
@@ -94,6 +98,40 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
             } else {
                 Err(EntityAccessError::MultipleDefinitionsFound {
                     server_entity_name: server_object_entity_name.into(),
+                })
+            }
+        }
+        None => Ok(None),
+    }
+}
+
+#[memo]
+pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    server_scalar_entity_name: ServerScalarEntityName,
+) -> Result<
+    Option<WithLocation<ServerScalarEntity<TNetworkProtocol>>>,
+    EntityAccessError<TNetworkProtocol::ParseTypeSystemDocumentsError>,
+> {
+    let memo_ref = server_entities_named(db, server_scalar_entity_name.into());
+    let entities = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
+
+    match entities.split_first() {
+        Some((first, rest)) => {
+            if rest.is_empty() {
+                match first {
+                    SelectionType::Scalar(s) => Ok(Some(s.clone())),
+                    SelectionType::Object(_) => {
+                        Err(EntityAccessError::IncorrectEntitySelectionType {
+                            server_entity_name: server_scalar_entity_name.into(),
+                            actual_entity_type: "an object",
+                            intended_entity_type: "a scalar",
+                        })
+                    }
+                }
+            } else {
+                Err(EntityAccessError::MultipleDefinitionsFound {
+                    server_entity_name: server_scalar_entity_name.into(),
                 })
             }
         }
