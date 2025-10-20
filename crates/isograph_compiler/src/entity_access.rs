@@ -1,9 +1,10 @@
 use std::ops::Deref;
 
-use common_lang_types::UnvalidatedTypeName;
+use common_lang_types::{ServerObjectEntityName, UnvalidatedTypeName, WithLocation};
 use isograph_lang_types::SelectionType;
-use isograph_schema::{IsographDatabase, NetworkProtocol, OwnedServerEntity};
+use isograph_schema::{IsographDatabase, NetworkProtocol, OwnedServerEntity, ServerObjectEntity};
 use pico_macros::memo;
+use thiserror::Error;
 
 #[memo]
 pub fn server_entities_named<TNetworkProtocol: NetworkProtocol + 'static>(
@@ -41,4 +42,58 @@ pub fn server_entities_named<TNetworkProtocol: NetworkProtocol + 'static>(
             }
         })
         .collect::<Vec<_>>())
+}
+
+#[derive(Debug, Error, PartialEq, Eq, Clone)]
+pub enum EntityAccessError<TParseTypeSystemDocumentsError> {
+    #[error("{0}")]
+    ParseTypeSystemDocumentsError(#[from] TParseTypeSystemDocumentsError),
+
+    #[error("Multiple definitions of {server_entity_name} found")]
+    MultipleDefinitionsFound {
+        server_entity_name: UnvalidatedTypeName,
+    },
+
+    #[error(
+        "{server_entity_name} is {actual_entity_type}, but it should be a {intended_entity_type}"
+    )]
+    IncorrectEntitySelectionType {
+        server_entity_name: UnvalidatedTypeName,
+        actual_entity_type: &'static str,
+        intended_entity_type: &'static str,
+    },
+}
+
+#[memo]
+pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    server_object_entity_name: ServerObjectEntityName,
+) -> Result<
+    Option<WithLocation<ServerObjectEntity<TNetworkProtocol>>>,
+    EntityAccessError<TNetworkProtocol::ParseTypeSystemDocumentsError>,
+> {
+    let memo_ref = server_entities_named(db, server_object_entity_name.into());
+    let entities = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
+
+    match entities.split_first() {
+        Some((first, rest)) => {
+            if rest.is_empty() {
+                match first {
+                    SelectionType::Object(o) => Ok(Some(o.clone())),
+                    SelectionType::Scalar(_) => {
+                        Err(EntityAccessError::IncorrectEntitySelectionType {
+                            server_entity_name: server_object_entity_name.into(),
+                            actual_entity_type: "a scalar",
+                            intended_entity_type: "an object",
+                        })
+                    }
+                }
+            } else {
+                Err(EntityAccessError::MultipleDefinitionsFound {
+                    server_entity_name: server_object_entity_name.into(),
+                })
+            }
+        }
+        None => Ok(None),
+    }
 }
