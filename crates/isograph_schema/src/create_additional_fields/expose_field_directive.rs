@@ -395,8 +395,8 @@ fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol + 'st
     Ok(processed_field_map_items)
 }
 
-fn traverse_object_selections<'a, TNetworkProtocol: NetworkProtocol + 'static>(
-    db: &'a IsographDatabase<TNetworkProtocol>,
+fn traverse_object_selections<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     root_object_name: ServerObjectEntityName,
     selections: impl Iterator<Item = ObjectSelectableName>,
