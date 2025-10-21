@@ -58,13 +58,12 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                 )
                 .is_some()
             {
-                return Err(WithLocation::new(
+                return Err(
                     CreateAdditionalFieldsError::CompilerCreatedFieldExistsOnType {
                         field_name: field_name.into(),
                         parent_type: object_name.item,
                     },
-                    Location::generated(),
-                ));
+                );
             }
         }
         Ok(())

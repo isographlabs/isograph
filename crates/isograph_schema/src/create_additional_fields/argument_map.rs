@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    Location, SelectableName, ServerObjectEntityName, StringLiteralValue, VariableName,
-    WithLocation,
+    SelectableName, ServerObjectEntityName, StringLiteralValue, VariableName, WithLocation,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
@@ -54,15 +53,12 @@ impl ArgumentMap {
                 name == split_to_arg.to_argument_name
             })
             .ok_or_else(|| {
-                WithLocation::new(
-                    CreateAdditionalFieldsError::PrimaryDirectiveArgumentDoesNotExistOnField {
-                        primary_type_name,
-                        mutation_object_name,
-                        mutation_field_name,
-                        field_name: split_to_arg.to_argument_name,
-                    },
-                    Location::generated(),
-                )
+                CreateAdditionalFieldsError::PrimaryDirectiveArgumentDoesNotExistOnField {
+                    primary_type_name,
+                    mutation_object_name,
+                    mutation_field_name,
+                    field_name: split_to_arg.to_argument_name,
+                }
             })?;
 
         // TODO avoid matching twice?
@@ -73,13 +69,12 @@ impl ArgumentMap {
                 match split_to_arg.to_field_names.split_first() {
                     None => {
                         if unmodified_argument.type_.inner().as_object().is_some() {
-                            return Err(WithLocation::new(
+                            return Err(
                                 CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
                                     primary_type_name,
                                     field_name: split_to_arg.to_argument_name.lookup().to_string(),
                                 },
-                                Location::generated(),
-                            ));
+                            );
                         }
 
                         self.arguments.swap_remove(index_of_argument);
@@ -107,13 +102,12 @@ impl ArgumentMap {
                         // TODO encode this in the type system.
                         // A modified argument will always have an object type, and cannot be remapped
                         // at the object level.
-                        return Err(WithLocation::new(
+                        return Err(
                             CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
                                 primary_type_name,
                                 field_name: split_to_arg.to_argument_name.lookup().to_string(),
                             },
-                            Location::generated(),
-                        ));
+                        );
                     }
                     Some((first, rest)) => {
                         modified.remove_to_field::<TNetworkProtocol>(
@@ -246,13 +240,12 @@ impl ModifiedArgument {
                         match field {
                             PotentiallyModifiedField::Unmodified(field_id) => {
                                 if field_id.as_object().is_some() {
-                                    return Err(WithLocation::new(
+                                    return Err(
                                         CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
                                             primary_type_name,
                                             field_name: key.lookup().to_string(),
-                                        },
-                                        Location::generated(),
-                                    ));
+                                        }
+                                    );
                                 }
 
                                 // Cool! We found a scalar, we can remove it.
@@ -263,26 +256,22 @@ impl ModifiedArgument {
                             }
                             PotentiallyModifiedField::Modified(_) => {
                                 // A field can only be modified if it has an object type
-                                return Err(WithLocation::new(
+                                return Err(
                                     CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
                                         primary_type_name,
                                         field_name: key.to_string(),
-                                    },
-                                    Location::generated(),
-                                ));
+                                    }
+                                );
                             }
                         }
                     }
                 }
             }
             None => {
-                return Err(WithLocation::new(
-                    CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
-                        primary_type_name,
-                        field_name: first,
-                    },
-                    Location::generated(),
-                ));
+                return Err(CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
+                    primary_type_name,
+                    field_name: first,
+                });
             }
         };
         Ok(())

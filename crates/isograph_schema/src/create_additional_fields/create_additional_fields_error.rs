@@ -1,7 +1,6 @@
 use crate::{EntityAccessError, NetworkProtocol, Schema};
 use common_lang_types::{
     SelectableName, ServerObjectEntityName, StringLiteralValue, UnvalidatedTypeName, VariableName,
-    WithLocation,
 };
 use intern::{Lookup, string_key::Intern};
 
@@ -42,9 +41,13 @@ impl FieldMapItem {
 pub(crate) struct ProcessedFieldMapItem(pub FieldMapItem);
 
 pub(crate) type ProcessTypeDefinitionResult<T, TNetworkProtocol> =
-    Result<T, WithLocation<CreateAdditionalFieldsError<TNetworkProtocol>>>;
+    Result<T, CreateAdditionalFieldsError<TNetworkProtocol>>;
 
 /// Errors that make semantic sense when referring to creating a GraphQL schema in-memory representation
+///
+/// TODO some variants here should contain locations, since we used to have
+/// WithLocation<CreateAdditionalFieldsError> everywhere, but we removed that. But it makes sense
+/// in some cases!
 #[derive(Error, Clone, Eq, PartialEq, Debug)]
 pub enum CreateAdditionalFieldsError<TNetworkProtocol: NetworkProtocol + 'static> {
     #[error(

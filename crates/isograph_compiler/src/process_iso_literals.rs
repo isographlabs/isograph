@@ -66,9 +66,9 @@ pub enum ProcessIsoLiteralsForSchemaError<TNetworkProtocol: NetworkProtocol + 's
         messages: Vec<WithLocation<ProcessClientFieldDeclarationError>>,
     },
 
-    #[error("{}", error.for_display())]
+    #[error("{}", error)]
     ProcessTypeDefinition {
-        error: WithLocation<CreateAdditionalFieldsError<TNetworkProtocol>>,
+        error: CreateAdditionalFieldsError<TNetworkProtocol>,
     },
 
     #[error(
@@ -140,10 +140,10 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> From<Vec<WithLocation<AddSelec
 }
 
 impl<TNetworkProtocol: NetworkProtocol + 'static>
-    From<WithLocation<CreateAdditionalFieldsError<TNetworkProtocol>>>
+    From<CreateAdditionalFieldsError<TNetworkProtocol>>
     for ProcessIsoLiteralsForSchemaError<TNetworkProtocol>
 {
-    fn from(value: WithLocation<CreateAdditionalFieldsError<TNetworkProtocol>>) -> Self {
+    fn from(value: CreateAdditionalFieldsError<TNetworkProtocol>) -> Self {
         ProcessIsoLiteralsForSchemaError::ProcessTypeDefinition { error: value }
     }
 }

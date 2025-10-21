@@ -4,10 +4,9 @@ use std::{
 };
 
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, JavascriptName, Location,
-    ObjectSelectableName, SelectableName, ServerObjectEntityName, ServerObjectSelectableName,
-    ServerScalarEntityName, ServerScalarIdSelectableName, ServerScalarSelectableName,
-    UnvalidatedTypeName, WithLocation,
+    ClientObjectSelectableName, ClientScalarSelectableName, JavascriptName, ObjectSelectableName,
+    SelectableName, ServerObjectEntityName, ServerObjectSelectableName, ServerScalarEntityName,
+    ServerScalarIdSelectableName, ServerScalarSelectableName, UnvalidatedTypeName,
 };
 use graphql_lang_types::GraphQLNamedTypeAnnotation;
 use intern::Lookup;
@@ -557,8 +556,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> ServerEntityData<TNetworkProto
     pub fn insert_server_scalar_entity(
         &mut self,
         server_scalar_entity_name: ServerScalarEntityName,
-        name_location: Location,
-    ) -> Result<(), WithLocation<CreateAdditionalFieldsError<TNetworkProtocol>>> {
+    ) -> Result<(), CreateAdditionalFieldsError<TNetworkProtocol>> {
         if self
             .defined_entities
             .insert(
@@ -567,13 +565,10 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> ServerEntityData<TNetworkProto
             )
             .is_some()
         {
-            return Err(WithLocation::new(
-                CreateAdditionalFieldsError::DuplicateTypeDefinition {
-                    type_definition_type: "scalar",
-                    type_name: server_scalar_entity_name.into(),
-                },
-                name_location,
-            ));
+            return Err(CreateAdditionalFieldsError::DuplicateTypeDefinition {
+                type_definition_type: "scalar",
+                type_name: server_scalar_entity_name.into(),
+            });
         }
 
         // there are no scalar entities anymore... so we don't actually insert anything
@@ -586,9 +581,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> ServerEntityData<TNetworkProto
     pub fn insert_server_object_entity(
         &mut self,
         server_server_object_entity: ServerObjectEntity<TNetworkProtocol>,
-        name_location: Location,
-    ) -> Result<ServerObjectEntityName, WithLocation<CreateAdditionalFieldsError<TNetworkProtocol>>>
-    {
+    ) -> Result<ServerObjectEntityName, CreateAdditionalFieldsError<TNetworkProtocol>> {
         let name = server_server_object_entity.name;
         if self
             .defined_entities
@@ -598,13 +591,10 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> ServerEntityData<TNetworkProto
             )
             .is_some()
         {
-            return Err(WithLocation::new(
-                CreateAdditionalFieldsError::DuplicateTypeDefinition {
-                    type_definition_type: "object",
-                    type_name: server_server_object_entity.name.item.into(),
-                },
-                name_location,
-            ));
+            return Err(CreateAdditionalFieldsError::DuplicateTypeDefinition {
+                type_definition_type: "object",
+                type_name: server_server_object_entity.name.item.into(),
+            });
         }
 
         self.server_object_entities.insert(

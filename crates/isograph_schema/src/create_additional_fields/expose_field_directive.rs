@@ -62,10 +62,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         db: &IsographDatabase<TNetworkProtocol>,
         expose_field_to_insert: ExposeAsFieldToInsert,
         parent_object_entity_name: ServerObjectEntityName,
-    ) -> Result<
-        UnprocessedClientFieldItem,
-        WithLocation<CreateAdditionalFieldsError<TNetworkProtocol>>,
-    > {
+    ) -> Result<UnprocessedClientFieldItem, CreateAdditionalFieldsError<TNetworkProtocol>> {
         let ExposeFieldDirective {
             expose_as,
             field_map,
@@ -137,8 +134,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                 self,
                 payload_object_entity_name,
                 primary_field_name_selection_parts.iter().copied(),
-            )
-            .map_err(|e| WithLocation::new(e, Location::generated()))?;
+            )?;
 
         let fields = processed_field_map_items
             .iter()
@@ -181,19 +177,17 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             .map(|x| x.item)
             .collect::<Vec<_>>();
 
-        let mut parts_reversed = self
-            .get_object_selections_path(
-                payload_object_entity_name,
-                primary_field_name_selection_parts.iter().copied(),
-            )
-            .map_err(|e| WithLocation::new(e, Location::generated()))?;
+        let mut parts_reversed = self.get_object_selections_path(
+            payload_object_entity_name,
+            primary_field_name_selection_parts.iter().copied(),
+        )?;
         parts_reversed.reverse();
 
         let mut subfields_or_inline_fragments = parts_reversed
             .iter()
             .map(|server_object_selectable| {
                 // The server object selectable may represent a linked field or an inline fragment
-                match server_object_selectable.object_selectable_variant {
+                let x = match server_object_selectable.object_selectable_variant {
                     ServerObjectSelectableVariant::LinkedField => {
                         WrappedSelectionMapSelection::LinkedField {
                             server_object_selectable_name: server_object_selectable.name.item,
@@ -202,17 +196,14 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                         }
                     }
                     ServerObjectSelectableVariant::InlineFragment => {
-                        WrappedSelectionMapSelection::InlineFragment({
+                        WrappedSelectionMapSelection::InlineFragment(
                             server_object_entity_named(
                                 db,
                                 *server_object_selectable.target_object_entity.inner(),
                             )
                             .deref()
                             .as_ref()
-                            .expect(
-                                "Expected parsing to not have failed. \
-                                This is indicative of a bug in Isograph.",
-                            )
+                            .map_err(|e| e.clone())?
                             .as_ref()
                             .expect(
                                 "Expected entity to exist. \
@@ -220,12 +211,13 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                             )
                             .item
                             .name
-                            .item
-                        })
+                            .item,
+                        )
                     }
-                }
+                };
+                Ok::<_, CreateAdditionalFieldsError<TNetworkProtocol>>(x)
             })
-            .collect::<Vec<_>>();
+            .collect::<Result<Vec<_>, _>>()?;
 
         subfields_or_inline_fragments.push(imperative_field_subfields_or_inline_fragments(
             top_level_schema_field_name,
@@ -295,7 +287,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         client_field_parent_object_entity_name: ServerObjectEntityName,
         client_field_name: ClientScalarSelectableName,
         payload_object_name: ServerObjectEntityName,
-    ) -> Result<(), WithLocation<CreateAdditionalFieldsError<TNetworkProtocol>>> {
+    ) -> Result<(), CreateAdditionalFieldsError<TNetworkProtocol>> {
         if self
             .server_entity_data
             .server_object_entity_extra_info
@@ -311,15 +303,13 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             )
             .is_some()
         {
-            return Err(WithLocation::new(
+            return Err(
                 // TODO use a more generic error message when making this
                 CreateAdditionalFieldsError::CompilerCreatedFieldExistsOnType {
                     field_name: mutation_field_name,
                     parent_type: payload_object_name,
                 },
-                // TODO this is blatantly incorrect
-                Location::generated(),
-            ));
+            );
         }
 
         Ok(())
@@ -353,14 +343,8 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                 }
                 None
             })
-            .ok_or_else(|| {
-                WithLocation::new(
-                    CreateAdditionalFieldsError::InvalidField {
-                        field_arg: field_arg.to_string(),
-                    },
-                    // TODO
-                    Location::generated(),
-                )
+            .ok_or_else(|| CreateAdditionalFieldsError::InvalidField {
+                field_arg: field_arg.to_string(),
             })?;
 
         Ok(*parent_entity_name_and_mutation_subfield_name)
