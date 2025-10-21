@@ -133,7 +133,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         .map_err(|e| WithLocation::new(e, Location::generated()))?;
 
         let maybe_abstract_parent_object_entity_name = maybe_abstract_target_object_entity.name;
-        let maybe_abstract_parent_object_entity = maybe_abstract_target_object_entity;
 
         let fields = processed_field_map_items
             .iter()
@@ -170,7 +169,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                 This is indicative of a bug in Isograph.",
             )
             .concrete_type;
-        let primary_field_concrete_type = maybe_abstract_parent_object_entity.concrete_type;
+        let primary_field_concrete_type = maybe_abstract_target_object_entity.concrete_type;
 
         let top_level_schema_field_arguments = mutation_field_arguments
             .into_iter()
