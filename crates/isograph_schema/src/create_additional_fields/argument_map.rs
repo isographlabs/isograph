@@ -152,16 +152,6 @@ pub(crate) enum PotentiallyModifiedField {
     Modified(ModifiedField),
 }
 
-impl PotentiallyModifiedField {
-    fn remove_to_field(
-        &mut self,
-        _first: StringLiteralValue,
-        _rest: &[StringLiteralValue],
-    ) -> ProcessTypeDefinitionResult<IsEmpty> {
-        unimplemented!("Removing to fields from PotentiallyModifiedField")
-    }
-}
-
 /// A modified field's type must be an object. A scalar field that
 /// is modified is just removed.
 #[derive(Debug)]
@@ -242,18 +232,8 @@ impl ModifiedArgument {
         {
             Some(field) => {
                 match rest.split_first() {
-                    Some((first, rest)) => {
-                        match field.remove_to_field(*first, rest)? {
-                            IsEmpty::IsEmpty => {
-                                // The field's object has no remaining fields (except for __typename),
-                                // so we remove the item from the parent.
-                                argument_object.field_map.remove(&key).expect(
-                                    "Expected to be able to remove item. \
-                                    This is indicative of a bug in Isograph",
-                                );
-                            }
-                            IsEmpty::NotEmpty => {}
-                        }
+                    Some((_, _)) => {
+                        unimplemented!("Removing to fields from PotentiallyModifiedField");
                     }
                     None => {
                         // We ran out of path segments, so we remove this item.
