@@ -135,7 +135,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &mut Schema<TNetworkProtocol>,
     field_queue: HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
     options: &CompilerConfigOptions,
-) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
+) -> Result<(), CreateSchemaError<TNetworkProtocol>> {
     for (parent_object_entity_name, field_definitions_to_insert) in field_queue {
         for server_field_to_insert in field_definitions_to_insert.into_iter() {
             let parent_object_entity = schema
@@ -152,13 +152,8 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
                 .server_entity_data
                 .defined_entities
                 .get(target_entity_type_name)
-                .ok_or_else(|| {
-                    WithLocation::new(
-                        CreateAdditionalFieldsError::FieldTypenameDoesNotExist {
-                            target_entity_type_name: *target_entity_type_name,
-                        },
-                        server_field_to_insert.item.name.location,
-                    )
+                .ok_or_else(|| CreateSchemaError::FieldTypenameDoesNotExist {
+                    target_entity_type_name: *target_entity_type_name,
                 })?;
 
             let arguments = server_field_to_insert
@@ -236,20 +231,20 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok(())
 }
 
-pub fn graphql_input_value_definition_to_variable_definition(
+pub fn graphql_input_value_definition_to_variable_definition<
+    TNetworkProtocol: NetworkProtocol + 'static,
+>(
     defined_types: &HashMap<UnvalidatedTypeName, ServerEntityName>,
     input_value_definition: WithLocation<GraphQLInputValueDefinition>,
     parent_type_name: ServerObjectEntityName,
     field_name: SelectableName,
-) -> Result<
-    WithLocation<VariableDefinition<ServerEntityName>>,
-    WithLocation<CreateAdditionalFieldsError>,
-> {
+) -> Result<WithLocation<VariableDefinition<ServerEntityName>>, CreateSchemaError<TNetworkProtocol>>
+{
     let default_value = input_value_definition
         .item
         .default_value
         .map(|graphql_constant_value| {
-            Ok::<_, WithLocation<CreateAdditionalFieldsError>>(WithLocation::new(
+            Ok::<_, CreateSchemaError<TNetworkProtocol>>(WithLocation::new(
                 convert_graphql_constant_value_to_isograph_constant_value(
                     graphql_constant_value.item,
                 ),
@@ -265,16 +260,11 @@ pub fn graphql_input_value_definition_to_variable_definition(
         .and_then(|input_type_name| {
             defined_types
                 .get(&(*input_value_definition.item.type_.inner()).into())
-                .ok_or_else(|| {
-                    WithLocation::new(
-                        CreateAdditionalFieldsError::FieldArgumentTypeDoesNotExist {
-                            argument_type: input_type_name.into(),
-                            argument_name: input_value_definition.item.name.item.into(),
-                            parent_type_name,
-                            field_name,
-                        },
-                        input_value_definition.location,
-                    )
+                .ok_or_else(|| CreateSchemaError::FieldArgumentTypeDoesNotExist {
+                    argument_type: input_type_name.into(),
+                    argument_name: input_value_definition.item.name.item.into(),
+                    parent_type_name,
+                    field_name,
                 })
                 .copied()
         })?;
@@ -339,6 +329,21 @@ pub enum CreateSchemaError<TNetworkProtocol: NetworkProtocol + 'static> {
     #[error("{}", message.for_display())]
     CreateAdditionalFields {
         message: WithLocation<CreateAdditionalFieldsError>,
+    },
+
+    #[error(
+        "The argument `{argument_name}` on field `{parent_type_name}.{field_name}` has inner type `{argument_type}`, which does not exist."
+    )]
+    FieldArgumentTypeDoesNotExist {
+        argument_name: VariableName,
+        parent_type_name: ServerObjectEntityName,
+        field_name: SelectableName,
+        argument_type: UnvalidatedTypeName,
+    },
+
+    #[error("This field has type `{target_entity_type_name}`, which does not exist")]
+    FieldTypenameDoesNotExist {
+        target_entity_type_name: UnvalidatedTypeName,
     },
 }
 
