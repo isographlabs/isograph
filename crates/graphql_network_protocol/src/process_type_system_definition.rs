@@ -13,10 +13,9 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{Description, SelectionType};
 use isograph_schema::{
-    CreateAdditionalFieldsError, ExposeAsFieldToInsert, ExposeFieldDirective, FieldMapItem,
-    FieldToInsert, IsographObjectTypeDefinition, ParseTypeSystemOutcome,
-    ProcessObjectTypeDefinitionOutcome, STRING_JAVASCRIPT_TYPE, ServerObjectEntity,
-    ServerScalarEntity, TYPENAME_FIELD_NAME,
+    ExposeAsFieldToInsert, ExposeFieldDirective, FieldMapItem, FieldToInsert,
+    IsographObjectTypeDefinition, ParseTypeSystemOutcome, ProcessObjectTypeDefinitionOutcome,
+    STRING_JAVASCRIPT_TYPE, ServerObjectEntity, ServerScalarEntity, TYPENAME_FIELD_NAME,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
@@ -344,9 +343,6 @@ pub(crate) type ProcessGraphqlTypeDefinitionResult<T> =
 pub enum ProcessGraphqlTypeSystemDefinitionError {
     #[error("Duplicate schema definition")]
     DuplicateSchemaDefinition,
-
-    #[error("{0}")]
-    CreateAdditionalFieldsError(#[from] CreateAdditionalFieldsError),
 
     #[error("Attempted to extend {type_name}, but that type is not defined")]
     AttemptedToExtendUndefinedType { type_name: ServerObjectEntityName },
