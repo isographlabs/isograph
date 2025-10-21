@@ -1,7 +1,7 @@
 use common_lang_types::{
-    ClientScalarSelectableName, Location, ParentObjectEntityNameAndSelectableName, SelectableName,
-    ServerObjectEntityName, ServerObjectSelectableName, Span, StringLiteralValue, WithLocation,
-    WithSpan,
+    ClientScalarSelectableName, Location, ObjectSelectableName,
+    ParentObjectEntityNameAndSelectableName, SelectableName, ServerObjectEntityName,
+    ServerObjectSelectableName, Span, StringLiteralValue, WithLocation, WithSpan,
 };
 use intern::{Lookup, string_key::Intern};
 use isograph_lang_types::{
@@ -14,8 +14,9 @@ use serde::Deserialize;
 use crate::{
     ClientFieldVariant, ClientScalarSelectable, ExposeAsFieldToInsert,
     ImperativelyLoadedFieldVariant, NetworkProtocol, RefetchStrategy, Schema, ServerEntityName,
-    ServerObjectSelectableVariant, UnprocessedClientFieldItem, WrappedSelectionMapSelection,
-    generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
+    ServerObjectEntity, ServerObjectSelectableVariant, UnprocessedClientFieldItem,
+    WrappedSelectionMapSelection, generate_refetch_field_strategy,
+    imperative_field_subfields_or_inline_fragments,
 };
 
 use super::{
@@ -124,12 +125,12 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             .server_entity_data
             .server_object_entity(payload_object_entity_name);
 
-        let maybe_abstract_target_object_entity = self
-            .traverse_object_selections(
-                payload_object_entity_name,
-                primary_field_name_selection_parts.iter().copied(),
-            )
-            .map_err(|e| WithLocation::new(e, Location::generated()))?;
+        let maybe_abstract_target_object_entity = traverse_object_selections(
+            self,
+            payload_object_entity_name,
+            primary_field_name_selection_parts.iter().copied(),
+        )
+        .map_err(|e| WithLocation::new(e, Location::generated()))?;
 
         let maybe_abstract_parent_object_entity_name = maybe_abstract_target_object_entity.name;
         let maybe_abstract_parent_object_entity = maybe_abstract_target_object_entity;
@@ -379,4 +380,101 @@ fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol + 'st
     }
 
     Ok(processed_field_map_items)
+}
+
+fn traverse_object_selections<TNetworkProtocol: NetworkProtocol + 'static>(
+    schema: &Schema<TNetworkProtocol>,
+    root_object_name: ServerObjectEntityName,
+    selections: impl Iterator<Item = ObjectSelectableName>,
+) -> Result<&ServerObjectEntity<TNetworkProtocol>, CreateAdditionalFieldsError> {
+    let mut current_entity = schema
+        .server_entity_data
+        .server_object_entity(root_object_name)
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        );
+    let mut current_selectables = &schema
+        .server_entity_data
+        .server_object_entity_extra_info
+        .get(&root_object_name)
+        .expect(
+            "Expected root_object_entity_name to exist \
+            in server_object_entity_available_selectables",
+        )
+        .selectables;
+
+    for selection_name in selections {
+        match current_selectables.get(&selection_name.into()) {
+            Some(entity) => match entity.transpose() {
+                SelectionType::Scalar(_) => {
+                    // TODO show a better error message
+                    return Err(CreateAdditionalFieldsError::InvalidField {
+                        field_arg: selection_name.lookup().to_string(),
+                    });
+                }
+                SelectionType::Object(object) => {
+                    let target_object_entity_name = match object {
+                        DefinitionLocation::Server((
+                            parent_object_entity_name,
+                            server_object_selectable_name,
+                        )) => {
+                            let selectable = schema.server_object_selectable(
+                                *parent_object_entity_name,
+                                *server_object_selectable_name,
+                            );
+                            selectable
+                                .expect(
+                                    "Expected selectable to exist. \
+                                    This is indicative of a bug in Isograph.",
+                                )
+                                .target_object_entity
+                                .inner()
+                        }
+                        DefinitionLocation::Client((
+                            parent_object_entity_name,
+                            client_object_selectable_name,
+                        )) => {
+                            let pointer = schema.client_object_selectable(
+                                *parent_object_entity_name,
+                                *client_object_selectable_name,
+                            );
+                            pointer
+                                .expect(
+                                    "Expected selectable to exist. \
+                                    This is indicative of a bug in Isograph.",
+                                )
+                                .target_object_entity_name
+                                .inner()
+                        }
+                    };
+
+                    current_entity = schema
+                        .server_entity_data
+                        .server_object_entity(*target_object_entity_name)
+                        .expect(
+                            "Expected entity to exist. \
+                            This is indicative of a bug in Isograph.",
+                        );
+                    current_selectables = &schema
+                        .server_entity_data
+                        .server_object_entity_extra_info
+                        .get(target_object_entity_name)
+                        .expect(
+                            "Expected target_object_entity_name to exist \
+                            in server_object_entity_available_selectables",
+                        )
+                        .selectables;
+                }
+            },
+            None => {
+                return Err(CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
+                    primary_type_name: current_entity.name.item,
+                    field_name: selection_name.unchecked_conversion(),
+                });
+            }
+        };
+    }
+
+    Ok(current_entity)
 }
