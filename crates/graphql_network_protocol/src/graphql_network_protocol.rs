@@ -9,9 +9,8 @@ use graphql_schema_parser::SchemaParseError;
 use intern::string_key::Intern;
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
-    CreateAdditionalFieldsError, ExposeAsFieldToInsert, Format, MergedSelectionMap,
-    NetworkProtocol, ParseTypeSystemOutcome, RootOperationName, Schema,
-    ValidatedVariableDefinition,
+    ExposeAsFieldToInsert, Format, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome,
+    RootOperationName, Schema, ValidatedVariableDefinition,
 };
 use isograph_schema::{IsographDatabase, ServerScalarEntity};
 use lazy_static::lazy_static;
@@ -62,7 +61,7 @@ pub struct GraphQLNetworkProtocol {}
 
 impl NetworkProtocol for GraphQLNetworkProtocol {
     type SchemaObjectAssociatedData = GraphQLSchemaObjectAssociatedData;
-    type ParseTypeSystemDocumentsError = ParseAndProcessGraphQLTypeSystemDocumentsError;
+    type ParseTypeSystemDocumentsError = ParseGraphQLTypeSystemDocumentsError;
 
     #[memo]
     fn parse_type_system_documents(
@@ -72,7 +71,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             ParseTypeSystemOutcome<Self>,
             BTreeMap<ServerObjectEntityName, RootOperationName>,
         ),
-        ParseAndProcessGraphQLTypeSystemDocumentsError,
+        ParseGraphQLTypeSystemDocumentsError,
     > {
         let mut graphql_root_types = None;
 
@@ -143,10 +142,11 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                         if directive.name.item == *EXPOSE_FIELD_DIRECTIVE {
                             let expose_field_directive = from_graphql_directive(&directive)
                                 .map_err(|err| match err {
-                                    DeserializationError::Custom(err) => WithLocation::new(
-                                        CreateAdditionalFieldsError::FailedToDeserialize(err),
-                                        directive.name.location.into(), // TODO: use location of the entire directive
-                                    ),
+                                    DeserializationError::Custom(err) => {
+                                        ParseGraphQLTypeSystemDocumentsError::FailedToDeserialize(
+                                            err,
+                                        )
+                                    }
                                 })?;
 
                             outcome
@@ -260,7 +260,7 @@ impl GraphQLSchemaOriginalDefinitionType {
 }
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
-pub enum ParseAndProcessGraphQLTypeSystemDocumentsError {
+pub enum ParseGraphQLTypeSystemDocumentsError {
     #[error("{}", message.for_display())]
     SchemaParse {
         message: WithLocation<SchemaParseError>,
@@ -277,31 +277,21 @@ pub enum ParseAndProcessGraphQLTypeSystemDocumentsError {
         message: ProcessGraphqlTypeSystemDefinitionError,
     },
 
-    #[error("{}", message.for_display())]
-    CreateAdditionalFields {
-        message: WithLocation<CreateAdditionalFieldsError>,
-    },
+    #[error("Failed to deserialize {0}")]
+    FailedToDeserialize(String),
 }
 
-impl From<WithLocation<SchemaParseError>> for ParseAndProcessGraphQLTypeSystemDocumentsError {
+impl From<WithLocation<SchemaParseError>> for ParseGraphQLTypeSystemDocumentsError {
     fn from(value: WithLocation<SchemaParseError>) -> Self {
         Self::SchemaParse { message: value }
     }
 }
 
 impl From<WithLocation<ProcessGraphqlTypeSystemDefinitionError>>
-    for ParseAndProcessGraphQLTypeSystemDocumentsError
+    for ParseGraphQLTypeSystemDocumentsError
 {
     fn from(value: WithLocation<ProcessGraphqlTypeSystemDefinitionError>) -> Self {
         Self::ProcessGraphQLTypeSystemDefinitionWithLocation { message: value }
-    }
-}
-
-impl From<WithLocation<CreateAdditionalFieldsError>>
-    for ParseAndProcessGraphQLTypeSystemDocumentsError
-{
-    fn from(value: WithLocation<CreateAdditionalFieldsError>) -> Self {
-        Self::CreateAdditionalFields { message: value }
     }
 }
 
