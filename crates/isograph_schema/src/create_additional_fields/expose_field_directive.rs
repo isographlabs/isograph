@@ -202,18 +202,26 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                         }
                     }
                     ServerObjectSelectableVariant::InlineFragment => {
-                        WrappedSelectionMapSelection::InlineFragment(
-                            self.server_entity_data
-                                .server_object_entity(
-                                    *server_object_selectable.target_object_entity.inner(),
-                                )
-                                .expect(
-                                    "Expected entity to exist. \
-                                    This is indicative of a bug in Isograph.",
-                                )
-                                .name
-                                .item,
-                        )
+                        WrappedSelectionMapSelection::InlineFragment({
+                            server_object_entity_named(
+                                db,
+                                *server_object_selectable.target_object_entity.inner(),
+                            )
+                            .deref()
+                            .as_ref()
+                            .expect(
+                                "Expected parsing to not have failed. \
+                                This is indicative of a bug in Isograph.",
+                            )
+                            .as_ref()
+                            .expect(
+                                "Expected entity to exist. \
+                                This is indicative of a bug in Isograph.",
+                            )
+                            .item
+                            .name
+                            .item
+                        })
                     }
                 }
             })
