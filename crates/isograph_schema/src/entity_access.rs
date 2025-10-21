@@ -54,9 +54,9 @@ pub fn server_entities_named<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
-pub enum EntityAccessError<TParseTypeSystemDocumentsError> {
+pub enum EntityAccessError<TNetworkProtocol: NetworkProtocol + 'static> {
     #[error("{0}")]
-    ParseTypeSystemDocumentsError(#[from] TParseTypeSystemDocumentsError),
+    ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),
 
     #[error("Multiple definitions of {server_entity_name} found")]
     MultipleDefinitionsFound {
@@ -79,10 +79,13 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
     server_object_entity_name: ServerObjectEntityName,
 ) -> Result<
     Option<WithLocation<ServerObjectEntity<TNetworkProtocol>>>,
-    EntityAccessError<TNetworkProtocol::ParseTypeSystemDocumentsError>,
+    EntityAccessError<TNetworkProtocol>,
 > {
     let memo_ref = server_entities_named(db, server_object_entity_name.into());
-    let entities = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
+    let entities = memo_ref
+        .deref()
+        .as_ref()
+        .map_err(|e| EntityAccessError::ParseTypeSystemDocumentsError(e.clone()))?;
 
     match entities.split_first() {
         Some((first, rest)) => {
@@ -113,10 +116,13 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
     server_scalar_entity_name: ServerScalarEntityName,
 ) -> Result<
     Option<WithLocation<ServerScalarEntity<TNetworkProtocol>>>,
-    EntityAccessError<TNetworkProtocol::ParseTypeSystemDocumentsError>,
+    EntityAccessError<TNetworkProtocol>,
 > {
     let memo_ref = server_entities_named(db, server_scalar_entity_name.into());
-    let entities = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
+    let entities = memo_ref
+        .deref()
+        .as_ref()
+        .map_err(|e| EntityAccessError::ParseTypeSystemDocumentsError(e.clone()))?;
 
     match entities.split_first() {
         Some((first, rest)) => {
@@ -145,10 +151,7 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
 pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_scalar_entity_name: ServerScalarEntityName,
-) -> Result<
-    Option<JavascriptName>,
-    EntityAccessError<TNetworkProtocol::ParseTypeSystemDocumentsError>,
-> {
+) -> Result<Option<JavascriptName>, EntityAccessError<TNetworkProtocol>> {
     let memo_ref = server_scalar_entity_named(db, server_scalar_entity_name);
     let value = memo_ref.deref().as_ref().map_err(|e| e.clone())?.as_ref();
 
@@ -164,10 +167,7 @@ pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol + 
 pub fn server_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     name: ServerEntityName,
-) -> Result<
-    Option<OwnedServerEntity<TNetworkProtocol>>,
-    EntityAccessError<TNetworkProtocol::ParseTypeSystemDocumentsError>,
-> {
+) -> Result<Option<OwnedServerEntity<TNetworkProtocol>>, EntityAccessError<TNetworkProtocol>> {
     match name {
         SelectionType::Object(server_object_entity_name) => {
             let server_object_entity =
