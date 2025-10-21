@@ -135,14 +135,6 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
 ) -> Result<(), CreateSchemaError<TNetworkProtocol>> {
     for (parent_object_entity_name, field_definitions_to_insert) in field_queue {
         for server_field_to_insert in field_definitions_to_insert.into_iter() {
-            let parent_object_entity = schema
-                .server_entity_data
-                .server_object_entity(parent_object_entity_name)
-                .expect(
-                    "Expected entity to exist. \
-                    This is indicative of a bug in Isograph.",
-                );
-
             let target_entity_type_name = server_field_to_insert.item.graphql_type.inner();
 
             let selection_type = schema
@@ -163,7 +155,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
                     graphql_input_value_definition_to_variable_definition(
                         &schema.server_entity_data.defined_entities,
                         input_value_definition,
-                        parent_object_entity.name.item,
+                        parent_object_entity_name,
                         server_field_to_insert.item.name.item.into(),
                     )
                 })
