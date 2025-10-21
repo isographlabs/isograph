@@ -24,7 +24,10 @@ pub fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol + 'stat
     mut unprocessed_items: Vec<
         SelectionType<UnprocessedClientFieldItem, UnprocessedClientPointerItem>,
     >,
-) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), ProcessIsoLiteralsForSchemaError> {
+) -> Result<
+    (Schema<TNetworkProtocol>, ContainsIsoStats),
+    ProcessIsoLiteralsForSchemaError<TNetworkProtocol>,
+> {
     let contains_iso = parse_iso_literals(db)?;
     let contains_iso_stats = contains_iso.stats();
 
@@ -50,7 +53,7 @@ pub fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol + 'stat
 }
 
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
-pub enum ProcessIsoLiteralsForSchemaError {
+pub enum ProcessIsoLiteralsForSchemaError<TNetworkProtocol: NetworkProtocol + 'static> {
     #[error(
         "{}{}",
         if messages.len() == 1 { "Unable to process Isograph literal:" } else { "Unable to process Isograph literals:" },
@@ -65,7 +68,7 @@ pub enum ProcessIsoLiteralsForSchemaError {
 
     #[error("{}", error.for_display())]
     ProcessTypeDefinition {
-        error: WithLocation<CreateAdditionalFieldsError>,
+        error: WithLocation<CreateAdditionalFieldsError<TNetworkProtocol>>,
     },
 
     #[error(
@@ -102,36 +105,45 @@ pub enum ProcessIsoLiteralsForSchemaError {
     },
 }
 
-impl From<Vec<WithLocation<ProcessClientFieldDeclarationError>>>
-    for ProcessIsoLiteralsForSchemaError
+impl<TNetworkProtocol: NetworkProtocol + 'static>
+    From<Vec<WithLocation<ProcessClientFieldDeclarationError>>>
+    for ProcessIsoLiteralsForSchemaError<TNetworkProtocol>
 {
     fn from(messages: Vec<WithLocation<ProcessClientFieldDeclarationError>>) -> Self {
         ProcessIsoLiteralsForSchemaError::ProcessIsoLiterals { messages }
     }
 }
 
-impl From<Vec<WithLocation<IsographLiteralParseError>>> for ProcessIsoLiteralsForSchemaError {
+impl<TNetworkProtocol: NetworkProtocol + 'static> From<Vec<WithLocation<IsographLiteralParseError>>>
+    for ProcessIsoLiteralsForSchemaError<TNetworkProtocol>
+{
     fn from(messages: Vec<WithLocation<IsographLiteralParseError>>) -> Self {
         ProcessIsoLiteralsForSchemaError::ParseIsoLiteral { messages }
     }
 }
 
-impl From<Vec<WithLocation<ValidateEntrypointDeclarationError>>>
-    for ProcessIsoLiteralsForSchemaError
+impl<TNetworkProtocol: NetworkProtocol + 'static>
+    From<Vec<WithLocation<ValidateEntrypointDeclarationError>>>
+    for ProcessIsoLiteralsForSchemaError<TNetworkProtocol>
 {
     fn from(messages: Vec<WithLocation<ValidateEntrypointDeclarationError>>) -> Self {
         ProcessIsoLiteralsForSchemaError::ValidateEntrypointDeclaration { messages }
     }
 }
 
-impl From<Vec<WithLocation<AddSelectionSetsError>>> for ProcessIsoLiteralsForSchemaError {
+impl<TNetworkProtocol: NetworkProtocol + 'static> From<Vec<WithLocation<AddSelectionSetsError>>>
+    for ProcessIsoLiteralsForSchemaError<TNetworkProtocol>
+{
     fn from(messages: Vec<WithLocation<AddSelectionSetsError>>) -> Self {
         ProcessIsoLiteralsForSchemaError::AddSelectionSets { messages }
     }
 }
 
-impl From<WithLocation<CreateAdditionalFieldsError>> for ProcessIsoLiteralsForSchemaError {
-    fn from(value: WithLocation<CreateAdditionalFieldsError>) -> Self {
+impl<TNetworkProtocol: NetworkProtocol + 'static>
+    From<WithLocation<CreateAdditionalFieldsError<TNetworkProtocol>>>
+    for ProcessIsoLiteralsForSchemaError<TNetworkProtocol>
+{
+    fn from(value: WithLocation<CreateAdditionalFieldsError<TNetworkProtocol>>) -> Self {
         ProcessIsoLiteralsForSchemaError::ProcessTypeDefinition { error: value }
     }
 }

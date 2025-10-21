@@ -121,7 +121,10 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         &self,
         root_object_name: ServerObjectEntityName,
         selections: impl Iterator<Item = ObjectSelectableName>,
-    ) -> Result<Vec<&ServerObjectSelectable<TNetworkProtocol>>, CreateAdditionalFieldsError> {
+    ) -> Result<
+        Vec<&ServerObjectSelectable<TNetworkProtocol>>,
+        CreateAdditionalFieldsError<TNetworkProtocol>,
+    > {
         let mut current_entity = self
             .server_entity_data
             .server_object_entity(root_object_name)
@@ -284,7 +287,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         // TODO do not accept this
         options: &CompilerConfigOptions,
         inner_non_null_named_type: Option<&GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
-    ) -> CreateAdditionalFieldsResult<()> {
+    ) -> CreateAdditionalFieldsResult<(), TNetworkProtocol> {
         let parent_object_entity_name = server_scalar_selectable.parent_object_entity_name;
         let next_scalar_name = server_scalar_selectable.name;
 
@@ -323,7 +326,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 
         // TODO do not do this here, this is a GraphQL-ism
         if server_scalar_selectable.name.item == "id" {
-            set_and_validate_id_field(
+            set_and_validate_id_field::<TNetworkProtocol>(
                 id_field,
                 server_scalar_selectable.name.item,
                 parent_object_entity_name,
@@ -347,7 +350,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     pub fn insert_server_object_selectable(
         &mut self,
         server_object_selectable: ServerObjectSelectable<TNetworkProtocol>,
-    ) -> CreateAdditionalFieldsResult<()> {
+    ) -> CreateAdditionalFieldsResult<(), TNetworkProtocol> {
         let parent_object_entity_name = server_object_selectable.parent_object_entity_name;
         let next_object_name = server_object_selectable.name;
 
@@ -555,7 +558,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> ServerEntityData<TNetworkProto
         &mut self,
         server_scalar_entity_name: ServerScalarEntityName,
         name_location: Location,
-    ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
+    ) -> Result<(), WithLocation<CreateAdditionalFieldsError<TNetworkProtocol>>> {
         if self
             .defined_entities
             .insert(
@@ -584,7 +587,8 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> ServerEntityData<TNetworkProto
         &mut self,
         server_server_object_entity: ServerObjectEntity<TNetworkProtocol>,
         name_location: Location,
-    ) -> Result<ServerObjectEntityName, WithLocation<CreateAdditionalFieldsError>> {
+    ) -> Result<ServerObjectEntityName, WithLocation<CreateAdditionalFieldsError<TNetworkProtocol>>>
+    {
         let name = server_server_object_entity.name;
         if self
             .defined_entities
@@ -660,13 +664,13 @@ pub type ScalarSelectableId = DefinitionLocation<
 /// If we have encountered an id field, we can:
 /// - validate that the id field is properly defined, i.e. has type ID!
 /// - set the id field
-fn set_and_validate_id_field(
+fn set_and_validate_id_field<TNetworkProtocol: NetworkProtocol + 'static>(
     id_field: &mut Option<ServerScalarIdSelectableName>,
     current_field_selectable_name: ServerScalarSelectableName,
     parent_object_entity_name: ServerObjectEntityName,
     options: &CompilerConfigOptions,
     inner_non_null_named_type: Option<&GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
-) -> CreateAdditionalFieldsResult<()> {
+) -> CreateAdditionalFieldsResult<(), TNetworkProtocol> {
     // N.B. id_field is guaranteed to be None; otherwise field_names_to_type_name would
     // have contained this field name already.
     debug_assert!(id_field.is_none(), "id field should not be defined twice");

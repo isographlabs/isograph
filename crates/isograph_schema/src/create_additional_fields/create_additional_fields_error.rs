@@ -1,4 +1,4 @@
-use crate::{NetworkProtocol, Schema};
+use crate::{EntityAccessError, NetworkProtocol, Schema};
 use common_lang_types::{
     SelectableName, ServerObjectEntityName, StringLiteralValue, UnvalidatedTypeName, VariableName,
     WithLocation,
@@ -41,12 +41,12 @@ impl FieldMapItem {
 // TODO this should be a different type.
 pub(crate) struct ProcessedFieldMapItem(pub FieldMapItem);
 
-pub(crate) type ProcessTypeDefinitionResult<T> =
-    Result<T, WithLocation<CreateAdditionalFieldsError>>;
+pub(crate) type ProcessTypeDefinitionResult<T, TNetworkProtocol> =
+    Result<T, WithLocation<CreateAdditionalFieldsError<TNetworkProtocol>>>;
 
 /// Errors that make semantic sense when referring to creating a GraphQL schema in-memory representation
 #[derive(Error, Clone, Eq, PartialEq, Debug)]
-pub enum CreateAdditionalFieldsError {
+pub enum CreateAdditionalFieldsError<TNetworkProtocol: NetworkProtocol + 'static> {
     #[error(
         "The Isograph compiler attempted to create a field named \
         `{field_name}` on type `{parent_type}`, but a field with that name already exists."
@@ -128,6 +128,10 @@ pub enum CreateAdditionalFieldsError {
         type_definition_type: &'static str,
         type_name: UnvalidatedTypeName,
     },
+
+    #[error("{0}")]
+    EntityAccessError(#[from] EntityAccessError<TNetworkProtocol>),
 }
 
-pub type CreateAdditionalFieldsResult<T> = Result<T, CreateAdditionalFieldsError>;
+pub type CreateAdditionalFieldsResult<T, TNetworkProtocol> =
+    Result<T, CreateAdditionalFieldsError<TNetworkProtocol>>;

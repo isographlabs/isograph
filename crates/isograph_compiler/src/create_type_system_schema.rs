@@ -113,8 +113,11 @@ pub fn create_type_system_schema_with_server_selectables<
 
     for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
         for expose_as_field in expose_as_fields_to_insert {
-            let unprocessed_scalar_item = unvalidated_isograph_schema
-                .create_new_exposed_field(expose_as_field, parent_object_entity_name)?;
+            let unprocessed_scalar_item = unvalidated_isograph_schema.create_new_exposed_field(
+                db,
+                expose_as_field,
+                parent_object_entity_name,
+            )?;
 
             unprocessed_items.push(SelectionType::Scalar(unprocessed_scalar_item));
         }
@@ -328,7 +331,7 @@ pub enum CreateSchemaError<TNetworkProtocol: NetworkProtocol + 'static> {
 
     #[error("{}", message.for_display())]
     CreateAdditionalFields {
-        message: WithLocation<CreateAdditionalFieldsError>,
+        message: WithLocation<CreateAdditionalFieldsError<TNetworkProtocol>>,
     },
 
     #[error(
@@ -347,10 +350,11 @@ pub enum CreateSchemaError<TNetworkProtocol: NetworkProtocol + 'static> {
     },
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static> From<WithLocation<CreateAdditionalFieldsError>>
+impl<TNetworkProtocol: NetworkProtocol + 'static>
+    From<WithLocation<CreateAdditionalFieldsError<TNetworkProtocol>>>
     for CreateSchemaError<TNetworkProtocol>
 {
-    fn from(value: WithLocation<CreateAdditionalFieldsError>) -> Self {
+    fn from(value: WithLocation<CreateAdditionalFieldsError<TNetworkProtocol>>) -> Self {
         CreateSchemaError::CreateAdditionalFields { message: value }
     }
 }

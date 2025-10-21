@@ -38,7 +38,7 @@ impl ArgumentMap {
         mutation_object_name: ServerObjectEntityName,
         mutation_field_name: SelectableName,
         schema: &mut Schema<TNetworkProtocol>,
-    ) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem> {
+    ) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem, TNetworkProtocol> {
         let split_to_arg = field_map_item.split_to_arg();
         let (index_of_argument, argument) = self
             .arguments
@@ -90,7 +90,7 @@ impl ArgumentMap {
                         let mut arg =
                             ModifiedArgument::from_unmodified(unmodified_argument, schema);
 
-                        arg.remove_to_field(*first, rest, primary_type_name)?;
+                        arg.remove_to_field::<TNetworkProtocol>(*first, rest, primary_type_name)?;
 
                         *argument =
                             WithLocation::new(PotentiallyModifiedArgument::Modified(arg), location);
@@ -116,7 +116,11 @@ impl ArgumentMap {
                         ));
                     }
                     Some((first, rest)) => {
-                        modified.remove_to_field(*first, rest, primary_type_name)?;
+                        modified.remove_to_field::<TNetworkProtocol>(
+                            *first,
+                            rest,
+                            primary_type_name,
+                        )?;
                         // TODO WAT
                         ProcessedFieldMapItem(field_map_item.clone())
                     }
@@ -216,12 +220,12 @@ impl ModifiedArgument {
         }
     }
 
-    pub fn remove_to_field(
+    pub fn remove_to_field<TNetworkProtocol: NetworkProtocol + 'static>(
         &mut self,
         first: StringLiteralValue,
         rest: &[StringLiteralValue],
         primary_type_name: ServerObjectEntityName,
-    ) -> ProcessTypeDefinitionResult<()> {
+    ) -> ProcessTypeDefinitionResult<(), TNetworkProtocol> {
         let argument_object = self.object.inner_mut();
 
         let key = first.unchecked_conversion();
