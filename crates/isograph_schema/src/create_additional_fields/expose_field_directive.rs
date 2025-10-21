@@ -96,14 +96,18 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         let payload_object_entity_name = *payload_object_type_annotation.inner();
 
         // TODO it's a bit annoying that we call .object twice!
-        let mutation_field_payload_type_name = self
-            .server_entity_data
-            .server_object_entity(payload_object_entity_name)
-            .expect(
-                "Expected object entity to exist. \
+        let mutation_field_payload_type_name =
+            server_object_entity_named(db, payload_object_entity_name)
+                .deref()
+                .as_ref()
+                .map_err(|e| e.clone())?
+                .as_ref()
+                .expect(
+                    "Expected object entity to exist. \
                 This is indicative of a bug in Isograph.",
-            )
-            .name;
+                )
+                .item
+                .name;
 
         let client_field_scalar_selection_name =
             expose_as.unwrap_or(mutation_field.name.item.into());
@@ -124,9 +128,19 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             field_map.clone(),
         )?;
 
-        let payload_object_entity = self
-            .server_entity_data
-            .server_object_entity(payload_object_entity_name);
+        let payload_object_entity_memo_ref =
+            server_object_entity_named(db, payload_object_entity_name);
+        let top_level_schema_field_concrete_type = payload_object_entity_memo_ref
+            .deref()
+            .as_ref()
+            .map_err(|e| e.clone())?
+            .as_ref()
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            )
+            .item
+            .concrete_type;
 
         let (maybe_abstract_parent_object_entity_name, primary_field_concrete_type) =
             traverse_object_selections(
@@ -164,13 +178,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 
         let mutation_field_client_field_name =
             client_field_scalar_selection_name.unchecked_conversion();
-
-        let top_level_schema_field_concrete_type = payload_object_entity
-            .expect(
-                "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-            )
-            .concrete_type;
 
         let top_level_schema_field_arguments = mutation_field_arguments
             .into_iter()
