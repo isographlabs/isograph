@@ -10,6 +10,7 @@ import {
   type StoreLink,
   type TypeName,
 } from './IsographEnvironment';
+import type { OptimisticLayer } from './optimisticProxy';
 
 export type RetainedQuery = {
   readonly normalizationAst: NormalizationAstNodes;
@@ -45,22 +46,27 @@ export function retainQuery(
 
 export function garbageCollectEnvironment(environment: IsographEnvironment) {
   const retainedIds: RetainedIds = {};
+  let node: OptimisticLayer = environment.store;
+
+  while (node.kind !== 'BaseNode') {
+    node = node.childNode;
+  }
 
   for (const query of environment.retainedQueries) {
-    recordReachableIds(environment.store, query, retainedIds);
+    recordReachableIds(node.data, query, retainedIds);
   }
   for (const query of environment.gcBuffer) {
-    recordReachableIds(environment.store, query, retainedIds);
+    recordReachableIds(node.data, query, retainedIds);
   }
 
-  for (const typeName in environment.store) {
-    const dataById = environment.store[typeName];
+  for (const typeName in node.data) {
+    const dataById = node.data[typeName];
     if (dataById == null) continue;
     const retainedTypeIds = retainedIds[typeName];
 
     // delete all objects
     if (retainedTypeIds == undefined || retainedTypeIds.size == 0) {
-      delete environment.store[typeName];
+      delete node.data[typeName];
       continue;
     }
 
@@ -71,7 +77,7 @@ export function garbageCollectEnvironment(environment: IsographEnvironment) {
     }
 
     if (Object.keys(dataById).length === 0) {
-      delete environment.store[typeName];
+      delete node.data[typeName];
     }
   }
 }
