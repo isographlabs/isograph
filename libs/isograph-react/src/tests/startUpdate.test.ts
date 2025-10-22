@@ -88,6 +88,7 @@ describe('startUpdate', () => {
 
       data = createUpdatableProxy(
         environment,
+        environment.store.data,
         item,
         {
           suspendIfInFlight: true,
@@ -100,7 +101,7 @@ describe('startUpdate', () => {
     test('updates updatable scalar nested in updatable object', () => {
       data.node!.asEconomist!.name = 'Updated Jeremy Bentham';
 
-      expect(environment.store).toMatchObject({
+      expect(environment.store.data).toMatchObject({
         Economist: {
           '0': {
             name: 'Updated Jeremy Bentham',
@@ -126,7 +127,7 @@ describe('startUpdate', () => {
       data.node = data.john_stuart_mill;
       jeremy!.asEconomist!.name = 'Updated Jeremy Bentham';
 
-      expect(environment.store).toMatchObject({
+      expect(environment.store.data).toMatchObject({
         Economist: {
           '0': {
             name: 'Updated Jeremy Bentham',
@@ -159,6 +160,7 @@ describe('startUpdate', () => {
 
       data = createUpdatableProxy(
         environment,
+        environment.store.data,
         item,
         {
           suspendIfInFlight: true,
@@ -181,7 +183,7 @@ describe('startUpdate', () => {
     test('updates scalar in cache', () => {
       data.node!.asEconomist!.name = 'Foo';
 
-      expect(environment.store).toMatchObject({
+      expect(environment.store.data).toMatchObject({
         Economist: {
           0: {
             name: 'Foo',
