@@ -89,7 +89,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                     Err(_) => return Ok(None),
                 };
                 if let Ok((parent_object, selectable)) =
-                    get_parent_and_selectable_for_scalar_path(&scalar_path, validated_schema)
+                    get_parent_and_selectable_for_scalar_path(db, &scalar_path, validated_schema)
                 {
                     Some(hover_text_for_selectable(
                         selectable.variant_name(),
@@ -110,7 +110,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                     Err(_) => return Ok(None),
                 };
                 if let Ok((parent_object, selectable)) =
-                    get_parent_and_selectable_for_object_path(&object_path, validated_schema)
+                    get_parent_and_selectable_for_object_path(db, &object_path, validated_schema)
                 {
                     Some(hover_text_for_selectable(
                         selectable.variant_name(),

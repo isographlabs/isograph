@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use common_lang_types::{
     SelectableName, ServerObjectEntityName, ServerScalarEntityName, WithLocation,
 };
@@ -9,8 +11,9 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    ClientOrServerObjectSelectable, NetworkProtocol, ObjectSelectable, ScalarSelectable, Schema,
-    Selectable, ServerObjectEntity, ServerScalarEntity,
+    ClientOrServerObjectSelectable, EntityAccessError, IsographDatabase, NetworkProtocol,
+    ObjectSelectable, ScalarSelectable, Schema, Selectable, ServerObjectEntity, ServerScalarEntity,
+    server_object_entity_named,
 };
 
 #[impl_for_selection_type]
@@ -57,6 +60,7 @@ pub fn get_parent_and_selectable_for_scalar_path<
     'a,
     TNetworkProtocol: NetworkProtocol + 'static,
 >(
+    db: &IsographDatabase<TNetworkProtocol>,
     scalar_path: &ScalarSelectionPath<'a>,
     validated_schema: &'a Schema<TNetworkProtocol>,
 ) -> Result<
@@ -64,12 +68,13 @@ pub fn get_parent_and_selectable_for_scalar_path<
         &'a ServerObjectEntity<TNetworkProtocol>,
         ScalarSelectable<'a, TNetworkProtocol>,
     ),
-    GetParentAndSelectableError,
+    GetParentAndSelectableError<TNetworkProtocol>,
 > {
     let ScalarSelectionPath { parent, inner } = scalar_path;
     let scalar_selectable_name = inner.name.item;
 
     let (parent, selectable) = get_parent_and_selectable_for_selection_parent(
+        db,
         parent,
         scalar_selectable_name.into(),
         validated_schema,
@@ -92,6 +97,7 @@ pub fn get_parent_and_selectable_for_object_path<
     'a,
     TNetworkProtocol: NetworkProtocol + 'static,
 >(
+    db: &IsographDatabase<TNetworkProtocol>,
     object_path: &ObjectSelectionPath<'a>,
     validated_schema: &'a Schema<TNetworkProtocol>,
 ) -> Result<
@@ -99,12 +105,13 @@ pub fn get_parent_and_selectable_for_object_path<
         &'a ServerObjectEntity<TNetworkProtocol>,
         ObjectSelectable<'a, TNetworkProtocol>,
     ),
-    GetParentAndSelectableError,
+    GetParentAndSelectableError<TNetworkProtocol>,
 > {
     let ObjectSelectionPath { parent, inner } = object_path;
     let object_selectable_name = inner.name.item;
 
     let (parent, selectable) = get_parent_and_selectable_for_selection_parent(
+        db,
         parent,
         object_selectable_name.into(),
         validated_schema,
@@ -127,6 +134,7 @@ pub fn get_parent_and_selectable_for_selection_parent<
     'a,
     TNetworkProtocol: NetworkProtocol + 'static,
 >(
+    db: &IsographDatabase<TNetworkProtocol>,
     selection_parent: &SelectionParentType<'a>,
     selectable_name: SelectableName,
     validated_schema: &'a Schema<TNetworkProtocol>,
@@ -135,16 +143,20 @@ pub fn get_parent_and_selectable_for_selection_parent<
         &'a ServerObjectEntity<TNetworkProtocol>,
         Selectable<'a, TNetworkProtocol>,
     ),
-    GetParentAndSelectableError,
+    GetParentAndSelectableError<TNetworkProtocol>,
 > {
     match selection_parent {
         SelectionParentType::ObjectSelection(object_selection_path) => {
-            let (_, object_selectable) =
-                get_parent_and_selectable_for_object_path(object_selection_path, validated_schema)?;
+            let (_, object_selectable) = get_parent_and_selectable_for_object_path(
+                db,
+                object_selection_path,
+                validated_schema,
+            )?;
 
             let object_parent_entity_name = *object_selectable.target_object_entity_name().inner();
 
             parent_object_entity_and_selectable(
+                db,
                 validated_schema,
                 object_parent_entity_name.into(),
                 selectable_name,
@@ -153,17 +165,28 @@ pub fn get_parent_and_selectable_for_selection_parent<
         SelectionParentType::ClientFieldDeclaration(client_field_declaration_path) => {
             let parent_type_name = client_field_declaration_path.inner.parent_type.item;
 
-            parent_object_entity_and_selectable(validated_schema, parent_type_name, selectable_name)
+            parent_object_entity_and_selectable(
+                db,
+                validated_schema,
+                parent_type_name,
+                selectable_name,
+            )
         }
         SelectionParentType::ClientPointerDeclaration(client_pointer_declaration_path) => {
             let parent_type_name = client_pointer_declaration_path.inner.parent_type.item;
 
-            parent_object_entity_and_selectable(validated_schema, parent_type_name, selectable_name)
+            parent_object_entity_and_selectable(
+                db,
+                validated_schema,
+                parent_type_name,
+                selectable_name,
+            )
         }
     }
 }
 
 pub fn parent_object_entity_and_selectable<'a, TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     validated_schema: &'a Schema<TNetworkProtocol>,
     parent_type_name: ServerObjectEntityNameWrapper,
     selectable_name: SelectableName,
@@ -172,12 +195,15 @@ pub fn parent_object_entity_and_selectable<'a, TNetworkProtocol: NetworkProtocol
         &'a ServerObjectEntity<TNetworkProtocol>,
         Selectable<'a, TNetworkProtocol>,
     ),
-    GetParentAndSelectableError,
+    GetParentAndSelectableError<TNetworkProtocol>,
 > {
-    let parent_entity = validated_schema
-        .server_entity_data
-        .server_object_entity(parent_type_name.0.unchecked_conversion())
-        .ok_or(GetParentAndSelectableError::ParentTypeNotDefined { parent_type_name })?;
+    let parent_entity = &server_object_entity_named(db, parent_type_name.0)
+        .deref()
+        .as_ref()
+        .map_err(|e| e.clone())?
+        .as_ref()
+        .ok_or(GetParentAndSelectableError::ParentTypeNotDefined { parent_type_name })?
+        .item;
 
     let extra_info = validated_schema
         .server_entity_data
@@ -204,7 +230,7 @@ pub fn parent_object_entity_and_selectable<'a, TNetworkProtocol: NetworkProtocol
 }
 
 #[derive(Error, Debug)]
-pub enum GetParentAndSelectableError {
+pub enum GetParentAndSelectableError<TNetworkProtocol: NetworkProtocol + 'static> {
     #[error("`{parent_type_name}` is not a type that has been defined.")]
     ParentTypeNotDefined {
         parent_type_name: ServerObjectEntityNameWrapper,
@@ -223,4 +249,7 @@ pub enum GetParentAndSelectableError {
         must_be: &'static str,
         is: &'static str,
     },
+
+    #[error("{0}")]
+    EntityAccessError(#[from] EntityAccessError<TNetworkProtocol>),
 }
