@@ -30,6 +30,7 @@ import {
 } from './PromiseWrapper';
 import { readButDoNotEvaluate } from './read';
 import { getOrCreateCachedStartUpdate } from './startUpdate';
+import { addNetworkResponseNode } from './optimisticProxy';
 
 let networkRequestId = 0;
 
@@ -201,8 +202,11 @@ export function makeNetworkRequest<
 
       const root = { __link: ROOT_ID, __typename: artifact.concreteType };
       if (status.kind === 'Undisposed') {
+        const data = {};
+        addNetworkResponseNode(environment, data);
         normalizeData(
           environment,
+          data,
           normalizationAst.selections,
           networkResponse.data ?? {},
           variables,

@@ -1,4 +1,5 @@
 import { ParentCache } from '@isograph/react-disposable-state';
+import type { Brand } from './brand';
 import {
   IsographEntrypoint,
   IsographOperation,
@@ -12,10 +13,10 @@ import {
 } from './FragmentReference';
 import type { RetainedQuery } from './garbageCollection';
 import { LogFunction, WrappedLogFunction } from './logging';
+import { type OptimisticLayer } from './optimisticProxy';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { WithEncounteredRecords } from './read';
 import type { ReaderAst, StartUpdate } from './reader';
-import type { Brand } from './brand';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
@@ -56,7 +57,7 @@ export type Subscriptions = Set<Subscription>;
 export type CacheMap<T> = { [index: string]: ParentCache<T> };
 
 export type IsographEnvironment = {
-  readonly store: IsographStore;
+  store: OptimisticLayer;
   readonly networkFunction: IsographNetworkFunction;
   readonly missingFieldHandler: MissingFieldHandler | null;
   readonly componentCache: FieldCache<React.FC<any>>;
@@ -125,14 +126,17 @@ export type DataId = string;
 
 export const ROOT_ID: DataId & '__ROOT' = '__ROOT';
 
-export type IsographStore = {
+export type DataLayer = {
   [index: TypeName]: {
     [index: DataId]: StoreRecord | null;
   } | null;
+};
+
+export interface IsographStore extends DataLayer {
   readonly Query: {
     readonly __ROOT: StoreRecord;
   };
-};
+}
 
 const DEFAULT_GC_BUFFER_SIZE = 10;
 export function createIsographEnvironment(
@@ -144,8 +148,14 @@ export function createIsographEnvironment(
   logFunction?.({
     kind: 'EnvironmentCreated',
   });
+  let optimisticLayer: OptimisticLayer = {
+    kind: 'BaseNode',
+    data: store,
+    parentNode: null,
+    childNode: null,
+  };
   return {
-    store,
+    store: optimisticLayer,
     networkFunction,
     missingFieldHandler: missingFieldHandler ?? null,
     componentCache: {},

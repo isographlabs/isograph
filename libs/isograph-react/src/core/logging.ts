@@ -9,12 +9,12 @@ import {
 import { FragmentReference, Variables } from './FragmentReference';
 import {
   IsographEnvironment,
-  IsographStore,
   StoreRecord,
   type StoreLink,
 } from './IsographEnvironment';
 import { ReadDataResult } from './read';
 import { Arguments } from './util';
+import type { OptimisticLayer } from './optimisticProxy';
 
 export type LogMessage =
   | {
@@ -25,7 +25,7 @@ export type LogMessage =
     }
   | {
       kind: 'AfterNormalization';
-      store: IsographStore;
+      store: OptimisticLayer;
       encounteredIds: EncounteredIds;
     }
   | {
