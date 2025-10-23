@@ -22,6 +22,7 @@ import {
 } from './garbageCollection';
 import { IsographEnvironment, ROOT_ID, StoreLink } from './IsographEnvironment';
 import { logMessage } from './logging';
+import { addNetworkResponseNode } from './optimisticProxy';
 import {
   AnyError,
   PromiseWrapper,
@@ -30,7 +31,6 @@ import {
 } from './PromiseWrapper';
 import { readButDoNotEvaluate } from './read';
 import { getOrCreateCachedStartUpdate } from './startUpdate';
-import { addNetworkResponseNode } from './optimisticProxy';
 
 let networkRequestId = 0;
 
@@ -203,7 +203,6 @@ export function makeNetworkRequest<
       const root = { __link: ROOT_ID, __typename: artifact.concreteType };
       if (status.kind === 'Undisposed') {
         const data = {};
-        addNetworkResponseNode(environment, data);
         normalizeData(
           environment,
           data,
@@ -212,6 +211,7 @@ export function makeNetworkRequest<
           variables,
           root,
         );
+        addNetworkResponseNode(environment, data);
       }
 
       const onComplete = fetchOptions?.onComplete;
