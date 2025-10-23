@@ -168,7 +168,6 @@ export function makeNetworkRequest<
       const root = { __link: ROOT_ID, __typename: artifact.concreteType };
       if (status.kind === 'UndisposedIncomplete') {
         const data = {};
-        addNetworkResponseNode(environment, data);
         normalizeData(
           environment,
           data,
@@ -177,6 +176,7 @@ export function makeNetworkRequest<
           variables,
           root,
         );
+        addNetworkResponseNode(environment, data);
         const retainedQuery = {
           normalizationAst: normalizationAst.selections,
           variables,
