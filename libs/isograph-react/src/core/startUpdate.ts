@@ -1,5 +1,4 @@
 import {
-  callSubscriptions,
   getParentRecordKey,
   insertEmptySetIfMissing,
   type EncounteredIds,
@@ -24,6 +23,7 @@ import {
   addStartUpdateNode,
   getOrInsertRecord,
   readOptimisticRecord,
+  type WithEncounteredIds,
 } from './optimisticProxy';
 import { readPromise, type PromiseWrapper } from './PromiseWrapper';
 import {
@@ -60,8 +60,8 @@ export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
   networkRequestOptions: NetworkRequestReaderOptions,
 ): ExtractStartUpdate<TReadFromStore> {
   return (updater) => {
-    function startUpdate() {
-      let dataLayer = {};
+    function startUpdate(): WithEncounteredIds<DataLayer> {
+      let dataLayer: DataLayer = {};
       let mutableUpdatedIds: EncounteredIds = new Map();
 
       let updatableData = createUpdatableProxy(
@@ -74,19 +74,13 @@ export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
 
       try {
         updater({ updatableData });
-        return dataLayer;
+        return { data: dataLayer, encounteredIds: mutableUpdatedIds };
       } catch (e) {
         logMessage(environment, () => ({
           kind: 'StartUpdateError',
           error: e,
         }));
         throw e;
-      } finally {
-        logMessage(environment, () => ({
-          kind: 'StartUpdateComplete',
-          updatedIds: mutableUpdatedIds,
-        }));
-        callSubscriptions(environment, mutableUpdatedIds);
       }
     }
 

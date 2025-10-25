@@ -1,3 +1,8 @@
+import {
+  callSubscriptions,
+  insertEmptySetIfMissing,
+  type EncounteredIds,
+} from './cache';
 import type {
   DataLayer,
   IsographEnvironment,
@@ -5,6 +10,7 @@ import type {
   StoreLink,
   StoreRecord,
 } from './IsographEnvironment';
+import { logMessage } from './logging';
 
 export function getOrInsertRecord(dataLayer: DataLayer, link: StoreLink) {
   const recordsById = (dataLayer[link.__typename] ??= {});
@@ -65,12 +71,20 @@ type NetworkResponseNode = {
   data: DataLayer;
 };
 
+export type WithEncounteredIds<T> = {
+  readonly encounteredIds: EncounteredIds;
+  readonly data: T;
+};
+
+type FirstUpdate = () => WithEncounteredIds<DataLayer>;
+type DataUpdate = () => Pick<WithEncounteredIds<DataLayer>, 'data'>;
+
 type StartUpdateNode = {
   readonly kind: 'StartUpdateNode';
   parentNode: OptimisticNode | NetworkResponseNode | null;
   childNode: OptimisticNode | NetworkResponseNode;
   data: DataLayer;
-  startUpdate: () => DataLayer;
+  startUpdate: DataUpdate;
 };
 
 type OptimisticNode = {
@@ -78,12 +92,13 @@ type OptimisticNode = {
   parentNode: OptimisticNode | StartUpdateNode | NetworkResponseNode | null;
   childNode: OptimisticNode | StartUpdateNode | NetworkResponseNode | BaseNode;
   data: DataLayer;
-  startUpdate: () => DataLayer;
+  startUpdate: DataUpdate;
 };
 
 export function addNetworkResponseNode(
   environment: IsographEnvironment,
   data: DataLayer,
+  encounteredIds: EncounteredIds,
 ) {
   switch (environment.store.kind) {
     case 'NetworkResponseNode':
@@ -108,9 +123,17 @@ export function addNetworkResponseNode(
       throw new Error('Unreachable');
     }
   }
+
+  logMessage(environment, () => ({
+    kind: 'AfterNormalization',
+    store: environment.store,
+    encounteredIds: encounteredIds,
+  }));
+
+  callSubscriptions(environment, encounteredIds);
 }
 
-function mergeDataLayer(target: DataLayer, source: DataLayer) {
+function mergeDataLayer(target: DataLayer, source: DataLayer): void {
   for (const typeName in source) {
     target[typeName] ??= {};
     for (const id in source[typeName]) {
@@ -122,22 +145,24 @@ function mergeDataLayer(target: DataLayer, source: DataLayer) {
 
 export function addStartUpdateNode(
   environment: IsographEnvironment,
-  startUpdate: () => DataLayer,
+  startUpdate: FirstUpdate,
 ) {
+  const { data, encounteredIds } = startUpdate();
+
   switch (environment.store.kind) {
     case 'BaseNode': {
-      mergeDataLayer(environment.store.data, startUpdate());
+      mergeDataLayer(environment.store.data, data);
       break;
     }
     case 'StartUpdateNode': {
       const prevStartUpdate = environment.store.startUpdate;
 
-      mergeDataLayer(environment.store.data, startUpdate());
+      mergeDataLayer(environment.store.data, data);
 
       environment.store.startUpdate = () => {
-        const data = prevStartUpdate();
-        mergeDataLayer(data, startUpdate());
-        return data;
+        const { data } = prevStartUpdate();
+        mergeDataLayer(data, startUpdate().data);
+        return { data };
       };
 
       break;
@@ -148,7 +173,7 @@ export function addStartUpdateNode(
         kind: 'StartUpdateNode',
         childNode: environment.store,
         parentNode: null,
-        data: startUpdate(),
+        data,
         startUpdate: startUpdate,
       };
       environment.store.parentNode = node;
@@ -159,12 +184,21 @@ export function addStartUpdateNode(
       environment.store satisfies never;
     }
   }
+
+  logMessage(environment, () => ({
+    kind: 'StartUpdateComplete',
+    updatedIds: encounteredIds,
+  }));
+
+  callSubscriptions(environment, encounteredIds);
 }
 
 export function addOptimisticNode(
   environment: IsographEnvironment,
-  startUpdate: () => DataLayer,
+  startUpdate: FirstUpdate,
 ) {
+  const { data, encounteredIds } = startUpdate();
+
   switch (environment.store.kind) {
     case 'BaseNode':
     case 'StartUpdateNode':
@@ -174,15 +208,24 @@ export function addOptimisticNode(
         kind: 'OptimisticNode',
         childNode: environment.store,
         parentNode: null,
-        data: startUpdate(),
+        data,
         startUpdate: startUpdate,
       };
 
       environment.store.parentNode = node;
       environment.store = node;
 
+      callSubscriptions(environment, encounteredIds);
       return (data: DataLayer) => {
-        replaceOptimisticNodeWithNetworkResponseNode(environment, node, data);
+        const encounteredIds: EncounteredIds = new Map();
+        compareData(node.data, data, encounteredIds);
+        replaceOptimisticNodeWithNetworkResponseNode(
+          environment,
+          node,
+          data,
+          encounteredIds,
+        );
+        callSubscriptions(environment, encounteredIds);
       };
     }
     default: {
@@ -195,18 +238,21 @@ export function addOptimisticNode(
 function reexecuteUpdates(
   environment: IsographEnvironment,
   node: OptimisticLayer | null,
+  mutableEncounteredIds: EncounteredIds,
 ) {
   while (node && node?.kind !== 'OptimisticNode') {
-    const data = 'startUpdate' in node ? node.startUpdate() : node.data;
+    const data = 'startUpdate' in node ? node.startUpdate().data : node.data;
+    compareData(node.data, data, mutableEncounteredIds);
     mergeDataLayer(environment.store.data, data);
     node = node.parentNode;
   }
 
   while (node !== null) {
+    const oldData = node.data;
     if ('startUpdate' in node) {
-      node.data = node.startUpdate();
+      node.data = node.startUpdate().data;
     }
-
+    compareData(oldData, node.data, mutableEncounteredIds);
     node.childNode = environment.store;
     environment.store.parentNode = node;
     environment.store = node;
@@ -219,9 +265,6 @@ function reexecuteUpdates(
 
 function makeRootNode(environment: IsographEnvironment, node: OptimisticLayer) {
   node.parentNode = null;
-  if (node.kind !== 'BaseNode') {
-    environment.store.parentNode = node;
-  }
   environment.store = node;
 }
 
@@ -229,6 +272,7 @@ function replaceOptimisticNodeWithNetworkResponseNode(
   environment: IsographEnvironment,
   optimisticNode: OptimisticNode,
   data: DataLayer,
+  encounteredIds: EncounteredIds,
 ) {
   if (
     optimisticNode.childNode.kind === 'BaseNode' ||
@@ -237,7 +281,7 @@ function replaceOptimisticNodeWithNetworkResponseNode(
     mergeDataLayer(optimisticNode.childNode.data, data);
 
     makeRootNode(environment, optimisticNode.childNode);
-    reexecuteUpdates(environment, optimisticNode.parentNode);
+    reexecuteUpdates(environment, optimisticNode.parentNode, encounteredIds);
   } else if (optimisticNode.parentNode?.kind === 'NetworkResponseNode') {
     const networkResponseNode = optimisticNode.parentNode;
     mergeDataLayer(data, networkResponseNode.data);
@@ -248,7 +292,7 @@ function replaceOptimisticNodeWithNetworkResponseNode(
 
     const parentNode = optimisticNode.parentNode.parentNode;
     makeRootNode(environment, networkResponseNode);
-    reexecuteUpdates(environment, parentNode);
+    reexecuteUpdates(environment, parentNode, encounteredIds);
   } else {
     const networkResponseNode: NetworkResponseNode = {
       kind: 'NetworkResponseNode',
@@ -258,7 +302,7 @@ function replaceOptimisticNodeWithNetworkResponseNode(
     };
 
     makeRootNode(environment, networkResponseNode);
-    reexecuteUpdates(environment, optimisticNode.parentNode);
+    reexecuteUpdates(environment, optimisticNode.parentNode, encounteredIds);
   }
 }
 
@@ -267,3 +311,39 @@ export type OptimisticLayer =
   | NetworkResponseNode
   | StartUpdateNode
   | BaseNode;
+
+function compareData(
+  oldData: DataLayer,
+  newData: DataLayer,
+  encounteredIds: EncounteredIds,
+) {
+  if (oldData === newData) {
+    for (const [typeName, ids] of encounteredIds.entries()) {
+      for (const id of ids) {
+        encounteredIds.get(typeName)?.delete(id);
+      }
+    }
+    return;
+  }
+  for (const [typeName, records] of Object.entries(newData)) {
+    if (!records) {
+      continue;
+    }
+    outer: for (const [id, record] of Object.entries(records)) {
+      if (!record) {
+        continue;
+      }
+
+      for (const [recordKey, recordValue] of Object.entries(record)) {
+        // TODO: compare links, compare arrays
+        if (recordValue !== oldData[typeName]?.[id]?.[recordKey]) {
+          const set = insertEmptySetIfMissing(encounteredIds, typeName);
+          set.add(id);
+          continue outer;
+        }
+      }
+
+      encounteredIds.get(typeName)?.delete(id);
+    }
+  }
+}
