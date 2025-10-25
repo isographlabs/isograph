@@ -235,9 +235,9 @@ export function addOptimisticNode(
   }
 }
 
-function reexecuteUpdates(
+function mergeParentNodes(
   environment: IsographEnvironment,
-  node: OptimisticLayer | null,
+  node: OptimisticNode | NetworkResponseNode | StartUpdateNode | null,
   mutableEncounteredIds: EncounteredIds,
 ) {
   while (node && node?.kind !== 'OptimisticNode') {
@@ -246,7 +246,14 @@ function reexecuteUpdates(
     mergeDataLayer(environment.store.data, data);
     node = node.parentNode;
   }
+  return node;
+}
 
+function reexecuteUpdates(
+  environment: IsographEnvironment,
+  node: OptimisticNode | NetworkResponseNode | StartUpdateNode | null,
+  mutableEncounteredIds: EncounteredIds,
+) {
   while (node !== null) {
     const oldData = node.data;
     if ('startUpdate' in node) {
@@ -274,10 +281,17 @@ function replaceOptimisticNodeWithNetworkResponseNode(
   data: DataLayer,
   encounteredIds: EncounteredIds,
 ) {
-  if (
-    optimisticNode.childNode.kind === 'BaseNode' ||
-    optimisticNode.childNode.kind === 'NetworkResponseNode'
-  ) {
+  if (optimisticNode.childNode.kind === 'BaseNode') {
+    mergeDataLayer(optimisticNode.childNode.data, data);
+
+    makeRootNode(environment, optimisticNode.childNode);
+    const node = mergeParentNodes(
+      environment,
+      optimisticNode.parentNode,
+      encounteredIds,
+    );
+    reexecuteUpdates(environment, node, encounteredIds);
+  } else if (optimisticNode.childNode.kind === 'NetworkResponseNode') {
     mergeDataLayer(optimisticNode.childNode.data, data);
 
     makeRootNode(environment, optimisticNode.childNode);

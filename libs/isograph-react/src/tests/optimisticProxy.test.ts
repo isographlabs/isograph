@@ -209,7 +209,7 @@ describe('optimisticLayer', () => {
       ).toBe(5);
     });
 
-    test('has child BaseNode and no parent node', () => {
+    test('merges if has child BaseNode', () => {
       const revert = addOptimisticNode(environment, (counter) => counter + 1);
 
       revert(5);
@@ -226,12 +226,25 @@ describe('optimisticLayer', () => {
       ).toBe(5);
     });
 
-    test('has child node and parent node', () => {
+    test("doesn't merge parent nodes if has child nodes", () => {
       addOptimisticNode(environment, (counter) => counter + 1);
       const revert = addOptimisticNode(environment, (counter) => counter + 1);
       addStartUpdateNode(environment, (counter) => counter + 1);
 
       revert(5);
+
+      expect(environment.store).toMatchObject({
+        kind: 'StartUpdateNode',
+        childNode: {
+          kind: 'NetworkResponseNode',
+          childNode: {
+            kind: 'OptimisticNode',
+            childNode: {
+              kind: 'BaseNode',
+            },
+          },
+        },
+      });
 
       expect(
         readOptimisticRecord(environment, {
@@ -241,7 +254,7 @@ describe('optimisticLayer', () => {
       ).toBe(6);
     });
 
-    test('has parent NetworkResponseNode', () => {
+    test('merges parent NetworkResponseNode', () => {
       addOptimisticNode(environment, (counter) => counter + 1);
       const revert = addOptimisticNode(environment, (counter) => counter + 1);
       addNetworkResponseNode(environment, 12);
@@ -263,6 +276,28 @@ describe('optimisticLayer', () => {
           __typename: 'Query',
         }).counter,
       ).toBe(12);
+    });
+
+    test('merges parent nodes if has child BaseNode', () => {
+      const revert = addOptimisticNode(environment, (counter) => counter + 1);
+      addStartUpdateNode(environment, (counter) => counter + 1);
+      addNetworkResponseNode(environment, 12);
+      addOptimisticNode(environment, (counter) => counter + 1);
+
+      revert(4);
+
+      expect(environment.store).toMatchObject({
+        kind: 'OptimisticNode',
+        childNode: {
+          kind: 'BaseNode',
+        },
+      });
+      expect(
+        readOptimisticRecord(environment, {
+          __link: '__ROOT',
+          __typename: 'Query',
+        }).counter,
+      ).toBe(13);
     });
   });
 
