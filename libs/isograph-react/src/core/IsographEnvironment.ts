@@ -148,14 +148,14 @@ export function createIsographEnvironment(
   logFunction?.({
     kind: 'EnvironmentCreated',
   });
-  let optimisticLayer: StoreNode = {
+  let storeNode = {
     kind: 'BaseNode',
     data: store,
     parentNode: null,
     childNode: null,
-  };
+  } as const;
   return {
-    store: optimisticLayer,
+    store: storeNode,
     networkFunction,
     missingFieldHandler: missingFieldHandler ?? null,
     componentCache: {},
