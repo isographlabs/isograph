@@ -81,7 +81,7 @@ export function garbageCollectEnvironment(environment: IsographEnvironment) {
   let node: OptimisticLayer = environment.store;
   while (node.kind !== 'BaseNode') {
     garbageCollectLayer(retainedQueries, node.data);
-    node = node.childNode;
+    node = node.parentNode;
   }
 }
 
