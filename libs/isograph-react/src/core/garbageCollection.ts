@@ -10,7 +10,7 @@ import {
   type StoreLink,
   type TypeName,
 } from './IsographEnvironment';
-import type { OptimisticLayer } from './optimisticProxy';
+import type { StoreNode } from './optimisticProxy';
 
 export type RetainedQuery = {
   readonly normalizationAst: NormalizationAstNodes;
@@ -45,7 +45,7 @@ export function retainQuery(
 }
 
 export function garbageCollectEnvironment(environment: IsographEnvironment) {
-  let node: OptimisticLayer | null = environment.store;
+  let node: StoreNode | null = environment.store;
 
   while (node !== null) {
     garbageCollectLayer(environment, node.data);

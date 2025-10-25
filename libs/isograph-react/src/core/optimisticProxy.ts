@@ -25,7 +25,7 @@ export function readOptimisticRecord(
     {},
     {
       get(_, p) {
-        let node: OptimisticLayer | null = environment.store;
+        let node: StoreNode | null = environment.store;
 
         while (node !== null) {
           const storeRecord = node.data[link.__typename]?.[link.__link];
@@ -39,7 +39,7 @@ export function readOptimisticRecord(
         }
       },
       has(_, p) {
-        let node: OptimisticLayer | null = environment.store;
+        let node: StoreNode | null = environment.store;
 
         while (node !== null) {
           const storeRecord = node.data[link.__typename]?.[link.__link];
@@ -270,7 +270,7 @@ function reexecuteUpdates(
   }
 }
 
-function makeRootNode(environment: IsographEnvironment, node: OptimisticLayer) {
+function makeRootNode(environment: IsographEnvironment, node: StoreNode) {
   node.childNode = null;
   environment.store = node;
 }
@@ -320,7 +320,7 @@ function replaceOptimisticNodeWithNetworkResponseNode(
   }
 }
 
-export type OptimisticLayer =
+export type StoreNode =
   | OptimisticNode
   | NetworkResponseNode
   | StartUpdateNode
