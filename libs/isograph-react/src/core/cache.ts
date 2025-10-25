@@ -184,13 +184,6 @@ export function normalizeData(
     encounteredIds,
   );
 
-  logMessage(environment, () => ({
-    kind: 'AfterNormalization',
-    store: environment.store,
-    encounteredIds,
-  }));
-
-  callSubscriptions(environment, encounteredIds);
   return encounteredIds;
 }
 
