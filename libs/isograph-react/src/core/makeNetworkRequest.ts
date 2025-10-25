@@ -24,7 +24,7 @@ import {
   IsographEnvironment,
   ROOT_ID,
   StoreLink,
-  type DataLayer,
+  type StoreLayerData,
 } from './IsographEnvironment';
 import { logMessage } from './logging';
 import {
@@ -35,7 +35,7 @@ import {
 } from './PromiseWrapper';
 import { readButDoNotEvaluate } from './read';
 import { getOrCreateCachedStartUpdate } from './startUpdate';
-import { addNetworkResponseNode } from './optimisticProxy';
+import { addNetworkResponseStoreLayer } from './optimisticProxy';
 
 let networkRequestId = 0;
 
@@ -172,7 +172,7 @@ export function makeNetworkRequest<
 
       const root = { __link: ROOT_ID, __typename: artifact.concreteType };
       if (status.kind === 'UndisposedIncomplete') {
-        const data: DataLayer = {};
+        const data: StoreLayerData = {};
         const encounteredIds = normalizeData(
           environment,
           data,
@@ -181,7 +181,7 @@ export function makeNetworkRequest<
           variables,
           root,
         );
-        addNetworkResponseNode(environment, data, encounteredIds);
+        addNetworkResponseStoreLayer(environment, data, encounteredIds);
         const retainedQuery = {
           normalizationAst: normalizationAst.selections,
           variables,

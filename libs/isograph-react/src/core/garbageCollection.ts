@@ -6,11 +6,11 @@ import {
   DataId,
   IsographEnvironment,
   StoreRecord,
-  type DataLayer,
+  type StoreLayerData,
   type StoreLink,
   type TypeName,
 } from './IsographEnvironment';
-import type { StoreNode } from './optimisticProxy';
+import type { StoreLayer } from './optimisticProxy';
 
 export type RetainedQuery = {
   readonly normalizationAst: NormalizationAstNodes;
@@ -45,17 +45,17 @@ export function retainQuery(
 }
 
 export function garbageCollectEnvironment(environment: IsographEnvironment) {
-  let node: StoreNode | null = environment.store;
+  let node: StoreLayer | null = environment.store;
 
   while (node !== null) {
     garbageCollectLayer(environment, node.data);
-    node = node.parentNode;
+    node = node.parentStoreLayer;
   }
 }
 
 export function garbageCollectLayer(
   environment: IsographEnvironment,
-  dataLayer: DataLayer,
+  dataLayer: StoreLayerData,
 ) {
   const retainedIds: RetainedIds = {};
 
@@ -94,7 +94,7 @@ interface RetainedIds {
 }
 
 function recordReachableIds(
-  dataLayer: DataLayer,
+  dataLayer: StoreLayerData,
   retainedQuery: RetainedQuery,
   mutableRetainedIds: RetainedIds,
 ) {
@@ -118,7 +118,7 @@ function recordReachableIds(
 }
 
 function recordReachableIdsFromRecord(
-  dataLayer: DataLayer,
+  dataLayer: StoreLayerData,
   currentRecord: StoreRecord,
   mutableRetainedIds: RetainedIds,
   selections: NormalizationAstNodes,

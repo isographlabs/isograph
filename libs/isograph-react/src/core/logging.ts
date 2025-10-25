@@ -14,7 +14,7 @@ import {
 } from './IsographEnvironment';
 import { ReadDataResult } from './read';
 import { Arguments } from './util';
-import type { StoreNode } from './optimisticProxy';
+import type { StoreLayer } from './optimisticProxy';
 
 export type LogMessage =
   | {
@@ -25,7 +25,7 @@ export type LogMessage =
     }
   | {
       kind: 'AfterNormalization';
-      store: StoreNode;
+      store: StoreLayer;
       encounteredIds: EncounteredIds;
     }
   | {
