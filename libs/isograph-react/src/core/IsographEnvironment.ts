@@ -13,7 +13,7 @@ import {
 } from './FragmentReference';
 import type { RetainedQuery } from './garbageCollection';
 import { LogFunction, WrappedLogFunction } from './logging';
-import { type StoreNode } from './optimisticProxy';
+import { type StoreLayer } from './optimisticProxy';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { WithEncounteredRecords } from './read';
 import type { ReaderAst, StartUpdate } from './reader';
@@ -57,7 +57,7 @@ export type Subscriptions = Set<Subscription>;
 export type CacheMap<T> = { [index: string]: ParentCache<T> };
 
 export type IsographEnvironment = {
-  store: StoreNode;
+  store: StoreLayer;
   readonly networkFunction: IsographNetworkFunction;
   readonly missingFieldHandler: MissingFieldHandler | null;
   readonly componentCache: FieldCache<React.FC<any>>;
@@ -126,13 +126,13 @@ export type DataId = string;
 
 export const ROOT_ID: DataId & '__ROOT' = '__ROOT';
 
-export type DataLayer = {
+export type StoreLayerData = {
   [index: TypeName]: {
     [index: DataId]: StoreRecord | null;
   } | null;
 };
 
-export interface IsographStore extends DataLayer {
+export interface BaseStoreLayerData extends StoreLayerData {
   readonly Query: {
     readonly __ROOT: StoreRecord;
   };
@@ -140,7 +140,7 @@ export interface IsographStore extends DataLayer {
 
 const DEFAULT_GC_BUFFER_SIZE = 10;
 export function createIsographEnvironment(
-  store: IsographStore,
+  baseStoreLayerData: BaseStoreLayerData,
   networkFunction: IsographNetworkFunction,
   missingFieldHandler?: MissingFieldHandler | null,
   logFunction?: LogFunction | null,
@@ -148,14 +148,14 @@ export function createIsographEnvironment(
   logFunction?.({
     kind: 'EnvironmentCreated',
   });
-  let storeNode = {
-    kind: 'BaseNode',
-    data: store,
-    parentNode: null,
-    childNode: null,
+  let store = {
+    kind: 'BaseStoreLayer',
+    data: baseStoreLayerData,
+    parentStoreLayer: null,
+    childStoreLayer: null,
   } as const;
   return {
-    store: storeNode,
+    store,
     networkFunction,
     missingFieldHandler: missingFieldHandler ?? null,
     componentCache: {},
@@ -170,7 +170,7 @@ export function createIsographEnvironment(
   };
 }
 
-export function createIsographStore(): IsographStore {
+export function createIsographStore(): BaseStoreLayerData {
   return {
     Query: {
       [ROOT_ID]: {},

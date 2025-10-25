@@ -29,7 +29,7 @@ import {
   ROOT_ID,
   StoreLink,
   StoreRecord,
-  type DataLayer,
+  type StoreLayerData,
   type IsographEnvironment,
   type TypeName,
 } from './IsographEnvironment';
@@ -156,7 +156,7 @@ export type NetworkResponseObject = {
 
 export function normalizeData(
   environment: IsographEnvironment,
-  dataLayer: DataLayer,
+  dataLayer: StoreLayerData,
   normalizationAst: NormalizationAstNodes,
   networkResponse: NetworkResponseObject,
   variables: Variables,
@@ -417,7 +417,7 @@ export type EncounteredIds = Map<TypeName, Set<DataId>>;
  */
 function normalizeDataIntoRecord(
   environment: IsographEnvironment,
-  dataLayer: DataLayer,
+  dataLayer: StoreLayerData,
   normalizationAst: NormalizationAstNodes,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
@@ -525,7 +525,7 @@ function normalizeScalarField(
  */
 function normalizeLinkedField(
   environment: IsographEnvironment,
-  dataLayer: DataLayer,
+  dataLayer: StoreLayerData,
   astNode: NormalizationLinkedField,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
@@ -624,7 +624,7 @@ function normalizeLinkedField(
  */
 function normalizeInlineFragment(
   environment: IsographEnvironment,
-  dataLayer: DataLayer,
+  dataLayer: StoreLayerData,
   astNode: NormalizationInlineFragment,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
@@ -674,7 +674,7 @@ function dataIdsAreTheSame(
 
 function normalizeNetworkResponseObject(
   environment: IsographEnvironment,
-  dataLayer: DataLayer,
+  dataLayer: StoreLayerData,
   astNode: NormalizationLinkedField,
   networkResponseData: NetworkResponseObject,
   targetParentRecordLink: StoreLink,

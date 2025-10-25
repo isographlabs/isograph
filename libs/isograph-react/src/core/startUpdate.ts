@@ -14,13 +14,13 @@ import {
 } from './FragmentReference';
 import {
   assertLink,
-  type DataLayer,
+  type StoreLayerData,
   type IsographEnvironment,
   type StoreLink,
 } from './IsographEnvironment';
 import { logMessage } from './logging';
 import {
-  addStartUpdateNode,
+  addStartUpdateStoreLayer,
   getOrInsertRecord,
   readOptimisticRecord,
   type WithEncounteredIds,
@@ -60,8 +60,8 @@ export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
   networkRequestOptions: NetworkRequestReaderOptions,
 ): ExtractStartUpdate<TReadFromStore> {
   return (updater) => {
-    function startUpdate(): WithEncounteredIds<DataLayer> {
-      let dataLayer: DataLayer = {};
+    function startUpdate(): WithEncounteredIds<StoreLayerData> {
+      let dataLayer: StoreLayerData = {};
       let mutableUpdatedIds: EncounteredIds = new Map();
 
       let updatableData = createUpdatableProxy(
@@ -84,7 +84,7 @@ export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
       }
     }
 
-    addStartUpdateNode(environment, startUpdate);
+    addStartUpdateStoreLayer(environment, startUpdate);
   };
 }
 
@@ -92,7 +92,7 @@ export function createUpdatableProxy<
   TReadFromStore extends UnknownTReadFromStore,
 >(
   environment: IsographEnvironment,
-  data: DataLayer,
+  data: StoreLayerData,
   fragmentReference: FragmentReference<TReadFromStore, unknown>,
   networkRequestOptions: NetworkRequestReaderOptions,
   mutableUpdatedIds: EncounteredIds,
@@ -163,7 +163,7 @@ function defineCachedProperty<T>(
 
 function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
   environment: IsographEnvironment,
-  dataLayer: DataLayer,
+  dataLayer: StoreLayerData,
   ast: ReaderAst<TReadFromStore>,
   root: StoreLink,
   variables: ExtractParameters<TReadFromStore>,

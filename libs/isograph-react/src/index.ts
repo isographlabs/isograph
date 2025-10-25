@@ -33,7 +33,7 @@ export {
   type DataTypeValue,
   type IsographEnvironment,
   type IsographNetworkFunction,
-  type IsographStore,
+  type BaseStoreLayerData as IsographStore,
   type MissingFieldHandler,
   type StoreLink,
   type Link,

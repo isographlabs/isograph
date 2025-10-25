@@ -7,9 +7,9 @@ import {
   type IsographEnvironment,
 } from '../core/IsographEnvironment';
 import {
-  addNetworkResponseNode as addNetworkResponseNodeInner,
-  addOptimisticNode as addOptimisticNodeInner,
-  addStartUpdateNode as addStartUpdateNodeInner,
+  addNetworkResponseStoreLayer as addNetworkResponseStoreLayerInner,
+  addOptimisticStoreLayer as addOptimisticStoreLayerInner,
+  addStartUpdateStoreLayer as addStartUpdateStoreLayerInner,
   readOptimisticRecord,
   type WithEncounteredIds,
 } from '../core/optimisticProxy';
@@ -31,13 +31,13 @@ describe('optimisticLayer', () => {
       createIsographStore(),
       networkFunction,
     );
-    addNetworkResponseNode(environment, 0);
+    addNetworkResponseStoreLayer(environment, 0);
   });
 
-  describe('addNetworkResponseNode', () => {
-    test('has parent BaseNode', () => {
+  describe('addNetworkResponseStoreLayer', () => {
+    test('has parent BaseStoreLayer', () => {
       expect(environment.store).toMatchObject({
-        kind: 'BaseNode',
+        kind: 'BaseStoreLayer',
       });
     });
 
@@ -50,7 +50,7 @@ describe('optimisticLayer', () => {
     });
 
     test("doesn't call subscriptions if no changes", () => {
-      addNetworkResponseNode(environment, 0);
+      addNetworkResponseStoreLayer(environment, 0);
 
       expect(callSubscriptions).toHaveBeenCalledTimes(2);
       expect(callSubscriptions).toHaveBeenNthCalledWith(
@@ -61,16 +61,16 @@ describe('optimisticLayer', () => {
     });
 
     test('merge', () => {
-      addOptimisticNode(environment, (counter) => counter + 1);
-      addNetworkResponseNode(environment, 3);
-      addNetworkResponseNode(environment, 4);
+      addOptimisticStoreLayer(environment, (counter) => counter + 1);
+      addNetworkResponseStoreLayer(environment, 3);
+      addNetworkResponseStoreLayer(environment, 4);
 
       expect(environment.store).toMatchObject({
-        kind: 'NetworkResponseNode',
-        parentNode: {
-          kind: 'OptimisticNode',
-          parentNode: {
-            kind: 'BaseNode',
+        kind: 'NetworkResponseStoreLayer',
+        parentStoreLayer: {
+          kind: 'OptimisticStoreLayer',
+          parentStoreLayer: {
+            kind: 'BaseStoreLayer',
           },
         },
       });
@@ -84,25 +84,25 @@ describe('optimisticLayer', () => {
     });
   });
 
-  describe('addStartUpdateNode', () => {
+  describe('addStartUpdateStoreLayer', () => {
     test('calls subscriptions', () => {
-      addStartUpdateNode(environment, () => 1);
+      addStartUpdateStoreLayer(environment, () => 1);
 
       expect(callSubscriptions).toHaveBeenCalledTimes(2);
       expect(callSubscriptions).nthCalledWith(2, expect.anything(), CHANGES);
     });
 
     test('merge', () => {
-      addOptimisticNode(environment, () => 1);
-      addStartUpdateNode(environment, (counter) => counter + 1);
-      addStartUpdateNode(environment, (counter) => counter + 1);
+      addOptimisticStoreLayer(environment, () => 1);
+      addStartUpdateStoreLayer(environment, (counter) => counter + 1);
+      addStartUpdateStoreLayer(environment, (counter) => counter + 1);
 
       expect(environment.store).toMatchObject({
-        kind: 'StartUpdateNode',
-        parentNode: {
-          kind: 'OptimisticNode',
-          parentNode: {
-            kind: 'BaseNode',
+        kind: 'StartUpdateStoreLayer',
+        parentStoreLayer: {
+          kind: 'OptimisticStoreLayer',
+          parentStoreLayer: {
+            kind: 'BaseStoreLayer',
           },
         },
       });
@@ -115,18 +115,18 @@ describe('optimisticLayer', () => {
     });
   });
 
-  describe('addOptimisticNode', () => {
+  describe('addOptimisticStoreLayer', () => {
     test('calls subscriptions', () => {
-      addOptimisticNode(environment, () => 1);
+      addOptimisticStoreLayer(environment, () => 1);
 
       expect(callSubscriptions).toHaveBeenCalledTimes(2);
       expect(callSubscriptions).nthCalledWith(2, expect.anything(), CHANGES);
     });
 
     test('add tree nodes', () => {
-      addOptimisticNode(environment, (counter) => counter + 1);
-      addOptimisticNode(environment, (counter) => counter + 1);
-      addOptimisticNode(environment, (counter) => counter + 1);
+      addOptimisticStoreLayer(environment, (counter) => counter + 1);
+      addOptimisticStoreLayer(environment, (counter) => counter + 1);
+      addOptimisticStoreLayer(environment, (counter) => counter + 1);
 
       expect(
         readOptimisticRecord(environment, {
@@ -137,9 +137,9 @@ describe('optimisticLayer', () => {
     });
   });
 
-  describe('replaceOptimisticNodeWithNetworkResponseNode', () => {
+  describe('replaceOptimisticStoreLayerWithNetworkResponseStoreLayer', () => {
     test('calls subscriptions if changes', () => {
-      const revert = addOptimisticNode(environment, () => 1);
+      const revert = addOptimisticStoreLayer(environment, () => 1);
 
       revert(2);
 
@@ -152,7 +152,7 @@ describe('optimisticLayer', () => {
     });
 
     test("doesn't call subscriptions if no changes", () => {
-      const revert = addOptimisticNode(environment, () => 1);
+      const revert = addOptimisticStoreLayer(environment, () => 1);
 
       revert(1);
 
@@ -164,16 +164,19 @@ describe('optimisticLayer', () => {
       );
     });
 
-    test('has parent BaseNode and child node', () => {
-      const revert = addOptimisticNode(environment, (counter) => counter + 1);
-      addOptimisticNode(environment, (counter) => counter + 1);
+    test('has parent BaseStoreLayer and child node', () => {
+      const revert = addOptimisticStoreLayer(
+        environment,
+        (counter) => counter + 1,
+      );
+      addOptimisticStoreLayer(environment, (counter) => counter + 1);
 
       revert(5);
 
       expect(environment.store).toMatchObject({
-        kind: 'OptimisticNode',
-        parentNode: {
-          kind: 'BaseNode',
+        kind: 'OptimisticStoreLayer',
+        parentStoreLayer: {
+          kind: 'BaseStoreLayer',
         },
       });
 
@@ -186,17 +189,20 @@ describe('optimisticLayer', () => {
     });
 
     test('has parent node and no child node', () => {
-      addOptimisticNode(environment, (counter) => counter + 1);
-      const revert = addOptimisticNode(environment, (counter) => counter + 1);
+      addOptimisticStoreLayer(environment, (counter) => counter + 1);
+      const revert = addOptimisticStoreLayer(
+        environment,
+        (counter) => counter + 1,
+      );
 
       revert(5);
 
       expect(environment.store).toMatchObject({
-        kind: 'NetworkResponseNode',
-        parentNode: {
-          kind: 'OptimisticNode',
-          parentNode: {
-            kind: 'BaseNode',
+        kind: 'NetworkResponseStoreLayer',
+        parentStoreLayer: {
+          kind: 'OptimisticStoreLayer',
+          parentStoreLayer: {
+            kind: 'BaseStoreLayer',
           },
         },
       });
@@ -209,13 +215,16 @@ describe('optimisticLayer', () => {
       ).toBe(5);
     });
 
-    test('merges if has parent BaseNode', () => {
-      const revert = addOptimisticNode(environment, (counter) => counter + 1);
+    test('merges if has parent BaseStoreLayer', () => {
+      const revert = addOptimisticStoreLayer(
+        environment,
+        (counter) => counter + 1,
+      );
 
       revert(5);
 
       expect(environment.store).toMatchObject({
-        kind: 'BaseNode',
+        kind: 'BaseStoreLayer',
       });
 
       expect(
@@ -227,20 +236,23 @@ describe('optimisticLayer', () => {
     });
 
     test("doesn't merge child nodes if has parent nodes", () => {
-      addOptimisticNode(environment, (counter) => counter + 1);
-      const revert = addOptimisticNode(environment, (counter) => counter + 1);
-      addStartUpdateNode(environment, (counter) => counter + 1);
+      addOptimisticStoreLayer(environment, (counter) => counter + 1);
+      const revert = addOptimisticStoreLayer(
+        environment,
+        (counter) => counter + 1,
+      );
+      addStartUpdateStoreLayer(environment, (counter) => counter + 1);
 
       revert(5);
 
       expect(environment.store).toMatchObject({
-        kind: 'StartUpdateNode',
-        parentNode: {
-          kind: 'NetworkResponseNode',
-          parentNode: {
-            kind: 'OptimisticNode',
-            parentNode: {
-              kind: 'BaseNode',
+        kind: 'StartUpdateStoreLayer',
+        parentStoreLayer: {
+          kind: 'NetworkResponseStoreLayer',
+          parentStoreLayer: {
+            kind: 'OptimisticStoreLayer',
+            parentStoreLayer: {
+              kind: 'BaseStoreLayer',
             },
           },
         },
@@ -254,18 +266,21 @@ describe('optimisticLayer', () => {
       ).toBe(6);
     });
 
-    test('merges child NetworkResponseNode', () => {
-      addOptimisticNode(environment, (counter) => counter + 1);
-      const revert = addOptimisticNode(environment, (counter) => counter + 1);
-      addNetworkResponseNode(environment, 12);
+    test('merges child NetworkResponseStoreLayer', () => {
+      addOptimisticStoreLayer(environment, (counter) => counter + 1);
+      const revert = addOptimisticStoreLayer(
+        environment,
+        (counter) => counter + 1,
+      );
+      addNetworkResponseStoreLayer(environment, 12);
       revert(5);
 
       expect(environment.store).toMatchObject({
-        kind: 'NetworkResponseNode',
-        parentNode: {
-          kind: 'OptimisticNode',
-          parentNode: {
-            kind: 'BaseNode',
+        kind: 'NetworkResponseStoreLayer',
+        parentStoreLayer: {
+          kind: 'OptimisticStoreLayer',
+          parentStoreLayer: {
+            kind: 'BaseStoreLayer',
           },
         },
       });
@@ -278,18 +293,21 @@ describe('optimisticLayer', () => {
       ).toBe(12);
     });
 
-    test('merges child nodes if has parent BaseNode', () => {
-      const revert = addOptimisticNode(environment, (counter) => counter + 1);
-      addStartUpdateNode(environment, (counter) => counter + 1);
-      addNetworkResponseNode(environment, 12);
-      addOptimisticNode(environment, (counter) => counter + 1);
+    test('merges child nodes if has parent BaseStoreLayer', () => {
+      const revert = addOptimisticStoreLayer(
+        environment,
+        (counter) => counter + 1,
+      );
+      addStartUpdateStoreLayer(environment, (counter) => counter + 1);
+      addNetworkResponseStoreLayer(environment, 12);
+      addOptimisticStoreLayer(environment, (counter) => counter + 1);
 
       revert(4);
 
       expect(environment.store).toMatchObject({
-        kind: 'OptimisticNode',
-        parentNode: {
-          kind: 'BaseNode',
+        kind: 'OptimisticStoreLayer',
+        parentStoreLayer: {
+          kind: 'BaseStoreLayer',
         },
       });
       expect(
@@ -302,19 +320,19 @@ describe('optimisticLayer', () => {
   });
 
   // utils
-  function addNetworkResponseNode(
+  function addNetworkResponseStoreLayer(
     environment: IsographEnvironment,
     counter: number,
   ) {
     const { data, encounteredIds } = update(() => counter);
-    return addNetworkResponseNodeInner(environment, data, encounteredIds);
+    return addNetworkResponseStoreLayerInner(environment, data, encounteredIds);
   }
 
-  function addOptimisticNode(
+  function addOptimisticStoreLayer(
     environment: IsographEnvironment,
     updater: (prev: number) => number,
   ) {
-    const revert = addOptimisticNodeInner(environment, () => {
+    const revert = addOptimisticStoreLayerInner(environment, () => {
       return update(updater);
     });
     return (counter: number) => {
@@ -322,11 +340,11 @@ describe('optimisticLayer', () => {
     };
   }
 
-  function addStartUpdateNode(
+  function addStartUpdateStoreLayer(
     environment: IsographEnvironment,
     updater: (prev: number) => number,
   ) {
-    addStartUpdateNodeInner(environment, () => {
+    addStartUpdateStoreLayerInner(environment, () => {
       return update(updater);
     });
   }
