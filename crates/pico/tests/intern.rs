@@ -38,7 +38,7 @@ enum ProcessInputError {
     ReadError(#[from] FirstLetterError),
 }
 
-#[memo]
+#[legacy_memo]
 fn first_letter(
     db: &TestDatabase,
     input_id: SourceId<Input>,
@@ -51,7 +51,7 @@ fn first_letter(
         .map(|v| db.intern(v))
 }
 
-#[memo]
+#[legacy_memo]
 fn process_input(
     db: &TestDatabase,
     input_id: SourceId<Input>,

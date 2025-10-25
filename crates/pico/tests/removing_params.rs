@@ -47,13 +47,13 @@ struct Input {
     pub value: String,
 }
 
-#[memo]
+#[legacy_memo]
 fn first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
     let input = db.get(input_id);
     input.value.chars().next().unwrap()
 }
 
-#[memo]
+#[legacy_memo]
 fn capitalized_first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
     let first = first_letter(db, input_id);
     first.to_ascii_uppercase()

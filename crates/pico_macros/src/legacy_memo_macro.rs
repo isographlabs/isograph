@@ -4,7 +4,7 @@ use proc_macro::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{Error, FnArg, ItemFn, PatType, ReturnType, Signature, parse_macro_input, parse_quote};
 
-pub(crate) fn memo_macro(_args: TokenStream, item: TokenStream) -> TokenStream {
+pub(crate) fn legacy_memo_macro(_args: TokenStream, item: TokenStream) -> TokenStream {
     let ItemFn {
         sig,
         vis,

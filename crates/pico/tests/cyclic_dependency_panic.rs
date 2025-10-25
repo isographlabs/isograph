@@ -42,27 +42,27 @@ fn test_calls_a() {
     calls_a(&db);
 }
 
-#[memo]
+#[legacy_memo]
 fn calls_itself(database: &TestDatabase) {
     calls_itself(database);
 }
 
-#[memo]
+#[legacy_memo]
 fn calls_calls_itself(database: &TestDatabase) {
     calls_itself(database);
 }
 
-#[memo]
+#[legacy_memo]
 fn a(database: &TestDatabase) {
     b(database);
 }
 
-#[memo]
+#[legacy_memo]
 fn b(database: &TestDatabase) {
     a(database);
 }
 
-#[memo]
+#[legacy_memo]
 fn calls_a(database: &TestDatabase) {
     a(database);
 }

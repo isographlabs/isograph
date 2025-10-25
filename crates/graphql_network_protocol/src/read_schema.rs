@@ -5,10 +5,10 @@ use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDo
 use graphql_schema_parser::{SchemaParseError, parse_schema, parse_schema_extensions};
 use isograph_schema::{IsographDatabase, NetworkProtocol, SchemaSource};
 use pico::{MemoRef, SourceId};
-use pico_macros::memo;
+use pico_macros::legacy_memo;
 
 #[allow(clippy::type_complexity)]
-#[memo]
+#[legacy_memo]
 pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
@@ -42,7 +42,7 @@ pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok((db.intern(schema), schema_extensions))
 }
 
-#[memo]
+#[legacy_memo]
 pub fn parse_schema_extensions_file<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema_extension_source_id: SourceId<SchemaSource>,

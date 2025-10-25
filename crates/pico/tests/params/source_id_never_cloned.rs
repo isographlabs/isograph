@@ -55,7 +55,7 @@ impl Clone for Input {
     }
 }
 
-#[memo]
+#[legacy_memo]
 fn assert_input_cloned(db: &TestDatabase, input_id: SourceId<Input>) {
     ASSERT_INPUT_COUNTER.fetch_add(1, Ordering::SeqCst);
     db.get(input_id);

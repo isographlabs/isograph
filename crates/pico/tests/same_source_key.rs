@@ -37,12 +37,12 @@ struct InputB {
     pub value: String,
 }
 
-#[memo]
+#[legacy_memo]
 fn memoized_a(db: &TestDatabase, input: SourceId<InputA>) -> char {
     db.get(input).value.chars().next().unwrap()
 }
 
-#[memo]
+#[legacy_memo]
 fn memoized_b(db: &TestDatabase, input: SourceId<InputB>) -> char {
     db.get(input).value.chars().next().unwrap()
 }

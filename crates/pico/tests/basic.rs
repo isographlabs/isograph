@@ -38,7 +38,7 @@ struct Input {
     pub value: String,
 }
 
-#[memo]
+#[legacy_memo]
 fn first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
     FIRST_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     let input = db.get(input_id);

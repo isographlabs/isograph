@@ -70,7 +70,7 @@ struct Input {
     pub value: String,
 }
 
-#[memo]
+#[legacy_memo]
 fn get_values_tracked(db: &TestDatabase) -> Vec<String> {
     let mut result = vec![];
     for (_, input_id) in db.get_map().tracked().0.iter() {
@@ -80,7 +80,7 @@ fn get_values_tracked(db: &TestDatabase) -> Vec<String> {
     result
 }
 
-#[memo]
+#[legacy_memo]
 fn get_values_untracked(db: &TestDatabase) -> Vec<String> {
     let mut result = vec![];
     for (_, input_id) in db.get_map().untracked().0.iter() {

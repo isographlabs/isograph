@@ -14,7 +14,7 @@ use isograph_schema::{
 };
 use isograph_schema::{IsographDatabase, ServerScalarEntity};
 use lazy_static::lazy_static;
-use pico_macros::memo;
+use pico_macros::legacy_memo;
 use thiserror::Error;
 
 use crate::{
@@ -63,7 +63,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
     type SchemaObjectAssociatedData = GraphQLSchemaObjectAssociatedData;
     type ParseTypeSystemDocumentsError = ParseGraphQLTypeSystemDocumentsError;
 
-    #[memo]
+    #[legacy_memo]
     fn parse_type_system_documents(
         db: &IsographDatabase<Self>,
     ) -> Result<

@@ -40,14 +40,14 @@ fn inner_retained() {
     assert_eq!(INNER_COUNTER.load(Ordering::SeqCst), 1);
 }
 
-#[memo]
+#[legacy_memo]
 fn outer(db: &TestDatabase) -> &'static str {
     inner(db);
     OUTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     "outer"
 }
 
-#[memo]
+#[legacy_memo]
 fn inner(_db: &TestDatabase) -> &'static str {
     INNER_COUNTER.fetch_add(1, Ordering::SeqCst);
     "inner"

@@ -97,14 +97,14 @@ impl Clone for Param {
     }
 }
 
-#[memo]
+#[legacy_memo]
 fn accepts_owned_param(db: &TestDatabase, input_id: SourceId<Input>, _param: Param) -> char {
     FIRST_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     let input = db.get(input_id);
     input.value.chars().next().unwrap()
 }
 
-#[memo]
+#[legacy_memo]
 fn accepts_borrowed_param(db: &TestDatabase, input_id: SourceId<Input>, _param: &Param) -> char {
     FIRST_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     let input = db.get(input_id);

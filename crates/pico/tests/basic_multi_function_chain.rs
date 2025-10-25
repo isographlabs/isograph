@@ -124,21 +124,21 @@ struct Input {
     pub value: String,
 }
 
-#[memo]
+#[legacy_memo]
 fn first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
     FIRST_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     let input = db.get(input_id);
     input.value.chars().next().unwrap()
 }
 
-#[memo]
+#[legacy_memo]
 fn capitalized_first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
     CAPITALIZED_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     let first = first_letter(db, input_id);
     first.to_ascii_uppercase()
 }
 
-#[memo]
+#[legacy_memo]
 fn capitalized_first_letter_from_memoref(db: &TestDatabase, first: MemoRef<char>) -> char {
     MEMO_REF_PARAM_COUNTER.fetch_add(1, Ordering::SeqCst);
     first.to_ascii_uppercase()

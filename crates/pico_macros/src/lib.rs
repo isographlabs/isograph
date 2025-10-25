@@ -1,5 +1,5 @@
 mod db_macro;
-mod memo_macro;
+mod legacy_memo_macro;
 mod singleton_macro;
 mod source_macro;
 
@@ -8,8 +8,8 @@ extern crate proc_macro2;
 use proc_macro::TokenStream;
 
 #[proc_macro_attribute]
-pub fn memo(args: TokenStream, input: TokenStream) -> TokenStream {
-    memo_macro::memo_macro(args, input)
+pub fn legacy_memo(args: TokenStream, input: TokenStream) -> TokenStream {
+    legacy_memo_macro::legacy_memo_macro(args, input)
 }
 
 #[proc_macro_derive(Source, attributes(key))]

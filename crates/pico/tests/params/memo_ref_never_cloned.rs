@@ -33,10 +33,10 @@ impl Clone for Output {
     }
 }
 
-#[memo]
+#[legacy_memo]
 fn get_output(_db: &TestDatabase) -> Output {
     Output {}
 }
 
-#[memo]
+#[legacy_memo]
 fn consume_output(db: &TestDatabase, _output: MemoRef<Output>) {}

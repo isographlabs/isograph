@@ -12,7 +12,7 @@ use isograph_schema::{
     ServerObjectSelectableVariant, ServerScalarSelectable, UnprocessedClientFieldItem,
     UnprocessedClientPointerItem,
 };
-use pico_macros::memo;
+use pico_macros::legacy_memo;
 use thiserror::Error;
 
 /// Create a schema from the type system document, i.e. avoid parsing any
@@ -20,7 +20,7 @@ use thiserror::Error;
 ///
 /// This is sufficient for some queries, like answering "Where is an entity
 /// defined".
-#[memo]
+#[legacy_memo]
 #[allow(clippy::type_complexity)]
 pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
@@ -76,7 +76,7 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
 /// iso literals. It *does* set server fields. Parsing iso literals is done in a future step.
 ///
 /// This is sufficient for some queries, like answering "Where is a server field defined."
-#[memo]
+#[legacy_memo]
 #[allow(clippy::type_complexity)]
 pub fn create_type_system_schema_with_server_selectables<
     TNetworkProtocol: NetworkProtocol + 'static,

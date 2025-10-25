@@ -5,7 +5,7 @@ use common_lang_types::{
     WithLocation,
 };
 use isograph_lang_types::SelectionType;
-use pico_macros::memo;
+use pico_macros::legacy_memo;
 use thiserror::Error;
 
 use crate::{
@@ -15,7 +15,7 @@ use crate::{
 
 // TODO consider adding a memoized function that creates a map of entities (maybe
 // with untracked access?) and going through that.
-#[memo]
+#[legacy_memo]
 pub fn server_entities_named<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: UnvalidatedTypeName,
@@ -73,7 +73,7 @@ pub enum EntityAccessError<TNetworkProtocol: NetworkProtocol + 'static> {
     },
 }
 
-#[memo]
+#[legacy_memo]
 pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_object_entity_name: ServerObjectEntityName,
@@ -110,7 +110,7 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
     }
 }
 
-#[memo]
+#[legacy_memo]
 pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_scalar_entity_name: ServerScalarEntityName,
@@ -147,7 +147,7 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
     }
 }
 
-#[memo]
+#[legacy_memo]
 pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_scalar_entity_name: ServerScalarEntityName,
@@ -163,7 +163,7 @@ pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol + 
     Ok(Some(entity.item.javascript_name))
 }
 
-#[memo]
+#[legacy_memo]
 pub fn server_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     name: ServerEntityName,

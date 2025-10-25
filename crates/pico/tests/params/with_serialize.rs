@@ -52,7 +52,7 @@ impl Clone for Param {
     }
 }
 
-#[memo]
+#[legacy_memo]
 fn accepts_param_with_serialize(
     db: &TestDatabase,
     input_id: SourceId<Input>,

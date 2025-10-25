@@ -44,13 +44,13 @@ fn basic_retained() {
     assert_eq!(B_COUNTER.load(Ordering::SeqCst), 1);
 }
 
-#[memo]
+#[legacy_memo]
 fn memoized_a(_db: &TestDatabase) -> char {
     A_COUNTER.fetch_add(1, Ordering::SeqCst);
     'a'
 }
 
-#[memo]
+#[legacy_memo]
 fn memoized_b(_db: &TestDatabase) -> char {
     B_COUNTER.fetch_add(1, Ordering::SeqCst);
     'b'

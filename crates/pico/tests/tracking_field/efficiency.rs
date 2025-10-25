@@ -94,7 +94,7 @@ struct Input {
     pub value: String,
 }
 
-#[memo]
+#[legacy_memo]
 fn get_key_untracked(db: &TestDatabase) {
     UNTRACKED_COUNTER.fetch_add(1, Ordering::SeqCst);
     let map = db.get_map();
@@ -109,7 +109,7 @@ fn get_key_untracked(db: &TestDatabase) {
     assert_eq!(value.value, "asdf".to_string());
 }
 
-#[memo]
+#[legacy_memo]
 fn get_key_tracked(db: &TestDatabase) {
     TRACKED_COUNTER.fetch_add(1, Ordering::SeqCst);
     let map = db.get_map();

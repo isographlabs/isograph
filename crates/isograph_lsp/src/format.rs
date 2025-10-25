@@ -16,7 +16,7 @@ use lsp_types::{
     Position, Range, TextEdit,
     request::{Formatting, Request},
 };
-use pico_macros::memo;
+use pico_macros::legacy_memo;
 
 use crate::{lsp_runtime_error::LSPRuntimeResult, uri_file_path_ext::UriFilePathExt};
 
@@ -96,7 +96,7 @@ pub fn char_index_to_position(content: &str, char_index: usize) -> Position {
     }
 }
 
-#[memo]
+#[legacy_memo]
 fn format_extraction<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     extraction: &IsoLiteralExtraction,

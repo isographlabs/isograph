@@ -41,14 +41,14 @@ struct Input {
     pub value: String,
 }
 
-#[memo]
+#[legacy_memo]
 fn first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
     FIRST_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     let input = db.get(input_id);
     input.value.chars().next().unwrap()
 }
 
-#[memo]
+#[legacy_memo]
 fn first_letter_as_memo_ref(db: &TestDatabase, input_id: SourceId<Input>) -> MemoRef<char> {
     FIRST_LETTER_AS_MEMO_REF_COUNTER.fetch_add(1, Ordering::SeqCst);
     first_letter(db, input_id)

@@ -50,14 +50,14 @@ struct Input {
     pub value: String,
 }
 
-#[memo]
+#[legacy_memo]
 fn first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
     FIRST_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     let input = db.get(input_id);
     input.value.chars().next().unwrap()
 }
 
-#[memo]
+#[legacy_memo]
 fn capitalized_first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
     CAPITALIZED_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     unchanged_subtree(db);
@@ -65,7 +65,7 @@ fn capitalized_first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> cha
     first.to_ascii_uppercase()
 }
 
-#[memo]
+#[legacy_memo]
 fn unchanged_subtree(_db: &TestDatabase) -> &'static str {
     UNCHANGED_SUBTREE.fetch_add(1, Ordering::SeqCst);
     "this function should not be re-executed, \

@@ -43,7 +43,7 @@ impl Clone for ReturnValue {
     }
 }
 
-#[memo]
+#[legacy_memo]
 fn first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> ReturnValue {
     let input = db.get(input_id);
     ReturnValue(input.value.chars().next().unwrap())
