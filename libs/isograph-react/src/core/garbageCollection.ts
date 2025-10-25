@@ -10,7 +10,7 @@ import {
   type StoreLink,
   type TypeName,
 } from './IsographEnvironment';
-import type { OptimisticLayer } from './optimisticProxy';
+import type { StoreNode } from './optimisticProxy';
 import {
   NOT_SET,
   type PromiseWrapper,
@@ -78,8 +78,8 @@ export function garbageCollectEnvironment(environment: IsographEnvironment) {
     retainedQueries.push(query);
   }
 
-  let node: OptimisticLayer = environment.store;
-  while (node.kind !== 'BaseNode') {
+  let node: StoreNode | null = environment.store;
+  while (node !== null) {
     garbageCollectLayer(retainedQueries, node.data);
     node = node.parentNode;
   }

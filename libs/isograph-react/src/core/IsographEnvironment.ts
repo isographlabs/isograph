@@ -13,7 +13,7 @@ import {
 } from './FragmentReference';
 import type { RetainedQuery } from './garbageCollection';
 import { LogFunction, WrappedLogFunction } from './logging';
-import { type OptimisticLayer } from './optimisticProxy';
+import { type StoreNode } from './optimisticProxy';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { WithEncounteredRecords } from './read';
 import type { ReaderAst, StartUpdate } from './reader';
@@ -57,7 +57,7 @@ export type Subscriptions = Set<Subscription>;
 export type CacheMap<T> = { [index: string]: ParentCache<T> };
 
 export type IsographEnvironment = {
-  store: OptimisticLayer;
+  store: StoreNode;
   readonly networkFunction: IsographNetworkFunction;
   readonly missingFieldHandler: MissingFieldHandler | null;
   readonly componentCache: FieldCache<React.FC<any>>;
@@ -148,7 +148,7 @@ export function createIsographEnvironment(
   logFunction?.({
     kind: 'EnvironmentCreated',
   });
-  let optimisticLayer: OptimisticLayer = {
+  let optimisticLayer: StoreNode = {
     kind: 'BaseNode',
     data: store,
     parentNode: null,
