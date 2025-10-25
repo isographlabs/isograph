@@ -1,8 +1,8 @@
 import { LoadableFieldReader } from '@isograph/react';
 import { Card, CardContent, Container, Stack } from '@mui/material';
-import { Suspense } from 'react';
 import { iso } from '@iso';
 import { useNavigateTo } from './routes';
+import { Suspense } from 'react';
 
 export const SmartestPetRoute = iso(`
   field Query.SmartestPetRoute @component {
@@ -14,13 +14,14 @@ export const SmartestPetRoute = iso(`
         intelligence
       }
       picture
-      firstCheckin {
+      checkinsPointer {
         location
       }
     }
   }
 `)(function SmartestRouteComponent({ data }) {
   const navigateTo = useNavigateTo();
+
   return (
     <Container maxWidth="md">
       <h1>Smartest Pet Award</h1>
@@ -53,24 +54,32 @@ export const SmartestPetRoute = iso(`
                         Intelligence level:{' '}
                         <b>{smartestPet.stats?.intelligence}</b>
                       </p>
-                      <p>
-                        {smartestPet.firstCheckin ? (
-                          <Suspense>
-                            <LoadableFieldReader
-                              loadableField={smartestPet.firstCheckin}
-                            >
-                              {(firstCheckin) => (
-                                <>
-                                  Next checkin location:{' '}
-                                  <b>{firstCheckin.location}</b>
-                                </>
-                              )}
-                            </LoadableFieldReader>
-                          </Suspense>
+                      <ul>
+                        {smartestPet.checkinsPointer.length ? (
+                          smartestPet.checkinsPointer.map(
+                            (loadableCheckin, i) => {
+                              return (
+                                <li key={i}>
+                                  <Suspense>
+                                    <LoadableFieldReader
+                                      loadableField={loadableCheckin}
+                                      args={{}}
+                                    >
+                                      {(checkin) => (
+                                        <>
+                                          Checkin: <b>{checkin.location}</b>
+                                        </>
+                                      )}
+                                    </LoadableFieldReader>
+                                  </Suspense>
+                                </li>
+                              );
+                            },
+                          )
                         ) : (
-                          'No checkins yet!'
+                          <li>No checkins yet!</li>
                         )}
-                      </p>
+                      </ul>
                     </div>
                   </>
                 )}
@@ -85,16 +94,16 @@ export const SmartestPetRoute = iso(`
   );
 });
 
-export const firstCheckin = iso(`
-  pointer Pet.firstCheckin to ICheckin {
+export const checkinsPointer = iso(`
+  pointer Pet.checkinsPointer to [ICheckin!]! {
     checkins(
-      limit: 1
+      limit: 2
     ) {
       __link
     }
   }
 `)(({ data }) => {
-  return data.checkins[0].__link ?? null;
+  return data.checkins.map((checkin) => checkin.__link);
 });
 
 export const SmartestPet = iso(`

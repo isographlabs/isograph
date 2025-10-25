@@ -35,7 +35,7 @@ const normalizationAst: NormalizationAst = {
               arguments: [
                 [
                   "limit",
-                  { kind: "Literal", value: 1 },
+                  { kind: "Literal", value: 2 },
                 ],
               ],
               concreteType: "Checkin",

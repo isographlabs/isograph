@@ -110,7 +110,7 @@ export type ReaderLinkedField = {
   readonly arguments: Arguments | null;
   readonly condition: EagerReaderArtifact<
     { data: any; parameters: any; startUpdate?: StartUpdate<any> },
-    StoreLink | null
+    StoreLink | null | (StoreLink | null)[] | StoreLink[]
   > | null;
   readonly isUpdatable: boolean;
   /**
@@ -118,6 +118,10 @@ export type ReaderLinkedField = {
    */
   readonly refetchQueryIndex: number | null;
 };
+
+export interface ReaderClientPointer extends ReaderLinkedField {
+  readonly refetchQueryIndex: number;
+}
 
 export type ReaderNonLoadableResolverField = {
   readonly kind: 'Resolver';

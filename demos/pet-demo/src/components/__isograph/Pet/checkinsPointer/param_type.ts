@@ -1,6 +1,6 @@
 import { type Checkin____link__output_type } from '../../Checkin/__link/output_type';
 
-export type Pet__firstCheckin__param = {
+export type Pet__checkinsPointer__param = {
   readonly data: {
     readonly checkins: ReadonlyArray<{
       /**
