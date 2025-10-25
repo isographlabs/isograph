@@ -49,7 +49,7 @@ export function garbageCollectEnvironment(environment: IsographEnvironment) {
 
   while (node !== null) {
     garbageCollectLayer(environment, node.data);
-    node = node.childNode;
+    node = node.parentNode;
   }
 }
 

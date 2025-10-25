@@ -35,7 +35,7 @@ export function readOptimisticRecord(
               return value;
             }
           }
-          node = node.childNode;
+          node = node.parentNode;
         }
       },
       has(_, p) {
@@ -49,7 +49,7 @@ export function readOptimisticRecord(
               return true;
             }
           }
-          node = node.childNode;
+          node = node.parentNode;
         }
         return false;
       },
@@ -59,15 +59,15 @@ export function readOptimisticRecord(
 
 type BaseNode = {
   readonly kind: 'BaseNode';
-  parentNode: OptimisticNode | null;
-  childNode: null;
+  childNode: OptimisticNode | null;
+  parentNode: null;
   readonly data: IsographStore;
 };
 
 type NetworkResponseNode = {
   readonly kind: 'NetworkResponseNode';
-  parentNode: OptimisticNode | StartUpdateNode | null;
-  childNode: OptimisticNode | StartUpdateNode;
+  childNode: OptimisticNode | StartUpdateNode | null;
+  parentNode: OptimisticNode | StartUpdateNode;
   data: DataLayer;
 };
 
@@ -81,16 +81,16 @@ type DataUpdate = () => Pick<WithEncounteredIds<DataLayer>, 'data'>;
 
 type StartUpdateNode = {
   readonly kind: 'StartUpdateNode';
-  parentNode: OptimisticNode | NetworkResponseNode | null;
-  childNode: OptimisticNode | NetworkResponseNode;
+  childNode: OptimisticNode | NetworkResponseNode | null;
+  parentNode: OptimisticNode | NetworkResponseNode;
   data: DataLayer;
   startUpdate: DataUpdate;
 };
 
 type OptimisticNode = {
   readonly kind: 'OptimisticNode';
-  parentNode: OptimisticNode | StartUpdateNode | NetworkResponseNode | null;
-  childNode: OptimisticNode | StartUpdateNode | NetworkResponseNode | BaseNode;
+  childNode: OptimisticNode | StartUpdateNode | NetworkResponseNode | null;
+  parentNode: OptimisticNode | StartUpdateNode | NetworkResponseNode | BaseNode;
   data: DataLayer;
   startUpdate: DataUpdate;
 };
@@ -110,11 +110,11 @@ export function addNetworkResponseNode(
     case 'OptimisticNode': {
       const node: NetworkResponseNode = {
         kind: 'NetworkResponseNode',
-        childNode: environment.store,
-        parentNode: null,
+        parentNode: environment.store,
+        childNode: null,
         data,
       };
-      environment.store.parentNode = node;
+      environment.store.childNode = node;
       environment.store = node;
       break;
     }
@@ -171,12 +171,12 @@ export function addStartUpdateNode(
     case 'OptimisticNode': {
       const node: StartUpdateNode = {
         kind: 'StartUpdateNode',
-        childNode: environment.store,
-        parentNode: null,
+        parentNode: environment.store,
+        childNode: null,
         data,
         startUpdate: startUpdate,
       };
-      environment.store.parentNode = node;
+      environment.store.childNode = node;
       environment.store = node;
       break;
     }
@@ -206,13 +206,13 @@ export function addOptimisticNode(
     case 'OptimisticNode': {
       const node: OptimisticNode = {
         kind: 'OptimisticNode',
-        childNode: environment.store,
-        parentNode: null,
+        parentNode: environment.store,
+        childNode: null,
         data,
         startUpdate: startUpdate,
       };
 
-      environment.store.parentNode = node;
+      environment.store.childNode = node;
       environment.store = node;
 
       callSubscriptions(environment, encounteredIds);
@@ -244,7 +244,7 @@ function mergeParentNodes(
     const data = 'startUpdate' in node ? node.startUpdate().data : node.data;
     compareData(node.data, data, mutableEncounteredIds);
     mergeDataLayer(environment.store.data, data);
-    node = node.parentNode;
+    node = node.childNode;
   }
   return node;
 }
@@ -260,18 +260,18 @@ function reexecuteUpdates(
       node.data = node.startUpdate().data;
     }
     compareData(oldData, node.data, mutableEncounteredIds);
-    node.childNode = environment.store;
-    environment.store.parentNode = node;
+    node.parentNode = environment.store;
+    environment.store.childNode = node;
     environment.store = node;
 
-    node = node.parentNode;
+    node = node.childNode;
 
-    environment.store.parentNode = null;
+    environment.store.childNode = null;
   }
 }
 
 function makeRootNode(environment: IsographEnvironment, node: OptimisticLayer) {
-  node.parentNode = null;
+  node.childNode = null;
   environment.store = node;
 }
 
@@ -281,42 +281,42 @@ function replaceOptimisticNodeWithNetworkResponseNode(
   data: DataLayer,
   encounteredIds: EncounteredIds,
 ) {
-  if (optimisticNode.childNode.kind === 'BaseNode') {
-    mergeDataLayer(optimisticNode.childNode.data, data);
+  if (optimisticNode.parentNode.kind === 'BaseNode') {
+    mergeDataLayer(optimisticNode.parentNode.data, data);
 
-    makeRootNode(environment, optimisticNode.childNode);
+    makeRootNode(environment, optimisticNode.parentNode);
     const node = mergeParentNodes(
       environment,
-      optimisticNode.parentNode,
+      optimisticNode.childNode,
       encounteredIds,
     );
     reexecuteUpdates(environment, node, encounteredIds);
-  } else if (optimisticNode.childNode.kind === 'NetworkResponseNode') {
-    mergeDataLayer(optimisticNode.childNode.data, data);
+  } else if (optimisticNode.parentNode.kind === 'NetworkResponseNode') {
+    mergeDataLayer(optimisticNode.parentNode.data, data);
 
-    makeRootNode(environment, optimisticNode.childNode);
-    reexecuteUpdates(environment, optimisticNode.parentNode, encounteredIds);
-  } else if (optimisticNode.parentNode?.kind === 'NetworkResponseNode') {
-    const networkResponseNode = optimisticNode.parentNode;
+    makeRootNode(environment, optimisticNode.parentNode);
+    reexecuteUpdates(environment, optimisticNode.childNode, encounteredIds);
+  } else if (optimisticNode.childNode?.kind === 'NetworkResponseNode') {
+    const networkResponseNode = optimisticNode.childNode;
     mergeDataLayer(data, networkResponseNode.data);
     networkResponseNode.data = data;
 
-    networkResponseNode.childNode = optimisticNode.childNode;
-    optimisticNode.childNode.parentNode = networkResponseNode;
+    networkResponseNode.parentNode = optimisticNode.parentNode;
+    optimisticNode.parentNode.childNode = networkResponseNode;
 
-    const parentNode = optimisticNode.parentNode.parentNode;
+    const childNode = optimisticNode.childNode.childNode;
     makeRootNode(environment, networkResponseNode);
-    reexecuteUpdates(environment, parentNode, encounteredIds);
+    reexecuteUpdates(environment, childNode, encounteredIds);
   } else {
     const networkResponseNode: NetworkResponseNode = {
       kind: 'NetworkResponseNode',
       data,
-      childNode: optimisticNode.childNode,
-      parentNode: null,
+      parentNode: optimisticNode.parentNode,
+      childNode: null,
     };
 
     makeRootNode(environment, networkResponseNode);
-    reexecuteUpdates(environment, optimisticNode.parentNode, encounteredIds);
+    reexecuteUpdates(environment, optimisticNode.childNode, encounteredIds);
   }
 }
 

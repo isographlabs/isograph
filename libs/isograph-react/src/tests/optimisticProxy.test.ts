@@ -35,7 +35,7 @@ describe('optimisticLayer', () => {
   });
 
   describe('addNetworkResponseNode', () => {
-    test('has child BaseNode', () => {
+    test('has parent BaseNode', () => {
       expect(environment.store).toMatchObject({
         kind: 'BaseNode',
       });
@@ -67,9 +67,9 @@ describe('optimisticLayer', () => {
 
       expect(environment.store).toMatchObject({
         kind: 'NetworkResponseNode',
-        childNode: {
+        parentNode: {
           kind: 'OptimisticNode',
-          childNode: {
+          parentNode: {
             kind: 'BaseNode',
           },
         },
@@ -99,9 +99,9 @@ describe('optimisticLayer', () => {
 
       expect(environment.store).toMatchObject({
         kind: 'StartUpdateNode',
-        childNode: {
+        parentNode: {
           kind: 'OptimisticNode',
-          childNode: {
+          parentNode: {
             kind: 'BaseNode',
           },
         },
@@ -164,7 +164,7 @@ describe('optimisticLayer', () => {
       );
     });
 
-    test('has child BaseNode and parent node', () => {
+    test('has parent BaseNode and child node', () => {
       const revert = addOptimisticNode(environment, (counter) => counter + 1);
       addOptimisticNode(environment, (counter) => counter + 1);
 
@@ -172,7 +172,7 @@ describe('optimisticLayer', () => {
 
       expect(environment.store).toMatchObject({
         kind: 'OptimisticNode',
-        childNode: {
+        parentNode: {
           kind: 'BaseNode',
         },
       });
@@ -185,7 +185,7 @@ describe('optimisticLayer', () => {
       ).toBe(6);
     });
 
-    test('has child node and no parent node', () => {
+    test('has parent node and no child node', () => {
       addOptimisticNode(environment, (counter) => counter + 1);
       const revert = addOptimisticNode(environment, (counter) => counter + 1);
 
@@ -193,9 +193,9 @@ describe('optimisticLayer', () => {
 
       expect(environment.store).toMatchObject({
         kind: 'NetworkResponseNode',
-        childNode: {
+        parentNode: {
           kind: 'OptimisticNode',
-          childNode: {
+          parentNode: {
             kind: 'BaseNode',
           },
         },
@@ -209,7 +209,7 @@ describe('optimisticLayer', () => {
       ).toBe(5);
     });
 
-    test('merges if has child BaseNode', () => {
+    test('merges if has parent BaseNode', () => {
       const revert = addOptimisticNode(environment, (counter) => counter + 1);
 
       revert(5);
@@ -226,7 +226,7 @@ describe('optimisticLayer', () => {
       ).toBe(5);
     });
 
-    test("doesn't merge parent nodes if has child nodes", () => {
+    test("doesn't merge child nodes if has parent nodes", () => {
       addOptimisticNode(environment, (counter) => counter + 1);
       const revert = addOptimisticNode(environment, (counter) => counter + 1);
       addStartUpdateNode(environment, (counter) => counter + 1);
@@ -235,11 +235,11 @@ describe('optimisticLayer', () => {
 
       expect(environment.store).toMatchObject({
         kind: 'StartUpdateNode',
-        childNode: {
+        parentNode: {
           kind: 'NetworkResponseNode',
-          childNode: {
+          parentNode: {
             kind: 'OptimisticNode',
-            childNode: {
+            parentNode: {
               kind: 'BaseNode',
             },
           },
@@ -254,7 +254,7 @@ describe('optimisticLayer', () => {
       ).toBe(6);
     });
 
-    test('merges parent NetworkResponseNode', () => {
+    test('merges child NetworkResponseNode', () => {
       addOptimisticNode(environment, (counter) => counter + 1);
       const revert = addOptimisticNode(environment, (counter) => counter + 1);
       addNetworkResponseNode(environment, 12);
@@ -262,9 +262,9 @@ describe('optimisticLayer', () => {
 
       expect(environment.store).toMatchObject({
         kind: 'NetworkResponseNode',
-        childNode: {
+        parentNode: {
           kind: 'OptimisticNode',
-          childNode: {
+          parentNode: {
             kind: 'BaseNode',
           },
         },
@@ -278,7 +278,7 @@ describe('optimisticLayer', () => {
       ).toBe(12);
     });
 
-    test('merges parent nodes if has child BaseNode', () => {
+    test('merges child nodes if has parent BaseNode', () => {
       const revert = addOptimisticNode(environment, (counter) => counter + 1);
       addStartUpdateNode(environment, (counter) => counter + 1);
       addNetworkResponseNode(environment, 12);
@@ -288,7 +288,7 @@ describe('optimisticLayer', () => {
 
       expect(environment.store).toMatchObject({
         kind: 'OptimisticNode',
-        childNode: {
+        parentNode: {
           kind: 'BaseNode',
         },
       });
