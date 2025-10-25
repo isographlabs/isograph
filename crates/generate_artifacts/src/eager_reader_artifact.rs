@@ -5,8 +5,9 @@ use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 use isograph_lang_types::{ClientFieldDirectiveSet, SelectionType};
 use isograph_schema::{
-    ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, LINK_FIELD_NAME,
-    NetworkProtocol, Schema, ServerObjectSelectable, ValidatedSelection, initial_variable_context,
+    ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, IsographDatabase,
+    LINK_FIELD_NAME, NetworkProtocol, Schema, ServerObjectSelectable, ValidatedSelection,
+    initial_variable_context,
 };
 use isograph_schema::{RefetchedPathsMap, UserWrittenClientTypeInfo};
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
@@ -26,7 +27,9 @@ use crate::{
     reader_ast::generate_reader_ast,
 };
 
-pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>(
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     client_selectable: &ClientSelectable<TNetworkProtocol>,
     config: &CompilerConfig,
@@ -146,7 +149,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
             .variable_definitions()
             .iter()
             .map(|x| &x.item);
-        let parameters_types = generate_parameters(schema, parameters);
+        let parameters_types = generate_parameters(db, schema, parameters);
         let parameters_content =
             format!("export type {reader_parameters_type} = {parameters_types}\n");
         path_and_contents.push(ArtifactPathAndContent {
@@ -162,7 +165,9 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
     path_and_contents
 }
 
-pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_eager_reader_condition_artifact<
+    TNetworkProtocol: NetworkProtocol + 'static,
+>(
     schema: &Schema<TNetworkProtocol>,
     server_object_selectable: &ServerObjectSelectable<TNetworkProtocol>,
     inline_fragment_reader_selections: &[WithSpan<ValidatedSelection>],
@@ -238,7 +243,10 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
     }
 }
 
-pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_eager_reader_param_type_artifact<
+    TNetworkProtocol: NetworkProtocol + 'static,
+>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     client_scalar_selectable: &ClientSelectable<TNetworkProtocol>,
     file_extensions: GenerateFileExtensionsOption,
@@ -256,6 +264,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     let mut loadable_fields = BTreeSet::new();
     let mut updatable_fields = false;
     let client_field_parameter_type = generate_client_field_parameter_type(
+        db,
         schema,
         client_scalar_selectable.selection_set_for_parent_query(),
         &mut param_type_imports,
@@ -263,6 +272,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         1,
     );
     let updatable_data_type = generate_client_field_updatable_data_type(
+        db,
         schema,
         client_scalar_selectable.selection_set_for_parent_query(),
         &mut param_type_imports,
@@ -343,7 +353,9 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     }
 }
 
-pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_eager_reader_output_type_artifact<
+    TNetworkProtocol: NetworkProtocol + 'static,
+>(
     schema: &Schema<TNetworkProtocol>,
     client_field: &ClientSelectable<TNetworkProtocol>,
     config: &CompilerConfig,
@@ -398,7 +410,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
     }
 }
 
-pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ArtifactPathAndContent {

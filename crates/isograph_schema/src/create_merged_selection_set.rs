@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet, HashSet, btree_map::Entry};
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, Location,
     ScalarSelectableName, SelectableName, ServerObjectEntityName, ServerObjectSelectableName,
-    ServerScalarEntityName, ServerScalarSelectableName, Span, VariableName, WithLocation, WithSpan,
+    ServerScalarSelectableName, Span, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
@@ -19,10 +19,11 @@ use lazy_static::lazy_static;
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientOrServerObjectSelectable,
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, ClientSelectableId,
-    ImperativelyLoadedFieldVariant, NameAndArguments, NetworkProtocol, PathToRefetchField, Schema,
-    ServerEntityName, ServerObjectEntity, ServerObjectEntityExtraInfo, ServerObjectSelectable,
-    ServerObjectSelectableVariant, ValidatedObjectSelection, ValidatedScalarSelection,
-    ValidatedSelection, VariableContext, create_transformed_name_and_arguments,
+    ID_ENTITY_NAME, ID_FIELD_NAME, ImperativelyLoadedFieldVariant, NameAndArguments,
+    NetworkProtocol, PathToRefetchField, Schema, ServerEntityName, ServerObjectEntity,
+    ServerObjectEntityExtraInfo, ServerObjectSelectable, ServerObjectSelectableVariant,
+    ValidatedObjectSelection, ValidatedScalarSelection, ValidatedSelection, VariableContext,
+    create_transformed_name_and_arguments,
     field_loadability::{Loadability, categorize_field_loadability},
     initial_variable_context, transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context,
@@ -472,7 +473,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     }
 }
 
-fn create_field_traversal_result<TNetworkProtocol: NetworkProtocol>(
+fn create_field_traversal_result<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     validated_selections: &[WithSpan<ValidatedSelection>],
@@ -528,7 +529,7 @@ pub fn imperative_field_subfields_or_inline_fragments(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtocol>(
+fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
@@ -649,7 +650,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
 }
 
 #[allow(clippy::too_many_arguments)]
-fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
+fn merge_server_object_field<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut BTreeMap<NormalizationKey, MergedServerSelection>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
@@ -821,7 +822,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
+fn merge_client_object_field<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut BTreeMap<NormalizationKey, MergedServerSelection>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
@@ -877,7 +878,7 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
+fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut BTreeMap<NormalizationKey, MergedServerSelection>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
@@ -972,7 +973,7 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
+fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
@@ -1040,7 +1041,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
 }
 
 #[allow(clippy::too_many_arguments)]
-fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
+fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
@@ -1102,7 +1103,7 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
         ),
         imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant {
             client_selection_name: newly_encountered_client_object_selectable.name.item.into(),
-            top_level_schema_field_arguments: id_arguments(schema.server_entity_data.id_type_name),
+            top_level_schema_field_arguments: id_arguments(),
             // top_level_schema_field_name: *NODE_FIELD_NAME,
             // top_level_schema_field_concrete_type: None,
             // primary_field_info: None,
@@ -1172,7 +1173,7 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
+fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol + 'static>(
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
@@ -1275,7 +1276,9 @@ fn merge_server_scalar_field(
     }
 }
 
-fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkProtocol>(
+fn select_typename_and_id_fields_in_merged_selection<
+    TNetworkProtocol: NetworkProtocol + 'static,
+>(
     schema: &Schema<TNetworkProtocol>,
     merged_selection_map: &mut MergedSelectionMap,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
@@ -1404,14 +1407,12 @@ fn get_aliased_mutation_field_name(
     s
 }
 
-pub fn id_arguments(
-    id_type_name: ServerScalarEntityName,
-) -> Vec<VariableDefinition<ServerEntityName>> {
+pub fn id_arguments() -> Vec<VariableDefinition<ServerEntityName>> {
     vec![VariableDefinition {
-        name: WithLocation::new("id".intern().into(), Location::generated()),
+        name: WithLocation::new(ID_FIELD_NAME.unchecked_conversion(), Location::generated()),
         type_: GraphQLTypeAnnotation::NonNull(Box::new(GraphQLNonNullTypeAnnotation::Named(
             GraphQLNamedTypeAnnotation(WithSpan::new(
-                SelectionType::Scalar(id_type_name),
+                SelectionType::Scalar(*ID_ENTITY_NAME),
                 Span::todo_generated(),
             )),
         ))),
@@ -1419,7 +1420,7 @@ pub fn id_arguments(
     }]
 }
 
-pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
+pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     server_object_selectable: &ServerObjectSelectable<TNetworkProtocol>,
 ) -> Vec<WithSpan<ValidatedSelection>> {

@@ -36,6 +36,7 @@ export const PetTaglineCard = iso(`
                 updatableData.tagline = oldTagline;
               });
             },
+            shouldFetch: 'Yes',
           },
         );
       }}

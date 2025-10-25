@@ -37,7 +37,7 @@ export const SmartestPetRoute = iso(`
         <CardContent>
           <Stack direction="row" spacing={4}>
             {data.smartestPet != null ? (
-              <LoadableFieldReader loadableField={data.smartestPet} args={{}}>
+              <LoadableFieldReader loadableField={data.smartestPet}>
                 {(smartestPet) => (
                   <>
                     <smartestPet.Avatar

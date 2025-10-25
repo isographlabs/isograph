@@ -20,7 +20,7 @@ pub struct EntrypointDeclarationInfo {
 }
 
 #[allow(clippy::type_complexity)]
-pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol>(
+pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     entrypoint_declarations: Vec<(TextSource, WithSpan<EntrypointDeclaration>)>,
 ) -> Result<
@@ -77,7 +77,7 @@ pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn validate_entrypoint_type_and_field<TNetworkProtocol: NetworkProtocol>(
+fn validate_entrypoint_type_and_field<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     text_source: TextSource,
     entrypoint_declaration: &WithSpan<EntrypointDeclaration>,
@@ -97,7 +97,7 @@ fn validate_entrypoint_type_and_field<TNetworkProtocol: NetworkProtocol>(
     Ok(client_field_id)
 }
 
-fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
+fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     parent_type: WithSpan<ServerObjectEntityNameWrapper>,
     text_source: TextSource,
@@ -143,27 +143,17 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
                 Ok(*object_entity_name)
             }
         }
-        ServerEntityName::Scalar(scalar_entity_name) => {
-            let scalar_name = schema
-                .server_entity_data
-                .server_scalar_entity(*scalar_entity_name)
-                .expect(
-                    "Expected entity to exist. \
-                    This is indicative of a bug in Isograph.",
-                )
-                .name;
-            Err(WithLocation::new(
-                ValidateEntrypointDeclarationError::InvalidParentType {
-                    parent_type: "scalar",
-                    parent_type_name: scalar_name.item.into(),
-                },
-                Location::new(text_source, parent_type.span),
-            ))
-        }
+        ServerEntityName::Scalar(scalar_entity_name) => Err(WithLocation::new(
+            ValidateEntrypointDeclarationError::InvalidParentType {
+                parent_type: "scalar",
+                parent_type_name: (*scalar_entity_name).into(),
+            },
+            Location::new(text_source, parent_type.span),
+        )),
     }
 }
 
-fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
+fn validate_client_field<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     field_name: WithSpan<ClientScalarSelectableNameWrapper>,
     text_source: TextSource,

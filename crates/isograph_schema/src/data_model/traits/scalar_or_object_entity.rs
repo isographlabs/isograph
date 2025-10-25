@@ -1,4 +1,6 @@
-use common_lang_types::{SelectableName, ServerObjectEntityName, ServerScalarEntityName};
+use common_lang_types::{
+    SelectableName, ServerObjectEntityName, ServerScalarEntityName, WithLocation,
+};
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
     Description, ObjectSelectionPath, ScalarSelectionPath, SelectionParentType, SelectionType,
@@ -17,8 +19,18 @@ pub trait ServerScalarOrObjectEntity {
     fn description(&self) -> Option<Description>;
 }
 
-impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
-    for &ServerScalarEntity<TNetworkProtocol>
+impl<T: ServerScalarOrObjectEntity> ServerScalarOrObjectEntity for WithLocation<T> {
+    fn name(&self) -> SelectionType<ServerScalarEntityName, ServerObjectEntityName> {
+        self.item.name()
+    }
+
+    fn description(&self) -> Option<Description> {
+        self.item.description()
+    }
+}
+
+impl<TNetworkProtocol: NetworkProtocol + 'static> ServerScalarOrObjectEntity
+    for ServerScalarEntity<TNetworkProtocol>
 {
     fn name(&self) -> SelectionType<ServerScalarEntityName, ServerObjectEntityName> {
         SelectionType::Scalar(self.name.item)
@@ -29,8 +41,8 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
-    for &ServerObjectEntity<TNetworkProtocol>
+impl<TNetworkProtocol: NetworkProtocol + 'static> ServerScalarOrObjectEntity
+    for ServerObjectEntity<TNetworkProtocol>
 {
     fn name(&self) -> SelectionType<ServerScalarEntityName, ServerObjectEntityName> {
         SelectionType::Object(self.name.item)

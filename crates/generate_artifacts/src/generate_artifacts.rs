@@ -17,11 +17,12 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, ClientSelectableId, FieldMapItem,
-    FieldTraversalResult, LINK_FIELD_NAME, NameAndArguments, NetworkProtocol, NormalizationKey,
-    RefetchStrategy, ScalarSelectableId, Schema, ServerEntityName, ServerObjectSelectableVariant,
-    UserWrittenClientTypeInfo, ValidatedSelection, ValidatedVariableDefinition,
-    WrappedSelectionMapSelection, accessible_client_fields, description,
-    inline_fragment_reader_selection_set, output_type_annotation, selection_map_wrapped,
+    FieldTraversalResult, ID_ENTITY_NAME, IsographDatabase, LINK_FIELD_NAME, NameAndArguments,
+    NetworkProtocol, NormalizationKey, RefetchStrategy, ScalarSelectableId, Schema,
+    ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo, ValidatedSelection,
+    ValidatedVariableDefinition, WrappedSelectionMapSelection, accessible_client_fields,
+    description, inline_fragment_reader_selection_set, output_type_annotation,
+    selection_map_wrapped, server_scalar_entity_javascript_name,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -101,11 +102,12 @@ lazy_static! {
 ///
 /// TODO this should go through OutputFormat
 #[tracing::instrument(skip(schema, config))]
-pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
+pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     config: &CompilerConfig,
 ) -> Vec<ArtifactPathAndContent> {
-    let mut artifact_path_and_content = get_artifact_path_and_content_impl(schema, config);
+    let mut artifact_path_and_content = get_artifact_path_and_content_impl(db, schema, config);
     if let Some(header) = config.options.generated_file_header {
         for artifact_path_and_content in artifact_path_and_content.iter_mut() {
             artifact_path_and_content.file_content =
@@ -115,7 +117,8 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
     artifact_path_and_content
 }
 
-fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
+fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     config: &CompilerConfig,
 ) -> Vec<ArtifactPathAndContent> {
@@ -137,6 +140,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
         &schema.entrypoints
     {
         let entrypoint_path_and_content = generate_entrypoint_artifacts(
+            db,
             schema,
             *parent_object_entity_name,
             *entrypoint_selectable_name,
@@ -206,6 +210,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                         This is indicative of a bug in Isograph.",
                     );
                 path_and_contents.extend(generate_eager_reader_artifacts(
+                    db,
                     schema,
                     &SelectionType::Object(client_object_selectable),
                     config,
@@ -239,6 +244,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     ClientFieldVariant::Link => (),
                     ClientFieldVariant::UserWritten(info) => {
                         path_and_contents.extend(generate_eager_reader_artifacts(
+                            db,
                             schema,
                             &SelectionType::Scalar(client_scalar_selectable),
                             config,
@@ -287,9 +293,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 type_: GraphQLTypeAnnotation::NonNull(Box::new(
                                     GraphQLNonNullTypeAnnotation::Named(
                                         GraphQLNamedTypeAnnotation(WithSpan::new(
-                                            ServerEntityName::Scalar(
-                                                schema.server_entity_data.id_type_name,
-                                            ),
+                                            ServerEntityName::Scalar(*ID_ENTITY_NAME),
                                             Span::todo_generated(),
                                         )),
                                     ),
@@ -356,6 +360,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
 
                             path_and_contents.extend(
                                 generate_entrypoint_artifacts_with_client_field_traversal_result(
+                                    db,
                                     schema,
                                     client_scalar_selectable,
                                     None,
@@ -388,6 +393,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
     for (client_type_name, user_written_client_type, _) in schema.user_written_client_types() {
         // For each user-written client types, generate a param type artifact
         path_and_contents.push(generate_eager_reader_param_type_artifact(
+            db,
             schema,
             &user_written_client_type,
             config.options.include_file_extensions_in_import_statements,
@@ -597,7 +603,7 @@ fn get_serialized_field_argument(
     }
 }
 
-pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ClientFieldOutputType {
@@ -625,7 +631,8 @@ pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     selection_map: &[WithSpan<ValidatedSelection>],
     nested_client_field_imports: &mut ParamTypeImports,
@@ -637,6 +644,7 @@ pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProt
 
     for selection in selection_map.iter() {
         write_param_type_from_selection(
+            db,
             schema,
             &mut client_field_parameter_type,
             selection,
@@ -651,7 +659,10 @@ pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProt
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn generate_client_field_updatable_data_type<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_client_field_updatable_data_type<
+    TNetworkProtocol: NetworkProtocol + 'static,
+>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     selection_map: &[WithSpan<ValidatedSelection>],
     nested_client_field_imports: &mut ParamTypeImports,
@@ -665,6 +676,7 @@ pub(crate) fn generate_client_field_updatable_data_type<TNetworkProtocol: Networ
 
     for selection in selection_map.iter() {
         write_updatable_data_type_from_selection(
+            db,
             schema,
             &mut client_field_updatable_data_type,
             selection,
@@ -682,7 +694,8 @@ pub(crate) fn generate_client_field_updatable_data_type<TNetworkProtocol: Networ
 }
 
 #[allow(clippy::too_many_arguments)]
-fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
+fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
@@ -722,16 +735,19 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                             .map(
                                 &mut |scalar_entity_name| match field.javascript_type_override {
                                     Some(javascript_name) => javascript_name,
-                                    None => {
-                                        schema
-                                            .server_entity_data
-                                            .server_scalar_entity(*scalar_entity_name)
-                                            .expect(
-                                                "Expected entity to exist. \
+                                    None => server_scalar_entity_javascript_name(
+                                        db,
+                                        *scalar_entity_name,
+                                    )
+                                    .to_owned()
+                                    .expect(
+                                        "Expected parsing to not have failed. \
                                         This is indicative of a bug in Isograph.",
-                                            )
-                                            .javascript_name
-                                    }
+                                    )
+                                    .expect(
+                                        "Expected entity to exist. \
+                                        This is indicative of a bug in Isograph.",
+                                    ),
                                 },
                             );
 
@@ -744,6 +760,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 }
                 DefinitionLocation::Client((parent_object_entity_name, client_field_name)) => {
                     write_param_type_from_client_field(
+                        db,
                         schema,
                         query_type_declaration,
                         nested_client_field_imports,
@@ -774,6 +791,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 
             let type_annotation = output_type_annotation(&field).clone().map(&mut |_| {
                 generate_client_field_parameter_type(
+                    db,
                     schema,
                     &linked_field.selection_set,
                     nested_client_field_imports,
@@ -805,7 +823,8 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
+fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     query_type_declaration: &mut String,
     nested_client_field_imports: &mut BTreeSet<ParentObjectEntityNameAndSelectableName>,
@@ -853,7 +872,7 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
                         format!(
                             ",\n{indent}Omit<ExtractParameters<{}__param>, keyof {}>",
                             client_field.type_and_field.underscore_separated(),
-                            get_loadable_field_type_from_arguments(schema, provided_arguments)
+                            get_loadable_field_type_from_arguments(db, provided_arguments)
                         )
                     };
 
@@ -880,7 +899,8 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
+fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
@@ -919,14 +939,16 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                             .target_scalar_entity
                             .clone()
                             .map(&mut |scalar_entity_name| {
-                                schema
-                                    .server_entity_data
-                                    .server_scalar_entity(scalar_entity_name)
+                                server_scalar_entity_javascript_name(db, scalar_entity_name)
+                                    .to_owned()
+                                    .expect(
+                                        "Expected parsing to not have failed. \
+                                        This is indicative of a bug in Isograph.",
+                                    )
                                     .expect(
                                         "Expected entity to exist. \
                                         This is indicative of a bug in Isograph.",
                                     )
-                                    .javascript_name
                             });
 
                     match scalar_field_selection.scalar_selection_directive_set {
@@ -955,6 +977,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 }
                 DefinitionLocation::Client((parent_object_entity_name, client_field_id)) => {
                     write_param_type_from_client_field(
+                        db,
                         schema,
                         query_type_declaration,
                         nested_client_field_imports,
@@ -985,6 +1008,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 
             let type_annotation = output_type_annotation(&field).clone().map(&mut |_| {
                 generate_client_field_updatable_data_type(
+                    db,
                     schema,
                     &linked_field.selection_set,
                     nested_client_field_imports,
@@ -1044,8 +1068,8 @@ fn write_getter_and_setter(
     ));
 }
 
-fn get_loadable_field_type_from_arguments<TNetworkProtocol: NetworkProtocol>(
-    schema: &Schema<TNetworkProtocol>,
+fn get_loadable_field_type_from_arguments<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     arguments: Vec<ValidatedVariableDefinition>,
 ) -> String {
     let mut loadable_field_type = "{".to_string();
@@ -1060,15 +1084,15 @@ fn get_loadable_field_type_from_arguments<TNetworkProtocol: NetworkProtocol>(
             "readonly {}{}: {}",
             arg.name.item,
             if is_optional { "?" } else { "" },
-            format_type_for_js(schema, arg.type_.clone())
+            format_type_for_js(db, arg.type_.clone())
         ));
     }
     loadable_field_type.push('}');
     loadable_field_type
 }
 
-fn format_type_for_js<TNetworkProtocol: NetworkProtocol>(
-    schema: &Schema<TNetworkProtocol>,
+fn format_type_for_js<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     type_: GraphQLTypeAnnotation<ServerEntityName>,
 ) -> String {
     let new_type = type_.map(
@@ -1080,14 +1104,16 @@ fn format_type_for_js<TNetworkProtocol: NetworkProtocol>(
                 )
             }
             ServerEntityName::Scalar(scalar_entity_name) => {
-                schema
-                    .server_entity_data
-                    .server_scalar_entity(scalar_entity_name)
+                server_scalar_entity_javascript_name(db, scalar_entity_name)
+                    .to_owned()
+                    .expect(
+                        "Expected parsing to not have failed. \
+                        This is indicative of a bug in Isograph.",
+                    )
                     .expect(
                         "Expected entity to exist. \
                         This is indicative of a bug in Isograph.",
                     )
-                    .javascript_name
             }
         },
     );
@@ -1116,7 +1142,8 @@ fn format_type_for_js_inner(
     }
 }
 
-pub(crate) fn generate_parameters<'a, TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_parameters<'a, TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     argument_definitions: impl Iterator<Item = &'a VariableDefinition<ServerEntityName>>,
 ) -> String {
@@ -1128,7 +1155,7 @@ pub(crate) fn generate_parameters<'a, TNetworkProtocol: NetworkProtocol>(
             "{indent}readonly {}{}: {},\n",
             arg.name.item,
             if is_optional { "?" } else { "" },
-            format_parameter_type(schema, arg.type_.clone(), 1)
+            format_parameter_type(db, schema, arg.type_.clone(), 1)
         ));
     }
     s.push_str("};");

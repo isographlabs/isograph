@@ -26,7 +26,7 @@ on:
 jobs:
   build-cli:
     name: Build compiler
-    timeout-minutes: 10
+    timeout-minutes: 15
     runs-on: ${{ inputs.os }}
     steps:
       - uses: actions/checkout@v2

@@ -5,7 +5,11 @@ use isograph_schema::{
 
 use crate::generate_artifacts::{NormalizationAstText, get_serialized_field_arguments};
 
-pub(crate) fn generate_normalization_ast_text<'schema, 'a, TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_normalization_ast_text<
+    'schema,
+    'a,
+    TNetworkProtocol: NetworkProtocol + 'static,
+>(
     schema: &'schema Schema<TNetworkProtocol>,
     selection_map: impl Iterator<Item = &'a MergedServerSelection> + 'a,
     indentation_level: u8,
@@ -19,7 +23,7 @@ pub(crate) fn generate_normalization_ast_text<'schema, 'a, TNetworkProtocol: Net
     NormalizationAstText(normalization_ast_text)
 }
 
-fn generate_normalization_ast_node<TNetworkProtocol: NetworkProtocol>(
+fn generate_normalization_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
     item: &MergedServerSelection,
     schema: &Schema<TNetworkProtocol>,
     indentation_level: u8,

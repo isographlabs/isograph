@@ -20,15 +20,17 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, EntrypointDeclarationInfo,
-    FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, Format, MergedSelectionMap,
-    NetworkProtocol, NormalizationKey, RootOperationName, RootRefetchedPath,
+    FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, Format, IsographDatabase,
+    MergedSelectionMap, NetworkProtocol, NormalizationKey, RootOperationName, RootRefetchedPath,
     ScalarClientFieldTraversalState, Schema, ServerObjectEntity, ValidatedVariableDefinition,
     WrappedSelectionMapSelection, create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_reachable_variables, initial_variable_context,
 };
 use std::collections::BTreeSet;
 
-pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     entrypoint_scalar_selectable_name: ClientScalarSelectableName,
@@ -67,6 +69,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     );
 
     generate_entrypoint_artifacts_with_client_field_traversal_result(
+        db,
         schema,
         entrypoint,
         Some(info),
@@ -88,6 +91,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
 pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     TNetworkProtocol: NetworkProtocol,
 >(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
     info: Option<&EntrypointDeclarationInfo>,
@@ -131,8 +135,8 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         get_used_variable_definitions(merged_selection_map, variable_definitions);
 
     let query_text = TNetworkProtocol::generate_query_text(
+        db,
         query_name,
-        schema,
         merged_selection_map,
         reachable_variables.iter().copied(),
         root_operation_name,
@@ -217,8 +221,8 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         );
 
     let operation_text = generate_operation_text(
+        db,
         query_name,
-        schema,
         merged_selection_map,
         reachable_variables.iter().copied(),
         root_operation_name,
@@ -285,6 +289,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
             .flat_map(
                 |(index, (root_refetch_path, nested_selection_map, reachable_variables))| {
                     get_paths_and_contents_for_imperatively_loaded_field(
+                        db,
                         schema,
                         file_extensions,
                         persisted_documents,
@@ -366,7 +371,7 @@ fn generate_refetch_query_artifact_import(
     RefetchQueryArtifactImport(output)
 }
 
-fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
+fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol + 'static>(
     file_extensions: GenerateFileExtensionsOption,
     query_name: QueryOperationName,
     operation_text: &OperationText,

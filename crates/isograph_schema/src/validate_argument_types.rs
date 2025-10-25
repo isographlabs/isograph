@@ -17,7 +17,8 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    NetworkProtocol, ServerEntityData, ServerEntityName, ServerObjectEntityAvailableSelectables,
+    BOOLEAN_ENTITY_NAME, FLOAT_ENTITY_NAME, ID_ENTITY_NAME, INT_ENTITY_NAME, NetworkProtocol,
+    STRING_ENTITY_NAME, ServerEntityData, ServerEntityName, ServerObjectEntityAvailableSelectables,
     ServerObjectSelectable, ServerScalarSelectable, ValidatedVariableDefinition,
 };
 
@@ -40,66 +41,43 @@ fn graphql_type_to_nullable_type<TValue>(
     }
 }
 
-fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
-    scalar_literal_name: &ServerScalarEntityName,
+fn scalar_literal_satisfies_type(
+    scalar_literal_name: ServerScalarEntityName,
     type_: &GraphQLTypeAnnotation<ServerEntityName>,
-    schema_data: &ServerEntityData<TNetworkProtocol>,
     location: Location,
 ) -> Result<(), WithLocation<ValidateArgumentTypesError>> {
     match graphql_type_to_non_null_type(type_.clone()) {
-        GraphQLNonNullTypeAnnotation::List(_) => {
-            let actual = schema_data
-                .server_scalar_entity(*scalar_literal_name)
-                .expect(
-                    "Expected entity to exist. \
-                    This is indicative of a bug in Isograph.",
-                )
-                .name
-                .item;
-
-            Err(WithLocation::new(
-                ValidateArgumentTypesError::ExpectedTypeFoundScalar {
-                    expected: id_annotation_to_typename_annotation(type_, schema_data),
-                    actual,
-                },
-                location,
-            ))
-        }
+        GraphQLNonNullTypeAnnotation::List(_) => Err(WithLocation::new(
+            ValidateArgumentTypesError::ExpectedTypeFoundScalar {
+                expected: id_annotation_to_typename_annotation(type_),
+                actual: scalar_literal_name,
+            },
+            location,
+        )),
         GraphQLNonNullTypeAnnotation::Named(named_type) => match named_type.item {
             SelectionType::Scalar(expected_scalar_entity_name) => {
-                if expected_scalar_entity_name == *scalar_literal_name {
+                if expected_scalar_entity_name == scalar_literal_name {
                     return Ok(());
                 }
-                let actual = schema_data
-                    .server_scalar_entity(*scalar_literal_name)
-                    .expect(
-                        "Expected entity to exist. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .name
-                    .item;
 
-                let expected = id_annotation_to_typename_annotation(type_, schema_data);
+                let expected = id_annotation_to_typename_annotation(type_);
 
                 Err(WithLocation::new(
-                    ValidateArgumentTypesError::ExpectedTypeFoundScalar { expected, actual },
+                    ValidateArgumentTypesError::ExpectedTypeFoundScalar {
+                        expected,
+                        actual: scalar_literal_name,
+                    },
                     location,
                 ))
             }
             SelectionType::Object(_) => {
-                let actual = schema_data
-                    .server_scalar_entity(*scalar_literal_name)
-                    .expect(
-                        "Expected entity to exist. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .name
-                    .item;
-
-                let expected = id_annotation_to_typename_annotation(type_, schema_data);
+                let expected = id_annotation_to_typename_annotation(type_);
 
                 Err(WithLocation::new(
-                    ValidateArgumentTypesError::ExpectedTypeFoundScalar { expected, actual },
+                    ValidateArgumentTypesError::ExpectedTypeFoundScalar {
+                        expected,
+                        actual: scalar_literal_name,
+                    },
                     location,
                 ))
             }
@@ -146,7 +124,7 @@ fn variable_type_satisfies_argument_type(
     }
 }
 
-pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
+pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol + 'static>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
     field_argument_definition_type: &GraphQLTypeAnnotation<ServerEntityName>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
@@ -171,11 +149,8 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             {
                 Ok(())
             } else {
-                let expected = id_annotation_to_typename_annotation(
-                    field_argument_definition_type,
-                    schema_data,
-                );
-                let actual = id_annotation_to_typename_annotation(variable_type, schema_data);
+                let expected = id_annotation_to_typename_annotation(field_argument_definition_type);
+                let actual = id_annotation_to_typename_annotation(variable_type);
 
                 Err(WithLocation::new(
                     ValidateArgumentTypesError::ExpectedTypeFoundVariable {
@@ -188,54 +163,47 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             }
         }
         NonConstantValue::Integer(_) => scalar_literal_satisfies_type(
-            &schema_data.int_type_name,
+            *INT_ENTITY_NAME,
             field_argument_definition_type,
-            schema_data,
             selection_supplied_argument_value.location,
         )
         .or_else(|error| {
             scalar_literal_satisfies_type(
-                &schema_data.float_type_name,
+                *FLOAT_ENTITY_NAME,
                 field_argument_definition_type,
-                schema_data,
                 selection_supplied_argument_value.location,
             )
             .map_err(|_| error)
         })
         .or_else(|error| {
             scalar_literal_satisfies_type(
-                &schema_data.id_type_name,
+                *ID_ENTITY_NAME,
                 field_argument_definition_type,
-                schema_data,
                 selection_supplied_argument_value.location,
             )
             .map_err(|_| error)
         }),
         NonConstantValue::Boolean(_) => scalar_literal_satisfies_type(
-            &schema_data.boolean_type_name,
+            *BOOLEAN_ENTITY_NAME,
             field_argument_definition_type,
-            schema_data,
             selection_supplied_argument_value.location,
         ),
         NonConstantValue::String(_) => scalar_literal_satisfies_type(
-            &schema_data.string_type_name,
+            *STRING_ENTITY_NAME,
             field_argument_definition_type,
-            schema_data,
             selection_supplied_argument_value.location,
         )
         .or_else(|error| {
             scalar_literal_satisfies_type(
-                &schema_data.id_type_name,
+                *ID_ENTITY_NAME,
                 field_argument_definition_type,
-                schema_data,
                 selection_supplied_argument_value.location,
             )
             .map_err(|_| error)
         }),
         NonConstantValue::Float(_) => scalar_literal_satisfies_type(
-            &schema_data.float_type_name,
+            *FLOAT_ENTITY_NAME,
             field_argument_definition_type,
-            schema_data,
             selection_supplied_argument_value.location,
         ),
         NonConstantValue::Enum(enum_literal_value) => {
@@ -244,7 +212,6 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                     ValidateArgumentTypesError::ExpectedTypeFoundEnum {
                         expected: id_annotation_to_typename_annotation(
                             field_argument_definition_type,
-                            schema_data,
                         ),
                         actual: *enum_literal_value,
                     },
@@ -266,7 +233,6 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                     ValidateArgumentTypesError::ExpectedNonNullTypeFoundNull {
                         expected: id_annotation_to_typename_annotation(
                             field_argument_definition_type,
-                            schema_data,
                         ),
                     },
                     selection_supplied_argument_value.location,
@@ -287,7 +253,6 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                     ValidateArgumentTypesError::ExpectedTypeFoundList {
                         expected: id_annotation_to_typename_annotation(
                             field_argument_definition_type,
-                            schema_data,
                         ),
                     },
                     selection_supplied_argument_value.location,
@@ -300,7 +265,6 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                     ValidateArgumentTypesError::ExpectedTypeFoundObject {
                         expected: id_annotation_to_typename_annotation(
                             field_argument_definition_type,
-                            schema_data,
                         ),
                     },
                     selection_supplied_argument_value.location,
@@ -310,7 +274,6 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                         ValidateArgumentTypesError::ExpectedTypeFoundObject {
                             expected: id_annotation_to_typename_annotation(
                                 field_argument_definition_type,
-                                schema_data,
                             ),
                         },
                         selection_supplied_argument_value.location,
@@ -330,7 +293,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
+fn object_satisfies_type<TNetworkProtocol: NetworkProtocol + 'static>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
     variable_definitions: &[WithSpan<VariableDefinition<ServerEntityName>>],
     server_entity_data: &ServerEntityData<TNetworkProtocol>,
@@ -405,7 +368,7 @@ enum ObjectLiteralFieldType {
     Missing(SelectableName),
 }
 
-fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtocol>(
+fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtocol + 'static>(
     server_entity_data: &ServerEntityData<TNetworkProtocol>,
     server_scalar_selectables: &HashMap<
         (ServerObjectEntityName, ServerScalarSelectableName),
@@ -506,33 +469,16 @@ fn validate_no_extraneous_fields(
     Ok(())
 }
 
-fn id_annotation_to_typename_annotation<TNetworkProtocol: NetworkProtocol>(
+fn id_annotation_to_typename_annotation(
     type_: &GraphQLTypeAnnotation<ServerEntityName>,
-    schema_data: &ServerEntityData<TNetworkProtocol>,
 ) -> GraphQLTypeAnnotation<UnvalidatedTypeName> {
     type_.clone().map(|type_id| match type_id {
-        SelectionType::Scalar(scalar_entity_name) => schema_data
-            .server_scalar_entity(scalar_entity_name)
-            .expect(
-                "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-            )
-            .name
-            .item
-            .into(),
-        SelectionType::Object(object_entity_name) => schema_data
-            .server_object_entity(object_entity_name)
-            .expect(
-                "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-            )
-            .name
-            .item
-            .into(),
+        SelectionType::Scalar(scalar_entity_name) => scalar_entity_name.into(),
+        SelectionType::Object(object_entity_name) => object_entity_name.into(),
     })
 }
 
-fn enum_satisfies_type<TNetworkProtocol: NetworkProtocol>(
+fn enum_satisfies_type<TNetworkProtocol: NetworkProtocol + 'static>(
     enum_literal_value: &EnumLiteralValue,
     enum_type: &GraphQLNamedTypeAnnotation<ServerEntityName>,
     schema_data: &ServerEntityData<TNetworkProtocol>,
@@ -568,7 +514,7 @@ fn enum_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
+fn list_satisfies_type<TNetworkProtocol: NetworkProtocol + 'static>(
     list: &[WithLocation<NonConstantValue>],
     list_type: GraphQLListTypeAnnotation<ServerEntityName>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],

@@ -4,10 +4,9 @@ use std::{
 };
 
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, JavascriptName, Location,
-    ObjectSelectableName, SelectableName, ServerObjectEntityName, ServerObjectSelectableName,
-    ServerScalarEntityName, ServerScalarIdSelectableName, ServerScalarSelectableName,
-    UnvalidatedTypeName, WithLocation,
+    ClientObjectSelectableName, ClientScalarSelectableName, JavascriptName, ObjectSelectableName,
+    SelectableName, ServerObjectEntityName, ServerObjectSelectableName, ServerScalarEntityName,
+    ServerScalarIdSelectableName, ServerScalarSelectableName, UnvalidatedTypeName,
 };
 use graphql_lang_types::GraphQLNamedTypeAnnotation;
 use intern::Lookup;
@@ -23,14 +22,19 @@ use lazy_static::lazy_static;
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectableId,
     EntrypointDeclarationInfo, NetworkProtocol, NormalizationKey, ObjectSelectable,
-    ObjectSelectableId, ScalarSelectable, Selectable, SelectableId, ServerEntity, ServerEntityName,
+    ObjectSelectableId, ScalarSelectable, Selectable, SelectableId, ServerEntityName,
     ServerObjectEntity, ServerObjectEntityAvailableSelectables, ServerObjectSelectable,
-    ServerScalarEntity, ServerScalarSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
+    ServerScalarSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
 };
 
 lazy_static! {
-    pub static ref ID_GRAPHQL_TYPE: ServerScalarEntityName = "ID".intern().into();
+    pub static ref ID_ENTITY_NAME: ServerScalarEntityName = "ID".intern().into();
+    pub static ref STRING_ENTITY_NAME: ServerScalarEntityName = "String".intern().into();
+    pub static ref INT_ENTITY_NAME: ServerScalarEntityName = "Int".intern().into();
+    pub static ref FLOAT_ENTITY_NAME: ServerScalarEntityName = "Float".intern().into();
+    pub static ref BOOLEAN_ENTITY_NAME: ServerScalarEntityName = "Boolean".intern().into();
+    pub static ref ID_FIELD_NAME: ServerScalarSelectableName = "id".intern().into();
     pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
 }
 
@@ -39,7 +43,7 @@ pub struct RootOperationName(pub &'static str);
 
 /// The in-memory representation of a schema.
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Schema<TNetworkProtocol: NetworkProtocol> {
+pub struct Schema<TNetworkProtocol: NetworkProtocol + 'static> {
     pub server_scalar_selectables: HashMap<
         (ServerObjectEntityName, ServerScalarSelectableName),
         ServerScalarSelectable<TNetworkProtocol>,
@@ -65,49 +69,14 @@ pub struct Schema<TNetworkProtocol: NetworkProtocol> {
     pub fetchable_types: BTreeMap<ServerObjectEntityName, RootOperationName>,
 }
 
-impl<TNetworkProtocol: NetworkProtocol> Default for Schema<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol + 'static> Default for Schema<TNetworkProtocol> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     pub fn new() -> Self {
-        // TODO add __typename
-        let mut scalars = HashMap::new();
-        let mut defined_types = HashMap::new();
-
-        let id_type_name = add_schema_defined_scalar_type(
-            &mut scalars,
-            &mut defined_types,
-            "ID",
-            *STRING_JAVASCRIPT_TYPE,
-        );
-        let string_type_name = add_schema_defined_scalar_type(
-            &mut scalars,
-            &mut defined_types,
-            "String",
-            *STRING_JAVASCRIPT_TYPE,
-        );
-        let boolean_type_name = add_schema_defined_scalar_type(
-            &mut scalars,
-            &mut defined_types,
-            "Boolean",
-            "boolean".intern().into(),
-        );
-        let float_type_name = add_schema_defined_scalar_type(
-            &mut scalars,
-            &mut defined_types,
-            "Float",
-            "number".intern().into(),
-        );
-        let int_type_name = add_schema_defined_scalar_type(
-            &mut scalars,
-            &mut defined_types,
-            "Int",
-            "number".intern().into(),
-        );
-
         Self {
             server_scalar_selectables: HashMap::new(),
             server_object_selectables: HashMap::new(),
@@ -117,15 +86,8 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             entrypoints: Default::default(),
             server_entity_data: ServerEntityData {
                 server_object_entities: HashMap::new(),
-                server_scalar_entities: scalars,
-                defined_entities: defined_types,
+                defined_entities: HashMap::new(),
                 server_object_entity_extra_info: HashMap::new(),
-
-                id_type_name,
-                string_type_name,
-                int_type_name,
-                float_type_name,
-                boolean_type_name,
             },
             fetchable_types: BTreeMap::new(),
         }
@@ -154,108 +116,14 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .find(|(_, root_operation_name)| root_operation_name.0 == "query")
     }
 
-    pub fn traverse_object_selections(
-        &self,
-        root_object_name: ServerObjectEntityName,
-        selections: impl Iterator<Item = ObjectSelectableName>,
-    ) -> Result<&ServerObjectEntity<TNetworkProtocol>, CreateAdditionalFieldsError> {
-        let mut current_entity = self
-            .server_entity_data
-            .server_object_entity(root_object_name)
-            .expect(
-                "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-            );
-        let mut current_selectables = &self
-            .server_entity_data
-            .server_object_entity_extra_info
-            .get(&root_object_name)
-            .expect(
-                "Expected root_object_entity_name to exist \
-                in server_object_entity_available_selectables",
-            )
-            .selectables;
-
-        for selection_name in selections {
-            match current_selectables.get(&selection_name.into()) {
-                Some(entity) => match entity.transpose() {
-                    SelectionType::Scalar(_) => {
-                        // TODO show a better error message
-                        return Err(CreateAdditionalFieldsError::InvalidField {
-                            field_arg: selection_name.lookup().to_string(),
-                        });
-                    }
-                    SelectionType::Object(object) => {
-                        let target_object_entity_name = match object {
-                            DefinitionLocation::Server((
-                                parent_object_entity_name,
-                                server_object_selectable_name,
-                            )) => {
-                                let selectable = self.server_object_selectable(
-                                    *parent_object_entity_name,
-                                    *server_object_selectable_name,
-                                );
-                                selectable
-                                    .expect(
-                                        "Expected selectable to exist. \
-                                        This is indicative of a bug in Isograph.",
-                                    )
-                                    .target_object_entity
-                                    .inner()
-                            }
-                            DefinitionLocation::Client((
-                                parent_object_entity_name,
-                                client_object_selectable_name,
-                            )) => {
-                                let pointer = self.client_object_selectable(
-                                    *parent_object_entity_name,
-                                    *client_object_selectable_name,
-                                );
-                                pointer
-                                    .expect(
-                                        "Expected selectable to exist. \
-                                        This is indicative of a bug in Isograph.",
-                                    )
-                                    .target_object_entity_name
-                                    .inner()
-                            }
-                        };
-
-                        current_entity = self
-                            .server_entity_data
-                            .server_object_entity(*target_object_entity_name)
-                            .expect(
-                                "Expected entity to exist. \
-                                This is indicative of a bug in Isograph.",
-                            );
-                        current_selectables = &self
-                            .server_entity_data
-                            .server_object_entity_extra_info
-                            .get(target_object_entity_name)
-                            .expect(
-                                "Expected target_object_entity_name to exist \
-                                in server_object_entity_available_selectables",
-                            )
-                            .selectables;
-                    }
-                },
-                None => {
-                    return Err(CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
-                        primary_type_name: current_entity.name.item,
-                        field_name: selection_name.unchecked_conversion(),
-                    });
-                }
-            };
-        }
-
-        Ok(current_entity)
-    }
-
     pub fn get_object_selections_path(
         &self,
         root_object_name: ServerObjectEntityName,
         selections: impl Iterator<Item = ObjectSelectableName>,
-    ) -> Result<Vec<&ServerObjectSelectable<TNetworkProtocol>>, CreateAdditionalFieldsError> {
+    ) -> Result<
+        Vec<&ServerObjectSelectable<TNetworkProtocol>>,
+        CreateAdditionalFieldsError<TNetworkProtocol>,
+    > {
         let mut current_entity = self
             .server_entity_data
             .server_object_entity(root_object_name)
@@ -350,12 +218,10 @@ pub struct ServerObjectEntityExtraInfo {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
+pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol + 'static> {
     // TODO consider combining these.
     pub server_object_entities:
         HashMap<ServerObjectEntityName, ServerObjectEntity<TNetworkProtocol>>,
-    pub server_scalar_entities:
-        HashMap<ServerScalarEntityName, ServerScalarEntity<TNetworkProtocol>>,
 
     // TODO consider whether this is needed. Especially when server_objects and server_scalars
     // are combined, this seems pretty useless.
@@ -365,18 +231,9 @@ pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol> {
     // we don't need a server_object_entity_mut method, which is incompatible with pico.
     pub server_object_entity_extra_info:
         HashMap<ServerObjectEntityName, ServerObjectEntityExtraInfo>,
-
-    // TODO remove. These are GraphQL-isms. And we can just hard code them, they're
-    // just interned strings!
-    // Well known types
-    pub id_type_name: ServerScalarEntityName,
-    pub string_type_name: ServerScalarEntityName,
-    pub float_type_name: ServerScalarEntityName,
-    pub boolean_type_name: ServerScalarEntityName,
-    pub int_type_name: ServerScalarEntityName,
 }
 
-impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     pub fn server_scalar_selectable(
         &self,
         parent_object_entity_name: ServerObjectEntityName,
@@ -429,7 +286,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         // TODO do not accept this
         options: &CompilerConfigOptions,
         inner_non_null_named_type: Option<&GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
-    ) -> CreateAdditionalFieldsResult<()> {
+    ) -> CreateAdditionalFieldsResult<(), TNetworkProtocol> {
         let parent_object_entity_name = server_scalar_selectable.parent_object_entity_name;
         let next_scalar_name = server_scalar_selectable.name;
 
@@ -468,7 +325,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         // TODO do not do this here, this is a GraphQL-ism
         if server_scalar_selectable.name.item == "id" {
-            set_and_validate_id_field(
+            set_and_validate_id_field::<TNetworkProtocol>(
                 id_field,
                 server_scalar_selectable.name.item,
                 parent_object_entity_name,
@@ -492,7 +349,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn insert_server_object_selectable(
         &mut self,
         server_object_selectable: ServerObjectSelectable<TNetworkProtocol>,
-    ) -> CreateAdditionalFieldsResult<()> {
+    ) -> CreateAdditionalFieldsResult<(), TNetworkProtocol> {
         let parent_object_entity_name = server_object_selectable.parent_object_entity_name;
         let next_object_name = server_object_selectable.name;
 
@@ -680,28 +537,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
-    pub fn server_scalar_entity(
-        &self,
-        server_scalar_entity_name: ServerScalarEntityName,
-    ) -> Option<&ServerScalarEntity<TNetworkProtocol>> {
-        self.server_scalar_entities.get(&server_scalar_entity_name)
-    }
-
-    pub fn server_entity(
-        &self,
-        server_entity_name: ServerEntityName,
-    ) -> Option<ServerEntity<'_, TNetworkProtocol>> {
-        match server_entity_name {
-            ServerEntityName::Object(object_entity_name) => self
-                .server_object_entity(object_entity_name)
-                .map(ServerEntity::Object),
-            ServerEntityName::Scalar(scalar_entity_name) => self
-                .server_scalar_entity(scalar_entity_name)
-                .map(ServerEntity::Scalar),
-        }
-    }
-
+impl<TNetworkProtocol: NetworkProtocol + 'static> ServerEntityData<TNetworkProtocol> {
     pub fn server_object_entity(
         &self,
         server_object_entity_name: ServerObjectEntityName,
@@ -716,39 +552,36 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
         self.server_object_entities.values_mut()
     }
 
-    // TODO this function should not exist
+    // TODO this function should not exist ... maybe soon!
     pub fn insert_server_scalar_entity(
         &mut self,
-        server_scalar_entity: ServerScalarEntity<TNetworkProtocol>,
-        name_location: Location,
-    ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
+        server_scalar_entity_name: ServerScalarEntityName,
+    ) -> Result<(), CreateAdditionalFieldsError<TNetworkProtocol>> {
         if self
             .defined_entities
             .insert(
-                server_scalar_entity.name.item.into(),
-                SelectionType::Scalar(server_scalar_entity.name.item),
+                server_scalar_entity_name.into(),
+                SelectionType::Scalar(server_scalar_entity_name),
             )
             .is_some()
         {
-            return Err(WithLocation::new(
-                CreateAdditionalFieldsError::DuplicateTypeDefinition {
-                    type_definition_type: "scalar",
-                    type_name: server_scalar_entity.name.item.into(),
-                },
-                name_location,
-            ));
+            return Err(CreateAdditionalFieldsError::DuplicateTypeDefinition {
+                type_definition_type: "scalar",
+                type_name: server_scalar_entity_name.into(),
+            });
         }
-        self.server_scalar_entities
-            .insert(server_scalar_entity.name.item, server_scalar_entity);
+
+        // there are no scalar entities anymore... so we don't actually insert anything
+
         Ok(())
     }
 
     // TODO this function should not exist
+    // TODO accept WithLocation instead of name_location
     pub fn insert_server_object_entity(
         &mut self,
         server_server_object_entity: ServerObjectEntity<TNetworkProtocol>,
-        name_location: Location,
-    ) -> Result<ServerObjectEntityName, WithLocation<CreateAdditionalFieldsError>> {
+    ) -> Result<ServerObjectEntityName, CreateAdditionalFieldsError<TNetworkProtocol>> {
         let name = server_server_object_entity.name;
         if self
             .defined_entities
@@ -758,13 +591,10 @@ impl<TNetworkProtocol: NetworkProtocol> ServerEntityData<TNetworkProtocol> {
             )
             .is_some()
         {
-            return Err(WithLocation::new(
-                CreateAdditionalFieldsError::DuplicateTypeDefinition {
-                    type_definition_type: "object",
-                    type_name: server_server_object_entity.name.item.into(),
-                },
-                name_location,
-            ));
+            return Err(CreateAdditionalFieldsError::DuplicateTypeDefinition {
+                type_definition_type: "object",
+                type_name: server_server_object_entity.name.item.into(),
+            });
         }
 
         self.server_object_entities.insert(
@@ -797,32 +627,6 @@ impl NameAndArguments {
     }
 }
 
-fn add_schema_defined_scalar_type<TNetworkProtocol: NetworkProtocol>(
-    scalars: &mut HashMap<ServerScalarEntityName, ServerScalarEntity<TNetworkProtocol>>,
-    defined_types: &mut HashMap<UnvalidatedTypeName, ServerEntityName>,
-    field_name: &'static str,
-    javascript_name: JavascriptName,
-) -> ServerScalarEntityName {
-    // TODO this is problematic, we have no span (or really, no location) associated with this
-    // schema-defined scalar, so we will not be able to properly show error messages if users
-    // e.g. have Foo implements String
-    let typename = WithLocation::new(field_name.intern().into(), Location::generated());
-    scalars.insert(
-        typename.item,
-        ServerScalarEntity {
-            description: None,
-            name: typename,
-            javascript_name,
-            network_protocol: std::marker::PhantomData,
-        },
-    );
-    defined_types.insert(
-        typename.item.into(),
-        ServerEntityName::Scalar(typename.item),
-    );
-    typename.item
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 // This struct is indicative of poor data modeling.
 pub enum ServerObjectSelectableVariant {
@@ -850,13 +654,13 @@ pub type ScalarSelectableId = DefinitionLocation<
 /// If we have encountered an id field, we can:
 /// - validate that the id field is properly defined, i.e. has type ID!
 /// - set the id field
-fn set_and_validate_id_field(
+fn set_and_validate_id_field<TNetworkProtocol: NetworkProtocol + 'static>(
     id_field: &mut Option<ServerScalarIdSelectableName>,
     current_field_selectable_name: ServerScalarSelectableName,
     parent_object_entity_name: ServerObjectEntityName,
     options: &CompilerConfigOptions,
     inner_non_null_named_type: Option<&GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
-) -> CreateAdditionalFieldsResult<()> {
+) -> CreateAdditionalFieldsResult<(), TNetworkProtocol> {
     // N.B. id_field is guaranteed to be None; otherwise field_names_to_type_name would
     // have contained this field name already.
     debug_assert!(id_field.is_none(), "id field should not be defined twice");
@@ -867,7 +671,7 @@ fn set_and_validate_id_field(
 
     match inner_non_null_named_type {
         Some(type_) => {
-            if type_.0.item != *ID_GRAPHQL_TYPE {
+            if type_.0.item != *ID_ENTITY_NAME {
                 options.on_invalid_id_type.on_failure(|| {
                     CreateAdditionalFieldsError::IdFieldMustBeNonNullIdType {
                         strong_field_name: "id",

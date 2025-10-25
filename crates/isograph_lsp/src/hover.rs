@@ -6,12 +6,13 @@ use common_lang_types::{
 use isograph_compiler::{
     CompilerState, IsoLiteralExtraction, extract_iso_literals_from_file_content,
     get_validated_schema, process_iso_literal_extraction,
-    read_iso_literals_source_from_relative_path, server_object_entity,
+    read_iso_literals_source_from_relative_path,
 };
 use isograph_lang_types::{Description, IsographResolvedNode, VariableDefinition};
 use isograph_schema::{
     IsographDatabase, NetworkProtocol, SelectableTrait, ServerEntityName, ServerObjectEntity,
     get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
+    server_object_entity_named,
 };
 use lsp_types::{
     Hover, HoverContents, MarkupContent, MarkupKind, Position, Uri,
@@ -21,7 +22,8 @@ use pico_macros::memo;
 use resolve_position::ResolvePosition;
 
 use crate::{
-    lsp_runtime_error::LSPRuntimeResult, semantic_tokens::delta_line_delta_start,
+    lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult},
+    semantic_tokens::delta_line_delta_start,
     uri_file_path_ext::UriFilePathExt,
 };
 
@@ -69,13 +71,15 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
             IsographResolvedNode::ClientPointerDeclaration(_) => None,
             IsographResolvedNode::EntrypointDeclaration(_) => None,
             IsographResolvedNode::ServerObjectEntityNameWrapper(entity) => {
-                let memo_ref = server_object_entity(db, entity.inner.0);
-                let server_object_entity = match memo_ref.deref() {
-                    Some(entity) => entity,
-                    None => return Ok(None),
-                };
+                let memo_ref = server_object_entity_named(db, entity.inner.0);
+                let server_object_entity = memo_ref
+                    .deref()
+                    .as_ref()
+                    .map_err(|_| LSPRuntimeError::ExpectedError)?
+                    .as_ref()
+                    .ok_or(LSPRuntimeError::ExpectedError)?;
 
-                Some(format_hover_for_entity(server_object_entity))
+                Some(format_hover_for_entity(&server_object_entity.item))
             }
             IsographResolvedNode::Description(_) => None,
             IsographResolvedNode::ScalarSelection(scalar_path) => {
@@ -315,7 +319,7 @@ fn hover_text_for_selectable(
     )
 }
 
-fn format_hover_for_entity<TNetworkProtocol: NetworkProtocol>(
+fn format_hover_for_entity<TNetworkProtocol: NetworkProtocol + 'static>(
     entity: &ServerObjectEntity<TNetworkProtocol>,
 ) -> String {
     let object_entity_name = entity.name.item;

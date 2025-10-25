@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    Location, SelectableName, ServerObjectEntityName, StringLiteralValue, VariableName,
-    WithLocation,
+    SelectableName, ServerObjectEntityName, StringLiteralValue, VariableName, WithLocation,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
@@ -31,14 +30,14 @@ impl ArgumentMap {
         }
     }
 
-    pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol>(
+    pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol + 'static>(
         &mut self,
         field_map_item: FieldMapItem,
         primary_type_name: ServerObjectEntityName,
         mutation_object_name: ServerObjectEntityName,
         mutation_field_name: SelectableName,
         schema: &mut Schema<TNetworkProtocol>,
-    ) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem> {
+    ) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem, TNetworkProtocol> {
         let split_to_arg = field_map_item.split_to_arg();
         let (index_of_argument, argument) = self
             .arguments
@@ -54,15 +53,12 @@ impl ArgumentMap {
                 name == split_to_arg.to_argument_name
             })
             .ok_or_else(|| {
-                WithLocation::new(
-                    CreateAdditionalFieldsError::PrimaryDirectiveArgumentDoesNotExistOnField {
-                        primary_type_name,
-                        mutation_object_name,
-                        mutation_field_name,
-                        field_name: split_to_arg.to_argument_name,
-                    },
-                    Location::generated(),
-                )
+                CreateAdditionalFieldsError::PrimaryDirectiveArgumentDoesNotExistOnField {
+                    primary_type_name,
+                    mutation_object_name,
+                    mutation_field_name,
+                    field_name: split_to_arg.to_argument_name,
+                }
             })?;
 
         // TODO avoid matching twice?
@@ -73,13 +69,12 @@ impl ArgumentMap {
                 match split_to_arg.to_field_names.split_first() {
                     None => {
                         if unmodified_argument.type_.inner().as_object().is_some() {
-                            return Err(WithLocation::new(
+                            return Err(
                                 CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
                                     primary_type_name,
                                     field_name: split_to_arg.to_argument_name.lookup().to_string(),
                                 },
-                                Location::generated(),
-                            ));
+                            );
                         }
 
                         self.arguments.swap_remove(index_of_argument);
@@ -90,7 +85,7 @@ impl ArgumentMap {
                         let mut arg =
                             ModifiedArgument::from_unmodified(unmodified_argument, schema);
 
-                        arg.remove_to_field(*first, rest, primary_type_name)?;
+                        arg.remove_to_field::<TNetworkProtocol>(*first, rest, primary_type_name)?;
 
                         *argument =
                             WithLocation::new(PotentiallyModifiedArgument::Modified(arg), location);
@@ -107,16 +102,19 @@ impl ArgumentMap {
                         // TODO encode this in the type system.
                         // A modified argument will always have an object type, and cannot be remapped
                         // at the object level.
-                        return Err(WithLocation::new(
+                        return Err(
                             CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
                                 primary_type_name,
                                 field_name: split_to_arg.to_argument_name.lookup().to_string(),
                             },
-                            Location::generated(),
-                        ));
+                        );
                     }
                     Some((first, rest)) => {
-                        modified.remove_to_field(*first, rest, primary_type_name)?;
+                        modified.remove_to_field::<TNetworkProtocol>(
+                            *first,
+                            rest,
+                            primary_type_name,
+                        )?;
                         // TODO WAT
                         ProcessedFieldMapItem(field_map_item.clone())
                     }
@@ -152,16 +150,6 @@ pub(crate) enum PotentiallyModifiedField {
     Modified(ModifiedField),
 }
 
-impl PotentiallyModifiedField {
-    fn remove_to_field(
-        &mut self,
-        _first: StringLiteralValue,
-        _rest: &[StringLiteralValue],
-    ) -> ProcessTypeDefinitionResult<IsEmpty> {
-        unimplemented!("Removing to fields from PotentiallyModifiedField")
-    }
-}
-
 /// A modified field's type must be an object. A scalar field that
 /// is modified is just removed.
 #[derive(Debug)]
@@ -185,7 +173,7 @@ impl ModifiedArgument {
     /// an existing object.
     ///
     /// This panics if unmodified's type is a scalar.
-    pub fn from_unmodified<TNetworkProtocol: NetworkProtocol>(
+    pub fn from_unmodified<TNetworkProtocol: NetworkProtocol + 'static>(
         unmodified: &VariableDefinition<ServerEntityName>,
         schema: &Schema<TNetworkProtocol>,
     ) -> Self {
@@ -226,12 +214,12 @@ impl ModifiedArgument {
         }
     }
 
-    pub fn remove_to_field(
+    pub fn remove_to_field<TNetworkProtocol: NetworkProtocol + 'static>(
         &mut self,
         first: StringLiteralValue,
         rest: &[StringLiteralValue],
         primary_type_name: ServerObjectEntityName,
-    ) -> ProcessTypeDefinitionResult<()> {
+    ) -> ProcessTypeDefinitionResult<(), TNetworkProtocol> {
         let argument_object = self.object.inner_mut();
 
         let key = first.unchecked_conversion();
@@ -242,18 +230,8 @@ impl ModifiedArgument {
         {
             Some(field) => {
                 match rest.split_first() {
-                    Some((first, rest)) => {
-                        match field.remove_to_field(*first, rest)? {
-                            IsEmpty::IsEmpty => {
-                                // The field's object has no remaining fields (except for __typename),
-                                // so we remove the item from the parent.
-                                argument_object.field_map.remove(&key).expect(
-                                    "Expected to be able to remove item. \
-                                    This is indicative of a bug in Isograph",
-                                );
-                            }
-                            IsEmpty::NotEmpty => {}
-                        }
+                    Some((_, _)) => {
+                        unimplemented!("Removing to fields from PotentiallyModifiedField");
                     }
                     None => {
                         // We ran out of path segments, so we remove this item.
@@ -262,13 +240,12 @@ impl ModifiedArgument {
                         match field {
                             PotentiallyModifiedField::Unmodified(field_id) => {
                                 if field_id.as_object().is_some() {
-                                    return Err(WithLocation::new(
+                                    return Err(
                                         CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
                                             primary_type_name,
                                             field_name: key.lookup().to_string(),
-                                        },
-                                        Location::generated(),
-                                    ));
+                                        }
+                                    );
                                 }
 
                                 // Cool! We found a scalar, we can remove it.
@@ -279,26 +256,22 @@ impl ModifiedArgument {
                             }
                             PotentiallyModifiedField::Modified(_) => {
                                 // A field can only be modified if it has an object type
-                                return Err(WithLocation::new(
+                                return Err(
                                     CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
                                         primary_type_name,
                                         field_name: key.to_string(),
-                                    },
-                                    Location::generated(),
-                                ));
+                                    }
+                                );
                             }
                         }
                     }
                 }
             }
             None => {
-                return Err(WithLocation::new(
-                    CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
-                        primary_type_name,
-                        field_name: first,
-                    },
-                    Location::generated(),
-                ));
+                return Err(CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
+                    primary_type_name,
+                    field_name: first,
+                });
             }
         };
         Ok(())

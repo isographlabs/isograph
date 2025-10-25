@@ -9,18 +9,10 @@ import {
 import { LoadableField } from '../core/reader';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 
-export function useClientSideDefer<
+type ArgsWithoutProvidedArgs<
   TReadFromStore extends UnknownTReadFromStore,
-  TResult,
->(
-  loadableField: LoadableField<
-    TReadFromStore,
-    TResult,
-    ExtractParameters<TReadFromStore>
-  >,
-  args?: Record<PropertyKey, never>,
-  fetchOptions?: FetchOptions<TResult>,
-): { fragmentReference: FragmentReference<TReadFromStore, TResult> };
+  TProvidedArgs extends object,
+> = Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>;
 
 export function useClientSideDefer<
   TReadFromStore extends UnknownTReadFromStore,
@@ -32,23 +24,21 @@ export function useClientSideDefer<
     TResult,
     Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
   >,
-  args: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>,
-  fetchOptions?: FetchOptions<TResult>,
-): { fragmentReference: FragmentReference<TReadFromStore, TResult> };
-
-export function useClientSideDefer<
-  TReadFromStore extends UnknownTReadFromStore,
-  TResult,
-  TProvidedArgs extends object,
->(
-  loadableField: LoadableField<
+  ...maybeRequiredArgs: {} extends ArgsWithoutProvidedArgs<
     TReadFromStore,
-    TResult,
-    Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
-  >,
-  args?: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>,
-  fetchOptions?: FetchOptions<TResult>,
+    TProvidedArgs
+  >
+    ? [
+        args?: ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs>,
+        fetchOptions?: FetchOptions<TResult>,
+      ]
+    : [
+        args: ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs>,
+        fetchOptions?: FetchOptions<TResult>,
+      ]
 ): { fragmentReference: FragmentReference<TReadFromStore, TResult> } {
+  const [args, fetchOptions] = maybeRequiredArgs;
+
   const [id, loader] = loadableField(args, fetchOptions ?? {});
   const environment = useIsographEnvironment();
   const cache = getOrCreateItemInSuspenseCache(environment, id, loader);
@@ -56,4 +46,64 @@ export function useClientSideDefer<
   const fragmentReference = useLazyDisposableState(cache).state;
 
   return { fragmentReference };
+}
+
+// @ts-ignore
+function tsTests() {
+  let neverArgs!: LoadableField<
+    {
+      parameters: Record<string, never>;
+      data: {};
+    },
+    unknown
+  >;
+
+  let optionalArgs!: LoadableField<
+    {
+      parameters: {
+        foo?: string;
+      };
+      data: {};
+    },
+    unknown
+  >;
+
+  let requiredArgs!: LoadableField<
+    {
+      parameters: {
+        foo: string;
+      };
+      data: {};
+    },
+    unknown
+  >;
+
+  useClientSideDefer(neverArgs);
+  useClientSideDefer(neverArgs, {});
+  useClientSideDefer(neverArgs, {
+    // @ts-expect-error
+    foo: 'bar',
+  });
+
+  useClientSideDefer(optionalArgs);
+  useClientSideDefer(optionalArgs, {});
+  useClientSideDefer(optionalArgs, {
+    foo: 'bar',
+  });
+  useClientSideDefer(optionalArgs, {
+    // @ts-expect-error
+    foo: 12,
+  });
+
+  // @ts-expect-error
+  useClientSideDefer(requiredArgs);
+  // @ts-expect-error
+  useClientSideDefer(requiredArgs, {});
+  useClientSideDefer(requiredArgs, {
+    foo: 'bar',
+  });
+  useClientSideDefer(requiredArgs, {
+    // @ts-expect-error
+    foo: 12,
+  });
 }

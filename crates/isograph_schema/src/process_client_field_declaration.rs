@@ -40,7 +40,7 @@ pub struct UnprocessedClientPointerItem {
 }
 pub type UnprocessedItem = SelectionType<UnprocessedClientFieldItem, UnprocessedClientPointerItem>;
 
-impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     pub fn process_client_field_declaration(
         &mut self,
         client_field_declaration: WithSpan<ClientFieldDeclaration>,
@@ -62,18 +62,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 .add_client_field_to_object(*object_entity_name, client_field_declaration)
                 .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?,
             ServerEntityName::Scalar(scalar_entity_name) => {
-                let scalar_name = self
-                    .server_entity_data
-                    .server_scalar_entity(*scalar_entity_name)
-                    .expect(
-                        "Expected entity to exist. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .name;
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
                         literal_type: "field".to_string(),
-                        parent_type_name: scalar_name.item.into(),
+                        parent_type_name: (*scalar_entity_name).into(),
                     },
                     Location::new(text_source, client_field_declaration.item.parent_type.span),
                 ));
@@ -133,17 +125,9 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     )
                     .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?,
                 ServerEntityName::Scalar(scalar_entity_name) => {
-                    let scalar_name = self
-                        .server_entity_data
-                        .server_scalar_entity(*scalar_entity_name)
-                        .expect(
-                            "Expected entity to exist. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .name;
                     return Err(WithLocation::new(
                         ProcessClientFieldDeclarationError::ClientPointerInvalidTargetType {
-                            target_type_name: scalar_name.item.into(),
+                            target_type_name: (*scalar_entity_name).into(),
                         },
                         Location::new(
                             text_source,
@@ -153,18 +137,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 }
             },
             ServerEntityName::Scalar(scalar_entity_name) => {
-                let scalar_name = self
-                    .server_entity_data
-                    .server_scalar_entity(*scalar_entity_name)
-                    .expect(
-                        "Expected entity to exist. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .name;
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
                         literal_type: "pointer".to_string(),
-                        parent_type_name: scalar_name.item.into(),
+                        parent_type_name: (*scalar_entity_name).into(),
                     },
                     Location::new(
                         text_source,

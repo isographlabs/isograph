@@ -178,6 +178,10 @@ impl<T> WithLocation<T> {
     pub fn for_display(&self) -> WithLocationForDisplay<'_, T> {
         WithLocationForDisplay { inner: self }
     }
+
+    pub fn new_generated(item: T) -> WithLocation<T> {
+        WithLocation::new(item, Location::Generated)
+    }
 }
 
 /// [WithLocation] does not implement Display. There have been a few bugs in which

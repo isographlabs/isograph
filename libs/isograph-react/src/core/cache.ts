@@ -217,7 +217,6 @@ export function subscribeToAnyChangesToRecord(
   return () => environment.subscriptions.delete(subscription);
 }
 
-// TODO we should re-read and call callback if the value has changed
 export function subscribe<TReadFromStore extends UnknownTReadFromStore>(
   environment: IsographEnvironment,
   encounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
@@ -234,6 +233,13 @@ export function subscribe<TReadFromStore extends UnknownTReadFromStore>(
     fragmentReference,
     readerAst,
   };
+
+  // subscribe is called in an effect. (We should actually subscribe during the
+  // initial render.) Because it's called in an effect, we might have missed some
+  // changes since the initial render! So, at this point, we re-read and call the
+  // subscription (i.e. re-render) if the fragment data has changed.
+  callSubscriptionIfDataChanged(environment, fragmentSubscription);
+
   environment.subscriptions.add(fragmentSubscription);
   return () => environment.subscriptions.delete(fragmentSubscription);
 }
@@ -292,53 +298,7 @@ export function callSubscriptions(
               subscription.encounteredDataAndRecords.encounteredRecords,
             )
           ) {
-            const newEncounteredDataAndRecords = readButDoNotEvaluate(
-              environment,
-              subscription.fragmentReference,
-              // Is this wrong?
-              // Reasons to think no:
-              // - we are only updating the read-out value, and the network
-              //   options only affect whether we throw.
-              // - the component will re-render, and re-throw on its own, anyway.
-              //
-              // Reasons to think not:
-              // - it seems more efficient to suspend here and not update state,
-              //   if we expect that the component will just throw anyway
-              // - consistency
-              // - it's also weird, this is called from makeNetworkRequest, where
-              //   we don't currently pass network request options
-              {
-                suspendIfInFlight: false,
-                throwOnNetworkError: false,
-              },
-            );
-
-            const mergedItem = mergeObjectsUsingReaderAst(
-              subscription.readerAst,
-              subscription.encounteredDataAndRecords.item,
-              newEncounteredDataAndRecords.item,
-            );
-
-            logMessage(environment, () => ({
-              kind: 'DeepEqualityCheck',
-              fragmentReference: subscription.fragmentReference,
-              old: subscription.encounteredDataAndRecords.item,
-              new: newEncounteredDataAndRecords.item,
-              deeplyEqual:
-                mergedItem === subscription.encounteredDataAndRecords.item,
-            }));
-
-            if (mergedItem !== subscription.encounteredDataAndRecords.item) {
-              logAnyError(
-                environment,
-                { situation: 'calling FragmentSubscription callback' },
-                () => {
-                  subscription.callback(newEncounteredDataAndRecords);
-                },
-              );
-              subscription.encounteredDataAndRecords =
-                newEncounteredDataAndRecords;
-            }
+            callSubscriptionIfDataChanged(environment, subscription);
           }
           return;
         }
@@ -373,6 +333,59 @@ export function callSubscriptions(
       }
     }),
   );
+}
+
+function callSubscriptionIfDataChanged<
+  TReadFromStore extends UnknownTReadFromStore,
+>(
+  environment: IsographEnvironment,
+  subscription: FragmentSubscription<TReadFromStore>,
+) {
+  const newEncounteredDataAndRecords = readButDoNotEvaluate(
+    environment,
+    subscription.fragmentReference,
+    // Is this wrong?
+    // Reasons to think no:
+    // - we are only updating the read-out value, and the network
+    //   options only affect whether we throw.
+    // - the component will re-render, and re-throw on its own, anyway.
+    //
+    // Reasons to think not:
+    // - it seems more efficient to suspend here and not update state,
+    //   if we expect that the component will just throw anyway
+    // - consistency
+    // - it's also weird, this is called from makeNetworkRequest, where
+    //   we don't currently pass network request options
+    {
+      suspendIfInFlight: false,
+      throwOnNetworkError: false,
+    },
+  );
+
+  const mergedItem = mergeObjectsUsingReaderAst(
+    subscription.readerAst,
+    subscription.encounteredDataAndRecords.item,
+    newEncounteredDataAndRecords.item,
+  );
+
+  logMessage(environment, () => ({
+    kind: 'DeepEqualityCheck',
+    fragmentReference: subscription.fragmentReference,
+    old: subscription.encounteredDataAndRecords.item,
+    new: newEncounteredDataAndRecords.item,
+    deeplyEqual: mergedItem === subscription.encounteredDataAndRecords.item,
+  }));
+
+  if (mergedItem !== subscription.encounteredDataAndRecords.item) {
+    logAnyError(
+      environment,
+      { situation: 'calling FragmentSubscription callback' },
+      () => {
+        subscription.callback(newEncounteredDataAndRecords);
+      },
+    );
+    subscription.encounteredDataAndRecords = newEncounteredDataAndRecords;
+  }
 }
 
 function hasOverlappingIds(

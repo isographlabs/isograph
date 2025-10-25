@@ -9,25 +9,43 @@ import { type LoadableField } from '../core/reader';
 import { useClientSideDefer } from '../loadable-hooks/useClientSideDefer';
 import { useResult } from './useResult';
 
+type ArgsWithoutProvidedArgs<
+  TReadFromStore extends UnknownTReadFromStore,
+  TProvidedArgs extends object,
+> = Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>;
+
+type MaybeRequiredArgs<
+  TReadFromStore extends UnknownTReadFromStore,
+  TProvidedArgs extends object,
+> =
+  {} extends ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs>
+    ? {
+        args?: ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs>;
+      }
+    : {
+        args: ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs>;
+      };
+
 export function LoadableFieldRenderer<
   TReadFromStore extends UnknownTReadFromStore,
   TProvidedArgs extends object,
   TChildrenResult,
   TProps,
->(props: {
-  loadableField: LoadableField<
-    TReadFromStore,
-    React.FC<TProps>,
-    Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
-  >;
-  // TODO we can improve this to not require args if its an empty object
-  args: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>;
-  fetchOptions?: FetchOptions<React.FC<TProps>>;
-  networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
-  additionalProps: Omit<TProps, keyof JSX.IntrinsicAttributes>;
-}): TChildrenResult {
+>(
+  props: {
+    loadableField: LoadableField<
+      TReadFromStore,
+      React.FC<TProps>,
+      Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
+    >;
+    fetchOptions?: FetchOptions<React.FC<TProps>>;
+    networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
+    additionalProps: Omit<TProps, keyof JSX.IntrinsicAttributes>;
+  } & MaybeRequiredArgs<TReadFromStore, TProvidedArgs>,
+): TChildrenResult {
   const { fragmentReference } = useClientSideDefer(
     props.loadableField,
+    // @ts-expect-error
     props.args,
     props.fetchOptions,
   );
@@ -38,4 +56,96 @@ export function LoadableFieldRenderer<
   // the validity of this.
   // @ts-expect-error
   return <Component {...props.additionalProps} />;
+}
+
+// @ts-ignore
+function tsTests() {
+  let neverArgs!: LoadableField<
+    {
+      parameters: Record<string, never>;
+      data: {};
+    },
+    () => React.ReactNode
+  >;
+
+  let optionalArgs!: LoadableField<
+    {
+      parameters: {
+        foo?: string;
+      };
+      data: {};
+    },
+    () => React.ReactNode
+  >;
+
+  let requiredArgs!: LoadableField<
+    {
+      parameters: {
+        foo: string;
+      };
+      data: {};
+    },
+    () => React.ReactNode
+  >;
+
+  <LoadableFieldRenderer loadableField={neverArgs} additionalProps={{}} />;
+  <LoadableFieldRenderer
+    loadableField={neverArgs}
+    additionalProps={{}}
+    args={{}}
+  />;
+  <LoadableFieldRenderer
+    loadableField={neverArgs}
+    additionalProps={{}}
+    args={{
+      // @ts-expect-error
+      foo: 'bar',
+    }}
+  />;
+
+  <LoadableFieldRenderer loadableField={optionalArgs} additionalProps={{}} />;
+  <LoadableFieldRenderer
+    loadableField={optionalArgs}
+    additionalProps={{}}
+    args={{}}
+  />;
+  <LoadableFieldRenderer
+    loadableField={optionalArgs}
+    additionalProps={{}}
+    args={{
+      foo: 'bar',
+    }}
+  />;
+  <LoadableFieldRenderer
+    loadableField={optionalArgs}
+    additionalProps={{}}
+    args={{
+      // @ts-expect-error
+      foo: 12,
+    }}
+  />;
+
+  // @ts-expect-error
+  <LoadableFieldRenderer loadableField={requiredArgs} additionalProps={{}} />;
+  <LoadableFieldRenderer
+    loadableField={requiredArgs}
+    additionalProps={{}}
+    // @ts-expect-error
+    args={{}}
+  />;
+  <LoadableFieldRenderer
+    loadableField={requiredArgs}
+    additionalProps={{}}
+    args={{
+      foo: 'bar',
+    }}
+  />;
+  <LoadableFieldRenderer
+    loadableField={requiredArgs}
+    additionalProps={{}}
+    args={{
+      // @ts-expect-error
+      foo: 12,
+    }}
+  />;
 }

@@ -26,7 +26,7 @@ pub trait ClientScalarOrObjectSelectable {
     fn client_type(&self) -> &'static str;
 }
 
-impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
+impl<TNetworkProtocol: NetworkProtocol + 'static> ClientScalarOrObjectSelectable
     for &ClientScalarSelectable<TNetworkProtocol>
 {
     fn description(&self) -> Option<Description> {
@@ -76,7 +76,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
+impl<TNetworkProtocol: NetworkProtocol + 'static> ClientScalarOrObjectSelectable
     for &ClientObjectSelectable<TNetworkProtocol>
 {
     fn description(&self) -> Option<Description> {
@@ -116,7 +116,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
+impl<TNetworkProtocol: NetworkProtocol + 'static> SelectableTrait
     for ClientScalarSelectable<TNetworkProtocol>
 {
     fn description(&self) -> Option<Description> {
@@ -136,7 +136,7 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
+impl<TNetworkProtocol: NetworkProtocol + 'static> SelectableTrait
     for ClientObjectSelectable<TNetworkProtocol>
 {
     fn description(&self) -> Option<Description> {

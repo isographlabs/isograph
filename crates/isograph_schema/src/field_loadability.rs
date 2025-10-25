@@ -21,7 +21,7 @@ pub enum Loadability<'a> {
 /// as an immediate follow-up request. Once we do this, there will always be one
 /// source of truth for whether a field is fetched imperatively: the presence of the
 /// @loadable directive.
-pub fn categorize_field_loadability<'a, TNetworkProtocol: NetworkProtocol>(
+pub fn categorize_field_loadability<'a, TNetworkProtocol: NetworkProtocol + 'static>(
     client_field: &'a ClientScalarSelectable<TNetworkProtocol>,
     selection_variant: &'a ScalarSelectionDirectiveSet,
 ) -> Option<Loadability<'a>> {

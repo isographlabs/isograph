@@ -25,7 +25,7 @@ pub type ClientSelectable<'a, TNetworkProtocol> = SelectionType<
 /// The struct formally known as a client field, and declared with the field keyword
 /// in iso literals.
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
+pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol + 'static> {
     pub description: Option<Description>,
     pub name: WithLocation<ClientScalarSelectableName>,
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
@@ -50,7 +50,7 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
 /// The struct formally known as a client pointer, and declared with the pointer keyword
 /// in iso literals.
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
+pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol + 'static> {
     pub description: Option<Description>,
     pub name: WithLocation<ClientObjectSelectableName>,
     pub target_object_entity_name: TypeAnnotation<ServerObjectEntityName>,

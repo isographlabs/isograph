@@ -1,7 +1,9 @@
+use std::ops::Deref;
+
 use common_lang_types::{
-    ClientScalarSelectableName, Location, ParentObjectEntityNameAndSelectableName, SelectableName,
-    ServerObjectEntityName, ServerObjectSelectableName, Span, StringLiteralValue, WithLocation,
-    WithSpan,
+    ClientScalarSelectableName, Location, ObjectSelectableName,
+    ParentObjectEntityNameAndSelectableName, SelectableName, ServerObjectEntityName,
+    ServerObjectSelectableName, Span, StringLiteralValue, WithLocation, WithSpan,
 };
 use intern::{Lookup, string_key::Intern};
 use isograph_lang_types::{
@@ -13,9 +15,10 @@ use serde::Deserialize;
 
 use crate::{
     ClientFieldVariant, ClientScalarSelectable, ExposeAsFieldToInsert,
-    ImperativelyLoadedFieldVariant, NetworkProtocol, RefetchStrategy, Schema, ServerEntityName,
-    ServerObjectSelectableVariant, UnprocessedClientFieldItem, WrappedSelectionMapSelection,
-    generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
+    ImperativelyLoadedFieldVariant, IsographDatabase, NetworkProtocol, RefetchStrategy, Schema,
+    ServerEntityName, ServerObjectSelectableVariant, UnprocessedClientFieldItem,
+    WrappedSelectionMapSelection, generate_refetch_field_strategy,
+    imperative_field_subfields_or_inline_fragments, server_object_entity_named,
 };
 
 use super::{
@@ -53,12 +56,13 @@ impl ExposeFieldDirective {
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     pub fn create_new_exposed_field(
         &mut self,
+        db: &IsographDatabase<TNetworkProtocol>,
         expose_field_to_insert: ExposeAsFieldToInsert,
         parent_object_entity_name: ServerObjectEntityName,
-    ) -> Result<UnprocessedClientFieldItem, WithLocation<CreateAdditionalFieldsError>> {
+    ) -> Result<UnprocessedClientFieldItem, CreateAdditionalFieldsError<TNetworkProtocol>> {
         let ExposeFieldDirective {
             expose_as,
             field_map,
@@ -92,14 +96,18 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let payload_object_entity_name = *payload_object_type_annotation.inner();
 
         // TODO it's a bit annoying that we call .object twice!
-        let mutation_field_payload_type_name = self
-            .server_entity_data
-            .server_object_entity(payload_object_entity_name)
-            .expect(
-                "Expected object entity to exist. \
+        let mutation_field_payload_type_name =
+            server_object_entity_named(db, payload_object_entity_name)
+                .deref()
+                .as_ref()
+                .map_err(|e| e.clone())?
+                .as_ref()
+                .expect(
+                    "Expected object entity to exist. \
                 This is indicative of a bug in Isograph.",
-            )
-            .name;
+                )
+                .item
+                .name;
 
         let client_field_scalar_selection_name =
             expose_as.unwrap_or(mutation_field.name.item.into());
@@ -120,19 +128,27 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             field_map.clone(),
         )?;
 
-        let payload_object_entity = self
-            .server_entity_data
-            .server_object_entity(payload_object_entity_name);
+        let payload_object_entity_memo_ref =
+            server_object_entity_named(db, payload_object_entity_name);
+        let top_level_schema_field_concrete_type = payload_object_entity_memo_ref
+            .deref()
+            .as_ref()
+            .map_err(|e| e.clone())?
+            .as_ref()
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            )
+            .item
+            .concrete_type;
 
-        let maybe_abstract_target_object_entity = self
-            .traverse_object_selections(
+        let (maybe_abstract_parent_object_entity_name, primary_field_concrete_type) =
+            traverse_object_selections(
+                db,
+                self,
                 payload_object_entity_name,
                 primary_field_name_selection_parts.iter().copied(),
-            )
-            .map_err(|e| WithLocation::new(e, Location::generated()))?;
-
-        let maybe_abstract_parent_object_entity_name = maybe_abstract_target_object_entity.name;
-        let maybe_abstract_parent_object_entity = maybe_abstract_target_object_entity;
+            )?;
 
         let fields = processed_field_map_items
             .iter()
@@ -163,32 +179,22 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         let mutation_field_client_field_name =
             client_field_scalar_selection_name.unchecked_conversion();
 
-        let top_level_schema_field_concrete_type = payload_object_entity
-            .expect(
-                "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-            )
-            .concrete_type;
-        let primary_field_concrete_type = maybe_abstract_parent_object_entity.concrete_type;
-
         let top_level_schema_field_arguments = mutation_field_arguments
             .into_iter()
             .map(|x| x.item)
             .collect::<Vec<_>>();
 
-        let mut parts_reversed = self
-            .get_object_selections_path(
-                payload_object_entity_name,
-                primary_field_name_selection_parts.iter().copied(),
-            )
-            .map_err(|e| WithLocation::new(e, Location::generated()))?;
+        let mut parts_reversed = self.get_object_selections_path(
+            payload_object_entity_name,
+            primary_field_name_selection_parts.iter().copied(),
+        )?;
         parts_reversed.reverse();
 
         let mut subfields_or_inline_fragments = parts_reversed
             .iter()
             .map(|server_object_selectable| {
                 // The server object selectable may represent a linked field or an inline fragment
-                match server_object_selectable.object_selectable_variant {
+                let x = match server_object_selectable.object_selectable_variant {
                     ServerObjectSelectableVariant::LinkedField => {
                         WrappedSelectionMapSelection::LinkedField {
                             server_object_selectable_name: server_object_selectable.name.item,
@@ -198,21 +204,27 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     }
                     ServerObjectSelectableVariant::InlineFragment => {
                         WrappedSelectionMapSelection::InlineFragment(
-                            self.server_entity_data
-                                .server_object_entity(
-                                    *server_object_selectable.target_object_entity.inner(),
-                                )
-                                .expect(
-                                    "Expected entity to exist. \
-                                    This is indicative of a bug in Isograph.",
-                                )
-                                .name
-                                .item,
+                            server_object_entity_named(
+                                db,
+                                *server_object_selectable.target_object_entity.inner(),
+                            )
+                            .deref()
+                            .as_ref()
+                            .map_err(|e| e.clone())?
+                            .as_ref()
+                            .expect(
+                                "Expected entity to exist. \
+                                This is indicative of a bug in Isograph.",
+                            )
+                            .item
+                            .name
+                            .item,
                         )
                     }
-                }
+                };
+                Ok::<_, CreateAdditionalFieldsError<TNetworkProtocol>>(x)
             })
-            .collect::<Vec<_>>();
+            .collect::<Result<Vec<_>, _>>()?;
 
         subfields_or_inline_fragments.push(imperative_field_subfields_or_inline_fragments(
             top_level_schema_field_name,
@@ -238,18 +250,16 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             }),
             variable_definitions: vec![],
             type_and_field: ParentObjectEntityNameAndSelectableName {
-                type_name: maybe_abstract_parent_object_entity_name
-                    .item
-                    .unchecked_conversion(), // e.g. Pet
+                type_name: maybe_abstract_parent_object_entity_name.unchecked_conversion(), // e.g. Pet
                 field_name: client_field_scalar_selection_name, // set_pet_best_friend
             },
-            parent_object_entity_name: maybe_abstract_parent_object_entity_name.item,
+            parent_object_entity_name: maybe_abstract_parent_object_entity_name,
             refetch_strategy: None,
             network_protocol: std::marker::PhantomData,
         };
         self.client_scalar_selectables.insert(
             (
-                maybe_abstract_parent_object_entity_name.item,
+                maybe_abstract_parent_object_entity_name,
                 mutation_client_scalar_selectable.name.item,
             ),
             mutation_client_scalar_selectable,
@@ -257,13 +267,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
 
         self.insert_client_field_on_object(
             client_field_scalar_selection_name,
-            maybe_abstract_parent_object_entity_name.item,
+            maybe_abstract_parent_object_entity_name,
             mutation_field_client_field_name,
             mutation_field_payload_type_name.item,
         )?;
         Ok(UnprocessedClientFieldItem {
             client_field_name: mutation_field_client_field_name,
-            parent_object_entity_name: maybe_abstract_parent_object_entity_name.item,
+            parent_object_entity_name: maybe_abstract_parent_object_entity_name,
             reader_selection_set: vec![],
             refetch_strategy: Some(RefetchStrategy::UseRefetchField(
                 generate_refetch_field_strategy(
@@ -284,7 +294,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         client_field_parent_object_entity_name: ServerObjectEntityName,
         client_field_name: ClientScalarSelectableName,
         payload_object_name: ServerObjectEntityName,
-    ) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
+    ) -> Result<(), CreateAdditionalFieldsError<TNetworkProtocol>> {
         if self
             .server_entity_data
             .server_object_entity_extra_info
@@ -300,15 +310,13 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             )
             .is_some()
         {
-            return Err(WithLocation::new(
+            return Err(
                 // TODO use a more generic error message when making this
                 CreateAdditionalFieldsError::CompilerCreatedFieldExistsOnType {
                     field_name: mutation_field_name,
                     parent_type: payload_object_name,
                 },
-                // TODO this is blatantly incorrect
-                Location::generated(),
-            ));
+            );
         }
 
         Ok(())
@@ -320,7 +328,10 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         &self,
         field_arg: &str,
         mutation_object_entity_name: ServerObjectEntityName,
-    ) -> ProcessTypeDefinitionResult<(ServerObjectEntityName, ServerObjectSelectableName)> {
+    ) -> ProcessTypeDefinitionResult<
+        (ServerObjectEntityName, ServerObjectSelectableName),
+        TNetworkProtocol,
+    > {
         let parent_entity_name_and_mutation_subfield_name = self
             .server_entity_data
             .server_object_entity_extra_info
@@ -339,21 +350,15 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 }
                 None
             })
-            .ok_or_else(|| {
-                WithLocation::new(
-                    CreateAdditionalFieldsError::InvalidField {
-                        field_arg: field_arg.to_string(),
-                    },
-                    // TODO
-                    Location::generated(),
-                )
+            .ok_or_else(|| CreateAdditionalFieldsError::InvalidField {
+                field_arg: field_arg.to_string(),
             })?;
 
         Ok(*parent_entity_name_and_mutation_subfield_name)
     }
 }
 
-fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol>(
+fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol + 'static>(
     // TODO move this to impl Schema
     schema: &mut Schema<TNetworkProtocol>,
     arguments: Vec<WithLocation<VariableDefinition<ServerEntityName>>>,
@@ -361,7 +366,7 @@ fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol>(
     mutation_object_name: ServerObjectEntityName,
     mutation_field_name: SelectableName,
     field_map_items: Vec<FieldMapItem>,
-) -> ProcessTypeDefinitionResult<Vec<ProcessedFieldMapItem>> {
+) -> ProcessTypeDefinitionResult<Vec<ProcessedFieldMapItem>, TNetworkProtocol> {
     let mut processed_field_map_items = Vec::with_capacity(field_map_items.len());
     // TODO
     // We need to create entirely new arguments, which are the existing arguments minus
@@ -379,4 +384,118 @@ fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol>(
     }
 
     Ok(processed_field_map_items)
+}
+
+fn traverse_object_selections<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    schema: &Schema<TNetworkProtocol>,
+    root_object_name: ServerObjectEntityName,
+    selections: impl Iterator<Item = ObjectSelectableName>,
+) -> Result<
+    (ServerObjectEntityName, Option<ServerObjectEntityName>),
+    CreateAdditionalFieldsError<TNetworkProtocol>,
+> {
+    let mut current_entity_memo_ref = server_object_entity_named(db, root_object_name);
+
+    let mut current_selectables = &schema
+        .server_entity_data
+        .server_object_entity_extra_info
+        .get(&root_object_name)
+        .expect(
+            "Expected root_object_entity_name to exist \
+            in server_object_entity_available_selectables",
+        )
+        .selectables;
+
+    for selection_name in selections {
+        match current_selectables.get(&selection_name.into()) {
+            Some(entity) => match entity.transpose() {
+                SelectionType::Scalar(_) => {
+                    // TODO show a better error message
+                    return Err(CreateAdditionalFieldsError::InvalidField {
+                        field_arg: selection_name.lookup().to_string(),
+                    });
+                }
+                SelectionType::Object(object) => {
+                    let target_object_entity_name = match object {
+                        DefinitionLocation::Server((
+                            parent_object_entity_name,
+                            server_object_selectable_name,
+                        )) => {
+                            let selectable = schema.server_object_selectable(
+                                *parent_object_entity_name,
+                                *server_object_selectable_name,
+                            );
+                            selectable
+                                .expect(
+                                    "Expected selectable to exist. \
+                                    This is indicative of a bug in Isograph.",
+                                )
+                                .target_object_entity
+                                .inner()
+                        }
+                        DefinitionLocation::Client((
+                            parent_object_entity_name,
+                            client_object_selectable_name,
+                        )) => {
+                            let pointer = schema.client_object_selectable(
+                                *parent_object_entity_name,
+                                *client_object_selectable_name,
+                            );
+                            pointer
+                                .expect(
+                                    "Expected selectable to exist. \
+                                    This is indicative of a bug in Isograph.",
+                                )
+                                .target_object_entity_name
+                                .inner()
+                        }
+                    };
+
+                    current_entity_memo_ref =
+                        server_object_entity_named(db, *target_object_entity_name);
+
+                    current_selectables = &schema
+                        .server_entity_data
+                        .server_object_entity_extra_info
+                        .get(target_object_entity_name)
+                        .expect(
+                            "Expected target_object_entity_name to exist \
+                            in server_object_entity_available_selectables",
+                        )
+                        .selectables;
+                }
+            },
+            None => {
+                let current_entity = current_entity_memo_ref
+                    .deref()
+                    .as_ref()
+                    .map_err(|e| e.clone())?
+                    .as_ref()
+                    .expect(
+                        "Expected entity to exist. \
+                            This is indicative of a bug in Isograph.",
+                    );
+                return Err(CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
+                    primary_type_name: current_entity.item.name.item,
+                    field_name: selection_name.unchecked_conversion(),
+                });
+            }
+        };
+    }
+
+    let current_entity = current_entity_memo_ref
+        .deref()
+        .as_ref()
+        .map_err(|e| e.clone())?
+        .as_ref()
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        );
+
+    Ok((
+        current_entity.item.name.item,
+        current_entity.item.concrete_type,
+    ))
 }

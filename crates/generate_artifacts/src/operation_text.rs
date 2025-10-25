@@ -4,7 +4,7 @@ use common_lang_types::{
 use intern::string_key::Intern;
 use isograph_config::PersistedDocumentsHashAlgorithm;
 use isograph_schema::{
-    Format, MergedSelectionMap, NetworkProtocol, RootOperationName, Schema,
+    Format, IsographDatabase, MergedSelectionMap, NetworkProtocol, RootOperationName,
     ValidatedVariableDefinition,
 };
 use md5::{Digest, Md5};
@@ -17,9 +17,9 @@ pub(crate) struct OperationText(pub String);
 derive_display!(OperationText);
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn generate_operation_text<'a, TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_operation_text<'a, TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     query_name: QueryOperationName,
-    schema: &Schema<TNetworkProtocol>,
     merged_selection_map: &MergedSelectionMap,
     query_variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
     root_operation_name: &RootOperationName,
@@ -31,8 +31,8 @@ pub(crate) fn generate_operation_text<'a, TNetworkProtocol: NetworkProtocol>(
     match persisted_documents {
         Some(pd) => {
             let query_text = TNetworkProtocol::generate_query_text(
+                db,
                 query_name,
-                schema,
                 merged_selection_map,
                 query_variables,
                 root_operation_name,

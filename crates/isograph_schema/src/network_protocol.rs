@@ -1,17 +1,11 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    error::Error,
-    fmt::Debug,
-    hash::Hash,
-};
+use std::{collections::BTreeMap, error::Error, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
-    JavascriptName, Location, QueryExtraInfo, QueryOperationName, QueryText,
-    ServerObjectEntityName, ServerScalarEntityName, ServerSelectableName, UnvalidatedTypeName,
-    WithLocation, WithSpan,
+    JavascriptName, QueryExtraInfo, QueryOperationName, QueryText, ServerObjectEntityName,
+    ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation};
-use isograph_lang_types::Description;
+use isograph_lang_types::{Description, SelectionType};
 use pico::MemoRef;
 
 use crate::{
@@ -19,30 +13,38 @@ use crate::{
     ServerScalarEntity, ValidatedVariableDefinition, isograph_database::IsographDatabase,
 };
 
+pub type ParseTypeSystemOutcome<TNetworkProtocol> = Vec<
+    SelectionType<
+        WithLocation<ServerScalarEntity<TNetworkProtocol>>,
+        ProcessObjectTypeDefinitionOutcome<TNetworkProtocol>,
+    >,
+>;
+
 pub trait NetworkProtocol:
     Debug + Clone + Copy + Eq + PartialEq + Ord + PartialOrd + Hash + Default
 where
     Self: Sized,
 {
     type SchemaObjectAssociatedData: Debug + PartialEq + Eq + Clone;
-    type ParseAndProcessTypeSystemDocumentsError: Error + PartialEq + Eq + Clone + 'static;
+    type ParseTypeSystemDocumentsError: Error + PartialEq + Eq + Clone + 'static;
 
     #[allow(clippy::type_complexity)]
-    fn parse_and_process_type_system_documents(
+    fn parse_type_system_documents(
         db: &IsographDatabase<Self>,
     ) -> MemoRef<
+        // TODO this should return a Vec<Result<...>>, not a Result<Vec<...>>, probably
         Result<
             (
-                ProcessTypeSystemDocumentOutcome<Self>,
+                ParseTypeSystemOutcome<Self>,
                 BTreeMap<ServerObjectEntityName, RootOperationName>,
             ),
-            Self::ParseAndProcessTypeSystemDocumentsError,
+            Self::ParseTypeSystemDocumentsError,
         >,
     >;
 
     fn generate_query_text<'a>(
+        db: &IsographDatabase<Self>,
         query_name: QueryOperationName,
-        schema: &Schema<Self>,
         selection_map: &MergedSelectionMap,
         query_variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
         root_operation_name: &RootOperationName,
@@ -63,21 +65,8 @@ where
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct ProcessTypeSystemDocumentOutcome<TNetworkProtocol: NetworkProtocol> {
-    pub scalars:
-        HashMap<ServerScalarEntityName, Vec<(ServerScalarEntity<TNetworkProtocol>, Location)>>,
-    pub objects: HashMap<
-        ServerObjectEntityName,
-        Vec<(
-            ProcessObjectTypeDefinitionOutcome<TNetworkProtocol>,
-            Location,
-        )>,
-    >,
-}
-
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol> {
-    pub server_object_entity: ServerObjectEntity<TNetworkProtocol>,
+pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol + 'static> {
+    pub server_object_entity: WithLocation<ServerObjectEntity<TNetworkProtocol>>,
     pub fields_to_insert: Vec<WithLocation<FieldToInsert>>,
     // TODO this seems sketch
     pub expose_as_fields_to_insert: Vec<ExposeAsFieldToInsert>,

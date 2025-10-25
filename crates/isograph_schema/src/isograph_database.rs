@@ -11,7 +11,7 @@ use pico_macros::{Db, Source};
 use crate::NetworkProtocol;
 
 #[derive(Default, Debug, Db)]
-pub struct IsographDatabase<TNetworkProtocol: NetworkProtocol> {
+pub struct IsographDatabase<TNetworkProtocol: NetworkProtocol + 'static> {
     storage: Storage<Self>,
     #[tracked]
     iso_literal_map: IsoLiteralMap,

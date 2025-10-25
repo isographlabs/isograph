@@ -8,9 +8,9 @@ use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{ConstantValue, SelectionType, TypeAnnotation, VariableDefinition};
 use isograph_schema::{
     CreateAdditionalFieldsError, ExposeAsFieldToInsert, FieldToInsert, IsographDatabase,
-    NetworkProtocol, ProcessObjectTypeDefinitionOutcome, ProcessTypeSystemDocumentOutcome, Schema,
-    ServerEntityName, ServerObjectSelectable, ServerObjectSelectableVariant,
-    ServerScalarSelectable, UnprocessedClientFieldItem, UnprocessedClientPointerItem,
+    NetworkProtocol, Schema, ServerEntityName, ServerObjectSelectable,
+    ServerObjectSelectableVariant, ServerScalarSelectable, UnprocessedClientFieldItem,
+    UnprocessedClientPointerItem,
 };
 use pico_macros::memo;
 use thiserror::Error;
@@ -33,45 +33,35 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     ),
     CreateSchemaError<TNetworkProtocol>,
 > {
-    let memo_ref = TNetworkProtocol::parse_and_process_type_system_documents(db);
-    let (ProcessTypeSystemDocumentOutcome { scalars, objects }, fetchable_types) =
-        match memo_ref.to_owned() {
-            Ok(x) => x,
-            Err(e) => {
-                return Err(CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e });
-            }
-        };
+    let memo_ref = TNetworkProtocol::parse_type_system_documents(db);
+    let (items, fetchable_types) = match memo_ref.to_owned() {
+        Ok(x) => x,
+        Err(e) => {
+            return Err(CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e });
+        }
+    };
 
     let mut unvalidated_isograph_schema = Schema::<TNetworkProtocol>::new();
-
     unvalidated_isograph_schema.fetchable_types = fetchable_types;
-
-    for (_server_scalar_entity_name, server_scalar_entities) in scalars {
-        for (server_scalar_entity, name_location) in server_scalar_entities {
-            unvalidated_isograph_schema
-                .server_entity_data
-                .insert_server_scalar_entity(server_scalar_entity, name_location)?;
-        }
-    }
 
     let mut field_queue = HashMap::new();
     let mut expose_as_field_queue = HashMap::new();
-    for (_, definitions) in objects {
-        for (
-            ProcessObjectTypeDefinitionOutcome {
-                server_object_entity,
-                fields_to_insert,
-                expose_as_fields_to_insert,
-            },
-            name_location,
-        ) in definitions
-        {
-            let new_object_id = unvalidated_isograph_schema
-                .server_entity_data
-                .insert_server_object_entity(server_object_entity, name_location)?;
-            field_queue.insert(new_object_id, fields_to_insert);
 
-            expose_as_field_queue.insert(new_object_id, expose_as_fields_to_insert);
+    for item in items {
+        match item {
+            SelectionType::Object(outcome) => {
+                let new_object_id = unvalidated_isograph_schema
+                    .server_entity_data
+                    .insert_server_object_entity(outcome.server_object_entity.item)?;
+                field_queue.insert(new_object_id, outcome.fields_to_insert);
+
+                expose_as_field_queue.insert(new_object_id, outcome.expose_as_fields_to_insert);
+            }
+            SelectionType::Scalar(server_scalar_entity) => {
+                unvalidated_isograph_schema
+                    .server_entity_data
+                    .insert_server_scalar_entity(server_scalar_entity.item.name.item)?;
+            }
         }
     }
 
@@ -117,8 +107,11 @@ pub fn create_type_system_schema_with_server_selectables<
 
     for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
         for expose_as_field in expose_as_fields_to_insert {
-            let unprocessed_scalar_item = unvalidated_isograph_schema
-                .create_new_exposed_field(expose_as_field, parent_object_entity_name)?;
+            let unprocessed_scalar_item = unvalidated_isograph_schema.create_new_exposed_field(
+                db,
+                expose_as_field,
+                parent_object_entity_name,
+            )?;
 
             unprocessed_items.push(SelectionType::Scalar(unprocessed_scalar_item));
         }
@@ -139,30 +132,17 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &mut Schema<TNetworkProtocol>,
     field_queue: HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
     options: &CompilerConfigOptions,
-) -> Result<(), WithLocation<CreateAdditionalFieldsError>> {
+) -> Result<(), CreateSchemaError<TNetworkProtocol>> {
     for (parent_object_entity_name, field_definitions_to_insert) in field_queue {
         for server_field_to_insert in field_definitions_to_insert.into_iter() {
-            let parent_object_entity = schema
-                .server_entity_data
-                .server_object_entity(parent_object_entity_name)
-                .expect(
-                    "Expected entity to exist. \
-                    This is indicative of a bug in Isograph.",
-                );
-
             let target_entity_type_name = server_field_to_insert.item.graphql_type.inner();
 
             let selection_type = schema
                 .server_entity_data
                 .defined_entities
                 .get(target_entity_type_name)
-                .ok_or_else(|| {
-                    WithLocation::new(
-                        CreateAdditionalFieldsError::FieldTypenameDoesNotExist {
-                            target_entity_type_name: *target_entity_type_name,
-                        },
-                        server_field_to_insert.item.name.location,
-                    )
+                .ok_or_else(|| CreateSchemaError::FieldTypenameDoesNotExist {
+                    target_entity_type_name: *target_entity_type_name,
                 })?;
 
             let arguments = server_field_to_insert
@@ -175,7 +155,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
                     graphql_input_value_definition_to_variable_definition(
                         &schema.server_entity_data.defined_entities,
                         input_value_definition,
-                        parent_object_entity.name.item,
+                        parent_object_entity_name,
                         server_field_to_insert.item.name.item.into(),
                     )
                 })
@@ -184,32 +164,30 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
 
             match selection_type {
                 SelectionType::Scalar(scalar_entity_name) => {
-                    schema
-                        .insert_server_scalar_selectable(
-                            ServerScalarSelectable {
-                                description,
-                                name: server_field_to_insert
-                                    .item
-                                    .name
-                                    .map(|x| x.unchecked_conversion()),
-                                target_scalar_entity: TypeAnnotation::from_graphql_type_annotation(
-                                    server_field_to_insert.item.graphql_type.clone(),
-                                )
-                                .map(&mut |_| *scalar_entity_name),
-                                javascript_type_override: server_field_to_insert
-                                    .item
-                                    .javascript_type_override,
-                                parent_object_entity_name,
-                                arguments,
-                                phantom_data: std::marker::PhantomData,
-                            },
-                            options,
-                            server_field_to_insert
+                    schema.insert_server_scalar_selectable(
+                        ServerScalarSelectable {
+                            description,
+                            name: server_field_to_insert
                                 .item
-                                .graphql_type
-                                .inner_non_null_named_type(),
-                        )
-                        .map_err(|e| WithLocation::new(e, server_field_to_insert.location))?;
+                                .name
+                                .map(|x| x.unchecked_conversion()),
+                            target_scalar_entity: TypeAnnotation::from_graphql_type_annotation(
+                                server_field_to_insert.item.graphql_type.clone(),
+                            )
+                            .map(&mut |_| *scalar_entity_name),
+                            javascript_type_override: server_field_to_insert
+                                .item
+                                .javascript_type_override,
+                            parent_object_entity_name,
+                            arguments,
+                            phantom_data: std::marker::PhantomData,
+                        },
+                        options,
+                        server_field_to_insert
+                            .item
+                            .graphql_type
+                            .inner_non_null_named_type(),
+                    )?;
                 }
                 SelectionType::Object(object_entity_name) => {
                     schema
@@ -230,8 +208,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
                                 } else {
                                     ServerObjectSelectableVariant::LinkedField
                                 }
-                        })
-                        .map_err(|e| WithLocation::new(e, server_field_to_insert.location))?;
+                        })?;
                 }
             }
         }
@@ -240,20 +217,20 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok(())
 }
 
-pub fn graphql_input_value_definition_to_variable_definition(
+pub fn graphql_input_value_definition_to_variable_definition<
+    TNetworkProtocol: NetworkProtocol + 'static,
+>(
     defined_types: &HashMap<UnvalidatedTypeName, ServerEntityName>,
     input_value_definition: WithLocation<GraphQLInputValueDefinition>,
     parent_type_name: ServerObjectEntityName,
     field_name: SelectableName,
-) -> Result<
-    WithLocation<VariableDefinition<ServerEntityName>>,
-    WithLocation<CreateAdditionalFieldsError>,
-> {
+) -> Result<WithLocation<VariableDefinition<ServerEntityName>>, CreateSchemaError<TNetworkProtocol>>
+{
     let default_value = input_value_definition
         .item
         .default_value
         .map(|graphql_constant_value| {
-            Ok::<_, WithLocation<CreateAdditionalFieldsError>>(WithLocation::new(
+            Ok::<_, CreateSchemaError<TNetworkProtocol>>(WithLocation::new(
                 convert_graphql_constant_value_to_isograph_constant_value(
                     graphql_constant_value.item,
                 ),
@@ -269,16 +246,11 @@ pub fn graphql_input_value_definition_to_variable_definition(
         .and_then(|input_type_name| {
             defined_types
                 .get(&(*input_value_definition.item.type_.inner()).into())
-                .ok_or_else(|| {
-                    WithLocation::new(
-                        CreateAdditionalFieldsError::FieldArgumentTypeDoesNotExist {
-                            argument_type: input_type_name.into(),
-                            argument_name: input_value_definition.item.name.item.into(),
-                            parent_type_name,
-                            field_name,
-                        },
-                        input_value_definition.location,
-                    )
+                .ok_or_else(|| CreateSchemaError::FieldArgumentTypeDoesNotExist {
+                    argument_type: input_type_name.into(),
+                    argument_name: input_value_definition.item.name.item.into(),
+                    parent_type_name,
+                    field_name,
                 })
                 .copied()
         })?;
@@ -337,19 +309,34 @@ fn convert_graphql_constant_value_to_isograph_constant_value(
 pub enum CreateSchemaError<TNetworkProtocol: NetworkProtocol + 'static> {
     #[error("{message}")]
     ParseAndProcessTypeSystemDocument {
-        message: TNetworkProtocol::ParseAndProcessTypeSystemDocumentsError,
+        message: TNetworkProtocol::ParseTypeSystemDocumentsError,
     },
 
-    #[error("{}", message.for_display())]
+    #[error("{}", message)]
     CreateAdditionalFields {
-        message: WithLocation<CreateAdditionalFieldsError>,
+        message: CreateAdditionalFieldsError<TNetworkProtocol>,
+    },
+
+    #[error(
+        "The argument `{argument_name}` on field `{parent_type_name}.{field_name}` has inner type `{argument_type}`, which does not exist."
+    )]
+    FieldArgumentTypeDoesNotExist {
+        argument_name: VariableName,
+        parent_type_name: ServerObjectEntityName,
+        field_name: SelectableName,
+        argument_type: UnvalidatedTypeName,
+    },
+
+    #[error("This field has type `{target_entity_type_name}`, which does not exist")]
+    FieldTypenameDoesNotExist {
+        target_entity_type_name: UnvalidatedTypeName,
     },
 }
 
-impl<TNetworkProtocol: NetworkProtocol> From<WithLocation<CreateAdditionalFieldsError>>
-    for CreateSchemaError<TNetworkProtocol>
+impl<TNetworkProtocol: NetworkProtocol + 'static>
+    From<CreateAdditionalFieldsError<TNetworkProtocol>> for CreateSchemaError<TNetworkProtocol>
 {
-    fn from(value: WithLocation<CreateAdditionalFieldsError>) -> Self {
+    fn from(value: CreateAdditionalFieldsError<TNetworkProtocol>) -> Self {
         CreateSchemaError::CreateAdditionalFields { message: value }
     }
 }

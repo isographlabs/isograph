@@ -7,12 +7,12 @@ use common_lang_types::{
 use graphql_lang_types::{DeserializationError, from_graphql_directive};
 use graphql_schema_parser::SchemaParseError;
 use intern::string_key::Intern;
-use isograph_schema::IsographDatabase;
+use isograph_lang_types::SelectionType;
 use isograph_schema::{
-    CreateAdditionalFieldsError, ExposeAsFieldToInsert, Format, MergedSelectionMap,
-    NetworkProtocol, ProcessTypeSystemDocumentOutcome, RootOperationName, Schema,
-    ValidatedVariableDefinition,
+    ExposeAsFieldToInsert, Format, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome,
+    RootOperationName, Schema, ValidatedVariableDefinition,
 };
+use isograph_schema::{IsographDatabase, ServerScalarEntity};
 use lazy_static::lazy_static;
 use pico_macros::memo;
 use thiserror::Error;
@@ -61,17 +61,17 @@ pub struct GraphQLNetworkProtocol {}
 
 impl NetworkProtocol for GraphQLNetworkProtocol {
     type SchemaObjectAssociatedData = GraphQLSchemaObjectAssociatedData;
-    type ParseAndProcessTypeSystemDocumentsError = ParseAndProcessGraphQLTypeSystemDocumentsError;
+    type ParseTypeSystemDocumentsError = ParseGraphQLTypeSystemDocumentsError;
 
     #[memo]
-    fn parse_and_process_type_system_documents(
+    fn parse_type_system_documents(
         db: &IsographDatabase<Self>,
     ) -> Result<
         (
-            ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>,
+            ParseTypeSystemOutcome<Self>,
             BTreeMap<ServerObjectEntityName, RootOperationName>,
         ),
-        ParseAndProcessGraphQLTypeSystemDocumentsError,
+        ParseGraphQLTypeSystemDocumentsError,
     > {
         let mut graphql_root_types = None;
 
@@ -95,28 +95,29 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 directives.entry(name).or_default().extend(new_directives);
             }
 
-            let ProcessTypeSystemDocumentOutcome { scalars, objects } = outcome;
-
             // Note: we process all newly-defined types in schema extensions.
             // However, we ignore a bunch of things, like newly-defined fields on existing types, etc.
             // We should probably fix that!
-            result.objects.extend(objects);
-            result.scalars.extend(scalars);
+            result.extend(outcome);
             refetch_fields.extend(new_refetch_fields);
         }
 
         let graphql_root_types = graphql_root_types.unwrap_or_default();
 
         let query = result
-            .objects
             .iter_mut()
-            .find_map(|(_, definitions)| {
-                definitions.iter_mut().find(|(object, _)| {
-                    object.server_object_entity.name.item == graphql_root_types.query
-                })
+            .find_map(|item| match item.as_ref_mut().as_object() {
+                Some(outcome) => {
+                    if outcome.server_object_entity.item.name.item == graphql_root_types.query {
+                        Some(outcome)
+                    } else {
+                        None
+                    }
+                }
+                None => None,
             })
             .expect("Expected query type to be found.");
-        query.0.expose_as_fields_to_insert.extend(refetch_fields);
+        query.expose_as_fields_to_insert.extend(refetch_fields);
 
         // - in the extension document, you may have added directives to objects, e.g. @exposeAs
         // - we need to transfer those to the original objects.
@@ -125,29 +126,34 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         for (name, directives) in directives {
             // TODO don't do O(n^2) here
             match result
-                .objects
                 .iter_mut()
-                .find_map(|(_, object_definitions)| {
-                    object_definitions
-                        .iter_mut()
-                        .find(|object| object.0.server_object_entity.name.item == name)
+                .find_map(|item| match item.as_ref_mut().as_object() {
+                    Some(x) => {
+                        if x.server_object_entity.item.name.item == name {
+                            Some(x)
+                        } else {
+                            None
+                        }
+                    }
+                    None => None,
                 }) {
-                Some((object, _)) => {
+                Some(outcome) => {
                     for directive in directives {
                         if directive.name.item == *EXPOSE_FIELD_DIRECTIVE {
                             let expose_field_directive = from_graphql_directive(&directive)
                                 .map_err(|err| match err {
-                                    DeserializationError::Custom(err) => WithLocation::new(
-                                        CreateAdditionalFieldsError::FailedToDeserialize(err),
-                                        directive.name.location.into(), // TODO: use location of the entire directive
-                                    ),
+                                    DeserializationError::Custom(err) => {
+                                        ParseGraphQLTypeSystemDocumentsError::FailedToDeserialize(
+                                            err,
+                                        )
+                                    }
                                 })?;
 
-                            object
+                            outcome
                                 .expose_as_fields_to_insert
                                 .push(ExposeAsFieldToInsert {
                                     expose_field_directive,
-                                    parent_object_name: object.server_object_entity.name.item,
+                                    parent_object_name: outcome.server_object_entity.item.name.item,
                                     description: None,
                                 });
                         }
@@ -162,6 +168,8 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 }
             }
         }
+
+        extend_result_with_default_types(&mut result);
 
         Ok((result, graphql_root_types.into()))
     }
@@ -193,16 +201,16 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
     }
 
     fn generate_query_text<'a>(
+        db: &IsographDatabase<Self>,
         query_name: QueryOperationName,
-        schema: &Schema<Self>,
         selection_map: &MergedSelectionMap,
         query_variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
         root_operation_name: &RootOperationName,
         format: Format,
     ) -> QueryText {
         generate_query_text(
+            db,
             query_name,
-            schema,
             selection_map,
             query_variables,
             root_operation_name,
@@ -252,7 +260,7 @@ impl GraphQLSchemaOriginalDefinitionType {
 }
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
-pub enum ParseAndProcessGraphQLTypeSystemDocumentsError {
+pub enum ParseGraphQLTypeSystemDocumentsError {
     #[error("{}", message.for_display())]
     SchemaParse {
         message: WithLocation<SchemaParseError>,
@@ -269,30 +277,63 @@ pub enum ParseAndProcessGraphQLTypeSystemDocumentsError {
         message: ProcessGraphqlTypeSystemDefinitionError,
     },
 
-    #[error("{}", message.for_display())]
-    CreateAdditionalFields {
-        message: WithLocation<CreateAdditionalFieldsError>,
-    },
+    #[error("Failed to deserialize {0}")]
+    FailedToDeserialize(String),
 }
 
-impl From<WithLocation<SchemaParseError>> for ParseAndProcessGraphQLTypeSystemDocumentsError {
+impl From<WithLocation<SchemaParseError>> for ParseGraphQLTypeSystemDocumentsError {
     fn from(value: WithLocation<SchemaParseError>) -> Self {
         Self::SchemaParse { message: value }
     }
 }
 
 impl From<WithLocation<ProcessGraphqlTypeSystemDefinitionError>>
-    for ParseAndProcessGraphQLTypeSystemDocumentsError
+    for ParseGraphQLTypeSystemDocumentsError
 {
     fn from(value: WithLocation<ProcessGraphqlTypeSystemDefinitionError>) -> Self {
         Self::ProcessGraphQLTypeSystemDefinitionWithLocation { message: value }
     }
 }
 
-impl From<WithLocation<CreateAdditionalFieldsError>>
-    for ParseAndProcessGraphQLTypeSystemDocumentsError
-{
-    fn from(value: WithLocation<CreateAdditionalFieldsError>) -> Self {
-        Self::CreateAdditionalFields { message: value }
-    }
+fn extend_result_with_default_types(result: &mut ParseTypeSystemOutcome<GraphQLNetworkProtocol>) {
+    result.push(SelectionType::Scalar(WithLocation::new_generated(
+        ServerScalarEntity {
+            description: None,
+            name: WithLocation::new_generated("ID".intern().into()),
+            javascript_name: "string".intern().into(),
+            network_protocol: std::marker::PhantomData,
+        },
+    )));
+    result.push(SelectionType::Scalar(WithLocation::new_generated(
+        ServerScalarEntity {
+            description: None,
+            name: WithLocation::new_generated("String".intern().into()),
+            javascript_name: "string".intern().into(),
+            network_protocol: std::marker::PhantomData,
+        },
+    )));
+    result.push(SelectionType::Scalar(WithLocation::new_generated(
+        ServerScalarEntity {
+            description: None,
+            name: WithLocation::new_generated("Boolean".intern().into()),
+            javascript_name: "boolean".intern().into(),
+            network_protocol: std::marker::PhantomData,
+        },
+    )));
+    result.push(SelectionType::Scalar(WithLocation::new_generated(
+        ServerScalarEntity {
+            description: None,
+            name: WithLocation::new_generated("Float".intern().into()),
+            javascript_name: "number".intern().into(),
+            network_protocol: std::marker::PhantomData,
+        },
+    )));
+    result.push(SelectionType::Scalar(WithLocation::new_generated(
+        ServerScalarEntity {
+            description: None,
+            name: WithLocation::new_generated("Int".intern().into()),
+            javascript_name: "number".intern().into(),
+            network_protocol: std::marker::PhantomData,
+        },
+    )));
 }

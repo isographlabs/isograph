@@ -1,14 +1,13 @@
-use crate::{NetworkProtocol, Schema};
+use crate::{EntityAccessError, NetworkProtocol, Schema};
 use common_lang_types::{
     SelectableName, ServerObjectEntityName, StringLiteralValue, UnvalidatedTypeName, VariableName,
-    WithLocation,
 };
 use intern::{Lookup, string_key::Intern};
 
 use serde::Deserialize;
 use thiserror::Error;
 
-impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {}
+impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {}
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, PartialOrd, Ord, Hash)]
 #[serde(deny_unknown_fields)]
@@ -41,12 +40,16 @@ impl FieldMapItem {
 // TODO this should be a different type.
 pub(crate) struct ProcessedFieldMapItem(pub FieldMapItem);
 
-pub(crate) type ProcessTypeDefinitionResult<T> =
-    Result<T, WithLocation<CreateAdditionalFieldsError>>;
+pub(crate) type ProcessTypeDefinitionResult<T, TNetworkProtocol> =
+    Result<T, CreateAdditionalFieldsError<TNetworkProtocol>>;
 
 /// Errors that make semantic sense when referring to creating a GraphQL schema in-memory representation
+///
+/// TODO some variants here should contain locations, since we used to have
+/// WithLocation<CreateAdditionalFieldsError> everywhere, but we removed that. But it makes sense
+/// in some cases!
 #[derive(Error, Clone, Eq, PartialEq, Debug)]
-pub enum CreateAdditionalFieldsError {
+pub enum CreateAdditionalFieldsError<TNetworkProtocol: NetworkProtocol + 'static> {
     #[error(
         "The Isograph compiler attempted to create a field named \
         `{field_name}` on type `{parent_type}`, but a field with that name already exists."
@@ -128,6 +131,10 @@ pub enum CreateAdditionalFieldsError {
         type_definition_type: &'static str,
         type_name: UnvalidatedTypeName,
     },
+
+    #[error("{0}")]
+    EntityAccessError(#[from] EntityAccessError<TNetworkProtocol>),
 }
 
-pub type CreateAdditionalFieldsResult<T> = Result<T, CreateAdditionalFieldsError>;
+pub type CreateAdditionalFieldsResult<T, TNetworkProtocol> =
+    Result<T, CreateAdditionalFieldsError<TNetworkProtocol>>;

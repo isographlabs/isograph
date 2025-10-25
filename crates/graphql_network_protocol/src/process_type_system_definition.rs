@@ -11,12 +11,11 @@ use graphql_lang_types::{
     GraphQLTypeSystemExtensionDocument, GraphQLTypeSystemExtensionOrDefinition,
 };
 use intern::string_key::Intern;
-use isograph_lang_types::Description;
+use isograph_lang_types::{Description, SelectionType};
 use isograph_schema::{
-    CreateAdditionalFieldsError, ExposeAsFieldToInsert, ExposeFieldDirective, FieldMapItem,
-    FieldToInsert, IsographObjectTypeDefinition, ProcessObjectTypeDefinitionOutcome,
-    ProcessTypeSystemDocumentOutcome, STRING_JAVASCRIPT_TYPE, ServerObjectEntity,
-    ServerScalarEntity, TYPENAME_FIELD_NAME,
+    ExposeAsFieldToInsert, ExposeFieldDirective, FieldMapItem, FieldToInsert,
+    IsographObjectTypeDefinition, ParseTypeSystemOutcome, ProcessObjectTypeDefinitionOutcome,
+    STRING_JAVASCRIPT_TYPE, ServerObjectEntity, ServerScalarEntity, TYPENAME_FIELD_NAME,
 };
 use lazy_static::lazy_static;
 use thiserror::Error;
@@ -40,7 +39,8 @@ pub fn process_graphql_type_system_document(
     type_system_document: GraphQLTypeSystemDocument,
     graphql_root_types: &mut Option<GraphQLRootTypes>,
 ) -> ProcessGraphqlTypeDefinitionResult<(
-    ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>,
+    ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
+    // TODO why are we returning these?
     HashMap<ServerObjectEntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
     Vec<ExposeAsFieldToInsert>,
 )> {
@@ -52,8 +52,8 @@ pub fn process_graphql_type_system_document(
 
     let mut supertype_to_subtype_map = BTreeMap::new();
 
-    let mut scalars = HashMap::new();
-    let mut objects = HashMap::new();
+    let mut type_system_entities = vec![];
+
     let mut directives = HashMap::<_, Vec<_>>::new();
 
     let mut refetch_fields = vec![];
@@ -94,17 +94,14 @@ pub fn process_graphql_type_system_document(
                     .or_default()
                     .extend(new_directives);
 
-                let object_definitions: &mut Vec<_> = objects.entry(object_name).or_default();
-                object_definitions.push((object_definition_outcome, location));
+                type_system_entities.push(SelectionType::Object(object_definition_outcome));
             }
             GraphQLTypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
-                let scalar_definitions: &mut Vec<_> =
-                    scalars.entry(scalar_type_definition.name.item).or_default();
                 let name_location = scalar_type_definition.name.location;
-                scalar_definitions.push((
+                type_system_entities.push(SelectionType::Scalar(WithLocation::new(
                     process_scalar_definition(scalar_type_definition),
                     name_location,
-                ));
+                )));
                 // N.B. we assume that Mutation will be an object, not a scalar
             }
             GraphQLTypeSystemDefinition::InterfaceTypeDefinition(interface_type_definition) => {
@@ -122,8 +119,9 @@ pub fn process_graphql_type_system_document(
                         &mut refetch_fields,
                     )?;
 
-                let object_definitions = objects.entry(interface_name).or_default();
-                object_definitions.push((process_object_type_definition_outcome, location));
+                type_system_entities.push(SelectionType::Object(
+                    process_object_type_definition_outcome,
+                ));
 
                 directives
                     .entry(interface_name)
@@ -153,8 +151,9 @@ pub fn process_graphql_type_system_document(
                         &mut refetch_fields,
                     )?;
 
-                let object_definitions = objects.entry(input_object_name).or_default();
-                object_definitions.push((process_object_type_definition_outcome, location));
+                type_system_entities.push(SelectionType::Object(
+                    process_object_type_definition_outcome,
+                ));
 
                 directives
                     .entry(input_object_name)
@@ -167,16 +166,14 @@ pub fn process_graphql_type_system_document(
             }
             GraphQLTypeSystemDefinition::EnumDefinition(enum_definition) => {
                 // TODO Do not do this
-                let scalar_definitions: &mut Vec<_> =
-                    scalars.entry(enum_definition.name.item).or_default();
-                scalar_definitions.push((
+                type_system_entities.push(SelectionType::Scalar(WithLocation::new(
                     process_scalar_definition(GraphQLScalarTypeDefinition {
                         description: enum_definition.description,
                         name: enum_definition.name.map(|x| x.unchecked_conversion()),
                         directives: enum_definition.directives,
                     }),
                     enum_definition.name.location,
-                ));
+                )))
             }
             GraphQLTypeSystemDefinition::UnionTypeDefinition(union_definition) => {
                 // TODO do something reasonable here, once we add support for type refinements.
@@ -200,10 +197,9 @@ pub fn process_graphql_type_system_document(
                         &mut refetch_fields,
                     )?;
 
-                let object_definitions = objects
-                    .entry(union_definition.name.item.into())
-                    .or_default();
-                object_definitions.push((process_object_type_definition_outcome, location));
+                type_system_entities.push(SelectionType::Object(
+                    process_object_type_definition_outcome,
+                ));
 
                 directives
                     .entry(union_definition.name.item.unchecked_conversion())
@@ -245,14 +241,18 @@ pub fn process_graphql_type_system_document(
 
     // For each supertype (e.g. Node) and a subtype (e.g. Pet), we need to add an asConcreteType field.
     for (supertype_name, subtypes) in supertype_to_subtype_map.iter() {
-        let (object_outcome, _) = objects
+        let object_outcome = type_system_entities
             .iter_mut()
-            .find_map(|(_, object_definitions)| {
-                object_definitions.iter_mut().find(|obj| {
+            .find_map(|definition| {
+                definition.as_ref_mut().as_object().and_then(|x| {
+                    // Why do we have to do this?
                     let supertype_name: ServerObjectEntityName =
                         supertype_name.unchecked_conversion();
-
-                    obj.0.server_object_entity.name.item == supertype_name
+                    if x.server_object_entity.item.name.item == supertype_name {
+                        Some(x)
+                    } else {
+                        None
+                    }
                 })
             })
             .expect("Expected supertype to exist. This is indicative of a bug in Isograph.");
@@ -260,6 +260,7 @@ pub fn process_graphql_type_system_document(
         // add subtypes to associated_data
         object_outcome
             .server_object_entity
+            .item
             .network_protocol_associated_data
             .subtypes
             .extend(subtypes);
@@ -291,11 +292,7 @@ pub fn process_graphql_type_system_document(
         }
     }
 
-    Ok((
-        ProcessTypeSystemDocumentOutcome { scalars, objects },
-        directives,
-        refetch_fields,
-    ))
+    Ok((type_system_entities, directives, refetch_fields))
 }
 
 #[allow(clippy::type_complexity)]
@@ -303,7 +300,7 @@ pub fn process_graphql_type_extension_document(
     extension_document: GraphQLTypeSystemExtensionDocument,
     graphql_root_types: &mut Option<GraphQLRootTypes>,
 ) -> ProcessGraphqlTypeDefinitionResult<(
-    ProcessTypeSystemDocumentOutcome<GraphQLNetworkProtocol>,
+    ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
     HashMap<ServerObjectEntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
     Vec<ExposeAsFieldToInsert>,
 )> {
@@ -347,9 +344,6 @@ pub enum ProcessGraphqlTypeSystemDefinitionError {
     #[error("Duplicate schema definition")]
     DuplicateSchemaDefinition,
 
-    #[error("{0}")]
-    CreateAdditionalFieldsError(#[from] CreateAdditionalFieldsError),
-
     #[error("Attempted to extend {type_name}, but that type is not defined")]
     AttemptedToExtendUndefinedType { type_name: ServerObjectEntityName },
 
@@ -375,12 +369,15 @@ fn process_object_type_definition(
     let should_add_refetch_field = type_definition_type.is_concrete()
         && type_definition_type.is_output_type()
         && type_implements_node(&object_type_definition);
-    let server_object_entity = ServerObjectEntity {
-        description: object_type_definition.description.map(|d| d.item),
-        name: object_type_definition.name,
-        concrete_type,
-        network_protocol_associated_data: associated_data,
-    };
+    let server_object_entity = WithLocation::new(
+        ServerObjectEntity {
+            description: object_type_definition.description.map(|d| d.item),
+            name: object_type_definition.name,
+            concrete_type,
+            network_protocol_associated_data: associated_data,
+        },
+        object_type_definition.name.location.into(),
+    );
 
     let mut fields_to_insert: Vec<_> = object_type_definition
         .fields
