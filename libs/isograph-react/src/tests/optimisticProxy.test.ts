@@ -3,7 +3,7 @@ import { callSubscriptions } from '../core/cache';
 import {
   createIsographEnvironment,
   createIsographStore,
-  type DataLayer,
+  type StoreLayerData as DataLayer,
   type IsographEnvironment,
 } from '../core/IsographEnvironment';
 import {
@@ -161,6 +161,27 @@ describe('optimisticLayer', () => {
         3,
         expect.anything(),
         NO_CHANGES,
+      );
+    });
+
+    test('calls subscriptions if nodes update different fields', () => {
+      const revert = addOptimisticStoreLayerInner(environment, () => ({
+        data: { Query: { __ROOT: { surname: 'foo' } } },
+        encounteredIds: CHANGES,
+      }));
+      addNetworkResponseStoreLayerInner(
+        environment,
+        { Query: { __ROOT: { name: 'foo' } } },
+        CHANGES,
+      );
+
+      revert({ Query: { __ROOT: { surname: 'bar' } } });
+
+      expect(callSubscriptions).toHaveBeenCalledTimes(4);
+      expect(callSubscriptions).toHaveBeenNthCalledWith(
+        4,
+        expect.anything(),
+        CHANGES,
       );
     });
 
