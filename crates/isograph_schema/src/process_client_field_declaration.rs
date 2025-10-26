@@ -52,7 +52,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             .get(&client_field_declaration.item.parent_type.item.0.into())
             .ok_or(WithLocation::new(
                 ProcessClientFieldDeclarationError::ParentTypeNotDefined {
-                    parent_type_name: client_field_declaration.item.parent_type.item,
+                    parent_object_entity_name: client_field_declaration.item.parent_type.item,
                 },
                 Location::new(text_source, client_field_declaration.item.parent_type.span),
             ))?;
@@ -64,8 +64,8 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             ServerEntityName::Scalar(scalar_entity_name) => {
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
-                        literal_type: "field".to_string(),
-                        parent_type_name: (*scalar_entity_name).into(),
+                        literal_type: "field",
+                        parent_object_entity_name: (*scalar_entity_name).into(),
                     },
                     Location::new(text_source, client_field_declaration.item.parent_type.span),
                 ));
@@ -87,7 +87,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             .get(&client_pointer_declaration.item.parent_type.item.0.into())
             .ok_or(WithLocation::new(
                 ProcessClientFieldDeclarationError::ParentTypeNotDefined {
-                    parent_type_name: client_pointer_declaration.item.parent_type.item,
+                    parent_object_entity_name: client_pointer_declaration.item.parent_type.item,
                 },
                 Location::new(
                     text_source,
@@ -101,7 +101,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             .get(&client_pointer_declaration.item.target_type.inner().0.into())
             .ok_or(WithLocation::new(
                 ProcessClientFieldDeclarationError::ParentTypeNotDefined {
-                    parent_type_name: *client_pointer_declaration.item.target_type.inner(),
+                    parent_object_entity_name: *client_pointer_declaration.item.target_type.inner(),
                 },
                 Location::new(
                     text_source,
@@ -127,7 +127,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                 ServerEntityName::Scalar(scalar_entity_name) => {
                     return Err(WithLocation::new(
                         ProcessClientFieldDeclarationError::ClientPointerInvalidTargetType {
-                            target_type_name: (*scalar_entity_name).into(),
+                            target_object_entity_name: (*scalar_entity_name).into(),
                         },
                         Location::new(
                             text_source,
@@ -139,8 +139,8 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             ServerEntityName::Scalar(scalar_entity_name) => {
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
-                        literal_type: "pointer".to_string(),
-                        parent_type_name: (*scalar_entity_name).into(),
+                        literal_type: "pointer",
+                        parent_object_entity_name: (*scalar_entity_name).into(),
                     },
                     Location::new(
                         text_source,
@@ -186,8 +186,8 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             // Did not insert, so this object already has a field with the same name :(
             return Err(WithSpan::new(
                 ProcessClientFieldDeclarationError::ParentAlreadyHasField {
-                    parent_type_name: object.name.item,
-                    client_field_name: client_field_name.0.into(),
+                    parent_object_entity_name: object.name.item,
+                    client_selectable_name: client_field_name.0.into(),
                 },
                 client_field_name_span,
             ));
@@ -322,7 +322,10 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             match id_field {
                 None => Err(WithSpan::new(
                     ProcessClientFieldDeclarationError::ClientPointerTargetTypeHasNoId {
-                        target_type_name: *client_pointer_declaration.item.target_type.inner(),
+                        target_object_entity_name: *client_pointer_declaration
+                            .item
+                            .target_type
+                            .inner(),
                     },
                     client_pointer_declaration.item.target_type.span(),
                 )),
@@ -407,8 +410,8 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             // Did not insert, so this object already has a field with the same name :(
             return Err(WithSpan::new(
                 ProcessClientFieldDeclarationError::ParentAlreadyHasField {
-                    parent_type_name: parent_object_entity_name,
-                    client_field_name: client_pointer_name.0.into(),
+                    parent_object_entity_name,
+                    client_selectable_name: client_pointer_name.0.into(),
                 },
                 client_pointer_name_span,
             ));
@@ -428,9 +431,9 @@ type ProcessClientFieldDeclarationResult<T> =
 
 #[derive(Error, Eq, PartialEq, Debug, Clone)]
 pub enum ProcessClientFieldDeclarationError {
-    #[error("`{parent_type_name}` is not a type that has been defined.")]
+    #[error("`{parent_object_entity_name}` is not a type that has been defined.")]
     ParentTypeNotDefined {
-        parent_type_name: ServerObjectEntityNameWrapper,
+        parent_object_entity_name: ServerObjectEntityNameWrapper,
     },
 
     #[error("Directive `@{directive_name}` is not supported on client pointers.")]
@@ -439,52 +442,52 @@ pub enum ProcessClientFieldDeclarationError {
     },
 
     #[error(
-        "Invalid parent type. `{parent_type_name}` is a scalar. \
+        "Invalid parent type. `{parent_object_entity_name}` is a scalar. \
         You are attempting to define a {literal_type} on it. \
         In order to do so, the parent object must be an object, interface or union."
     )]
     InvalidParentType {
-        literal_type: String,
-        parent_type_name: UnvalidatedTypeName,
+        literal_type: &'static str,
+        parent_object_entity_name: UnvalidatedTypeName,
     },
 
     #[error(
-        "Invalid client pointer target type. `{target_type_name}` is a scalar. \
+        "Invalid client pointer target type. `{target_object_entity_name}` is a scalar. \
         You are attempting to define a pointer to it. \
         In order to do so, the type must be an object, interface or union."
     )]
     ClientPointerInvalidTargetType {
-        target_type_name: UnvalidatedTypeName,
+        target_object_entity_name: UnvalidatedTypeName,
     },
 
     #[error(
-        "Invalid client pointer target type. `{target_type_name}` has no id field. \
+        "Invalid client pointer target type. `{target_object_entity_name}` has no id field. \
         You are attempting to define a pointer to it. \
         In order to do so, the target must be an object implementing the `Node` interface."
     )]
     ClientPointerTargetTypeHasNoId {
-        target_type_name: ServerObjectEntityNameWrapper,
+        target_object_entity_name: ServerObjectEntityNameWrapper,
     },
 
     #[error(
-        "The Isograph object type `{parent_type_name}` already has a field named `{client_field_name}`."
+        "The Isograph object type `{parent_object_entity_name}` already has a field named `{client_selectable_name}`."
     )]
     ParentAlreadyHasField {
-        parent_type_name: ServerObjectEntityName,
-        client_field_name: SelectableName,
+        parent_object_entity_name: ServerObjectEntityName,
+        client_selectable_name: ClientSelectableName,
     },
 
     #[error("Error when deserializing directives. Message: {message}")]
     UnableToDeserializeDirectives { message: DeserializationError },
 
     #[error(
-        "The argument `{argument_name}` on field `{parent_type_name}.{field_name}` \
+        "The argument `{argument_name}` on field `{parent_object_entity_name}.{selectable_name}` \
         has inner type `{argument_type}`, which does not exist."
     )]
     FieldArgumentTypeDoesNotExist {
         argument_name: VariableName,
-        parent_type_name: ServerObjectEntityName,
-        field_name: SelectableName,
+        parent_object_entity_name: ServerObjectEntityName,
+        selectable_name: SelectableName,
         argument_type: UnvalidatedTypeName,
     },
 }
@@ -544,8 +547,8 @@ pub fn id_top_level_arguments() -> Vec<ArgumentKeyAndValue> {
 pub fn validate_variable_definition(
     defined_types: &HashMap<UnvalidatedTypeName, ServerEntityName>,
     variable_definition: WithSpan<VariableDefinition<UnvalidatedTypeName>>,
-    parent_type_name: ServerObjectEntityName,
-    field_name: SelectableName,
+    parent_object_entity_name: ServerObjectEntityName,
+    selectable_name: SelectableName,
 ) -> ProcessClientFieldDeclarationResult<WithSpan<VariableDefinition<ServerEntityName>>> {
     let type_ = variable_definition
         .item
@@ -559,8 +562,8 @@ pub fn validate_variable_definition(
                         ProcessClientFieldDeclarationError::FieldArgumentTypeDoesNotExist {
                             argument_type: input_type_name,
                             argument_name: variable_definition.item.name.item,
-                            parent_type_name,
-                            field_name,
+                            parent_object_entity_name,
+                            selectable_name,
                         },
                         variable_definition.span,
                     )
