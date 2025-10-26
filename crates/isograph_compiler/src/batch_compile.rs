@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
 use crate::{
     SourceError,
@@ -36,23 +36,7 @@ pub fn print_result<TNetworkProtocol: NetworkProtocol + 'static>(
 ) -> Result<(), BatchCompileError<TNetworkProtocol>> {
     match result.item {
         Ok(stats) => {
-            let s_if_plural = |count: usize| {
-                if count == 1 { "" } else { "s" }
-            };
-
-            info!(
-                "Successfully compiled {} client field{}, {} client pointer{}, {} \
-                entrypoint{}, and wrote {} artifact{}, in {}.",
-                stats.client_field_count,
-                s_if_plural(stats.client_field_count),
-                stats.client_pointer_count,
-                s_if_plural(stats.client_pointer_count),
-                stats.entrypoint_count,
-                s_if_plural(stats.entrypoint_count),
-                stats.total_artifacts_written,
-                s_if_plural(stats.total_artifacts_written),
-                pretty_duration(&result.elapsed_time, None)
-            );
+            print_stats(result.elapsed_time, stats);
             Ok(())
         }
         Err(err) => {
@@ -69,6 +53,26 @@ pub fn print_result<TNetworkProtocol: NetworkProtocol + 'static>(
             Err(err)
         }
     }
+}
+
+fn print_stats(elapsed_time: Duration, stats: CompilationStats) {
+    let s_if_plural = |count: usize| {
+        if count == 1 { "" } else { "s" }
+    };
+
+    info!(
+        "Successfully compiled {} client field{}, {} client pointer{}, {} \
+        entrypoint{}, and wrote {} artifact{}, in {}.",
+        stats.client_field_count,
+        s_if_plural(stats.client_field_count),
+        stats.client_pointer_count,
+        s_if_plural(stats.client_pointer_count),
+        stats.entrypoint_count,
+        s_if_plural(stats.entrypoint_count),
+        stats.total_artifacts_written,
+        s_if_plural(stats.total_artifacts_written),
+        pretty_duration(&elapsed_time, None)
+    );
 }
 
 /// This the "workhorse" command of batch compilation.
