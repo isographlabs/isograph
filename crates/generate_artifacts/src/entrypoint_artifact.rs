@@ -25,8 +25,9 @@ use isograph_schema::{
     ScalarClientFieldTraversalState, Schema, ServerObjectEntity, ValidatedVariableDefinition,
     WrappedSelectionMapSelection, create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, get_reachable_variables, initial_variable_context,
+    server_object_entity_named,
 };
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, ops::Deref};
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol + 'static>(
@@ -46,19 +47,27 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol + 
             This is indicative of a bug in Isograph.",
         );
 
+    let memo_ref = server_object_entity_named(db, entrypoint.parent_object_entity_name());
+    let parent_object_entity = &memo_ref
+        .deref()
+        .as_ref()
+        .expect(
+            "Expected validation to have worked. \
+                This is indicative of a bug in Isograph.",
+        )
+        .as_ref()
+        .expect(
+            "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+        )
+        .item;
     let FieldTraversalResult {
         traversal_state,
         merged_selection_map,
         ..
     } = create_merged_selection_map_for_field_and_insert_into_global_map(
         schema,
-        schema
-            .server_entity_data
-            .server_object_entity(entrypoint.parent_object_entity_name)
-            .expect(
-                "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-            ),
+        parent_object_entity,
         entrypoint.selection_set_for_parent_query(),
         encountered_client_type_map,
         DefinitionLocation::Client(SelectionType::Scalar((
@@ -123,13 +132,20 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
                 })
         });
 
-    let parent_object = schema
-        .server_entity_data
-        .server_object_entity(entrypoint.parent_object_entity_name)
+    let memo_ref = server_object_entity_named(db, entrypoint.parent_object_entity_name());
+    let parent_object_entity = &memo_ref
+        .deref()
+        .as_ref()
+        .expect(
+            "Expected validation to have worked. \
+                This is indicative of a bug in Isograph.",
+        )
+        .as_ref()
         .expect(
             "Expected entity to exist. \
-            This is indicative of a bug in Isograph.",
-        );
+                This is indicative of a bug in Isograph.",
+        )
+        .item;
 
     let reachable_variables =
         get_used_variable_definitions(merged_selection_map, variable_definitions);
@@ -236,13 +252,13 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         .unwrap_or(EntrypointDirectiveSet::None(EmptyDirectiveSet {}));
 
     let field_name = query_name.into();
-    let type_name = parent_object.name.item;
+    let type_name = parent_object_entity.name.item;
 
     let entrypoint_file_content = entrypoint_file_content(
         file_extensions,
         query_name,
         &operation_text,
-        parent_object,
+        parent_object_entity,
         &refetch_query_artifact_import,
         concrete_type.name.item,
         &directive_set,
