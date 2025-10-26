@@ -28,7 +28,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                     variant: ClientFieldVariant::Link,
                     type_and_field: ParentObjectEntityNameAndSelectableName {
                         selectable_name: field_name.into(),
-                        server_object_entity_name: object.name.item,
+                        parent_object_entity_name: object.name.item,
                     },
                     refetch_strategy: None,
                     network_protocol: std::marker::PhantomData,

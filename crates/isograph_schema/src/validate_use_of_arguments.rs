@@ -261,7 +261,7 @@ fn validate_all_variables_are_used(
         return Err(WithLocation::new(
             ValidateUseOfArgumentsError::UnusedVariables {
                 unused_variables,
-                type_name: top_level_type_and_field_name.server_object_entity_name,
+                type_name: top_level_type_and_field_name.parent_object_entity_name,
                 field_name: top_level_type_and_field_name.selectable_name,
             },
             location,

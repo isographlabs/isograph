@@ -4,7 +4,7 @@ use crate::{ArtifactFilePrefix, SelectableName, ServerObjectEntityName};
 // that the field is e.g. a scalar field
 #[derive(Debug, PartialEq, Eq, Hash, Ord, PartialOrd, Clone, Copy)]
 pub struct ParentObjectEntityNameAndSelectableName {
-    pub server_object_entity_name: ServerObjectEntityName,
+    pub parent_object_entity_name: ServerObjectEntityName,
     pub selectable_name: SelectableName,
 }
 
@@ -12,7 +12,7 @@ impl ParentObjectEntityNameAndSelectableName {
     pub fn underscore_separated(&self) -> String {
         format!(
             "{}__{}",
-            self.server_object_entity_name, self.selectable_name
+            self.parent_object_entity_name, self.selectable_name
         )
     }
 
@@ -22,7 +22,7 @@ impl ParentObjectEntityNameAndSelectableName {
         file_type: ArtifactFilePrefix,
     ) -> String {
         let ParentObjectEntityNameAndSelectableName {
-            server_object_entity_name: type_name,
+            parent_object_entity_name: type_name,
             selectable_name: field_name,
         } = *self;
         if type_name != current_file_type_name {

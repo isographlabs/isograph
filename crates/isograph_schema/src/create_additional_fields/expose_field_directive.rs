@@ -251,7 +251,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             }),
             variable_definitions: vec![],
             type_and_field: ParentObjectEntityNameAndSelectableName {
-                server_object_entity_name: maybe_abstract_parent_object_entity_name
+                parent_object_entity_name: maybe_abstract_parent_object_entity_name
                     .unchecked_conversion(), // e.g. Pet
                 selectable_name: client_field_scalar_selection_name, // set_pet_best_friend
             },

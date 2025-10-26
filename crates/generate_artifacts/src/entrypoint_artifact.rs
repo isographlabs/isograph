@@ -276,7 +276,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         file_content: format!("export default '{query_text}';"),
         file_name: *QUERY_TEXT_FILE_NAME,
         type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-            server_object_entity_name: type_name,
+            parent_object_entity_name: type_name,
             selectable_name: field_name,
         }),
     });
@@ -292,7 +292,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         ),
         file_name: *NORMALIZATION_AST_FILE_NAME,
         type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-            server_object_entity_name: type_name,
+            parent_object_entity_name: type_name,
             selectable_name: field_name,
         }),
     });
@@ -300,7 +300,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         file_content: entrypoint_file_content,
         file_name: *ENTRYPOINT_FILE_NAME,
         type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-            server_object_entity_name: type_name,
+            parent_object_entity_name: type_name,
             selectable_name: field_name,
         }),
     });
