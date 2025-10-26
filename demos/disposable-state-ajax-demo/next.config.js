@@ -1,4 +1,4 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
+const nextConfig = { transpilePackages: ['@isograph/react-disposable-state'] };
 
 module.exports = nextConfig;
