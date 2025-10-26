@@ -7,9 +7,10 @@ use isograph_lang_types::{ClientFieldDirectiveSet, SelectionType};
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, IsographDatabase,
     LINK_FIELD_NAME, NetworkProtocol, Schema, ServerObjectSelectable, ValidatedSelection,
-    initial_variable_context,
+    initial_variable_context, server_object_entity_named,
 };
 use isograph_schema::{RefetchedPathsMap, UserWrittenClientTypeInfo};
+use std::ops::Deref;
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
 use crate::{
@@ -40,13 +41,21 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol 
 ) -> Vec<ArtifactPathAndContent> {
     let ts_file_extension = file_extensions.ts();
     let user_written_component_variant = info.client_field_directive_set;
-    let parent_object_entity = schema
-        .server_entity_data
-        .server_object_entity(client_selectable.parent_object_entity_name())
+
+    let memo_ref = server_object_entity_named(db, client_selectable.parent_object_entity_name());
+    let parent_object_entity = &memo_ref
+        .deref()
+        .as_ref()
+        .expect(
+            "Expected validation to have worked. \
+                This is indicative of a bug in Isograph.",
+        )
+        .as_ref()
         .expect(
             "Expected entity to exist. \
-            This is indicative of a bug in Isograph.",
-        );
+                This is indicative of a bug in Isograph.",
+        )
+        .item;
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         schema,
