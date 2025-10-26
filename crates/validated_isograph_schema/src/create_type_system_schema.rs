@@ -78,7 +78,7 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
 /// This is sufficient for some queries, like answering "Where is a server field defined."
 #[legacy_memo]
 #[allow(clippy::type_complexity)]
-pub fn create_type_system_schema_with_server_selectables<
+pub(crate) fn create_type_system_schema_with_server_selectables<
     TNetworkProtocol: NetworkProtocol + 'static,
 >(
     db: &IsographDatabase<TNetworkProtocol>,

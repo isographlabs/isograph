@@ -18,7 +18,7 @@ use crate::{
     parse_iso_literal_in_source, process_iso_literals,
 };
 
-pub fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol + 'static>(
+pub(crate) fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     mut unvalidated_isograph_schema: Schema<TNetworkProtocol>,
     mut unprocessed_items: Vec<
