@@ -9,7 +9,7 @@ use isograph_lang_types::{Description, SelectionType};
 use pico::MemoRef;
 
 use crate::{
-    ExposeFieldDirective, MergedSelectionMap, RootOperationName, Schema, ServerObjectEntity,
+    ExposeFieldDirective, MergedSelectionMap, RootOperationName, ServerObjectEntity,
     ServerScalarEntity, ValidatedVariableDefinition, isograph_database::IsographDatabase,
 };
 
@@ -52,8 +52,8 @@ where
     ) -> QueryText;
 
     fn generate_link_type(
-        schema: &Schema<Self>,
-        server_object_entity: &ServerObjectEntityName,
+        db: &IsographDatabase<Self>,
+        server_object_entity_name: &ServerObjectEntityName,
     ) -> String;
 
     // TODO: include `QueryText` to incrementally adopt persisted documents

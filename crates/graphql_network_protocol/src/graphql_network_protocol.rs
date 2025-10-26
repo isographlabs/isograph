@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::ops::Deref;
 
 use common_lang_types::{
     DirectiveName, QueryExtraInfo, QueryOperationName, QueryText, ServerObjectEntityName,
@@ -10,7 +11,7 @@ use intern::string_key::Intern;
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
     ExposeAsFieldToInsert, Format, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome,
-    RootOperationName, Schema, ValidatedVariableDefinition,
+    RootOperationName, ValidatedVariableDefinition, server_object_entity_named,
 };
 use isograph_schema::{IsographDatabase, ServerScalarEntity};
 use lazy_static::lazy_static;
@@ -175,16 +176,23 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
     }
 
     fn generate_link_type<'a>(
-        schema: &Schema<Self>,
-        server_object_entity: &ServerObjectEntityName,
+        db: &IsographDatabase<Self>,
+        server_object_entity_name: &ServerObjectEntityName,
     ) -> String {
-        let server_object_entity = schema
-            .server_entity_data
-            .server_object_entity(*server_object_entity)
+        let memo_ref = server_object_entity_named(db, *server_object_entity_name);
+        let server_object_entity = &memo_ref
+            .deref()
+            .as_ref()
+            .expect(
+                "Expected validation to have worked. \
+                This is indicative of a bug in Isograph.",
+            )
+            .as_ref()
             .expect(
                 "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-            );
+            )
+            .item;
 
         if let Some(concrete_type) = server_object_entity.concrete_type {
             return format!("Link<\"{concrete_type}\">");

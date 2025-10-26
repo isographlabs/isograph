@@ -391,7 +391,6 @@ pub(crate) fn generate_eager_reader_output_type_artifact<
     TNetworkProtocol: NetworkProtocol + 'static,
 >(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
     client_field: &ClientSelectable<TNetworkProtocol>,
     config: &CompilerConfig,
     info: UserWrittenClientTypeInfo,
@@ -419,7 +418,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<
         SelectionType::Object(_) => {
             ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
         }
-        SelectionType::Scalar(client_field) => generate_output_type(schema, client_field),
+        SelectionType::Scalar(client_field) => generate_output_type(db, client_field),
     };
 
     let output_type_text = format!(
@@ -454,7 +453,6 @@ pub(crate) fn generate_eager_reader_output_type_artifact<
 
 pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ArtifactPathAndContent {
     let memo_ref = server_object_entity_named(db, client_field.parent_object_entity_name());
@@ -472,7 +470,7 @@ pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtoc
         )
         .item;
 
-    let client_field_output_type = generate_output_type(schema, client_field);
+    let client_field_output_type = generate_output_type(db, client_field);
 
     let output_type_text = format!(
         "import type {{ Link }} from '@isograph/react';\n\

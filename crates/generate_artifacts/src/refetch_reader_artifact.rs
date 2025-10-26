@@ -3,8 +3,8 @@ use common_lang_types::{ArtifactPathAndContent, ParentObjectEntityNameAndSelecta
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
-    ClientScalarOrObjectSelectable, ClientScalarSelectable, FieldMapItem, NetworkProtocol,
-    RefetchedPathsMap, Schema, initial_variable_context,
+    ClientScalarOrObjectSelectable, ClientScalarSelectable, FieldMapItem, IsographDatabase,
+    NetworkProtocol, RefetchedPathsMap, Schema, initial_variable_context,
 };
 
 use crate::{
@@ -79,10 +79,10 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
 }
 
 pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkProtocol + 'static>(
-    schema: &Schema<TNetworkProtocol>,
+    db: &IsographDatabase<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ArtifactPathAndContent {
-    let client_field_output_type = generate_output_type(schema, client_field);
+    let client_field_output_type = generate_output_type(db, client_field);
 
     let output_type_text = {
         let output_type = client_field_output_type;

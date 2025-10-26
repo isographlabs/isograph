@@ -440,7 +440,6 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol + 'stati
             SelectionType::Object(client_pointer) => {
                 Some(generate_eager_reader_output_type_artifact(
                     db,
-                    schema,
                     &SelectionType::Object(client_pointer),
                     config,
                     UserWrittenClientTypeInfo {
@@ -455,12 +454,11 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol + 'stati
             }
             SelectionType::Scalar(client_field) => match client_field.variant {
                 ClientFieldVariant::Link => {
-                    Some(generate_link_output_type_artifact(db, schema, client_field))
+                    Some(generate_link_output_type_artifact(db, client_field))
                 }
                 ClientFieldVariant::UserWritten(info) => {
                     Some(generate_eager_reader_output_type_artifact(
                         db,
-                        schema,
                         &SelectionType::Scalar(client_field),
                         config,
                         info,
@@ -468,7 +466,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol + 'stati
                     ))
                 }
                 ClientFieldVariant::ImperativelyLoadedField(_) => {
-                    Some(generate_refetch_output_type_artifact(schema, client_field))
+                    Some(generate_refetch_output_type_artifact(db, client_field))
                 }
             },
         };
@@ -617,13 +615,13 @@ fn get_serialized_field_argument(
 }
 
 pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol + 'static>(
-    schema: &Schema<TNetworkProtocol>,
+    db: &IsographDatabase<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ClientFieldOutputType {
     let variant = &client_field.variant;
     match variant {
         ClientFieldVariant::Link => ClientFieldOutputType(TNetworkProtocol::generate_link_type(
-            schema,
+            db,
             &client_field.parent_object_entity_name,
         )),
         ClientFieldVariant::UserWritten(info) => match info.client_field_directive_set {
