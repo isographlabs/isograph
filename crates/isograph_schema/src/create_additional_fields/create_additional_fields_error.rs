@@ -40,7 +40,7 @@ impl FieldMapItem {
 // TODO this should be a different type.
 pub(crate) struct ProcessedFieldMapItem(pub FieldMapItem);
 
-pub(crate) type ProcessTypeDefinitionResult<T, TNetworkProtocol> =
+pub type ProcessTypeDefinitionResult<T, TNetworkProtocol> =
     Result<T, CreateAdditionalFieldsError<TNetworkProtocol>>;
 
 /// Errors that make semantic sense when referring to creating a GraphQL schema in-memory representation

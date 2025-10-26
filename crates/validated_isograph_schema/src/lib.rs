@@ -1,3 +1,4 @@
+mod add_link_fields;
 mod add_selection_sets;
 mod create_type_system_schema;
 mod get_validated_schema;

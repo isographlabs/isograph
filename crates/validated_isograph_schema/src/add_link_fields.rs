@@ -1,21 +1,19 @@
 use std::ops::Deref;
 
-use crate::{
-    ClientFieldVariant, ClientScalarSelectable, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol,
-    Schema, server_object_entities,
-};
 use common_lang_types::{Location, ParentObjectEntityNameAndSelectableName, WithLocation};
 use intern::string_key::Intern;
 use isograph_lang_types::{DefinitionLocation, Description, SelectionType};
-
-use super::create_additional_fields_error::{
-    CreateAdditionalFieldsError, ProcessTypeDefinitionResult,
+use isograph_schema::{
+    ClientFieldVariant, ClientScalarSelectable, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol,
+    Schema, server_object_entities,
 };
+
+use crate::ProcessIsoLiteralsForSchemaError;
 
 pub fn add_link_fields<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
-) -> ProcessTypeDefinitionResult<(), TNetworkProtocol> {
+) -> Result<(), ProcessIsoLiteralsForSchemaError> {
     let mut selectables_to_process = vec![];
     let memo_ref = server_object_entities(db);
     for object in memo_ref
@@ -23,7 +21,7 @@ pub fn add_link_fields<TNetworkProtocol: NetworkProtocol + 'static>(
         .as_ref()
         .expect(
             "Expected validation to have worked. \
-                This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         )
         .iter()
     {
@@ -76,7 +74,7 @@ pub fn add_link_fields<TNetworkProtocol: NetworkProtocol + 'static>(
             .is_some()
         {
             return Err(
-                CreateAdditionalFieldsError::CompilerCreatedFieldExistsOnType {
+                ProcessIsoLiteralsForSchemaError::CompilerCreatedFieldExistsOnType {
                     selectable_name: field_name.into(),
                     parent_object_entity_name: object_entity_name.item,
                 },
