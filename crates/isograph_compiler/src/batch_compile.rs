@@ -1,9 +1,8 @@
 use std::{ops::Deref, path::PathBuf};
 
 use crate::{
-    GetValidatedSchemaError, SourceError,
+    SourceError,
     compiler_state::CompilerState,
-    get_validated_schema,
     with_duration::WithDuration,
     write_artifacts::{GenerateArtifactsError, write_artifacts_to_disk},
 };
@@ -14,6 +13,7 @@ use isograph_schema::{IsographDatabase, NetworkProtocol};
 use pretty_duration::pretty_duration;
 use thiserror::Error;
 use tracing::{error, info};
+use validated_isograph_schema::GetValidatedSchemaError;
 
 pub struct CompilationStats {
     pub client_field_count: usize,
@@ -76,7 +76,7 @@ pub fn print_result<TNetworkProtocol: NetworkProtocol + 'static>(
 pub fn compile<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<CompilationStats, BatchCompileError<TNetworkProtocol>> {
-    let validated_schema = get_validated_schema(db);
+    let validated_schema = validated_isograph_schema::get_validated_schema(db);
     let (isograph_schema, stats) = match validated_schema.deref() {
         Ok((schema, stats)) => (schema, stats),
         Err(e) => return Err(e.clone().into()),

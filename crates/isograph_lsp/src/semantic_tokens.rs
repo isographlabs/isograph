@@ -8,10 +8,7 @@ use crate::{
 use common_lang_types::{
     Span, TextSource, WithSpan, relative_path_from_absolute_and_working_directory,
 };
-use isograph_compiler::{
-    CompilerState, parse_iso_literals_in_file_content_and_return_all,
-    read_iso_literals_source_from_relative_path,
-};
+use isograph_compiler::CompilerState;
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::IsographSemanticToken;
 use isograph_schema::{IsographDatabase, NetworkProtocol};
@@ -21,6 +18,9 @@ use lsp_types::{
     request::{Request, SemanticTokensFullRequest},
 };
 use pico_macros::legacy_memo;
+use validated_isograph_schema::{
+    parse_iso_literals_in_file_content_and_return_all, read_iso_literals_source_from_relative_path,
+};
 
 pub fn on_semantic_token_full_request<TNetworkProtocol: NetworkProtocol + 'static>(
     compiler_state: &CompilerState<TNetworkProtocol>,

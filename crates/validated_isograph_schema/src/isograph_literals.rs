@@ -25,6 +25,10 @@ use thiserror::Error;
 
 use crate::process_iso_literals::ParsedIsoLiteralsMap;
 
+/**
+ * TODO: Most of these functions do not belong here. Move them back to isograph-compiler
+ */
+
 pub fn read_files_in_folder(
     folder: &Path,
     current_working_directory: CurrentWorkingDirectory,

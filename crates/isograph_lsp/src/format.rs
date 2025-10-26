@@ -4,10 +4,7 @@ use common_lang_types::{
     CurrentWorkingDirectory, RelativePathToSourceFile,
     relative_path_from_absolute_and_working_directory,
 };
-use isograph_compiler::{
-    CompilerState, IsoLiteralExtraction, extract_iso_literals_from_file_content,
-    process_iso_literal_extraction, read_iso_literals_source_from_relative_path,
-};
+use isograph_compiler::CompilerState;
 use isograph_lang_types::{
     InlineBehavior, LineBehavior, SpaceAfter, SpaceBefore, semantic_token_legend::IndentChange,
 };
@@ -17,6 +14,10 @@ use lsp_types::{
     request::{Formatting, Request},
 };
 use pico_macros::legacy_memo;
+use validated_isograph_schema::{
+    IsoLiteralExtraction, extract_iso_literals_from_file_content, process_iso_literal_extraction,
+    read_iso_literals_source_from_relative_path,
+};
 
 use crate::{lsp_runtime_error::LSPRuntimeResult, uri_file_path_ext::UriFilePathExt};
 

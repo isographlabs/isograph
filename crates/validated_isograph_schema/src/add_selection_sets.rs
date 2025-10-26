@@ -77,12 +77,12 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol + 'st
         .as_ref()
         .expect(
             "Expected validation to have worked. \
-                This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         )
         .as_ref()
         .expect(
             "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         )
         .item;
 

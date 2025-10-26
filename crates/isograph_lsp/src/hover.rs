@@ -3,11 +3,7 @@ use std::ops::Deref;
 use common_lang_types::{
     SelectableName, ServerObjectEntityName, Span, relative_path_from_absolute_and_working_directory,
 };
-use isograph_compiler::{
-    CompilerState, IsoLiteralExtraction, extract_iso_literals_from_file_content,
-    get_validated_schema, process_iso_literal_extraction,
-    read_iso_literals_source_from_relative_path,
-};
+use isograph_compiler::CompilerState;
 use isograph_lang_types::{Description, IsographResolvedNode, VariableDefinition};
 use isograph_schema::{
     IsographDatabase, NetworkProtocol, SelectableTrait, ServerEntityName, ServerObjectEntity,
@@ -20,6 +16,10 @@ use lsp_types::{
 };
 use pico_macros::legacy_memo;
 use resolve_position::ResolvePosition;
+use validated_isograph_schema::{
+    IsoLiteralExtraction, extract_iso_literals_from_file_content, get_validated_schema,
+    process_iso_literal_extraction, read_iso_literals_source_from_relative_path,
+};
 
 use crate::{
     lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult},

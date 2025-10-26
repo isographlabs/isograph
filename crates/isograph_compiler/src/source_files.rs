@@ -13,11 +13,9 @@ use isograph_config::absolute_and_relative_paths;
 use isograph_schema::{IsographDatabase, NetworkProtocol, SchemaSource, StandardSources};
 use pico::{Database, SourceId};
 use thiserror::Error;
+use validated_isograph_schema::{ReadFileError, read_file, read_files_in_folder};
 
-use crate::{
-    isograph_literals::{ReadFileError, read_file, read_files_in_folder},
-    watch::{ChangedFileKind, SourceEventKind, SourceFileEvent},
-};
+use crate::watch::{ChangedFileKind, SourceEventKind, SourceFileEvent};
 
 pub fn initialize_sources<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &mut IsographDatabase<TNetworkProtocol>,
@@ -164,6 +162,7 @@ fn create_or_update_iso_literals<TNetworkProtocol: NetworkProtocol + 'static>(
     path: &Path,
 ) -> Result<(), SourceError> {
     let (relative_path, content) =
+        // TODO this function should live here
         read_file(path.to_path_buf(), db.get_current_working_directory())?;
     db.insert_iso_literal(relative_path, content);
     Ok(())
@@ -277,6 +276,7 @@ fn read_iso_literals_from_folder<TNetworkProtocol: NetworkProtocol + 'static>(
     folder: &Path,
 ) -> Result<(), SourceError> {
     for (relative_path, content) in
+        // TODO this function should live here
         read_files_in_folder(folder, db.get_current_working_directory())?
     {
         db.insert_iso_literal(relative_path, content);

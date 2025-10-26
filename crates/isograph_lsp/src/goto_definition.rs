@@ -5,10 +5,7 @@ use crate::{
     uri_file_path_ext::UriFilePathExt,
 };
 use common_lang_types::{Span, relative_path_from_absolute_and_working_directory};
-use isograph_compiler::{
-    CompilerState, get_validated_schema, process_iso_literal_extraction,
-    read_iso_literals_source_from_relative_path,
-};
+use isograph_compiler::CompilerState;
 use isograph_lang_types::{
     ClientObjectSelectableNameWrapperParent, ClientScalarSelectableNameWrapperParent,
     DefinitionLocation, IsographResolvedNode,
@@ -25,6 +22,10 @@ use lsp_types::{
 use pico_macros::legacy_memo;
 use resolve_position::ResolvePosition;
 use std::ops::Deref;
+use validated_isograph_schema::{
+    get_validated_schema, process_iso_literal_extraction,
+    read_iso_literals_source_from_relative_path,
+};
 
 pub fn on_goto_definition<TNetworkProtocol: NetworkProtocol + 'static>(
     compiler_state: &CompilerState<TNetworkProtocol>,
