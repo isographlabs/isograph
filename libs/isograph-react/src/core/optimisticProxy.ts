@@ -376,6 +376,16 @@ function compareData(
   newData: StoreLayerData,
   encounteredIds: EncounteredIds,
 ): void {
+  const oldDataTypeNames = new Set(Object.keys(oldData));
+  const newDataTypeNames = new Set(Object.keys(newData));
+
+  for (const oldTypeName of oldDataTypeNames.difference(newDataTypeNames)) {
+    const set = insertEmptySetIfMissing(encounteredIds, oldTypeName);
+    for (const id in oldData[oldTypeName]) {
+      set.add(id);
+    }
+  }
+
   for (const [typeName, newRecords] of Object.entries(newData)) {
     if (!newRecords) {
       continue;

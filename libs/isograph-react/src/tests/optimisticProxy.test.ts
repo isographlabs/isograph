@@ -185,6 +185,27 @@ describe('optimisticLayer', () => {
       );
     });
 
+    test('calls subscriptions if reverted unrelated field', () => {
+      const revert = addOptimisticStoreLayerInner(environment, () => ({
+        data: { Pet: { 1: { surname: 'foo' } } },
+        encounteredIds: new Map([['Pet', new Set(['1'])]]),
+      }));
+      addNetworkResponseStoreLayerInner(
+        environment,
+        { Query: { __ROOT: { name: 'foo' } } },
+        CHANGES,
+      );
+
+      revert({});
+
+      expect(callSubscriptions).toHaveBeenCalledTimes(4);
+      expect(callSubscriptions).toHaveBeenNthCalledWith(
+        4,
+        expect.anything(),
+        new Map([['Pet', new Set(['1'])]]),
+      );
+    });
+
     test('has parent BaseStoreLayer and child node', () => {
       const revert = addOptimisticStoreLayer(
         environment,
