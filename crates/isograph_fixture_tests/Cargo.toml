@@ -11,7 +11,6 @@ path = "src/main.rs"
 [dependencies]
 common_lang_types = { path = "../common_lang_types" }
 intern = { path = "../../relay-crates/intern" }
-isograph_compiler = { path = "../isograph_compiler" }
 isograph_config = { path = "../isograph_config" }
 graphql_network_protocol = { path = "../graphql_network_protocol" }
 isograph_lang_types = { path = "../isograph_lang_types" }
