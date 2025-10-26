@@ -4,7 +4,7 @@ use std::{
 };
 
 use pico::{Database, SourceId, Storage};
-use pico_macros::{Db, Source, memo};
+use pico_macros::{Db, Source, legacy_memo};
 
 static UNTRACKED_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static TRACKED_COUNTER: AtomicUsize = AtomicUsize::new(0);

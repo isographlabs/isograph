@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use pico::{MemoRef, Storage};
-use pico_macros::{Db, memo};
+use pico_macros::{Db, legacy_memo};
 
 static OUTPUT_CLONE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 

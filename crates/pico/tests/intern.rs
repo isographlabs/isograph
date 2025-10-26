@@ -1,5 +1,5 @@
 use pico::{Database, MemoRef, SourceId, Storage};
-use pico_macros::{Db, Source, memo};
+use pico_macros::{Db, Source, legacy_memo};
 use thiserror::Error;
 
 #[derive(Db, Default)]

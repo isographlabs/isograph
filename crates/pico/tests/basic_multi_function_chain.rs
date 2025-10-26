@@ -4,7 +4,7 @@ use std::sync::{
 };
 
 use pico::{Database, MemoRef, SourceId, Storage};
-use pico_macros::{Db, Source, memo};
+use pico_macros::{Db, Source, legacy_memo};
 
 static FIRST_LETTER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static CAPITALIZED_LETTER_COUNTER: AtomicUsize = AtomicUsize::new(0);

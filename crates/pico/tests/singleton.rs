@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use pico::{Database, Storage};
-use pico_macros::{Db, Singleton, memo};
+use pico_macros::{Db, Singleton, legacy_memo};
 
 static FIRST_LETTER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use pico::{Database, SourceId, Storage};
-use pico_macros::{Db, Source, memo};
+use pico_macros::{Db, Source, legacy_memo};
 
 #[derive(Default)]
 pub struct TestMap(HashMap<String, SourceId<Input>>);
