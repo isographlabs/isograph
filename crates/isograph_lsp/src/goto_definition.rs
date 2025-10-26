@@ -99,7 +99,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 };
 
                 if let Ok((_, selectable)) =
-                    get_parent_and_selectable_for_scalar_path(&scalar_path, validated_schema)
+                    get_parent_and_selectable_for_scalar_path(db, &scalar_path, validated_schema)
                 {
                     match selectable {
                         DefinitionLocation::Server(server_selectable) => server_selectable
@@ -147,7 +147,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 };
 
                 if let Ok((_, selectable)) =
-                    get_parent_and_selectable_for_object_path(&object_path, validated_schema)
+                    get_parent_and_selectable_for_object_path(db, &object_path, validated_schema)
                 {
                     match selectable {
                         DefinitionLocation::Server(server_selectable) => server_selectable
