@@ -91,7 +91,10 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol + 
             .iter()
             .map(|variable_definition| &variable_definition.item)
             .collect(),
-        &schema.find_mutation(),
+        &schema
+            .fetchable_types
+            .iter()
+            .find(|(_, root_operation_name)| root_operation_name.0 == "mutation"),
         file_extensions,
         persisted_documents,
     )

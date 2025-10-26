@@ -95,12 +95,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         }
     }
 
-    pub fn find_mutation(&self) -> Option<(&ServerObjectEntityName, &RootOperationName)> {
-        self.fetchable_types
-            .iter()
-            .find(|(_, root_operation_name)| root_operation_name.0 == "mutation")
-    }
-
     pub fn find_query(&self) -> Option<(&ServerObjectEntityName, &RootOperationName)> {
         self.fetchable_types
             .iter()
