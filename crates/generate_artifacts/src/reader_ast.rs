@@ -132,16 +132,9 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
                         }
                         .normalization_key(),
                         ServerObjectSelectableVariant::InlineFragment => {
-                            let target_object_entity = schema
-                                .server_entity_data
-                                .server_object_entity(
-                                    *server_object_selectable.target_object_entity.inner(),
-                                )
-                                .expect(
-                                    "Expected entity to exist. \
-                                    This is indicative of a bug in Isograph.",
-                                );
-                            NormalizationKey::InlineFragment(target_object_entity.name.item)
+                            NormalizationKey::InlineFragment(
+                                *server_object_selectable.target_object_entity.inner(),
+                            )
                         }
                     };
 
@@ -235,17 +228,9 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
                 );
             match &server_field.object_selectable_variant {
                 ServerObjectSelectableVariant::InlineFragment => {
-                    let object = schema
-                        .server_entity_data
-                        .server_object_entity(server_field.parent_object_entity_name)
-                        .expect(
-                            "Expected entity to exist. \
-                            This is indicative of a bug in Isograph.",
-                        );
-
                     let type_and_field = ParentObjectEntityNameAndSelectableName {
                         field_name: linked_field.name.item.into(),
-                        type_name: object.name.item,
+                        type_name: server_field.parent_object_entity_name,
                     };
 
                     let reader_artifact_import_name =
@@ -871,16 +856,9 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol + 'static>(
                                 }
                                 .normalization_key(),
                                 ServerObjectSelectableVariant::InlineFragment => {
-                                    let target_object_entity = schema
-                                        .server_entity_data
-                                        .server_object_entity(
-                                            *server_object_selectable.target_object_entity.inner(),
-                                        )
-                                        .expect(
-                                            "Expected entity to exist. \
-                                            This is indicative of a bug in Isograph.",
-                                        );
-                                    NormalizationKey::InlineFragment(target_object_entity.name.item)
+                                    NormalizationKey::InlineFragment(
+                                        *server_object_selectable.target_object_entity.inner(),
+                                    )
                                 }
                             };
 
