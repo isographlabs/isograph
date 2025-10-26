@@ -177,6 +177,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol 
 pub(crate) fn generate_eager_reader_condition_artifact<
     TNetworkProtocol: NetworkProtocol + 'static,
 >(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     server_object_selectable: &ServerObjectSelectable<TNetworkProtocol>,
     inline_fragment_reader_selections: &[WithSpan<ValidatedSelection>],
@@ -185,21 +186,37 @@ pub(crate) fn generate_eager_reader_condition_artifact<
 ) -> ArtifactPathAndContent {
     let server_object_selectable_name = server_object_selectable.name.item;
 
-    let parent_object_entity = schema
-        .server_entity_data
-        .server_object_entity(server_object_selectable.parent_object_entity_name)
+    let memo_ref =
+        server_object_entity_named(db, server_object_selectable.parent_object_entity_name);
+    let parent_object_entity = &memo_ref
+        .deref()
+        .as_ref()
         .expect(
-            "Expected entity to exist. \
-            This is indicative of a bug in Isograph.",
-        );
-
-    let concrete_type = schema
-        .server_entity_data
-        .server_object_entity(*server_object_selectable.target_object_entity.inner())
-        .expect(
-            "Expected entity to exist. \
-            This is indicative of a bug in Isograph.",
+            "Expected validation to have worked. \
+                This is indicative of a bug in Isograph.",
         )
+        .as_ref()
+        .expect(
+            "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+        )
+        .item;
+
+    let concrete_type_memo_ref =
+        server_object_entity_named(db, *server_object_selectable.target_object_entity.inner());
+    let concrete_type = &concrete_type_memo_ref
+        .deref()
+        .as_ref()
+        .expect(
+            "Expected validation to have worked. \
+                This is indicative of a bug in Isograph.",
+        )
+        .as_ref()
+        .expect(
+            "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+        )
+        .item
         .name
         .item;
 
@@ -261,13 +278,21 @@ pub(crate) fn generate_eager_reader_param_type_artifact<
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
     let ts_file_extension = file_extensions.ts();
-    let parent_type = schema
-        .server_entity_data
-        .server_object_entity(client_scalar_selectable.parent_object_entity_name())
+    let memo_ref =
+        server_object_entity_named(db, client_scalar_selectable.parent_object_entity_name());
+    let parent_object_entity = &memo_ref
+        .deref()
+        .as_ref()
+        .expect(
+            "Expected validation to have worked. \
+                This is indicative of a bug in Isograph.",
+        )
+        .as_ref()
         .expect(
             "Expected entity to exist. \
-            This is indicative of a bug in Isograph.",
-        );
+                This is indicative of a bug in Isograph.",
+        )
+        .item;
 
     let mut param_type_imports = BTreeSet::new();
     let mut loadable_fields = BTreeSet::new();
@@ -294,7 +319,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<
         param_type_imports_to_import_statement(&param_type_imports, file_extensions);
     let reader_param_type = format!(
         "{}__{}__param",
-        parent_type.name.item,
+        parent_object_entity.name.item,
         client_scalar_selectable.name()
     );
 
@@ -321,7 +346,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<
     {
         let reader_parameters_type = format!(
             "{}__{}__parameters",
-            parent_type.name.item,
+            parent_object_entity.name.item,
             client_scalar_selectable.name()
         );
         (
@@ -356,7 +381,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<
         file_name: *RESOLVER_PARAM_TYPE_FILE_NAME,
         file_content: param_type_content,
         type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-            type_name: parent_type.name.item,
+            type_name: parent_object_entity.name.item,
             field_name: client_scalar_selectable.name().into(),
         }),
     }
@@ -365,19 +390,27 @@ pub(crate) fn generate_eager_reader_param_type_artifact<
 pub(crate) fn generate_eager_reader_output_type_artifact<
     TNetworkProtocol: NetworkProtocol + 'static,
 >(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     client_field: &ClientSelectable<TNetworkProtocol>,
     config: &CompilerConfig,
     info: UserWrittenClientTypeInfo,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
-    let parent_type = schema
-        .server_entity_data
-        .server_object_entity(client_field.parent_object_entity_name())
+    let memo_ref = server_object_entity_named(db, client_field.parent_object_entity_name());
+    let parent_object_entity = &memo_ref
+        .deref()
+        .as_ref()
+        .expect(
+            "Expected validation to have worked. \
+                This is indicative of a bug in Isograph.",
+        )
+        .as_ref()
         .expect(
             "Expected entity to exist. \
-            This is indicative of a bug in Isograph.",
-        );
+                This is indicative of a bug in Isograph.",
+        )
+        .item;
 
     let function_import_statement =
         generate_function_import_statement(config, info, file_extensions);
@@ -393,7 +426,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<
         "import type React from 'react';\n\
         {function_import_statement}\n\
         export type {}__{}__output_type = {};",
-        parent_type.name.item,
+        parent_object_entity.name.item,
         client_field.name(),
         client_field_output_type
     );
@@ -413,30 +446,38 @@ pub(crate) fn generate_eager_reader_output_type_artifact<
         file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
         file_content: final_output_type_text,
         type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-            type_name: parent_type.name.item,
+            type_name: parent_object_entity.name.item,
             field_name: client_field.name().into(),
         }),
     }
 }
 
 pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ArtifactPathAndContent {
-    let parent_type = schema
-        .server_entity_data
-        .server_object_entity(client_field.parent_object_entity_name())
+    let memo_ref = server_object_entity_named(db, client_field.parent_object_entity_name());
+    let parent_object_entity = &memo_ref
+        .deref()
+        .as_ref()
+        .expect(
+            "Expected validation to have worked. \
+                This is indicative of a bug in Isograph.",
+        )
+        .as_ref()
         .expect(
             "Expected entity to exist. \
-            This is indicative of a bug in Isograph.",
-        );
+                This is indicative of a bug in Isograph.",
+        )
+        .item;
 
     let client_field_output_type = generate_output_type(schema, client_field);
 
     let output_type_text = format!(
         "import type {{ Link }} from '@isograph/react';\n\
         export type {}__{}__output_type = {};",
-        parent_type.name.item,
+        parent_object_entity.name.item,
         client_field.name(),
         client_field_output_type
     );
@@ -445,7 +486,7 @@ pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtoc
         file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
         file_content: output_type_text,
         type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-            type_name: parent_type.name.item,
+            type_name: parent_object_entity.name.item,
             field_name: client_field.name().into(),
         }),
     }

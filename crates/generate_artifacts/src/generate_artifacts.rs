@@ -186,6 +186,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol + 'stati
                     ServerObjectSelectableVariant::LinkedField => {}
                     ServerObjectSelectableVariant::InlineFragment => {
                         path_and_contents.push(generate_eager_reader_condition_artifact(
+                            db,
                             schema,
                             server_object_selectable,
                             &inline_fragment_reader_selection_set(schema, server_object_selectable),
@@ -428,6 +429,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol + 'stati
         let artifact_path_and_content = match client_type {
             SelectionType::Object(client_pointer) => {
                 Some(generate_eager_reader_output_type_artifact(
+                    db,
                     schema,
                     &SelectionType::Object(client_pointer),
                     config,
@@ -443,10 +445,11 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol + 'stati
             }
             SelectionType::Scalar(client_field) => match client_field.variant {
                 ClientFieldVariant::Link => {
-                    Some(generate_link_output_type_artifact(schema, client_field))
+                    Some(generate_link_output_type_artifact(db, schema, client_field))
                 }
                 ClientFieldVariant::UserWritten(info) => {
                     Some(generate_eager_reader_output_type_artifact(
+                        db,
                         schema,
                         &SelectionType::Scalar(client_field),
                         config,
