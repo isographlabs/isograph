@@ -53,6 +53,26 @@ pub fn server_entities_named<TNetworkProtocol: NetworkProtocol + 'static>(
         .collect::<Vec<_>>())
 }
 
+#[legacy_memo]
+pub fn server_object_entities<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+) -> Result<
+    Vec<WithLocation<ServerObjectEntity<TNetworkProtocol>>>,
+    TNetworkProtocol::ParseTypeSystemDocumentsError,
+> {
+    let memo_ref = TNetworkProtocol::parse_type_system_documents(db);
+    let (outcome, _) = match memo_ref.deref() {
+        Ok(outcome) => outcome,
+        Err(e) => return Err(e.clone()),
+    };
+
+    Ok(outcome
+        .iter()
+        .filter_map(|x| x.as_ref().as_object())
+        .map(|x| x.server_object_entity.clone())
+        .collect())
+}
+
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum EntityAccessError<TNetworkProtocol: NetworkProtocol + 'static> {
     #[error("{0}")]
