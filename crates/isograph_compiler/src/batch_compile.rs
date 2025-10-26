@@ -72,36 +72,6 @@ pub fn print_result<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 /// This the "workhorse" command of batch compilation.
-///
-/// ## Overall plan
-///
-/// When the compiler runs in batch mode, we must do the following things. This
-/// description is a bit simplified.
-///
-/// - Read and parse things:
-///   - Read and parse the GraphQL schema
-///   - Read and parse the Isograph literals
-/// - Combine everything into an Schema.
-/// - Turn the Schema into a Schema
-///   - Note: at this point, we do most of the validations, like ensuring that
-///     all selected fields exist and are of the correct types, parameters are
-///     passed when needed, etc.
-/// - Generate an in-memory representation of all of the generated files
-///   (called artifacts). This step should not fail. It should panic if any
-///   invariant is violated, or represent that invariant in the type system.
-/// - Delete and recreate the artifacts on disk.
-///
-/// ## Additional things we do
-///
-/// In addition to the things we do above, we also do some specific things like:
-///
-/// - if a client field is defined on an interface, add it to each concrete
-///   type. So, if User implements Actor, you can define Actor.NameDisplay, and
-///   select User.NameDisplay
-/// - create fields from exposeAs directives
-///
-/// These are less "core" to the overall mission, and thus invite the question
-/// of whether they belong in this function, or at all.
 #[tracing::instrument(skip(db))]
 pub fn compile<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
