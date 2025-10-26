@@ -211,30 +211,36 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     let normalization_ast_text =
         generate_normalization_ast_text(schema, merged_selection_map.values(), 1);
 
-    let concrete_type = schema
-        .server_entity_data
-        .server_object_entity(
-            if schema
-                .fetchable_types
-                .contains_key(&entrypoint.parent_object_entity_name)
-            {
-                entrypoint.parent_object_entity_name
-            } else {
-                *default_root_operation
-                    .map(|(operation_id, _)| operation_id)
-                    .unwrap_or_else(|| {
-                        schema
-                            .fetchable_types
-                            .keys()
-                            .next()
-                            .expect("Expected at least one fetchable type to exist")
-                    })
-            },
+    let concrete_type_entity_name = if schema
+        .fetchable_types
+        .contains_key(&entrypoint.parent_object_entity_name)
+    {
+        entrypoint.parent_object_entity_name
+    } else {
+        *default_root_operation
+            .map(|(operation_id, _)| operation_id)
+            .unwrap_or_else(|| {
+                schema
+                    .fetchable_types
+                    .keys()
+                    .next()
+                    .expect("Expected at least one fetchable type to exist")
+            })
+    };
+    let memo_ref = server_object_entity_named(db, concrete_type_entity_name);
+    let concrete_object_entity = &memo_ref
+        .deref()
+        .as_ref()
+        .expect(
+            "Expected validation to have worked. \
+                This is indicative of a bug in Isograph.",
         )
+        .as_ref()
         .expect(
             "Expected entity to exist. \
-            This is indicative of a bug in Isograph.",
-        );
+                This is indicative of a bug in Isograph.",
+        )
+        .item;
 
     let operation_text = generate_operation_text(
         db,
@@ -242,7 +248,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         merged_selection_map,
         reachable_variables.iter().copied(),
         root_operation_name,
-        concrete_type.name.item,
+        concrete_object_entity.name.item,
         persisted_documents,
         1,
     );
@@ -260,7 +266,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         &operation_text,
         parent_object_entity,
         &refetch_query_artifact_import,
-        concrete_type.name.item,
+        concrete_object_entity.name.item,
         &directive_set,
     );
 
