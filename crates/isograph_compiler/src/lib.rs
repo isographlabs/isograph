@@ -1,5 +1,6 @@
 pub mod batch_compile;
 mod compiler_state;
+mod read_files;
 mod source_files;
 pub mod watch;
 mod with_duration;

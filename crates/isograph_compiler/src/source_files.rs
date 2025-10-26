@@ -13,9 +13,11 @@ use isograph_config::absolute_and_relative_paths;
 use isograph_schema::{IsographDatabase, NetworkProtocol, SchemaSource, StandardSources};
 use pico::{Database, SourceId};
 use thiserror::Error;
-use validated_isograph_schema::{ReadFileError, read_file, read_files_in_folder};
 
-use crate::watch::{ChangedFileKind, SourceEventKind, SourceFileEvent};
+use crate::{
+    read_files::{ReadFileError, read_file, read_files_in_folder},
+    watch::{ChangedFileKind, SourceEventKind, SourceFileEvent},
+};
 
 pub fn initialize_sources<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &mut IsographDatabase<TNetworkProtocol>,
