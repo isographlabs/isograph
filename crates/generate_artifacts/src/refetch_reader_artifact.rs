@@ -26,13 +26,6 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
 ) -> ArtifactPathAndContent {
     let read_out_data = get_read_out_data(field_map);
     let function_import_statement = generate_function_import_statement(read_out_data);
-    let parent_type = schema
-        .server_entity_data
-        .server_object_entity(client_field.parent_object_entity_name)
-        .expect(
-            "Expected entity to exist. \
-            This is indicative of a bug in Isograph.",
-        );
 
     let empty_selection_set = vec![];
 
@@ -79,7 +72,7 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
         file_name: *REFETCH_READER_FILE_NAME,
         file_content: reader_content,
         type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-            type_name: parent_type.name.item,
+            type_name: client_field.parent_object_entity_name,
             field_name: client_field.name.item.into(),
         }),
     }
@@ -89,22 +82,13 @@ pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkPro
     schema: &Schema<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ArtifactPathAndContent {
-    let parent_type = schema
-        .server_entity_data
-        .server_object_entity(client_field.parent_object_entity_name)
-        .expect(
-            "Expected entity to exist. \
-            This is indicative of a bug in Isograph.",
-        );
-
     let client_field_output_type = generate_output_type(schema, client_field);
 
     let output_type_text = {
-        let parent_type_name = parent_type.name;
         let output_type = client_field_output_type;
         format!(
             "export type {}__{}__output_type = {};",
-            parent_type_name.item, client_field.name.item, output_type
+            client_field.parent_object_entity_name, client_field.name.item, output_type
         )
     };
     let output_type_text = format!(
@@ -116,7 +100,7 @@ pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkPro
         file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
         file_content: output_type_text,
         type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-            type_name: parent_type.name.item,
+            type_name: client_field.parent_object_entity_name,
             field_name: client_field.name.item.into(),
         }),
     }
