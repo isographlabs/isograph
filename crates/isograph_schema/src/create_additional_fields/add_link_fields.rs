@@ -10,7 +10,7 @@ use super::create_additional_fields_error::{
 impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     pub fn add_link_fields(&mut self) -> ProcessTypeDefinitionResult<(), TNetworkProtocol> {
         let mut selectables_to_process = vec![];
-        for object in &mut self.server_entity_data.server_object_entities_mut() {
+        for object in &mut self.server_entity_data.server_object_entities() {
             let field_name = *LINK_FIELD_NAME;
             let parent_object_entity_name = object.name;
             self.client_scalar_selectables.insert(
