@@ -128,7 +128,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol + 'static>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
     field_argument_definition_type: &GraphQLTypeAnnotation<ServerEntityName>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-    schema_data: &ServerEntityData<TNetworkProtocol>,
+    schema_data: &ServerEntityData,
     server_scalar_selectables: &HashMap<
         (ServerObjectEntityName, ServerScalarSelectableName),
         ServerScalarSelectable<TNetworkProtocol>,
@@ -295,7 +295,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol + 'static>(
 fn object_satisfies_type<TNetworkProtocol: NetworkProtocol + 'static>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
     variable_definitions: &[WithSpan<VariableDefinition<ServerEntityName>>],
-    server_entity_data: &ServerEntityData<TNetworkProtocol>,
+    server_entity_data: &ServerEntityData,
     server_scalar_selectables: &HashMap<
         (ServerObjectEntityName, ServerScalarSelectableName),
         ServerScalarSelectable<TNetworkProtocol>,
@@ -368,7 +368,7 @@ enum ObjectLiteralFieldType {
 }
 
 fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtocol + 'static>(
-    server_entity_data: &ServerEntityData<TNetworkProtocol>,
+    server_entity_data: &ServerEntityData,
     server_scalar_selectables: &HashMap<
         (ServerObjectEntityName, ServerScalarSelectableName),
         ServerScalarSelectable<TNetworkProtocol>,
@@ -506,7 +506,7 @@ fn list_satisfies_type<TNetworkProtocol: NetworkProtocol + 'static>(
     list: &[WithLocation<NonConstantValue>],
     list_type: GraphQLListTypeAnnotation<ServerEntityName>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-    schema_data: &ServerEntityData<TNetworkProtocol>,
+    schema_data: &ServerEntityData,
     server_scalar_selectables: &HashMap<
         (ServerObjectEntityName, ServerScalarSelectableName),
         ServerScalarSelectable<TNetworkProtocol>,

@@ -65,7 +65,7 @@ pub struct Schema<TNetworkProtocol: NetworkProtocol + 'static> {
     >,
     pub entrypoints:
         HashMap<(ServerObjectEntityName, ClientScalarSelectableName), EntrypointDeclarationInfo>,
-    pub server_entity_data: ServerEntityData<TNetworkProtocol>,
+    pub server_entity_data: ServerEntityData,
 
     /// These are root types like Query, Mutation, Subscription
     // TODO remove??? It's a GraphQL-ism
@@ -88,7 +88,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 
             entrypoints: Default::default(),
             server_entity_data: ServerEntityData {
-                server_object_entities: HashMap::new(),
                 defined_entities: HashMap::new(),
                 server_object_entity_extra_info: HashMap::new(),
             },
@@ -226,11 +225,7 @@ pub struct ServerObjectEntityExtraInfo {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct ServerEntityData<TNetworkProtocol: NetworkProtocol + 'static> {
-    // TODO consider combining these.
-    pub server_object_entities:
-        HashMap<ServerObjectEntityName, ServerObjectEntity<TNetworkProtocol>>,
-
+pub struct ServerEntityData {
     // TODO consider whether this is needed. Especially when server_objects and server_scalars
     // are combined, this seems pretty useless.
     pub defined_entities: HashMap<UnvalidatedTypeName, ServerEntityName>,
@@ -531,9 +526,9 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static> ServerEntityData<TNetworkProtocol> {
+impl ServerEntityData {
     // TODO this function should not exist ... maybe soon!
-    pub fn insert_server_scalar_entity(
+    pub fn insert_server_scalar_entity<TNetworkProtocol: NetworkProtocol + 'static>(
         &mut self,
         server_scalar_entity_name: ServerScalarEntityName,
     ) -> Result<(), CreateAdditionalFieldsError<TNetworkProtocol>> {
@@ -558,7 +553,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> ServerEntityData<TNetworkProto
 
     // TODO this function should not exist
     // TODO accept WithLocation instead of name_location
-    pub fn insert_server_object_entity(
+    pub fn insert_server_object_entity<TNetworkProtocol: NetworkProtocol + 'static>(
         &mut self,
         server_server_object_entity: ServerObjectEntity<TNetworkProtocol>,
     ) -> Result<ServerObjectEntityName, CreateAdditionalFieldsError<TNetworkProtocol>> {
@@ -577,10 +572,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> ServerEntityData<TNetworkProto
             });
         }
 
-        self.server_object_entities.insert(
-            server_server_object_entity.name.item,
-            server_server_object_entity,
-        );
         Ok(name.item)
     }
 }
