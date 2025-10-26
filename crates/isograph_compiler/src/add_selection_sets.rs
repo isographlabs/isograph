@@ -64,7 +64,7 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol + 'st
     let client_field = schema
         .client_scalar_selectable(
             unprocessed_item.parent_object_entity_name,
-            unprocessed_item.client_field_name,
+            unprocessed_item.client_scalar_selectable_name,
         )
         .expect(
             "Expected selectable to exist. \
@@ -107,7 +107,7 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol + 'st
     let client_field = schema
         .client_scalar_selectable_mut(
             unprocessed_item.parent_object_entity_name,
-            unprocessed_item.client_field_name,
+            unprocessed_item.client_scalar_selectable_name,
         )
         .expect(
             "Expected selectable to exist. \

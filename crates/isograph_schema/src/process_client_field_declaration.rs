@@ -26,7 +26,7 @@ pub type UnprocessedSelection = WithSpan<UnvalidatedSelection>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnprocessedClientFieldItem {
     pub parent_object_entity_name: ServerObjectEntityName,
-    pub client_field_name: ClientScalarSelectableName,
+    pub client_scalar_selectable_name: ClientScalarSelectableName,
     pub reader_selection_set: Vec<UnprocessedSelection>,
     pub refetch_strategy: Option<RefetchStrategy<(), ()>>,
 }
@@ -163,9 +163,11 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             .server_object_entities
             .get(&parent_object_entity_name)
             .expect("Expected type to exist");
-        let client_field_field_name_ws = client_field_declaration.item.client_field_name;
-        let client_field_name = client_field_field_name_ws.item;
-        let client_field_name_span = client_field_field_name_ws.location.span;
+        let client_field_name_span = client_field_declaration
+            .item
+            .client_field_name
+            .location
+            .span;
         let client_scalar_selectable_name = client_field_declaration.item.client_field_name.item;
 
         if self
@@ -175,7 +177,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             .or_default()
             .selectables
             .insert(
-                client_field_name.0.into(),
+                client_scalar_selectable_name.0.into(),
                 DefinitionLocation::Client(SelectionType::Scalar((
                     parent_object_entity_name,
                     client_scalar_selectable_name.0,
@@ -187,7 +189,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             return Err(WithSpan::new(
                 ProcessClientFieldDeclarationError::ParentAlreadyHasField {
                     parent_object_entity_name: object.name.item,
-                    client_selectable_name: client_field_name.0.into(),
+                    client_selectable_name: client_scalar_selectable_name.0.into(),
                 },
                 client_field_name_span,
             ));
@@ -215,7 +217,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                             &self.server_entity_data.defined_entities,
                             variable_definition,
                             object.name.item,
-                            client_field_name.0.into(),
+                            client_scalar_selectable_name.0.into(),
                         )
                     })
                     .collect::<Result<_, _>>()?,
@@ -267,7 +269,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 
         Ok(UnprocessedClientFieldItem {
             parent_object_entity_name,
-            client_field_name: *client_scalar_selectable_name,
+            client_scalar_selectable_name: *client_scalar_selectable_name,
             reader_selection_set: selections,
             refetch_strategy,
         })

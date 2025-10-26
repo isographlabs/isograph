@@ -272,7 +272,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             mutation_field_payload_type_name.item,
         )?;
         Ok(UnprocessedClientFieldItem {
-            client_field_name: mutation_field_client_field_name,
+            client_scalar_selectable_name: mutation_field_client_field_name,
             parent_object_entity_name: maybe_abstract_parent_object_entity_name,
             reader_selection_set: vec![],
             refetch_strategy: Some(RefetchStrategy::UseRefetchField(
