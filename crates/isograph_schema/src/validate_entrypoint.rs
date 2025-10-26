@@ -108,7 +108,7 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol + 'stati
         .get(&parent_type.item.0.into())
         .ok_or(WithLocation::new(
             ValidateEntrypointDeclarationError::ParentTypeNotDefined {
-                parent_type_name: parent_type.item,
+                parent_object_entity_name: parent_type.item,
             },
             Location::new(text_source, parent_type.span),
         ))?;
@@ -118,7 +118,7 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol + 'stati
             if !schema.fetchable_types.contains_key(object_entity_name) {
                 Err(WithLocation::new(
                     ValidateEntrypointDeclarationError::NonFetchableParentType {
-                        parent_type_name: parent_type.item,
+                        parent_object_entity_name: parent_type.item,
                         fetchable_types: schema
                             .fetchable_types
                             .keys()
@@ -135,7 +135,7 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol + 'stati
         ServerEntityName::Scalar(scalar_entity_name) => Err(WithLocation::new(
             ValidateEntrypointDeclarationError::InvalidParentType {
                 parent_type: "scalar",
-                parent_type_name: (*scalar_entity_name).into(),
+                parent_object_entity_name: (*scalar_entity_name).into(),
             },
             Location::new(text_source, parent_type.span),
         )),
@@ -146,20 +146,12 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     field_name: WithSpan<ClientScalarSelectableNameWrapper>,
     text_source: TextSource,
-    parent_object_name: ServerObjectEntityName,
+    parent_object_entity_name: ServerObjectEntityName,
 ) -> Result<ClientScalarSelectableName, WithLocation<ValidateEntrypointDeclarationError>> {
-    let parent_object = schema
-        .server_entity_data
-        .server_object_entity(parent_object_name)
-        .expect(
-            "Expected entity to exist. \
-            This is indicative of a bug in Isograph.",
-        );
-
     match schema
         .server_entity_data
         .server_object_entity_extra_info
-        .get(&parent_object_name)
+        .get(&parent_object_entity_name)
         .expect(
             "Expected parent_object_entity_name to exist \
             in server_object_entity_available_selectables",
@@ -171,7 +163,7 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol + 'static>(
             DefinitionLocation::Client(SelectionType::Object(_))
             | DefinitionLocation::Server(_) => Err(WithLocation::new(
                 ValidateEntrypointDeclarationError::FieldMustBeClientField {
-                    parent_type_name: parent_object.name.item,
+                    parent_object_entity_name,
                     client_field_name: field_name.item,
                 },
                 Location::new(text_source, field_name.span),
@@ -183,7 +175,7 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol + 'static>(
         },
         None => Err(WithLocation::new(
             ValidateEntrypointDeclarationError::ClientFieldMustExist {
-                parent_type_name: parent_object.name.item,
+                parent_object_entity_name,
                 client_field_name: field_name.item,
             },
             Location::new(text_source, field_name.span),
@@ -193,39 +185,39 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol + 'static>(
 
 #[derive(Error, Eq, PartialEq, Debug, Clone)]
 pub enum ValidateEntrypointDeclarationError {
-    #[error("`{parent_type_name}` is not a type that has been defined.")]
+    #[error("`{parent_object_entity_name}` is not a type that has been defined.")]
     ParentTypeNotDefined {
-        parent_type_name: ServerObjectEntityNameWrapper,
+        parent_object_entity_name: ServerObjectEntityNameWrapper,
     },
 
     #[error(
-        "Invalid parent type. `{parent_type_name}` is a {parent_type}, but it should be an object or interface."
+        "Invalid parent type. `{parent_object_entity_name}` is a {parent_type}, but it should be an object or interface."
     )]
     InvalidParentType {
         parent_type: &'static str,
-        parent_type_name: UnvalidatedTypeName,
+        parent_object_entity_name: UnvalidatedTypeName,
     },
 
     #[error(
-        "The type `{parent_type_name}` is not fetchable. The following types are fetchable: {fetchable_types}."
+        "The type `{parent_object_entity_name}` is not fetchable. The following types are fetchable: {fetchable_types}."
     )]
     NonFetchableParentType {
-        parent_type_name: ServerObjectEntityNameWrapper,
+        parent_object_entity_name: ServerObjectEntityNameWrapper,
         fetchable_types: String,
     },
 
-    #[error("The client field `{parent_type_name}.{client_field_name}` is not defined.")]
+    #[error("The client field `{parent_object_entity_name}.{client_field_name}` is not defined.")]
     ClientFieldMustExist {
-        parent_type_name: ServerObjectEntityName,
+        parent_object_entity_name: ServerObjectEntityName,
         client_field_name: ClientScalarSelectableNameWrapper,
     },
 
     // N.B. We could conceivably support fetching server fields, though!
     #[error(
-        "The field `{parent_type_name}.{client_field_name}` is a server field. It must be a client defined field."
+        "The field `{parent_object_entity_name}.{client_field_name}` is a server field. It must be a client defined field."
     )]
     FieldMustBeClientField {
-        parent_type_name: ServerObjectEntityName,
+        parent_object_entity_name: ServerObjectEntityName,
         client_field_name: ClientScalarSelectableNameWrapper,
     },
 

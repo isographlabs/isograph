@@ -220,7 +220,6 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol + 'static>(
                 GraphQLNonNullTypeAnnotation::Named(named_type) => enum_satisfies_type(
                     enum_literal_value,
                     &named_type,
-                    schema_data,
                     selection_supplied_argument_value.location,
                 ),
             }
@@ -478,26 +477,15 @@ fn id_annotation_to_typename_annotation(
     })
 }
 
-fn enum_satisfies_type<TNetworkProtocol: NetworkProtocol + 'static>(
+fn enum_satisfies_type(
     enum_literal_value: &EnumLiteralValue,
     enum_type: &GraphQLNamedTypeAnnotation<ServerEntityName>,
-    schema_data: &ServerEntityData<TNetworkProtocol>,
     location: Location,
 ) -> ValidateArgumentTypesResult<()> {
     match enum_type.item {
         SelectionType::Object(object_entity_name) => {
             let expected = GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                enum_type.clone().map(|_| {
-                    schema_data
-                        .server_object_entity(object_entity_name)
-                        .expect(
-                            "Expected entity to exist. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .name
-                        .item
-                        .into()
-                }),
+                enum_type.clone().map(|_| object_entity_name.into()),
             ));
 
             Err(WithLocation::new(
