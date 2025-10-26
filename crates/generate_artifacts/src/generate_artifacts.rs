@@ -16,18 +16,20 @@ use isograph_lang_types::{
     SelectionTypeContainingSelections, TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
-    ClientFieldVariant, ClientScalarSelectable, ClientSelectableId, FieldMapItem,
-    FieldTraversalResult, ID_ENTITY_NAME, IsographDatabase, LINK_FIELD_NAME, NameAndArguments,
-    NetworkProtocol, NormalizationKey, RefetchStrategy, ScalarSelectableId, Schema,
-    ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo, ValidatedSelection,
-    ValidatedVariableDefinition, WrappedSelectionMapSelection, accessible_client_fields,
-    description, inline_fragment_reader_selection_set, output_type_annotation,
-    selection_map_wrapped, server_scalar_entity_javascript_name,
+    ClientFieldVariant, ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectableId,
+    FieldMapItem, FieldTraversalResult, ID_ENTITY_NAME, IsographDatabase, LINK_FIELD_NAME,
+    NameAndArguments, NetworkProtocol, NormalizationKey, RefetchStrategy, ScalarSelectableId,
+    Schema, ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo,
+    ValidatedSelection, ValidatedVariableDefinition, WrappedSelectionMapSelection,
+    accessible_client_fields, description, inline_fragment_reader_selection_set,
+    output_type_annotation, selection_map_wrapped, server_object_entity_named,
+    server_scalar_entity_javascript_name,
 };
 use lazy_static::lazy_static;
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
     fmt::{Debug, Display},
+    ops::Deref,
 };
 
 use crate::{
@@ -274,15 +276,23 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol + 'stati
                                 value: NonConstantValue::Variable("id".intern().into()),
                             };
 
-                            let type_to_refine_to = schema
-                                .server_entity_data
-                                .server_object_entity(
-                                    client_scalar_selectable.parent_object_entity_name,
+                            let memo_ref = server_object_entity_named(
+                                db,
+                                client_scalar_selectable.parent_object_entity_name(),
+                            );
+                            let type_to_refine_to = &memo_ref
+                                .deref()
+                                .as_ref()
+                                .expect(
+                                    "Expected validation to have worked. \
+                                    This is indicative of a bug in Isograph.",
                                 )
+                                .as_ref()
                                 .expect(
                                     "Expected entity to exist. \
                                     This is indicative of a bug in Isograph.",
-                                );
+                                )
+                                .item;
 
                             let variable_definitions_iter = client_scalar_selectable
                                 .variable_definitions
