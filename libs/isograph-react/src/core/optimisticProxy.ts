@@ -376,18 +376,20 @@ function compareData(
   newData: StoreLayerData,
   encounteredIds: EncounteredIds,
 ): void {
-  for (const [typeName, records] of Object.entries(newData)) {
-    if (!records) {
+  for (const [typeName, newRecords] of Object.entries(newData)) {
+    if (!newRecords) {
       continue;
     }
-    outer: for (const [id, record] of Object.entries(records)) {
-      if (!record) {
+    const oldRecords = oldData[typeName];
+    outer: for (const [id, newRecord] of Object.entries(newRecords)) {
+      if (!newRecord) {
         continue;
       }
+      const oldRecord = oldRecords?.[id];
 
-      for (const [recordKey, recordValue] of Object.entries(record)) {
+      for (const [recordKey, newRecordValue] of Object.entries(newRecord)) {
         // TODO: compare links, compare arrays
-        if (recordValue !== oldData[typeName]?.[id]?.[recordKey]) {
+        if (newRecordValue !== oldRecord?.[recordKey]) {
           const set = insertEmptySetIfMissing(encounteredIds, typeName);
           set.add(id);
           continue outer;
