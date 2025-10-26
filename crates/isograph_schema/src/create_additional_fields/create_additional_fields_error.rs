@@ -52,50 +52,50 @@ pub(crate) type ProcessTypeDefinitionResult<T, TNetworkProtocol> =
 pub enum CreateAdditionalFieldsError<TNetworkProtocol: NetworkProtocol + 'static> {
     #[error(
         "The Isograph compiler attempted to create a field named \
-        `{field_name}` on type `{parent_type}`, but a field with that name already exists."
+        `{selectable_name}` on type `{parent_object_entity_name}`, but a field with that name already exists."
     )]
     CompilerCreatedFieldExistsOnType {
-        field_name: SelectableName,
-        parent_type: ServerObjectEntityName,
+        selectable_name: SelectableName,
+        parent_object_entity_name: ServerObjectEntityName,
     },
 
     // TODO include info about where the field was previously defined
-    #[error("Duplicate field named `{field_name}` on type `{parent_type}`")]
+    #[error("Duplicate field named `{selectable_name}` on type `{parent_object_entity_name}`")]
     DuplicateField {
-        field_name: SelectableName,
-        parent_type: ServerObjectEntityName,
+        selectable_name: SelectableName,
+        parent_object_entity_name: ServerObjectEntityName,
     },
 
     #[error("Invalid field `{field_arg}` in @exposeField directive")]
     InvalidField { field_arg: String },
 
     #[error(
-        "Error when processing @exposeField directive on type `{primary_type_name}`. \
-        The field `{mutation_object_name}.{mutation_field_name}` does not have argument `{field_name}`, \
+        "Error when processing @exposeField directive on type `{primary_object_entity_name}`. \
+        The field `{mutation_object_entity_name}.{mutation_selectable_name}` does not have argument `{field_name}`, \
         or it was previously processed by another field_map item."
     )]
     PrimaryDirectiveArgumentDoesNotExistOnField {
-        primary_type_name: ServerObjectEntityName,
-        mutation_object_name: ServerObjectEntityName,
-        mutation_field_name: SelectableName,
+        primary_object_entity_name: ServerObjectEntityName,
+        mutation_object_entity_name: ServerObjectEntityName,
+        mutation_selectable_name: SelectableName,
         field_name: StringLiteralValue,
     },
 
     #[error(
-        "Error when processing @exposeField directive on type `{primary_type_name}`. \
+        "Error when processing @exposeField directive on type `{primary_object_entity_name}`. \
         The field `{field_name}` is an object, and cannot be remapped. Remap scalars only."
     )]
     PrimaryDirectiveCannotRemapObject {
-        primary_type_name: ServerObjectEntityName,
+        primary_object_entity_name: ServerObjectEntityName,
         field_name: String,
     },
 
     #[error(
-        "Error when processing @exposeField directive on type `{primary_type_name}`. \
+        "Error when processing @exposeField directive on type `{primary_object_entity_name}`. \
         The field `{field_name}` is not found."
     )]
     PrimaryDirectiveFieldNotFound {
-        primary_type_name: ServerObjectEntityName,
+        primary_object_entity_name: ServerObjectEntityName,
         field_name: StringLiteralValue,
     },
 
@@ -103,33 +103,33 @@ pub enum CreateAdditionalFieldsError<TNetworkProtocol: NetworkProtocol + 'static
     FailedToDeserialize(String),
 
     #[error(
-        "The `{strong_field_name}` field on `{parent_type}` must have type `ID!`.\n\
+        "The `{strong_field_name}` field on `{parent_object_entity_name}` must have type `ID!`.\n\
         This error can be suppressed using the \"on_invalid_id_type\" config parameter."
     )]
     IdFieldMustBeNonNullIdType {
-        parent_type: ServerObjectEntityName,
+        parent_object_entity_name: ServerObjectEntityName,
         strong_field_name: &'static str,
     },
 
     #[error(
-        "The argument `{argument_name}` on field `{parent_type_name}.{field_name}` has inner type `{argument_type}`, which does not exist."
+        "The argument `{argument_name}` on field `{parent_object_entity_name}.{field_name}` has inner type `{argument_type}`, which does not exist."
     )]
     FieldArgumentTypeDoesNotExist {
         argument_name: VariableName,
-        parent_type_name: ServerObjectEntityName,
+        parent_object_entity_name: ServerObjectEntityName,
         field_name: SelectableName,
         argument_type: UnvalidatedTypeName,
     },
 
-    #[error("This field has type `{target_entity_type_name}`, which does not exist")]
+    #[error("This field has type `{target_entity_name}`, which does not exist")]
     FieldTypenameDoesNotExist {
-        target_entity_type_name: UnvalidatedTypeName,
+        target_entity_name: UnvalidatedTypeName,
     },
 
-    #[error("Duplicate type definition (`{type_definition_type}`) named `{type_name}`")]
+    #[error("Duplicate type definition (`{type_definition_type}`) named `{duplicate_entity_name}`")]
     DuplicateTypeDefinition {
         type_definition_type: &'static str,
-        type_name: UnvalidatedTypeName,
+        duplicate_entity_name: UnvalidatedTypeName,
     },
 
     #[error("{0}")]

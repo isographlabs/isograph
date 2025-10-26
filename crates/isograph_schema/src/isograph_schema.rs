@@ -1,6 +1,7 @@
 use std::{
     collections::{BTreeMap, HashMap},
     fmt::Debug,
+    ops::Deref,
 };
 
 use common_lang_types::{
@@ -21,11 +22,13 @@ use lazy_static::lazy_static;
 
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectableId,
-    EntrypointDeclarationInfo, NetworkProtocol, NormalizationKey, ObjectSelectable,
-    ObjectSelectableId, ScalarSelectable, Selectable, SelectableId, ServerEntityName,
-    ServerObjectEntity, ServerObjectEntityAvailableSelectables, ServerObjectSelectable,
-    ServerScalarSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
+    EntrypointDeclarationInfo, IsographDatabase, NetworkProtocol, NormalizationKey,
+    ObjectSelectable, ObjectSelectableId, ScalarSelectable, Selectable, SelectableId,
+    ServerEntityName, ServerObjectEntity, ServerObjectEntityAvailableSelectables,
+    ServerObjectSelectable, ServerScalarSelectable, ServerSelectableId,
+    UseRefetchFieldRefetchStrategy,
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
+    server_object_entity_named,
 };
 
 lazy_static! {
@@ -118,19 +121,14 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 
     pub fn get_object_selections_path(
         &self,
+        db: &IsographDatabase<TNetworkProtocol>,
         root_object_name: ServerObjectEntityName,
         selections: impl Iterator<Item = ObjectSelectableName>,
     ) -> Result<
         Vec<&ServerObjectSelectable<TNetworkProtocol>>,
         CreateAdditionalFieldsError<TNetworkProtocol>,
     > {
-        let mut current_entity = self
-            .server_entity_data
-            .server_object_entity(root_object_name)
-            .expect(
-                "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-            );
+        let mut current_entity_memo_ref = server_object_entity_named(db, root_object_name);
 
         let mut current_selectables = &self
             .server_entity_data
@@ -180,13 +178,9 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                             }
                         };
 
-                        current_entity = self
-                            .server_entity_data
-                            .server_object_entity(*target_object_entity_name)
-                            .expect(
-                                "Expected entity to exist. \
-                                This is indicative of a bug in Isograph.",
-                            );
+                        current_entity_memo_ref =
+                            server_object_entity_named(db, *target_object_entity_name);
+
                         current_selectables = &self
                             .server_entity_data
                             .server_object_entity_extra_info
@@ -200,7 +194,21 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                 },
                 None => {
                     return Err(CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
-                        primary_type_name: current_entity.name.item,
+                        primary_object_entity_name: current_entity_memo_ref
+                            .deref()
+                            .as_ref()
+                            .expect(
+                                "Expected validation to have succeeded. \
+                                This is indicative of a bug in Isograph.",
+                            )
+                            .as_ref()
+                            .expect(
+                                "Expected entity to exist. \
+                                This is indicative of a bug in Isograph.",
+                            )
+                            .item
+                            .name
+                            .item,
                         field_name: selection_name.unchecked_conversion(),
                     });
                 }
@@ -310,16 +318,9 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             )
             .is_some()
         {
-            let parent_object = self
-                .server_entity_data
-                .server_object_entity(parent_object_entity_name)
-                .expect(
-                    "Expected entity to exist. \
-                    This is indicative of a bug in Isograph.",
-                );
             return Err(CreateAdditionalFieldsError::DuplicateField {
-                field_name: server_scalar_selectable.name.item.into(),
-                parent_type: parent_object.name.item,
+                selectable_name: server_scalar_selectable.name.item.into(),
+                parent_object_entity_name,
             });
         }
 
@@ -376,8 +377,8 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                     This is indicative of a bug in Isograph.",
                 );
             return Err(CreateAdditionalFieldsError::DuplicateField {
-                field_name: next_object_name.item.into(),
-                parent_type: parent_object.name.item,
+                selectable_name: next_object_name.item.into(),
+                parent_object_entity_name: parent_object.name.item,
             });
         }
 
@@ -567,7 +568,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> ServerEntityData<TNetworkProto
         {
             return Err(CreateAdditionalFieldsError::DuplicateTypeDefinition {
                 type_definition_type: "scalar",
-                type_name: server_scalar_entity_name.into(),
+                duplicate_entity_name: server_scalar_entity_name.into(),
             });
         }
 
@@ -593,7 +594,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> ServerEntityData<TNetworkProto
         {
             return Err(CreateAdditionalFieldsError::DuplicateTypeDefinition {
                 type_definition_type: "object",
-                type_name: server_server_object_entity.name.item.into(),
+                duplicate_entity_name: server_server_object_entity.name.item.into(),
             });
         }
 
@@ -675,7 +676,7 @@ fn set_and_validate_id_field<TNetworkProtocol: NetworkProtocol + 'static>(
                 options.on_invalid_id_type.on_failure(|| {
                     CreateAdditionalFieldsError::IdFieldMustBeNonNullIdType {
                         strong_field_name: "id",
-                        parent_type: parent_object_entity_name,
+                        parent_object_entity_name,
                     }
                 })?;
             }
@@ -685,7 +686,7 @@ fn set_and_validate_id_field<TNetworkProtocol: NetworkProtocol + 'static>(
             options.on_invalid_id_type.on_failure(|| {
                 CreateAdditionalFieldsError::IdFieldMustBeNonNullIdType {
                     strong_field_name: "id",
-                    parent_type: parent_object_entity_name,
+                    parent_object_entity_name,
                 }
             })?;
             Ok(())

@@ -185,6 +185,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             .collect::<Vec<_>>();
 
         let mut parts_reversed = self.get_object_selections_path(
+            db,
             payload_object_entity_name,
             primary_field_name_selection_parts.iter().copied(),
         )?;
@@ -314,8 +315,8 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             return Err(
                 // TODO use a more generic error message when making this
                 CreateAdditionalFieldsError::CompilerCreatedFieldExistsOnType {
-                    field_name: mutation_field_name,
-                    parent_type: payload_object_name,
+                    selectable_name: mutation_field_name,
+                    parent_object_entity_name: payload_object_name,
                 },
             );
         }
@@ -478,7 +479,7 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol + 'static>(
                             This is indicative of a bug in Isograph.",
                     );
                 return Err(CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
-                    primary_type_name: current_entity.item.name.item,
+                    primary_object_entity_name: current_entity.item.name.item,
                     field_name: selection_name.unchecked_conversion(),
                 });
             }

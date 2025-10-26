@@ -33,9 +33,9 @@ impl ArgumentMap {
     pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol + 'static>(
         &mut self,
         field_map_item: FieldMapItem,
-        primary_type_name: ServerObjectEntityName,
-        mutation_object_name: ServerObjectEntityName,
-        mutation_field_name: SelectableName,
+        primary_object_entity_name: ServerObjectEntityName,
+        mutation_object_entity_name: ServerObjectEntityName,
+        mutation_selectable_name: SelectableName,
         schema: &mut Schema<TNetworkProtocol>,
     ) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem, TNetworkProtocol> {
         let split_to_arg = field_map_item.split_to_arg();
@@ -54,9 +54,9 @@ impl ArgumentMap {
             })
             .ok_or_else(|| {
                 CreateAdditionalFieldsError::PrimaryDirectiveArgumentDoesNotExistOnField {
-                    primary_type_name,
-                    mutation_object_name,
-                    mutation_field_name,
+                    primary_object_entity_name,
+                    mutation_object_entity_name,
+                    mutation_selectable_name,
                     field_name: split_to_arg.to_argument_name,
                 }
             })?;
@@ -71,7 +71,7 @@ impl ArgumentMap {
                         if unmodified_argument.type_.inner().as_object().is_some() {
                             return Err(
                                 CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
-                                    primary_type_name,
+                                    primary_object_entity_name,
                                     field_name: split_to_arg.to_argument_name.lookup().to_string(),
                                 },
                             );
@@ -85,7 +85,11 @@ impl ArgumentMap {
                         let mut arg =
                             ModifiedArgument::from_unmodified(unmodified_argument, schema);
 
-                        arg.remove_to_field::<TNetworkProtocol>(*first, rest, primary_type_name)?;
+                        arg.remove_to_field::<TNetworkProtocol>(
+                            *first,
+                            rest,
+                            primary_object_entity_name,
+                        )?;
 
                         *argument =
                             WithLocation::new(PotentiallyModifiedArgument::Modified(arg), location);
@@ -104,7 +108,7 @@ impl ArgumentMap {
                         // at the object level.
                         return Err(
                             CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
-                                primary_type_name,
+                                primary_object_entity_name,
                                 field_name: split_to_arg.to_argument_name.lookup().to_string(),
                             },
                         );
@@ -113,7 +117,7 @@ impl ArgumentMap {
                         modified.remove_to_field::<TNetworkProtocol>(
                             *first,
                             rest,
-                            primary_type_name,
+                            primary_object_entity_name,
                         )?;
                         // TODO WAT
                         ProcessedFieldMapItem(field_map_item.clone())
@@ -218,7 +222,7 @@ impl ModifiedArgument {
         &mut self,
         first: StringLiteralValue,
         rest: &[StringLiteralValue],
-        primary_type_name: ServerObjectEntityName,
+        primary_object_entity_name: ServerObjectEntityName,
     ) -> ProcessTypeDefinitionResult<(), TNetworkProtocol> {
         let argument_object = self.object.inner_mut();
 
@@ -242,7 +246,7 @@ impl ModifiedArgument {
                                 if field_id.as_object().is_some() {
                                     return Err(
                                         CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
-                                            primary_type_name,
+                                            primary_object_entity_name,
                                             field_name: key.lookup().to_string(),
                                         }
                                     );
@@ -258,7 +262,7 @@ impl ModifiedArgument {
                                 // A field can only be modified if it has an object type
                                 return Err(
                                     CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
-                                        primary_type_name,
+                                        primary_object_entity_name,
                                         field_name: key.to_string(),
                                     }
                                 );
@@ -269,7 +273,7 @@ impl ModifiedArgument {
             }
             None => {
                 return Err(CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
-                    primary_type_name,
+                    primary_object_entity_name,
                     field_name: first,
                 });
             }

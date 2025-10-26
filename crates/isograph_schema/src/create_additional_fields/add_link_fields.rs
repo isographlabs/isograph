@@ -42,7 +42,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         // loop, we can't also update self.server_entity_data.server_object_entity_available_selectables!
         //
         // This is temporary: when everything moves to pico, this will be easier!
-        for (parent_object_entity_name, field_name, object_name) in selectables_to_process {
+        for (parent_object_entity_name, field_name, object_entity_name) in selectables_to_process {
             if self
                 .server_entity_data
                 .server_object_entity_extra_info
@@ -60,8 +60,8 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             {
                 return Err(
                     CreateAdditionalFieldsError::CompilerCreatedFieldExistsOnType {
-                        field_name: field_name.into(),
-                        parent_type: object_name.item,
+                        selectable_name: field_name.into(),
+                        parent_object_entity_name: object_entity_name.item,
                     },
                 );
             }
