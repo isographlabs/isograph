@@ -1166,7 +1166,14 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol + 
             // primary_field_info: None,
             field_map: vec![],
             subfields_or_inline_fragments,
-            root_object_entity_name: schema.query_type_name(),
+            root_object_entity_name: {
+                *schema
+                    .fetchable_types
+                    .iter()
+                    .find(|(_, root_operation_name)| root_operation_name.0 == "query")
+                    .expect("Expected query to be found")
+                    .0
+            },
         },
         client_selectable_id: SelectionType::Object((
             parent_object_entity_name,

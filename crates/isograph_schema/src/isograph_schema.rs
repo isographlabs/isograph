@@ -95,17 +95,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         }
     }
 
-    /// This is a smell, and we should refactor away from it, or all schema's
-    /// should have a root type.
-    pub fn query_type_name(&self) -> ServerObjectEntityName {
-        *self
-            .fetchable_types
-            .iter()
-            .find(|(_, root_operation_name)| root_operation_name.0 == "query")
-            .expect("Expected query to be found")
-            .0
-    }
-
     pub fn find_mutation(&self) -> Option<(&ServerObjectEntityName, &RootOperationName)> {
         self.fetchable_types
             .iter()

@@ -157,7 +157,12 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         parent_object_entity_name: ServerObjectEntityName,
         client_field_declaration: WithSpan<ClientFieldDeclaration>,
     ) -> ProcessClientFieldDeclarationResult<UnprocessedClientFieldItem> {
-        let query_id = self.query_type_name();
+        let query_id = *self
+            .fetchable_types
+            .iter()
+            .find(|(_, root_operation_name)| root_operation_name.0 == "query")
+            .expect("Expected query to be found")
+            .0;
         let client_field_name_span = client_field_declaration
             .item
             .client_field_name
@@ -276,7 +281,12 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         to_object_entity_name: TypeAnnotation<ServerObjectEntityName>,
         client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
     ) -> ProcessClientFieldDeclarationResult<UnprocessedClientPointerItem> {
-        let query_id = self.query_type_name();
+        let query_id = *self
+            .fetchable_types
+            .iter()
+            .find(|(_, root_operation_name)| root_operation_name.0 == "query")
+            .expect("Expected query to be found")
+            .0;
         let client_pointer_pointer_name_ws = client_pointer_declaration.item.client_pointer_name;
         let client_pointer_name = client_pointer_pointer_name_ws.item;
         let client_pointer_name_span = client_pointer_pointer_name_ws.location.span;
