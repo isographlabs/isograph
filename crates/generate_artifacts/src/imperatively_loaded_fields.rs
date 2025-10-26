@@ -62,18 +62,10 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     );
 
     if let Some(refetch_field_parent_object_entity_name) = refetch_field_parent_object_entity_name {
-        let refetch_field_parent_type_name = schema
-            .server_entity_data
-            .server_object_entity(refetch_field_parent_object_entity_name)
-            .expect(
-                "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-            )
-            .name;
         // This could be Pet
         subfields_or_inline_fragments.insert(
             0,
-            WrappedSelectionMapSelection::InlineFragment(refetch_field_parent_type_name.item),
+            WrappedSelectionMapSelection::InlineFragment(refetch_field_parent_object_entity_name),
         );
     }
 
