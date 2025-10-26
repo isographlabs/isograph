@@ -275,25 +275,11 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 
     fn add_client_pointer_to_object(
         &mut self,
-        parent_object_name: ServerObjectEntityName,
-        to_object_name: TypeAnnotation<ServerObjectEntityName>,
+        parent_object_entity_name: ServerObjectEntityName,
+        to_object_entity_name: TypeAnnotation<ServerObjectEntityName>,
         client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
     ) -> ProcessClientFieldDeclarationResult<UnprocessedClientPointerItem> {
         let query_id = self.query_type_name();
-        let to_object = self
-            .server_entity_data
-            .server_object_entity(*to_object_name.inner())
-            .expect(
-                "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-            );
-        let parent_object = self
-            .server_entity_data
-            .server_object_entity(parent_object_name)
-            .expect(
-                "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-            );
         let client_pointer_pointer_name_ws = client_pointer_declaration.item.client_pointer_name;
         let client_pointer_name = client_pointer_pointer_name_ws.item;
         let client_pointer_name_span = client_pointer_pointer_name_ws.location.span;
@@ -317,13 +303,16 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         let unprocessed_fields = client_pointer_declaration.item.selection_set;
 
         // TODO extract this into a helper function, probably on TNetworkProtocol
-        let refetch_strategy = if self.fetchable_types.contains_key(to_object_name.inner()) {
+        let refetch_strategy = if self
+            .fetchable_types
+            .contains_key(to_object_entity_name.inner())
+        {
             RefetchStrategy::RefetchFromRoot
         } else {
             let id_field = self
                 .server_entity_data
                 .server_object_entity_extra_info
-                .get(to_object_name.inner())
+                .get(to_object_entity_name.inner())
                 .expect(
                     "Expected parent_object_entity_name \
                 to exist in server_object_entity_available_selectables",
@@ -344,7 +333,9 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                             vec![],
                             query_id,
                             vec![
-                                WrappedSelectionMapSelection::InlineFragment(to_object.name.item),
+                                WrappedSelectionMapSelection::InlineFragment(
+                                    *to_object_entity_name.inner(),
+                                ),
                                 WrappedSelectionMapSelection::LinkedField {
                                     server_object_selectable_name: *NODE_FIELD_NAME,
                                     arguments: id_top_level_arguments(),
@@ -358,7 +349,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         };
 
         self.client_object_selectables.insert(
-            (parent_object_name, *client_object_selectable_name),
+            (parent_object_entity_name, *client_object_selectable_name),
             ClientObjectSelectable {
                 description: client_pointer_declaration.item.description.map(|x| x.item),
                 name: client_pointer_declaration
@@ -376,19 +367,19 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                         validate_variable_definition(
                             &self.server_entity_data.defined_entities,
                             variable_definition,
-                            parent_object.name.item,
+                            parent_object_entity_name,
                             client_pointer_name.0.into(),
                         )
                     })
                     .collect::<Result<_, _>>()?,
                 type_and_field: ParentObjectEntityNameAndSelectableName {
-                    type_name: parent_object.name.item,
+                    type_name: parent_object_entity_name,
                     field_name: client_object_selectable_name.0.into(),
                 },
 
-                parent_object_entity_name: parent_object_name,
+                parent_object_entity_name,
                 refetch_strategy,
-                target_object_entity_name: to_object_name,
+                target_object_entity_name: to_object_entity_name,
                 network_protocol: std::marker::PhantomData,
 
                 info: UserWrittenClientPointerInfo {
@@ -401,29 +392,22 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         if self
             .server_entity_data
             .server_object_entity_extra_info
-            .entry(parent_object_name)
+            .entry(parent_object_entity_name)
             .or_default()
             .selectables
             .insert(
                 client_pointer_name.0.into(),
                 DefinitionLocation::Client(SelectionType::Object((
-                    parent_object_name,
+                    parent_object_entity_name,
                     *client_object_selectable_name,
                 ))),
             )
             .is_some()
         {
-            let parent_object = self
-                .server_entity_data
-                .server_object_entity(parent_object_name)
-                .expect(
-                    "Expected entity to exist. \
-                    This is indicative of a bug in Isograph.",
-                );
             // Did not insert, so this object already has a field with the same name :(
             return Err(WithSpan::new(
                 ProcessClientFieldDeclarationError::ParentAlreadyHasField {
-                    parent_type_name: parent_object.name.item,
+                    parent_type_name: parent_object_entity_name,
                     client_field_name: client_pointer_name.0.into(),
                 },
                 client_pointer_name_span,
@@ -432,7 +416,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 
         Ok(UnprocessedClientPointerItem {
             client_object_selectable_name: *client_pointer_name,
-            parent_object_entity_name: parent_object_name,
+            parent_object_entity_name,
             reader_selection_set: unprocessed_fields,
             refetch_selection_set: vec![id_selection()],
         })
