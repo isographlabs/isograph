@@ -256,8 +256,8 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                 AddSelectionSetsError::SelectionTypeSelectionFieldDoesNotExist {
                     client_field_parent_type_name: top_level_field_or_pointer
                         .type_and_field()
-                        .type_name,
-                    client_field_name: top_level_field_or_pointer.type_and_field().field_name,
+                        .server_object_entity_name,
+                    client_field_name: top_level_field_or_pointer.type_and_field().selectable_name,
                     field_parent_type_name: selection_parent_object.name.item,
                     field_name: scalar_selection.name.item.into(),
                     client_type: top_level_field_or_pointer.client_type().to_string(),
@@ -298,7 +298,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                             AddSelectionSetsError::SelectionTypeSelectionFieldIsNotScalar {
                                 client_field_parent_type_name: top_level_field_or_pointer
                                     .type_and_field()
-                                    .type_name,
+                                    .server_object_entity_name,
                                 client_field_name: top_level_field_or_pointer.name().into(),
                                 field_parent_type_name: selection_parent_object.name.item,
                                 field_name: scalar_selection.name.item.into(),
@@ -321,8 +321,8 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                     AddSelectionSetsError::SelectionTypeSelectionClientPointerSelectedAsScalar {
                             client_field_parent_type_name: top_level_field_or_pointer
                                 .type_and_field()
-                                .type_name,
-                            client_field_name: top_level_field_or_pointer.type_and_field().field_name,
+                                .server_object_entity_name,
+                            client_field_name: top_level_field_or_pointer.type_and_field().selectable_name,
                             field_parent_type_name: selection_parent_object.name.item,
                             field_name: scalar_selection.name.item.into(),
                             client_type: top_level_field_or_pointer.client_type().to_string(),
@@ -366,8 +366,8 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                 AddSelectionSetsError::SelectionTypeSelectionFieldDoesNotExist {
                     client_field_parent_type_name: top_level_field_or_pointer
                         .type_and_field()
-                        .type_name,
-                    client_field_name: top_level_field_or_pointer.type_and_field().field_name,
+                        .server_object_entity_name,
+                    client_field_name: top_level_field_or_pointer.type_and_field().selectable_name,
                     field_parent_type_name: selection_parent_object.name.item,
                     field_name: object_selection.name.item.into(),
                     client_type: top_level_field_or_pointer.client_type().to_string(),
@@ -397,7 +397,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                             AddSelectionSetsError::SelectionTypeSelectionFieldIsScalar {
                                 client_field_parent_type_name: top_level_field_or_pointer
                                     .type_and_field()
-                                    .type_name,
+                                    .server_object_entity_name,
                                 client_field_name: top_level_field_or_pointer.name().into(),
                                 field_parent_type_name: selection_parent_object.name.item,
                                 field_name: object_selection.name.item.into(),
@@ -430,8 +430,8 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                         AddSelectionSetsError::SelectionTypeSelectionClientPointerSelectedAsScalar {
                             client_field_parent_type_name: top_level_field_or_pointer
                                 .type_and_field()
-                                .type_name,
-                            client_field_name: top_level_field_or_pointer.type_and_field().field_name,
+                                .server_object_entity_name,
+                            client_field_name: top_level_field_or_pointer.type_and_field().selectable_name,
                             field_parent_type_name: selection_parent_object.name.item,
                             field_name: object_selection.name.item.into(),
                             client_type: top_level_field_or_pointer.client_type().to_string(),

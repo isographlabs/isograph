@@ -27,8 +27,8 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                     reader_selection_set: vec![],
                     variant: ClientFieldVariant::Link,
                     type_and_field: ParentObjectEntityNameAndSelectableName {
-                        field_name: field_name.into(),
-                        type_name: object.name.item,
+                        selectable_name: field_name.into(),
+                        server_object_entity_name: object.name.item,
                     },
                     refetch_strategy: None,
                     network_protocol: std::marker::PhantomData,

@@ -17,15 +17,19 @@ fn build_iso_overload_for_entrypoint<TNetworkProtocol: NetworkProtocol + 'static
 ) -> (String, String) {
     let formatted_field = format!(
         "entrypoint {}.{}",
-        validated_client_field.type_and_field.type_name,
-        validated_client_field.type_and_field.field_name
+        validated_client_field
+            .type_and_field
+            .server_object_entity_name,
+        validated_client_field.type_and_field.selectable_name
     );
     let mut s: String = "".to_string();
     let import = format!(
         "import entrypoint_{} from '../__isograph/{}/{}/entrypoint{}';\n",
         validated_client_field.type_and_field.underscore_separated(),
-        validated_client_field.type_and_field.type_name,
-        validated_client_field.type_and_field.field_name,
+        validated_client_field
+            .type_and_field
+            .server_object_entity_name,
+        validated_client_field.type_and_field.selectable_name,
         file_extensions.ts()
     );
 
@@ -50,8 +54,8 @@ fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol 
     let import = format!(
         "import {{ type {}__param }} from './{}/{}/param_type{}';\n",
         client_type.type_and_field().underscore_separated(),
-        client_type.type_and_field().type_name,
-        client_type.type_and_field().field_name,
+        client_type.type_and_field().server_object_entity_name,
+        client_type.type_and_field().selectable_name,
         file_extensions.ts()
     );
 
@@ -61,8 +65,8 @@ fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol 
             SelectionType::Scalar(_) => "field",
             SelectionType::Object(_) => "pointer",
         },
-        client_type.type_and_field().type_name,
-        client_type.type_and_field().field_name
+        client_type.type_and_field().server_object_entity_name,
+        client_type.type_and_field().selectable_name
     );
     if matches!(variant, ClientFieldDirectiveSet::Component(_)) {
         s.push_str(&format!(
@@ -269,14 +273,14 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol + 'static>(
         match client_type_1
             .0
             .type_and_field()
-            .type_name
-            .cmp(&client_type_2.0.type_and_field().type_name)
+            .server_object_entity_name
+            .cmp(&client_type_2.0.type_and_field().server_object_entity_name)
         {
             Ordering::Less => Ordering::Less,
             Ordering::Greater => Ordering::Greater,
             Ordering::Equal => sort_field_name(
-                client_type_1.0.type_and_field().field_name,
-                client_type_2.0.type_and_field().field_name,
+                client_type_1.0.type_and_field().selectable_name,
+                client_type_2.0.type_and_field().selectable_name,
             ),
         }
     });
@@ -309,14 +313,14 @@ fn sorted_entrypoints<TNetworkProtocol: NetworkProtocol + 'static>(
     entrypoints.sort_by(|(client_field_1, _), (client_field_2, _)| {
         match client_field_1
             .type_and_field
-            .type_name
-            .cmp(&client_field_2.type_and_field.type_name)
+            .server_object_entity_name
+            .cmp(&client_field_2.type_and_field.server_object_entity_name)
         {
             Ordering::Less => Ordering::Less,
             Ordering::Greater => Ordering::Greater,
             Ordering::Equal => sort_field_name(
-                client_field_1.type_and_field.field_name,
-                client_field_2.type_and_field.field_name,
+                client_field_1.type_and_field.selectable_name,
+                client_field_2.type_and_field.selectable_name,
             ),
         }
     });

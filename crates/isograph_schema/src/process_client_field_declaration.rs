@@ -222,8 +222,8 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                     })
                     .collect::<Result<_, _>>()?,
                 type_and_field: ParentObjectEntityNameAndSelectableName {
-                    type_name: object.name.item,
-                    field_name: client_scalar_selectable_name.0.into(),
+                    server_object_entity_name: object.name.item,
+                    selectable_name: client_scalar_selectable_name.0.into(),
                 },
 
                 parent_object_entity_name,
@@ -378,8 +378,8 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                     })
                     .collect::<Result<_, _>>()?,
                 type_and_field: ParentObjectEntityNameAndSelectableName {
-                    type_name: parent_object_entity_name,
-                    field_name: client_object_selectable_name.0.into(),
+                    server_object_entity_name: parent_object_entity_name,
+                    selectable_name: client_object_selectable_name.0.into(),
                 },
 
                 parent_object_entity_name,

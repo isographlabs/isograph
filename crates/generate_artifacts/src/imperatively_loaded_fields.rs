@@ -168,16 +168,16 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
             file_content: format!("export default '{query_text}';"),
             file_name: query_text_file_name_with_extension,
             type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-                type_name: root_parent_object,
-                field_name: root_fetchable_field.into(),
+                server_object_entity_name: root_parent_object,
+                selectable_name: root_fetchable_field.into(),
             }),
         },
         ArtifactPathAndContent {
             file_content: imperatively_loaded_field_file_contents,
             file_name: file_name_prefix,
             type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-                type_name: root_parent_object,
-                field_name: root_fetchable_field.into(),
+                server_object_entity_name: root_parent_object,
+                selectable_name: root_fetchable_field.into(),
             }),
         },
     ]

@@ -229,8 +229,8 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
             match &server_field.object_selectable_variant {
                 ServerObjectSelectableVariant::InlineFragment => {
                     let type_and_field = ParentObjectEntityNameAndSelectableName {
-                        field_name: linked_field.name.item.into(),
-                        type_name: server_field.parent_object_entity_name,
+                        selectable_name: linked_field.name.item.into(),
+                        server_object_entity_name: server_field.parent_object_entity_name,
                     };
 
                     let reader_artifact_import_name =
@@ -487,7 +487,7 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol + 'static>
         format!("{type_and_field}__entrypoint")
     } else {
         let indent_3 = "  ".repeat((indentation_level + 2) as usize);
-        let field_parent_type = client_field.type_and_field.type_name;
+        let field_parent_type = client_field.type_and_field.server_object_entity_name;
         format!(
             "{{\n\
             {indent_3}kind: \"EntrypointLoader\",\n\

@@ -35,8 +35,8 @@ pub(crate) fn write_artifacts_to_disk(
 
         let absolute_directory = match path_and_content.type_and_field {
             Some(type_and_field) => artifact_directory
-                .join(type_and_field.type_name.lookup())
-                .join(type_and_field.field_name.lookup()),
+                .join(type_and_field.server_object_entity_name.lookup())
+                .join(type_and_field.selectable_name.lookup()),
             None => artifact_directory.clone(),
         };
         fs::create_dir_all(&absolute_directory).map_err(|e| {
