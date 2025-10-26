@@ -369,16 +369,9 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             )
             .is_some()
         {
-            let parent_object = self
-                .server_entity_data
-                .server_object_entity(parent_object_entity_name)
-                .expect(
-                    "Expected entity to exist. \
-                    This is indicative of a bug in Isograph.",
-                );
             return Err(CreateAdditionalFieldsError::DuplicateField {
                 selectable_name: next_object_name.item.into(),
-                parent_object_entity_name: parent_object.name.item,
+                parent_object_entity_name,
             });
         }
 
