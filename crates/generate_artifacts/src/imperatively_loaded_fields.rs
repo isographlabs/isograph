@@ -81,15 +81,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         });
     }
 
-    let root_parent_object = schema
-        .server_entity_data
-        .server_object_entity(entrypoint.parent_object_entity_name())
-        .expect(
-            "Expected entity to exist. \
-            This is indicative of a bug in Isograph.",
-        )
-        .name
-        .item;
+    let root_parent_object = entrypoint.parent_object_entity_name();
 
     let root_operation_name = schema
         .fetchable_types
@@ -107,15 +99,6 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     let query_text_selection_map_wrapped =
         selection_map_wrapped(nested_selection_map.clone(), subfields_or_inline_fragments);
     let root_fetchable_field = entrypoint.name();
-    let concrete_type = schema
-        .server_entity_data
-        .server_object_entity(root_object_entity_name)
-        .expect(
-            "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-        )
-        .name
-        .item;
 
     let query_text = TNetworkProtocol::generate_query_text(
         db,
@@ -132,7 +115,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         &query_text_selection_map_wrapped,
         definitions_of_used_variables.iter(),
         &root_operation_name,
-        concrete_type,
+        root_object_entity_name,
         persisted_documents,
         1,
     );
@@ -174,7 +157,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         {}  operation: {operation_text},\n\
         {}  normalizationAst,\n\
         {}}},\n\
-        {}concreteType: \"{concrete_type}\",\n\
+        {}concreteType: \"{root_object_entity_name}\",\n\
         }};\n\n\
         export default artifact;\n",
         "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ",
