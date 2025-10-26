@@ -10,7 +10,6 @@ generate_artifacts = { path = "../generate_artifacts" }
 graphql_lang_types = { path = "../graphql_lang_types" }
 isograph_config = { path = "../isograph_config" }
 isograph_schema = { path = "../isograph_schema" }
-isograph_lang_parser = { path = "../isograph_lang_parser" }
 isograph_lang_types = { path = "../isograph_lang_types" }
 intern = { path = "../../relay-crates/intern" }
 pico = { path = "../pico" }
