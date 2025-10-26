@@ -112,6 +112,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     traversal_state: &ScalarClientFieldTraversalState,
     encountered_client_type_map: &FieldToCompletedMergeTraversalStateMap,
     variable_definitions: Vec<&ValidatedVariableDefinition>,
+    // TODO this implements copy, don't take reference
     default_root_operation: &Option<(&ServerObjectEntityName, &RootOperationName)>,
     file_extensions: GenerateFileExtensionsOption,
     persisted_documents: &mut Option<PersistedDocuments>,

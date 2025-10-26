@@ -389,7 +389,9 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol + 'stati
                                     &traversal_state,
                                     &encountered_client_type_map,
                                     variable_definitions_iter,
-                                    &schema.find_query(),
+                                    &schema.fetchable_types.iter().find(
+                                        |(_, root_operation_name)| root_operation_name.0 == "query",
+                                    ),
                                     config.options.include_file_extensions_in_import_statements,
                                     &mut persisted_documents,
                                 ),
