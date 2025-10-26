@@ -133,6 +133,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 
 [[package]]
+name = "artifact_content"
+version = "0.4.3"
+dependencies = [
+ "common_lang_types",
+ "graphql_lang_types",
+ "hex",
+ "indexmap 2.10.0",
+ "intern",
+ "isograph_config",
+ "isograph_lang_types",
+ "isograph_schema",
+ "lazy_static",
+ "md-5",
+ "pathdiff",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 1.0.69",
+ "tracing",
+ "validated_isograph_schema",
+]
+
+[[package]]
 name = "ast_node"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1014,29 +1037,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "generate_artifacts"
-version = "0.4.3"
-dependencies = [
- "common_lang_types",
- "graphql_lang_types",
- "hex",
- "indexmap 2.10.0",
- "intern",
- "isograph_config",
- "isograph_lang_types",
- "isograph_schema",
- "lazy_static",
- "md-5",
- "pathdiff",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 1.0.69",
- "tracing",
- "validated_isograph_schema",
-]
-
-[[package]]
 name = "generator"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1624,9 +1624,9 @@ dependencies = [
 name = "isograph_compiler"
 version = "0.4.3"
 dependencies = [
+ "artifact_content",
  "colored",
  "common_lang_types",
- "generate_artifacts",
  "graphql_lang_types",
  "intern",
  "isograph_config",

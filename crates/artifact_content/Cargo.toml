@@ -1,5 +1,5 @@
 [package]
-name = "generate_artifacts"
+name = "artifact_content"
 version = { workspace = true }
 edition = { workspace = true }
 license = { workspace = true }

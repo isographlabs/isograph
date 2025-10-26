@@ -6,11 +6,11 @@ use crate::{
     with_duration::WithDuration,
     write_artifacts::{GenerateArtifactsError, write_artifacts_to_disk},
 };
-use colored::Colorize;
-use common_lang_types::CurrentWorkingDirectory;
-use generate_artifacts::{
+use artifact_content::{
     generate_artifacts::GetArtifactPathAndContentError, get_artifact_path_and_content,
 };
+use colored::Colorize;
+use common_lang_types::CurrentWorkingDirectory;
 use isograph_schema::{IsographDatabase, NetworkProtocol};
 use pretty_duration::pretty_duration;
 use thiserror::Error;

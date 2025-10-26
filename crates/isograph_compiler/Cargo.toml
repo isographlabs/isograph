@@ -6,7 +6,7 @@ license = { workspace = true }
 
 [dependencies]
 common_lang_types = { path = "../common_lang_types" }
-generate_artifacts = { path = "../generate_artifacts" }
+artifact_content = { path = "../artifact_content" }
 graphql_lang_types = { path = "../graphql_lang_types" }
 isograph_config = { path = "../isograph_config" }
 isograph_schema = { path = "../isograph_schema" }
