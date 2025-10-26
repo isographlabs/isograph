@@ -4,11 +4,11 @@ use common_lang_types::{
     ClientScalarSelectableName, IsoLiteralText, Location, ServerObjectEntityName, TextSource,
     UnvalidatedTypeName, WithLocation, WithSpan,
 };
+use intern::Lookup;
 use isograph_lang_types::{
     ClientScalarSelectableNameWrapper, DefinitionLocation, EntrypointDeclaration,
     EntrypointDirectiveSet, SelectionType, ServerObjectEntityNameWrapper,
 };
-
 use thiserror::Error;
 
 use crate::{NetworkProtocol, Schema, ServerEntityName};
@@ -122,18 +122,7 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol + 'stati
                         fetchable_types: schema
                             .fetchable_types
                             .keys()
-                            .map(|object_entity_name| {
-                                schema
-                                    .server_entity_data
-                                    .server_object_entity(*object_entity_name)
-                                    .expect(
-                                        "Expected entity to exist. \
-                                            This is indicative of a bug in Isograph.",
-                                    )
-                                    .name
-                                    .item
-                                    .to_string()
-                            })
+                            .map(|object_entity_name| object_entity_name.lookup())
                             .collect::<Vec<_>>()
                             .join(", "),
                     },
