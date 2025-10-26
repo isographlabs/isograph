@@ -4,15 +4,18 @@ import {
   type EncounteredIds,
 } from './cache';
 import type {
-  StoreLayerData,
-  IsographEnvironment,
   BaseStoreLayerData,
+  IsographEnvironment,
+  StoreLayerData,
   StoreLink,
   StoreRecord,
 } from './IsographEnvironment';
 import { logMessage } from './logging';
 
-export function getOrInsertRecord(dataLayer: StoreLayerData, link: StoreLink) {
+export function getOrInsertRecord(
+  dataLayer: StoreLayerData,
+  link: StoreLink,
+): StoreRecord {
   const recordsById = (dataLayer[link.__typename] ??= {});
   return (recordsById[link.__link] ??= {});
 }
@@ -20,7 +23,7 @@ export function getOrInsertRecord(dataLayer: StoreLayerData, link: StoreLink) {
 export function readOptimisticRecord(
   environment: IsographEnvironment,
   link: StoreLink,
-) {
+): StoreRecord {
   return new Proxy<StoreRecord>(
     {},
     {
@@ -107,7 +110,7 @@ export function addNetworkResponseStoreLayer(
   environment: IsographEnvironment,
   data: StoreLayerData,
   encounteredIds: EncounteredIds,
-) {
+): void {
   switch (environment.store.kind) {
     case 'NetworkResponseStoreLayer':
     case 'BaseStoreLayer': {
@@ -154,7 +157,7 @@ function mergeDataLayer(target: StoreLayerData, source: StoreLayerData): void {
 export function addStartUpdateStoreLayer(
   environment: IsographEnvironment,
   startUpdate: FirstUpdate,
-) {
+): void {
   const { data, encounteredIds } = startUpdate();
 
   switch (environment.store.kind) {
@@ -224,7 +227,7 @@ export function addOptimisticStoreLayer(
       environment.store = node;
 
       callSubscriptions(environment, encounteredIds);
-      return (data: StoreLayerData) => {
+      return (data: StoreLayerData): void => {
         const encounteredIds: EncounteredIds = new Map();
         compareData(node.data, data, encounteredIds);
         replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
@@ -251,7 +254,7 @@ function mergeParentNodes(
     | StartUpdateStoreLayer
     | null,
   mutableEncounteredIds: EncounteredIds,
-) {
+): OptimisticStoreLayer | null {
   while (node && node?.kind !== 'OptimisticStoreLayer') {
     const data = 'startUpdate' in node ? node.startUpdate().data : node.data;
     compareData(node.data, data, mutableEncounteredIds);
@@ -269,7 +272,7 @@ function reexecuteUpdates(
     | StartUpdateStoreLayer
     | null,
   mutableEncounteredIds: EncounteredIds,
-) {
+): void {
   while (node !== null) {
     const oldData = node.data;
     if ('startUpdate' in node) {
@@ -286,7 +289,10 @@ function reexecuteUpdates(
   }
 }
 
-function makeRootNode(environment: IsographEnvironment, node: StoreLayer) {
+function makeRootNode(
+  environment: IsographEnvironment,
+  node: StoreLayer,
+): void {
   node.childStoreLayer = null;
   environment.store = node;
 }
@@ -296,7 +302,7 @@ function replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
   optimisticNode: OptimisticStoreLayer,
   data: StoreLayerData,
   encounteredIds: EncounteredIds,
-) {
+): void {
   if (optimisticNode.parentStoreLayer.kind === 'BaseStoreLayer') {
     mergeDataLayer(optimisticNode.parentStoreLayer.data, data);
 
@@ -358,7 +364,7 @@ function compareData(
   oldData: StoreLayerData,
   newData: StoreLayerData,
   encounteredIds: EncounteredIds,
-) {
+): void {
   if (oldData === newData) {
     for (const [typeName, ids] of encounteredIds.entries()) {
       for (const id of ids) {
