@@ -177,7 +177,7 @@ impl ModifiedArgument {
     /// an existing object.
     ///
     /// This panics if unmodified's type is a scalar.
-    pub fn from_unmodified<TNetworkProtocol: NetworkProtocol + 'static>(
+    fn from_unmodified<TNetworkProtocol: NetworkProtocol + 'static>(
         unmodified: &VariableDefinition<ServerEntityName>,
         schema: &Schema<TNetworkProtocol>,
     ) -> Self {
@@ -218,7 +218,7 @@ impl ModifiedArgument {
         }
     }
 
-    pub fn remove_to_field<TNetworkProtocol: NetworkProtocol + 'static>(
+    fn remove_to_field<TNetworkProtocol: NetworkProtocol + 'static>(
         &mut self,
         first: StringLiteralValue,
         rest: &[StringLiteralValue],

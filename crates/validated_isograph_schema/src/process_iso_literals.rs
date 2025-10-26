@@ -9,7 +9,8 @@ use isograph_lang_types::SelectionType;
 use isograph_schema::{
     CreateAdditionalFieldsError, IsographDatabase, NetworkProtocol,
     ProcessClientFieldDeclarationError, Schema, UnprocessedClientFieldItem,
-    UnprocessedClientPointerItem, ValidateEntrypointDeclarationError, validate_entrypoints,
+    UnprocessedClientPointerItem, ValidateEntrypointDeclarationError, add_link_fields,
+    validate_entrypoints,
 };
 use thiserror::Error;
 
@@ -35,7 +36,7 @@ pub(crate) fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol 
         process_iso_literals(&mut unvalidated_isograph_schema, contains_iso)?;
     unprocessed_items.extend(unprocessed_client_types);
 
-    unvalidated_isograph_schema.add_link_fields(db)?;
+    add_link_fields(db, &mut unvalidated_isograph_schema)?;
 
     unvalidated_isograph_schema.entrypoints =
         validate_entrypoints(&unvalidated_isograph_schema, unprocessed_entrypoints)?;
