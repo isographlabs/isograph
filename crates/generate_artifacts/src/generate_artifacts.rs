@@ -104,14 +104,14 @@ lazy_static! {
 /// output_type artifact.
 ///
 /// TODO this should go through OutputFormat
-#[tracing::instrument(skip(config))]
+#[tracing::instrument]
 pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
-    config: &CompilerConfig,
 ) -> Result<
     (Vec<ArtifactPathAndContent>, ContainsIsoStats),
     GetValidatedSchemaError<TNetworkProtocol>,
 > {
+    let config = db.get_isograph_config();
     let validated_schema = get_validated_schema(db);
     let (schema, stats) = match validated_schema.deref() {
         Ok((schema, stats)) => (schema, stats),
