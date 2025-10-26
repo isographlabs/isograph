@@ -253,11 +253,13 @@ function mergeParentNodes(
     | NetworkResponseStoreLayer
     | StartUpdateStoreLayer
     | null,
-  mutableEncounteredIds: EncounteredIds,
+  oldData: StoreLayerData,
+  newData: StoreLayerData,
 ): OptimisticStoreLayer | null {
   while (node && node?.kind !== 'OptimisticStoreLayer') {
+    mergeDataLayer(oldData, node.data);
     const data = 'startUpdate' in node ? node.startUpdate().data : node.data;
-    compareData(node.data, data, mutableEncounteredIds);
+    mergeDataLayer(newData, data);
     mergeDataLayer(environment.store.data, data);
     node = node.childStoreLayer;
   }
@@ -271,14 +273,16 @@ function reexecuteUpdates(
     | NetworkResponseStoreLayer
     | StartUpdateStoreLayer
     | null,
-  mutableEncounteredIds: EncounteredIds,
+  oldData: StoreLayerData,
+  newData: StoreLayerData,
 ): void {
   while (node !== null) {
-    const oldData = node.data;
+    mergeDataLayer(oldData, node.data);
+
     if ('startUpdate' in node) {
       node.data = node.startUpdate().data;
     }
-    compareData(oldData, node.data, mutableEncounteredIds);
+    mergeDataLayer(newData, node.data);
     node.parentStoreLayer = environment.store;
     environment.store.childStoreLayer = node;
     environment.store = node;
@@ -303,6 +307,8 @@ function replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
   data: StoreLayerData,
   encounteredIds: EncounteredIds,
 ): void {
+  const oldData = optimisticNode.data;
+  const newData = structuredClone(data);
   if (optimisticNode.parentStoreLayer.kind === 'BaseStoreLayer') {
     mergeDataLayer(optimisticNode.parentStoreLayer.data, data);
 
@@ -310,9 +316,10 @@ function replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
     const node = mergeParentNodes(
       environment,
       optimisticNode.childStoreLayer,
-      encounteredIds,
+      oldData,
+      newData,
     );
-    reexecuteUpdates(environment, node, encounteredIds);
+    reexecuteUpdates(environment, node, oldData, newData);
   } else if (
     optimisticNode.parentStoreLayer.kind === 'NetworkResponseStoreLayer'
   ) {
@@ -322,7 +329,8 @@ function replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
     reexecuteUpdates(
       environment,
       optimisticNode.childStoreLayer,
-      encounteredIds,
+      oldData,
+      newData,
     );
   } else if (
     optimisticNode.childStoreLayer?.kind === 'NetworkResponseStoreLayer'
@@ -336,7 +344,7 @@ function replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
 
     const childStoreLayer = optimisticNode.childStoreLayer.childStoreLayer;
     makeRootNode(environment, networkResponseNode);
-    reexecuteUpdates(environment, childStoreLayer, encounteredIds);
+    reexecuteUpdates(environment, childStoreLayer, oldData, newData);
   } else {
     const networkResponseNode: NetworkResponseStoreLayer = {
       kind: 'NetworkResponseStoreLayer',
@@ -349,9 +357,12 @@ function replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
     reexecuteUpdates(
       environment,
       optimisticNode.childStoreLayer,
-      encounteredIds,
+      oldData,
+      newData,
     );
   }
+
+  compareData(oldData, newData, encounteredIds);
 }
 
 export type StoreLayer =
@@ -365,14 +376,6 @@ function compareData(
   newData: StoreLayerData,
   encounteredIds: EncounteredIds,
 ): void {
-  if (oldData === newData) {
-    for (const [typeName, ids] of encounteredIds.entries()) {
-      for (const id of ids) {
-        encounteredIds.get(typeName)?.delete(id);
-      }
-    }
-    return;
-  }
   for (const [typeName, records] of Object.entries(newData)) {
     if (!records) {
       continue;
