@@ -47,7 +47,11 @@ pub fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol + 'stat
     // - to validate arguments (e.g. no missing arguments, etc.)
     // - validate loadability/updatability, and
     // - to store the selectable id,
-    add_selection_sets_to_client_selectables(&mut unvalidated_isograph_schema, unprocessed_items)?;
+    add_selection_sets_to_client_selectables(
+        db,
+        &mut unvalidated_isograph_schema,
+        unprocessed_items,
+    )?;
 
     Ok((unvalidated_isograph_schema, contains_iso_stats))
 }
