@@ -35,7 +35,7 @@ pub fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol + 'stat
         process_iso_literals(&mut unvalidated_isograph_schema, contains_iso)?;
     unprocessed_items.extend(unprocessed_client_types);
 
-    unvalidated_isograph_schema.add_link_fields()?;
+    unvalidated_isograph_schema.add_link_fields(db)?;
 
     unvalidated_isograph_schema.entrypoints =
         validate_entrypoints(&unvalidated_isograph_schema, unprocessed_entrypoints)?;

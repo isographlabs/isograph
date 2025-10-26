@@ -1,4 +1,9 @@
-use crate::{ClientFieldVariant, ClientScalarSelectable, LINK_FIELD_NAME, NetworkProtocol, Schema};
+use std::ops::Deref;
+
+use crate::{
+    ClientFieldVariant, ClientScalarSelectable, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol,
+    Schema, server_object_entities,
+};
 use common_lang_types::{Location, ParentObjectEntityNameAndSelectableName, WithLocation};
 use intern::string_key::Intern;
 use isograph_lang_types::{DefinitionLocation, Description, SelectionType};
@@ -8,9 +13,22 @@ use super::create_additional_fields_error::{
 };
 
 impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
-    pub fn add_link_fields(&mut self) -> ProcessTypeDefinitionResult<(), TNetworkProtocol> {
+    pub fn add_link_fields(
+        &mut self,
+        db: &IsographDatabase<TNetworkProtocol>,
+    ) -> ProcessTypeDefinitionResult<(), TNetworkProtocol> {
         let mut selectables_to_process = vec![];
-        for object in &mut self.server_entity_data.server_object_entities() {
+        let memo_ref = server_object_entities(db);
+        for object in memo_ref
+            .deref()
+            .as_ref()
+            .expect(
+                "Expected validation to have worked. \
+                This is indicative of a bug in Isograph.",
+            )
+            .iter()
+        {
+            let object = &object.item;
             let field_name = *LINK_FIELD_NAME;
             let parent_object_entity_name = object.name;
             self.client_scalar_selectables.insert(

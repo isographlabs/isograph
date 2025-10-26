@@ -532,13 +532,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 }
 
 impl<TNetworkProtocol: NetworkProtocol + 'static> ServerEntityData<TNetworkProtocol> {
-    // TODO this function should not exist
-    pub fn server_object_entities(
-        &self,
-    ) -> impl Iterator<Item = &ServerObjectEntity<TNetworkProtocol>> + '_ {
-        self.server_object_entities.values()
-    }
-
     // TODO this function should not exist ... maybe soon!
     pub fn insert_server_scalar_entity(
         &mut self,
