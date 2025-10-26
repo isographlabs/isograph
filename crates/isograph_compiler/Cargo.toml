@@ -14,7 +14,6 @@ isograph_lang_types = { path = "../isograph_lang_types" }
 intern = { path = "../../relay-crates/intern" }
 pico = { path = "../pico" }
 pico_macros = { path = "../pico_macros" }
-validated_isograph_schema = { path = "../validated_isograph_schema" }
 colored = { workspace = true }
 lazy_static = { workspace = true }
 notify = { workspace = true }

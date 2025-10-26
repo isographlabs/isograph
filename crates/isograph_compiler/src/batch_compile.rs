@@ -8,12 +8,13 @@ use crate::{
 };
 use colored::Colorize;
 use common_lang_types::CurrentWorkingDirectory;
-use generate_artifacts::get_artifact_path_and_content;
+use generate_artifacts::{
+    generate_artifacts::GetArtifactPathAndContentError, get_artifact_path_and_content,
+};
 use isograph_schema::{IsographDatabase, NetworkProtocol};
 use pretty_duration::pretty_duration;
 use thiserror::Error;
 use tracing::{error, info};
-use validated_isograph_schema::GetValidatedSchemaError;
 
 pub struct CompilationStats {
     pub client_field_count: usize,
@@ -121,9 +122,9 @@ pub enum BatchCompileError<TNetworkProtocol: NetworkProtocol + 'static> {
     NotifyErrors { messages: Vec<notify::Error> },
 
     #[error("{error}")]
-    GetValidatedSchemaError {
+    GenerateArtifactsError {
         #[from]
-        error: GetValidatedSchemaError<TNetworkProtocol>,
+        error: GetArtifactPathAndContentError<TNetworkProtocol>,
     },
 }
 

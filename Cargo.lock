@@ -1031,6 +1031,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "thiserror 1.0.69",
  "tracing",
  "validated_isograph_schema",
 ]
@@ -1642,7 +1643,6 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
- "validated_isograph_schema",
 ]
 
 [[package]]

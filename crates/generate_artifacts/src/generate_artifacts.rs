@@ -31,6 +31,7 @@ use std::{
     fmt::{Debug, Display},
     ops::Deref,
 };
+use thiserror::Error;
 use validated_isograph_schema::{ContainsIsoStats, GetValidatedSchemaError, get_validated_schema};
 
 use crate::{
@@ -109,7 +110,7 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol + 'static
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
     (Vec<ArtifactPathAndContent>, ContainsIsoStats),
-    GetValidatedSchemaError<TNetworkProtocol>,
+    GetArtifactPathAndContentError<TNetworkProtocol>,
 > {
     let config = db.get_isograph_config();
     let validated_schema = get_validated_schema(db);
@@ -1309,4 +1310,10 @@ pub fn get_provided_arguments<'a>(
             }
         })
         .collect()
+}
+
+#[derive(Error, Debug, Clone)]
+pub enum GetArtifactPathAndContentError<TNetworkProtocol: NetworkProtocol + 'static> {
+    #[error("{0}")]
+    GetValidatedSchemaError(#[from] GetValidatedSchemaError<TNetworkProtocol>),
 }
