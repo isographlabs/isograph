@@ -246,7 +246,7 @@ export function addOptimisticStoreLayer(
   }
 }
 
-function mergeParentNodes(
+function mergeChildNodes(
   environment: IsographEnvironment,
   node:
     | OptimisticStoreLayer
@@ -313,7 +313,7 @@ function replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
     mergeDataLayer(optimisticNode.parentStoreLayer.data, data);
 
     makeRootNode(environment, optimisticNode.parentStoreLayer);
-    const node = mergeParentNodes(
+    const node = mergeChildNodes(
       environment,
       optimisticNode.childStoreLayer,
       oldData,
