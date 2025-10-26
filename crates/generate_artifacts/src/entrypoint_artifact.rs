@@ -66,6 +66,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol + 
         merged_selection_map,
         ..
     } = create_merged_selection_map_for_field_and_insert_into_global_map(
+        db,
         schema,
         parent_object_entity,
         entrypoint.selection_set_for_parent_query(),
