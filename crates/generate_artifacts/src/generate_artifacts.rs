@@ -31,6 +31,7 @@ use std::{
     fmt::{Debug, Display},
     ops::Deref,
 };
+use validated_isograph_schema::{ContainsIsoStats, GetValidatedSchemaError, get_validated_schema};
 
 use crate::{
     eager_reader_artifact::{
@@ -103,12 +104,20 @@ lazy_static! {
 /// output_type artifact.
 ///
 /// TODO this should go through OutputFormat
-#[tracing::instrument(skip(schema, config))]
+#[tracing::instrument(skip(config))]
 pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
     config: &CompilerConfig,
-) -> Vec<ArtifactPathAndContent> {
+) -> Result<
+    (Vec<ArtifactPathAndContent>, ContainsIsoStats),
+    GetValidatedSchemaError<TNetworkProtocol>,
+> {
+    let validated_schema = get_validated_schema(db);
+    let (schema, stats) = match validated_schema.deref() {
+        Ok((schema, stats)) => (schema, stats),
+        Err(e) => return Err(e.clone())?,
+    };
+
     let mut artifact_path_and_content = get_artifact_path_and_content_impl(db, schema, config);
     if let Some(header) = config.options.generated_file_header {
         for artifact_path_and_content in artifact_path_and_content.iter_mut() {
@@ -116,7 +125,7 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol + 'static
                 format!("// {header}\n{}", artifact_path_and_content.file_content);
         }
     }
-    artifact_path_and_content
+    Ok((artifact_path_and_content, stats.clone()))
 }
 
 fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol + 'static>(
