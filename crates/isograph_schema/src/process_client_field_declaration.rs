@@ -158,11 +158,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         client_field_declaration: WithSpan<ClientFieldDeclaration>,
     ) -> ProcessClientFieldDeclarationResult<UnprocessedClientFieldItem> {
         let query_id = self.query_type_name();
-        let object = &mut self
-            .server_entity_data
-            .server_object_entities
-            .get(&parent_object_entity_name)
-            .expect("Expected type to exist");
         let client_field_name_span = client_field_declaration
             .item
             .client_field_name
@@ -188,7 +183,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             // Did not insert, so this object already has a field with the same name :(
             return Err(WithSpan::new(
                 ProcessClientFieldDeclarationError::ParentAlreadyHasField {
-                    parent_object_entity_name: object.name.item,
+                    parent_object_entity_name,
                     client_selectable_name: client_scalar_selectable_name.0.into(),
                 },
                 client_field_name_span,
@@ -198,7 +193,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         let variant = get_client_variant(&client_field_declaration.item);
 
         self.client_scalar_selectables.insert(
-            (object.name.item, client_scalar_selectable_name.0),
+            (parent_object_entity_name, client_scalar_selectable_name.0),
             ClientScalarSelectable {
                 description: client_field_declaration.item.description.map(|x| x.item),
                 name: client_field_declaration
@@ -216,13 +211,13 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                         validate_variable_definition(
                             &self.server_entity_data.defined_entities,
                             variable_definition,
-                            object.name.item,
+                            parent_object_entity_name,
                             client_scalar_selectable_name.0.into(),
                         )
                     })
                     .collect::<Result<_, _>>()?,
                 type_and_field: ParentObjectEntityNameAndSelectableName {
-                    server_object_entity_name: object.name.item,
+                    server_object_entity_name: parent_object_entity_name,
                     selectable_name: client_scalar_selectable_name.0.into(),
                 },
 
@@ -256,7 +251,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                     vec![id_selection()],
                     query_id,
                     vec![
-                        WrappedSelectionMapSelection::InlineFragment(object.name.item),
+                        WrappedSelectionMapSelection::InlineFragment(parent_object_entity_name),
                         WrappedSelectionMapSelection::LinkedField {
                             server_object_selectable_name: *NODE_FIELD_NAME,
                             arguments: id_top_level_arguments(),

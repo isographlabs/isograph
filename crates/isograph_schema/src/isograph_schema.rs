@@ -532,13 +532,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 }
 
 impl<TNetworkProtocol: NetworkProtocol + 'static> ServerEntityData<TNetworkProtocol> {
-    pub fn server_object_entity(
-        &self,
-        server_object_entity_name: ServerObjectEntityName,
-    ) -> Option<&ServerObjectEntity<TNetworkProtocol>> {
-        self.server_object_entities.get(&server_object_entity_name)
-    }
-
     // TODO this function should not exist
     pub fn server_object_entities_mut(
         &mut self,
