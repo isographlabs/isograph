@@ -36,7 +36,7 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     let mut field_queue = HashMap::new();
     let mut expose_as_field_queue = HashMap::new();
 
-    for item in items.into_iter().flat_map(|x| x.as_ref().as_object()) {
+    for item in items.iter().flat_map(|x| x.as_ref().as_object()) {
         field_queue.insert(
             item.server_object_entity.item.name.item,
             item.fields_to_insert.clone(),
