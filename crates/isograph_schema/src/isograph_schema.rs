@@ -1,8 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    fmt::Debug,
-    ops::Deref,
-};
+use std::{collections::HashMap, fmt::Debug, ops::Deref};
 
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, JavascriptName, ObjectSelectableName,
@@ -66,10 +62,6 @@ pub struct Schema<TNetworkProtocol: NetworkProtocol + 'static> {
     pub entrypoints:
         HashMap<(ServerObjectEntityName, ClientScalarSelectableName), EntrypointDeclarationInfo>,
     pub server_entity_data: ServerEntityData,
-
-    /// These are root types like Query, Mutation, Subscription
-    // TODO remove??? It's a GraphQL-ism
-    pub fetchable_types: BTreeMap<ServerObjectEntityName, RootOperationName>,
 }
 
 impl<TNetworkProtocol: NetworkProtocol + 'static> Default for Schema<TNetworkProtocol> {
@@ -91,7 +83,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                 defined_entities: HashMap::new(),
                 server_object_entity_extra_info: HashMap::new(),
             },
-            fetchable_types: BTreeMap::new(),
         }
     }
 

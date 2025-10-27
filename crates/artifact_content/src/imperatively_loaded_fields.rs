@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, ops::Deref};
 
 use common_lang_types::{
     ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName, VariableName,
@@ -10,7 +10,7 @@ use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, Format,
     ImperativelyLoadedFieldVariant, IsographDatabase, MergedSelectionMap, NetworkProtocol,
     PathToRefetchFieldInfo, REFETCH_FIELD_NAME, RootRefetchedPath, Schema, ServerEntityName,
-    WrappedSelectionMapSelection, selection_map_wrapped,
+    WrappedSelectionMapSelection, fetchable_types, selection_map_wrapped,
 };
 
 use crate::{
@@ -83,14 +83,19 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
 
     let root_parent_object = entrypoint.parent_object_entity_name();
 
-    let root_operation_name = schema
-        .fetchable_types
-        .get(&root_object_entity_name)
+    let root_operation_name = fetchable_types(db)
+        .deref()
+        .as_ref()
         .expect(
-            "Expected root type to be fetchable here.\
+            "Expected parsing to have succeeded. \
             This is indicative of a bug in Isograph.",
         )
-        .clone();
+        .get(&root_object_entity_name)
+        .cloned()
+        .expect(
+            "Expected root type to be fetchable here. \
+            This is indicative of a bug in Isograph.",
+        );
 
     let query_name = format!("{root_parent_object}__{client_selection_name}")
         .intern()

@@ -21,7 +21,7 @@ use isograph_schema::{
     NameAndArguments, NetworkProtocol, NormalizationKey, RefetchStrategy, ScalarSelectableId,
     Schema, ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo,
     ValidatedSelection, ValidatedVariableDefinition, WrappedSelectionMapSelection,
-    accessible_client_fields, description, inline_fragment_reader_selection_set,
+    accessible_client_fields, description, fetchable_types, inline_fragment_reader_selection_set,
     output_type_annotation, selection_map_wrapped, server_object_entity_named,
     server_scalar_entity_javascript_name,
 };
@@ -379,6 +379,17 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol + 'stati
                                 })
                                 .collect();
 
+                            let memo_ref = fetchable_types(db);
+                            let query_type = memo_ref
+                                .deref()
+                                .as_ref()
+                                .expect(
+                                    "Expected parsing to have succeeded. \
+                                    This is indicative of a bug in Isograph.",
+                                )
+                                .iter()
+                                .find(|(_, root_operation_name)| root_operation_name.0 == "query");
+
                             path_and_contents.extend(
                                 generate_entrypoint_artifacts_with_client_field_traversal_result(
                                     db,
@@ -389,9 +400,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol + 'stati
                                     &traversal_state,
                                     &encountered_client_type_map,
                                     variable_definitions_iter,
-                                    &schema.fetchable_types.iter().find(
-                                        |(_, root_operation_name)| root_operation_name.0 == "query",
-                                    ),
+                                    &query_type,
                                     config.options.include_file_extensions_in_import_statements,
                                     &mut persisted_documents,
                                 ),

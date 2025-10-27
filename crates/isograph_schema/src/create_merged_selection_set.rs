@@ -26,7 +26,7 @@ use crate::{
     NameAndArguments, NetworkProtocol, PathToRefetchField, Schema, ServerEntityName,
     ServerObjectEntity, ServerObjectEntityExtraInfo, ServerObjectSelectable,
     ServerObjectSelectableVariant, ValidatedObjectSelection, ValidatedScalarSelection,
-    ValidatedSelection, VariableContext, create_transformed_name_and_arguments,
+    ValidatedSelection, VariableContext, create_transformed_name_and_arguments, fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
     initial_variable_context, server_object_entity_named, transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context,
@@ -1167,8 +1167,13 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol + 
             field_map: vec![],
             subfields_or_inline_fragments,
             root_object_entity_name: {
-                *schema
-                    .fetchable_types
+                *fetchable_types(db)
+                    .deref()
+                    .as_ref()
+                    .expect(
+                        "Expected parsing to have succeeded. \
+                        This is indicative of a bug in Isograph.",
+                    )
                     .iter()
                     .find(|(_, root_operation_name)| root_operation_name.0 == "query")
                     .expect("Expected query to be found")

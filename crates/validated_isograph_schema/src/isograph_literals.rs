@@ -131,6 +131,7 @@ pub fn read_iso_literals_source<TNetworkProtocol: NetworkProtocol + 'static>(
 
 #[allow(clippy::type_complexity)]
 pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
     contains_iso: ParsedIsoLiteralsMap,
 ) -> Result<
@@ -147,9 +148,11 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol + 'static>(
         for (extraction_result, text_source) in iso_literals {
             match extraction_result {
                 IsoLiteralExtractionResult::ClientFieldDeclaration(client_field_declaration) => {
-                    match schema
-                        .process_client_field_declaration(client_field_declaration, text_source)
-                    {
+                    match schema.process_client_field_declaration(
+                        db,
+                        client_field_declaration,
+                        text_source,
+                    ) {
                         Ok(unprocessed_client_field_items) => unprocess_client_field_items
                             .push(SelectionType::Scalar(unprocessed_client_field_items)),
                         Err(e) => {
@@ -160,9 +163,11 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol + 'static>(
                 IsoLiteralExtractionResult::ClientPointerDeclaration(
                     client_pointer_declaration,
                 ) => {
-                    match schema
-                        .process_client_pointer_declaration(client_pointer_declaration, text_source)
-                    {
+                    match schema.process_client_pointer_declaration(
+                        db,
+                        client_pointer_declaration,
+                        text_source,
+                    ) {
                         Ok(unprocessed_client_pointer_item) => unprocess_client_field_items
                             .push(SelectionType::Object(unprocessed_client_pointer_item)),
                         Err(e) => {

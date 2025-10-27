@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Deref};
 
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, ConstExportName,
@@ -16,8 +16,9 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    ClientObjectSelectable, ClientScalarSelectable, FieldMapItem, NODE_FIELD_NAME, NetworkProtocol,
-    Schema, ServerEntityName, ValidatedVariableDefinition, WrappedSelectionMapSelection,
+    ClientObjectSelectable, ClientScalarSelectable, FieldMapItem, IsographDatabase,
+    NODE_FIELD_NAME, NetworkProtocol, Schema, ServerEntityName, ValidatedVariableDefinition,
+    WrappedSelectionMapSelection, fetchable_types,
     refetch_strategy::{RefetchStrategy, generate_refetch_field_strategy, id_selection},
 };
 
@@ -43,6 +44,7 @@ pub type UnprocessedItem = SelectionType<UnprocessedClientFieldItem, Unprocessed
 impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     pub fn process_client_field_declaration(
         &mut self,
+        db: &IsographDatabase<TNetworkProtocol>,
         client_field_declaration: WithSpan<ClientFieldDeclaration>,
         text_source: TextSource,
     ) -> Result<UnprocessedClientFieldItem, WithLocation<ProcessClientFieldDeclarationError>> {
@@ -59,7 +61,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 
         let unprocess_client_field_items = match parent_type_id {
             ServerEntityName::Object(object_entity_name) => self
-                .add_client_field_to_object(*object_entity_name, client_field_declaration)
+                .add_client_field_to_object(db, *object_entity_name, client_field_declaration)
                 .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?,
             ServerEntityName::Scalar(scalar_entity_name) => {
                 return Err(WithLocation::new(
@@ -77,6 +79,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 
     pub fn process_client_pointer_declaration(
         &mut self,
+        db: &IsographDatabase<TNetworkProtocol>,
         client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
         text_source: TextSource,
     ) -> Result<UnprocessedClientPointerItem, WithLocation<ProcessClientFieldDeclarationError>>
@@ -113,6 +116,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             ServerEntityName::Object(object_entity_name) => match target_type_id {
                 ServerEntityName::Object(to_object_entity_name) => self
                     .add_client_pointer_to_object(
+                        db,
                         *object_entity_name,
                         TypeAnnotation::from_graphql_type_annotation(
                             client_pointer_declaration
@@ -154,11 +158,17 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 
     fn add_client_field_to_object(
         &mut self,
+        db: &IsographDatabase<TNetworkProtocol>,
         parent_object_entity_name: ServerObjectEntityName,
         client_field_declaration: WithSpan<ClientFieldDeclaration>,
     ) -> ProcessClientFieldDeclarationResult<UnprocessedClientFieldItem> {
-        let query_id = *self
-            .fetchable_types
+        let query_id = *fetchable_types(db)
+            .deref()
+            .as_ref()
+            .expect(
+                "Expected parsing to have succeeded. \
+                        This is indicative of a bug in Isograph.",
+            )
             .iter()
             .find(|(_, root_operation_name)| root_operation_name.0 == "query")
             .expect("Expected query to be found")
@@ -234,10 +244,16 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 
         let selections = client_field_declaration.item.selection_set;
 
-        let refetch_strategy = if self
-            .fetchable_types
-            .contains_key(&parent_object_entity_name)
-        {
+        let is_fetchable = fetchable_types(db)
+            .deref()
+            .as_ref()
+            .expect(
+                "Expected parsing to have succeeded. \
+                This is indicative of a bug in Isograph.",
+            )
+            .contains_key(&parent_object_entity_name);
+
+        let refetch_strategy = if is_fetchable {
             Some(RefetchStrategy::RefetchFromRoot)
         } else {
             let id_field = self
@@ -277,12 +293,18 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 
     fn add_client_pointer_to_object(
         &mut self,
+        db: &IsographDatabase<TNetworkProtocol>,
         parent_object_entity_name: ServerObjectEntityName,
         to_object_entity_name: TypeAnnotation<ServerObjectEntityName>,
         client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
     ) -> ProcessClientFieldDeclarationResult<UnprocessedClientPointerItem> {
-        let query_id = *self
-            .fetchable_types
+        let query_id = *fetchable_types(db)
+            .deref()
+            .as_ref()
+            .expect(
+                "Expected parsing to have succeeded. \
+                        This is indicative of a bug in Isograph.",
+            )
             .iter()
             .find(|(_, root_operation_name)| root_operation_name.0 == "query")
             .expect("Expected query to be found")
@@ -309,11 +331,17 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 
         let unprocessed_fields = client_pointer_declaration.item.selection_set;
 
+        let is_fetchable = fetchable_types(db)
+            .deref()
+            .as_ref()
+            .expect(
+                "Expected parsing to have succeeded. \
+                This is indicative of a bug in Isograph.",
+            )
+            .contains_key(to_object_entity_name.inner());
+
         // TODO extract this into a helper function, probably on TNetworkProtocol
-        let refetch_strategy = if self
-            .fetchable_types
-            .contains_key(to_object_entity_name.inner())
-        {
+        let refetch_strategy = if is_fetchable {
             RefetchStrategy::RefetchFromRoot
         } else {
             let id_field = self

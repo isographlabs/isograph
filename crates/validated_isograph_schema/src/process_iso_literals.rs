@@ -32,13 +32,13 @@ pub(crate) fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol 
     let contains_iso_stats = contains_iso.stats();
 
     let (unprocessed_client_types, unprocessed_entrypoints) =
-        process_iso_literals(&mut unvalidated_isograph_schema, contains_iso)?;
+        process_iso_literals(db, &mut unvalidated_isograph_schema, contains_iso)?;
     unprocessed_items.extend(unprocessed_client_types);
 
     add_link_fields(db, &mut unvalidated_isograph_schema)?;
 
     unvalidated_isograph_schema.entrypoints =
-        validate_entrypoints(&unvalidated_isograph_schema, unprocessed_entrypoints)?;
+        validate_entrypoints(db, &unvalidated_isograph_schema, unprocessed_entrypoints)?;
 
     // Step two: now, we can create the selection sets. Creating a selection set involves
     // looking up client selectables, to:

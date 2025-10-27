@@ -34,7 +34,7 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     CreateSchemaError<TNetworkProtocol>,
 > {
     let memo_ref = TNetworkProtocol::parse_type_system_documents(db);
-    let (items, fetchable_types) = match memo_ref.to_owned() {
+    let (items, _fetchable_types) = match memo_ref.to_owned() {
         Ok(x) => x,
         Err(e) => {
             return Err(CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e });
@@ -42,7 +42,6 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     };
 
     let mut unvalidated_isograph_schema = Schema::<TNetworkProtocol>::new();
-    unvalidated_isograph_schema.fetchable_types = fetchable_types;
 
     let mut field_queue = HashMap::new();
     let mut expose_as_field_queue = HashMap::new();

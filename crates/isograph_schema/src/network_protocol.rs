@@ -36,6 +36,7 @@ where
         Result<
             (
                 ParseTypeSystemOutcome<Self>,
+                // TODO just seems awkward that we return fetchable types
                 BTreeMap<ServerObjectEntityName, RootOperationName>,
             ),
             Self::ParseTypeSystemDocumentsError,

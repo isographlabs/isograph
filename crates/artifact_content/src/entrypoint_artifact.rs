@@ -24,8 +24,8 @@ use isograph_schema::{
     MergedSelectionMap, NetworkProtocol, NormalizationKey, RootOperationName, RootRefetchedPath,
     ScalarClientFieldTraversalState, Schema, ServerObjectEntity, ValidatedVariableDefinition,
     WrappedSelectionMapSelection, create_merged_selection_map_for_field_and_insert_into_global_map,
-    current_target_merged_selections, get_reachable_variables, initial_variable_context,
-    server_object_entity_named,
+    current_target_merged_selections, fetchable_types, get_reachable_variables,
+    initial_variable_context, server_object_entity_named,
 };
 use std::{collections::BTreeSet, ops::Deref};
 
@@ -91,8 +91,13 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol + 
             .iter()
             .map(|variable_definition| &variable_definition.item)
             .collect(),
-        &schema
-            .fetchable_types
+        &fetchable_types(db)
+            .deref()
+            .as_ref()
+            .expect(
+                "Expected parsing to have succeeded. \
+                This is indicative of a bug in Isograph.",
+            )
             .iter()
             .find(|(_, root_operation_name)| root_operation_name.0 == "mutation"),
         file_extensions,
@@ -122,15 +127,19 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     // we can panic instead of using a default entrypoint type
     // TODO model this better so that the RootOperationName is somehow a
     // parameter
-    let root_operation_name = schema
-        .fetchable_types
+    let memo_ref = fetchable_types(db);
+    let fetchable_types_map = memo_ref.deref().as_ref().expect(
+        "Expected parsing to have succeeded. \
+        This is indicative of a bug in Isograph.",
+    );
+
+    let root_operation_name = fetchable_types_map
         .get(&entrypoint.parent_object_entity_name)
         .unwrap_or_else(|| {
             default_root_operation
                 .map(|(_, operation_name)| operation_name)
                 .unwrap_or_else(|| {
-                    schema
-                        .fetchable_types
+                    fetchable_types_map
                         .values()
                         .next()
                         .expect("Expected at least one fetchable type to exist")
@@ -216,22 +225,19 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     let normalization_ast_text =
         generate_normalization_ast_text(schema, merged_selection_map.values(), 1);
 
-    let concrete_type_entity_name = if schema
-        .fetchable_types
-        .contains_key(&entrypoint.parent_object_entity_name)
-    {
-        entrypoint.parent_object_entity_name
-    } else {
-        *default_root_operation
-            .map(|(operation_id, _)| operation_id)
-            .unwrap_or_else(|| {
-                schema
-                    .fetchable_types
-                    .keys()
-                    .next()
-                    .expect("Expected at least one fetchable type to exist")
-            })
-    };
+    let concrete_type_entity_name =
+        if fetchable_types_map.contains_key(&entrypoint.parent_object_entity_name) {
+            entrypoint.parent_object_entity_name
+        } else {
+            *default_root_operation
+                .map(|(operation_id, _)| operation_id)
+                .unwrap_or_else(|| {
+                    fetchable_types_map
+                        .keys()
+                        .next()
+                        .expect("Expected at least one fetchable type to exist")
+                })
+        };
     let memo_ref = server_object_entity_named(db, concrete_type_entity_name);
     let concrete_object_entity = &memo_ref
         .deref()

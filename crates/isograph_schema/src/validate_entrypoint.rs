@@ -1,4 +1,7 @@
-use std::collections::{HashMap, hash_map::Entry};
+use std::{
+    collections::{HashMap, hash_map::Entry},
+    ops::Deref,
+};
 
 use common_lang_types::{
     ClientScalarSelectableName, IsoLiteralText, Location, ServerObjectEntityName, TextSource,
@@ -11,7 +14,7 @@ use isograph_lang_types::{
 };
 use thiserror::Error;
 
-use crate::{NetworkProtocol, Schema, ServerEntityName};
+use crate::{IsographDatabase, NetworkProtocol, Schema, ServerEntityName, fetchable_types};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct EntrypointDeclarationInfo {
@@ -21,6 +24,7 @@ pub struct EntrypointDeclarationInfo {
 
 #[allow(clippy::type_complexity)]
 pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     entrypoint_declarations: Vec<(TextSource, WithSpan<EntrypointDeclaration>)>,
 ) -> Result<
@@ -33,7 +37,7 @@ pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol + 'static>(
         EntrypointDeclarationInfo,
     > = HashMap::new();
     for (text_source, entrypoint_declaration) in entrypoint_declarations {
-        match validate_entrypoint_type_and_field(schema, text_source, &entrypoint_declaration) {
+        match validate_entrypoint_type_and_field(db, schema, text_source, &entrypoint_declaration) {
             Ok(client_field_id) => {
                 let new_entrypoint = EntrypointDeclarationInfo {
                     iso_literal_text: entrypoint_declaration.item.iso_literal_text,
@@ -78,11 +82,13 @@ pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 fn validate_entrypoint_type_and_field<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     text_source: TextSource,
     entrypoint_declaration: &WithSpan<EntrypointDeclaration>,
 ) -> Result<ClientScalarSelectableName, WithLocation<ValidateEntrypointDeclarationError>> {
     let parent_object_entity_name = validate_parent_object_entity_name(
+        db,
         schema,
         entrypoint_declaration.item.parent_type,
         text_source,
@@ -98,6 +104,7 @@ fn validate_entrypoint_type_and_field<TNetworkProtocol: NetworkProtocol + 'stati
 }
 
 fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     parent_type: WithSpan<ServerObjectEntityNameWrapper>,
     text_source: TextSource,
@@ -115,16 +122,32 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol + 'stati
 
     match parent_type_id {
         ServerEntityName::Object(object_entity_name) => {
-            if !schema.fetchable_types.contains_key(object_entity_name) {
+            let is_fetchable = fetchable_types(db)
+                .deref()
+                .as_ref()
+                .expect(
+                    "Expected parsing to have succeeded. \
+                This is indicative of a bug in Isograph.",
+                )
+                .contains_key(object_entity_name);
+
+            if !is_fetchable {
+                let fetchable_types = fetchable_types(db)
+                    .deref()
+                    .as_ref()
+                    .expect(
+                        "Expected parsing to have succeeded. \
+                        This is indicative of a bug in Isograph.",
+                    )
+                    .keys()
+                    .map(|object_entity_name| object_entity_name.lookup())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
                 Err(WithLocation::new(
                     ValidateEntrypointDeclarationError::NonFetchableParentType {
                         parent_object_entity_name: parent_type.item,
-                        fetchable_types: schema
-                            .fetchable_types
-                            .keys()
-                            .map(|object_entity_name| object_entity_name.lookup())
-                            .collect::<Vec<_>>()
-                            .join(", "),
+                        fetchable_types,
                     },
                     Location::new(text_source, parent_type.span),
                 ))
