@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Deref};
+use std::ops::Deref;
 
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, ConstExportName,
@@ -18,7 +18,7 @@ use thiserror::Error;
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, FieldMapItem, IsographDatabase,
     NODE_FIELD_NAME, NetworkProtocol, Schema, ServerEntityName, ValidatedVariableDefinition,
-    WrappedSelectionMapSelection, fetchable_types,
+    WrappedSelectionMapSelection, defined_entity, fetchable_types,
     refetch_strategy::{RefetchStrategy, generate_refetch_field_strategy, id_selection},
 };
 
@@ -48,26 +48,29 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         client_field_declaration: WithSpan<ClientFieldDeclaration>,
         text_source: TextSource,
     ) -> Result<UnprocessedClientFieldItem, WithLocation<ProcessClientFieldDeclarationError>> {
-        let parent_type_id = self
-            .server_entity_data
-            .defined_entities
-            .get(&client_field_declaration.item.parent_type.item.0.into())
-            .ok_or(WithLocation::new(
-                ProcessClientFieldDeclarationError::ParentTypeNotDefined {
-                    parent_object_entity_name: client_field_declaration.item.parent_type.item,
-                },
-                Location::new(text_source, client_field_declaration.item.parent_type.span),
-            ))?;
+        let parent_type_id =
+            defined_entity(db, client_field_declaration.item.parent_type.item.0.into())
+                .to_owned()
+                .expect(
+                    "Expected parsing to have succeeded. \
+                    This is indicative of a bug in Isograph.",
+                )
+                .ok_or(WithLocation::new(
+                    ProcessClientFieldDeclarationError::ParentTypeNotDefined {
+                        parent_object_entity_name: client_field_declaration.item.parent_type.item,
+                    },
+                    Location::new(text_source, client_field_declaration.item.parent_type.span),
+                ))?;
 
         let unprocess_client_field_items = match parent_type_id {
             ServerEntityName::Object(object_entity_name) => self
-                .add_client_field_to_object(db, *object_entity_name, client_field_declaration)
+                .add_client_field_to_object(db, object_entity_name, client_field_declaration)
                 .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?,
             ServerEntityName::Scalar(scalar_entity_name) => {
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
                         literal_type: "field",
-                        parent_object_entity_name: (*scalar_entity_name).into(),
+                        parent_object_entity_name: scalar_entity_name.into(),
                     },
                     Location::new(text_source, client_field_declaration.item.parent_type.span),
                 ));
@@ -84,46 +87,56 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         text_source: TextSource,
     ) -> Result<UnprocessedClientPointerItem, WithLocation<ProcessClientFieldDeclarationError>>
     {
-        let parent_type_id = self
-            .server_entity_data
-            .defined_entities
-            .get(&client_pointer_declaration.item.parent_type.item.0.into())
-            .ok_or(WithLocation::new(
-                ProcessClientFieldDeclarationError::ParentTypeNotDefined {
-                    parent_object_entity_name: client_pointer_declaration.item.parent_type.item,
-                },
-                Location::new(
-                    text_source,
-                    client_pointer_declaration.item.parent_type.span,
-                ),
-            ))?;
+        let parent_type_id = defined_entity(
+            db,
+            client_pointer_declaration.item.parent_type.item.0.into(),
+        )
+        .to_owned()
+        .expect(
+            "Expected parsing to have succeeded. \
+            This is indicative of a bug in Isograph.",
+        )
+        .ok_or(WithLocation::new(
+            ProcessClientFieldDeclarationError::ParentTypeNotDefined {
+                parent_object_entity_name: client_pointer_declaration.item.parent_type.item,
+            },
+            Location::new(
+                text_source,
+                client_pointer_declaration.item.parent_type.span,
+            ),
+        ))?;
 
-        let target_type_id = self
-            .server_entity_data
-            .defined_entities
-            .get(&client_pointer_declaration.item.target_type.inner().0.into())
-            .ok_or(WithLocation::new(
-                ProcessClientFieldDeclarationError::ParentTypeNotDefined {
-                    parent_object_entity_name: *client_pointer_declaration.item.target_type.inner(),
-                },
-                Location::new(
-                    text_source,
-                    client_pointer_declaration.item.target_type.span(),
-                ),
-            ))?;
+        let target_type_id = defined_entity(
+            db,
+            client_pointer_declaration.item.target_type.inner().0.into(),
+        )
+        .to_owned()
+        .expect(
+            "Expected parsing to have succeeded. \
+            This is indicative of a bug in Isograph.",
+        )
+        .ok_or(WithLocation::new(
+            ProcessClientFieldDeclarationError::ParentTypeNotDefined {
+                parent_object_entity_name: *client_pointer_declaration.item.target_type.inner(),
+            },
+            Location::new(
+                text_source,
+                client_pointer_declaration.item.target_type.span(),
+            ),
+        ))?;
 
         let unprocessed_client_pointer_items = match parent_type_id {
             ServerEntityName::Object(object_entity_name) => match target_type_id {
-                ServerEntityName::Object(to_object_entity_name) => self
+                ServerEntityName::Object(_to_object_entity_name) => self
                     .add_client_pointer_to_object(
                         db,
-                        *object_entity_name,
+                        object_entity_name,
                         TypeAnnotation::from_graphql_type_annotation(
                             client_pointer_declaration
                                 .item
                                 .target_type
                                 .clone()
-                                .map(|_| *to_object_entity_name),
+                                .map(|x| x.0),
                         ),
                         client_pointer_declaration,
                     )
@@ -131,7 +144,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                 ServerEntityName::Scalar(scalar_entity_name) => {
                     return Err(WithLocation::new(
                         ProcessClientFieldDeclarationError::ClientPointerInvalidTargetType {
-                            target_object_entity_name: (*scalar_entity_name).into(),
+                            target_object_entity_name: scalar_entity_name.into(),
                         },
                         Location::new(
                             text_source,
@@ -144,7 +157,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::InvalidParentType {
                         literal_type: "pointer",
-                        parent_object_entity_name: (*scalar_entity_name).into(),
+                        parent_object_entity_name: scalar_entity_name.into(),
                     },
                     Location::new(
                         text_source,
@@ -167,7 +180,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             .as_ref()
             .expect(
                 "Expected parsing to have succeeded. \
-                        This is indicative of a bug in Isograph.",
+                This is indicative of a bug in Isograph.",
             )
             .iter()
             .find(|(_, root_operation_name)| root_operation_name.0 == "query")
@@ -224,7 +237,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                     .into_iter()
                     .map(|variable_definition| {
                         validate_variable_definition(
-                            &self.server_entity_data.defined_entities,
+                            db,
                             variable_definition,
                             parent_object_entity_name,
                             client_scalar_selectable_name.0.into(),
@@ -403,7 +416,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                     .into_iter()
                     .map(|variable_definition| {
                         validate_variable_definition(
-                            &self.server_entity_data.defined_entities,
+                            db,
                             variable_definition,
                             parent_object_entity_name,
                             client_pointer_name.0.into(),
@@ -579,8 +592,8 @@ pub fn id_top_level_arguments() -> Vec<ArgumentKeyAndValue> {
     }]
 }
 
-pub fn validate_variable_definition(
-    defined_types: &HashMap<UnvalidatedTypeName, ServerEntityName>,
+pub fn validate_variable_definition<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     variable_definition: WithSpan<VariableDefinition<UnvalidatedTypeName>>,
     parent_object_entity_name: ServerObjectEntityName,
     selectable_name: SelectableName,
@@ -590,8 +603,13 @@ pub fn validate_variable_definition(
         .type_
         .clone()
         .and_then(|input_type_name| {
-            defined_types
-                .get(variable_definition.item.type_.inner())
+            defined_entity(db, *variable_definition.item.type_.inner())
+                .deref()
+                .to_owned()
+                .expect(
+                    "Expected parsing to have succeeded. \
+                    This is indicative of a bug in Isograph.",
+                )
                 .ok_or_else(|| {
                     WithSpan::new(
                         ProcessClientFieldDeclarationError::FieldArgumentTypeDoesNotExist {
@@ -603,7 +621,6 @@ pub fn validate_variable_definition(
                         variable_definition.span,
                     )
                 })
-                .copied()
         })?;
 
     Ok(WithSpan::new(

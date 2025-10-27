@@ -20,9 +20,8 @@ use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectableId,
     EntrypointDeclarationInfo, IsographDatabase, NetworkProtocol, NormalizationKey,
     ObjectSelectable, ObjectSelectableId, ScalarSelectable, Selectable, SelectableId,
-    ServerEntityName, ServerObjectEntity, ServerObjectEntityAvailableSelectables,
-    ServerObjectSelectable, ServerScalarSelectable, ServerSelectableId,
-    UseRefetchFieldRefetchStrategy,
+    ServerEntityName, ServerObjectEntityAvailableSelectables, ServerObjectSelectable,
+    ServerScalarSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
     server_object_entity_named,
 };
@@ -80,7 +79,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 
             entrypoints: Default::default(),
             server_entity_data: ServerEntityData {
-                defined_entities: HashMap::new(),
                 server_object_entity_extra_info: HashMap::new(),
             },
         }
@@ -194,10 +192,6 @@ pub struct ServerObjectEntityExtraInfo {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ServerEntityData {
-    // TODO consider whether this is needed. Especially when server_objects and server_scalars
-    // are combined, this seems pretty useless.
-    pub defined_entities: HashMap<UnvalidatedTypeName, ServerEntityName>,
-
     // We keep track of available selectables and id fields outside of server_objects so that
     // we don't need a server_object_entity_mut method, which is incompatible with pico.
     pub server_object_entity_extra_info:
@@ -491,56 +485,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                     ClientFieldDirectiveSet::None(EmptyDirectiveSet {}),
                 )
             }))
-    }
-}
-
-impl ServerEntityData {
-    // TODO this function should not exist ... maybe soon!
-    pub fn insert_server_scalar_entity<TNetworkProtocol: NetworkProtocol + 'static>(
-        &mut self,
-        server_scalar_entity_name: ServerScalarEntityName,
-    ) -> Result<(), CreateAdditionalFieldsError<TNetworkProtocol>> {
-        if self
-            .defined_entities
-            .insert(
-                server_scalar_entity_name.into(),
-                SelectionType::Scalar(server_scalar_entity_name),
-            )
-            .is_some()
-        {
-            return Err(CreateAdditionalFieldsError::DuplicateTypeDefinition {
-                type_definition_type: "scalar",
-                duplicate_entity_name: server_scalar_entity_name.into(),
-            });
-        }
-
-        // there are no scalar entities anymore... so we don't actually insert anything
-
-        Ok(())
-    }
-
-    // TODO this function should not exist
-    // TODO accept WithLocation instead of name_location
-    pub fn insert_server_object_entity<TNetworkProtocol: NetworkProtocol + 'static>(
-        &mut self,
-        server_server_object_entity: ServerObjectEntity<TNetworkProtocol>,
-    ) -> Result<ServerObjectEntityName, CreateAdditionalFieldsError<TNetworkProtocol>> {
-        let name = server_server_object_entity.name;
-        if self
-            .defined_entities
-            .insert(
-                server_server_object_entity.name.item.into(),
-                SelectionType::Object(server_server_object_entity.name.item),
-            )
-            .is_some()
-        {
-            return Err(CreateAdditionalFieldsError::DuplicateTypeDefinition {
-                type_definition_type: "object",
-                duplicate_entity_name: server_server_object_entity.name.item.into(),
-            });
-        }
-
-        Ok(name.item)
     }
 }
 

@@ -14,7 +14,9 @@ use isograph_lang_types::{
 };
 use thiserror::Error;
 
-use crate::{IsographDatabase, NetworkProtocol, Schema, ServerEntityName, fetchable_types};
+use crate::{
+    IsographDatabase, NetworkProtocol, Schema, ServerEntityName, defined_entity, fetchable_types,
+};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct EntrypointDeclarationInfo {
@@ -89,7 +91,6 @@ fn validate_entrypoint_type_and_field<TNetworkProtocol: NetworkProtocol + 'stati
 ) -> Result<ClientScalarSelectableName, WithLocation<ValidateEntrypointDeclarationError>> {
     let parent_object_entity_name = validate_parent_object_entity_name(
         db,
-        schema,
         entrypoint_declaration.item.parent_type,
         text_source,
     )?;
@@ -105,19 +106,20 @@ fn validate_entrypoint_type_and_field<TNetworkProtocol: NetworkProtocol + 'stati
 
 fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
-    parent_type: WithSpan<ServerObjectEntityNameWrapper>,
+    parent_object_entity_name: WithSpan<ServerObjectEntityNameWrapper>,
     text_source: TextSource,
 ) -> Result<ServerObjectEntityName, WithLocation<ValidateEntrypointDeclarationError>> {
-    let parent_type_id = schema
-        .server_entity_data
-        .defined_entities
-        .get(&parent_type.item.0.into())
+    let parent_type_id = defined_entity(db, parent_object_entity_name.item.0.into())
+        .to_owned()
+        .expect(
+            "Expected parsing to have succeeded. \
+            This is indicative of a bug in Isograph.",
+        )
         .ok_or(WithLocation::new(
             ValidateEntrypointDeclarationError::ParentTypeNotDefined {
-                parent_object_entity_name: parent_type.item,
+                parent_object_entity_name: parent_object_entity_name.item,
             },
-            Location::new(text_source, parent_type.span),
+            Location::new(text_source, parent_object_entity_name.span),
         ))?;
 
     match parent_type_id {
@@ -129,7 +131,7 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol + 'stati
                     "Expected parsing to have succeeded. \
                 This is indicative of a bug in Isograph.",
                 )
-                .contains_key(object_entity_name);
+                .contains_key(&object_entity_name);
 
             if !is_fetchable {
                 let fetchable_types = fetchable_types(db)
@@ -146,21 +148,21 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol + 'stati
 
                 Err(WithLocation::new(
                     ValidateEntrypointDeclarationError::NonFetchableParentType {
-                        parent_object_entity_name: parent_type.item,
+                        parent_object_entity_name: parent_object_entity_name.item,
                         fetchable_types,
                     },
-                    Location::new(text_source, parent_type.span),
+                    Location::new(text_source, parent_object_entity_name.span),
                 ))
             } else {
-                Ok(*object_entity_name)
+                Ok(object_entity_name)
             }
         }
         ServerEntityName::Scalar(scalar_entity_name) => Err(WithLocation::new(
             ValidateEntrypointDeclarationError::InvalidParentType {
                 parent_type: "scalar",
-                parent_object_entity_name: (*scalar_entity_name).into(),
+                parent_object_entity_name: scalar_entity_name.into(),
             },
-            Location::new(text_source, parent_type.span),
+            Location::new(text_source, parent_object_entity_name.span),
         )),
     }
 }

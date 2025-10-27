@@ -276,7 +276,7 @@ pub fn defined_entity<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
-enum DefinedEntityError<TNetworkProtocol: NetworkProtocol + 'static> {
+pub enum DefinedEntityError<TNetworkProtocol: NetworkProtocol + 'static> {
     #[error("{0}")]
     ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),
 
