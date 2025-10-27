@@ -78,9 +78,9 @@ pub enum EntityAccessError<TNetworkProtocol: NetworkProtocol + 'static> {
     #[error("{0}")]
     ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),
 
-    #[error("Multiple definitions of {server_entity_name} found")]
+    #[error("Multiple definitions of `{duplicate_entity_name}` were found")]
     MultipleDefinitionsFound {
-        server_entity_name: UnvalidatedTypeName,
+        duplicate_entity_name: UnvalidatedTypeName,
     },
 
     #[error(
@@ -122,7 +122,7 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
                 }
             } else {
                 Err(EntityAccessError::MultipleDefinitionsFound {
-                    server_entity_name: server_object_entity_name.into(),
+                    duplicate_entity_name: server_object_entity_name.into(),
                 })
             }
         }
@@ -159,7 +159,7 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
                 }
             } else {
                 Err(EntityAccessError::MultipleDefinitionsFound {
-                    server_entity_name: server_scalar_entity_name.into(),
+                    duplicate_entity_name: server_scalar_entity_name.into(),
                 })
             }
         }
@@ -260,7 +260,7 @@ pub fn defined_entity<TNetworkProtocol: NetworkProtocol + 'static>(
                     if rest.is_empty() {
                         Ok(Some(*first))
                     } else {
-                        Err(DefinedEntityError::DuplicateTypeDefinition {
+                        Err(DefinedEntityError::MultipleDefinitionsFound {
                             duplicate_entity_name: entity_name,
                         })
                     }
@@ -282,7 +282,7 @@ enum DefinedEntityError<TNetworkProtocol: NetworkProtocol + 'static> {
 
     // TODO include additional locations
     #[error("Multiple definitions of `{duplicate_entity_name}` were found")]
-    DuplicateTypeDefinition {
+    MultipleDefinitionsFound {
         duplicate_entity_name: UnvalidatedTypeName,
     },
 }
