@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Deref};
 
 use common_lang_types::{
     SelectableName, ServerObjectEntityName, UnvalidatedTypeName, VariableName, WithLocation,
@@ -35,23 +35,24 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
 > {
     let memo_ref = TNetworkProtocol::parse_type_system_documents(db);
     let (items, _fetchable_types) = memo_ref
-        .to_owned()
-        .map_err(|e| CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e })?;
+        .deref()
+        .as_ref()
+        .map_err(|e| CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e.clone() })?;
 
     let unvalidated_isograph_schema = Schema::<TNetworkProtocol>::new();
 
     let mut field_queue = HashMap::new();
     let mut expose_as_field_queue = HashMap::new();
 
-    for item in items.into_iter().flat_map(|x| x.as_object()) {
+    for item in items.into_iter().flat_map(|x| x.as_ref().as_object()) {
         field_queue.insert(
             item.server_object_entity.item.name.item,
-            item.fields_to_insert,
+            item.fields_to_insert.clone(),
         );
 
         expose_as_field_queue.insert(
             item.server_object_entity.item.name.item,
-            item.expose_as_fields_to_insert,
+            item.expose_as_fields_to_insert.clone(),
         );
     }
 
