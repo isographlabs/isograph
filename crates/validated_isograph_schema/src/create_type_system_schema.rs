@@ -26,7 +26,6 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
     (
-        Schema<TNetworkProtocol>,
         // TODO combine these into one hashmap?
         HashMap<ServerObjectEntityName, Vec<ExposeAsFieldToInsert>>,
         HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
@@ -38,8 +37,6 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
         .deref()
         .as_ref()
         .map_err(|e| CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e.clone() })?;
-
-    let unvalidated_isograph_schema = Schema::<TNetworkProtocol>::new();
 
     let mut field_queue = HashMap::new();
     let mut expose_as_field_queue = HashMap::new();
@@ -56,11 +53,7 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
         );
     }
 
-    Ok((
-        unvalidated_isograph_schema,
-        expose_as_field_queue,
-        field_queue,
-    ))
+    Ok((expose_as_field_queue, field_queue))
 }
 
 /// Create a schema from the type system document, i.e. avoid parsing any
@@ -80,8 +73,9 @@ pub(crate) fn create_type_system_schema_with_server_selectables<
     ),
     CreateSchemaError<TNetworkProtocol>,
 > {
-    let (mut unvalidated_isograph_schema, expose_as_field_queue, field_queue) =
-        create_type_system_schema(db).to_owned()?;
+    let (expose_as_field_queue, field_queue) = create_type_system_schema(db).to_owned()?;
+
+    let mut unvalidated_isograph_schema = Schema::new();
 
     process_field_queue(
         db,
