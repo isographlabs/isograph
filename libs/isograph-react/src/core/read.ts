@@ -154,7 +154,7 @@ function readData<TReadFromStore>(
     root.__typename,
   );
   encounteredIds.add(root.__link);
-  let storeRecord = readOptimisticRecord(environment, root);
+  let storeRecord = readOptimisticRecord(environment.store, root);
   if (storeRecord === undefined) {
     return {
       kind: 'MissingData',

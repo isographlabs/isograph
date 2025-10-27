@@ -14,7 +14,6 @@ import {
 } from './FragmentReference';
 import {
   assertLink,
-  type StoreLayerData,
   type IsographEnvironment,
   type StoreLink,
 } from './IsographEnvironment';
@@ -23,7 +22,8 @@ import {
   addStartUpdateStoreLayer,
   getOrInsertRecord,
   readOptimisticRecord,
-  type WithEncounteredIds,
+  type FirstUpdate,
+  type StoreLayer,
 } from './optimisticProxy';
 import { readPromise, type PromiseWrapper } from './PromiseWrapper';
 import {
@@ -60,13 +60,12 @@ export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
   networkRequestOptions: NetworkRequestReaderOptions,
 ): ExtractStartUpdate<TReadFromStore> {
   return (updater) => {
-    function startUpdate(): WithEncounteredIds<StoreLayerData> {
-      let dataLayer: StoreLayerData = {};
+    const startUpdate: FirstUpdate = (storeLayer) => {
       let mutableUpdatedIds: EncounteredIds = new Map();
 
       let updatableData = createUpdatableProxy(
         environment,
-        dataLayer,
+        storeLayer,
         fragmentReference,
         networkRequestOptions,
         mutableUpdatedIds,
@@ -74,7 +73,7 @@ export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
 
       try {
         updater({ updatableData });
-        return { data: dataLayer, encounteredIds: mutableUpdatedIds };
+        return mutableUpdatedIds;
       } catch (e) {
         logMessage(environment, () => ({
           kind: 'StartUpdateError',
@@ -82,7 +81,7 @@ export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
         }));
         throw e;
       }
-    }
+    };
 
     addStartUpdateStoreLayer(environment, startUpdate);
   };
@@ -92,7 +91,7 @@ export function createUpdatableProxy<
   TReadFromStore extends UnknownTReadFromStore,
 >(
   environment: IsographEnvironment,
-  data: StoreLayerData,
+  storeLayer: StoreLayer,
   fragmentReference: FragmentReference<TReadFromStore, unknown>,
   networkRequestOptions: NetworkRequestReaderOptions,
   mutableUpdatedIds: EncounteredIds,
@@ -103,7 +102,7 @@ export function createUpdatableProxy<
 
   return readUpdatableData(
     environment,
-    data,
+    storeLayer,
     readerWithRefetchQueries.readerArtifact.readerAst,
     fragmentReference.root,
     fragmentReference.variables ?? {},
@@ -163,7 +162,7 @@ function defineCachedProperty<T>(
 
 function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
   environment: IsographEnvironment,
-  dataLayer: StoreLayerData,
+  storeLayer: StoreLayer,
   ast: ReaderAst<TReadFromStore>,
   root: StoreLink,
   variables: ExtractParameters<TReadFromStore>,
@@ -173,7 +172,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
   mutableState: MutableInvalidationState,
   mutableUpdatedIds: EncounteredIds,
 ): ReadDataResultSuccess<ExtractUpdatableData<TReadFromStore>> {
-  let storeRecord = readOptimisticRecord(environment, root);
+  let storeRecord = readOptimisticRecord(storeLayer, root);
   if (storeRecord == null) {
     return {
       kind: 'Success',
@@ -206,7 +205,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
           },
           field.isUpdatable
             ? (newValue) => {
-                const storeRecord = getOrInsertRecord(dataLayer, root);
+                const storeRecord = getOrInsertRecord(storeLayer.data, root);
                 storeRecord[storeRecordName] = newValue;
                 const updatedIds = insertEmptySetIfMissing(
                   mutableUpdatedIds,
@@ -237,7 +236,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
               (ast, root) =>
                 readUpdatableData(
                   environment,
-                  dataLayer,
+                  storeLayer,
                   ast,
                   root,
                   variables,
@@ -255,7 +254,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
           },
           'isUpdatable' in field && field.isUpdatable
             ? (newValue) => {
-                const storeRecord = getOrInsertRecord(dataLayer, root);
+                const storeRecord = getOrInsertRecord(storeLayer.data, root);
                 if (Array.isArray(newValue)) {
                   storeRecord[storeRecordName] = newValue.map((node) =>
                     assertLink(node?.__link),

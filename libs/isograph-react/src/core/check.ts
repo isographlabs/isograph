@@ -40,7 +40,7 @@ export function check(
   variables: Variables,
   root: StoreLink,
 ): CheckResult {
-  const newStoreRecord = readOptimisticRecord(environment, root);
+  const newStoreRecord = readOptimisticRecord(environment.store, root);
 
   const checkResult = checkFromRecord(
     environment,
@@ -107,7 +107,7 @@ function checkFromRecord(
               );
             }
 
-            const linkedRecord = readOptimisticRecord(environment, link);
+            const linkedRecord = readOptimisticRecord(environment.store, link);
 
             if (linkedRecord === undefined) {
               return {
@@ -140,7 +140,7 @@ function checkFromRecord(
             );
           }
 
-          const linkedRecord = readOptimisticRecord(environment, link);
+          const linkedRecord = readOptimisticRecord(environment.store, link);
 
           if (linkedRecord === undefined) {
             return {

@@ -20,13 +20,9 @@ import {
   retainQuery,
   unretainQuery,
 } from './garbageCollection';
-import {
-  IsographEnvironment,
-  ROOT_ID,
-  StoreLink,
-  type StoreLayerData,
-} from './IsographEnvironment';
+import { IsographEnvironment, ROOT_ID, StoreLink } from './IsographEnvironment';
 import { logMessage } from './logging';
+import { addNetworkResponseStoreLayer } from './optimisticProxy';
 import {
   AnyError,
   PromiseWrapper,
@@ -35,7 +31,6 @@ import {
 } from './PromiseWrapper';
 import { readButDoNotEvaluate } from './read';
 import { getOrCreateCachedStartUpdate } from './startUpdate';
-import { addNetworkResponseStoreLayer } from './optimisticProxy';
 
 let networkRequestId = 0;
 
@@ -172,16 +167,16 @@ export function makeNetworkRequest<
 
       const root = { __link: ROOT_ID, __typename: artifact.concreteType };
       if (status.kind === 'UndisposedIncomplete') {
-        const data: StoreLayerData = {};
-        const encounteredIds = normalizeData(
-          environment,
-          data,
-          normalizationAst.selections,
-          networkResponse.data ?? {},
-          variables,
-          root,
-        );
-        addNetworkResponseStoreLayer(environment, data, encounteredIds);
+        addNetworkResponseStoreLayer(environment, (storeLayer) => {
+          return normalizeData(
+            environment,
+            storeLayer,
+            normalizationAst.selections,
+            networkResponse.data ?? {},
+            variables,
+            root,
+          );
+        });
         const retainedQuery = {
           normalizationAst: normalizationAst.selections,
           variables,
