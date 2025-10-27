@@ -15,11 +15,6 @@ use isograph_schema::{
 use pico_macros::legacy_memo;
 use thiserror::Error;
 
-/// Create a schema from the type system document, i.e. avoid parsing any
-/// iso literals. It also doesn't set any server fields. That is done in a future step.
-///
-/// This is sufficient for some queries, like answering "Where is an entity
-/// defined".
 #[legacy_memo]
 #[allow(clippy::type_complexity)]
 pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
