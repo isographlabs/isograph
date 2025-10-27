@@ -225,8 +225,8 @@ pub fn defined_entities<TNetworkProtocol: NetworkProtocol + 'static>(
 
     let mut defined_entities: HashMap<UnvalidatedTypeName, Vec<_>> = HashMap::new();
 
-    for x in outcome.iter() {
-        match x {
+    for defined_entity in outcome.iter() {
+        match defined_entity {
             SelectionType::Object(outcome) => defined_entities
                 .entry(outcome.server_object_entity.item.name.item.into())
                 .or_default()
