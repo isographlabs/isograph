@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{collections::HashMap, ops::Deref};
 
 use common_lang_types::{
     JavascriptName, ServerObjectEntityName, ServerScalarEntityName, UnvalidatedTypeName,
@@ -208,4 +208,81 @@ pub fn server_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
             }
         }
     }
+}
+
+#[legacy_memo]
+pub fn defined_entities<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+) -> Result<
+    HashMap<UnvalidatedTypeName, Vec<ServerEntityName>>,
+    TNetworkProtocol::ParseTypeSystemDocumentsError,
+> {
+    let memo_ref = TNetworkProtocol::parse_type_system_documents(db);
+    let (outcome, _) = match memo_ref.deref() {
+        Ok(outcome) => outcome,
+        Err(e) => return Err(e.clone()),
+    };
+
+    let mut defined_entities: HashMap<UnvalidatedTypeName, Vec<_>> = HashMap::new();
+
+    for x in outcome.iter() {
+        match x {
+            SelectionType::Object(outcome) => defined_entities
+                .entry(outcome.server_object_entity.item.name.item.into())
+                .or_default()
+                .push(SelectionType::Object(
+                    outcome.server_object_entity.item.name.item,
+                )),
+            SelectionType::Scalar(server_scalar_entity) => defined_entities
+                .entry(server_scalar_entity.item.name.item.into())
+                .or_default()
+                .push(SelectionType::Scalar(server_scalar_entity.item.name.item)),
+        }
+    }
+
+    Ok(defined_entities)
+}
+
+#[legacy_memo]
+pub fn defined_entity<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    entity_name: UnvalidatedTypeName,
+) -> Result<Option<ServerEntityName>, DefinedEntityError<TNetworkProtocol>> {
+    match defined_entities(db)
+        .deref()
+        .as_ref()
+        .map_err(|e| DefinedEntityError::ParseTypeSystemDocumentsError(e.clone()))?
+        .get(&entity_name)
+    {
+        Some(items) => {
+            match items.split_first() {
+                Some((first, rest)) => {
+                    if rest.is_empty() {
+                        Ok(Some(*first))
+                    } else {
+                        Err(DefinedEntityError::DuplicateTypeDefinition {
+                            duplicate_entity_name: entity_name,
+                        })
+                    }
+                }
+                None => {
+                    // Empty, this shouldn't happen. We can consider having a NonEmptyVec or something
+                    Ok(None)
+                }
+            }
+        }
+        None => Ok(None),
+    }
+}
+
+#[derive(Clone, Debug, Error, Eq, PartialEq)]
+enum DefinedEntityError<TNetworkProtocol: NetworkProtocol + 'static> {
+    #[error("{0}")]
+    ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),
+
+    // TODO include additional locations
+    #[error("Multiple definitions of `{duplicate_entity_name}` were found")]
+    DuplicateTypeDefinition {
+        duplicate_entity_name: UnvalidatedTypeName,
+    },
 }
