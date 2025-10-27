@@ -4,14 +4,14 @@ import type { ExtractUpdatableData } from '../core/FragmentReference';
 import {
   createIsographEnvironment,
   ROOT_ID,
-  type IsographStore,
+  type BaseStoreLayerData,
 } from '../core/IsographEnvironment';
 import { createUpdatableProxy } from '../core/startUpdate';
 import { iso } from './__isograph/iso';
 import type { Query__linkedUpdate__param } from './__isograph/Query/linkedUpdate/param_type';
 import type { Query__startUpdate__param } from './__isograph/Query/startUpdate/param_type';
 
-const getDefaultStore = (): IsographStore => ({
+const getDefaultStore = (): BaseStoreLayerData => ({
   Query: {
     [ROOT_ID]: {
       node____id___0: {
@@ -88,7 +88,7 @@ describe('startUpdate', () => {
 
       data = createUpdatableProxy(
         environment,
-        environment.store.data,
+        environment.store,
         item,
         {
           suspendIfInFlight: true,
@@ -160,7 +160,7 @@ describe('startUpdate', () => {
 
       data = createUpdatableProxy(
         environment,
-        environment.store.data,
+        environment.store,
         item,
         {
           suspendIfInFlight: true,

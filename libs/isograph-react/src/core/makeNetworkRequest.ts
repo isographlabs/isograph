@@ -20,12 +20,7 @@ import {
   retainQuery,
   unretainQuery,
 } from './garbageCollection';
-import {
-  IsographEnvironment,
-  ROOT_ID,
-  StoreLink,
-  type StoreLayerData,
-} from './IsographEnvironment';
+import { IsographEnvironment, ROOT_ID, StoreLink } from './IsographEnvironment';
 import { logMessage } from './logging';
 import { addNetworkResponseStoreLayer } from './optimisticProxy';
 import {
@@ -207,16 +202,16 @@ export function makeNetworkRequest<
 
       const root = { __link: ROOT_ID, __typename: artifact.concreteType };
       if (status.kind === 'Undisposed') {
-        const data: StoreLayerData = {};
-        const encounteredIds = normalizeData(
-          environment,
-          data,
-          normalizationAst.selections,
-          networkResponse.data ?? {},
-          variables,
-          root,
-        );
-        addNetworkResponseStoreLayer(environment, data, encounteredIds);
+        addNetworkResponseStoreLayer(environment, (storeLayer) => {
+          return normalizeData(
+            environment,
+            storeLayer,
+            normalizationAst.selections,
+            networkResponse.data ?? {},
+            variables,
+            root,
+          );
+        });
       }
 
       const onComplete = fetchOptions?.onComplete;

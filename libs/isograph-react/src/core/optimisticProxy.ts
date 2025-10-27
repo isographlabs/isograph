@@ -21,19 +21,19 @@ export function getOrInsertRecord(
 }
 
 export function readOptimisticRecord(
-  environment: IsographEnvironment,
+  storeLayer: StoreLayer,
   link: StoreLink,
 ): StoreRecord {
   return new Proxy<StoreRecord>(
     {},
     {
       get(_, p) {
-        let node: StoreLayer | null = environment.store;
+        let node: StoreLayer | null = storeLayer;
 
         while (node !== null) {
           const storeRecord = node.data[link.__typename]?.[link.__link];
           if (storeRecord != undefined) {
-            const value = Reflect.get(storeRecord, p, storeRecord);
+            const value = Reflect.get(storeRecord, p);
             if (value !== undefined) {
               return value;
             }
@@ -42,7 +42,7 @@ export function readOptimisticRecord(
         }
       },
       has(_, p) {
-        let node: StoreLayer | null = environment.store;
+        let node: StoreLayer | null = storeLayer;
 
         while (node !== null) {
           const storeRecord = node.data[link.__typename]?.[link.__link];
@@ -55,6 +55,13 @@ export function readOptimisticRecord(
           node = node.parentStoreLayer;
         }
         return false;
+      },
+      set(_, p, newValue) {
+        return Reflect.set(
+          getOrInsertRecord(storeLayer.data, link),
+          p,
+          newValue,
+        );
       },
     },
   );
@@ -74,13 +81,8 @@ type NetworkResponseStoreLayer = {
   data: StoreLayerData;
 };
 
-export type WithEncounteredIds<T> = {
-  readonly encounteredIds: EncounteredIds;
-  readonly data: T;
-};
-
-type FirstUpdate = () => WithEncounteredIds<StoreLayerData>;
-type DataUpdate = () => Pick<WithEncounteredIds<StoreLayerData>, 'data'>;
+export type FirstUpdate = (storeLayer: StoreLayer) => EncounteredIds;
+type DataUpdate = (storeLayer: StoreLayer) => void;
 
 type StartUpdateStoreLayer = {
   readonly kind: 'StartUpdateStoreLayer';
@@ -108,13 +110,13 @@ type OptimisticStoreLayer = {
 
 export function addNetworkResponseStoreLayer(
   environment: IsographEnvironment,
-  data: StoreLayerData,
-  encounteredIds: EncounteredIds,
+  normalizeData: FirstUpdate,
 ): void {
+  let encounteredIds: EncounteredIds;
   switch (environment.store.kind) {
     case 'NetworkResponseStoreLayer':
     case 'BaseStoreLayer': {
-      mergeDataLayer(environment.store.data, data);
+      encounteredIds = normalizeData(environment.store);
       break;
     }
     case 'StartUpdateStoreLayer':
@@ -123,15 +125,17 @@ export function addNetworkResponseStoreLayer(
         kind: 'NetworkResponseStoreLayer',
         parentStoreLayer: environment.store,
         childStoreLayer: null,
-        data,
+        data: {},
       };
       environment.store.childStoreLayer = node;
       environment.store = node;
+
+      encounteredIds = normalizeData(node);
       break;
     }
     default: {
       environment.store satisfies never;
-      throw new Error('Unreachable');
+      throw new Error('Unreachable. This is a bug in Isograph.');
     }
   }
 
@@ -158,24 +162,23 @@ export function addStartUpdateStoreLayer(
   environment: IsographEnvironment,
   startUpdate: FirstUpdate,
 ): void {
-  const { data, encounteredIds } = startUpdate();
+  let encounteredIds: EncounteredIds;
 
   switch (environment.store.kind) {
     case 'BaseStoreLayer': {
-      mergeDataLayer(environment.store.data, data);
+      encounteredIds = startUpdate(environment.store);
       break;
     }
     case 'StartUpdateStoreLayer': {
-      const prevStartUpdate = environment.store.startUpdate;
+      const node = environment.store;
 
-      mergeDataLayer(environment.store.data, data);
-
-      environment.store.startUpdate = () => {
-        const { data } = prevStartUpdate();
-        mergeDataLayer(data, startUpdate().data);
-        return { data };
+      const prevStartUpdate = node.startUpdate;
+      node.startUpdate = () => {
+        prevStartUpdate(node);
+        startUpdate(node);
       };
 
+      encounteredIds = startUpdate(node);
       break;
     }
     case 'NetworkResponseStoreLayer':
@@ -184,15 +187,18 @@ export function addStartUpdateStoreLayer(
         kind: 'StartUpdateStoreLayer',
         parentStoreLayer: environment.store,
         childStoreLayer: null,
-        data,
+        data: {},
         startUpdate: startUpdate,
       };
       environment.store.childStoreLayer = node;
       environment.store = node;
+
+      encounteredIds = startUpdate(node);
       break;
     }
     default: {
       environment.store satisfies never;
+      throw new Error('Unreachable. This is a bug in Isograph.');
     }
   }
 
@@ -208,13 +214,13 @@ export function addOptimisticStoreLayer(
   environment: IsographEnvironment,
   startUpdate: FirstUpdate,
 ) {
-  const { data, encounteredIds } = startUpdate();
-
   switch (environment.store.kind) {
     case 'BaseStoreLayer':
     case 'StartUpdateStoreLayer':
     case 'NetworkResponseStoreLayer':
     case 'OptimisticStoreLayer': {
+      const data = {};
+
       const node: OptimisticStoreLayer = {
         kind: 'OptimisticStoreLayer',
         parentStoreLayer: environment.store,
@@ -223,51 +229,41 @@ export function addOptimisticStoreLayer(
         startUpdate: startUpdate,
       };
 
+      const encounteredIds = startUpdate(node);
+
       environment.store.childStoreLayer = node;
       environment.store = node;
 
       callSubscriptions(environment, encounteredIds);
-      return (data: StoreLayerData): void => {
-        const encounteredIds: EncounteredIds = new Map();
-        compareData(node.data, data, encounteredIds);
+      return (
+        normalizeData: (storeLayer: StoreLayer) => EncounteredIds,
+      ): void => {
         replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
           environment,
           node,
-          data,
-          encounteredIds,
+          normalizeData,
         );
-        callSubscriptions(environment, encounteredIds);
       };
     }
     default: {
       environment.store satisfies never;
-      throw new Error('Unreachable');
+      throw new Error('Unreachable. This is a bug in Isograph.');
     }
   }
 }
 
 function mergeChildNodes(
-  environment: IsographEnvironment,
-  node:
-    | OptimisticStoreLayer
-    | NetworkResponseStoreLayer
-    | StartUpdateStoreLayer
-    | null,
-  oldData: StoreLayerData,
-  newData: StoreLayerData,
+  node: StoreLayer | null,
+  baseNode: BaseStoreLayer | NetworkResponseStoreLayer,
 ): OptimisticStoreLayer | null {
-  while (node && node?.kind !== 'OptimisticStoreLayer') {
-    mergeDataLayer(oldData, node.data);
-    const data = 'startUpdate' in node ? node.startUpdate().data : node.data;
-    mergeDataLayer(newData, data);
-    mergeDataLayer(environment.store.data, data);
+  while (node && node.kind !== 'OptimisticStoreLayer') {
+    mergeDataLayer(baseNode.data, node.data);
     node = node.childStoreLayer;
   }
   return node;
 }
 
 function reexecuteUpdates(
-  environment: IsographEnvironment,
   node:
     | OptimisticStoreLayer
     | NetworkResponseStoreLayer
@@ -278,91 +274,90 @@ function reexecuteUpdates(
 ): void {
   while (node !== null) {
     mergeDataLayer(oldData, node.data);
-
     if ('startUpdate' in node) {
-      node.data = node.startUpdate().data;
+      node.data = {};
+      node.startUpdate(node);
     }
     mergeDataLayer(newData, node.data);
-    node.parentStoreLayer = environment.store;
-    environment.store.childStoreLayer = node;
-    environment.store = node;
 
     node = node.childStoreLayer;
-
-    environment.store.childStoreLayer = null;
   }
-}
-
-function makeRootNode(
-  environment: IsographEnvironment,
-  node: StoreLayer,
-): void {
-  node.childStoreLayer = null;
-  environment.store = node;
 }
 
 function replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
   environment: IsographEnvironment,
   optimisticNode: OptimisticStoreLayer,
-  data: StoreLayerData,
-  encounteredIds: EncounteredIds,
+  normalizeData: (storeLayer: StoreLayer) => void,
 ): void {
   const oldData = optimisticNode.data;
-  const newData = structuredClone(data);
-  if (optimisticNode.parentStoreLayer.kind === 'BaseStoreLayer') {
-    mergeDataLayer(optimisticNode.parentStoreLayer.data, data);
+  //  we cannot replace optimistic node with network response directly
+  // because of the types so we have to:
+  //  1. reset the optimistic node
+  optimisticNode.data = {};
+  // 2. append the network response as child
+  const networkResponseNode: NetworkResponseStoreLayer = {
+    kind: 'NetworkResponseStoreLayer',
+    data: {},
+    parentStoreLayer: optimisticNode,
+    childStoreLayer: null,
+  };
+  normalizeData(networkResponseNode);
 
-    makeRootNode(environment, optimisticNode.parentStoreLayer);
-    const node = mergeChildNodes(
-      environment,
-      optimisticNode.childStoreLayer,
-      oldData,
-      newData,
-    );
-    reexecuteUpdates(environment, node, oldData, newData);
-  } else if (
-    optimisticNode.parentStoreLayer.kind === 'NetworkResponseStoreLayer'
-  ) {
-    mergeDataLayer(optimisticNode.parentStoreLayer.data, data);
+  let childNode = optimisticNode.childStoreLayer;
 
-    makeRootNode(environment, optimisticNode.parentStoreLayer);
-    reexecuteUpdates(
-      environment,
-      optimisticNode.childStoreLayer,
-      oldData,
-      newData,
-    );
-  } else if (
-    optimisticNode.childStoreLayer?.kind === 'NetworkResponseStoreLayer'
-  ) {
-    const networkResponseNode = optimisticNode.childStoreLayer;
-    mergeDataLayer(data, networkResponseNode.data);
-    networkResponseNode.data = data;
+  if (childNode?.kind === 'NetworkResponseStoreLayer') {
+    mergeDataLayer(networkResponseNode.data, childNode.data);
+    mergeDataLayer(oldData, childNode.data);
+    childNode = childNode.childStoreLayer;
+  }
+  const newData = structuredClone(networkResponseNode.data);
 
-    networkResponseNode.parentStoreLayer = optimisticNode.parentStoreLayer;
-    optimisticNode.parentStoreLayer.childStoreLayer = networkResponseNode;
-
-    const childStoreLayer = optimisticNode.childStoreLayer.childStoreLayer;
-    makeRootNode(environment, networkResponseNode);
-    reexecuteUpdates(environment, childStoreLayer, oldData, newData);
+  networkResponseNode.childStoreLayer = childNode;
+  if (childNode) {
+    childNode.parentStoreLayer = networkResponseNode;
   } else {
-    const networkResponseNode: NetworkResponseStoreLayer = {
-      kind: 'NetworkResponseStoreLayer',
-      data,
-      parentStoreLayer: optimisticNode.parentStoreLayer,
-      childStoreLayer: null,
-    };
+    environment.store = networkResponseNode;
+  }
+  optimisticNode.childStoreLayer = networkResponseNode;
 
-    makeRootNode(environment, networkResponseNode);
-    reexecuteUpdates(
-      environment,
+  // reexecute all updates after the network response
+  reexecuteUpdates(networkResponseNode.childStoreLayer, oldData, newData);
+  // merge the child nodes if possible and remove them or remove the optimistic node
+  if (optimisticNode.parentStoreLayer.kind === 'BaseStoreLayer') {
+    const childOptimisticNode = mergeChildNodes(
       optimisticNode.childStoreLayer,
-      oldData,
-      newData,
+      optimisticNode.parentStoreLayer,
     );
+
+    optimisticNode.parentStoreLayer.childStoreLayer = childOptimisticNode;
+    if (childOptimisticNode) {
+      childOptimisticNode.parentStoreLayer = optimisticNode.parentStoreLayer;
+    } else {
+      environment.store = optimisticNode.parentStoreLayer;
+    }
+  } else if (
+    optimisticNode.parentStoreLayer.kind == 'NetworkResponseStoreLayer'
+  ) {
+    mergeDataLayer(
+      optimisticNode.parentStoreLayer.data,
+      networkResponseNode.data,
+    );
+    optimisticNode.parentStoreLayer.childStoreLayer =
+      networkResponseNode.childStoreLayer;
+    if (networkResponseNode.childStoreLayer) {
+      networkResponseNode.childStoreLayer.parentStoreLayer =
+        optimisticNode.parentStoreLayer;
+    } else {
+      environment.store = optimisticNode.parentStoreLayer;
+    }
+  } else {
+    optimisticNode.parentStoreLayer.childStoreLayer = networkResponseNode;
+    networkResponseNode.parentStoreLayer = optimisticNode.parentStoreLayer;
   }
 
+  let encounteredIds: EncounteredIds = new Map();
   compareData(oldData, newData, encounteredIds);
+  callSubscriptions(environment, encounteredIds);
 }
 
 export type StoreLayer =
