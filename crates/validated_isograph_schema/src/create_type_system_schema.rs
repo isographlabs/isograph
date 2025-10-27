@@ -34,12 +34,9 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     CreateSchemaError<TNetworkProtocol>,
 > {
     let memo_ref = TNetworkProtocol::parse_type_system_documents(db);
-    let (items, _fetchable_types) = match memo_ref.to_owned() {
-        Ok(x) => x,
-        Err(e) => {
-            return Err(CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e });
-        }
-    };
+    let (items, _fetchable_types) = memo_ref
+        .to_owned()
+        .map_err(|e| CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e })?;
 
     let unvalidated_isograph_schema = Schema::<TNetworkProtocol>::new();
 
