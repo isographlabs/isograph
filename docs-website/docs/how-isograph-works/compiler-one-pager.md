@@ -1,5 +1,7 @@
 # Compiler one-pager
 
+A description of the compiler and how we are rewriting it from being a batch compiler to being an incremental compiler.
+
 This document will be updated with a talk I gave about this, when it is made public.
 
 ## Overview
