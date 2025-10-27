@@ -13,6 +13,40 @@ use crate::{
     ServerScalarEntity,
 };
 
+/// N.B. we should normally not materialize a map here. However, parse_type_system_documents
+/// already fully parses the schema, so until that's refactored, there isn't much upside in
+/// not materializing a map here.
+#[legacy_memo]
+fn server_entity_map<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+) -> Result<
+    HashMap<UnvalidatedTypeName, Vec<OwnedServerEntity<TNetworkProtocol>>>,
+    TNetworkProtocol::ParseTypeSystemDocumentsError,
+> {
+    let memo_ref = TNetworkProtocol::parse_type_system_documents(db);
+    let (outcome, _) = match memo_ref.deref() {
+        Ok(outcome) => outcome,
+        Err(e) => return Err(e.clone()),
+    };
+
+    let mut server_entities: HashMap<_, Vec<_>> = HashMap::new();
+
+    for item in outcome.iter() {
+        match item {
+            SelectionType::Scalar(s) => server_entities
+                .entry(s.item.name.item.into())
+                .or_default()
+                .push(SelectionType::Scalar(s.clone())),
+            SelectionType::Object(outcome) => server_entities
+                .entry(outcome.server_object_entity.item.name.item.into())
+                .or_default()
+                .push(SelectionType::Object(outcome.server_object_entity.clone())),
+        }
+    }
+
+    Ok(server_entities)
+}
+
 // TODO consider adding a memoized function that creates a map of entities (maybe
 // with untracked access?) and going through that.
 #[legacy_memo]
@@ -21,36 +55,10 @@ pub fn server_entities_named<TNetworkProtocol: NetworkProtocol + 'static>(
     entity_name: UnvalidatedTypeName,
 ) -> Result<Vec<OwnedServerEntity<TNetworkProtocol>>, TNetworkProtocol::ParseTypeSystemDocumentsError>
 {
-    let memo_ref = TNetworkProtocol::parse_type_system_documents(db);
-    let (outcome, _) = match memo_ref.deref() {
-        Ok(outcome) => outcome,
-        Err(e) => return Err(e.clone()),
-    };
+    let memo_ref = server_entity_map(db);
+    let map = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
 
-    Ok(outcome
-        .iter()
-        .filter_map(|x| match x {
-            SelectionType::Object(o) => {
-                // Why??
-                let name: UnvalidatedTypeName =
-                    o.server_object_entity.item.name.item.unchecked_conversion();
-                if name == entity_name {
-                    Some(SelectionType::Object(o.server_object_entity.clone()))
-                } else {
-                    None
-                }
-            }
-            SelectionType::Scalar(s) => {
-                // Why??
-                let name: UnvalidatedTypeName = s.item.name.item.unchecked_conversion();
-                if name == entity_name {
-                    Some(SelectionType::Scalar(s.clone()))
-                } else {
-                    None
-                }
-            }
-        })
-        .collect::<Vec<_>>())
+    Ok(map.get(&entity_name).cloned().unwrap_or_default())
 }
 
 #[legacy_memo]
@@ -167,6 +175,7 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
     }
 }
 
+/// TODO remove once we return references
 #[legacy_memo]
 pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
