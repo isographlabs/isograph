@@ -46,21 +46,16 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     let mut field_queue = HashMap::new();
     let mut expose_as_field_queue = HashMap::new();
 
-    for item in items {
-        match item {
-            SelectionType::Object(outcome) => {
-                field_queue.insert(
-                    outcome.server_object_entity.item.name.item,
-                    outcome.fields_to_insert,
-                );
+    for item in items.into_iter().flat_map(|x| x.as_object()) {
+        field_queue.insert(
+            item.server_object_entity.item.name.item,
+            item.fields_to_insert,
+        );
 
-                expose_as_field_queue.insert(
-                    outcome.server_object_entity.item.name.item,
-                    outcome.expose_as_fields_to_insert,
-                );
-            }
-            SelectionType::Scalar(_server_scalar_entity) => {}
-        }
+        expose_as_field_queue.insert(
+            item.server_object_entity.item.name.item,
+            item.expose_as_fields_to_insert,
+        );
     }
 
     Ok((
