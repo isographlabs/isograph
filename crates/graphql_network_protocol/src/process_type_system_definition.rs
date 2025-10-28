@@ -13,7 +13,7 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{Description, SelectionType};
 use isograph_schema::{
-    ExposeAsFieldToInsert, ExposeFieldDirective, FieldMapItem, FieldToInsert,
+    ExposeFieldDirective, ExposeFieldToInsert, FieldMapItem, FieldToInsert,
     IsographObjectTypeDefinition, ParseTypeSystemOutcome, ProcessObjectTypeDefinitionOutcome,
     STRING_JAVASCRIPT_TYPE, ServerObjectEntity, ServerScalarEntity, TYPENAME_FIELD_NAME,
 };
@@ -42,7 +42,7 @@ pub fn process_graphql_type_system_document(
     ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
     // TODO why are we returning these?
     HashMap<ServerObjectEntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
-    Vec<ExposeAsFieldToInsert>,
+    Vec<ExposeFieldToInsert>,
 )> {
     // TODO return a vec of errors, not just one
 
@@ -302,7 +302,7 @@ pub fn process_graphql_type_extension_document(
 ) -> ProcessGraphqlTypeDefinitionResult<(
     ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
     HashMap<ServerObjectEntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
-    Vec<ExposeAsFieldToInsert>,
+    Vec<ExposeFieldToInsert>,
 )> {
     let mut definitions = Vec::with_capacity(extension_document.0.len());
     let mut extensions = Vec::with_capacity(extension_document.0.len());
@@ -361,7 +361,7 @@ fn process_object_type_definition(
     concrete_type: Option<ServerObjectEntityName>,
     associated_data: GraphQLSchemaObjectAssociatedData,
     type_definition_type: GraphQLObjectDefinitionType,
-    refetch_fields: &mut Vec<ExposeAsFieldToInsert>,
+    refetch_fields: &mut Vec<ExposeFieldToInsert>,
 ) -> ProcessGraphqlTypeDefinitionResult<(
     ProcessObjectTypeDefinitionOutcome<GraphQLNetworkProtocol>,
     Vec<GraphQLDirective<GraphQLConstantValue>>,
@@ -426,7 +426,7 @@ fn process_object_type_definition(
     }
 
     if should_add_refetch_field {
-        refetch_fields.push(ExposeAsFieldToInsert {
+        refetch_fields.push(ExposeFieldToInsert {
             expose_field_directive: ExposeFieldDirective {
                 expose_as: Some(*REFETCH_FIELD_NAME),
                 field_map: vec![FieldMapItem {

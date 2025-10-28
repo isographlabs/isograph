@@ -10,7 +10,7 @@ use graphql_schema_parser::SchemaParseError;
 use intern::string_key::Intern;
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
-    ExposeAsFieldToInsert, Format, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome,
+    ExposeFieldToInsert, Format, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome,
     RootOperationName, ValidatedVariableDefinition, server_object_entity_named,
 };
 use isograph_schema::{IsographDatabase, ServerScalarEntity};
@@ -120,7 +120,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             .expect("Expected query type to be found.");
         query.expose_as_fields_to_insert.extend(refetch_fields);
 
-        // - in the extension document, you may have added directives to objects, e.g. @exposeAs
+        // - in the extension document, you may have added directives to objects, e.g. @expose
         // - we need to transfer those to the original objects.
         //
         // The way we are doing this is in dire need of cleanup.
@@ -152,7 +152,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 
                             outcome
                                 .expose_as_fields_to_insert
-                                .push(ExposeAsFieldToInsert {
+                                .push(ExposeFieldToInsert {
                                     expose_field_directive,
                                     parent_object_name: outcome.server_object_entity.item.name.item,
                                     description: None,

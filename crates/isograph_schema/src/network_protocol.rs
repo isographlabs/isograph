@@ -70,7 +70,7 @@ pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol 
     pub server_object_entity: WithLocation<ServerObjectEntity<TNetworkProtocol>>,
     pub fields_to_insert: Vec<WithLocation<FieldToInsert>>,
     // TODO this seems sketch
-    pub expose_as_fields_to_insert: Vec<ExposeAsFieldToInsert>,
+    pub expose_as_fields_to_insert: Vec<ExposeFieldToInsert>,
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
@@ -99,7 +99,7 @@ pub struct FieldToInsert {
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
-pub struct ExposeAsFieldToInsert {
+pub struct ExposeFieldToInsert {
     pub expose_field_directive: ExposeFieldDirective,
     // e.g. Query or Mutation
     pub parent_object_name: ServerObjectEntityName,

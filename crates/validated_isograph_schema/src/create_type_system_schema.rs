@@ -7,7 +7,7 @@ use graphql_lang_types::{GraphQLConstantValue, GraphQLInputValueDefinition, Name
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{ConstantValue, SelectionType, TypeAnnotation, VariableDefinition};
 use isograph_schema::{
-    CreateAdditionalFieldsError, ExposeAsFieldToInsert, FieldToInsert, IsographDatabase,
+    CreateAdditionalFieldsError, ExposeFieldToInsert, FieldToInsert, IsographDatabase,
     NetworkProtocol, Schema, ServerEntityName, ServerObjectSelectable,
     ServerObjectSelectableVariant, ServerScalarSelectable, UnprocessedClientFieldItem,
     UnprocessedClientPointerItem, defined_entity,
@@ -22,7 +22,7 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
 ) -> Result<
     (
         // TODO combine these into one hashmap?
-        HashMap<ServerObjectEntityName, Vec<ExposeAsFieldToInsert>>,
+        HashMap<ServerObjectEntityName, Vec<ExposeFieldToInsert>>,
         HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
     ),
     CreateSchemaError<TNetworkProtocol>,

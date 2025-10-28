@@ -41,7 +41,7 @@ In selection sets, selections can be labeled `@updatable`.
 
 - `__typename`, `id` or `link`
 - another resolver, e.g. `PetDetailCard`
-- a refetch or `@exposeAs` field
+- a refetch or `@expose` field
 
 Just use common sense!
 :::

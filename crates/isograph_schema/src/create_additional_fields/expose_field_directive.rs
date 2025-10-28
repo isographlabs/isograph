@@ -14,7 +14,7 @@ use isograph_lang_types::{
 use serde::Deserialize;
 
 use crate::{
-    ClientFieldVariant, ClientScalarSelectable, ExposeAsFieldToInsert,
+    ClientFieldVariant, ClientScalarSelectable, ExposeFieldToInsert,
     ImperativelyLoadedFieldVariant, IsographDatabase, NetworkProtocol, RefetchStrategy, Schema,
     ServerEntityName, ServerObjectSelectableVariant, UnprocessedClientFieldItem,
     WrappedSelectionMapSelection, generate_refetch_field_strategy,
@@ -60,7 +60,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     pub fn create_new_exposed_field(
         &mut self,
         db: &IsographDatabase<TNetworkProtocol>,
-        expose_field_to_insert: ExposeAsFieldToInsert,
+        expose_field_to_insert: ExposeFieldToInsert,
         parent_object_entity_name: ServerObjectEntityName,
     ) -> Result<UnprocessedClientFieldItem, CreateAdditionalFieldsError<TNetworkProtocol>> {
         let ExposeFieldDirective {
