@@ -1,4 +1,6 @@
 import avatarSrc from '../assets/avatar.png';
+import petDetailRouteEntrypointSrc from '../assets/pet-detail-route-entrypoint.png';
+import petDetailRouteSrc from '../assets/pet-detail-route.png';
 
 # Isograph one-pager
 
@@ -8,7 +10,7 @@ A whirlwind tour of Isograph.
 
 Currently, in web/app dev, you want to: fetch all the data in one go, avoid underfetching (i.e. fetch everything that is needed) and avoid overfetching (don't fetch things that are unused.) These are hard, and avoiding overfetching is particularly difficult to maintain as an app changes.
 
-Consider, for example, that a PM asks you to avoid using a field in a subcomponent: not using that field is easy, but removing it from the query is hard. You have to trace where that data goes and determine whether it flows into any other subcomponent. And you have to worry about that field flowing into a subcomponent in a way that isn't tracked by the type system. This is further compounded if the subcomponent is used across multiple screens, or it's a REST endpoint and now you must contend with multiple versions of your app.
+Consider, for example, that a PM asks you to avoid using a field in a subcomponent: not using that field is easy, but removing it from the query is hard. You have to trace where that data goes and determine whether it flows into any other subcomponent. And you have to worry about that field flowing into a subcomponent in a way that isn't tracked by the type system. This is further compounded if the subcomponent is used across multiple screens, or your query takes the form of a REST endpoint and now you must contend with multiple versions of your app.
 
 If you remove the field and it turns out to be used, you break the app. So, over time, queries tend to accumulate probably-unused fields.
 
@@ -24,11 +26,23 @@ There is a compiler (written in Rust) that scans your codebase and generates que
 
 Thus, changes to the data required by any subcomponent (a client field) are automatically, correctly reflected in the correct queries.
 
+## How do I render a screen?
+
+<img src={petDetailRouteEntrypointSrc} height="308" />
+
+Let's say we have `Query.PetDetail`, which renders `Pet.Avatar`. The `PetDetail` component is an entrypoint, which is to say, the Isograph compiler has been instructed to generate a query for all the server fields reachable from `Query.PetDetail`. (This might be something like `query PetDetail($id: ID!) pet(id: $id) { picture }`).
+
+A React component (call it `PetDetailRoute`) will use an Isograph API (like `useLazyReference`, which makes that network request during the initial render of a component) to fetch the data associated with that entrypoint. `PetDetailRoute`, when initially rendered, will suspend while that network request is in flight. When that request completes, it will re-render, and Isograph will render the `Query.PetDetail` component, which will render the `Pet.Avatar` component.
+
+Throughout this, `PetDetail` does not pass any data down to `Avatar`! It simply receives a component that it can render.
+
+<img src={petDetailRouteSrc} height="308" />
+
 ## Client fields are a powerful primitive
 
 In Isograph, the function that consumes the data and the data are statically linked, a rarity among these frameworks. This allows for many things:
 
-- This vastly improves discoverability. How many UserAvatar components are in your codebase? With Isograph, in VSCode, you can just goto definition on `User.Avatar` and see the implementation; when we add autocomplete functionality, you will be strongly discouraged from re-inventing these components.
+- This vastly improves discoverability. How many `UserAvatar` components are in your codebase? With Isograph, in VSCode, you can just goto definition on `User.Avatar` and see the implementation; when we add autocomplete functionality, you will be even more strongly discouraged from re-inventing duplicate components.
 - Deferring fetching some data? You should probably asynchronously loading the JS. In other frameworks, that's two unrelated steps; in Isograph, it's one. (This feature is called loadable fields.)
   - Note that this is true for something like a comment component, whose data you fetch immediately, but as a separate request, as well for things like modals, whose data you may fetch only when the modal is shown.
 - This is on the roadmap. But you can consider loadable fields as multiple queries that are syntactically related, but in practice distinct queries. We can do a lot with this, namely: avoid fetching data that is part of the loadable field query if we know it was fetched as part of the parent query\!
