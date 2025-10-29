@@ -26,7 +26,6 @@ impl GraphQLConstantValue {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum GraphQLNonConstantValue {
     Variable(VariableName),

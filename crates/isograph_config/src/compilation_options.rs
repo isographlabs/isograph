@@ -126,7 +126,6 @@ pub enum PersistedDocumentsHashAlgorithm {
 pub struct IsographProjectConfig {
     /// The user may hard-code the JSON Schema for their version of the config.
     #[serde(rename = "$schema")]
-    #[allow(dead_code)]
     pub json_schema: Option<String>,
     /// The relative path to the folder where the compiler should look for Isograph literals
     pub project_root: PathBuf,

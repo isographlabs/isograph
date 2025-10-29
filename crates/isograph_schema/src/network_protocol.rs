@@ -28,7 +28,7 @@ where
     type SchemaObjectAssociatedData: Debug + PartialEq + Eq + Clone;
     type ParseTypeSystemDocumentsError: Error + PartialEq + Eq + Clone + 'static;
 
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     fn parse_type_system_documents(
         db: &IsographDatabase<Self>,
     ) -> MemoRef<

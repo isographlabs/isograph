@@ -28,7 +28,7 @@ use crate::{
     reader_ast::generate_reader_ast,
 };
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,

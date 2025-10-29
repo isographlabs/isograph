@@ -84,7 +84,6 @@ fn write_variables_to_string<'a>(
     }
 }
 
-#[allow(clippy::only_used_in_recursion)]
 fn write_selections_for_query_text(
     query_text: &mut String,
     items: &MergedSelectionMap,

@@ -27,7 +27,7 @@ impl<T> PartialEq for MemoRef<T> {
 
 impl<T> Eq for MemoRef<T> {}
 
-#[allow(clippy::unnecessary_cast)]
+#[expect(clippy::unnecessary_cast)]
 impl<T: 'static + Clone> MemoRef<T> {
     pub fn new(db: &dyn DatabaseDyn, derived_node_id: DerivedNodeId) -> Self {
         Self {

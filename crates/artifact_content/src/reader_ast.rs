@@ -168,7 +168,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     linked_field: &ValidatedObjectSelection,
@@ -277,7 +277,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn scalar_client_defined_field_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
     scalar_field_selection: &ValidatedScalarSelection,
     schema: &Schema<TNetworkProtocol>,
@@ -354,7 +354,7 @@ fn link_variant_ast_node(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
     scalar_field_selection: &ValidatedScalarSelection,
     indentation_level: u8,
@@ -419,7 +419,6 @@ fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
 fn imperatively_loaded_variant_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
     nested_client_field: &ClientScalarSelectable<TNetworkProtocol>,
     reader_imports: &mut ReaderImports,

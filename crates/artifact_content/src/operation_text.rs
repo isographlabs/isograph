@@ -16,7 +16,7 @@ use crate::persisted_documents::PersistedDocuments;
 pub(crate) struct OperationText(pub String);
 derive_display!(OperationText);
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn generate_operation_text<'a, TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     query_name: QueryOperationName,

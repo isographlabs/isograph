@@ -142,7 +142,7 @@ impl<'source> PeekableLexer<'source> {
         Ok(WithSpan::new(source.into(), kind.span))
     }
 
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub fn parse_matching_identifier(
         &mut self,
         identifier: &'static str,

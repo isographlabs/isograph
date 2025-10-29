@@ -227,7 +227,7 @@ fn categorize_changed_file_and_filter_changes_in_artifact_directory(
 }
 
 // TODO reimplement this as create_debounced_file_watcher.map(...)
-#[allow(clippy::complexity)]
+#[expect(clippy::complexity)]
 pub fn create_debounced_file_watcher(
     config: &CompilerConfig,
 ) -> (

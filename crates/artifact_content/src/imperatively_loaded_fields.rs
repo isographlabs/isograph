@@ -18,7 +18,7 @@ use crate::{
     operation_text::generate_operation_text, persisted_documents::PersistedDocuments,
 };
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     TNetworkProtocol: NetworkProtocol,
 >(

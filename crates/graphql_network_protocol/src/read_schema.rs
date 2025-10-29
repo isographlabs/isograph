@@ -7,7 +7,7 @@ use isograph_schema::{IsographDatabase, NetworkProtocol, SchemaSource};
 use pico::{MemoRef, SourceId};
 use pico_macros::legacy_memo;
 
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 #[legacy_memo]
 pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,

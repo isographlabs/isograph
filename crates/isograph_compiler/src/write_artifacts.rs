@@ -63,7 +63,7 @@ pub(crate) fn write_artifacts_to_disk(
     Ok(count)
 }
 
-#[allow(clippy::enum_variant_names)]
+#[expect(clippy::enum_variant_names)]
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum GenerateArtifactsError {
     #[error(

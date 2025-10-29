@@ -662,7 +662,6 @@ pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol + 'static>(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
@@ -690,7 +689,6 @@ pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProt
     ClientFieldParameterType(client_field_parameter_type)
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn generate_client_field_updatable_data_type<
     TNetworkProtocol: NetworkProtocol + 'static,
 >(
@@ -725,7 +723,6 @@ pub(crate) fn generate_client_field_updatable_data_type<
     ClientFieldUpdatableDataType(client_field_updatable_data_type)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
@@ -854,7 +851,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol + 'static>(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
@@ -930,7 +927,7 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol + 'stati
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,

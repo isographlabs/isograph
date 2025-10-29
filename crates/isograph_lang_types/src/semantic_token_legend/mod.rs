@@ -48,37 +48,37 @@ pub fn semantic_token_legend() -> SemanticTokensLegend {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct LspSemanticToken(pub u32);
 
-#[allow(unused)]
+#[expect(unused)]
 const LSP_ST_NAMESPACE: LspSemanticToken = LspSemanticToken(0);
 const LSP_ST_TYPE: LspSemanticToken = LspSemanticToken(1);
 const LSP_ST_CLASS: LspSemanticToken = LspSemanticToken(2);
-#[allow(unused)]
+#[expect(unused)]
 const LSP_ST_ENUM: LspSemanticToken = LspSemanticToken(3);
-#[allow(unused)]
+#[expect(unused)]
 const LSP_ST_INTERFACE: LspSemanticToken = LspSemanticToken(4);
-#[allow(unused)]
+#[expect(unused)]
 const LSP_ST_STRUCT: LspSemanticToken = LspSemanticToken(5);
-#[allow(unused)]
+#[expect(unused)]
 const LSP_ST_TYPE_PARAMETER: LspSemanticToken = LspSemanticToken(6);
 const LSP_ST_PARAMETER: LspSemanticToken = LspSemanticToken(7);
 const LSP_ST_VARIABLE: LspSemanticToken = LspSemanticToken(8);
 const LSP_ST_PROPERTY: LspSemanticToken = LspSemanticToken(9);
-#[allow(unused)]
+#[expect(unused)]
 const LSP_ST_ENUM_MEMBER: LspSemanticToken = LspSemanticToken(10);
-#[allow(unused)]
+#[expect(unused)]
 const LSP_ST_EVENT: LspSemanticToken = LspSemanticToken(11);
-#[allow(unused)]
+#[expect(unused)]
 const LSP_ST_FUNCTION: LspSemanticToken = LspSemanticToken(12);
 const LSP_ST_METHOD: LspSemanticToken = LspSemanticToken(13);
-#[allow(unused)]
+#[expect(unused)]
 const LSP_ST_MACRO: LspSemanticToken = LspSemanticToken(14);
 const LSP_ST_KEYWORD: LspSemanticToken = LspSemanticToken(15);
-#[allow(unused)]
+#[expect(unused)]
 const LSP_ST_MODIFIER: LspSemanticToken = LspSemanticToken(16);
 const LSP_ST_COMMENT: LspSemanticToken = LspSemanticToken(17);
 const LSP_ST_STRING: LspSemanticToken = LspSemanticToken(18);
 const LSP_ST_NUMBER: LspSemanticToken = LspSemanticToken(19);
-#[allow(unused)]
+#[expect(unused)]
 const LSP_ST_REGEXP: LspSemanticToken = LspSemanticToken(20);
 const LSP_ST_OPERATOR: LspSemanticToken = LspSemanticToken(21);
 const LSP_ST_DECORATOR: LspSemanticToken = LspSemanticToken(22);

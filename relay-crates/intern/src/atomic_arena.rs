@@ -673,7 +673,7 @@ mod tests {
     use super::*;
 
     static mut ZERO: Zero<&str> = Zero::new("zero");
-    #[allow(static_mut_refs)]
+    #[expect(static_mut_refs)]
     static STRING_ARENA: AtomicArena<'static, &str> = AtomicArena::with_zero(unsafe { &ZERO });
 
     /// For internal testing purposes we permit the unsafe synthesis of Refs.

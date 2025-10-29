@@ -24,7 +24,7 @@ pub struct EntrypointDeclarationInfo {
     pub directive_set: EntrypointDirectiveSet,
 }
 
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,

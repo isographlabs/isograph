@@ -34,7 +34,7 @@ lazy_static! {
 
 }
 
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 pub fn process_graphql_type_system_document(
     type_system_document: GraphQLTypeSystemDocument,
     graphql_root_types: &mut Option<GraphQLRootTypes>,
@@ -295,7 +295,7 @@ pub fn process_graphql_type_system_document(
     Ok((type_system_entities, directives, refetch_fields))
 }
 
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 pub fn process_graphql_type_extension_document(
     extension_document: GraphQLTypeSystemExtensionDocument,
     graphql_root_types: &mut Option<GraphQLRootTypes>,

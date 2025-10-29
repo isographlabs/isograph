@@ -153,7 +153,6 @@ struct ResolvePositionArgs {
     self_type_generics: Option<syn::AngleBracketedGenericArguments>,
 }
 
-#[allow(clippy::enum_variant_names)]
 enum ResolveFieldInfoType {
     WithLocation(syn::Type),
     WithEmbeddedLocation(syn::Type),

@@ -142,7 +142,7 @@ pub struct WithLocation<T> {
 
 impl<T: Error> Error for WithLocationForDisplay<'_, T> {
     fn description(&self) -> &str {
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         self.inner.item.description()
     }
 }
@@ -207,7 +207,7 @@ pub struct WithEmbeddedLocation<T> {
 
 impl<T: Error> Error for WithEmbeddedLocation<T> {
     fn description(&self) -> &str {
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         self.item.description()
     }
 }

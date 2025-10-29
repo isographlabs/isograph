@@ -20,7 +20,6 @@ use crate::process_iso_literals::ParsedIsoLiteralsMap;
 
 // TODO this should return a Vec of Results, since a file can contain
 // both valid and invalid iso literals.
-#[allow(clippy::type_complexity)]
 pub fn parse_iso_literals_in_file_content<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     relative_path_to_source_file: RelativePathToSourceFile,
@@ -56,7 +55,6 @@ pub fn parse_iso_literals_in_file_content<TNetworkProtocol: NetworkProtocol + 's
 }
 
 // TODO this (and the previous function) smell
-#[allow(clippy::type_complexity)]
 pub fn parse_iso_literals_in_file_content_and_return_all<
     TNetworkProtocol: NetworkProtocol + 'static,
 >(
@@ -79,7 +77,6 @@ pub fn parse_iso_literals_in_file_content_and_return_all<
         .collect()
 }
 
-#[allow(clippy::type_complexity)]
 #[legacy_memo]
 pub fn parse_iso_literal_in_source<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
@@ -129,7 +126,7 @@ pub fn read_iso_literals_source<TNetworkProtocol: NetworkProtocol + 'static>(
     }
 }
 
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,

@@ -150,7 +150,7 @@ pub(crate) enum PotentiallyModifiedField {
     Unmodified(ServerSelectableId),
     // This is exercised in the case of 3+ segments, e.g. input.foo.id.
     // For now, we support only up to two segments.
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     Modified(ModifiedField),
 }
 
@@ -158,7 +158,7 @@ pub(crate) enum PotentiallyModifiedField {
 /// is modified is just removed.
 #[derive(Debug)]
 pub(crate) struct ModifiedField {
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     modified_object: ModifiedObject,
 }
 
@@ -282,7 +282,7 @@ impl ModifiedArgument {
     }
 }
 
-#[allow(dead_code)]
+#[expect(dead_code)]
 enum IsEmpty {
     IsEmpty,
     NotEmpty,

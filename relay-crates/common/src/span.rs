@@ -32,7 +32,7 @@ impl Span {
     }
 
     // clippy suggest to use `subspan.start < self.start` :-)
-    #[allow(clippy::suspicious_operation_groupings)]
+    #[expect(clippy::suspicious_operation_groupings)]
     pub fn contains(self, subspan: Span) -> bool {
         subspan.start >= self.start && subspan.start < self.end && subspan.end <= self.end
     }

@@ -29,7 +29,6 @@ pub fn on_did_open_text_document<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok(())
 }
 
-#[allow(clippy::unnecessary_wraps)]
 pub fn on_did_close_text_document<TNetworkProtocol: NetworkProtocol + 'static>(
     compiler_state: &mut CompilerState<TNetworkProtocol>,
     params: <DidCloseTextDocument as Notification>::Params,

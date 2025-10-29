@@ -161,7 +161,6 @@ pub struct GraphQLSchemaDefinition {
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
 }
 
-#[allow(unused)]
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, EnumString, Hash)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 pub enum DirectiveLocation {

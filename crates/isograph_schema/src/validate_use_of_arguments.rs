@@ -183,7 +183,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol +
     );
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol + 'static>(
     schema: &Schema<TNetworkProtocol>,
     errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError>>,

@@ -535,7 +535,7 @@ pub fn imperative_field_subfields_or_inline_fragments(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
@@ -670,7 +670,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
     select_typename_and_id_fields_in_merged_selection(schema, parent_map, parent_object_entity);
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn merge_server_object_field<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
@@ -862,7 +862,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol + 'static>(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn merge_client_object_field<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
@@ -920,7 +920,7 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol + 'static>(
         )));
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
@@ -1019,7 +1019,7 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol + 'static>(
         )));
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
@@ -1089,7 +1089,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol 
     );
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
@@ -1242,7 +1242,7 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol + 
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,

@@ -98,7 +98,7 @@ string_key_one_way_conversion!(from: ServerObjectSelectableName, to: ObjectSelec
  * define SelectableAlias and SelectableNameOrAlias, and have everything be convertible
  * to SelectableNameOrAlias.
  */
-#[allow(dead_code)]
+#[expect(dead_code)]
 struct AllowDocComment2;
 
 string_key_newtype!(SelectableAlias);

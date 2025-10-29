@@ -3,7 +3,6 @@ use isograph_lang_types::{DefinitionLocation, Description, TypeAnnotation};
 
 use crate::{ClientObjectSelectable, NetworkProtocol, ServerObjectSelectable};
 
-#[allow(clippy::type_complexity)]
 pub fn description<TNetworkProtocol: NetworkProtocol + 'static>(
     definition_location: &DefinitionLocation<
         &ServerObjectSelectable<TNetworkProtocol>,
