@@ -3,12 +3,10 @@ use std::{collections::HashMap, fmt::Debug, ops::Deref};
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, JavascriptName, ObjectSelectableName,
     SelectableName, ServerObjectEntityName, ServerObjectSelectableName, ServerScalarEntityName,
-    ServerScalarIdSelectableName, ServerScalarSelectableName, UnvalidatedTypeName,
+    ServerScalarIdSelectableName, ServerScalarSelectableName,
 };
-use graphql_lang_types::GraphQLNamedTypeAnnotation;
 use intern::Lookup;
 use intern::string_key::Intern;
-use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDirectiveSet, DefinitionLocation, EmptyDirectiveSet,
     ObjectSelection, ScalarSelection, SelectionType, SelectionTypeContainingSelections,
@@ -242,18 +240,11 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     pub fn insert_server_scalar_selectable(
         &mut self,
         server_scalar_selectable: ServerScalarSelectable<TNetworkProtocol>,
-        // TODO do not accept this
-        options: &CompilerConfigOptions,
-        inner_non_null_named_type: Option<&GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
     ) -> CreateAdditionalFieldsResult<(), TNetworkProtocol> {
         let parent_object_entity_name = server_scalar_selectable.parent_object_entity_name;
         let next_scalar_name = server_scalar_selectable.name;
 
-        let ServerObjectEntityExtraInfo {
-            selectables,
-            id_field,
-            ..
-        } = self
+        let ServerObjectEntityExtraInfo { selectables, .. } = self
             .server_entity_data
             .entry(parent_object_entity_name)
             .or_default();
@@ -272,17 +263,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                 selectable_name: server_scalar_selectable.name.item.into(),
                 parent_object_entity_name,
             });
-        }
-
-        // TODO do not do this here, this is a GraphQL-ism
-        if server_scalar_selectable.name.item == "id" {
-            set_and_validate_id_field::<TNetworkProtocol>(
-                id_field,
-                server_scalar_selectable.name.item,
-                parent_object_entity_name,
-                options,
-                inner_non_null_named_type,
-            )?;
         }
 
         self.server_scalar_selectables.insert(
@@ -525,45 +505,3 @@ pub type ScalarSelectableId = DefinitionLocation<
     (ServerObjectEntityName, ServerScalarSelectableName),
     (ServerObjectEntityName, ClientScalarSelectableName),
 >;
-
-/// If we have encountered an id field, we can:
-/// - validate that the id field is properly defined, i.e. has type ID!
-/// - set the id field
-fn set_and_validate_id_field<TNetworkProtocol: NetworkProtocol + 'static>(
-    id_field: &mut Option<ServerScalarIdSelectableName>,
-    current_field_selectable_name: ServerScalarSelectableName,
-    parent_object_entity_name: ServerObjectEntityName,
-    options: &CompilerConfigOptions,
-    inner_non_null_named_type: Option<&GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
-) -> CreateAdditionalFieldsResult<(), TNetworkProtocol> {
-    // N.B. id_field is guaranteed to be None; otherwise field_names_to_type_name would
-    // have contained this field name already.
-    debug_assert!(id_field.is_none(), "id field should not be defined twice");
-
-    // We should change the type here! It should not be ID! It should be a
-    // type specific to the concrete type, e.g. UserID.
-    *id_field = Some(current_field_selectable_name.unchecked_conversion());
-
-    match inner_non_null_named_type {
-        Some(type_) => {
-            if type_.0.item != *ID_ENTITY_NAME {
-                options.on_invalid_id_type.on_failure(|| {
-                    CreateAdditionalFieldsError::IdFieldMustBeNonNullIdType {
-                        strong_field_name: "id",
-                        parent_object_entity_name,
-                    }
-                })?;
-            }
-            Ok(())
-        }
-        None => {
-            options.on_invalid_id_type.on_failure(|| {
-                CreateAdditionalFieldsError::IdFieldMustBeNonNullIdType {
-                    strong_field_name: "id",
-                    parent_object_entity_name,
-                }
-            })?;
-            Ok(())
-        }
-    }
-}

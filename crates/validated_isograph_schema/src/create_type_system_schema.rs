@@ -8,12 +8,14 @@ use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{ConstantValue, SelectionType, TypeAnnotation, VariableDefinition};
 use isograph_schema::{
     CreateAdditionalFieldsError, ExposeFieldToInsert, FieldToInsert, IsographDatabase,
-    NetworkProtocol, Schema, ServerEntityName, ServerObjectSelectable,
+    NetworkProtocol, Schema, ServerEntityName, ServerObjectEntityExtraInfo, ServerObjectSelectable,
     ServerObjectSelectableVariant, ServerScalarSelectable, UnprocessedClientFieldItem,
     UnprocessedClientPointerItem, defined_entity,
 };
 use pico_macros::legacy_memo;
 use thiserror::Error;
+
+use crate::set_and_validate_id_field::set_and_validate_id_field;
 
 #[legacy_memo]
 #[expect(clippy::type_complexity)]
@@ -189,14 +191,27 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
 
             match selectable {
                 SelectionType::Scalar(server_scalar_selectable) => {
-                    schema.insert_server_scalar_selectable(
-                        server_scalar_selectable,
-                        options,
-                        server_field_to_insert
-                            .item
-                            .graphql_type
-                            .inner_non_null_named_type(),
-                    )?;
+                    let server_scalar_selectable_name = server_scalar_selectable.name.item;
+
+                    schema.insert_server_scalar_selectable(server_scalar_selectable)?;
+
+                    let ServerObjectEntityExtraInfo { id_field, .. } = schema
+                        .server_entity_data
+                        .entry(parent_object_entity_name)
+                        .or_default();
+                    // TODO do not do this here, this is a GraphQL-ism
+                    if server_scalar_selectable_name == "id" {
+                        set_and_validate_id_field::<TNetworkProtocol>(
+                            id_field,
+                            server_scalar_selectable_name,
+                            parent_object_entity_name,
+                            options,
+                            server_field_to_insert
+                                .item
+                                .graphql_type
+                                .inner_non_null_named_type(),
+                        )?;
+                    }
                 }
                 SelectionType::Object(server_object_selectable) => {
                     schema.insert_server_object_selectable(server_object_selectable)?;
