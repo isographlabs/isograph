@@ -92,7 +92,7 @@ pub(crate) fn create_type_system_schema_with_server_selectables<
                 create_new_exposed_field(
                     db,
                     &unvalidated_isograph_schema,
-                    expose_as_field,
+                    &expose_as_field,
                     parent_object_entity_name,
                 )?;
 

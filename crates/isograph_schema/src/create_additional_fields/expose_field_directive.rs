@@ -59,7 +59,7 @@ impl ExposeFieldDirective {
 pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
-    expose_field_to_insert: ExposeFieldToInsert,
+    expose_field_to_insert: &ExposeFieldToInsert,
     parent_object_entity_name: ServerObjectEntityName,
 ) -> Result<
     (
@@ -73,7 +73,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
         expose_as,
         field_map,
         field,
-    } = expose_field_to_insert.expose_field_directive;
+    } = &expose_field_to_insert.expose_field_directive;
 
     // HACK: we're essentially splitting the field arg by . and keeping the same
     // implementation as before. But really, there isn't much a distinction
@@ -83,7 +83,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
     let mut path = field.lookup().split('.');
     let field = path.next().expect(
         "Expected iter to have at least one element. \
-            This is indicative of a bug in Isograph.",
+        This is indicative of a bug in Isograph.",
     );
     let primary_field_name_selection_parts = path.map(|x| x.intern().into()).collect::<Vec<_>>();
 
@@ -236,7 +236,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
 
             root_object_entity_name: parent_object_entity_name,
             subfields_or_inline_fragments: subfields_or_inline_fragments.clone(),
-            field_map,
+            field_map: field_map.clone(),
         }),
         variable_definitions: vec![],
         type_and_field: ParentObjectEntityNameAndSelectableName {
