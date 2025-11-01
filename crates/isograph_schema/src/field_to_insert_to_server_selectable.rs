@@ -20,7 +20,7 @@ pub type ScalarSelectionAndNonNullType<TNetworkProtocol> = (
 pub fn field_to_insert_to_server_selectable<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
-    server_field_to_insert: WithLocation<FieldToInsert>,
+    server_field_to_insert: &WithLocation<FieldToInsert>,
 ) -> Result<
     SelectionType<
         ScalarSelectionAndNonNullType<TNetworkProtocol>,

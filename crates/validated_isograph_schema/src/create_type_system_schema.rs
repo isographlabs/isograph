@@ -166,7 +166,7 @@ pub fn process_field_queue_inner<TNetworkProtocol: NetworkProtocol + 'static>(
                     field_to_insert_to_server_selectable(
                         db,
                         parent_object_entity_name,
-                        server_field_to_insert,
+                        &server_field_to_insert,
                     )
                     .map_err(|e| e.into())
                 })
