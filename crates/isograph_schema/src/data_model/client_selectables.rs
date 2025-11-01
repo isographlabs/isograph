@@ -22,6 +22,11 @@ pub type ClientSelectable<'a, TNetworkProtocol> = SelectionType<
     &'a ClientObjectSelectable<TNetworkProtocol>,
 >;
 
+pub type OwnedClientSelectable<TNetworkProtocol> = SelectionType<
+    ClientScalarSelectable<TNetworkProtocol>,
+    ClientObjectSelectable<TNetworkProtocol>,
+>;
+
 /// The struct formally known as a client field, and declared with the field keyword
 /// in iso literals.
 #[derive(Debug, PartialEq, Eq, Clone)]
