@@ -118,7 +118,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 None => None,
             })
             .expect("Expected query type to be found.");
-        query.expose_as_fields_to_insert.extend(refetch_fields);
+        query.expose_fields_to_insert.extend(refetch_fields);
 
         // - in the extension document, you may have added directives to objects, e.g. @expose
         // - we need to transfer those to the original objects.
@@ -150,13 +150,11 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                     }
                                 })?;
 
-                            outcome
-                                .expose_as_fields_to_insert
-                                .push(ExposeFieldToInsert {
-                                    expose_field_directive,
-                                    parent_object_name: outcome.server_object_entity.item.name.item,
-                                    description: None,
-                                });
+                            outcome.expose_fields_to_insert.push(ExposeFieldToInsert {
+                                expose_field_directive,
+                                parent_object_name: outcome.server_object_entity.item.name.item,
+                                description: None,
+                            });
                         }
                     }
                 }

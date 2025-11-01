@@ -453,7 +453,7 @@ fn process_object_type_definition(
         ProcessObjectTypeDefinitionOutcome {
             server_object_entity,
             fields_to_insert,
-            expose_as_fields_to_insert: vec![],
+            expose_fields_to_insert: vec![],
         },
         object_type_definition.directives,
     ))

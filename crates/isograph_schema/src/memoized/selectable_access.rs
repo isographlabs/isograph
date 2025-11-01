@@ -41,8 +41,7 @@ pub fn server_selectables_vec<TNetworkProtocol: NetworkProtocol + 'static>(
                     .map(|x| DefinitionLocation::Server(x));
                     fields.push(item);
                 }
-                if let Some(_expose_as_field_to_insert) = o.expose_as_fields_to_insert.iter().next()
-                {
+                if let Some(_expose_as_field_to_insert) = o.expose_fields_to_insert.iter().next() {
                     unimplemented!("expose as fields to insert")
                 }
 

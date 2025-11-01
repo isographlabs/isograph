@@ -44,7 +44,7 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
 
         expose_as_field_queue.insert(
             item.server_object_entity.item.name.item,
-            item.expose_as_fields_to_insert.clone(),
+            item.expose_fields_to_insert.clone(),
         );
     }
 
