@@ -7,10 +7,10 @@ use graphql_lang_types::{GraphQLConstantValue, GraphQLInputValueDefinition, Name
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{ConstantValue, SelectionType, TypeAnnotation, VariableDefinition};
 use isograph_schema::{
-    CreateAdditionalFieldsError, ExposeFieldToInsert, FieldToInsert, IsographDatabase,
-    NetworkProtocol, Schema, ServerEntityName, ServerObjectEntityExtraInfo, ServerObjectSelectable,
-    ServerObjectSelectableVariant, ServerScalarSelectable, UnprocessedClientFieldItem,
-    UnprocessedClientPointerItem, defined_entity,
+    CreateAdditionalFieldsError, ExposeFieldToInsert, FieldToInsert, ID_FIELD_NAME,
+    IsographDatabase, NetworkProtocol, Schema, ServerEntityName, ServerObjectEntityExtraInfo,
+    ServerObjectSelectable, ServerObjectSelectableVariant, ServerScalarSelectable,
+    UnprocessedClientFieldItem, UnprocessedClientPointerItem, defined_entity,
 };
 use pico_macros::legacy_memo;
 use thiserror::Error;
@@ -200,7 +200,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
                         .entry(parent_object_entity_name)
                         .or_default();
                     // TODO do not do this here, this is a GraphQL-ism
-                    if server_scalar_selectable_name == "id" {
+                    if server_scalar_selectable_name == *ID_FIELD_NAME {
                         set_and_validate_id_field::<TNetworkProtocol>(
                             id_field,
                             server_scalar_selectable_name,
