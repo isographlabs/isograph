@@ -4,14 +4,14 @@ import type { ExtractUpdatableData } from '../core/FragmentReference';
 import {
   createIsographEnvironment,
   ROOT_ID,
-  type IsographStore,
+  type BaseStoreLayerData,
 } from '../core/IsographEnvironment';
 import { createUpdatableProxy } from '../core/startUpdate';
 import { iso } from './__isograph/iso';
 import type { Query__linkedUpdate__param } from './__isograph/Query/linkedUpdate/param_type';
 import type { Query__startUpdate__param } from './__isograph/Query/startUpdate/param_type';
 
-const getDefaultStore = (): IsographStore => ({
+const getDefaultStore = (): BaseStoreLayerData => ({
   Query: {
     [ROOT_ID]: {
       node____id___0: {
@@ -88,6 +88,7 @@ describe('startUpdate', () => {
 
       data = createUpdatableProxy(
         environment,
+        environment.store,
         item,
         {
           suspendIfInFlight: true,
@@ -100,7 +101,7 @@ describe('startUpdate', () => {
     test('updates updatable scalar nested in updatable object', () => {
       data.node!.asEconomist!.name = 'Updated Jeremy Bentham';
 
-      expect(environment.store).toMatchObject({
+      expect(environment.store.data).toMatchObject({
         Economist: {
           '0': {
             name: 'Updated Jeremy Bentham',
@@ -126,7 +127,7 @@ describe('startUpdate', () => {
       data.node = data.john_stuart_mill;
       jeremy!.asEconomist!.name = 'Updated Jeremy Bentham';
 
-      expect(environment.store).toMatchObject({
+      expect(environment.store.data).toMatchObject({
         Economist: {
           '0': {
             name: 'Updated Jeremy Bentham',
@@ -159,6 +160,7 @@ describe('startUpdate', () => {
 
       data = createUpdatableProxy(
         environment,
+        environment.store,
         item,
         {
           suspendIfInFlight: true,
@@ -181,7 +183,7 @@ describe('startUpdate', () => {
     test('updates scalar in cache', () => {
       data.node!.asEconomist!.name = 'Foo';
 
-      expect(environment.store).toMatchObject({
+      expect(environment.store.data).toMatchObject({
         Economist: {
           0: {
             name: 'Foo',

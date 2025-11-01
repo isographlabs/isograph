@@ -19,6 +19,13 @@ import {
   type StoreLink,
 } from './IsographEnvironment';
 import { logMessage } from './logging';
+import {
+  addStartUpdateStoreLayer,
+  getOrInsertRecord,
+  readOptimisticRecord,
+  type DataUpdate,
+  type StoreLayer,
+} from './optimisticProxy';
 import { readPromise, type PromiseWrapper } from './PromiseWrapper';
 import {
   readImperativelyLoadedField,
@@ -56,28 +63,38 @@ export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
   return (updater) => {
     let mutableUpdatedIds: EncounteredIds = new Map();
 
-    let updatableData = createUpdatableProxy(
-      environment,
-      fragmentReference,
-      networkRequestOptions,
-      mutableUpdatedIds,
+    const startUpdate: DataUpdate = (storeLayer) => {
+      mutableUpdatedIds.clear();
+      let updatableData = createUpdatableProxy(
+        environment,
+        storeLayer,
+        fragmentReference,
+        networkRequestOptions,
+        mutableUpdatedIds,
+      );
+
+      try {
+        updater({ updatableData });
+      } catch (e) {
+        logMessage(environment, () => ({
+          kind: 'StartUpdateError',
+          error: e,
+        }));
+        throw e;
+      }
+    };
+
+    environment.store = addStartUpdateStoreLayer(
+      environment.store,
+      startUpdate,
     );
 
-    try {
-      updater({ updatableData });
-    } catch (e) {
-      logMessage(environment, () => ({
-        kind: 'StartUpdateError',
-        error: e,
-      }));
-      throw e;
-    } finally {
-      logMessage(environment, () => ({
-        kind: 'StartUpdateComplete',
-        updatedIds: mutableUpdatedIds,
-      }));
-      callSubscriptions(environment, mutableUpdatedIds);
-    }
+    logMessage(environment, () => ({
+      kind: 'StartUpdateComplete',
+      updatedIds: mutableUpdatedIds,
+    }));
+
+    callSubscriptions(environment, mutableUpdatedIds);
   };
 }
 
@@ -85,6 +102,7 @@ export function createUpdatableProxy<
   TReadFromStore extends UnknownTReadFromStore,
 >(
   environment: IsographEnvironment,
+  storeLayer: StoreLayer,
   fragmentReference: FragmentReference<TReadFromStore, unknown>,
   networkRequestOptions: NetworkRequestReaderOptions,
   mutableUpdatedIds: EncounteredIds,
@@ -95,6 +113,7 @@ export function createUpdatableProxy<
 
   return readUpdatableData(
     environment,
+    storeLayer,
     readerWithRefetchQueries.readerArtifact.readerAst,
     fragmentReference.root,
     fragmentReference.variables ?? {},
@@ -154,6 +173,7 @@ function defineCachedProperty<T>(
 
 function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
   environment: IsographEnvironment,
+  storeLayer: StoreLayer,
   ast: ReaderAst<TReadFromStore>,
   root: StoreLink,
   variables: ExtractParameters<TReadFromStore>,
@@ -163,7 +183,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
   mutableState: MutableInvalidationState,
   mutableUpdatedIds: EncounteredIds,
 ): ReadDataResultSuccess<ExtractUpdatableData<TReadFromStore>> {
-  let storeRecord = environment.store[root.__typename]?.[root.__link];
+  let storeRecord = readOptimisticRecord(storeLayer, root);
   if (storeRecord == null) {
     return {
       kind: 'Success',
@@ -196,6 +216,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
           },
           field.isUpdatable
             ? (newValue) => {
+                const storeRecord = getOrInsertRecord(storeLayer.data, root);
                 storeRecord[storeRecordName] = newValue;
                 const updatedIds = insertEmptySetIfMissing(
                   mutableUpdatedIds,
@@ -226,6 +247,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
               (ast, root) =>
                 readUpdatableData(
                   environment,
+                  storeLayer,
                   ast,
                   root,
                   variables,
@@ -243,6 +265,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
           },
           'isUpdatable' in field && field.isUpdatable
             ? (newValue) => {
+                const storeRecord = getOrInsertRecord(storeLayer.data, root);
                 if (Array.isArray(newValue)) {
                   storeRecord[storeRecordName] = newValue.map((node) =>
                     assertLink(node?.__link),

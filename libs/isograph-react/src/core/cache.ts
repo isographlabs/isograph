@@ -34,6 +34,7 @@ import {
 } from './IsographEnvironment';
 import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
+import { readOptimisticRecord, type StoreLayer } from './optimisticProxy';
 import { wrapPromise, wrapResolvedValue } from './PromiseWrapper';
 import { readButDoNotEvaluate, WithEncounteredRecords } from './read';
 import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
@@ -154,13 +155,13 @@ export type NetworkResponseObject = {
 
 export function normalizeData(
   environment: IsographEnvironment,
+  storeLayer: StoreLayer,
   normalizationAst: NormalizationAstNodes,
   networkResponse: NetworkResponseObject,
   variables: Variables,
   root: StoreLink,
+  encounteredIds: EncounteredIds,
 ): EncounteredIds {
-  const encounteredIds: EncounteredIds = new Map();
-
   logMessage(environment, () => ({
     kind: 'AboutToNormalize',
     normalizationAst,
@@ -168,11 +169,11 @@ export function normalizeData(
     variables,
   }));
 
-  const recordsById = (environment.store[root.__typename] ??= {});
-  const newStoreRecord = (recordsById[root.__link] ??= {});
+  const newStoreRecord = readOptimisticRecord(storeLayer, root);
 
   normalizeDataIntoRecord(
     environment,
+    storeLayer,
     normalizationAst,
     networkResponse,
     newStoreRecord,
@@ -181,13 +182,6 @@ export function normalizeData(
     encounteredIds,
   );
 
-  logMessage(environment, () => ({
-    kind: 'AfterNormalization',
-    store: environment.store,
-    encounteredIds,
-  }));
-
-  callSubscriptions(environment, encounteredIds);
   return encounteredIds;
 }
 
@@ -421,6 +415,7 @@ export type EncounteredIds = Map<TypeName, Set<DataId>>;
  */
 function normalizeDataIntoRecord(
   environment: IsographEnvironment,
+  storeLayer: StoreLayer,
   normalizationAst: NormalizationAstNodes,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
@@ -445,6 +440,7 @@ function normalizeDataIntoRecord(
       case 'Linked': {
         const linkedFieldResultedInChange = normalizeLinkedField(
           environment,
+          storeLayer,
           normalizationNode,
           networkResponseParentRecord,
           targetParentRecord,
@@ -459,6 +455,7 @@ function normalizeDataIntoRecord(
       case 'InlineFragment': {
         const inlineFragmentResultedInChange = normalizeInlineFragment(
           environment,
+          storeLayer,
           normalizationNode,
           networkResponseParentRecord,
           targetParentRecord,
@@ -526,6 +523,7 @@ function normalizeScalarField(
  */
 function normalizeLinkedField(
   environment: IsographEnvironment,
+  storeLayer: StoreLayer,
   astNode: NormalizationLinkedField,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
@@ -563,6 +561,7 @@ function normalizeLinkedField(
       }
       const newStoreRecordId = normalizeNetworkResponseObject(
         environment,
+        storeLayer,
         astNode,
         networkResponseObject,
         targetParentRecordLink,
@@ -589,6 +588,7 @@ function normalizeLinkedField(
   } else {
     const newStoreRecordId = normalizeNetworkResponseObject(
       environment,
+      storeLayer,
       astNode,
       networkResponseData,
       targetParentRecordLink,
@@ -622,6 +622,7 @@ function normalizeLinkedField(
  */
 function normalizeInlineFragment(
   environment: IsographEnvironment,
+  storeLayer: StoreLayer,
   astNode: NormalizationInlineFragment,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
@@ -633,6 +634,7 @@ function normalizeInlineFragment(
   if (networkResponseParentRecord[TYPENAME_FIELD_NAME] === typeToRefineTo) {
     const hasBeenModified = normalizeDataIntoRecord(
       environment,
+      storeLayer,
       astNode.selections,
       networkResponseParentRecord,
       targetParentRecord,
@@ -670,6 +672,7 @@ function dataIdsAreTheSame(
 
 function normalizeNetworkResponseObject(
   environment: IsographEnvironment,
+  storeLayer: StoreLayer,
   astNode: NormalizationLinkedField,
   networkResponseData: NetworkResponseObject,
   targetParentRecordLink: StoreLink,
@@ -694,15 +697,16 @@ function normalizeNetworkResponseObject(
     );
   }
 
-  const recordsById = (environment.store[__typename] ??= {});
-  const newStoreRecord = (recordsById[newStoreRecordId] ??= {});
+  const link = { __link: newStoreRecordId, __typename: __typename };
+  const newStoreRecord = readOptimisticRecord(storeLayer, link);
 
   normalizeDataIntoRecord(
     environment,
+    storeLayer,
     astNode.selections,
     networkResponseData,
     newStoreRecord,
-    { __link: newStoreRecordId, __typename: __typename },
+    link,
     variables,
     mutableEncounteredIds,
   );
