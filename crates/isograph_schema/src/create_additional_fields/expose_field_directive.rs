@@ -58,10 +58,17 @@ impl ExposeFieldDirective {
 
 pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &mut Schema<TNetworkProtocol>,
+    schema: &Schema<TNetworkProtocol>,
     expose_field_to_insert: ExposeFieldToInsert,
     parent_object_entity_name: ServerObjectEntityName,
-) -> Result<UnprocessedClientFieldItem, CreateAdditionalFieldsError<TNetworkProtocol>> {
+) -> Result<
+    (
+        UnprocessedClientFieldItem,
+        ClientScalarSelectable<TNetworkProtocol>,
+        ServerObjectEntityName,
+    ),
+    CreateAdditionalFieldsError<TNetworkProtocol>,
+> {
     let ExposeFieldDirective {
         expose_as,
         field_map,
@@ -88,7 +95,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
         .server_object_selectable(parent_object_entity_name, mutation_subfield_name)
         .expect(
             "Expected selectable to exist. \
-                This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         );
     let payload_object_type_annotation = &mutation_field.target_object_entity;
     let payload_object_entity_name = *payload_object_type_annotation.inner();
@@ -119,7 +126,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
         .as_ref()
         .expect(
             "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         )
         .item
         .concrete_type;
@@ -241,34 +248,25 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
         refetch_strategy: None,
         network_protocol: std::marker::PhantomData,
     };
-    schema.client_scalar_selectables.insert(
-        (
-            maybe_abstract_parent_object_entity_name,
-            mutation_client_scalar_selectable.name.item,
-        ),
-        mutation_client_scalar_selectable,
-    );
 
-    schema.insert_client_field_on_object(
-        client_field_scalar_selection_name,
-        maybe_abstract_parent_object_entity_name,
-        mutation_field_client_field_name,
+    Ok((
+        UnprocessedClientFieldItem {
+            client_scalar_selectable_name: mutation_field_client_field_name,
+            parent_object_entity_name: maybe_abstract_parent_object_entity_name,
+            reader_selection_set: vec![],
+            refetch_strategy: Some(RefetchStrategy::UseRefetchField(
+                generate_refetch_field_strategy(
+                    fields.to_vec(),
+                    // NOTE: this will probably panic if we're not exposing fields which are
+                    // originally on Mutation
+                    parent_object_entity_name,
+                    subfields_or_inline_fragments,
+                ),
+            )),
+        },
+        mutation_client_scalar_selectable,
         payload_object_entity_name,
-    )?;
-    Ok(UnprocessedClientFieldItem {
-        client_scalar_selectable_name: mutation_field_client_field_name,
-        parent_object_entity_name: maybe_abstract_parent_object_entity_name,
-        reader_selection_set: vec![],
-        refetch_strategy: Some(RefetchStrategy::UseRefetchField(
-            generate_refetch_field_strategy(
-                fields.to_vec(),
-                // NOTE: this will probably panic if we're not exposing fields which are
-                // originally on Mutation
-                parent_object_entity_name,
-                subfields_or_inline_fragments,
-            ),
-        )),
-    })
+    ))
 }
 
 impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {

@@ -88,11 +88,32 @@ pub(crate) fn create_type_system_schema_with_server_selectables<
 
     for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
         for expose_as_field in expose_as_fields_to_insert {
-            let unprocessed_scalar_item = create_new_exposed_field(
-                db,
-                &mut unvalidated_isograph_schema,
-                expose_as_field,
+            let (unprocessed_scalar_item, client_scalar_selectable, payload_object_entity_name) =
+                create_new_exposed_field(
+                    db,
+                    &unvalidated_isograph_schema,
+                    expose_as_field,
+                    parent_object_entity_name,
+                )?;
+
+            let client_scalar_selectable_name = client_scalar_selectable.name.item;
+            let parent_object_entity_name = client_scalar_selectable.parent_object_entity_name;
+
+            unvalidated_isograph_schema
+                .client_scalar_selectables
+                .insert(
+                    (
+                        client_scalar_selectable.parent_object_entity_name,
+                        client_scalar_selectable_name,
+                    ),
+                    client_scalar_selectable,
+                );
+
+            unvalidated_isograph_schema.insert_client_field_on_object(
+                client_scalar_selectable_name.into(),
                 parent_object_entity_name,
+                client_scalar_selectable_name,
+                payload_object_entity_name,
             )?;
 
             unprocessed_items.push(SelectionType::Scalar(unprocessed_scalar_item));
