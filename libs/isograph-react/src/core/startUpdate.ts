@@ -1,4 +1,5 @@
 import {
+  callSubscriptions,
   getParentRecordKey,
   insertEmptySetIfMissing,
   type EncounteredIds,
@@ -22,7 +23,7 @@ import {
   addStartUpdateStoreLayer,
   getOrInsertRecord,
   readOptimisticRecord,
-  type FirstUpdate,
+  type DataUpdate,
   type StoreLayer,
 } from './optimisticProxy';
 import { readPromise, type PromiseWrapper } from './PromiseWrapper';
@@ -60,9 +61,10 @@ export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
   networkRequestOptions: NetworkRequestReaderOptions,
 ): ExtractStartUpdate<TReadFromStore> {
   return (updater) => {
-    const startUpdate: FirstUpdate = (storeLayer) => {
-      let mutableUpdatedIds: EncounteredIds = new Map();
+    let mutableUpdatedIds: EncounteredIds = new Map();
 
+    const startUpdate: DataUpdate = (storeLayer) => {
+      mutableUpdatedIds.clear();
       let updatableData = createUpdatableProxy(
         environment,
         storeLayer,
@@ -73,7 +75,6 @@ export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
 
       try {
         updater({ updatableData });
-        return mutableUpdatedIds;
       } catch (e) {
         logMessage(environment, () => ({
           kind: 'StartUpdateError',
@@ -83,7 +84,17 @@ export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
       }
     };
 
-    addStartUpdateStoreLayer(environment, startUpdate);
+    environment.store = addStartUpdateStoreLayer(
+      environment.store,
+      startUpdate,
+    );
+
+    logMessage(environment, () => ({
+      kind: 'StartUpdateComplete',
+      updatedIds: mutableUpdatedIds,
+    }));
+
+    callSubscriptions(environment, mutableUpdatedIds);
   };
 }
 

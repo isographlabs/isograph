@@ -41,25 +41,6 @@ describe('optimisticLayer', () => {
       });
     });
 
-    test('calls subscriptions', () => {
-      expect(callSubscriptions).toHaveBeenCalledTimes(1);
-      expect(callSubscriptions).toHaveBeenCalledWith(
-        expect.anything(),
-        CHANGES,
-      );
-    });
-
-    test("doesn't call subscriptions if no changes", () => {
-      addNetworkResponseStoreLayer(environment, 0);
-
-      expect(callSubscriptions).toHaveBeenCalledTimes(2);
-      expect(callSubscriptions).toHaveBeenNthCalledWith(
-        2,
-        expect.anything(),
-        NO_CHANGES,
-      );
-    });
-
     test('merge', () => {
       addOptimisticStoreLayer(environment, (counter) => counter + 1);
       addNetworkResponseStoreLayer(environment, 3);
@@ -85,13 +66,6 @@ describe('optimisticLayer', () => {
   });
 
   describe('addStartUpdateStoreLayer', () => {
-    test('calls subscriptions', () => {
-      addStartUpdateStoreLayer(environment, () => 1);
-
-      expect(callSubscriptions).toHaveBeenCalledTimes(2);
-      expect(callSubscriptions).nthCalledWith(2, expect.anything(), CHANGES);
-    });
-
     test('merge', () => {
       addOptimisticStoreLayer(environment, () => 1);
       addStartUpdateStoreLayer(environment, (counter) => counter + 1);
@@ -116,13 +90,6 @@ describe('optimisticLayer', () => {
   });
 
   describe('addOptimisticStoreLayer', () => {
-    test('calls subscriptions', () => {
-      addOptimisticStoreLayer(environment, () => 1);
-
-      expect(callSubscriptions).toHaveBeenCalledTimes(2);
-      expect(callSubscriptions).nthCalledWith(2, expect.anything(), CHANGES);
-    });
-
     test('add tree nodes', () => {
       addOptimisticStoreLayer(environment, (counter) => counter + 1);
       addOptimisticStoreLayer(environment, (counter) => counter + 1);
@@ -144,9 +111,9 @@ describe('optimisticLayer', () => {
 
         revert(2);
 
-        expect(callSubscriptions).toHaveBeenCalledTimes(3);
+        expect(callSubscriptions).toHaveBeenCalledTimes(1);
         expect(callSubscriptions).toHaveBeenNthCalledWith(
-          3,
+          1,
           expect.anything(),
           CHANGES,
         );
@@ -157,17 +124,17 @@ describe('optimisticLayer', () => {
 
         revert(1);
 
-        expect(callSubscriptions).toHaveBeenCalledTimes(3);
+        expect(callSubscriptions).toHaveBeenCalledTimes(1);
         expect(callSubscriptions).toHaveBeenNthCalledWith(
-          3,
+          1,
           expect.anything(),
           NO_CHANGES,
         );
       });
 
       test('calls subscriptions if nodes update different fields', () => {
-        const revert = addOptimisticStoreLayerInner(
-          environment,
+        const { revert, node } = addOptimisticStoreLayerInner(
+          environment.store,
           (storeLayer) => {
             ignoreReadonly(storeLayer).data = {
               Query: {
@@ -179,35 +146,39 @@ describe('optimisticLayer', () => {
             return CHANGES;
           },
         );
-        addNetworkResponseStoreLayerInner(environment, (storeLayer) => {
-          ignoreReadonly(storeLayer).data = {
-            Query: {
-              __ROOT: {
-                name: 'foo',
+        environment.store = node;
+        environment.store = addNetworkResponseStoreLayerInner(
+          environment.store,
+          (storeLayer) => {
+            ignoreReadonly(storeLayer).data = {
+              Query: {
+                __ROOT: {
+                  name: 'foo',
+                },
               },
-            },
-          };
-          return CHANGES;
-        });
+            };
+            return CHANGES;
+          },
+        );
 
-        revert((storeLayer) => {
+        revert(environment, (storeLayer) => {
           ignoreReadonly(storeLayer).data = {
             Query: { __ROOT: { surname: 'bar' } },
           };
           return CHANGES;
         });
 
-        expect(callSubscriptions).toHaveBeenCalledTimes(4);
+        expect(callSubscriptions).toHaveBeenCalledTimes(1);
         expect(callSubscriptions).toHaveBeenNthCalledWith(
-          4,
+          1,
           expect.anything(),
           CHANGES,
         );
       });
 
       test('calls subscriptions if reverted unrelated field', () => {
-        const revert = addOptimisticStoreLayerInner(
-          environment,
+        const { revert, node } = addOptimisticStoreLayerInner(
+          environment.store,
           (storeLayer) => {
             ignoreReadonly(storeLayer).data = {
               Pet: { 1: { surname: 'foo' } },
@@ -215,22 +186,26 @@ describe('optimisticLayer', () => {
             return new Map([['Pet', new Set(['1'])]]);
           },
         );
+        environment.store = node;
 
-        addNetworkResponseStoreLayerInner(environment, (storeLayer) => {
-          ignoreReadonly(storeLayer).data = {
-            Query: { __ROOT: { name: 'foo' } },
-          };
-          return CHANGES;
-        });
+        environment.store = addNetworkResponseStoreLayerInner(
+          environment.store,
+          (storeLayer) => {
+            ignoreReadonly(storeLayer).data = {
+              Query: { __ROOT: { name: 'foo' } },
+            };
+            return CHANGES;
+          },
+        );
 
-        revert((storeLayer) => {
+        revert(environment, (storeLayer) => {
           ignoreReadonly(storeLayer).data = {};
           return new Map();
         });
 
-        expect(callSubscriptions).toHaveBeenCalledTimes(4);
+        expect(callSubscriptions).toHaveBeenCalledTimes(1);
         expect(callSubscriptions).toHaveBeenNthCalledWith(
-          4,
+          1,
           expect.anything(),
           new Map([['Pet', new Set(['1'])]]),
         );
@@ -479,20 +454,28 @@ describe('optimisticLayer', () => {
     environment: IsographEnvironment,
     counter: number,
   ) {
-    return addNetworkResponseStoreLayerInner(environment, (storeLayer) => {
-      return update(storeLayer, () => counter);
-    });
+    const node = addNetworkResponseStoreLayerInner(
+      environment.store,
+      (storeLayer) => {
+        return update(storeLayer, () => counter);
+      },
+    );
+    environment.store = node;
   }
 
   function addOptimisticStoreLayer(
     environment: IsographEnvironment,
     updater: (prev: number) => number,
   ) {
-    const revert = addOptimisticStoreLayerInner(environment, (storeLayer) => {
-      return update(storeLayer, updater);
-    });
+    const { revert, node } = addOptimisticStoreLayerInner(
+      environment.store,
+      (storeLayer) => {
+        return update(storeLayer, updater);
+      },
+    );
+    environment.store = node;
     return (counter: number) => {
-      revert((storeLayer) => update(storeLayer, () => counter));
+      revert(environment, (storeLayer) => update(storeLayer, () => counter));
     };
   }
 
@@ -500,9 +483,13 @@ describe('optimisticLayer', () => {
     environment: IsographEnvironment,
     updater: (prev: number) => number,
   ) {
-    addStartUpdateStoreLayerInner(environment, (storeLayer) => {
-      return update(storeLayer, updater);
-    });
+    const node = addStartUpdateStoreLayerInner(
+      environment.store,
+      (storeLayer) => {
+        return update(storeLayer, updater);
+      },
+    );
+    environment.store = node;
   }
 
   const update = (

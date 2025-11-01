@@ -160,9 +160,8 @@ export function normalizeData(
   networkResponse: NetworkResponseObject,
   variables: Variables,
   root: StoreLink,
+  encounteredIds: EncounteredIds,
 ): EncounteredIds {
-  const encounteredIds: EncounteredIds = new Map();
-
   logMessage(environment, () => ({
     kind: 'AboutToNormalize',
     normalizationAst,

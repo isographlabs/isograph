@@ -42,6 +42,7 @@ describe('normalizeData', () => {
       },
       { id: '1' },
       { __link: ROOT_ID, __typename: entrypoint.concreteType },
+      new Map(),
     );
 
     expect(store).toStrictEqual({

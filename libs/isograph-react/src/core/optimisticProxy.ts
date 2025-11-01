@@ -10,7 +10,6 @@ import type {
   StoreLink,
   StoreRecord,
 } from './IsographEnvironment';
-import { logMessage } from './logging';
 
 export function getOrInsertRecord(
   dataLayer: StoreLayerData,
@@ -81,8 +80,7 @@ type NetworkResponseStoreLayer = {
   data: StoreLayerData;
 };
 
-export type FirstUpdate = (storeLayer: StoreLayer) => EncounteredIds;
-type DataUpdate = (storeLayer: StoreLayer) => void;
+export type DataUpdate = (storeLayer: StoreLayer) => void;
 
 type StartUpdateStoreLayer = {
   readonly kind: 'StartUpdateStoreLayer';
@@ -109,43 +107,33 @@ type OptimisticStoreLayer = {
 };
 
 export function addNetworkResponseStoreLayer(
-  environment: IsographEnvironment,
-  normalizeData: FirstUpdate,
-): void {
-  let encounteredIds: EncounteredIds;
-  switch (environment.store.kind) {
+  parent: StoreLayer,
+  normalizeData: DataUpdate,
+): StoreLayer {
+  switch (parent.kind) {
     case 'NetworkResponseStoreLayer':
     case 'BaseStoreLayer': {
-      encounteredIds = normalizeData(environment.store);
-      break;
+      normalizeData(parent);
+      return parent;
     }
     case 'StartUpdateStoreLayer':
     case 'OptimisticStoreLayer': {
       const node: NetworkResponseStoreLayer = {
         kind: 'NetworkResponseStoreLayer',
-        parentStoreLayer: environment.store,
+        parentStoreLayer: parent,
         childStoreLayer: null,
         data: {},
       };
-      environment.store.childStoreLayer = node;
-      environment.store = node;
+      parent.childStoreLayer = node;
 
-      encounteredIds = normalizeData(node);
-      break;
+      normalizeData(node);
+      return node;
     }
     default: {
-      environment.store satisfies never;
+      parent satisfies never;
       throw new Error('Unreachable. This is a bug in Isograph.');
     }
   }
-
-  logMessage(environment, () => ({
-    kind: 'AfterNormalization',
-    store: environment.store,
-    encounteredIds: encounteredIds,
-  }));
-
-  callSubscriptions(environment, encounteredIds);
 }
 
 function mergeDataLayer(target: StoreLayerData, source: StoreLayerData): void {
@@ -159,18 +147,16 @@ function mergeDataLayer(target: StoreLayerData, source: StoreLayerData): void {
 }
 
 export function addStartUpdateStoreLayer(
-  environment: IsographEnvironment,
-  startUpdate: FirstUpdate,
-): void {
-  let encounteredIds: EncounteredIds;
-
-  switch (environment.store.kind) {
+  parent: StoreLayer,
+  startUpdate: DataUpdate,
+): StoreLayer {
+  switch (parent.kind) {
     case 'BaseStoreLayer': {
-      encounteredIds = startUpdate(environment.store);
-      break;
+      startUpdate(parent);
+      return parent;
     }
     case 'StartUpdateStoreLayer': {
-      const node = environment.store;
+      const node = parent;
 
       const prevStartUpdate = node.startUpdate;
       node.startUpdate = () => {
@@ -178,43 +164,35 @@ export function addStartUpdateStoreLayer(
         startUpdate(node);
       };
 
-      encounteredIds = startUpdate(node);
-      break;
+      startUpdate(node);
+      return node;
     }
     case 'NetworkResponseStoreLayer':
     case 'OptimisticStoreLayer': {
       const node: StartUpdateStoreLayer = {
         kind: 'StartUpdateStoreLayer',
-        parentStoreLayer: environment.store,
+        parentStoreLayer: parent,
         childStoreLayer: null,
         data: {},
         startUpdate: startUpdate,
       };
-      environment.store.childStoreLayer = node;
-      environment.store = node;
+      parent.childStoreLayer = node;
 
-      encounteredIds = startUpdate(node);
-      break;
+      startUpdate(node);
+      return node;
     }
     default: {
-      environment.store satisfies never;
+      parent satisfies never;
       throw new Error('Unreachable. This is a bug in Isograph.');
     }
   }
-
-  logMessage(environment, () => ({
-    kind: 'StartUpdateComplete',
-    updatedIds: encounteredIds,
-  }));
-
-  callSubscriptions(environment, encounteredIds);
 }
 
 export function addOptimisticStoreLayer(
-  environment: IsographEnvironment,
-  startUpdate: FirstUpdate,
+  parent: StoreLayer,
+  startUpdate: DataUpdate,
 ) {
-  switch (environment.store.kind) {
+  switch (parent.kind) {
     case 'BaseStoreLayer':
     case 'StartUpdateStoreLayer':
     case 'NetworkResponseStoreLayer':
@@ -223,30 +201,31 @@ export function addOptimisticStoreLayer(
 
       const node: OptimisticStoreLayer = {
         kind: 'OptimisticStoreLayer',
-        parentStoreLayer: environment.store,
+        parentStoreLayer: parent,
         childStoreLayer: null,
         data,
         startUpdate: startUpdate,
       };
 
-      const encounteredIds = startUpdate(node);
+      startUpdate(node);
+      parent.childStoreLayer = node;
 
-      environment.store.childStoreLayer = node;
-      environment.store = node;
-
-      callSubscriptions(environment, encounteredIds);
-      return (
-        normalizeData: (storeLayer: StoreLayer) => EncounteredIds,
-      ): void => {
-        replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
-          environment,
-          node,
-          normalizeData,
-        );
+      return {
+        node,
+        revert: (
+          environment: IsographEnvironment,
+          normalizeData: (storeLayer: StoreLayer) => EncounteredIds,
+        ): void => {
+          replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
+            environment,
+            node,
+            normalizeData,
+          );
+        },
       };
     }
     default: {
-      environment.store satisfies never;
+      parent satisfies never;
       throw new Error('Unreachable. This is a bug in Isograph.');
     }
   }
