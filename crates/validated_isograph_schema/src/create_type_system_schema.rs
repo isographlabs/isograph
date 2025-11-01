@@ -3,7 +3,9 @@ use std::{collections::HashMap, ops::Deref};
 use common_lang_types::{
     SelectableName, ServerObjectEntityName, UnvalidatedTypeName, VariableName, WithLocation,
 };
-use graphql_lang_types::{GraphQLConstantValue, GraphQLInputValueDefinition, NameValuePair};
+use graphql_lang_types::{
+    GraphQLConstantValue, GraphQLInputValueDefinition, GraphQLNamedTypeAnnotation, NameValuePair,
+};
 use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::{ConstantValue, SelectionType, TypeAnnotation, VariableDefinition};
 use isograph_schema::{
@@ -117,110 +119,132 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
     field_queue: HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
     options: &CompilerConfigOptions,
 ) -> Result<(), CreateSchemaError<TNetworkProtocol>> {
-    for (parent_object_entity_name, field_definitions_to_insert) in field_queue {
-        for server_field_to_insert in field_definitions_to_insert.into_iter() {
-            let target_entity_type_name = server_field_to_insert.item.graphql_type.inner();
+    for selectable in process_field_queue_inner(db, field_queue) {
+        match selectable? {
+            SelectionType::Scalar((server_scalar_selectable, inner_non_null_named_type)) => {
+                let server_scalar_selectable_name = server_scalar_selectable.name.item;
+                let parent_object_entity_name = server_scalar_selectable.parent_object_entity_name;
 
-            let selection_type = defined_entity(db, *target_entity_type_name)
-                .to_owned()
-                .expect(
-                    "Expected parsing to have succeeded. \
-                    This is indicative of a bug in Isograph.",
-                )
-                .ok_or(CreateSchemaError::FieldTypenameDoesNotExist {
-                    target_entity_type_name: *target_entity_type_name,
-                })?;
+                schema.insert_server_scalar_selectable(server_scalar_selectable)?;
 
-            let arguments = server_field_to_insert
-                .item
-                .arguments
-                // TODO don't clone
-                .clone()
-                .into_iter()
-                .map(|input_value_definition| {
-                    graphql_input_value_definition_to_variable_definition(
-                        db,
-                        input_value_definition,
+                let ServerObjectEntityExtraInfo { id_field, .. } = schema
+                    .server_entity_data
+                    .entry(parent_object_entity_name)
+                    .or_default();
+                // TODO do not do this here, this is a GraphQL-ism
+                if server_scalar_selectable_name == *ID_FIELD_NAME {
+                    set_and_validate_id_field::<TNetworkProtocol>(
+                        id_field,
+                        server_scalar_selectable_name,
                         parent_object_entity_name,
-                        server_field_to_insert.item.name.item.into(),
-                    )
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            let description = server_field_to_insert.item.description.map(|d| d.item);
-            let selectable = match selection_type {
-                SelectionType::Scalar(scalar_entity_name) => {
-                    SelectionType::Scalar(ServerScalarSelectable {
-                        description,
-                        name: server_field_to_insert
-                            .item
-                            .name
-                            .map(|x| x.unchecked_conversion()),
-                        target_scalar_entity: TypeAnnotation::from_graphql_type_annotation(
-                            server_field_to_insert.item.graphql_type.clone(),
-                        )
-                        .map(&mut |_| scalar_entity_name),
-                        javascript_type_override: server_field_to_insert
-                            .item
-                            .javascript_type_override,
-                        parent_object_entity_name,
-                        arguments,
-                        phantom_data: std::marker::PhantomData,
-                    })
+                        options,
+                        inner_non_null_named_type.as_ref(),
+                    )?;
                 }
-                SelectionType::Object(object_entity_name) => {
-                    SelectionType::Object(ServerObjectSelectable {
-                        description,
-                        name: server_field_to_insert.item.name.map(|x| x.unchecked_conversion()),
-                        target_object_entity: TypeAnnotation::from_graphql_type_annotation(
-                            server_field_to_insert.item.graphql_type.clone(),
-                        )
-                        .map(&mut |_| object_entity_name),
-                        parent_object_entity_name,
-                        arguments,
-                        phantom_data: std::marker::PhantomData,
-                        object_selectable_variant:
-                            // TODO this is hacky
-                            if server_field_to_insert.item.is_inline_fragment {
-                                ServerObjectSelectableVariant::InlineFragment
-                            } else {
-                                ServerObjectSelectableVariant::LinkedField
-                            }
-                    })
-                }
-            };
-
-            match selectable {
-                SelectionType::Scalar(server_scalar_selectable) => {
-                    let server_scalar_selectable_name = server_scalar_selectable.name.item;
-
-                    schema.insert_server_scalar_selectable(server_scalar_selectable)?;
-
-                    let ServerObjectEntityExtraInfo { id_field, .. } = schema
-                        .server_entity_data
-                        .entry(parent_object_entity_name)
-                        .or_default();
-                    // TODO do not do this here, this is a GraphQL-ism
-                    if server_scalar_selectable_name == *ID_FIELD_NAME {
-                        set_and_validate_id_field::<TNetworkProtocol>(
-                            id_field,
-                            server_scalar_selectable_name,
-                            parent_object_entity_name,
-                            options,
-                            server_field_to_insert
-                                .item
-                                .graphql_type
-                                .inner_non_null_named_type(),
-                        )?;
-                    }
-                }
-                SelectionType::Object(server_object_selectable) => {
-                    schema.insert_server_object_selectable(server_object_selectable)?;
-                }
+            }
+            SelectionType::Object(server_object_selectable) => {
+                schema.insert_server_object_selectable(server_object_selectable)?;
             }
         }
     }
 
     Ok(())
+}
+
+#[expect(clippy::type_complexity)]
+pub fn process_field_queue_inner<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    field_queue: HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
+) -> impl Iterator<
+    Item = Result<
+        SelectionType<
+            (
+                ServerScalarSelectable<TNetworkProtocol>,
+                Option<GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
+            ),
+            ServerObjectSelectable<TNetworkProtocol>,
+        >,
+        CreateSchemaError<TNetworkProtocol>,
+    >,
+> {
+    field_queue
+        .into_iter()
+        .flat_map(move |(parent_object_entity_name, field_definitions_to_insert)| {
+            field_definitions_to_insert.into_iter().map(move |server_field_to_insert| {
+                let target_entity_type_name = server_field_to_insert.item.graphql_type.inner();
+                let target_entity_type_name_non_null = server_field_to_insert.item.graphql_type.inner_non_null_named_type().cloned();
+
+                let selection_type = defined_entity(db, *target_entity_type_name)
+                    .to_owned()
+                    .expect(
+                        "Expected parsing to have succeeded. \
+                        This is indicative of a bug in Isograph.",
+                    )
+                    .ok_or(CreateSchemaError::FieldTypenameDoesNotExist {
+                        target_entity_type_name: *target_entity_type_name,
+                    })?;
+
+                let arguments = server_field_to_insert
+                    .item
+                    .arguments
+                    // TODO don't clone
+                    .clone()
+                    .into_iter()
+                    .map(|input_value_definition| {
+                        graphql_input_value_definition_to_variable_definition(
+                            db,
+                            input_value_definition,
+                            parent_object_entity_name,
+                            server_field_to_insert.item.name.item.into(),
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let description = server_field_to_insert.item.description.map(|d| d.item);
+                let selectable = match selection_type {
+                    SelectionType::Scalar(scalar_entity_name) => {
+                        SelectionType::Scalar((ServerScalarSelectable {
+                            description,
+                            name: server_field_to_insert
+                                .item
+                                .name
+                                .map(|x| x.unchecked_conversion()),
+                            target_scalar_entity: TypeAnnotation::from_graphql_type_annotation(
+                                server_field_to_insert.item.graphql_type.clone(),
+                            )
+                            .map(&mut |_| scalar_entity_name),
+                            javascript_type_override: server_field_to_insert
+                                .item
+                                .javascript_type_override,
+                            parent_object_entity_name,
+                            arguments,
+                            phantom_data: std::marker::PhantomData,
+                        }, target_entity_type_name_non_null))
+                    }
+                    SelectionType::Object(object_entity_name) => {
+                        SelectionType::Object(ServerObjectSelectable {
+                            description,
+                            name: server_field_to_insert.item.name.map(|x| x.unchecked_conversion()),
+                            target_object_entity: TypeAnnotation::from_graphql_type_annotation(
+                                server_field_to_insert.item.graphql_type.clone(),
+                            )
+                            .map(&mut |_| object_entity_name),
+                            parent_object_entity_name,
+                            arguments,
+                            phantom_data: std::marker::PhantomData,
+                            object_selectable_variant:
+                                // TODO this is hacky
+                                if server_field_to_insert.item.is_inline_fragment {
+                                    ServerObjectSelectableVariant::InlineFragment
+                                } else {
+                                    ServerObjectSelectableVariant::LinkedField
+                                }
+                        })
+                    }
+                };
+                Ok(selectable)
+
+            })
+        })
 }
 
 pub fn graphql_input_value_definition_to_variable_definition<
