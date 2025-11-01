@@ -56,239 +56,236 @@ impl ExposeFieldDirective {
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
-    pub fn create_new_exposed_field(
-        &mut self,
-        db: &IsographDatabase<TNetworkProtocol>,
-        expose_field_to_insert: ExposeFieldToInsert,
-        parent_object_entity_name: ServerObjectEntityName,
-    ) -> Result<UnprocessedClientFieldItem, CreateAdditionalFieldsError<TNetworkProtocol>> {
-        let ExposeFieldDirective {
-            expose_as,
-            field_map,
-            field,
-        } = expose_field_to_insert.expose_field_directive;
+pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    schema: &mut Schema<TNetworkProtocol>,
+    expose_field_to_insert: ExposeFieldToInsert,
+    parent_object_entity_name: ServerObjectEntityName,
+) -> Result<UnprocessedClientFieldItem, CreateAdditionalFieldsError<TNetworkProtocol>> {
+    let ExposeFieldDirective {
+        expose_as,
+        field_map,
+        field,
+    } = expose_field_to_insert.expose_field_directive;
 
-        // HACK: we're essentially splitting the field arg by . and keeping the same
-        // implementation as before. But really, there isn't much a distinction
-        // between field and path, and we should clean this up.
-        //
-        // But, this is an expedient way to combine field and path.
-        let mut path = field.lookup().split('.');
-        let field = path.next().expect(
-            "Expected iter to have at least one element. \
+    // HACK: we're essentially splitting the field arg by . and keeping the same
+    // implementation as before. But really, there isn't much a distinction
+    // between field and path, and we should clean this up.
+    //
+    // But, this is an expedient way to combine field and path.
+    let mut path = field.lookup().split('.');
+    let field = path.next().expect(
+        "Expected iter to have at least one element. \
             This is indicative of a bug in Isograph.",
-        );
-        let primary_field_name_selection_parts =
-            path.map(|x| x.intern().into()).collect::<Vec<_>>();
+    );
+    let primary_field_name_selection_parts = path.map(|x| x.intern().into()).collect::<Vec<_>>();
 
-        let (parent_object_entity_name, mutation_subfield_name) =
-            self.parse_mutation_subfield_id(field, parent_object_entity_name)?;
+    let (parent_object_entity_name, mutation_subfield_name) =
+        schema.parse_mutation_subfield_id(field, parent_object_entity_name)?;
 
-        // TODO do not use mutation naming here
-        let mutation_field = self
-            .server_object_selectable(parent_object_entity_name, mutation_subfield_name)
-            .expect(
-                "Expected selectable to exist. \
+    // TODO do not use mutation naming here
+    let mutation_field = schema
+        .server_object_selectable(parent_object_entity_name, mutation_subfield_name)
+        .expect(
+            "Expected selectable to exist. \
                 This is indicative of a bug in Isograph.",
-            );
-        let payload_object_type_annotation = &mutation_field.target_object_entity;
-        let payload_object_entity_name = *payload_object_type_annotation.inner();
+        );
+    let payload_object_type_annotation = &mutation_field.target_object_entity;
+    let payload_object_entity_name = *payload_object_type_annotation.inner();
 
-        // TODO it's a bit annoying that we call .object twice!
-        let mutation_field_payload_type_name =
-            server_object_entity_named(db, payload_object_entity_name)
-                .deref()
-                .as_ref()
-                .map_err(|e| e.clone())?
-                .as_ref()
-                .expect(
-                    "Expected object entity to exist. \
-                    This is indicative of a bug in Isograph.",
-                )
-                .item
-                .name;
-
-        let client_field_scalar_selection_name =
-            expose_as.unwrap_or(mutation_field.name.item.into());
-        // TODO what is going on here. Should mutation_field have a checked way of converting to LinkedField?
-        let top_level_schema_field_name = mutation_field.name.item.unchecked_conversion();
-        let mutation_field_arguments = mutation_field.arguments.clone();
-        let description = expose_field_to_insert
-            .description
-            .or(mutation_field.description);
-
-        let processed_field_map_items = skip_arguments_contained_in_field_map(
-            self,
-            mutation_field_arguments.clone(),
-            mutation_field_payload_type_name.item,
-            expose_field_to_insert.parent_object_name,
-            client_field_scalar_selection_name,
-            // TODO don't clone
-            field_map.clone(),
-        )?;
-
-        let payload_object_entity_memo_ref =
-            server_object_entity_named(db, payload_object_entity_name);
-        let top_level_schema_field_concrete_type = payload_object_entity_memo_ref
+    // TODO it's a bit annoying that we call .object twice!
+    let mutation_field_payload_type_name =
+        server_object_entity_named(db, payload_object_entity_name)
             .deref()
             .as_ref()
             .map_err(|e| e.clone())?
             .as_ref()
             .expect(
-                "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
+                "Expected object entity to exist. \
+                    This is indicative of a bug in Isograph.",
             )
             .item
-            .concrete_type;
+            .name;
 
-        let (maybe_abstract_parent_object_entity_name, primary_field_concrete_type) =
-            traverse_object_selections(
-                db,
-                self,
-                payload_object_entity_name,
-                primary_field_name_selection_parts.iter().copied(),
-            )?;
+    let client_field_scalar_selection_name = expose_as.unwrap_or(mutation_field.name.item.into());
+    // TODO what is going on here. Should mutation_field have a checked way of converting to LinkedField?
+    let top_level_schema_field_name = mutation_field.name.item.unchecked_conversion();
+    let mutation_field_arguments = mutation_field.arguments.clone();
+    let description = expose_field_to_insert
+        .description
+        .or(mutation_field.description);
 
-        let fields = processed_field_map_items
-            .iter()
-            .map(|field_map_item| {
-                let scalar_field_selection = ScalarSelection {
-                    name: WithLocation::new(
-                        // TODO make this no-op
-                        // TODO split on . here; we should be able to have from: "best_friend.id" or whatnot.
-                        field_map_item.0.from.unchecked_conversion(),
-                        Location::generated(),
-                    ),
-                    reader_alias: None,
-                    associated_data: (),
-                    scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(
-                        EmptyDirectiveSet {},
-                    ),
-                    // TODO what about arguments? How would we handle them?
-                    arguments: vec![],
-                };
+    let processed_field_map_items = skip_arguments_contained_in_field_map(
+        schema,
+        mutation_field_arguments.clone(),
+        mutation_field_payload_type_name.item,
+        expose_field_to_insert.parent_object_name,
+        client_field_scalar_selection_name,
+        // TODO don't clone
+        field_map.clone(),
+    )?;
 
-                WithSpan::new(
-                    SelectionTypeContainingSelections::Scalar(scalar_field_selection),
-                    Span::todo_generated(),
-                )
-            })
-            .collect::<Vec<_>>();
+    let payload_object_entity_memo_ref = server_object_entity_named(db, payload_object_entity_name);
+    let top_level_schema_field_concrete_type = payload_object_entity_memo_ref
+        .deref()
+        .as_ref()
+        .map_err(|e| e.clone())?
+        .as_ref()
+        .expect(
+            "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+        )
+        .item
+        .concrete_type;
 
-        let mutation_field_client_field_name =
-            client_field_scalar_selection_name.unchecked_conversion();
-
-        let top_level_schema_field_arguments = mutation_field_arguments
-            .into_iter()
-            .map(|x| x.item)
-            .collect::<Vec<_>>();
-
-        let mut parts_reversed = self.get_object_selections_path(
+    let (maybe_abstract_parent_object_entity_name, primary_field_concrete_type) =
+        traverse_object_selections(
             db,
+            schema,
             payload_object_entity_name,
             primary_field_name_selection_parts.iter().copied(),
         )?;
-        parts_reversed.reverse();
 
-        let mut subfields_or_inline_fragments = parts_reversed
-            .iter()
-            .map(|server_object_selectable| {
-                // The server object selectable may represent a linked field or an inline fragment
-                let x = match server_object_selectable.object_selectable_variant {
-                    ServerObjectSelectableVariant::LinkedField => {
-                        WrappedSelectionMapSelection::LinkedField {
-                            server_object_selectable_name: server_object_selectable.name.item,
-                            arguments: vec![],
-                            concrete_type: primary_field_concrete_type,
-                        }
-                    }
-                    ServerObjectSelectableVariant::InlineFragment => {
-                        WrappedSelectionMapSelection::InlineFragment(
-                            server_object_entity_named(
-                                db,
-                                *server_object_selectable.target_object_entity.inner(),
-                            )
-                            .deref()
-                            .as_ref()
-                            .map_err(|e| e.clone())?
-                            .as_ref()
-                            .expect(
-                                "Expected entity to exist. \
-                                This is indicative of a bug in Isograph.",
-                            )
-                            .item
-                            .name
-                            .item,
-                        )
-                    }
-                };
-                Ok::<_, CreateAdditionalFieldsError<TNetworkProtocol>>(x)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        subfields_or_inline_fragments.push(imperative_field_subfields_or_inline_fragments(
-            top_level_schema_field_name,
-            &top_level_schema_field_arguments,
-            top_level_schema_field_concrete_type,
-        ));
-
-        let mutation_client_scalar_selectable = ClientScalarSelectable {
-            description,
-            name: WithLocation::new(
-                client_field_scalar_selection_name.unchecked_conversion(),
-                Location::generated(),
-            ),
-            reader_selection_set: vec![],
-
-            variant: ClientFieldVariant::ImperativelyLoadedField(ImperativelyLoadedFieldVariant {
-                top_level_schema_field_arguments,
-                client_selection_name: client_field_scalar_selection_name.unchecked_conversion(),
-
-                root_object_entity_name: parent_object_entity_name,
-                subfields_or_inline_fragments: subfields_or_inline_fragments.clone(),
-                field_map,
-            }),
-            variable_definitions: vec![],
-            type_and_field: ParentObjectEntityNameAndSelectableName {
-                parent_object_entity_name: maybe_abstract_parent_object_entity_name
-                    .unchecked_conversion(), // e.g. Pet
-                selectable_name: client_field_scalar_selection_name, // set_pet_best_friend
-            },
-            parent_object_entity_name: maybe_abstract_parent_object_entity_name,
-            refetch_strategy: None,
-            network_protocol: std::marker::PhantomData,
-        };
-        self.client_scalar_selectables.insert(
-            (
-                maybe_abstract_parent_object_entity_name,
-                mutation_client_scalar_selectable.name.item,
-            ),
-            mutation_client_scalar_selectable,
-        );
-
-        self.insert_client_field_on_object(
-            client_field_scalar_selection_name,
-            maybe_abstract_parent_object_entity_name,
-            mutation_field_client_field_name,
-            mutation_field_payload_type_name.item,
-        )?;
-        Ok(UnprocessedClientFieldItem {
-            client_scalar_selectable_name: mutation_field_client_field_name,
-            parent_object_entity_name: maybe_abstract_parent_object_entity_name,
-            reader_selection_set: vec![],
-            refetch_strategy: Some(RefetchStrategy::UseRefetchField(
-                generate_refetch_field_strategy(
-                    fields.to_vec(),
-                    // NOTE: this will probably panic if we're not exposing fields which are
-                    // originally on Mutation
-                    parent_object_entity_name,
-                    subfields_or_inline_fragments,
+    let fields = processed_field_map_items
+        .iter()
+        .map(|field_map_item| {
+            let scalar_field_selection = ScalarSelection {
+                name: WithLocation::new(
+                    // TODO make this no-op
+                    // TODO split on . here; we should be able to have from: "best_friend.id" or whatnot.
+                    field_map_item.0.from.unchecked_conversion(),
+                    Location::generated(),
                 ),
-            )),
-        })
-    }
+                reader_alias: None,
+                associated_data: (),
+                scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(
+                    EmptyDirectiveSet {},
+                ),
+                // TODO what about arguments? How would we handle them?
+                arguments: vec![],
+            };
 
+            WithSpan::new(
+                SelectionTypeContainingSelections::Scalar(scalar_field_selection),
+                Span::todo_generated(),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let mutation_field_client_field_name =
+        client_field_scalar_selection_name.unchecked_conversion();
+
+    let top_level_schema_field_arguments = mutation_field_arguments
+        .into_iter()
+        .map(|x| x.item)
+        .collect::<Vec<_>>();
+
+    let mut parts_reversed = schema.get_object_selections_path(
+        db,
+        payload_object_entity_name,
+        primary_field_name_selection_parts.iter().copied(),
+    )?;
+    parts_reversed.reverse();
+
+    let mut subfields_or_inline_fragments = parts_reversed
+        .iter()
+        .map(|server_object_selectable| {
+            // The server object selectable may represent a linked field or an inline fragment
+            let x = match server_object_selectable.object_selectable_variant {
+                ServerObjectSelectableVariant::LinkedField => {
+                    WrappedSelectionMapSelection::LinkedField {
+                        server_object_selectable_name: server_object_selectable.name.item,
+                        arguments: vec![],
+                        concrete_type: primary_field_concrete_type,
+                    }
+                }
+                ServerObjectSelectableVariant::InlineFragment => {
+                    WrappedSelectionMapSelection::InlineFragment(
+                        server_object_entity_named(
+                            db,
+                            *server_object_selectable.target_object_entity.inner(),
+                        )
+                        .deref()
+                        .as_ref()
+                        .map_err(|e| e.clone())?
+                        .as_ref()
+                        .expect(
+                            "Expected entity to exist. \
+                                This is indicative of a bug in Isograph.",
+                        )
+                        .item
+                        .name
+                        .item,
+                    )
+                }
+            };
+            Ok::<_, CreateAdditionalFieldsError<TNetworkProtocol>>(x)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    subfields_or_inline_fragments.push(imperative_field_subfields_or_inline_fragments(
+        top_level_schema_field_name,
+        &top_level_schema_field_arguments,
+        top_level_schema_field_concrete_type,
+    ));
+
+    let mutation_client_scalar_selectable = ClientScalarSelectable {
+        description,
+        name: WithLocation::new(
+            client_field_scalar_selection_name.unchecked_conversion(),
+            Location::generated(),
+        ),
+        reader_selection_set: vec![],
+
+        variant: ClientFieldVariant::ImperativelyLoadedField(ImperativelyLoadedFieldVariant {
+            top_level_schema_field_arguments,
+            client_selection_name: client_field_scalar_selection_name.unchecked_conversion(),
+
+            root_object_entity_name: parent_object_entity_name,
+            subfields_or_inline_fragments: subfields_or_inline_fragments.clone(),
+            field_map,
+        }),
+        variable_definitions: vec![],
+        type_and_field: ParentObjectEntityNameAndSelectableName {
+            parent_object_entity_name: maybe_abstract_parent_object_entity_name
+                .unchecked_conversion(), // e.g. Pet
+            selectable_name: client_field_scalar_selection_name, // set_pet_best_friend
+        },
+        parent_object_entity_name: maybe_abstract_parent_object_entity_name,
+        refetch_strategy: None,
+        network_protocol: std::marker::PhantomData,
+    };
+    schema.client_scalar_selectables.insert(
+        (
+            maybe_abstract_parent_object_entity_name,
+            mutation_client_scalar_selectable.name.item,
+        ),
+        mutation_client_scalar_selectable,
+    );
+
+    schema.insert_client_field_on_object(
+        client_field_scalar_selection_name,
+        maybe_abstract_parent_object_entity_name,
+        mutation_field_client_field_name,
+        mutation_field_payload_type_name.item,
+    )?;
+    Ok(UnprocessedClientFieldItem {
+        client_scalar_selectable_name: mutation_field_client_field_name,
+        parent_object_entity_name: maybe_abstract_parent_object_entity_name,
+        reader_selection_set: vec![],
+        refetch_strategy: Some(RefetchStrategy::UseRefetchField(
+            generate_refetch_field_strategy(
+                fields.to_vec(),
+                // NOTE: this will probably panic if we're not exposing fields which are
+                // originally on Mutation
+                parent_object_entity_name,
+                subfields_or_inline_fragments,
+            ),
+        )),
+    })
+}
+
+impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     // TODO this should be defined elsewhere, probably
     pub fn insert_client_field_on_object(
         &mut self,

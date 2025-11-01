@@ -7,7 +7,8 @@ use isograph_schema::{
     CreateAdditionalFieldsError, ExposeFieldToInsert, FieldToInsert,
     FieldToInsertToServerSelectableError, ID_FIELD_NAME, IsographDatabase, NetworkProtocol,
     ScalarSelectionAndNonNullType, Schema, ServerObjectEntityExtraInfo, ServerObjectSelectable,
-    UnprocessedClientFieldItem, UnprocessedClientPointerItem, field_to_insert_to_server_selectable,
+    UnprocessedClientFieldItem, UnprocessedClientPointerItem, create_new_exposed_field,
+    field_to_insert_to_server_selectable,
 };
 use pico_macros::legacy_memo;
 use thiserror::Error;
@@ -87,8 +88,9 @@ pub(crate) fn create_type_system_schema_with_server_selectables<
 
     for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
         for expose_as_field in expose_as_fields_to_insert {
-            let unprocessed_scalar_item = unvalidated_isograph_schema.create_new_exposed_field(
+            let unprocessed_scalar_item = create_new_exposed_field(
                 db,
+                &mut unvalidated_isograph_schema,
                 expose_as_field,
                 parent_object_entity_name,
             )?;
