@@ -356,8 +356,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 }
 
 fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol + 'static>(
-    // TODO move this to impl Schema
-    schema: &mut Schema<TNetworkProtocol>,
+    schema: &Schema<TNetworkProtocol>,
     arguments: Vec<WithLocation<VariableDefinition<ServerEntityName>>>,
     primary_type_name: ServerObjectEntityName,
     mutation_object_name: ServerObjectEntityName,

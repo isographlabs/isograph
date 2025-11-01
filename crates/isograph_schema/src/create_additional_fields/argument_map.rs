@@ -36,7 +36,7 @@ impl ArgumentMap {
         primary_object_entity_name: ServerObjectEntityName,
         mutation_object_entity_name: ServerObjectEntityName,
         mutation_selectable_name: SelectableName,
-        schema: &mut Schema<TNetworkProtocol>,
+        schema: &Schema<TNetworkProtocol>,
     ) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem, TNetworkProtocol> {
         let split_to_arg = field_map_item.split_to_arg();
         let (index_of_argument, argument) = self
