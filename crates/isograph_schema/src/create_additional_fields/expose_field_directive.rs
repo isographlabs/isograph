@@ -299,7 +299,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     ) -> Result<(), CreateAdditionalFieldsError<TNetworkProtocol>> {
         if self
             .server_entity_data
-            .server_object_entity_extra_info
             .entry(client_field_parent_object_entity_name)
             .or_default()
             .selectables
@@ -336,7 +335,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     > {
         let parent_entity_name_and_mutation_subfield_name = self
             .server_entity_data
-            .server_object_entity_extra_info
             .get(&mutation_object_entity_name)
             .expect(
                 "Expected mutation_object_entity_name to exist \
@@ -401,7 +399,6 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol + 'static>(
 
     let mut current_selectables = &schema
         .server_entity_data
-        .server_object_entity_extra_info
         .get(&root_object_name)
         .expect(
             "Expected root_object_entity_name to exist \
@@ -459,7 +456,6 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol + 'static>(
 
                     current_selectables = &schema
                         .server_entity_data
-                        .server_object_entity_extra_info
                         .get(target_object_entity_name)
                         .expect(
                             "Expected target_object_entity_name to exist \

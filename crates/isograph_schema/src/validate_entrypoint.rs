@@ -175,7 +175,6 @@ fn validate_client_field<TNetworkProtocol: NetworkProtocol + 'static>(
 ) -> Result<ClientScalarSelectableName, WithLocation<ValidateEntrypointDeclarationError>> {
     match schema
         .server_entity_data
-        .server_object_entity_extra_info
         .get(&parent_object_entity_name)
         .expect(
             "Expected parent_object_entity_name to exist \

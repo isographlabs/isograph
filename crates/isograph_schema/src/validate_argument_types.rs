@@ -309,7 +309,6 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol + 'static>(
 ) -> Result<(), WithLocation<ValidateArgumentTypesError>> {
     validate_no_extraneous_fields(
         &server_entity_data
-            .server_object_entity_extra_info
             .get(&object_entity_name)
             .expect(
                 "Expected object_entity_name to exist \
@@ -381,7 +380,6 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
     object_entity_name: ServerObjectEntityName,
 ) -> Vec<ObjectLiteralFieldType> {
     server_entity_data
-        .server_object_entity_extra_info
         .get(&object_entity_name)
         .expect(
             "Expected object_entity_name to exist \

@@ -78,9 +78,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             client_object_selectables: HashMap::new(),
 
             entrypoints: Default::default(),
-            server_entity_data: ServerEntityData {
-                server_object_entity_extra_info: HashMap::new(),
-            },
+            server_entity_data: HashMap::new(),
         }
     }
 
@@ -97,7 +95,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 
         let mut current_selectables = &self
             .server_entity_data
-            .server_object_entity_extra_info
             .get(&root_object_name)
             .expect(
                 "Expected root_object_entity_name to exist \
@@ -148,7 +145,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 
                         current_selectables = &self
                             .server_entity_data
-                            .server_object_entity_extra_info
                             .get(target_object_entity_name)
                             .expect(
                                 "Expected target_object_entity_name to exist \
@@ -190,13 +186,11 @@ pub struct ServerObjectEntityExtraInfo {
     pub id_field: Option<ServerScalarIdSelectableName>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct ServerEntityData {
-    // We keep track of available selectables and id fields outside of server_objects so that
-    // we don't need a server_object_entity_mut method, which is incompatible with pico.
-    pub server_object_entity_extra_info:
-        HashMap<ServerObjectEntityName, ServerObjectEntityExtraInfo>,
-}
+// We keep track of available selectables and id fields outside of server_objects so that
+// we don't need a server_object_entity_mut method, which is incompatible with pico.
+//
+// This type alias is a bit outdated. It should be gone soon anyway, though.
+pub type ServerEntityData = HashMap<ServerObjectEntityName, ServerObjectEntityExtraInfo>;
 
 impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     pub fn server_scalar_selectable(
@@ -261,7 +255,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             ..
         } = self
             .server_entity_data
-            .server_object_entity_extra_info
             .entry(parent_object_entity_name)
             .or_default();
 
@@ -313,7 +306,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 
         if self
             .server_entity_data
-            .server_object_entity_extra_info
             .entry(parent_object_entity_name)
             .or_default()
             .selectables

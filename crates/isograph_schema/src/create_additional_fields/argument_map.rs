@@ -188,7 +188,6 @@ impl ModifiedArgument {
                 ServerEntityName::Object(object_entity_name) => ModifiedObject {
                     field_map: schema
                         .server_entity_data
-                        .server_object_entity_extra_info
                         .get(&object_entity_name)
                         .expect(
                             "Expected object_entity_name to exist \

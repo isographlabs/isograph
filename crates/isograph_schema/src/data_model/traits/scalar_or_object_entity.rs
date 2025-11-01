@@ -202,7 +202,6 @@ pub fn parent_object_entity_and_selectable<'a, TNetworkProtocol: NetworkProtocol
 
     let extra_info = validated_schema
         .server_entity_data
-        .server_object_entity_extra_info
         .get(&parent_type_name.0.unchecked_conversion())
         .expect(
             "Expected extra info to exist. \

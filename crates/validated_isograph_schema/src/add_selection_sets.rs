@@ -243,7 +243,6 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol + 'static>(
 ) -> AddSelectionSetsResult<ValidatedScalarSelection> {
     let location = schema
         .server_entity_data
-        .server_object_entity_extra_info
         .get(&selection_parent_object_name)
         .expect(
             "Expected selection_parent_object_id to exist \
@@ -353,7 +352,6 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol + 'static>(
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<ValidatedObjectSelection> {
     let location = schema
         .server_entity_data
-        .server_object_entity_extra_info
         .get(&selection_parent_object_name)
         .expect(
             "Expected selection_parent_object_id to exist \

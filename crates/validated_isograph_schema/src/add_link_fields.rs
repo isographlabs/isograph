@@ -60,7 +60,6 @@ pub fn add_link_fields<TNetworkProtocol: NetworkProtocol + 'static>(
     for (parent_object_entity_name, field_name, object_entity_name) in selectables_to_process {
         if schema
             .server_entity_data
-            .server_object_entity_extra_info
             .entry(parent_object_entity_name.item)
             .or_default()
             .selectables
