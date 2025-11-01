@@ -90,7 +90,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             .server_object_selectable(parent_object_entity_name, mutation_subfield_name)
             .expect(
                 "Expected selectable to exist. \
-                    This is indicative of a bug in Isograph.",
+                This is indicative of a bug in Isograph.",
             );
         let payload_object_type_annotation = &mutation_field.target_object_entity;
         let payload_object_entity_name = *payload_object_type_annotation.inner();
@@ -104,7 +104,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                 .as_ref()
                 .expect(
                     "Expected object entity to exist. \
-                This is indicative of a bug in Isograph.",
+                    This is indicative of a bug in Isograph.",
                 )
                 .item
                 .name;

@@ -17,6 +17,8 @@ pub fn server_selectables_vec<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
 ) -> Result<
+    // TODO return the SelectableId with each Result, i.e. we should know
+    // the parent type and selectable name infallibly
     Vec<Result<OwnedSelectable<TNetworkProtocol>, FieldToInsertToServerSelectableError>>,
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
