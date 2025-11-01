@@ -212,6 +212,13 @@ impl<TScalar, TObject> SelectionType<TScalar, TObject> {
             SelectionType::Object(o) => Ok(o),
         }
     }
+
+    pub fn map_scalar<U>(self, f: impl FnOnce(TScalar) -> U) -> SelectionType<U, TObject> {
+        match self {
+            SelectionType::Scalar(s) => SelectionType::Scalar(f(s)),
+            SelectionType::Object(o) => SelectionType::Object(o),
+        }
+    }
 }
 
 impl<TScalar, TObject> SelectionType<WithLocation<TScalar>, WithLocation<TObject>> {

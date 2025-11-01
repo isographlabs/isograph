@@ -39,7 +39,7 @@ pub fn field_to_insert_to_server_selectable<TNetworkProtocol: NetworkProtocol + 
         .to_owned()
         .expect(
             "Expected parsing to have succeeded. \
-                        This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         )
         .ok_or(
             FieldToInsertToServerSelectableError::FieldTypenameDoesNotExist {

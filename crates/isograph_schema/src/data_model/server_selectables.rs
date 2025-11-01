@@ -91,3 +91,8 @@ pub type ServerSelectable<'a, TNetworkProtocol> = SelectionType<
     &'a ServerScalarSelectable<TNetworkProtocol>,
     &'a ServerObjectSelectable<TNetworkProtocol>,
 >;
+
+pub type OwnedServerSelectable<TNetworkProtocol> = SelectionType<
+    ServerScalarSelectable<TNetworkProtocol>,
+    ServerObjectSelectable<TNetworkProtocol>,
+>;

@@ -146,7 +146,7 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok(())
 }
 
-pub fn process_field_queue_inner<TNetworkProtocol: NetworkProtocol + 'static>(
+fn process_field_queue_inner<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     field_queue: HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
 ) -> impl Iterator<
