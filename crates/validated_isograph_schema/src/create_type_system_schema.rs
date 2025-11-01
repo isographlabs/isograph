@@ -110,7 +110,6 @@ pub(crate) fn create_type_system_schema_with_server_selectables<
                 );
 
             unvalidated_isograph_schema.insert_client_field_on_object(
-                client_scalar_selectable_name.into(),
                 parent_object_entity_name,
                 client_scalar_selectable_name,
                 payload_object_entity_name,

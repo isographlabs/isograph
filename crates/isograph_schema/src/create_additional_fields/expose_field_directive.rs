@@ -273,9 +273,8 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     // TODO this should be defined elsewhere, probably
     pub fn insert_client_field_on_object(
         &mut self,
-        mutation_field_name: SelectableName,
         client_field_parent_object_entity_name: ServerObjectEntityName,
-        client_field_name: ClientScalarSelectableName,
+        client_selectable_name: ClientScalarSelectableName,
         payload_object_name: ServerObjectEntityName,
     ) -> Result<(), CreateAdditionalFieldsError<TNetworkProtocol>> {
         if self
@@ -284,10 +283,10 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             .or_default()
             .selectables
             .insert(
-                mutation_field_name,
+                client_selectable_name.into(),
                 DefinitionLocation::Client(SelectionType::Scalar((
                     client_field_parent_object_entity_name,
-                    client_field_name,
+                    client_selectable_name,
                 ))),
             )
             .is_some()
@@ -295,7 +294,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             return Err(
                 // TODO use a more generic error message when making this
                 CreateAdditionalFieldsError::CompilerCreatedFieldExistsOnType {
-                    selectable_name: mutation_field_name,
+                    client_scalar_selectable_name: client_selectable_name,
                     parent_object_entity_name: payload_object_name,
                 },
             );

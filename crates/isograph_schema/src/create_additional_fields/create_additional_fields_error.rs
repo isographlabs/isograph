@@ -1,6 +1,7 @@
 use crate::{EntityAccessError, NetworkProtocol, Schema};
 use common_lang_types::{
-    SelectableName, ServerObjectEntityName, StringLiteralValue, UnvalidatedTypeName, VariableName,
+    ClientScalarSelectableName, SelectableName, ServerObjectEntityName, StringLiteralValue,
+    UnvalidatedTypeName, VariableName,
 };
 use intern::{Lookup, string_key::Intern};
 
@@ -52,10 +53,11 @@ pub type ProcessTypeDefinitionResult<T, TNetworkProtocol> =
 pub enum CreateAdditionalFieldsError<TNetworkProtocol: NetworkProtocol + 'static> {
     #[error(
         "The Isograph compiler attempted to create a field named \
-        `{selectable_name}` on type `{parent_object_entity_name}`, but a field with that name already exists."
+        `{client_scalar_selectable_name}` on entity `{parent_object_entity_name}`, \
+        but a field with that name already exists."
     )]
     CompilerCreatedFieldExistsOnType {
-        selectable_name: SelectableName,
+        client_scalar_selectable_name: ClientScalarSelectableName,
         parent_object_entity_name: ServerObjectEntityName,
     },
 
