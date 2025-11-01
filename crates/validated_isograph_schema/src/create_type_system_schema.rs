@@ -145,27 +145,52 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             let description = server_field_to_insert.item.description.map(|d| d.item);
-
-            match selection_type {
+            let selectable = match selection_type {
                 SelectionType::Scalar(scalar_entity_name) => {
+                    SelectionType::Scalar(ServerScalarSelectable {
+                        description,
+                        name: server_field_to_insert
+                            .item
+                            .name
+                            .map(|x| x.unchecked_conversion()),
+                        target_scalar_entity: TypeAnnotation::from_graphql_type_annotation(
+                            server_field_to_insert.item.graphql_type.clone(),
+                        )
+                        .map(&mut |_| scalar_entity_name),
+                        javascript_type_override: server_field_to_insert
+                            .item
+                            .javascript_type_override,
+                        parent_object_entity_name,
+                        arguments,
+                        phantom_data: std::marker::PhantomData,
+                    })
+                }
+                SelectionType::Object(object_entity_name) => {
+                    SelectionType::Object(ServerObjectSelectable {
+                        description,
+                        name: server_field_to_insert.item.name.map(|x| x.unchecked_conversion()),
+                        target_object_entity: TypeAnnotation::from_graphql_type_annotation(
+                            server_field_to_insert.item.graphql_type.clone(),
+                        )
+                        .map(&mut |_| object_entity_name),
+                        parent_object_entity_name,
+                        arguments,
+                        phantom_data: std::marker::PhantomData,
+                        object_selectable_variant:
+                            // TODO this is hacky
+                            if server_field_to_insert.item.is_inline_fragment {
+                                ServerObjectSelectableVariant::InlineFragment
+                            } else {
+                                ServerObjectSelectableVariant::LinkedField
+                            }
+                    })
+                }
+            };
+
+            match selectable {
+                SelectionType::Scalar(server_scalar_selectable) => {
                     schema.insert_server_scalar_selectable(
-                        ServerScalarSelectable {
-                            description,
-                            name: server_field_to_insert
-                                .item
-                                .name
-                                .map(|x| x.unchecked_conversion()),
-                            target_scalar_entity: TypeAnnotation::from_graphql_type_annotation(
-                                server_field_to_insert.item.graphql_type.clone(),
-                            )
-                            .map(&mut |_| scalar_entity_name),
-                            javascript_type_override: server_field_to_insert
-                                .item
-                                .javascript_type_override,
-                            parent_object_entity_name,
-                            arguments,
-                            phantom_data: std::marker::PhantomData,
-                        },
+                        server_scalar_selectable,
                         options,
                         server_field_to_insert
                             .item
@@ -173,26 +198,8 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
                             .inner_non_null_named_type(),
                     )?;
                 }
-                SelectionType::Object(object_entity_name) => {
-                    schema
-                        .insert_server_object_selectable(ServerObjectSelectable {
-                            description,
-                            name: server_field_to_insert.item.name.map(|x| x.unchecked_conversion()),
-                            target_object_entity: TypeAnnotation::from_graphql_type_annotation(
-                                server_field_to_insert.item.graphql_type.clone(),
-                            )
-                            .map(&mut |_| object_entity_name),
-                            parent_object_entity_name,
-                            arguments,
-                            phantom_data: std::marker::PhantomData,
-                            object_selectable_variant:
-                                // TODO this is hacky
-                                if server_field_to_insert.item.is_inline_fragment {
-                                    ServerObjectSelectableVariant::InlineFragment
-                                } else {
-                                    ServerObjectSelectableVariant::LinkedField
-                                }
-                        })?;
+                SelectionType::Object(server_object_selectable) => {
+                    schema.insert_server_object_selectable(server_object_selectable)?;
                 }
             }
         }
