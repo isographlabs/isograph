@@ -93,20 +93,6 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
     let payload_object_type_annotation = &mutation_field.target_object_entity;
     let payload_object_entity_name = *payload_object_type_annotation.inner();
 
-    // TODO it's a bit annoying that we call .object twice!
-    let mutation_field_payload_type_name =
-        server_object_entity_named(db, payload_object_entity_name)
-            .deref()
-            .as_ref()
-            .map_err(|e| e.clone())?
-            .as_ref()
-            .expect(
-                "Expected object entity to exist. \
-                    This is indicative of a bug in Isograph.",
-            )
-            .item
-            .name;
-
     let client_field_scalar_selection_name = expose_as.unwrap_or(mutation_field.name.item.into());
     // TODO what is going on here. Should mutation_field have a checked way of converting to LinkedField?
     let top_level_schema_field_name = mutation_field.name.item.unchecked_conversion();
@@ -118,7 +104,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
     let processed_field_map_items = skip_arguments_contained_in_field_map(
         schema,
         mutation_field_arguments.clone(),
-        mutation_field_payload_type_name.item,
+        payload_object_entity_name,
         expose_field_to_insert.parent_object_name,
         client_field_scalar_selection_name,
         // TODO don't clone
@@ -267,7 +253,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
         client_field_scalar_selection_name,
         maybe_abstract_parent_object_entity_name,
         mutation_field_client_field_name,
-        mutation_field_payload_type_name.item,
+        payload_object_entity_name,
     )?;
     Ok(UnprocessedClientFieldItem {
         client_scalar_selectable_name: mutation_field_client_field_name,
