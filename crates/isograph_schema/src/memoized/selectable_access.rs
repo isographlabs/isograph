@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{collections::HashMap, ops::Deref};
 
 use common_lang_types::{ServerObjectEntityName, ServerSelectableName};
 use pico_macros::legacy_memo;
@@ -44,4 +44,27 @@ pub fn server_selectables_vec<TNetworkProtocol: NetworkProtocol + 'static>(
             })
         })
         .collect())
+}
+
+#[legacy_memo]
+#[expect(clippy::type_complexity)]
+pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    parent_server_object_entity_name: ServerObjectEntityName,
+) -> Result<
+    HashMap<
+        ServerSelectableName,
+        Vec<Result<OwnedServerSelectable<TNetworkProtocol>, FieldToInsertToServerSelectableError>>,
+    >,
+    TNetworkProtocol::ParseTypeSystemDocumentsError,
+> {
+    let server_selectables =
+        server_selectables_vec(db, parent_server_object_entity_name).to_owned()?;
+    let mut map: HashMap<_, Vec<_>> = HashMap::new();
+
+    for (name, item) in server_selectables {
+        map.entry(name).or_default().push(item);
+    }
+
+    Ok(map)
 }
