@@ -2,15 +2,18 @@ use std::{collections::HashMap, ops::Deref};
 
 use common_lang_types::{ServerObjectEntityName, ServerSelectableName};
 use pico_macros::legacy_memo;
+use thiserror::Error;
 
 use crate::{
     FieldToInsertToServerSelectableError, IsographDatabase, NetworkProtocol, OwnedServerSelectable,
     field_to_insert_to_server_selectable,
 };
 
+type OwnedSelectableResult<TNetworkProtocol> =
+    Result<OwnedServerSelectable<TNetworkProtocol>, FieldToInsertToServerSelectableError>;
+
 /// A vector of all server selectables that are defined in the type system schema
 #[legacy_memo]
-#[expect(clippy::type_complexity)]
 pub fn server_selectables_vec<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
@@ -19,7 +22,7 @@ pub fn server_selectables_vec<TNetworkProtocol: NetworkProtocol + 'static>(
     // the parent type and selectable name infallibly
     Vec<(
         ServerSelectableName,
-        Result<OwnedServerSelectable<TNetworkProtocol>, FieldToInsertToServerSelectableError>,
+        OwnedSelectableResult<TNetworkProtocol>,
     )>,
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
@@ -47,15 +50,11 @@ pub fn server_selectables_vec<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[legacy_memo]
-#[expect(clippy::type_complexity)]
 pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
 ) -> Result<
-    HashMap<
-        ServerSelectableName,
-        Vec<Result<OwnedServerSelectable<TNetworkProtocol>, FieldToInsertToServerSelectableError>>,
-    >,
+    HashMap<ServerSelectableName, Vec<OwnedSelectableResult<TNetworkProtocol>>>,
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
     let server_selectables =
@@ -75,7 +74,7 @@ pub fn server_selectables_named<TNetworkProtocol: NetworkProtocol + 'static>(
     parent_server_object_entity_name: ServerObjectEntityName,
     server_selectable_name: ServerSelectableName,
 ) -> Result<
-    Vec<Result<OwnedServerSelectable<TNetworkProtocol>, FieldToInsertToServerSelectableError>>,
+    Vec<OwnedSelectableResult<TNetworkProtocol>>,
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
     let memo_ref = server_selectables_map(db, parent_server_object_entity_name);
@@ -85,4 +84,49 @@ pub fn server_selectables_named<TNetworkProtocol: NetworkProtocol + 'static>(
         .get(&server_selectable_name)
         .cloned()
         .unwrap_or_default())
+}
+
+#[legacy_memo]
+pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    parent_server_object_entity_name: ServerObjectEntityName,
+    server_selectable_name: ServerSelectableName,
+) -> Result<
+    Option<OwnedSelectableResult<TNetworkProtocol>>,
+    ServerSelectableNamedError<TNetworkProtocol>,
+> {
+    let memo_ref =
+        server_selectables_named(db, parent_server_object_entity_name, server_selectable_name);
+    let vec = memo_ref
+        .as_ref()
+        .map_err(|e| ServerSelectableNamedError::ParseTypeSystemDocumentsError(e.clone()))?;
+
+    match vec.split_first() {
+        Some((first, rest)) => {
+            if rest.is_empty() {
+                Ok(Some(first.clone()))
+            } else {
+                Err(ServerSelectableNamedError::MultipleDefinitionsFound {
+                    parent_object_entity_name: parent_server_object_entity_name,
+                    duplicate_selectable_name: server_selectable_name,
+                })
+            }
+        }
+        None => Ok(None),
+    }
+}
+
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
+pub enum ServerSelectableNamedError<TNetworkProtocol: NetworkProtocol + 'static> {
+    #[error("{0}")]
+    ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),
+
+    // TODO include additional locations
+    #[error(
+        "Multiple definitions of `{parent_object_entity_name}.{duplicate_selectable_name}` were found"
+    )]
+    MultipleDefinitionsFound {
+        parent_object_entity_name: ServerObjectEntityName,
+        duplicate_selectable_name: ServerSelectableName,
+    },
 }
