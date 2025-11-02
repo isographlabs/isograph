@@ -9,10 +9,10 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientScalarOrObjectSelectable, IsographDatabase, NetworkProtocol, ObjectSelectableId,
-    RefetchStrategy, ScalarSelectableId, Schema, ServerObjectEntity, UnprocessedClientFieldItem,
-    UnprocessedClientPointerItem, UnprocessedItem, UseRefetchFieldRefetchStrategy,
-    ValidatedObjectSelection, ValidatedScalarSelection, ValidatedSelection,
-    server_object_entity_named,
+    RefetchStrategy, ScalarSelectableId, Schema, ServerObjectEntity,
+    UnprocessedClientObjectSelectableSelectionSet, UnprocessedClientScalarSelectableSelectionSet,
+    UnprocessedSelectionSet, UseRefetchFieldRefetchStrategy, ValidatedObjectSelection,
+    ValidatedScalarSelection, ValidatedSelection, server_object_entity_named,
 };
 use thiserror::Error;
 
@@ -24,23 +24,25 @@ pub(crate) fn add_selection_sets_to_client_selectables<
 >(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
-    unprocessed_items: Vec<UnprocessedItem>,
+    unprocessed_selection_sets: Vec<UnprocessedSelectionSet>,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
     let mut errors = vec![];
-    for unprocessed_item in unprocessed_items {
-        match unprocessed_item {
-            SelectionType::Scalar(unprocessed_client_field_item) => {
-                if let Err(e) =
-                    process_unprocessed_client_field_item(db, schema, unprocessed_client_field_item)
-                {
+    for unprocessed_selection_set in unprocessed_selection_sets {
+        match unprocessed_selection_set {
+            SelectionType::Scalar(unprocessed_client_scalar_selection_set) => {
+                if let Err(e) = process_unprocessed_client_field_item(
+                    db,
+                    schema,
+                    unprocessed_client_scalar_selection_set,
+                ) {
                     errors.extend(e)
                 }
             }
-            SelectionType::Object(unprocessed_client_pointer_item) => {
+            SelectionType::Object(unprocessed_client_object_selection_set) => {
                 if let Err(e) = process_unprocessed_client_pointer_item(
                     db,
                     schema,
-                    unprocessed_client_pointer_item,
+                    unprocessed_client_object_selection_set,
                 ) {
                     errors.extend(e)
                 }
@@ -59,12 +61,12 @@ pub(crate) fn add_selection_sets_to_client_selectables<
 fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
-    unprocessed_item: UnprocessedClientFieldItem,
+    unprocessed_scalar_selection_set: UnprocessedClientScalarSelectableSelectionSet,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
     let client_field = schema
         .client_scalar_selectable(
-            unprocessed_item.parent_object_entity_name,
-            unprocessed_item.client_scalar_selectable_name,
+            unprocessed_scalar_selection_set.parent_object_entity_name,
+            unprocessed_scalar_selection_set.client_scalar_selectable_name,
         )
         .expect(
             "Expected selectable to exist. \
@@ -89,7 +91,7 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol + 'st
     let new_selection_set = get_validated_selection_set(
         db,
         schema,
-        unprocessed_item.reader_selection_set,
+        unprocessed_scalar_selection_set.reader_selection_set,
         parent_object_entity,
         client_field.parent_object_entity_name,
         &client_field,
@@ -98,7 +100,7 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol + 'st
     let refetch_strategy = get_validated_refetch_strategy(
         db,
         schema,
-        unprocessed_item.refetch_strategy,
+        unprocessed_scalar_selection_set.refetch_strategy,
         parent_object_entity,
         client_field.parent_object_entity_name,
         &client_field,
@@ -106,8 +108,8 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol + 'st
 
     let client_field = schema
         .client_scalar_selectable_mut(
-            unprocessed_item.parent_object_entity_name,
-            unprocessed_item.client_scalar_selectable_name,
+            unprocessed_scalar_selection_set.parent_object_entity_name,
+            unprocessed_scalar_selection_set.client_scalar_selectable_name,
         )
         .expect(
             "Expected selectable to exist. \
@@ -125,12 +127,12 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol + 'st
 fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
-    unprocessed_item: UnprocessedClientPointerItem,
+    unprocessed_client_object_selection_set: UnprocessedClientObjectSelectableSelectionSet,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
     let client_pointer = schema
         .client_object_selectable(
-            unprocessed_item.parent_object_entity_name,
-            unprocessed_item.client_object_selectable_name,
+            unprocessed_client_object_selection_set.parent_object_entity_name,
+            unprocessed_client_object_selection_set.client_object_selectable_name,
         )
         .expect(
             "Expected selectable to exist. \
@@ -155,7 +157,7 @@ fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol + '
     let new_selection_set = get_validated_selection_set(
         db,
         schema,
-        unprocessed_item.reader_selection_set,
+        unprocessed_client_object_selection_set.reader_selection_set,
         parent_object_entity,
         client_pointer.parent_object_entity_name,
         &client_pointer,
@@ -163,8 +165,8 @@ fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol + '
 
     let client_pointer = schema
         .client_object_selectable_mut(
-            unprocessed_item.parent_object_entity_name,
-            unprocessed_item.client_object_selectable_name,
+            unprocessed_client_object_selection_set.parent_object_entity_name,
+            unprocessed_client_object_selection_set.client_object_selectable_name,
         )
         .expect(
             "Expected selectable to exist. \

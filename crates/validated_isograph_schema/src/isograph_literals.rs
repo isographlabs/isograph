@@ -8,7 +8,7 @@ use isograph_lang_parser::{
 use isograph_lang_types::{EntrypointDeclaration, SelectionType};
 use isograph_schema::{
     IsoLiteralsSource, IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError,
-    Schema, UnprocessedItem,
+    Schema, UnprocessedSelectionSet,
 };
 use lazy_static::lazy_static;
 use pico::SourceId;
@@ -133,7 +133,7 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol + 'static>(
     contains_iso: ParsedIsoLiteralsMap,
 ) -> Result<
     (
-        Vec<UnprocessedItem>,
+        Vec<UnprocessedSelectionSet>,
         Vec<(TextSource, WithSpan<EntrypointDeclaration>)>,
     ),
     Vec<WithLocation<ProcessClientFieldDeclarationError>>,

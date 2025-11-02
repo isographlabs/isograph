@@ -25,7 +25,7 @@ use crate::{
 pub type UnprocessedSelection = WithSpan<UnvalidatedSelection>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UnprocessedClientFieldItem {
+pub struct UnprocessedClientScalarSelectableSelectionSet {
     pub parent_object_entity_name: ServerObjectEntityName,
     pub client_scalar_selectable_name: ClientScalarSelectableName,
     pub reader_selection_set: Vec<UnprocessedSelection>,
@@ -33,13 +33,16 @@ pub struct UnprocessedClientFieldItem {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UnprocessedClientPointerItem {
+pub struct UnprocessedClientObjectSelectableSelectionSet {
     pub parent_object_entity_name: ServerObjectEntityName,
     pub client_object_selectable_name: ClientObjectSelectableName,
     pub reader_selection_set: Vec<UnprocessedSelection>,
     pub refetch_selection_set: Vec<UnprocessedSelection>,
 }
-pub type UnprocessedItem = SelectionType<UnprocessedClientFieldItem, UnprocessedClientPointerItem>;
+pub type UnprocessedSelectionSet = SelectionType<
+    UnprocessedClientScalarSelectableSelectionSet,
+    UnprocessedClientObjectSelectableSelectionSet,
+>;
 
 impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     pub fn process_client_field_declaration(
@@ -47,7 +50,10 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         db: &IsographDatabase<TNetworkProtocol>,
         client_field_declaration: WithSpan<ClientFieldDeclaration>,
         text_source: TextSource,
-    ) -> Result<UnprocessedClientFieldItem, WithLocation<ProcessClientFieldDeclarationError>> {
+    ) -> Result<
+        UnprocessedClientScalarSelectableSelectionSet,
+        WithLocation<ProcessClientFieldDeclarationError>,
+    > {
         let parent_type_id =
             defined_entity(db, client_field_declaration.item.parent_type.item.0.into())
                 .to_owned()
@@ -85,8 +91,10 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         db: &IsographDatabase<TNetworkProtocol>,
         client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
         text_source: TextSource,
-    ) -> Result<UnprocessedClientPointerItem, WithLocation<ProcessClientFieldDeclarationError>>
-    {
+    ) -> Result<
+        UnprocessedClientObjectSelectableSelectionSet,
+        WithLocation<ProcessClientFieldDeclarationError>,
+    > {
         let parent_type_id = defined_entity(
             db,
             client_pointer_declaration.item.parent_type.item.0.into(),
@@ -125,7 +133,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             ),
         ))?;
 
-        let unprocessed_client_pointer_items = match parent_type_id {
+        let unprocessed_client_object_selection_set = match parent_type_id {
             ServerEntityName::Object(object_entity_name) => match target_type_id {
                 ServerEntityName::Object(_to_object_entity_name) => self
                     .add_client_pointer_to_object(
@@ -166,7 +174,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                 ));
             }
         };
-        Ok(unprocessed_client_pointer_items)
+        Ok(unprocessed_client_object_selection_set)
     }
 
     fn add_client_field_to_object(
@@ -174,7 +182,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         db: &IsographDatabase<TNetworkProtocol>,
         parent_object_entity_name: ServerObjectEntityName,
         client_field_declaration: WithSpan<ClientFieldDeclaration>,
-    ) -> ProcessClientFieldDeclarationResult<UnprocessedClientFieldItem> {
+    ) -> ProcessClientFieldDeclarationResult<UnprocessedClientScalarSelectableSelectionSet> {
         let query_id = *fetchable_types(db)
             .deref()
             .as_ref()
@@ -294,7 +302,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             })
         };
 
-        Ok(UnprocessedClientFieldItem {
+        Ok(UnprocessedClientScalarSelectableSelectionSet {
             parent_object_entity_name,
             client_scalar_selectable_name: *client_scalar_selectable_name,
             reader_selection_set: selections,
@@ -308,7 +316,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         parent_object_entity_name: ServerObjectEntityName,
         to_object_entity_name: TypeAnnotation<ServerObjectEntityName>,
         client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
-    ) -> ProcessClientFieldDeclarationResult<UnprocessedClientPointerItem> {
+    ) -> ProcessClientFieldDeclarationResult<UnprocessedClientObjectSelectableSelectionSet> {
         let query_id = *fetchable_types(db)
             .deref()
             .as_ref()
@@ -461,7 +469,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             ));
         }
 
-        Ok(UnprocessedClientPointerItem {
+        Ok(UnprocessedClientObjectSelectableSelectionSet {
             client_object_selectable_name: *client_pointer_name,
             parent_object_entity_name,
             reader_selection_set: unprocessed_fields,

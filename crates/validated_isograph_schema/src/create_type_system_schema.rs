@@ -7,8 +7,7 @@ use isograph_schema::{
     CreateAdditionalFieldsError, ExposeFieldToInsert, FieldToInsert,
     FieldToInsertToServerSelectableError, ID_FIELD_NAME, IsographDatabase, NetworkProtocol,
     ScalarSelectionAndNonNullType, Schema, ServerObjectEntityExtraInfo, ServerObjectSelectable,
-    UnprocessedClientFieldItem, UnprocessedClientPointerItem, create_new_exposed_field,
-    field_to_insert_to_server_selectable,
+    UnprocessedSelectionSet, create_new_exposed_field, field_to_insert_to_server_selectable,
 };
 use pico_macros::legacy_memo;
 use thiserror::Error;
@@ -62,10 +61,7 @@ pub(crate) fn create_type_system_schema_with_server_selectables<
 >(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
-    (
-        Schema<TNetworkProtocol>,
-        Vec<SelectionType<UnprocessedClientFieldItem, UnprocessedClientPointerItem>>,
-    ),
+    (Schema<TNetworkProtocol>, Vec<UnprocessedSelectionSet>),
     CreateSchemaError<TNetworkProtocol>,
 > {
     let (expose_as_field_queue, field_queue) = create_type_system_schema(db).to_owned()?;
@@ -82,19 +78,22 @@ pub(crate) fn create_type_system_schema_with_server_selectables<
     // Step one: we can create client selectables. However, we must create all
     // client selectables before being able to create their selection sets, because
     // selection sets refer to client selectables. We hold onto these selection sets
-    // (both reader selection sets and refetch selection sets) in the unprocess_items
+    // (both reader selection sets and refetch selection sets) in the unprocess_selection_sets
     // vec, then process it later.
-    let mut unprocessed_items = vec![];
+    let mut unprocessed_selection_set = vec![];
 
     for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
         for expose_as_field in expose_as_fields_to_insert {
-            let (unprocessed_scalar_item, client_scalar_selectable, payload_object_entity_name) =
-                create_new_exposed_field(
-                    db,
-                    &unvalidated_isograph_schema,
-                    &expose_as_field,
-                    parent_object_entity_name,
-                )?;
+            let (
+                unprocessed_client_scalar_selection_set,
+                client_scalar_selectable,
+                payload_object_entity_name,
+            ) = create_new_exposed_field(
+                db,
+                &unvalidated_isograph_schema,
+                &expose_as_field,
+                parent_object_entity_name,
+            )?;
 
             let client_scalar_selectable_name = client_scalar_selectable.name.item;
             let parent_object_entity_name = client_scalar_selectable.parent_object_entity_name;
@@ -115,11 +114,13 @@ pub(crate) fn create_type_system_schema_with_server_selectables<
                 payload_object_entity_name,
             )?;
 
-            unprocessed_items.push(SelectionType::Scalar(unprocessed_scalar_item));
+            unprocessed_selection_set.push(SelectionType::Scalar(
+                unprocessed_client_scalar_selection_set,
+            ));
         }
     }
 
-    Ok((unvalidated_isograph_schema, unprocessed_items))
+    Ok((unvalidated_isograph_schema, unprocessed_selection_set))
 }
 
 /// Now that we have processed all objects and scalars, we can process fields (i.e.

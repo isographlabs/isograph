@@ -7,11 +7,9 @@ use common_lang_types::{
     RelativePathToSourceFile, SelectableName, ServerObjectEntityName, TextSource, WithLocation,
 };
 use isograph_lang_parser::{IsoLiteralExtractionResult, IsographLiteralParseError};
-use isograph_lang_types::SelectionType;
 use isograph_schema::{
     IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError, Schema,
-    UnprocessedClientFieldItem, UnprocessedClientPointerItem, ValidateEntrypointDeclarationError,
-    validate_entrypoints,
+    UnprocessedSelectionSet, ValidateEntrypointDeclarationError, validate_entrypoints,
 };
 use thiserror::Error;
 
@@ -24,16 +22,14 @@ use crate::{
 pub(crate) fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     mut unvalidated_isograph_schema: Schema<TNetworkProtocol>,
-    mut unprocessed_items: Vec<
-        SelectionType<UnprocessedClientFieldItem, UnprocessedClientPointerItem>,
-    >,
+    mut unprocessed_selection_sets: Vec<UnprocessedSelectionSet>,
 ) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), ProcessIsoLiteralsForSchemaError> {
     let contains_iso = parse_iso_literals(db)?;
     let contains_iso_stats = contains_iso.stats();
 
     let (unprocessed_client_types, unprocessed_entrypoints) =
         process_iso_literals(db, &mut unvalidated_isograph_schema, contains_iso)?;
-    unprocessed_items.extend(unprocessed_client_types);
+    unprocessed_selection_sets.extend(unprocessed_client_types);
 
     add_link_fields(db, &mut unvalidated_isograph_schema)?;
 
@@ -50,7 +46,7 @@ pub(crate) fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol 
     add_selection_sets_to_client_selectables(
         db,
         &mut unvalidated_isograph_schema,
-        unprocessed_items,
+        unprocessed_selection_sets,
     )?;
 
     Ok((unvalidated_isograph_schema, contains_iso_stats))

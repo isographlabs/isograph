@@ -16,7 +16,7 @@ use serde::Deserialize;
 use crate::{
     ClientFieldVariant, ClientScalarSelectable, ExposeFieldToInsert,
     ImperativelyLoadedFieldVariant, IsographDatabase, NetworkProtocol, RefetchStrategy, Schema,
-    ServerEntityName, ServerObjectSelectableVariant, UnprocessedClientFieldItem,
+    ServerEntityName, ServerObjectSelectableVariant, UnprocessedClientScalarSelectableSelectionSet,
     WrappedSelectionMapSelection, generate_refetch_field_strategy,
     imperative_field_subfields_or_inline_fragments, server_object_entity_named,
 };
@@ -63,7 +63,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
     parent_object_entity_name: ServerObjectEntityName,
 ) -> Result<
     (
-        UnprocessedClientFieldItem,
+        UnprocessedClientScalarSelectableSelectionSet,
         ClientScalarSelectable<TNetworkProtocol>,
         ServerObjectEntityName,
     ),
@@ -250,7 +250,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
     };
 
     Ok((
-        UnprocessedClientFieldItem {
+        UnprocessedClientScalarSelectableSelectionSet {
             client_scalar_selectable_name: mutation_field_client_field_name,
             parent_object_entity_name: maybe_abstract_parent_object_entity_name,
             reader_selection_set: vec![],

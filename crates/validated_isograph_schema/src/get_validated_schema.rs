@@ -20,12 +20,15 @@ pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), GetValidatedSchemaError<TNetworkProtocol>>
 {
-    let (unvalidated_isograph_schema, unprocessed_items) =
+    let (unvalidated_isograph_schema, unprocessed_selection_sets) =
         create_type_system_schema_with_server_selectables::<TNetworkProtocol>(db)
             .deref()
             .clone()?;
-    let (isograph_schema, stats) =
-        process_iso_literals_for_schema(db, unvalidated_isograph_schema, unprocessed_items)?;
+    let (isograph_schema, stats) = process_iso_literals_for_schema(
+        db,
+        unvalidated_isograph_schema,
+        unprocessed_selection_sets,
+    )?;
     validate_use_of_arguments(&isograph_schema)?;
     Ok((isograph_schema, stats))
 }
