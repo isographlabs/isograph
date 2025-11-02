@@ -1,17 +1,14 @@
-use std::ops::Deref;
+use std::{collections::HashMap, ops::Deref};
 
 use common_lang_types::ServerObjectEntityName;
-use isograph_lang_types::{DefinitionLocation, SelectionType};
 use pico_macros::legacy_memo;
 
 use crate::{
-    FieldToInsertToServerSelectableError, IsographDatabase, NetworkProtocol, OwnedSelectable,
+    FieldToInsertToServerSelectableError, IsographDatabase, NetworkProtocol, OwnedServerSelectable,
     field_to_insert_to_server_selectable,
 };
 
-/// Note: this does not return an OwnedServerSelectable because exposeAs fields are
-/// client fields! This is weird! But these are conceptually the server selectables
-/// that came from the type system schema.
+/// A vector of all server selectables that are defined in the type system schema
 #[legacy_memo]
 pub fn server_selectables_vec<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
@@ -19,7 +16,7 @@ pub fn server_selectables_vec<TNetworkProtocol: NetworkProtocol + 'static>(
 ) -> Result<
     // TODO return the SelectableId with each Result, i.e. we should know
     // the parent type and selectable name infallibly
-    Vec<Result<OwnedSelectable<TNetworkProtocol>, FieldToInsertToServerSelectableError>>,
+    Vec<Result<OwnedServerSelectable<TNetworkProtocol>, FieldToInsertToServerSelectableError>>,
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
     let memo_ref = TNetworkProtocol::parse_type_system_documents(db);
@@ -27,29 +24,17 @@ pub fn server_selectables_vec<TNetworkProtocol: NetworkProtocol + 'static>(
 
     Ok(items
         .iter()
-        .flat_map(|x| match x {
-            SelectionType::Object(o) => {
-                let mut fields = vec![];
-
-                for field_to_insert in o.fields_to_insert.iter() {
-                    let item = field_to_insert_to_server_selectable(
-                        db,
-                        parent_server_object_entity_name,
-                        field_to_insert,
-                    )
-                    .map(|x| x.map_scalar(|(scalar, _)| scalar))
-                    .map(|x| DefinitionLocation::Server(x));
-                    fields.push(item);
-                }
-                if let Some(_expose_as_field_to_insert) = o.expose_fields_to_insert.iter().next() {
-                    unimplemented!("expose as fields to insert")
-                }
-
-                fields
-            }
-            SelectionType::Scalar(_s) => {
-                unimplemented!("scalar selectable")
-            }
+        .flat_map(|selection_type| selection_type.as_ref().as_object())
+        .filter(|o| o.server_object_entity.item.name.item == parent_server_object_entity_name)
+        .flat_map(|o| {
+            o.fields_to_insert.iter().map(|field_to_insert| {
+                field_to_insert_to_server_selectable(
+                    db,
+                    parent_server_object_entity_name,
+                    field_to_insert,
+                )
+                .map(|x| x.map_scalar(|(scalar, _)| scalar))
+            })
         })
         .collect())
 }
