@@ -68,3 +68,21 @@ pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol + 'static>(
 
     Ok(map)
 }
+
+#[legacy_memo]
+pub fn server_selectables_named<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    parent_server_object_entity_name: ServerObjectEntityName,
+    server_selectable_name: ServerSelectableName,
+) -> Result<
+    Vec<Result<OwnedServerSelectable<TNetworkProtocol>, FieldToInsertToServerSelectableError>>,
+    TNetworkProtocol::ParseTypeSystemDocumentsError,
+> {
+    let memo_ref = server_selectables_map(db, parent_server_object_entity_name);
+    let map = memo_ref.as_ref().map_err(|e| e.clone())?;
+
+    Ok(map
+        .get(&server_selectable_name)
+        .cloned()
+        .unwrap_or_default())
+}
