@@ -13,6 +13,7 @@ use isograph_schema::{
     UnprocessedClientObjectSelectableSelectionSet, UnprocessedClientScalarSelectableSelectionSet,
     UnprocessedSelectionSet, UseRefetchFieldRefetchStrategy, ValidatedObjectSelection,
     ValidatedScalarSelection, ValidatedSelection, server_object_entity_named,
+    server_object_selectable_named,
 };
 use thiserror::Error;
 
@@ -215,6 +216,7 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol + 'static>(
     with_span.and_then(|selection| match selection {
         SelectionType::Scalar(scalar_selection) => Ok(SelectionType::Scalar(
             get_validated_scalar_selection(
+                db,
                 schema,
                 selection_parent_object_entity,
                 selection_parent_object_name,
@@ -237,6 +239,7 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
     selection_parent_object_name: ServerObjectEntityName,
@@ -285,11 +288,19 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol + 'static>(
             let server_scalar_selectable_id =
                 *server_selectable_id.as_scalar_result().as_ref().map_err(
                     |(parent_object_entity_name, server_object_selectable_name)| {
-                        let object_selectable = schema
-                            .server_object_selectable(
-                                *parent_object_entity_name,
-                                *server_object_selectable_name,
+                        let memo_ref = server_object_selectable_named(
+                            db,
+                            *parent_object_entity_name,
+                            (*server_object_selectable_name).into(),
+                        );
+                        let server_object_selectable = memo_ref
+                            .deref()
+                            .as_ref()
+                            .expect(
+                                "Expected validation to have succeeded. \
+                                This is indicative of a bug in Isograph.",
                             )
+                            .as_ref()
                             .expect(
                                 "Expected selectable to exist. \
                                 This is indicative of a bug in Isograph.",
@@ -303,8 +314,10 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                                 client_field_name: top_level_field_or_pointer.name().into(),
                                 field_parent_type_name: selection_parent_object.name.item,
                                 field_name: scalar_selection.name.item.into(),
-                                target_type_name: (*object_selectable.target_object_entity.inner())
-                                    .into(),
+                                target_type_name: (*server_object_selectable
+                                    .target_object_entity
+                                    .inner())
+                                .into(),
                                 client_type: top_level_field_or_pointer.client_type().to_string(),
                                 field_type: top_level_field_or_pointer.client_type(),
                             },
