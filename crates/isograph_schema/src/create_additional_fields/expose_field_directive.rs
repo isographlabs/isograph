@@ -91,13 +91,28 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
     let (parent_object_entity_name, mutation_subfield_name) =
         parse_mutation_subfield_id(db, field, parent_object_entity_name)?;
 
-    // TODO do not use mutation naming here
-    let mutation_field = schema
-        .server_object_selectable(parent_object_entity_name, mutation_subfield_name)
+    let mutation_field_memo_ref =
+        server_selectable_named(db, parent_object_entity_name, mutation_subfield_name.into());
+    let mutation_field = mutation_field_memo_ref
+        .deref()
+        .as_ref()
+        .map_err(|e| e.clone())?
+        .as_ref()
+        // TODO propagate this errors instead of panicking
         .expect(
             "Expected selectable to exist. \
             This is indicative of a bug in Isograph.",
+        )
+        .as_ref()
+        .map_err(|e| e.clone())?
+        .as_ref()
+        .as_object()
+        // TODO propagate this errors instead of panicking
+        .expect(
+            "Expected selectable to be an object selectable. \
+            This is indicative of a bug in Isograph.",
         );
+
     let payload_object_type_annotation = &mutation_field.target_object_entity;
     let payload_object_entity_name = *payload_object_type_annotation.inner();
 
