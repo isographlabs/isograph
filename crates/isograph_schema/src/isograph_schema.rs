@@ -17,11 +17,11 @@ use lazy_static::lazy_static;
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectableId,
     EntrypointDeclarationInfo, IsographDatabase, NetworkProtocol, NormalizationKey,
-    ObjectSelectable, ObjectSelectableId, ScalarSelectable, Selectable, SelectableId,
-    ServerEntityName, ServerObjectEntityAvailableSelectables, ServerObjectSelectable,
-    ServerScalarSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
+    ObjectSelectable, ObjectSelectableId, ScalarSelectable, ServerEntityName,
+    ServerObjectEntityAvailableSelectables, ServerObjectSelectable, ServerScalarSelectable,
+    UseRefetchFieldRefetchStrategy,
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
-    server_selectable_named,
+    server_object_selectable_named, server_selectable_named,
 };
 
 lazy_static! {
@@ -149,42 +149,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             .get(&(parent_object_entity_name, server_scalar_selectable_name))
     }
 
-    pub fn server_object_selectable(
-        &self,
-        parent_object_entity_name: ServerObjectEntityName,
-        server_object_selectable_name: ServerObjectSelectableName,
-    ) -> Option<&ServerObjectSelectable<TNetworkProtocol>> {
-        self.server_object_selectables
-            .get(&(parent_object_entity_name, server_object_selectable_name))
-    }
-
-    pub fn server_selectable(
-        &'_ self,
-        server_selectable_id: ServerSelectableId,
-    ) -> Option<
-        SelectionType<
-            &ServerScalarSelectable<TNetworkProtocol>,
-            &ServerObjectSelectable<TNetworkProtocol>,
-        >,
-    > {
-        match server_selectable_id {
-            SelectionType::Scalar((parent_object_entity_name, server_scalar_selectable_name)) => {
-                self.server_scalar_selectable(
-                    parent_object_entity_name,
-                    server_scalar_selectable_name,
-                )
-                .map(SelectionType::Scalar)
-            }
-            SelectionType::Object((parent_object_entity_name, server_object_selectable_name)) => {
-                self.server_object_selectable(
-                    parent_object_entity_name,
-                    server_object_selectable_name,
-                )
-                .map(SelectionType::Object)
-            }
-        }
-    }
-
     // TODO this function should not exist
     pub fn insert_server_scalar_selectable(
         &mut self,
@@ -285,15 +249,30 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 
     pub fn object_selectable(
         &self,
+        db: &IsographDatabase<TNetworkProtocol>,
         field_id: ObjectSelectableId,
     ) -> Option<ObjectSelectable<'_, TNetworkProtocol>> {
         match field_id {
             DefinitionLocation::Server((
                 parent_object_entity_name,
                 server_object_selectable_name,
-            )) => self
-                .server_object_selectable(parent_object_entity_name, server_object_selectable_name)
-                .map(DefinitionLocation::Server),
+            )) => {
+                let memo_ref = server_object_selectable_named(
+                    db,
+                    parent_object_entity_name,
+                    server_object_selectable_name.into(),
+                );
+                let server_object_selectable = memo_ref
+                    .deref()
+                    .as_ref()
+                    .expect(
+                        "Expected validation to have succeeded. \
+                        This is indicative of a bug in Isograph.",
+                    )
+                    .clone();
+
+                server_object_selectable.map(DefinitionLocation::Server)
+            }
             DefinitionLocation::Client((
                 parent_object_entity_name,
                 client_object_selectable_name,
@@ -340,17 +319,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     ) -> Option<&mut ClientObjectSelectable<TNetworkProtocol>> {
         self.client_object_selectables
             .get_mut(&(parent_object_entity_name, client_object_selectable_name))
-    }
-
-    pub fn selectable(&self, id: SelectableId) -> Option<Selectable<'_, TNetworkProtocol>> {
-        match id {
-            DefinitionLocation::Server(server_selectable_id) => Some(DefinitionLocation::Server(
-                self.server_selectable(server_selectable_id)?,
-            )),
-            DefinitionLocation::Client(client_selectable_id) => Some(DefinitionLocation::Client(
-                self.client_selectable(client_selectable_id)?,
-            )),
-        }
     }
 
     pub fn client_selectable(

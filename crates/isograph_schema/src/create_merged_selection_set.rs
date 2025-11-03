@@ -580,7 +580,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
             }
             SelectionType::Object(object_selection) => {
                 let parent_object_entity_name = *schema
-                    .object_selectable(object_selection.associated_data)
+                    .object_selectable(db, object_selection.associated_data)
                     .expect(
                         "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
@@ -809,7 +809,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol + 'static>(
             // This might be indicative of poor modeling.
             let linked_field = parent_map.entry(normalization_key).or_insert_with(|| {
                 let concrete_object_entity_name = *schema
-                    .object_selectable(object_selection.associated_data)
+                    .object_selectable(db, object_selection.associated_data)
                     .expect(
                         "Expected selectable to exist. \
                         This is indicative of a bug in Isograph.",

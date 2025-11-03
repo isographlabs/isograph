@@ -815,7 +815,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol + 'static>(
         }
         SelectionTypeContainingSelections::Object(linked_field) => {
             let field = schema
-                .object_selectable(linked_field.associated_data)
+                .object_selectable(db, linked_field.associated_data)
                 .expect(
                     "Expected selectable to exist. \
                         This is indicative of a bug in Isograph.",
@@ -1032,7 +1032,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol + 
         }
         SelectionTypeContainingSelections::Object(linked_field) => {
             let field = schema
-                .object_selectable(linked_field.associated_data)
+                .object_selectable(db, linked_field.associated_data)
                 .expect(
                     "Expected selectable to exist. \
                     This is indicative of a bug in Isograph.",
