@@ -6,7 +6,7 @@ use thiserror::Error;
 
 use crate::{
     FieldToInsertToServerSelectableError, IsographDatabase, NetworkProtocol, OwnedServerSelectable,
-    field_to_insert_to_server_selectable,
+    ServerObjectSelectable, ServerScalarSelectable, field_to_insert_to_server_selectable,
 };
 
 type OwnedSelectableResult<TNetworkProtocol> =
@@ -129,4 +129,79 @@ pub enum ServerSelectableNamedError<TNetworkProtocol: NetworkProtocol + 'static>
         parent_object_entity_name: ServerObjectEntityName,
         duplicate_selectable_name: ServerSelectableName,
     },
+
+    #[error(
+        "Expected `{parent_object_entity_name}.{selectable_name}` to be {expected_type}, \
+        but it was {actual_type}."
+    )]
+    IncorrectType {
+        parent_object_entity_name: ServerObjectEntityName,
+        selectable_name: ServerSelectableName,
+        expected_type: &'static str,
+        actual_type: &'static str,
+    },
+
+    // TODO this is probably indicative of bad modeling
+    #[error("{0}")]
+    FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),
+}
+
+#[legacy_memo]
+pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    parent_server_object_entity_name: ServerObjectEntityName,
+    server_selectable_name: ServerSelectableName,
+) -> Result<
+    Option<ServerObjectSelectable<TNetworkProtocol>>,
+    ServerSelectableNamedError<TNetworkProtocol>,
+> {
+    let memo_ref =
+        server_selectable_named(db, parent_server_object_entity_name, server_selectable_name);
+    let item = memo_ref.as_ref().map_err(|e| e.clone())?;
+
+    match item {
+        Some(item) => {
+            let item = item.as_ref().map_err(|e| e.clone())?;
+            match item.as_ref().as_object() {
+                Some(obj) => Ok(Some(obj.clone())),
+                None => Err(ServerSelectableNamedError::IncorrectType {
+                    parent_object_entity_name: parent_server_object_entity_name,
+                    selectable_name: server_selectable_name,
+                    expected_type: "an object",
+                    actual_type: "a scalar",
+                }),
+            }
+        }
+        None => Ok(None),
+    }
+}
+
+#[legacy_memo]
+pub fn server_scalar_selectable_named<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    parent_server_object_entity_name: ServerObjectEntityName,
+    server_selectable_name: ServerSelectableName,
+) -> Result<
+    Option<ServerScalarSelectable<TNetworkProtocol>>,
+    ServerSelectableNamedError<TNetworkProtocol>,
+> {
+    let memo_ref =
+        server_selectable_named(db, parent_server_object_entity_name, server_selectable_name);
+    let item = memo_ref.as_ref().map_err(|e| e.clone())?;
+
+    match item {
+        Some(item) => {
+            let item = item.as_ref().map_err(|e| e.clone())?;
+            match item.as_ref().as_scalar() {
+                Some(scalar) => Ok(Some(scalar.clone())),
+                None => Err(ServerSelectableNamedError::IncorrectType {
+                    parent_object_entity_name: parent_server_object_entity_name,
+                    selectable_name: server_selectable_name,
+                    expected_type: "a scalar",
+                    actual_type: "an object",
+                }),
+            }
+        }
+        None => Ok(None),
+    }
 }
