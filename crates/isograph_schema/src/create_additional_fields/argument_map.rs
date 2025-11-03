@@ -1,14 +1,17 @@
 use std::collections::HashMap;
+use std::ops::Deref;
 
 use common_lang_types::{
-    SelectableName, ServerObjectEntityName, StringLiteralValue, VariableName, WithLocation,
+    SelectableName, ServerObjectEntityName, ServerSelectableName, StringLiteralValue, VariableName,
+    WithLocation,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
-use isograph_lang_types::{DefinitionLocation, VariableDefinition};
+use isograph_lang_types::{SelectionType, VariableDefinition};
 
 use crate::{
-    NetworkProtocol, Schema, ServerEntityName, ServerSelectableId, ValidatedVariableDefinition,
+    IsographDatabase, NetworkProtocol, ServerEntityName, ServerSelectableId,
+    ValidatedVariableDefinition, server_selectables_vec,
 };
 
 use super::create_additional_fields_error::{
@@ -32,12 +35,12 @@ impl ArgumentMap {
 }
 
 pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     argument_map: &mut ArgumentMap,
     field_map_item: FieldMapItem,
     primary_object_entity_name: ServerObjectEntityName,
     mutation_object_entity_name: ServerObjectEntityName,
     mutation_selectable_name: SelectableName,
-    schema: &Schema<TNetworkProtocol>,
 ) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem, TNetworkProtocol> {
     let split_to_arg = field_map_item.split_to_arg();
     let (index_of_argument, argument) = argument_map
@@ -83,7 +86,7 @@ pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol + 'static>
                     ProcessedFieldMapItem(field_map_item.clone())
                 }
                 Some((first, rest)) => {
-                    let mut arg = ModifiedArgument::from_unmodified(unmodified_argument, schema);
+                    let mut arg = ModifiedArgument::from_unmodified(db, unmodified_argument);
 
                     arg.remove_to_field::<TNetworkProtocol>(
                         *first,
@@ -141,7 +144,7 @@ enum PotentiallyModifiedArgument {
 /// only deleted.
 #[derive(Debug)]
 pub(crate) struct ModifiedObject {
-    field_map: HashMap<SelectableName, PotentiallyModifiedField>,
+    field_map: HashMap<ServerSelectableName, PotentiallyModifiedField>,
 }
 
 #[derive(Debug)]
@@ -177,31 +180,45 @@ impl ModifiedArgument {
     ///
     /// This panics if unmodified's type is a scalar.
     fn from_unmodified<TNetworkProtocol: NetworkProtocol + 'static>(
+        db: &IsographDatabase<TNetworkProtocol>,
         unmodified: &VariableDefinition<ServerEntityName>,
-        schema: &Schema<TNetworkProtocol>,
     ) -> Self {
         // TODO I think we have validated that the item exists already.
         // But we should double check that, and return an error if necessary
         let object = unmodified.type_.clone().map(|input_type_name| {
             match input_type_name {
-                ServerEntityName::Object(object_entity_name) => ModifiedObject {
-                    field_map: schema
-                        .server_entity_data
-                        .get(&object_entity_name)
+                ServerEntityName::Object(object_entity_name) => {
+                    let field_map_memo_ref = server_selectables_vec(db, object_entity_name);
+                    let field_map = field_map_memo_ref
+                        .deref()
+                        .as_ref()
                         .expect(
-                            "Expected object_entity_name to exist \
-                            in server_object_entity_available_selectables",
+                            "Expected parsing to have worked. \
+                            This is indicative of a bug in Isograph.",
                         )
-                        .selectables
                         .iter()
-                        .flat_map(|(name, field_id)| match field_id {
-                            DefinitionLocation::Server(s) => {
-                                Some((*name, PotentiallyModifiedField::Unmodified(*s)))
+                        .flat_map(|(name, result)| {
+                            if let Ok(v) = result {
+                                Some((
+                                    *name,
+                                    PotentiallyModifiedField::Unmodified(match v {
+                                        SelectionType::Scalar(s) => SelectionType::Scalar((
+                                            s.parent_object_entity_name,
+                                            s.name.item,
+                                        )),
+                                        SelectionType::Object(o) => SelectionType::Object((
+                                            o.parent_object_entity_name,
+                                            o.name.item,
+                                        )),
+                                    }),
+                                ))
+                            } else {
+                                None
                             }
-                            DefinitionLocation::Client(_) => None,
                         })
-                        .collect(),
-                },
+                        .collect();
+                    ModifiedObject { field_map }
+                }
                 ServerEntityName::Scalar(_scalar_entity_name) => {
                     // TODO don't be lazy, return an error
                     panic!("Cannot modify a scalar")

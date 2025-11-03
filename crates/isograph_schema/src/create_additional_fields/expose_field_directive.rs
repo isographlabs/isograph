@@ -125,7 +125,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
         .or(mutation_field.description);
 
     let processed_field_map_items = skip_arguments_contained_in_field_map(
-        schema,
+        db,
         mutation_field_arguments.clone(),
         payload_object_entity_name,
         expose_field_to_insert.parent_object_name,
@@ -357,7 +357,7 @@ fn parse_mutation_subfield_id<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol + 'static>(
-    schema: &Schema<TNetworkProtocol>,
+    db: &IsographDatabase<TNetworkProtocol>,
     arguments: Vec<WithLocation<VariableDefinition<ServerEntityName>>>,
     primary_type_name: ServerObjectEntityName,
     mutation_object_name: ServerObjectEntityName,
@@ -372,12 +372,12 @@ fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol + 'st
 
     for field_map_item in field_map_items {
         processed_field_map_items.push(remove_field_map_item(
+            db,
             &mut argument_map,
             field_map_item,
             primary_type_name,
             mutation_object_name,
             mutation_field_name,
-            schema,
         )?);
     }
 
