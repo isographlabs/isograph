@@ -23,7 +23,7 @@ use isograph_schema::{
     ValidatedSelection, ValidatedVariableDefinition, WrappedSelectionMapSelection,
     accessible_client_fields, description, fetchable_types, inline_fragment_reader_selection_set,
     output_type_annotation, selection_map_wrapped, server_object_entity_named,
-    server_scalar_entity_javascript_name,
+    server_object_selectable_named, server_scalar_entity_javascript_name,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -185,15 +185,24 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol + 'stati
                 parent_object_entity_name,
                 server_object_selectable_name,
             )) => {
-                let server_object_selectable = schema
-                    .server_object_selectable(
-                        *parent_object_entity_name,
-                        *server_object_selectable_name,
+                let memo_ref = server_object_selectable_named(
+                    db,
+                    *parent_object_entity_name,
+                    (*server_object_selectable_name).into(),
+                );
+                let server_object_selectable = memo_ref
+                    .deref()
+                    .as_ref()
+                    .expect(
+                        "Expected validation to have succeeded. \
+                    This is indicative of a bug in Isograph.",
                     )
+                    .as_ref()
                     .expect(
                         "Expected selectable to exist. \
                         This is indicative of a bug in Isograph.",
                     );
+
                 match &server_object_selectable.object_selectable_variant {
                     ServerObjectSelectableVariant::LinkedField => {}
                     ServerObjectSelectableVariant::InlineFragment => {
