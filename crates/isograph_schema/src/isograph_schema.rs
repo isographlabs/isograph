@@ -1,9 +1,9 @@
 use std::{collections::HashMap, fmt::Debug, ops::Deref};
 
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, JavascriptName, ObjectSelectableName,
-    SelectableName, ServerObjectEntityName, ServerObjectSelectableName, ServerScalarEntityName,
-    ServerScalarIdSelectableName, ServerScalarSelectableName,
+    ClientObjectSelectableName, ClientScalarSelectableName, JavascriptName, SelectableName,
+    ServerObjectEntityName, ServerObjectSelectableName, ServerScalarEntityName,
+    ServerScalarIdSelectableName, ServerScalarSelectableName, ServerSelectableName,
 };
 use intern::Lookup;
 use intern::string_key::Intern;
@@ -84,7 +84,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
         &self,
         db: &IsographDatabase<TNetworkProtocol>,
         root_object_name: ServerObjectEntityName,
-        selections: impl Iterator<Item = ObjectSelectableName>,
+        selections: impl Iterator<Item = ServerSelectableName>,
     ) -> Result<
         Vec<&ServerObjectSelectable<TNetworkProtocol>>,
         CreateAdditionalFieldsError<TNetworkProtocol>,
