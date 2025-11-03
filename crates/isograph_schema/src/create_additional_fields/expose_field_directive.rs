@@ -19,6 +19,7 @@ use crate::{
     ServerEntityName, ServerObjectSelectableVariant, UnprocessedClientScalarSelectableSelectionSet,
     WrappedSelectionMapSelection, generate_refetch_field_strategy,
     imperative_field_subfields_or_inline_fragments, server_object_entity_named,
+    server_selectable_named,
 };
 
 use super::{
@@ -88,7 +89,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
     let primary_field_name_selection_parts = path.map(|x| x.intern().into()).collect::<Vec<_>>();
 
     let (parent_object_entity_name, mutation_subfield_name) =
-        parse_mutation_subfield_id(schema, field, parent_object_entity_name)?;
+        parse_mutation_subfield_id(db, field, parent_object_entity_name)?;
 
     // TODO do not use mutation naming here
     let mutation_field = schema
@@ -307,35 +308,37 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 /// Here, we are turning "pet" (the field_arg) to the ServerFieldId
 /// of that specific field
 fn parse_mutation_subfield_id<TNetworkProtocol: NetworkProtocol + 'static>(
-    schema: &Schema<TNetworkProtocol>,
+    db: &IsographDatabase<TNetworkProtocol>,
     field_arg: &str,
     mutation_object_entity_name: ServerObjectEntityName,
 ) -> ProcessTypeDefinitionResult<
     (ServerObjectEntityName, ServerObjectSelectableName),
     TNetworkProtocol,
 > {
-    let parent_entity_name_and_mutation_subfield_name = schema
-        .server_entity_data
-        .get(&mutation_object_entity_name)
-        .expect(
-            "Expected mutation_object_entity_name to exist \
-                in server_object_entity_available_selectables",
-        )
-        .selectables
-        .iter()
-        .find_map(|(name, field_id)| {
-            if let DefinitionLocation::Server(SelectionType::Object(server_field_id)) = field_id
-                && name.lookup() == field_arg
-            {
-                return Some(server_field_id);
-            }
-            None
-        })
-        .ok_or_else(|| CreateAdditionalFieldsError::InvalidField {
-            field_arg: field_arg.to_string(),
-        })?;
+    let memo_ref =
+        server_selectable_named(db, mutation_object_entity_name, field_arg.intern().into());
+    let opt_field = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
 
-    Ok(*parent_entity_name_and_mutation_subfield_name)
+    match opt_field {
+        Some(s) => {
+            let server_object_selectable = s
+                .as_ref()
+                .map_err(|e| e.clone())?
+                .as_ref()
+                .as_object()
+                .ok_or_else(|| CreateAdditionalFieldsError::InvalidField {
+                    field_arg: field_arg.to_string(),
+                })?;
+
+            Ok((
+                server_object_selectable.parent_object_entity_name,
+                server_object_selectable.name.item,
+            ))
+        }
+        None => Err(CreateAdditionalFieldsError::InvalidField {
+            field_arg: field_arg.to_string(),
+        }),
+    }
 }
 
 fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol + 'static>(

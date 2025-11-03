@@ -1,4 +1,7 @@
-use crate::{EntityAccessError, NetworkProtocol, Schema};
+use crate::{
+    EntityAccessError, FieldToInsertToServerSelectableError, NetworkProtocol, Schema,
+    ServerSelectableNamedError,
+};
 use common_lang_types::{
     ClientScalarSelectableName, SelectableName, ServerObjectEntityName, StringLiteralValue,
     UnvalidatedTypeName, VariableName,
@@ -136,6 +139,12 @@ pub enum CreateAdditionalFieldsError<TNetworkProtocol: NetworkProtocol + 'static
 
     #[error("{0}")]
     EntityAccessError(#[from] EntityAccessError<TNetworkProtocol>),
+
+    #[error("{0}")]
+    ServerSelectableNamedError(#[from] ServerSelectableNamedError<TNetworkProtocol>),
+
+    #[error("{0}")]
+    FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),
 }
 
 pub type CreateAdditionalFieldsResult<T, TNetworkProtocol> =
