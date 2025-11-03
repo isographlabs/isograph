@@ -2,8 +2,8 @@ use std::{collections::HashMap, fmt::Debug, ops::Deref};
 
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, JavascriptName, SelectableName,
-    ServerObjectEntityName, ServerObjectSelectableName, ServerScalarEntityName,
-    ServerScalarIdSelectableName, ServerScalarSelectableName, ServerSelectableName,
+    ServerObjectEntityName, ServerScalarEntityName, ServerScalarIdSelectableName,
+    ServerScalarSelectableName, ServerSelectableName,
 };
 use intern::Lookup;
 use intern::string_key::Intern;
@@ -43,10 +43,6 @@ pub struct Schema<TNetworkProtocol: NetworkProtocol + 'static> {
         (ServerObjectEntityName, ServerScalarSelectableName),
         ServerScalarSelectable<TNetworkProtocol>,
     >,
-    pub server_object_selectables: HashMap<
-        (ServerObjectEntityName, ServerObjectSelectableName),
-        ServerObjectSelectable<TNetworkProtocol>,
-    >,
     pub client_scalar_selectables: HashMap<
         (ServerObjectEntityName, ClientScalarSelectableName),
         ClientScalarSelectable<TNetworkProtocol>,
@@ -70,7 +66,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     pub fn new() -> Self {
         Self {
             server_scalar_selectables: HashMap::new(),
-            server_object_selectables: HashMap::new(),
             client_scalar_selectables: HashMap::new(),
             client_object_selectables: HashMap::new(),
 
@@ -215,14 +210,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                 parent_object_entity_name,
             });
         }
-
-        self.server_object_selectables.insert(
-            (
-                parent_object_entity_name,
-                server_object_selectable.name.item,
-            ),
-            server_object_selectable,
-        );
 
         Ok(())
     }
