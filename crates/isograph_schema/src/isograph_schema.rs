@@ -21,7 +21,7 @@ use crate::{
     ServerEntityName, ServerObjectEntityAvailableSelectables, ServerObjectSelectable,
     ServerScalarSelectable, ServerSelectableId, UseRefetchFieldRefetchStrategy,
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
-    server_object_entity_named,
+    server_selectable_named,
 };
 
 lazy_static! {
@@ -81,94 +81,43 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     }
 }
 
-pub fn get_object_selections_path<'a, TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &'a Schema<TNetworkProtocol>,
     root_object_name: ServerObjectEntityName,
     selections: impl Iterator<Item = ServerSelectableName>,
 ) -> Result<
-    Vec<&'a ServerObjectSelectable<TNetworkProtocol>>,
+    Vec<ServerObjectSelectable<TNetworkProtocol>>,
     CreateAdditionalFieldsError<TNetworkProtocol>,
 > {
-    let mut current_entity_memo_ref = server_object_entity_named(db, root_object_name);
-
-    let mut current_selectables = &schema
-        .server_entity_data
-        .get(&root_object_name)
-        .expect(
-            "Expected root_object_entity_name to exist \
-                in server_object_entity_available_selectables",
-        )
-        .selectables;
-
     let mut path = vec![];
+    let mut current_entity_name = root_object_name;
 
     for selection_name in selections {
-        match current_selectables.get(&selection_name.into()) {
-            Some(entity) => match entity.transpose() {
-                SelectionType::Scalar(_) => {
-                    // TODO show a better error message
-                    return Err(CreateAdditionalFieldsError::InvalidField {
-                        field_arg: selection_name.lookup().to_string(),
-                    });
+        let memo_ref = server_selectable_named(db, current_entity_name, selection_name);
+
+        let current_selectable = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
+
+        match current_selectable {
+            Some(entity) => {
+                let entity = entity.as_ref().map_err(|e| e.clone())?;
+                match entity {
+                    SelectionType::Scalar(_) => {
+                        // TODO show a better error message
+                        return Err(CreateAdditionalFieldsError::InvalidField {
+                            field_arg: selection_name.lookup().to_string(),
+                        });
+                    }
+                    SelectionType::Object(object) => {
+                        // TODO don't clone. When memoized functions return references with 'db lifetime,
+                        // this will be doable.
+                        path.push(object.clone());
+                        current_entity_name = *object.target_object_entity.inner();
+                    }
                 }
-                SelectionType::Object(object) => {
-                    let target_object_entity_name = match object {
-                        DefinitionLocation::Server((
-                            parent_object_entity_name,
-                            server_object_selectable_name,
-                        )) => {
-                            let selectable = schema
-                                .server_object_selectable(
-                                    *parent_object_entity_name,
-                                    *server_object_selectable_name,
-                                )
-                                .expect(
-                                    "Expected selectable to exist. \
-                                        This is indicative of a bug in Isograph.",
-                                );
-                            path.push(selectable);
-                            selectable.target_object_entity.inner()
-                        }
-
-                        DefinitionLocation::Client(_) => {
-                            // TODO better error, or support client fields
-                            return Err(CreateAdditionalFieldsError::InvalidField {
-                                field_arg: selection_name.lookup().to_string(),
-                            });
-                        }
-                    };
-
-                    current_entity_memo_ref =
-                        server_object_entity_named(db, *target_object_entity_name);
-
-                    current_selectables = &schema
-                        .server_entity_data
-                        .get(target_object_entity_name)
-                        .expect(
-                            "Expected target_object_entity_name to exist \
-                                in server_object_entity_available_selectables",
-                        )
-                        .selectables;
-                }
-            },
+            }
             None => {
                 return Err(CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
-                    primary_object_entity_name: current_entity_memo_ref
-                        .deref()
-                        .as_ref()
-                        .expect(
-                            "Expected validation to have succeeded. \
-                                This is indicative of a bug in Isograph.",
-                        )
-                        .as_ref()
-                        .expect(
-                            "Expected entity to exist. \
-                                This is indicative of a bug in Isograph.",
-                        )
-                        .item
-                        .name
-                        .item,
+                    primary_object_entity_name: current_entity_name,
                     field_name: selection_name.unchecked_conversion(),
                 });
             }

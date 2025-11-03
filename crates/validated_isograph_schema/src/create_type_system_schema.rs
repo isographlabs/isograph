@@ -87,12 +87,7 @@ pub(crate) fn create_type_system_schema_with_server_selectables<
                 unprocessed_client_scalar_selection_set,
                 client_scalar_selectable,
                 payload_object_entity_name,
-            ) = create_new_exposed_field(
-                db,
-                &unvalidated_isograph_schema,
-                &expose_as_field,
-                parent_object_entity_name,
-            )?;
+            ) = create_new_exposed_field(db, &expose_as_field, parent_object_entity_name)?;
 
             let client_scalar_selectable_name = client_scalar_selectable.name.item;
             let parent_object_entity_name = client_scalar_selectable.parent_object_entity_name;

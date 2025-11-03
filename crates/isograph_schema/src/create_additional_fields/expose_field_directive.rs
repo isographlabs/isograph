@@ -60,7 +60,6 @@ impl ExposeFieldDirective {
 
 pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
     expose_field_to_insert: &ExposeFieldToInsert,
     parent_object_entity_name: ServerObjectEntityName,
 ) -> Result<
@@ -191,7 +190,6 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
 
     let mut parts_reversed = get_object_selections_path(
         db,
-        schema,
         payload_object_entity_name,
         primary_field_name_selection_parts.into_iter(),
     )?;
