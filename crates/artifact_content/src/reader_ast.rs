@@ -355,6 +355,7 @@ fn scalar_client_defined_field_ast_node<TNetworkProtocol: NetworkProtocol + 'sta
             }
             ClientFieldVariant::UserWritten(_) | ClientFieldVariant::ImperativelyLoadedField(_) => {
                 user_written_variant_ast_node(
+                    db,
                     scalar_field_selection,
                     indentation_level,
                     client_field,
@@ -388,6 +389,7 @@ fn link_variant_ast_node(
 
 #[expect(clippy::too_many_arguments)]
 fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     scalar_field_selection: &ValidatedScalarSelection,
     indentation_level: u8,
     nested_client_field: &ClientScalarSelectable<TNetworkProtocol>,
@@ -405,6 +407,7 @@ fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
     // arguments **to** the client field (below), and the child context (here) for
     // the refetch paths **within** the client field.
     let paths_to_refetch_field_in_client_field = refetched_paths_for_client_field(
+        db,
         nested_client_field,
         schema,
         path,
@@ -728,6 +731,7 @@ pub(crate) fn generate_reader_ast<'schema, TNetworkProtocol: NetworkProtocol + '
 }
 
 fn refetched_paths_for_client_field<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     nested_client_field: &ClientScalarSelectable<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     path: &mut Vec<NormalizationKey>,
@@ -738,6 +742,7 @@ fn refetched_paths_for_client_field<TNetworkProtocol: NetworkProtocol + 'static>
     // this method would return something containing foo.bar.baz.__refetch
     // TODO return a BTreeSet
     let path_set = refetched_paths_with_path(
+        db,
         nested_client_field.selection_set_for_parent_query(),
         schema,
         path,
@@ -750,6 +755,7 @@ fn refetched_paths_for_client_field<TNetworkProtocol: NetworkProtocol + 'static>
 }
 
 fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     selection_set: &[WithSpan<ValidatedSelection>],
     schema: &Schema<TNetworkProtocol>,
     path: &mut Vec<NormalizationKey>,
@@ -786,6 +792,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol + 'static>(
                             }
                             None => {
                                 let new_paths = refetched_paths_with_path(
+                                    db,
                                     client_field.selection_set_for_parent_query(),
                                     schema,
                                     path,
@@ -819,6 +826,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol + 'static>(
                             );
 
                         let new_paths = refetched_paths_with_path(
+                            db,
                             client_pointer.selection_set_for_parent_query(),
                             schema,
                             path,
@@ -855,6 +863,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol + 'static>(
                         path.push(normalization_key);
 
                         let new_paths = refetched_paths_with_path(
+                            db,
                             &linked_field_selection.selection_set,
                             schema,
                             path,
@@ -869,15 +878,24 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol + 'static>(
                         parent_object_entity_name,
                         server_object_selectable_name,
                     )) => {
-                        let server_object_selectable = schema
-                            .server_object_selectable(
-                                parent_object_entity_name,
-                                server_object_selectable_name,
+                        let memo_ref = server_object_selectable_named(
+                            db,
+                            parent_object_entity_name,
+                            server_object_selectable_name.into(),
+                        );
+                        let server_object_selectable = memo_ref
+                            .deref()
+                            .as_ref()
+                            .expect(
+                                "Expected validation to have succeeded. \
+                                This is indicative of a bug in Isograph.",
                             )
+                            .as_ref()
                             .expect(
                                 "Expected selectable to exist. \
                                 This is indicative of a bug in Isograph.",
                             );
+
                         let normalization_key =
                             match server_object_selectable.object_selectable_variant {
                                 ServerObjectSelectableVariant::LinkedField => NameAndArguments {
@@ -904,6 +922,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol + 'static>(
                         path.push(normalization_key);
 
                         let new_paths = refetched_paths_with_path(
+                            db,
                             &linked_field_selection.selection_set,
                             schema,
                             path,
