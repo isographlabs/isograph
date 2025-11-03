@@ -16,7 +16,7 @@ use thiserror::Error;
 
 use crate::{
     ClientScalarOrObjectSelectable, IsographDatabase, NetworkProtocol, Schema,
-    ValidatedVariableDefinition, server_object_selectable_named,
+    ValidatedVariableDefinition, server_object_selectable_named, server_scalar_selectable_named,
     validate_argument_types::{ValidateArgumentTypesError, value_satisfies_type},
     visit_selection_set::visit_selection_set,
 };
@@ -82,19 +82,31 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol +
                     DefinitionLocation::Server((
                         parent_object_entity_name,
                         server_scalar_selectable_name,
-                    )) => schema
-                        .server_scalar_selectable(
+                    )) => {
+                        let memo_ref = server_scalar_selectable_named(
+                            db,
                             parent_object_entity_name,
-                            server_scalar_selectable_name,
-                        )
-                        .expect(
-                            "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .arguments
-                        .iter()
-                        .map(|x| x.item.clone())
-                        .collect::<Vec<_>>(),
+                            server_scalar_selectable_name.into(),
+                        );
+                        let server_scalar_selectable = memo_ref
+                            .deref()
+                            .as_ref()
+                            .expect(
+                                "Expected validation to have succeeded. \
+                                This is indicative of a bug in Isograph.",
+                            )
+                            .as_ref()
+                            .expect(
+                                "Expected selectable to exist. \
+                                This is indicative of a bug in Isograph.",
+                            );
+
+                        server_scalar_selectable
+                            .arguments
+                            .iter()
+                            .map(|x| x.item.clone())
+                            .collect::<Vec<_>>()
+                    }
                     DefinitionLocation::Client((
                         parent_object_entity_name,
                         client_selectable_name,

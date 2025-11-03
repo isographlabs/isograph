@@ -13,7 +13,7 @@ use isograph_schema::{
     UnprocessedClientObjectSelectableSelectionSet, UnprocessedClientScalarSelectableSelectionSet,
     UnprocessedSelectionSet, UseRefetchFieldRefetchStrategy, ValidatedObjectSelection,
     ValidatedScalarSelection, ValidatedSelection, server_object_entity_named,
-    server_object_selectable_named,
+    server_object_selectable_named, server_scalar_selectable_named,
 };
 use thiserror::Error;
 
@@ -394,11 +394,19 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol + 'static>(
             let (parent_object_entity_name, server_object_selectable_name) =
                 *server_selectable_id.as_object_result().as_ref().map_err(
                     |(parent_object_entity_name, server_scalar_selectable_name)| {
-                        let server_scalar_selectable = schema
-                            .server_scalar_selectable(
-                                *parent_object_entity_name,
-                                *server_scalar_selectable_name,
+                        let memo_ref = server_scalar_selectable_named(
+                            db,
+                            *parent_object_entity_name,
+                            (*server_scalar_selectable_name).into(),
+                        );
+                        let server_scalar_selectable = memo_ref
+                            .deref()
+                            .as_ref()
+                            .expect(
+                                "Expected validation to have succeeded. \
+                                This is indicative of a bug in Isograph.",
                             )
+                            .as_ref()
                             .expect(
                                 "Expected selectable to exist. \
                                 This is indicative of a bug in Isograph.",
