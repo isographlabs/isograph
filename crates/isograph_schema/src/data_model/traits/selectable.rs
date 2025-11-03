@@ -1,20 +1,14 @@
 use common_lang_types::{SelectableName, ServerObjectEntityName, WithLocation};
 use impl_base_types_macro::{impl_for_definition_location, impl_for_selection_type};
-use isograph_lang_types::{DefinitionLocation, Description, SelectionType, VariableDefinition};
+use isograph_lang_types::{DefinitionLocation, Description, VariableDefinition};
 
-use crate::{
-    ClientSelectable, OwnedClientSelectable, OwnedServerSelectable, ServerEntityName,
-    ServerObjectSelectable, ServerScalarSelectable,
-};
+use crate::{ClientSelectable, OwnedClientSelectable, OwnedServerSelectable, ServerEntityName};
 
 pub type Selectable<'a, TNetworkProtocol> = DefinitionLocation<
     // HACK: Note the owned server selectable
     // This is fixable when memoized functions can return references with 'db lifetime
     // ServerSelectable<'a, TNetworkProtocol>,
-    SelectionType<
-        &'a ServerScalarSelectable<TNetworkProtocol>,
-        ServerObjectSelectable<TNetworkProtocol>,
-    >,
+    OwnedServerSelectable<TNetworkProtocol>,
     ClientSelectable<'a, TNetworkProtocol>,
 >;
 

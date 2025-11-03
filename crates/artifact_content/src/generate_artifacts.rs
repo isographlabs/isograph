@@ -24,6 +24,7 @@ use isograph_schema::{
     accessible_client_fields, description, fetchable_types, inline_fragment_reader_selection_set,
     output_type_annotation, selection_map_wrapped, server_object_entity_named,
     server_object_selectable_named, server_scalar_entity_javascript_name,
+    server_scalar_selectable_named,
 };
 use lazy_static::lazy_static;
 use std::{
@@ -750,46 +751,49 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                     parent_object_entity_name,
                     server_scalar_selectable_name,
                 )) => {
-                    let field = schema
-                        .server_scalar_selectable(
-                            parent_object_entity_name,
-                            server_scalar_selectable_name,
+                    let memo_ref = server_scalar_selectable_named(
+                        db,
+                        parent_object_entity_name,
+                        server_scalar_selectable_name.into(),
+                    );
+                    let server_scalar_selectable = memo_ref
+                        .deref()
+                        .as_ref()
+                        .expect(
+                            "Expected validation to have succeeded. \
+                            This is indicative of a bug in Isograph.",
                         )
+                        .as_ref()
                         .expect(
                             "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
                         );
 
                     write_optional_description(
-                        field.description,
+                        server_scalar_selectable.description,
                         query_type_declaration,
                         indentation_level,
                     );
 
                     let name_or_alias = scalar_field_selection.name_or_alias().item;
 
-                    let output_type =
-                        field
-                            .target_scalar_entity
-                            .as_ref()
-                            .map(
-                                &mut |scalar_entity_name| match field.javascript_type_override {
-                                    Some(javascript_name) => javascript_name,
-                                    None => server_scalar_entity_javascript_name(
-                                        db,
-                                        *scalar_entity_name,
-                                    )
-                                    .to_owned()
-                                    .expect(
-                                        "Expected parsing to not have failed. \
+                    let output_type = server_scalar_selectable.target_scalar_entity.as_ref().map(
+                        &mut |scalar_entity_name| match server_scalar_selectable
+                            .javascript_type_override
+                        {
+                            Some(javascript_name) => javascript_name,
+                            None => server_scalar_entity_javascript_name(db, *scalar_entity_name)
+                                .to_owned()
+                                .expect(
+                                    "Expected parsing to not have failed. \
                                         This is indicative of a bug in Isograph.",
-                                    )
-                                    .expect(
-                                        "Expected entity to exist. \
+                                )
+                                .expect(
+                                    "Expected entity to exist. \
                                         This is indicative of a bug in Isograph.",
-                                    ),
-                                },
-                            );
+                                ),
+                        },
+                    );
 
                     query_type_declaration.push_str(&format!(
                         "{}readonly {}: {},\n",
@@ -956,40 +960,46 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol + 
                     parent_object_entity_name,
                     server_scalar_selectable_name,
                 )) => {
-                    let field = schema
-                        .server_scalar_selectable(
-                            parent_object_entity_name,
-                            server_scalar_selectable_name,
+                    let memo_ref = server_scalar_selectable_named(
+                        db,
+                        parent_object_entity_name,
+                        server_scalar_selectable_name.into(),
+                    );
+                    let server_scalar_selectable = memo_ref
+                        .deref()
+                        .as_ref()
+                        .expect(
+                            "Expected validation to have succeeded. \
+                            This is indicative of a bug in Isograph.",
                         )
+                        .as_ref()
                         .expect(
                             "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
                         );
 
                     write_optional_description(
-                        field.description,
+                        server_scalar_selectable.description,
                         query_type_declaration,
                         indentation_level,
                     );
 
                     let name_or_alias = scalar_field_selection.name_or_alias().item;
 
-                    let output_type =
-                        field
-                            .target_scalar_entity
-                            .clone()
-                            .map(&mut |scalar_entity_name| {
-                                server_scalar_entity_javascript_name(db, scalar_entity_name)
-                                    .to_owned()
-                                    .expect(
-                                        "Expected parsing to not have failed. \
+                    let output_type = server_scalar_selectable.target_scalar_entity.clone().map(
+                        &mut |scalar_entity_name| {
+                            server_scalar_entity_javascript_name(db, scalar_entity_name)
+                                .to_owned()
+                                .expect(
+                                    "Expected parsing to not have failed. \
                                         This is indicative of a bug in Isograph.",
-                                    )
-                                    .expect(
-                                        "Expected entity to exist. \
+                                )
+                                .expect(
+                                    "Expected entity to exist. \
                                         This is indicative of a bug in Isograph.",
-                                    )
-                            });
+                                )
+                        },
+                    );
 
                     match scalar_field_selection.scalar_selection_directive_set {
                         ScalarSelectionDirectiveSet::Updatable(_) => {

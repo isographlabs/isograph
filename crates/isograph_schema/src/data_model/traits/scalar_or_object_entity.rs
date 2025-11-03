@@ -12,7 +12,7 @@ use thiserror::Error;
 use crate::{
     ClientOrServerObjectSelectable, EntityAccessError, IsographDatabase, NetworkProtocol,
     ObjectSelectable, ScalarSelectable, Schema, Selectable, ServerObjectEntity, ServerScalarEntity,
-    server_object_entity_named, server_object_selectable_named,
+    server_object_entity_named, server_object_selectable_named, server_scalar_selectable_named,
 };
 
 #[impl_for_selection_type]
@@ -219,17 +219,25 @@ pub fn parent_object_entity_and_selectable<'a, TNetworkProtocol: NetworkProtocol
     let selectable = match selectable_id {
         DefinitionLocation::Server(s) => match s {
             SelectionType::Scalar((parent_object_entity_name, server_scalar_selectable_name)) => {
-                DefinitionLocation::Server(SelectionType::Scalar(
-                    validated_schema
-                        .server_scalar_selectable(
-                            *parent_object_entity_name,
-                            *server_scalar_selectable_name,
-                        )
-                        .expect(
-                            "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
-                        ),
-                ))
+                let memo_ref = server_scalar_selectable_named(
+                    db,
+                    *parent_object_entity_name,
+                    (*server_scalar_selectable_name).into(),
+                );
+                let server_scalar_selectable = memo_ref
+                    .deref()
+                    .as_ref()
+                    .expect(
+                        "Expected validation to have succeeded. \
+                        This is indicative of a bug in Isograph.",
+                    )
+                    .as_ref()
+                    .expect(
+                        "Expected selectable to exist. \
+                        This is indicative of a bug in Isograph.",
+                    )
+                    .clone();
+                DefinitionLocation::Server(SelectionType::Scalar(server_scalar_selectable))
             }
             SelectionType::Object((parent_object_entity_name, server_object_selectable_name)) => {
                 let memo_ref = server_object_selectable_named(

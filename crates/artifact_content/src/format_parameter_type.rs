@@ -8,6 +8,7 @@ use isograph_lang_types::{DefinitionLocation, SelectionType, TypeAnnotation, Uni
 use isograph_schema::{
     IsographDatabase, NetworkProtocol, Schema, ServerEntityName, ServerSelectableId,
     server_object_selectable_named, server_scalar_entity_javascript_name,
+    server_scalar_selectable_named,
 };
 
 pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol + 'static>(
@@ -105,12 +106,24 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol + 'static>(
 ) -> String {
     let (is_optional, selection_type) = match server_selectable_id {
         SelectionType::Scalar((parent_object_entity_name, server_scalar_selectable_name)) => {
-            let server_scalar_selectable = schema
-                .server_scalar_selectable(parent_object_entity_name, server_scalar_selectable_name)
+            let memo_ref = server_scalar_selectable_named(
+                db,
+                parent_object_entity_name,
+                server_scalar_selectable_name.into(),
+            );
+            let server_scalar_selectable = memo_ref
+                .deref()
+                .as_ref()
+                .expect(
+                    "Expected validation to have succeeded. \
+                    This is indicative of a bug in Isograph.",
+                )
+                .as_ref()
                 .expect(
                     "Expected selectable to exist. \
                     This is indicative of a bug in Isograph.",
                 );
+
             (
                 is_nullable(&server_scalar_selectable.target_scalar_entity),
                 server_scalar_selectable
