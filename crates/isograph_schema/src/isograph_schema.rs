@@ -17,9 +17,8 @@ use lazy_static::lazy_static;
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectableId,
     EntrypointDeclarationInfo, IsographDatabase, NetworkProtocol, NormalizationKey,
-    ObjectSelectable, ObjectSelectableId, ScalarSelectable, ServerEntityName,
-    ServerObjectEntityAvailableSelectables, ServerObjectSelectable, ServerScalarSelectable,
-    UseRefetchFieldRefetchStrategy,
+    ObjectSelectable, ObjectSelectableId, ServerEntityName, ServerObjectEntityAvailableSelectables,
+    ServerObjectSelectable, ServerScalarSelectable, UseRefetchFieldRefetchStrategy,
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
     server_object_selectable_named, server_selectable_named,
 };
@@ -278,26 +277,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                 client_object_selectable_name,
             )) => self
                 .client_object_selectable(parent_object_entity_name, client_object_selectable_name)
-                .map(DefinitionLocation::Client),
-        }
-    }
-
-    pub fn scalar_selectable(
-        &self,
-        field_id: ScalarSelectableId,
-    ) -> Option<ScalarSelectable<'_, TNetworkProtocol>> {
-        match field_id {
-            DefinitionLocation::Server((
-                parent_object_entity_name,
-                server_scalar_selectable_name,
-            )) => self
-                .server_scalar_selectable(parent_object_entity_name, server_scalar_selectable_name)
-                .map(DefinitionLocation::Server),
-            DefinitionLocation::Client((
-                parent_object_entity_name,
-                client_scalar_selectable_name,
-            )) => self
-                .client_scalar_selectable(parent_object_entity_name, client_scalar_selectable_name)
                 .map(DefinitionLocation::Client),
         }
     }
