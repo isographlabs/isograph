@@ -28,7 +28,8 @@ use crate::{
     ServerObjectSelectableVariant, ValidatedObjectSelection, ValidatedScalarSelection,
     ValidatedSelection, VariableContext, create_transformed_name_and_arguments, fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
-    initial_variable_context, server_object_entity_named, transform_arguments_with_child_context,
+    initial_variable_context, server_object_entity_named, server_object_selectable_named,
+    transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context,
 };
 
@@ -691,11 +692,19 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol + 'static>(
         merge_traversal_state.has_updatable = true;
     }
 
-    let server_object_selectable = schema
-        .server_object_selectable(
-            field_parent_object_entity_name,
-            field_server_object_selectable_name,
+    let memo_ref = server_object_selectable_named(
+        db,
+        field_parent_object_entity_name,
+        field_server_object_selectable_name.into(),
+    );
+    let server_object_selectable = memo_ref
+        .deref()
+        .as_ref()
+        .expect(
+            "Expected validation to have succeeded. \
+            This is indicative of a bug in Isograph.",
         )
+        .as_ref()
         .expect(
             "Expected selectable to exist. \
             This is indicative of a bug in Isograph.",
