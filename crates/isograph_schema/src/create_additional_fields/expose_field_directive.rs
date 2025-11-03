@@ -431,21 +431,11 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol + 'static>(
                                 .target_object_entity
                                 .inner()
                         }
-                        DefinitionLocation::Client((
-                            parent_object_entity_name,
-                            client_object_selectable_name,
-                        )) => {
-                            let pointer = schema.client_object_selectable(
-                                *parent_object_entity_name,
-                                *client_object_selectable_name,
-                            );
-                            pointer
-                                .expect(
-                                    "Expected selectable to exist. \
-                                    This is indicative of a bug in Isograph.",
-                                )
-                                .target_object_entity_name
-                                .inner()
+                        DefinitionLocation::Client(_) => {
+                            unreachable!(
+                                "This code path is unreachable. \
+                                This is indicative of a bug in Isograph."
+                            )
                         }
                     };
 
