@@ -39,10 +39,6 @@ pub struct RootOperationName(pub &'static str);
 /// The in-memory representation of a schema.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Schema<TNetworkProtocol: NetworkProtocol + 'static> {
-    pub server_scalar_selectables: HashMap<
-        (ServerObjectEntityName, ServerScalarSelectableName),
-        ServerScalarSelectable<TNetworkProtocol>,
-    >,
     pub client_scalar_selectables: HashMap<
         (ServerObjectEntityName, ClientScalarSelectableName),
         ClientScalarSelectable<TNetworkProtocol>,
@@ -65,7 +61,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Default for Schema<TNetworkPro
 impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     pub fn new() -> Self {
         Self {
-            server_scalar_selectables: HashMap::new(),
             client_scalar_selectables: HashMap::new(),
             client_object_selectables: HashMap::new(),
 
@@ -134,15 +129,6 @@ pub struct ServerObjectEntityExtraInfo {
 pub type ServerEntityData = HashMap<ServerObjectEntityName, ServerObjectEntityExtraInfo>;
 
 impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
-    pub fn server_scalar_selectable(
-        &self,
-        parent_object_entity_name: ServerObjectEntityName,
-        server_scalar_selectable_name: ServerScalarSelectableName,
-    ) -> Option<&ServerScalarSelectable<TNetworkProtocol>> {
-        self.server_scalar_selectables
-            .get(&(parent_object_entity_name, server_scalar_selectable_name))
-    }
-
     // TODO this function should not exist
     pub fn insert_server_scalar_selectable(
         &mut self,
@@ -171,14 +157,6 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
                 parent_object_entity_name,
             });
         }
-
-        self.server_scalar_selectables.insert(
-            (
-                server_scalar_selectable.parent_object_entity_name,
-                server_scalar_selectable.name.item,
-            ),
-            server_scalar_selectable,
-        );
 
         Ok(())
     }
