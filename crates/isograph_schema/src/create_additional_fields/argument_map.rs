@@ -29,83 +29,47 @@ impl ArgumentMap {
                 .collect(),
         }
     }
+}
 
-    pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol + 'static>(
-        &mut self,
-        field_map_item: FieldMapItem,
-        primary_object_entity_name: ServerObjectEntityName,
-        mutation_object_entity_name: ServerObjectEntityName,
-        mutation_selectable_name: SelectableName,
-        schema: &Schema<TNetworkProtocol>,
-    ) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem, TNetworkProtocol> {
-        let split_to_arg = field_map_item.split_to_arg();
-        let (index_of_argument, argument) = self
-            .arguments
-            .iter_mut()
-            .enumerate()
-            .find(|(_, argument)| {
-                let name = match &argument.item {
-                    PotentiallyModifiedArgument::Unmodified(argument) => argument.name.item,
-                    PotentiallyModifiedArgument::Modified(modified_argument) => {
-                        modified_argument.name.item
-                    }
-                };
-                name == split_to_arg.to_argument_name
-            })
-            .ok_or_else(|| {
-                CreateAdditionalFieldsError::PrimaryDirectiveArgumentDoesNotExistOnField {
-                    primary_object_entity_name,
-                    mutation_object_entity_name,
-                    mutation_selectable_name,
-                    field_name: split_to_arg.to_argument_name,
+pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol + 'static>(
+    argument_map: &mut ArgumentMap,
+    field_map_item: FieldMapItem,
+    primary_object_entity_name: ServerObjectEntityName,
+    mutation_object_entity_name: ServerObjectEntityName,
+    mutation_selectable_name: SelectableName,
+    schema: &Schema<TNetworkProtocol>,
+) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem, TNetworkProtocol> {
+    let split_to_arg = field_map_item.split_to_arg();
+    let (index_of_argument, argument) = argument_map
+        .arguments
+        .iter_mut()
+        .enumerate()
+        .find(|(_, argument)| {
+            let name = match &argument.item {
+                PotentiallyModifiedArgument::Unmodified(argument) => argument.name.item,
+                PotentiallyModifiedArgument::Modified(modified_argument) => {
+                    modified_argument.name.item
                 }
-            })?;
-
-        // TODO avoid matching twice?
-        let location = argument.location;
-
-        let processed_field_map_item = match &mut argument.item {
-            PotentiallyModifiedArgument::Unmodified(unmodified_argument) => {
-                match split_to_arg.to_field_names.split_first() {
-                    None => {
-                        if unmodified_argument.type_.inner().as_object().is_some() {
-                            return Err(
-                                CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
-                                    primary_object_entity_name,
-                                    field_name: split_to_arg.to_argument_name.lookup().to_string(),
-                                },
-                            );
-                        }
-
-                        self.arguments.swap_remove(index_of_argument);
-
-                        ProcessedFieldMapItem(field_map_item.clone())
-                    }
-                    Some((first, rest)) => {
-                        let mut arg =
-                            ModifiedArgument::from_unmodified(unmodified_argument, schema);
-
-                        arg.remove_to_field::<TNetworkProtocol>(
-                            *first,
-                            rest,
-                            primary_object_entity_name,
-                        )?;
-
-                        *argument =
-                            WithLocation::new(PotentiallyModifiedArgument::Modified(arg), location);
-                        // processed_field_map_item
-                        // TODO wat
-                        ProcessedFieldMapItem(field_map_item.clone())
-                    }
-                }
+            };
+            name == split_to_arg.to_argument_name
+        })
+        .ok_or_else(|| {
+            CreateAdditionalFieldsError::PrimaryDirectiveArgumentDoesNotExistOnField {
+                primary_object_entity_name,
+                mutation_object_entity_name,
+                mutation_selectable_name,
+                field_name: split_to_arg.to_argument_name,
             }
-            PotentiallyModifiedArgument::Modified(modified) => {
-                let to_field_names = &split_to_arg.to_field_names;
-                match to_field_names.split_first() {
-                    None => {
-                        // TODO encode this in the type system.
-                        // A modified argument will always have an object type, and cannot be remapped
-                        // at the object level.
+        })?;
+
+    // TODO avoid matching twice?
+    let location = argument.location;
+
+    let processed_field_map_item = match &mut argument.item {
+        PotentiallyModifiedArgument::Unmodified(unmodified_argument) => {
+            match split_to_arg.to_field_names.split_first() {
+                None => {
+                    if unmodified_argument.type_.inner().as_object().is_some() {
                         return Err(
                             CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
                                 primary_object_entity_name,
@@ -113,21 +77,56 @@ impl ArgumentMap {
                             },
                         );
                     }
-                    Some((first, rest)) => {
-                        modified.remove_to_field::<TNetworkProtocol>(
-                            *first,
-                            rest,
-                            primary_object_entity_name,
-                        )?;
-                        // TODO WAT
-                        ProcessedFieldMapItem(field_map_item.clone())
-                    }
+
+                    argument_map.arguments.swap_remove(index_of_argument);
+
+                    ProcessedFieldMapItem(field_map_item.clone())
+                }
+                Some((first, rest)) => {
+                    let mut arg = ModifiedArgument::from_unmodified(unmodified_argument, schema);
+
+                    arg.remove_to_field::<TNetworkProtocol>(
+                        *first,
+                        rest,
+                        primary_object_entity_name,
+                    )?;
+
+                    *argument =
+                        WithLocation::new(PotentiallyModifiedArgument::Modified(arg), location);
+                    // processed_field_map_item
+                    // TODO wat
+                    ProcessedFieldMapItem(field_map_item.clone())
                 }
             }
-        };
+        }
+        PotentiallyModifiedArgument::Modified(modified) => {
+            let to_field_names = &split_to_arg.to_field_names;
+            match to_field_names.split_first() {
+                None => {
+                    // TODO encode this in the type system.
+                    // A modified argument will always have an object type, and cannot be remapped
+                    // at the object level.
+                    return Err(
+                        CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
+                            primary_object_entity_name,
+                            field_name: split_to_arg.to_argument_name.lookup().to_string(),
+                        },
+                    );
+                }
+                Some((first, rest)) => {
+                    modified.remove_to_field::<TNetworkProtocol>(
+                        *first,
+                        rest,
+                        primary_object_entity_name,
+                    )?;
+                    // TODO WAT
+                    ProcessedFieldMapItem(field_map_item.clone())
+                }
+            }
+        }
+    };
 
-        Ok(processed_field_map_item)
-    }
+    Ok(processed_field_map_item)
 }
 
 #[derive(Debug)]

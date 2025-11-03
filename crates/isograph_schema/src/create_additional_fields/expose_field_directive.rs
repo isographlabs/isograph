@@ -17,9 +17,9 @@ use crate::{
     ClientFieldVariant, ClientScalarSelectable, ExposeFieldToInsert,
     ImperativelyLoadedFieldVariant, IsographDatabase, NetworkProtocol, RefetchStrategy, Schema,
     ServerEntityName, ServerObjectSelectableVariant, UnprocessedClientScalarSelectableSelectionSet,
-    WrappedSelectionMapSelection, generate_refetch_field_strategy,
-    imperative_field_subfields_or_inline_fragments, server_object_entity_named,
-    server_selectable_named,
+    WrappedSelectionMapSelection, create_additional_fields::argument_map::remove_field_map_item,
+    generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
+    server_object_entity_named, server_selectable_named,
 };
 
 use super::{
@@ -371,7 +371,8 @@ fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol + 'st
     let mut argument_map = ArgumentMap::new(arguments);
 
     for field_map_item in field_map_items {
-        processed_field_map_items.push(argument_map.remove_field_map_item(
+        processed_field_map_items.push(remove_field_map_item(
+            &mut argument_map,
             field_map_item,
             primary_type_name,
             mutation_object_name,
