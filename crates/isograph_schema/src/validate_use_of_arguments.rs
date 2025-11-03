@@ -117,6 +117,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol +
                 );
 
                 validate_use_of_arguments_impl(
+                    db,
                     schema,
                     errors,
                     &mut reachable_variables,
@@ -174,6 +175,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol +
                 };
 
                 validate_use_of_arguments_impl(
+                    db,
                     schema,
                     errors,
                     &mut reachable_variables,
@@ -201,6 +203,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol +
 
 #[expect(clippy::too_many_arguments)]
 fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError>>,
     reachable_variables: &mut BTreeSet<VariableName>,
@@ -223,12 +226,11 @@ fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol + 'static>(
                 maybe_push_errors(
                     errors,
                     value_satisfies_type(
+                        db,
                         &selection_supplied_argument.item.value,
                         &field_argument_definition.type_,
                         client_type_variable_definitions,
                         &schema.server_entity_data,
-                        &schema.server_scalar_selectables,
-                        &schema.server_object_selectables,
                     )
                     .map_err(|with_location| with_location.map(|e| e.into())),
                 );
