@@ -96,6 +96,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
                     path.pop();
 
                     linked_field_ast_node(
+                        db,
                         schema,
                         linked_field_selection,
                         indentation_level,
@@ -168,6 +169,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
                     path.pop();
 
                     linked_field_ast_node(
+                        db,
                         schema,
                         linked_field_selection,
                         indentation_level,
@@ -185,6 +187,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
 
 #[expect(clippy::too_many_arguments)]
 fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     linked_field: &ValidatedObjectSelection,
     indentation_level: u8,
@@ -235,17 +238,29 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
             reader_artifact_import_name
         }
         DefinitionLocation::Server((parent_object_entity_name, server_object_selectable_name)) => {
-            let server_field = schema
-                .server_object_selectable(parent_object_entity_name, server_object_selectable_name)
+            let memo_ref = server_object_selectable_named(
+                db,
+                parent_object_entity_name,
+                server_object_selectable_name.into(),
+            );
+            let server_object_selectable = memo_ref
+                .deref()
+                .as_ref()
+                .expect(
+                    "Expected validation to have succeeded. \
+                    This is indicative of a bug in Isograph.",
+                )
+                .as_ref()
                 .expect(
                     "Expected selectable to exist. \
-                    This is indicative of a bug in Isograph.",
+                        This is indicative of a bug in Isograph.",
                 );
-            match &server_field.object_selectable_variant {
+            match &server_object_selectable.object_selectable_variant {
                 ServerObjectSelectableVariant::InlineFragment => {
                     let type_and_field = ParentObjectEntityNameAndSelectableName {
                         selectable_name: linked_field.name.item.into(),
-                        parent_object_entity_name: server_field.parent_object_entity_name,
+                        parent_object_entity_name: server_object_selectable
+                            .parent_object_entity_name,
                     };
 
                     let reader_artifact_import_name =
