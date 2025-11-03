@@ -421,11 +421,23 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol + 'static>(
                         )]
                     },
                 )?;
-            let server_object_selectable = schema
-                .server_object_selectable(parent_object_entity_name, server_object_selectable_name)
+
+            let memo_ref = server_object_selectable_named(
+                db,
+                parent_object_entity_name,
+                server_object_selectable_name.into(),
+            );
+            let server_object_selectable = memo_ref
+                .deref()
+                .as_ref()
+                .expect(
+                    "Expected validation to have succeeded. \
+                    This is indicative of a bug in Isograph.",
+                )
+                .as_ref()
                 .expect(
                     "Expected selectable to exist. \
-                    This is indicative of a bug in Isograph.",
+                        This is indicative of a bug in Isograph.",
                 );
 
             (
