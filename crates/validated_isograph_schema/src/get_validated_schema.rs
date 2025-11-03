@@ -29,7 +29,7 @@ pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol + 'static>(
         unvalidated_isograph_schema,
         unprocessed_selection_sets,
     )?;
-    validate_use_of_arguments(&isograph_schema)?;
+    validate_use_of_arguments(db, &isograph_schema)?;
     Ok((isograph_schema, stats))
 }
 
