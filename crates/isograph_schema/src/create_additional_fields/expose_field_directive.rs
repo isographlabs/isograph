@@ -18,8 +18,9 @@ use crate::{
     ImperativelyLoadedFieldVariant, IsographDatabase, NetworkProtocol, RefetchStrategy, Schema,
     ServerEntityName, ServerObjectSelectableVariant, UnprocessedClientScalarSelectableSelectionSet,
     WrappedSelectionMapSelection, create_additional_fields::argument_map::remove_field_map_item,
-    generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
-    server_object_entity_named, server_selectable_named,
+    generate_refetch_field_strategy, get_object_selections_path,
+    imperative_field_subfields_or_inline_fragments, server_object_entity_named,
+    server_selectable_named,
 };
 
 use super::{
@@ -188,8 +189,9 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
         .map(|x| x.item)
         .collect::<Vec<_>>();
 
-    let mut parts_reversed = schema.get_object_selections_path(
+    let mut parts_reversed = get_object_selections_path(
         db,
+        schema,
         payload_object_entity_name,
         primary_field_name_selection_parts.into_iter(),
     )?;

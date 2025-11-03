@@ -79,103 +79,103 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
             server_entity_data: HashMap::new(),
         }
     }
+}
 
-    pub fn get_object_selections_path(
-        &self,
-        db: &IsographDatabase<TNetworkProtocol>,
-        root_object_name: ServerObjectEntityName,
-        selections: impl Iterator<Item = ServerSelectableName>,
-    ) -> Result<
-        Vec<&ServerObjectSelectable<TNetworkProtocol>>,
-        CreateAdditionalFieldsError<TNetworkProtocol>,
-    > {
-        let mut current_entity_memo_ref = server_object_entity_named(db, root_object_name);
+pub fn get_object_selections_path<'a, TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    schema: &'a Schema<TNetworkProtocol>,
+    root_object_name: ServerObjectEntityName,
+    selections: impl Iterator<Item = ServerSelectableName>,
+) -> Result<
+    Vec<&'a ServerObjectSelectable<TNetworkProtocol>>,
+    CreateAdditionalFieldsError<TNetworkProtocol>,
+> {
+    let mut current_entity_memo_ref = server_object_entity_named(db, root_object_name);
 
-        let mut current_selectables = &self
-            .server_entity_data
-            .get(&root_object_name)
-            .expect(
-                "Expected root_object_entity_name to exist \
+    let mut current_selectables = &schema
+        .server_entity_data
+        .get(&root_object_name)
+        .expect(
+            "Expected root_object_entity_name to exist \
                 in server_object_entity_available_selectables",
-            )
-            .selectables;
+        )
+        .selectables;
 
-        let mut path = vec![];
+    let mut path = vec![];
 
-        for selection_name in selections {
-            match current_selectables.get(&selection_name.into()) {
-                Some(entity) => match entity.transpose() {
-                    SelectionType::Scalar(_) => {
-                        // TODO show a better error message
-                        return Err(CreateAdditionalFieldsError::InvalidField {
-                            field_arg: selection_name.lookup().to_string(),
-                        });
-                    }
-                    SelectionType::Object(object) => {
-                        let target_object_entity_name = match object {
-                            DefinitionLocation::Server((
-                                parent_object_entity_name,
-                                server_object_selectable_name,
-                            )) => {
-                                let selectable = self
-                                    .server_object_selectable(
-                                        *parent_object_entity_name,
-                                        *server_object_selectable_name,
-                                    )
-                                    .expect(
-                                        "Expected selectable to exist. \
-                                        This is indicative of a bug in Isograph.",
-                                    );
-                                path.push(selectable);
-                                selectable.target_object_entity.inner()
-                            }
-
-                            DefinitionLocation::Client(_) => {
-                                // TODO better error, or support client fields
-                                return Err(CreateAdditionalFieldsError::InvalidField {
-                                    field_arg: selection_name.lookup().to_string(),
-                                });
-                            }
-                        };
-
-                        current_entity_memo_ref =
-                            server_object_entity_named(db, *target_object_entity_name);
-
-                        current_selectables = &self
-                            .server_entity_data
-                            .get(target_object_entity_name)
-                            .expect(
-                                "Expected target_object_entity_name to exist \
-                                in server_object_entity_available_selectables",
-                            )
-                            .selectables;
-                    }
-                },
-                None => {
-                    return Err(CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
-                        primary_object_entity_name: current_entity_memo_ref
-                            .deref()
-                            .as_ref()
-                            .expect(
-                                "Expected validation to have succeeded. \
-                                This is indicative of a bug in Isograph.",
-                            )
-                            .as_ref()
-                            .expect(
-                                "Expected entity to exist. \
-                                This is indicative of a bug in Isograph.",
-                            )
-                            .item
-                            .name
-                            .item,
-                        field_name: selection_name.unchecked_conversion(),
+    for selection_name in selections {
+        match current_selectables.get(&selection_name.into()) {
+            Some(entity) => match entity.transpose() {
+                SelectionType::Scalar(_) => {
+                    // TODO show a better error message
+                    return Err(CreateAdditionalFieldsError::InvalidField {
+                        field_arg: selection_name.lookup().to_string(),
                     });
                 }
-            };
-        }
+                SelectionType::Object(object) => {
+                    let target_object_entity_name = match object {
+                        DefinitionLocation::Server((
+                            parent_object_entity_name,
+                            server_object_selectable_name,
+                        )) => {
+                            let selectable = schema
+                                .server_object_selectable(
+                                    *parent_object_entity_name,
+                                    *server_object_selectable_name,
+                                )
+                                .expect(
+                                    "Expected selectable to exist. \
+                                        This is indicative of a bug in Isograph.",
+                                );
+                            path.push(selectable);
+                            selectable.target_object_entity.inner()
+                        }
 
-        Ok(path)
+                        DefinitionLocation::Client(_) => {
+                            // TODO better error, or support client fields
+                            return Err(CreateAdditionalFieldsError::InvalidField {
+                                field_arg: selection_name.lookup().to_string(),
+                            });
+                        }
+                    };
+
+                    current_entity_memo_ref =
+                        server_object_entity_named(db, *target_object_entity_name);
+
+                    current_selectables = &schema
+                        .server_entity_data
+                        .get(target_object_entity_name)
+                        .expect(
+                            "Expected target_object_entity_name to exist \
+                                in server_object_entity_available_selectables",
+                        )
+                        .selectables;
+                }
+            },
+            None => {
+                return Err(CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
+                    primary_object_entity_name: current_entity_memo_ref
+                        .deref()
+                        .as_ref()
+                        .expect(
+                            "Expected validation to have succeeded. \
+                                This is indicative of a bug in Isograph.",
+                        )
+                        .as_ref()
+                        .expect(
+                            "Expected entity to exist. \
+                                This is indicative of a bug in Isograph.",
+                        )
+                        .item
+                        .name
+                        .item,
+                    field_name: selection_name.unchecked_conversion(),
+                });
+            }
+        };
     }
+
+    Ok(path)
 }
 
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
