@@ -58,6 +58,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol 
         .item;
 
     let (reader_ast, reader_imports) = generate_reader_ast(
+        db,
         schema,
         client_selectable.selection_set_for_parent_query(),
         0,
@@ -221,6 +222,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<
         .item;
 
     let (reader_ast, reader_imports) = generate_reader_ast(
+        db,
         schema,
         inline_fragment_reader_selections,
         0,

@@ -17,6 +17,7 @@ use crate::{
 };
 
 pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
     refetched_paths: &RefetchedPathsMap,
@@ -30,6 +31,7 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
     let empty_selection_set = vec![];
 
     let (reader_ast, reader_imports) = generate_reader_ast(
+        db,
         schema,
         if was_selected_loadably {
             // TODO model this better

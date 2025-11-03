@@ -278,6 +278,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol + 'stati
 
                         if *was_ever_selected_loadably {
                             path_and_contents.push(generate_refetch_reader_artifact(
+                                db,
                                 schema,
                                 client_scalar_selectable,
                                 &traversal_state.refetch_paths,
@@ -418,6 +419,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol + 'stati
                     }
                     ClientFieldVariant::ImperativelyLoadedField(s) => {
                         path_and_contents.push(generate_refetch_reader_artifact(
+                            db,
                             schema,
                             client_scalar_selectable,
                             &traversal_state.refetch_paths,
