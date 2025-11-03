@@ -88,7 +88,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
     let primary_field_name_selection_parts = path.map(|x| x.intern().into()).collect::<Vec<_>>();
 
     let (parent_object_entity_name, mutation_subfield_name) =
-        schema.parse_mutation_subfield_id(field, parent_object_entity_name)?;
+        parse_mutation_subfield_id(schema, field, parent_object_entity_name)?;
 
     // TODO do not use mutation naming here
     let mutation_field = schema
@@ -302,40 +302,40 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 
         Ok(())
     }
+}
 
-    /// Here, we are turning "pet" (the field_arg) to the ServerFieldId
-    /// of that specific field
-    fn parse_mutation_subfield_id(
-        &self,
-        field_arg: &str,
-        mutation_object_entity_name: ServerObjectEntityName,
-    ) -> ProcessTypeDefinitionResult<
-        (ServerObjectEntityName, ServerObjectSelectableName),
-        TNetworkProtocol,
-    > {
-        let parent_entity_name_and_mutation_subfield_name = self
-            .server_entity_data
-            .get(&mutation_object_entity_name)
-            .expect(
-                "Expected mutation_object_entity_name to exist \
+/// Here, we are turning "pet" (the field_arg) to the ServerFieldId
+/// of that specific field
+fn parse_mutation_subfield_id<TNetworkProtocol: NetworkProtocol + 'static>(
+    schema: &Schema<TNetworkProtocol>,
+    field_arg: &str,
+    mutation_object_entity_name: ServerObjectEntityName,
+) -> ProcessTypeDefinitionResult<
+    (ServerObjectEntityName, ServerObjectSelectableName),
+    TNetworkProtocol,
+> {
+    let parent_entity_name_and_mutation_subfield_name = schema
+        .server_entity_data
+        .get(&mutation_object_entity_name)
+        .expect(
+            "Expected mutation_object_entity_name to exist \
                 in server_object_entity_available_selectables",
-            )
-            .selectables
-            .iter()
-            .find_map(|(name, field_id)| {
-                if let DefinitionLocation::Server(SelectionType::Object(server_field_id)) = field_id
-                    && name.lookup() == field_arg
-                {
-                    return Some(server_field_id);
-                }
-                None
-            })
-            .ok_or_else(|| CreateAdditionalFieldsError::InvalidField {
-                field_arg: field_arg.to_string(),
-            })?;
+        )
+        .selectables
+        .iter()
+        .find_map(|(name, field_id)| {
+            if let DefinitionLocation::Server(SelectionType::Object(server_field_id)) = field_id
+                && name.lookup() == field_arg
+            {
+                return Some(server_field_id);
+            }
+            None
+        })
+        .ok_or_else(|| CreateAdditionalFieldsError::InvalidField {
+            field_arg: field_arg.to_string(),
+        })?;
 
-        Ok(*parent_entity_name_and_mutation_subfield_name)
-    }
+    Ok(*parent_entity_name_and_mutation_subfield_name)
 }
 
 fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol + 'static>(
