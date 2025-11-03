@@ -85,21 +85,22 @@ pub(crate) fn create_type_system_schema_with_server_selectables<
         for expose_as_field in expose_as_fields_to_insert {
             let (
                 unprocessed_client_scalar_selection_set,
-                client_scalar_selectable,
+                exposed_field_client_scalar_selectable,
                 payload_object_entity_name,
             ) = create_new_exposed_field(db, &expose_as_field, parent_object_entity_name)?;
 
-            let client_scalar_selectable_name = client_scalar_selectable.name.item;
-            let parent_object_entity_name = client_scalar_selectable.parent_object_entity_name;
+            let client_scalar_selectable_name = exposed_field_client_scalar_selectable.name.item;
+            let parent_object_entity_name =
+                exposed_field_client_scalar_selectable.parent_object_entity_name;
 
             unvalidated_isograph_schema
                 .client_scalar_selectables
                 .insert(
                     (
-                        client_scalar_selectable.parent_object_entity_name,
+                        exposed_field_client_scalar_selectable.parent_object_entity_name,
                         client_scalar_selectable_name,
                     ),
-                    client_scalar_selectable,
+                    exposed_field_client_scalar_selectable,
                 );
 
             unvalidated_isograph_schema.insert_client_field_on_object(
