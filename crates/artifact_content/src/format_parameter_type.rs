@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::ops::Deref;
 
 use common_lang_types::SelectableName;
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
@@ -6,7 +7,7 @@ use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 use isograph_lang_types::{DefinitionLocation, SelectionType, TypeAnnotation, UnionVariant};
 use isograph_schema::{
     IsographDatabase, NetworkProtocol, Schema, ServerEntityName, ServerSelectableId,
-    server_scalar_entity_javascript_name,
+    server_object_selectable_named, server_scalar_entity_javascript_name,
 };
 
 pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol + 'static>(
@@ -102,24 +103,48 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol + 'static>(
     server_selectable_id: ServerSelectableId,
     indentation_level: u8,
 ) -> String {
-    let (is_optional, selection_type) = match schema.server_selectable(server_selectable_id).expect(
-        "Expected selectable to exist. \
-        This is indicative of a bug in Isograph.",
-    ) {
-        SelectionType::Scalar(scalar_selectable) => (
-            is_nullable(&scalar_selectable.target_scalar_entity),
-            scalar_selectable
-                .target_scalar_entity
-                .clone()
-                .map(&mut SelectionType::Scalar),
-        ),
-        SelectionType::Object(object_selectable) => (
-            is_nullable(&object_selectable.target_object_entity),
-            object_selectable
-                .target_object_entity
-                .clone()
-                .map(&mut SelectionType::Object),
-        ),
+    let (is_optional, selection_type) = match server_selectable_id {
+        SelectionType::Scalar((parent_object_entity_name, server_scalar_selectable_name)) => {
+            let server_scalar_selectable = schema
+                .server_scalar_selectable(parent_object_entity_name, server_scalar_selectable_name)
+                .expect(
+                    "Expected selectable to exist. \
+                    This is indicative of a bug in Isograph.",
+                );
+            (
+                is_nullable(&server_scalar_selectable.target_scalar_entity),
+                server_scalar_selectable
+                    .target_scalar_entity
+                    .clone()
+                    .map(&mut SelectionType::Scalar),
+            )
+        }
+        SelectionType::Object((parent_object_entity_name, server_object_selectable_name)) => {
+            let memo_ref = server_object_selectable_named(
+                db,
+                parent_object_entity_name,
+                server_object_selectable_name.into(),
+            );
+            let server_object_selectable = memo_ref
+                .deref()
+                .as_ref()
+                .expect(
+                    "Expected validation to have succeeded. \
+                    This is indicative of a bug in Isograph.",
+                )
+                .as_ref()
+                .expect(
+                    "Expected selectable to exist. \
+                    This is indicative of a bug in Isograph.",
+                );
+            (
+                is_nullable(&server_object_selectable.target_object_entity),
+                server_object_selectable
+                    .target_object_entity
+                    .clone()
+                    .map(&mut SelectionType::Object),
+            )
+        }
     };
 
     format!(
