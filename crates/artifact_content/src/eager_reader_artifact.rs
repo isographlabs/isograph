@@ -159,7 +159,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol 
             .variable_definitions()
             .iter()
             .map(|x| &x.item);
-        let parameters_types = generate_parameters(db, schema, parameters);
+        let parameters_types = generate_parameters(db, parameters);
         let parameters_content =
             format!("export type {reader_parameters_type} = {parameters_types}\n");
         path_and_contents.push(ArtifactPathAndContent {

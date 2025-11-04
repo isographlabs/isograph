@@ -1194,7 +1194,6 @@ fn format_type_for_js_inner(
 
 pub(crate) fn generate_parameters<'a, TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
     argument_definitions: impl Iterator<Item = &'a VariableDefinition<ServerEntityName>>,
 ) -> String {
     let mut s = "{\n".to_string();
@@ -1205,7 +1204,7 @@ pub(crate) fn generate_parameters<'a, TNetworkProtocol: NetworkProtocol + 'stati
             "{indent}readonly {}{}: {},\n",
             arg.name.item,
             if is_optional { "?" } else { "" },
-            format_parameter_type(db, schema, arg.type_.clone(), 1)
+            format_parameter_type(db, arg.type_.clone(), 1)
         ));
     }
     s.push_str("};");
