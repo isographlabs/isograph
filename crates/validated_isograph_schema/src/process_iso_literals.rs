@@ -14,7 +14,6 @@ use isograph_schema::{
 use thiserror::Error;
 
 use crate::{
-    add_link_fields::add_link_fields,
     add_selection_sets::{AddSelectionSetsError, add_selection_sets_to_client_selectables},
     parse_iso_literal_in_source, process_iso_literals,
 };
@@ -30,8 +29,6 @@ pub(crate) fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol 
     let (unprocessed_client_types, unprocessed_entrypoints) =
         process_iso_literals(db, &mut unvalidated_isograph_schema, contains_iso)?;
     unprocessed_selection_sets.extend(unprocessed_client_types);
-
-    add_link_fields(db, &mut unvalidated_isograph_schema)?;
 
     unvalidated_isograph_schema.entrypoints =
         validate_entrypoints(db, &unvalidated_isograph_schema, unprocessed_entrypoints)?;

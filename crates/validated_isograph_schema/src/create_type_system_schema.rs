@@ -1,6 +1,6 @@
 use std::{collections::HashMap, ops::Deref};
 
-use common_lang_types::{ServerObjectEntityName, WithLocation};
+use common_lang_types::{SelectableName, ServerObjectEntityName, WithLocation};
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
     CreateAdditionalFieldsError, ExposeFieldToInsert, FieldToInsert,
@@ -11,7 +11,9 @@ use isograph_schema::{
 use pico_macros::legacy_memo;
 use thiserror::Error;
 
-use crate::set_and_validate_id_field::set_and_validate_id_field;
+use crate::{
+    add_link_fields::add_link_fields, set_and_validate_id_field::set_and_validate_id_field,
+};
 
 #[legacy_memo]
 #[expect(clippy::type_complexity)]
@@ -109,6 +111,8 @@ pub(crate) fn create_type_system_schema_with_server_selectables<
         }
     }
 
+    add_link_fields(db, &mut unvalidated_isograph_schema)?;
+
     Ok((unvalidated_isograph_schema, unprocessed_selection_set))
 }
 
@@ -199,6 +203,15 @@ pub enum CreateSchemaError<TNetworkProtocol: NetworkProtocol + 'static> {
 
     #[error("{0}")]
     FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),
+
+    #[error(
+        "The Isograph compiler attempted to create a field named \
+        `{selectable_name}` on type `{parent_object_entity_name}`, but a field with that name already exists."
+    )]
+    CompilerCreatedFieldExistsOnType {
+        selectable_name: SelectableName,
+        parent_object_entity_name: ServerObjectEntityName,
+    },
 }
 
 impl<TNetworkProtocol: NetworkProtocol + 'static>

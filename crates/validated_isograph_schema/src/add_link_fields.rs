@@ -8,12 +8,12 @@ use isograph_schema::{
     Schema, server_object_entities,
 };
 
-use crate::ProcessIsoLiteralsForSchemaError;
+use crate::create_type_system_schema::CreateSchemaError;
 
 pub fn add_link_fields<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
-) -> Result<(), ProcessIsoLiteralsForSchemaError> {
+) -> Result<(), CreateSchemaError<TNetworkProtocol>> {
     let mut selectables_to_process = vec![];
     let memo_ref = server_object_entities(db);
     for object in memo_ref
@@ -72,12 +72,10 @@ pub fn add_link_fields<TNetworkProtocol: NetworkProtocol + 'static>(
             )
             .is_some()
         {
-            return Err(
-                ProcessIsoLiteralsForSchemaError::CompilerCreatedFieldExistsOnType {
-                    selectable_name: field_name.into(),
-                    parent_object_entity_name: object_entity_name.item,
-                },
-            );
+            return Err(CreateSchemaError::CompilerCreatedFieldExistsOnType {
+                selectable_name: field_name.into(),
+                parent_object_entity_name: object_entity_name.item,
+            });
         }
     }
     Ok(())
