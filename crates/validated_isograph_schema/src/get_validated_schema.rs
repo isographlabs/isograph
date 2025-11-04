@@ -56,7 +56,7 @@ pub enum GetValidatedSchemaError<TNetworkProtocol: NetworkProtocol + 'static> {
     #[error("{error}")]
     ProcessIsoLiteralsForSchemaError {
         #[from]
-        error: ProcessIsoLiteralsForSchemaError,
+        error: ProcessIsoLiteralsForSchemaError<TNetworkProtocol>,
     },
 }
 

@@ -3,7 +3,7 @@ use std::ops::Deref;
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, ConstExportName,
     IsographDirectiveName, Location, ParentObjectEntityNameAndSelectableName,
-    RelativePathToSourceFile, SelectableName, ServerObjectEntityName, TextSource,
+    RelativePathToSourceFile, SelectableName, ServerObjectEntityName, Span, TextSource,
     UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
 };
 use intern::string_key::Intern;
@@ -16,10 +16,12 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    ClientObjectSelectable, ClientScalarSelectable, FieldMapItem, IsographDatabase,
-    NODE_FIELD_NAME, NetworkProtocol, Schema, ServerEntityName, ValidatedVariableDefinition,
-    WrappedSelectionMapSelection, defined_entity, fetchable_types,
+    ClientObjectSelectable, ClientScalarSelectable, FieldMapItem,
+    FieldToInsertToServerSelectableError, ID_FIELD_NAME, IsographDatabase, NODE_FIELD_NAME,
+    NetworkProtocol, Schema, ServerEntityName, ServerSelectableNamedError,
+    ValidatedVariableDefinition, WrappedSelectionMapSelection, defined_entity, fetchable_types,
     refetch_strategy::{RefetchStrategy, generate_refetch_field_strategy, id_selection},
+    server_selectable_named,
 };
 
 pub type UnprocessedSelection = WithSpan<UnvalidatedSelection>;
@@ -51,7 +53,7 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol + 'sta
     text_source: TextSource,
 ) -> Result<
     UnprocessedClientScalarSelectableSelectionSet,
-    WithLocation<ProcessClientFieldDeclarationError>,
+    WithLocation<ProcessClientFieldDeclarationError<TNetworkProtocol>>,
 > {
     let parent_type_id =
         defined_entity(db, client_field_declaration.item.parent_type.item.0.into())
@@ -93,7 +95,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol + 's
     text_source: TextSource,
 ) -> Result<
     UnprocessedClientObjectSelectableSelectionSet,
-    WithLocation<ProcessClientFieldDeclarationError>,
+    WithLocation<ProcessClientFieldDeclarationError<TNetworkProtocol>>,
 > {
     let parent_type_id = defined_entity(
         db,
@@ -180,9 +182,12 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol + 's
 fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_server_object_entity_name: ServerObjectEntityName,
     client_field_declaration: WithSpan<ClientFieldDeclaration>,
-) -> ProcessClientFieldDeclarationResult<UnprocessedClientScalarSelectableSelectionSet> {
+) -> ProcessClientFieldDeclarationResult<
+    UnprocessedClientScalarSelectableSelectionSet,
+    TNetworkProtocol,
+> {
     let query_id = *fetchable_types(db)
         .deref()
         .as_ref()
@@ -203,13 +208,13 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
 
     if schema
         .server_entity_data
-        .entry(parent_object_entity_name)
+        .entry(parent_server_object_entity_name)
         .or_default()
         .selectables
         .insert(
             client_scalar_selectable_name.0.into(),
             DefinitionLocation::Client(SelectionType::Scalar((
-                parent_object_entity_name,
+                parent_server_object_entity_name,
                 client_scalar_selectable_name.0,
             ))),
         )
@@ -218,7 +223,7 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
         // Did not insert, so this object already has a field with the same name :(
         return Err(WithSpan::new(
             ProcessClientFieldDeclarationError::ParentAlreadyHasField {
-                parent_object_entity_name,
+                parent_object_entity_name: parent_server_object_entity_name,
                 client_selectable_name: client_scalar_selectable_name.0.into(),
             },
             client_field_name_span,
@@ -228,7 +233,10 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
     let variant = get_client_variant(&client_field_declaration.item);
 
     schema.client_scalar_selectables.insert(
-        (parent_object_entity_name, client_scalar_selectable_name.0),
+        (
+            parent_server_object_entity_name,
+            client_scalar_selectable_name.0,
+        ),
         ClientScalarSelectable {
             description: client_field_declaration.item.description.map(|x| x.item),
             name: client_field_declaration
@@ -246,17 +254,17 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
                     validate_variable_definition(
                         db,
                         variable_definition,
-                        parent_object_entity_name,
+                        parent_server_object_entity_name,
                         client_scalar_selectable_name.0.into(),
                     )
                 })
                 .collect::<Result<_, _>>()?,
             type_and_field: ParentObjectEntityNameAndSelectableName {
-                parent_object_entity_name,
+                parent_object_entity_name: parent_server_object_entity_name,
                 selectable_name: client_scalar_selectable_name.0.into(),
             },
 
-            parent_object_entity_name,
+            parent_object_entity_name: parent_server_object_entity_name,
             refetch_strategy: None,
             network_protocol: std::marker::PhantomData,
         },
@@ -271,19 +279,33 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
             "Expected parsing to have succeeded. \
             This is indicative of a bug in Isograph.",
         )
-        .contains_key(&parent_object_entity_name);
+        .contains_key(&parent_server_object_entity_name);
 
     let refetch_strategy = if is_fetchable {
         Some(RefetchStrategy::RefetchFromRoot)
     } else {
-        let id_field = schema
-            .server_entity_data
-            .get(&parent_object_entity_name)
-            .expect(
-                "Expected parent_object_entity_name to exist in \
-                server_object_entity_available_selectables",
-            )
-            .id_field;
+        let id_field_memo_ref = server_selectable_named(
+            db,
+            parent_server_object_entity_name,
+            (*ID_FIELD_NAME).into(),
+        );
+
+        let id_field = id_field_memo_ref
+            // TODO don't call to_owned
+            .to_owned()
+            .map_err(|e| {
+                WithSpan::new(
+                    ProcessClientFieldDeclarationError::ServerSelectableNamedError(e),
+                    Span::todo_generated(),
+                )
+            })?
+            .transpose()
+            .map_err(|e| {
+                WithSpan::new(
+                    ProcessClientFieldDeclarationError::FieldToInsertToServerSelectableError(e),
+                    Span::todo_generated(),
+                )
+            })?;
 
         id_field.map(|_| {
             // Assume that if we have an id field, this implements Node
@@ -291,7 +313,7 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
                 vec![id_selection()],
                 query_id,
                 vec![
-                    WrappedSelectionMapSelection::InlineFragment(parent_object_entity_name),
+                    WrappedSelectionMapSelection::InlineFragment(parent_server_object_entity_name),
                     WrappedSelectionMapSelection::LinkedField {
                         server_object_selectable_name: *NODE_FIELD_NAME,
                         arguments: id_top_level_arguments(),
@@ -303,7 +325,7 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
     };
 
     Ok(UnprocessedClientScalarSelectableSelectionSet {
-        parent_object_entity_name,
+        parent_object_entity_name: parent_server_object_entity_name,
         client_scalar_selectable_name: *client_scalar_selectable_name,
         reader_selection_set: selections,
         refetch_strategy,
@@ -316,7 +338,10 @@ fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
     parent_object_entity_name: ServerObjectEntityName,
     to_object_entity_name: TypeAnnotation<ServerObjectEntityName>,
     client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
-) -> ProcessClientFieldDeclarationResult<UnprocessedClientObjectSelectableSelectionSet> {
+) -> ProcessClientFieldDeclarationResult<
+    UnprocessedClientObjectSelectableSelectionSet,
+    TNetworkProtocol,
+> {
     let query_id = *fetchable_types(db)
         .deref()
         .as_ref()
@@ -473,11 +498,11 @@ fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
     })
 }
 
-type ProcessClientFieldDeclarationResult<T> =
-    Result<T, WithSpan<ProcessClientFieldDeclarationError>>;
+type ProcessClientFieldDeclarationResult<T, TNetworkProtocol> =
+    Result<T, WithSpan<ProcessClientFieldDeclarationError<TNetworkProtocol>>>;
 
 #[derive(Error, Eq, PartialEq, Debug, Clone)]
-pub enum ProcessClientFieldDeclarationError {
+pub enum ProcessClientFieldDeclarationError<TNetworkProtocol: NetworkProtocol + 'static> {
     #[error("`{parent_object_entity_name}` is not a type that has been defined.")]
     ParentTypeNotDefined {
         parent_object_entity_name: ServerObjectEntityNameWrapper,
@@ -537,6 +562,12 @@ pub enum ProcessClientFieldDeclarationError {
         selectable_name: SelectableName,
         argument_type: UnvalidatedTypeName,
     },
+
+    #[error("{0}")]
+    ServerSelectableNamedError(ServerSelectableNamedError<TNetworkProtocol>),
+
+    #[error("{0}")]
+    FieldToInsertToServerSelectableError(FieldToInsertToServerSelectableError),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -596,7 +627,10 @@ pub fn validate_variable_definition<TNetworkProtocol: NetworkProtocol + 'static>
     variable_definition: WithSpan<VariableDefinition<UnvalidatedTypeName>>,
     parent_object_entity_name: ServerObjectEntityName,
     selectable_name: SelectableName,
-) -> ProcessClientFieldDeclarationResult<WithSpan<VariableDefinition<ServerEntityName>>> {
+) -> ProcessClientFieldDeclarationResult<
+    WithSpan<VariableDefinition<ServerEntityName>>,
+    TNetworkProtocol,
+> {
     let type_ = variable_definition
         .item
         .type_
