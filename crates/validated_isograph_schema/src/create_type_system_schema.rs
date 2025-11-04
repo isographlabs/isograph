@@ -1,7 +1,6 @@
 use std::{collections::HashMap, ops::Deref};
 
 use common_lang_types::{ServerObjectEntityName, WithLocation};
-use isograph_config::CompilerConfigOptions;
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
     CreateAdditionalFieldsError, ExposeFieldToInsert, FieldToInsert,
@@ -67,12 +66,7 @@ pub(crate) fn create_type_system_schema_with_server_selectables<
 
     let mut unvalidated_isograph_schema = Schema::new();
 
-    process_field_queue(
-        db,
-        &mut unvalidated_isograph_schema,
-        field_queue,
-        &db.get_isograph_config().options,
-    )?;
+    process_field_queue(db, &mut unvalidated_isograph_schema, field_queue)?;
 
     // Step one: we can create client selectables. However, we must create all
     // client selectables before being able to create their selection sets, because
@@ -130,7 +124,6 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
     field_queue: HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
-    options: &CompilerConfigOptions,
 ) -> Result<(), CreateSchemaError<TNetworkProtocol>> {
     for selectable in process_field_queue_inner(db, field_queue) {
         match selectable? {
@@ -147,10 +140,10 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
                 // TODO do not do this here, this is a GraphQL-ism
                 if server_scalar_selectable_name == *ID_FIELD_NAME {
                     set_and_validate_id_field::<TNetworkProtocol>(
+                        db,
                         id_field,
                         server_scalar_selectable_name,
                         parent_object_entity_name,
-                        options,
                         inner_non_null_named_type.as_ref(),
                     )?;
                 }
