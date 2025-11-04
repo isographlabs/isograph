@@ -8,7 +8,8 @@ use isograph_lang_parser::{
 use isograph_lang_types::{EntrypointDeclaration, SelectionType};
 use isograph_schema::{
     IsoLiteralsSource, IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError,
-    Schema, UnprocessedSelectionSet,
+    Schema, UnprocessedSelectionSet, process_client_field_declaration,
+    process_client_pointer_declaration,
 };
 use lazy_static::lazy_static;
 use pico::SourceId;
@@ -145,8 +146,9 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol + 'static>(
         for (extraction_result, text_source) in iso_literals {
             match extraction_result {
                 IsoLiteralExtractionResult::ClientFieldDeclaration(client_field_declaration) => {
-                    match schema.process_client_field_declaration(
+                    match process_client_field_declaration(
                         db,
+                        schema,
                         client_field_declaration,
                         text_source,
                     ) {
@@ -160,8 +162,9 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol + 'static>(
                 IsoLiteralExtractionResult::ClientPointerDeclaration(
                     client_pointer_declaration,
                 ) => {
-                    match schema.process_client_pointer_declaration(
+                    match process_client_pointer_declaration(
                         db,
+                        schema,
                         client_pointer_declaration,
                         text_source,
                     ) {
