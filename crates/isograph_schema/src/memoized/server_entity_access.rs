@@ -219,6 +219,7 @@ pub fn server_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
     }
 }
 
+// TODO define this in terms of server_entities_vec??
 #[legacy_memo]
 pub fn defined_entities<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
