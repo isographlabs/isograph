@@ -17,13 +17,14 @@ use crate::{
 
 #[legacy_memo]
 #[expect(clippy::type_complexity)]
-pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn create_type_system_schema_with_server_selectables<
+    TNetworkProtocol: NetworkProtocol + 'static,
+>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
     (
-        // TODO combine these into one hashmap?
         HashMap<ServerObjectEntityName, Vec<ExposeFieldToInsert>>,
-        HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
+        Schema<TNetworkProtocol>,
     ),
     CreateSchemaError<TNetworkProtocol>,
 > {
@@ -48,7 +49,11 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
         );
     }
 
-    Ok((expose_as_field_queue, field_queue))
+    let mut unvalidated_isograph_schema = Schema::new();
+
+    process_field_queue(db, &mut unvalidated_isograph_schema, field_queue)?;
+
+    Ok((expose_as_field_queue, unvalidated_isograph_schema))
 }
 
 /// Create a schema from the type system document, i.e. avoid parsing any
@@ -56,7 +61,7 @@ pub fn create_type_system_schema<TNetworkProtocol: NetworkProtocol + 'static>(
 ///
 /// This is sufficient for some queries, like answering "Where is a server field defined."
 #[legacy_memo]
-pub(crate) fn create_type_system_schema_with_server_selectables<
+pub(crate) fn create_type_system_schema_with_type_system_client_selectables<
     TNetworkProtocol: NetworkProtocol + 'static,
 >(
     db: &IsographDatabase<TNetworkProtocol>,
@@ -64,17 +69,9 @@ pub(crate) fn create_type_system_schema_with_server_selectables<
     (Schema<TNetworkProtocol>, Vec<UnprocessedSelectionSet>),
     CreateSchemaError<TNetworkProtocol>,
 > {
-    let (expose_as_field_queue, field_queue) = create_type_system_schema(db).to_owned()?;
+    let (expose_as_field_queue, mut unvalidated_isograph_schema) =
+        create_type_system_schema_with_server_selectables(db).to_owned()?;
 
-    let mut unvalidated_isograph_schema = Schema::new();
-
-    process_field_queue(db, &mut unvalidated_isograph_schema, field_queue)?;
-
-    // Step one: we can create client selectables. However, we must create all
-    // client selectables before being able to create their selection sets, because
-    // selection sets refer to client selectables. We hold onto these selection sets
-    // (both reader selection sets and refetch selection sets) in the unprocess_selection_sets
-    // vec, then process it later.
     let mut unprocessed_selection_set = vec![];
 
     for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
