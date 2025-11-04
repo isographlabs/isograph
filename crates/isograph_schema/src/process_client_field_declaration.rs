@@ -188,23 +188,18 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
     UnprocessedClientScalarSelectableSelectionSet,
     TNetworkProtocol,
 > {
-    let query_id = *fetchable_types(db)
-        .deref()
-        .as_ref()
-        .expect(
-            "Expected parsing to have succeeded. \
-            This is indicative of a bug in Isograph.",
-        )
-        .iter()
-        .find(|(_, root_operation_name)| root_operation_name.0 == "query")
-        .expect("Expected query to be found")
-        .0;
-    let client_field_name_span = client_field_declaration
+    let name_span = client_field_declaration
         .item
         .client_field_name
         .location
         .span;
     let client_scalar_selectable_name = client_field_declaration.item.client_field_name.item;
+
+    let (result, client_scalar_selectable) = add_client_field_to_object_inner(
+        db,
+        parent_server_object_entity_name,
+        client_field_declaration,
+    )?;
 
     if schema
         .server_entity_data
@@ -226,49 +221,79 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
                 parent_object_entity_name: parent_server_object_entity_name,
                 client_selectable_name: client_scalar_selectable_name.0.into(),
             },
-            client_field_name_span,
+            name_span,
         ));
     }
-
-    let variant = get_client_variant(&client_field_declaration.item);
 
     schema.client_scalar_selectables.insert(
         (
             parent_server_object_entity_name,
             client_scalar_selectable_name.0,
         ),
-        ClientScalarSelectable {
-            description: client_field_declaration.item.description.map(|x| x.item),
-            name: client_field_declaration
-                .item
-                .client_field_name
-                .map(|client_scalar_selectable_name| *client_scalar_selectable_name)
-                .into_with_location(),
-            reader_selection_set: vec![],
-            variant,
-            variable_definitions: client_field_declaration
-                .item
-                .variable_definitions
-                .into_iter()
-                .map(|variable_definition| {
-                    validate_variable_definition(
-                        db,
-                        variable_definition,
-                        parent_server_object_entity_name,
-                        client_scalar_selectable_name.0.into(),
-                    )
-                })
-                .collect::<Result<_, _>>()?,
-            type_and_field: ParentObjectEntityNameAndSelectableName {
-                parent_object_entity_name: parent_server_object_entity_name,
-                selectable_name: client_scalar_selectable_name.0.into(),
-            },
-
-            parent_object_entity_name: parent_server_object_entity_name,
-            refetch_strategy: None,
-            network_protocol: std::marker::PhantomData,
-        },
+        client_scalar_selectable,
     );
+
+    Ok(result)
+}
+
+fn add_client_field_to_object_inner<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    parent_server_object_entity_name: ServerObjectEntityName,
+    client_field_declaration: WithSpan<ClientFieldDeclaration>,
+) -> ProcessClientFieldDeclarationResult<
+    (
+        UnprocessedClientScalarSelectableSelectionSet,
+        ClientScalarSelectable<TNetworkProtocol>,
+    ),
+    TNetworkProtocol,
+> {
+    let query_id = *fetchable_types(db)
+        .deref()
+        .as_ref()
+        .expect(
+            "Expected parsing to have succeeded. \
+            This is indicative of a bug in Isograph.",
+        )
+        .iter()
+        .find(|(_, root_operation_name)| root_operation_name.0 == "query")
+        .expect("Expected query to be found")
+        .0;
+
+    let client_scalar_selectable_name = client_field_declaration.item.client_field_name.item;
+
+    let variant = get_client_variant(&client_field_declaration.item);
+
+    let selectable = ClientScalarSelectable {
+        description: client_field_declaration.item.description.map(|x| x.item),
+        name: client_field_declaration
+            .item
+            .client_field_name
+            .map(|client_scalar_selectable_name| *client_scalar_selectable_name)
+            .into_with_location(),
+        reader_selection_set: vec![],
+        variant,
+        variable_definitions: client_field_declaration
+            .item
+            .variable_definitions
+            .into_iter()
+            .map(|variable_definition| {
+                validate_variable_definition(
+                    db,
+                    variable_definition,
+                    parent_server_object_entity_name,
+                    client_scalar_selectable_name.0.into(),
+                )
+            })
+            .collect::<Result<_, _>>()?,
+        type_and_field: ParentObjectEntityNameAndSelectableName {
+            parent_object_entity_name: parent_server_object_entity_name,
+            selectable_name: client_scalar_selectable_name.0.into(),
+        },
+
+        parent_object_entity_name: parent_server_object_entity_name,
+        refetch_strategy: None,
+        network_protocol: std::marker::PhantomData,
+    };
 
     let selections = client_field_declaration.item.selection_set;
 
@@ -324,12 +349,15 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
         })
     };
 
-    Ok(UnprocessedClientScalarSelectableSelectionSet {
-        parent_object_entity_name: parent_server_object_entity_name,
-        client_scalar_selectable_name: *client_scalar_selectable_name,
-        reader_selection_set: selections,
-        refetch_strategy,
-    })
+    Ok((
+        UnprocessedClientScalarSelectableSelectionSet {
+            parent_object_entity_name: parent_server_object_entity_name,
+            client_scalar_selectable_name: *client_scalar_selectable_name,
+            reader_selection_set: selections,
+            refetch_strategy,
+        },
+        selectable,
+    ))
 }
 
 fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
