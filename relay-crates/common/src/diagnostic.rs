@@ -242,7 +242,7 @@ impl Diagnostic {
                 )
                 .unwrap();
             }
-        };
+        }
         result
     }
 }

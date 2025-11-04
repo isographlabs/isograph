@@ -207,7 +207,7 @@ fn bucket_capacity(a: usize) -> usize {
 fn index(i: u32) -> (usize, usize) {
     memory_consistency_assert!(i >= MIN_SIZE);
     memory_consistency_assert!(i - MIN_SIZE <= MAX_INDEX);
-    memory_consistency_assert!(i as u64 <= std::usize::MAX as u64);
+    memory_consistency_assert!(u64::from(i) <= std::usize::MAX as u64);
     let a = i.leading_zeros() as usize;
     memory_consistency_assert!(a < NUM_SIZES, "{} < {}", a, NUM_SIZES);
     let b = (i & ((bucket_capacity(0) as u32 - 1) >> a)) as usize;
@@ -446,7 +446,7 @@ impl<'a, T> Drop for AtomicArena<'a, T> {
                 Vec::from_raw_parts(b_ptr, sz as usize, cap as usize)
             };
             drop(iv);
-            bucket.store(ptr::null_mut(), Ordering::Relaxed)
+            bucket.store(ptr::null_mut(), Ordering::Relaxed);
         }
     }
 }

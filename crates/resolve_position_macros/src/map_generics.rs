@@ -82,8 +82,7 @@ pub(crate) fn validate_and_map_generics(
     // Validate count matches
     let provided_count = self_type_generics
         .as_ref()
-        .map(|generics| generics.args.len())
-        .unwrap_or(0);
+        .map_or(0, |generics| generics.args.len());
     let expected_count = struct_generics.len();
 
     if provided_count != expected_count {

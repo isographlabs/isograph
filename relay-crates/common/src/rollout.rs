@@ -23,8 +23,8 @@ impl Rollout {
     pub fn check(&self, key: impl AsRef<[u8]>) -> bool {
         if let Some(percentage) = self.0 {
             let hash = Md5::digest(key.as_ref());
-            let hash: u16 = ((hash[1] as u16) << 8) | (hash[0] as u16);
-            (hash % 100) < (percentage as u16)
+            let hash: u16 = (u16::from(hash[1]) << 8) | u16::from(hash[0]);
+            (hash % 100) < u16::from(percentage)
         } else {
             true
         }

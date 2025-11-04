@@ -30,7 +30,7 @@ fn basic_gc() {
     memoized_b(&db);
     assert_eq!(B_COUNTER.load(Ordering::SeqCst), 1);
 
-    // Run GC. memoized_b is retained, but not memoized_a.
+    // Run GC. memoized_b is retained, but not memoized_a. This test only has capacity of 1.
     db.run_garbage_collection();
 
     memoized_a(&db);

@@ -157,7 +157,7 @@ pub struct AsInterned<Id>(pub Id);
 
 impl<Id: InternId> Hash for AsInterned<Id> {
     fn hash<H: Hasher>(&self, h: &mut H) {
-        self.0.get().hash(h)
+        self.0.get().hash(h);
     }
 }
 

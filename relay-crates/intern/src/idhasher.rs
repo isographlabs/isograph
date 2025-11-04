@@ -34,7 +34,7 @@ impl<T: IsEnabled> Hasher for IdHasher<T> {
 
     fn write_u32(&mut self, n: u32) {
         debug_assert_eq!(self.0, 0); // Allow one write per Hasher instance.
-        self.0 = (n as u64).wrapping_mul(0x9e3779b97f4a7c15);
+        self.0 = u64::from(n).wrapping_mul(0x9e37_79b9_7f4a_7c15);
     }
 
     fn finish(&self) -> u64 {
