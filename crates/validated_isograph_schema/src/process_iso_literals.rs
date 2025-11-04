@@ -11,6 +11,7 @@ use isograph_schema::{
     IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError, Schema,
     UnprocessedSelectionSet, ValidateEntrypointDeclarationError, validate_entrypoints,
 };
+use pico_macros::legacy_memo;
 use thiserror::Error;
 
 use crate::{
@@ -23,7 +24,7 @@ pub(crate) fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol 
     mut unvalidated_isograph_schema: Schema<TNetworkProtocol>,
     mut unprocessed_selection_sets: Vec<UnprocessedSelectionSet>,
 ) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), ProcessIsoLiteralsForSchemaError> {
-    let contains_iso = parse_iso_literals(db)?;
+    let contains_iso = parse_iso_literals(db).to_owned()?;
     let contains_iso_stats = contains_iso.stats();
 
     let (unprocessed_client_types, unprocessed_entrypoints) =
@@ -134,6 +135,7 @@ impl From<Vec<WithLocation<AddSelectionSetsError>>> for ProcessIsoLiteralsForSch
     }
 }
 
+#[legacy_memo]
 fn parse_iso_literals<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<ParsedIsoLiteralsMap, Vec<WithLocation<IsographLiteralParseError>>> {
