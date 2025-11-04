@@ -24,6 +24,7 @@ pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol + 'static>(
         create_type_system_schema_with_type_system_client_selectables::<TNetworkProtocol>(db)
             .deref()
             .clone()?;
+
     let (isograph_schema, stats) = process_iso_literals_for_schema(
         db,
         unvalidated_isograph_schema,
