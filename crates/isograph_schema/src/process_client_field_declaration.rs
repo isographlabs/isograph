@@ -58,7 +58,7 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol + 'sta
             .to_owned()
             .expect(
                 "Expected parsing to have succeeded. \
-                    This is indicative of a bug in Isograph.",
+                This is indicative of a bug in Isograph.",
             )
             .ok_or(WithLocation::new(
                 ProcessClientFieldDeclarationError::ParentTypeNotDefined {
@@ -68,9 +68,10 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol + 'sta
             ))?;
 
     let unprocess_client_field_items = match parent_type_id {
-        ServerEntityName::Object(object_entity_name) => schema
-            .add_client_field_to_object(db, object_entity_name, client_field_declaration)
-            .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?,
+        ServerEntityName::Object(object_entity_name) => {
+            add_client_field_to_object(db, schema, object_entity_name, client_field_declaration)
+                .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?
+        }
         ServerEntityName::Scalar(scalar_entity_name) => {
             return Err(WithLocation::new(
                 ProcessClientFieldDeclarationError::InvalidParentType {
@@ -101,7 +102,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol + 's
     .to_owned()
     .expect(
         "Expected parsing to have succeeded. \
-            This is indicative of a bug in Isograph.",
+        This is indicative of a bug in Isograph.",
     )
     .ok_or(WithLocation::new(
         ProcessClientFieldDeclarationError::ParentTypeNotDefined {
@@ -134,20 +135,20 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol + 's
 
     let unprocessed_client_object_selection_set = match parent_type_id {
         ServerEntityName::Object(object_entity_name) => match target_type_id {
-            ServerEntityName::Object(_to_object_entity_name) => schema
-                .add_client_pointer_to_object(
-                    db,
-                    object_entity_name,
-                    TypeAnnotation::from_graphql_type_annotation(
-                        client_pointer_declaration
-                            .item
-                            .target_type
-                            .clone()
-                            .map(|x| x.0),
-                    ),
-                    client_pointer_declaration,
-                )
-                .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?,
+            ServerEntityName::Object(_to_object_entity_name) => add_client_pointer_to_object(
+                db,
+                schema,
+                object_entity_name,
+                TypeAnnotation::from_graphql_type_annotation(
+                    client_pointer_declaration
+                        .item
+                        .target_type
+                        .clone()
+                        .map(|x| x.0),
+                ),
+                client_pointer_declaration,
+            )
+            .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?,
             ServerEntityName::Scalar(scalar_entity_name) => {
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::ClientPointerInvalidTargetType {
@@ -176,306 +177,300 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol + 's
     Ok(unprocessed_client_object_selection_set)
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
-    fn add_client_field_to_object(
-        &mut self,
-        db: &IsographDatabase<TNetworkProtocol>,
-        parent_object_entity_name: ServerObjectEntityName,
-        client_field_declaration: WithSpan<ClientFieldDeclaration>,
-    ) -> ProcessClientFieldDeclarationResult<UnprocessedClientScalarSelectableSelectionSet> {
-        let query_id = *fetchable_types(db)
-            .deref()
-            .as_ref()
-            .expect(
-                "Expected parsing to have succeeded. \
-                This is indicative of a bug in Isograph.",
-            )
-            .iter()
-            .find(|(_, root_operation_name)| root_operation_name.0 == "query")
-            .expect("Expected query to be found")
-            .0;
-        let client_field_name_span = client_field_declaration
-            .item
-            .client_field_name
-            .location
-            .span;
-        let client_scalar_selectable_name = client_field_declaration.item.client_field_name.item;
+fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    schema: &mut Schema<TNetworkProtocol>,
+    parent_object_entity_name: ServerObjectEntityName,
+    client_field_declaration: WithSpan<ClientFieldDeclaration>,
+) -> ProcessClientFieldDeclarationResult<UnprocessedClientScalarSelectableSelectionSet> {
+    let query_id = *fetchable_types(db)
+        .deref()
+        .as_ref()
+        .expect(
+            "Expected parsing to have succeeded. \
+            This is indicative of a bug in Isograph.",
+        )
+        .iter()
+        .find(|(_, root_operation_name)| root_operation_name.0 == "query")
+        .expect("Expected query to be found")
+        .0;
+    let client_field_name_span = client_field_declaration
+        .item
+        .client_field_name
+        .location
+        .span;
+    let client_scalar_selectable_name = client_field_declaration.item.client_field_name.item;
 
-        if self
-            .server_entity_data
-            .entry(parent_object_entity_name)
-            .or_default()
-            .selectables
-            .insert(
-                client_scalar_selectable_name.0.into(),
-                DefinitionLocation::Client(SelectionType::Scalar((
-                    parent_object_entity_name,
-                    client_scalar_selectable_name.0,
-                ))),
-            )
-            .is_some()
-        {
-            // Did not insert, so this object already has a field with the same name :(
-            return Err(WithSpan::new(
-                ProcessClientFieldDeclarationError::ParentAlreadyHasField {
-                    parent_object_entity_name,
-                    client_selectable_name: client_scalar_selectable_name.0.into(),
-                },
-                client_field_name_span,
-            ));
-        }
-
-        let variant = get_client_variant(&client_field_declaration.item);
-
-        self.client_scalar_selectables.insert(
-            (parent_object_entity_name, client_scalar_selectable_name.0),
-            ClientScalarSelectable {
-                description: client_field_declaration.item.description.map(|x| x.item),
-                name: client_field_declaration
-                    .item
-                    .client_field_name
-                    .map(|client_scalar_selectable_name| *client_scalar_selectable_name)
-                    .into_with_location(),
-                reader_selection_set: vec![],
-                variant,
-                variable_definitions: client_field_declaration
-                    .item
-                    .variable_definitions
-                    .into_iter()
-                    .map(|variable_definition| {
-                        validate_variable_definition(
-                            db,
-                            variable_definition,
-                            parent_object_entity_name,
-                            client_scalar_selectable_name.0.into(),
-                        )
-                    })
-                    .collect::<Result<_, _>>()?,
-                type_and_field: ParentObjectEntityNameAndSelectableName {
-                    parent_object_entity_name,
-                    selectable_name: client_scalar_selectable_name.0.into(),
-                },
-
+    if schema
+        .server_entity_data
+        .entry(parent_object_entity_name)
+        .or_default()
+        .selectables
+        .insert(
+            client_scalar_selectable_name.0.into(),
+            DefinitionLocation::Client(SelectionType::Scalar((
                 parent_object_entity_name,
-                refetch_strategy: None,
-                network_protocol: std::marker::PhantomData,
+                client_scalar_selectable_name.0,
+            ))),
+        )
+        .is_some()
+    {
+        // Did not insert, so this object already has a field with the same name :(
+        return Err(WithSpan::new(
+            ProcessClientFieldDeclarationError::ParentAlreadyHasField {
+                parent_object_entity_name,
+                client_selectable_name: client_scalar_selectable_name.0.into(),
             },
-        );
+            client_field_name_span,
+        ));
+    }
 
-        let selections = client_field_declaration.item.selection_set;
+    let variant = get_client_variant(&client_field_declaration.item);
 
-        let is_fetchable = fetchable_types(db)
-            .deref()
-            .as_ref()
+    schema.client_scalar_selectables.insert(
+        (parent_object_entity_name, client_scalar_selectable_name.0),
+        ClientScalarSelectable {
+            description: client_field_declaration.item.description.map(|x| x.item),
+            name: client_field_declaration
+                .item
+                .client_field_name
+                .map(|client_scalar_selectable_name| *client_scalar_selectable_name)
+                .into_with_location(),
+            reader_selection_set: vec![],
+            variant,
+            variable_definitions: client_field_declaration
+                .item
+                .variable_definitions
+                .into_iter()
+                .map(|variable_definition| {
+                    validate_variable_definition(
+                        db,
+                        variable_definition,
+                        parent_object_entity_name,
+                        client_scalar_selectable_name.0.into(),
+                    )
+                })
+                .collect::<Result<_, _>>()?,
+            type_and_field: ParentObjectEntityNameAndSelectableName {
+                parent_object_entity_name,
+                selectable_name: client_scalar_selectable_name.0.into(),
+            },
+
+            parent_object_entity_name,
+            refetch_strategy: None,
+            network_protocol: std::marker::PhantomData,
+        },
+    );
+
+    let selections = client_field_declaration.item.selection_set;
+
+    let is_fetchable = fetchable_types(db)
+        .deref()
+        .as_ref()
+        .expect(
+            "Expected parsing to have succeeded. \
+            This is indicative of a bug in Isograph.",
+        )
+        .contains_key(&parent_object_entity_name);
+
+    let refetch_strategy = if is_fetchable {
+        Some(RefetchStrategy::RefetchFromRoot)
+    } else {
+        let id_field = schema
+            .server_entity_data
+            .get(&parent_object_entity_name)
             .expect(
-                "Expected parsing to have succeeded. \
-                This is indicative of a bug in Isograph.",
-            )
-            .contains_key(&parent_object_entity_name);
-
-        let refetch_strategy = if is_fetchable {
-            Some(RefetchStrategy::RefetchFromRoot)
-        } else {
-            let id_field = self
-                .server_entity_data
-                .get(&parent_object_entity_name)
-                .expect(
-                    "Expected parent_object_entity_name to exist in \
+                "Expected parent_object_entity_name to exist in \
                 server_object_entity_available_selectables",
-                )
-                .id_field;
-
-            id_field.map(|_| {
-                // Assume that if we have an id field, this implements Node
-                RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
-                    vec![id_selection()],
-                    query_id,
-                    vec![
-                        WrappedSelectionMapSelection::InlineFragment(parent_object_entity_name),
-                        WrappedSelectionMapSelection::LinkedField {
-                            server_object_selectable_name: *NODE_FIELD_NAME,
-                            arguments: id_top_level_arguments(),
-                            concrete_type: None,
-                        },
-                    ],
-                ))
-            })
-        };
-
-        Ok(UnprocessedClientScalarSelectableSelectionSet {
-            parent_object_entity_name,
-            client_scalar_selectable_name: *client_scalar_selectable_name,
-            reader_selection_set: selections,
-            refetch_strategy,
-        })
-    }
-
-    fn add_client_pointer_to_object(
-        &mut self,
-        db: &IsographDatabase<TNetworkProtocol>,
-        parent_object_entity_name: ServerObjectEntityName,
-        to_object_entity_name: TypeAnnotation<ServerObjectEntityName>,
-        client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
-    ) -> ProcessClientFieldDeclarationResult<UnprocessedClientObjectSelectableSelectionSet> {
-        let query_id = *fetchable_types(db)
-            .deref()
-            .as_ref()
-            .expect(
-                "Expected parsing to have succeeded. \
-                        This is indicative of a bug in Isograph.",
             )
-            .iter()
-            .find(|(_, root_operation_name)| root_operation_name.0 == "query")
-            .expect("Expected query to be found")
-            .0;
-        let client_pointer_pointer_name_ws = client_pointer_declaration.item.client_pointer_name;
-        let client_pointer_name = client_pointer_pointer_name_ws.item;
-        let client_pointer_name_span = client_pointer_pointer_name_ws.location.span;
+            .id_field;
 
-        let client_object_selectable_name =
-            client_pointer_declaration.item.client_pointer_name.item;
-
-        if let Some(directive) = client_pointer_declaration
-            .item
-            .directives
-            .into_iter()
-            .next()
-        {
-            return Err(directive.map(|directive| {
-                ProcessClientFieldDeclarationError::DirectiveNotSupportedOnClientPointer {
-                    directive_name: directive.name.item,
-                }
-            }));
-        }
-
-        let unprocessed_fields = client_pointer_declaration.item.selection_set;
-
-        let is_fetchable = fetchable_types(db)
-            .deref()
-            .as_ref()
-            .expect(
-                "Expected parsing to have succeeded. \
-                This is indicative of a bug in Isograph.",
-            )
-            .contains_key(to_object_entity_name.inner());
-
-        // TODO extract this into a helper function, probably on TNetworkProtocol
-        let refetch_strategy = if is_fetchable {
-            RefetchStrategy::RefetchFromRoot
-        } else {
-            let id_field = self
-                .server_entity_data
-                .get(to_object_entity_name.inner())
-                .expect(
-                    "Expected parent_object_entity_name \
-                to exist in server_object_entity_available_selectables",
-                )
-                .id_field;
-
-            match id_field {
-                None => Err(WithSpan::new(
-                    ProcessClientFieldDeclarationError::ClientPointerTargetTypeHasNoId {
-                        target_object_entity_name: *client_pointer_declaration
-                            .item
-                            .target_type
-                            .inner(),
+        id_field.map(|_| {
+            // Assume that if we have an id field, this implements Node
+            RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
+                vec![id_selection()],
+                query_id,
+                vec![
+                    WrappedSelectionMapSelection::InlineFragment(parent_object_entity_name),
+                    WrappedSelectionMapSelection::LinkedField {
+                        server_object_selectable_name: *NODE_FIELD_NAME,
+                        arguments: id_top_level_arguments(),
+                        concrete_type: None,
                     },
-                    client_pointer_declaration.item.target_type.span(),
-                )),
-                Some(_) => {
-                    // Assume that if we have an id field, this implements Node
-                    Ok(RefetchStrategy::UseRefetchField(
-                        generate_refetch_field_strategy(
-                            vec![],
-                            query_id,
-                            vec![
-                                WrappedSelectionMapSelection::InlineFragment(
-                                    *to_object_entity_name.inner(),
-                                ),
-                                WrappedSelectionMapSelection::LinkedField {
-                                    server_object_selectable_name: *NODE_FIELD_NAME,
-                                    arguments: id_top_level_arguments(),
-                                    concrete_type: None,
-                                },
-                            ],
-                        ),
-                    ))
-                }
-            }?
-        };
-
-        self.client_object_selectables.insert(
-            (parent_object_entity_name, *client_object_selectable_name),
-            ClientObjectSelectable {
-                description: client_pointer_declaration.item.description.map(|x| x.item),
-                name: client_pointer_declaration
-                    .item
-                    .client_pointer_name
-                    .map(|client_object_selectable_name| *client_object_selectable_name)
-                    .into_with_location(),
-                reader_selection_set: vec![],
-
-                variable_definitions: client_pointer_declaration
-                    .item
-                    .variable_definitions
-                    .into_iter()
-                    .map(|variable_definition| {
-                        validate_variable_definition(
-                            db,
-                            variable_definition,
-                            parent_object_entity_name,
-                            client_pointer_name.0.into(),
-                        )
-                    })
-                    .collect::<Result<_, _>>()?,
-                type_and_field: ParentObjectEntityNameAndSelectableName {
-                    parent_object_entity_name,
-                    selectable_name: client_object_selectable_name.0.into(),
-                },
-
-                parent_object_entity_name,
-                refetch_strategy,
-                target_object_entity_name: to_object_entity_name,
-                network_protocol: std::marker::PhantomData,
-
-                info: UserWrittenClientPointerInfo {
-                    const_export_name: client_pointer_declaration.item.const_export_name,
-                    file_path: client_pointer_declaration.item.definition_path,
-                },
-            },
-        );
-
-        if self
-            .server_entity_data
-            .entry(parent_object_entity_name)
-            .or_default()
-            .selectables
-            .insert(
-                client_pointer_name.0.into(),
-                DefinitionLocation::Client(SelectionType::Object((
-                    parent_object_entity_name,
-                    *client_object_selectable_name,
-                ))),
-            )
-            .is_some()
-        {
-            // Did not insert, so this object already has a field with the same name :(
-            return Err(WithSpan::new(
-                ProcessClientFieldDeclarationError::ParentAlreadyHasField {
-                    parent_object_entity_name,
-                    client_selectable_name: client_pointer_name.0.into(),
-                },
-                client_pointer_name_span,
-            ));
-        }
-
-        Ok(UnprocessedClientObjectSelectableSelectionSet {
-            client_object_selectable_name: *client_pointer_name,
-            parent_object_entity_name,
-            reader_selection_set: unprocessed_fields,
-            refetch_selection_set: vec![id_selection()],
+                ],
+            ))
         })
+    };
+
+    Ok(UnprocessedClientScalarSelectableSelectionSet {
+        parent_object_entity_name,
+        client_scalar_selectable_name: *client_scalar_selectable_name,
+        reader_selection_set: selections,
+        refetch_strategy,
+    })
+}
+
+fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    schema: &mut Schema<TNetworkProtocol>,
+    parent_object_entity_name: ServerObjectEntityName,
+    to_object_entity_name: TypeAnnotation<ServerObjectEntityName>,
+    client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
+) -> ProcessClientFieldDeclarationResult<UnprocessedClientObjectSelectableSelectionSet> {
+    let query_id = *fetchable_types(db)
+        .deref()
+        .as_ref()
+        .expect(
+            "Expected parsing to have succeeded. \
+            This is indicative of a bug in Isograph.",
+        )
+        .iter()
+        .find(|(_, root_operation_name)| root_operation_name.0 == "query")
+        .expect("Expected query to be found")
+        .0;
+    let client_pointer_pointer_name_ws = client_pointer_declaration.item.client_pointer_name;
+    let client_pointer_name = client_pointer_pointer_name_ws.item;
+    let client_pointer_name_span = client_pointer_pointer_name_ws.location.span;
+
+    let client_object_selectable_name = client_pointer_declaration.item.client_pointer_name.item;
+
+    if let Some(directive) = client_pointer_declaration
+        .item
+        .directives
+        .into_iter()
+        .next()
+    {
+        return Err(directive.map(|directive| {
+            ProcessClientFieldDeclarationError::DirectiveNotSupportedOnClientPointer {
+                directive_name: directive.name.item,
+            }
+        }));
     }
+
+    let unprocessed_fields = client_pointer_declaration.item.selection_set;
+
+    let is_fetchable = fetchable_types(db)
+        .deref()
+        .as_ref()
+        .expect(
+            "Expected parsing to have succeeded. \
+            This is indicative of a bug in Isograph.",
+        )
+        .contains_key(to_object_entity_name.inner());
+
+    // TODO extract this into a helper function, probably on TNetworkProtocol
+    let refetch_strategy = if is_fetchable {
+        RefetchStrategy::RefetchFromRoot
+    } else {
+        let id_field = schema
+            .server_entity_data
+            .get(to_object_entity_name.inner())
+            .expect(
+                "Expected parent_object_entity_name \
+                to exist in server_object_entity_available_selectables",
+            )
+            .id_field;
+
+        match id_field {
+            None => Err(WithSpan::new(
+                ProcessClientFieldDeclarationError::ClientPointerTargetTypeHasNoId {
+                    target_object_entity_name: *client_pointer_declaration.item.target_type.inner(),
+                },
+                client_pointer_declaration.item.target_type.span(),
+            )),
+            Some(_) => {
+                // Assume that if we have an id field, this implements Node
+                Ok(RefetchStrategy::UseRefetchField(
+                    generate_refetch_field_strategy(
+                        vec![],
+                        query_id,
+                        vec![
+                            WrappedSelectionMapSelection::InlineFragment(
+                                *to_object_entity_name.inner(),
+                            ),
+                            WrappedSelectionMapSelection::LinkedField {
+                                server_object_selectable_name: *NODE_FIELD_NAME,
+                                arguments: id_top_level_arguments(),
+                                concrete_type: None,
+                            },
+                        ],
+                    ),
+                ))
+            }
+        }?
+    };
+
+    schema.client_object_selectables.insert(
+        (parent_object_entity_name, *client_object_selectable_name),
+        ClientObjectSelectable {
+            description: client_pointer_declaration.item.description.map(|x| x.item),
+            name: client_pointer_declaration
+                .item
+                .client_pointer_name
+                .map(|client_object_selectable_name| *client_object_selectable_name)
+                .into_with_location(),
+            reader_selection_set: vec![],
+
+            variable_definitions: client_pointer_declaration
+                .item
+                .variable_definitions
+                .into_iter()
+                .map(|variable_definition| {
+                    validate_variable_definition(
+                        db,
+                        variable_definition,
+                        parent_object_entity_name,
+                        client_pointer_name.0.into(),
+                    )
+                })
+                .collect::<Result<_, _>>()?,
+            type_and_field: ParentObjectEntityNameAndSelectableName {
+                parent_object_entity_name,
+                selectable_name: client_object_selectable_name.0.into(),
+            },
+
+            parent_object_entity_name,
+            refetch_strategy,
+            target_object_entity_name: to_object_entity_name,
+            network_protocol: std::marker::PhantomData,
+
+            info: UserWrittenClientPointerInfo {
+                const_export_name: client_pointer_declaration.item.const_export_name,
+                file_path: client_pointer_declaration.item.definition_path,
+            },
+        },
+    );
+
+    if schema
+        .server_entity_data
+        .entry(parent_object_entity_name)
+        .or_default()
+        .selectables
+        .insert(
+            client_pointer_name.0.into(),
+            DefinitionLocation::Client(SelectionType::Object((
+                parent_object_entity_name,
+                *client_object_selectable_name,
+            ))),
+        )
+        .is_some()
+    {
+        // Did not insert, so this object already has a field with the same name :(
+        return Err(WithSpan::new(
+            ProcessClientFieldDeclarationError::ParentAlreadyHasField {
+                parent_object_entity_name,
+                client_selectable_name: client_pointer_name.0.into(),
+            },
+            client_pointer_name_span,
+        ));
+    }
+
+    Ok(UnprocessedClientObjectSelectableSelectionSet {
+        client_object_selectable_name: *client_pointer_name,
+        parent_object_entity_name,
+        reader_selection_set: unprocessed_fields,
+        refetch_selection_set: vec![id_selection()],
+    })
 }
 
 type ProcessClientFieldDeclarationResult<T> =
