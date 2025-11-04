@@ -59,9 +59,10 @@ impl GenerateFileExtensionsOption {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OptionalValidationLevel {
     /// If this validation error is encountered, it will be ignored
+    #[default]
     Ignore,
     /// If this validation error is encountered, a warning will be issued
     Warn,
@@ -83,12 +84,6 @@ impl OptionalValidationLevel {
             }
             OptionalValidationLevel::Error => Err(on_error()),
         }
-    }
-}
-
-impl Default for OptionalValidationLevel {
-    fn default() -> Self {
-        Self::Ignore
     }
 }
 
@@ -256,19 +251,15 @@ pub struct ConfigFileOptions {
 
 #[derive(Deserialize, Debug, Clone, Copy, JsonSchema)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum ConfigFileOptionalValidationLevel {
     /// If this validation error is encountered, it will be ignored
     Ignore,
     /// If this validation error is encountered, a warning will be issued
     Warn,
     /// If this validation error is encountered, the compilation will fail
+    #[default]
     Error,
-}
-
-impl Default for ConfigFileOptionalValidationLevel {
-    fn default() -> Self {
-        Self::Error
-    }
 }
 
 #[derive(Deserialize, Default, Debug, Clone, Copy, JsonSchema)]
