@@ -279,6 +279,31 @@ describe('optimisticLayer', () => {
         ).toBe(13);
       });
 
+      test('reexecutes updates while merging children', () => {
+        const revert = addOptimisticStoreLayer(
+          environment,
+          (counter) => counter + 1,
+        );
+        addStartUpdateStoreLayer(environment, (counter) => counter * 2);
+        addStartUpdateStoreLayer(environment, (counter) => counter + 7);
+        addOptimisticStoreLayer(environment, (counter) => counter + 1);
+
+        revert(4);
+
+        expect(environment.store).toMatchObject({
+          kind: 'OptimisticStoreLayer',
+          parentStoreLayer: {
+            kind: 'BaseStoreLayer',
+          },
+        });
+        expect(
+          readOptimisticRecord(environment.store, {
+            __link: '__ROOT',
+            __typename: 'Query',
+          }).counter,
+        ).toBe(16);
+      });
+
       test('stops at optimistic child node', () => {
         const revert = addOptimisticStoreLayer(
           environment,
