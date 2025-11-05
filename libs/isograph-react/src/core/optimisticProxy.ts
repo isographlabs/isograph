@@ -66,31 +66,33 @@ export function readOptimisticRecord(
   );
 }
 
-type BaseStoreLayer = {
+export type BaseStoreLayer = {
   readonly kind: 'BaseStoreLayer';
   childStoreLayer: OptimisticStoreLayer | null;
   parentStoreLayer: null;
   readonly data: BaseStoreLayerData;
 };
 
-type NetworkResponseStoreLayer = {
+export type NetworkResponseStoreLayer = {
   readonly kind: 'NetworkResponseStoreLayer';
   childStoreLayer: OptimisticStoreLayer | StartUpdateStoreLayer | null;
   parentStoreLayer: OptimisticStoreLayer | StartUpdateStoreLayer;
   data: StoreLayerData;
 };
 
-export type DataUpdate = (storeLayer: StoreLayer) => void;
+export type DataUpdate<TStoreLayer extends StoreLayer> = (
+  storeLayer: TStoreLayer,
+) => void;
 
-type StartUpdateStoreLayer = {
+export type StartUpdateStoreLayer = {
   readonly kind: 'StartUpdateStoreLayer';
   childStoreLayer: OptimisticStoreLayer | NetworkResponseStoreLayer | null;
   parentStoreLayer: OptimisticStoreLayer | NetworkResponseStoreLayer;
   data: StoreLayerData;
-  startUpdate: DataUpdate;
+  startUpdate: DataUpdate<StartUpdateStoreLayer | BaseStoreLayer>;
 };
 
-type OptimisticStoreLayer = {
+export type OptimisticStoreLayer = {
   readonly kind: 'OptimisticStoreLayer';
   childStoreLayer:
     | OptimisticStoreLayer
@@ -103,12 +105,12 @@ type OptimisticStoreLayer = {
     | NetworkResponseStoreLayer
     | BaseStoreLayer;
   data: StoreLayerData;
-  startUpdate: DataUpdate;
+  startUpdate: DataUpdate<OptimisticStoreLayer>;
 };
 
 export function addNetworkResponseStoreLayer(
   parent: StoreLayer,
-  normalizeData: DataUpdate,
+  normalizeData: DataUpdate<NetworkResponseStoreLayer | BaseStoreLayer>,
 ): StoreLayer {
   switch (parent.kind) {
     case 'NetworkResponseStoreLayer':
@@ -148,7 +150,7 @@ function mergeDataLayer(target: StoreLayerData, source: StoreLayerData): void {
 
 export function addStartUpdateStoreLayer(
   parent: StoreLayer,
-  startUpdate: DataUpdate,
+  startUpdate: StartUpdateStoreLayer['startUpdate'],
 ): StoreLayer {
   switch (parent.kind) {
     case 'BaseStoreLayer': {
@@ -190,7 +192,7 @@ export function addStartUpdateStoreLayer(
 
 export function addOptimisticStoreLayer(
   parent: StoreLayer,
-  startUpdate: DataUpdate,
+  startUpdate: OptimisticStoreLayer['startUpdate'],
 ) {
   switch (parent.kind) {
     case 'BaseStoreLayer':
@@ -251,9 +253,23 @@ function reexecuteUpdates(
 ): void {
   while (node !== null) {
     mergeDataLayer(oldData, node.data);
-    if ('startUpdate' in node) {
-      node.data = {};
-      node.startUpdate(node);
+    switch (node.kind) {
+      case 'NetworkResponseStoreLayer':
+        break;
+      case 'StartUpdateStoreLayer': {
+        node.data = {};
+        node.startUpdate(node);
+        break;
+      }
+      case 'OptimisticStoreLayer': {
+        node.data = {};
+        node.startUpdate(node);
+        break;
+      }
+      default: {
+        node satisfies never;
+        throw new Error('Unreachable. This is a bug in Isograph.');
+      }
     }
     mergeDataLayer(newData, node.data);
 

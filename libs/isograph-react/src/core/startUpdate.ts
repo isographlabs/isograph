@@ -23,7 +23,7 @@ import {
   addStartUpdateStoreLayer,
   getOrInsertRecord,
   readOptimisticRecord,
-  type DataUpdate,
+  type StartUpdateStoreLayer,
   type StoreLayer,
 } from './optimisticProxy';
 import { readPromise, type PromiseWrapper } from './PromiseWrapper';
@@ -63,7 +63,7 @@ export function createStartUpdate<TReadFromStore extends UnknownTReadFromStore>(
   return (updater) => {
     let mutableUpdatedIds: EncounteredIds = new Map();
 
-    const startUpdate: DataUpdate = (storeLayer) => {
+    const startUpdate: StartUpdateStoreLayer['startUpdate'] = (storeLayer) => {
       mutableUpdatedIds.clear();
       let updatableData = createUpdatableProxy(
         environment,
