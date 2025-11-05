@@ -197,13 +197,11 @@ export function addOptimisticStoreLayer(
     case 'StartUpdateStoreLayer':
     case 'NetworkResponseStoreLayer':
     case 'OptimisticStoreLayer': {
-      const data = {};
-
       const node: OptimisticStoreLayer = {
         kind: 'OptimisticStoreLayer',
         parentStoreLayer: parent,
         childStoreLayer: null,
-        data,
+        data: {},
         startUpdate: startUpdate,
       };
 
