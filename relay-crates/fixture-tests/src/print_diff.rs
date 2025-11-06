@@ -6,7 +6,7 @@
  */
 
 use colored::Colorize;
-use diff::Result::*;
+use diff::Result::{Both, Left, Right};
 
 /// Prints a diff between the expected and actual strings to stdout.
 pub(crate) fn print_diff(expected: &str, actual: &str) {

@@ -55,7 +55,7 @@ pub fn retain<Db: Database, T>(db: &Db, memo_ref: MemoRef<T>) -> RetainedQuery {
         Entry::Vacant(vacant_entry) => {
             vacant_entry.insert(1);
         }
-    };
+    }
     RetainedQuery {
         derived_node_id: memo_ref.derived_node_id,
         cleared: false,

@@ -37,7 +37,7 @@ impl TrackedDependencies {
         {
             last_dependency.time_verified_or_updated = dependency.time_verified_or_updated;
             return;
-        };
+        }
         self.dependencies.push(dependency);
     }
 }

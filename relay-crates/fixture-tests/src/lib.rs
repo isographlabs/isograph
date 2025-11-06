@@ -152,7 +152,7 @@ pub async fn test_fixture<T, U, V>(
             );
         }
         _ => {}
-    };
+    }
 
     let actual = format!("{}\n", actual.trim_end());
     if actual != expected {

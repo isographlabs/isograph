@@ -25,12 +25,12 @@ pub(crate) fn legacy_memo_macro(_args: TokenStream, item: TokenStream) -> TokenS
 
     let db_arg = match &sig.inputs[0] {
         FnArg::Typed(PatType { pat, .. }) => pat,
-        _ => unreachable!(),
+        FnArg::Receiver(_) => unreachable!(),
     };
 
     let args = sig.inputs.iter().skip(1).map(|arg| match arg {
         FnArg::Typed(PatType { pat, ty, .. }) => (pat, ty),
-        _ => unreachable!(),
+        FnArg::Receiver(_) => unreachable!(),
     });
 
     let param_ids_blocks = args.clone().map(|(arg, ty)| match ArgType::parse(ty) {

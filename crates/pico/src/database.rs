@@ -23,6 +23,7 @@ pub trait DatabaseDyn {
 pub trait Database: DatabaseDyn + Sized {
     fn get_storage(&self) -> &Storage<Self>;
     fn get<T: 'static>(&self, id: SourceId<T>) -> &T;
+    /// Because `T` is a `Singleton`, unlike `get` this does not require `id: SourceId<T>`
     fn get_singleton<T: 'static + Singleton>(&self) -> Option<&T>;
     fn intern<T: Clone + Hash + DynEq + 'static>(&self, value: T) -> MemoRef<T>;
     fn intern_ref<T: Clone + Hash + DynEq + 'static>(&self, value: &T) -> MemoRef<T>;
@@ -149,6 +150,9 @@ impl<Db: Database> Storage<Db> {
         )
     }
 
+    /// As long as a memoized function is not currently being invoked
+    /// modify the database by setting a source
+    /// Increment the current epoch if it is a new and different item
     pub fn set<T: Source + DynEq>(&mut self, source: T) -> SourceId<T> {
         self.assert_empty_dependency_stack();
         let source_id = SourceId::new(&source);
@@ -158,7 +162,7 @@ impl<Db: Database> Storage<Db> {
 
     pub fn remove<T>(&mut self, id: SourceId<T>) {
         self.assert_empty_dependency_stack();
-        self.internal.remove_source(id)
+        self.internal.remove_source(id);
     }
 
     pub fn remove_singleton<T: Singleton + 'static>(&mut self) {

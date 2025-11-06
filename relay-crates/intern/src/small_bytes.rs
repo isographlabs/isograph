@@ -32,7 +32,7 @@ pub enum SmallBytes {
     Large(Box<[u8]>),
 }
 
-use SmallBytes::*;
+use SmallBytes::{Large, Small};
 
 impl SmallBytes {
     pub const fn empty() -> SmallBytes {
@@ -180,7 +180,7 @@ impl PartialEq for SmallBytes {
 
 impl Hash for SmallBytes {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.deref().hash(state)
+        self.deref().hash(state);
     }
 }
 

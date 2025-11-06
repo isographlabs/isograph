@@ -25,9 +25,11 @@ pub(crate) fn resolve_position_macro(item: TokenStream) -> TokenStream {
         syn::Data::Enum(data_enum) => {
             handle_data_enum(struct_name, resolve_position_args, data_enum)
         }
-        _ => Error::new(input.span(), "This derive only works on structs")
-            .to_compile_error()
-            .into(),
+        syn::Data::Union(_) => {
+            Error::new(input.span(), "This derive only works on structs and enums")
+                .to_compile_error()
+                .into()
+        }
     }
 }
 
