@@ -1,6 +1,9 @@
 import { ReaderWithRefetchQueries } from '../core/entrypoint';
 import { stableCopy } from './cache';
-import { type StoreLink } from './IsographEnvironment';
+import {
+  type ComponentOrFieldName,
+  type StoreLink,
+} from './IsographEnvironment';
 import { PromiseWrapper } from './PromiseWrapper';
 import type { StartUpdate } from './reader';
 
@@ -53,8 +56,9 @@ export type FragmentReference<
     ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
   >;
   readonly root: StoreLink;
+  readonly fieldName: ComponentOrFieldName;
   // TODO we potentially stably copy and stringify variables a lot!
-  // So, we should employ interior mutability: pretend that fragent reference
+  // So, we should employ interior mutability: pretend that fragment reference
   // is immutable, but actually store something like
   // `Map<Variable, StablyCopiedStringifiedOutput>`
   // and read or update that map when we would otherwise stably copy and
@@ -67,7 +71,6 @@ export type StableIdForFragmentReference = string;
 
 export function stableIdForFragmentReference(
   fragmentReference: FragmentReference<any, any>,
-  fieldName: string,
 ): StableIdForFragmentReference {
-  return `${fragmentReference.root.__typename}/${fragmentReference.root.__link}/${fieldName}/${JSON.stringify(stableCopy(fragmentReference.variables))}`;
+  return `${fragmentReference.root.__typename}/${fragmentReference.root.__link}/${fragmentReference.fieldName}/${JSON.stringify(stableCopy(fragmentReference.variables))}`;
 }

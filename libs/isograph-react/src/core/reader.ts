@@ -31,7 +31,7 @@ export type EagerReaderArtifact<
   TClientFieldValue,
 > = {
   readonly kind: 'EagerReaderArtifact';
-  readonly fieldName: string;
+  readonly fieldName: ComponentOrFieldName;
   readonly readerAst: ReaderAst<TReadFromStore>;
   readonly resolver: (
     data: ResolverFirstParameter<TReadFromStore>,
