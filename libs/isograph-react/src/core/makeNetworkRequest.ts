@@ -346,6 +346,7 @@ function readDataForOnComplete<
       readerWithRefetchQueries: wrapResolvedValue(
         resolvedReaderWithRefetchQueries,
       ),
+      fieldName: resolvedReaderWithRefetchQueries.readerArtifact.fieldName,
       root,
       variables,
       networkRequest: fakeNetworkRequest,
@@ -363,7 +364,6 @@ function readDataForOnComplete<
         // TClientFieldValue which is a React.FC<...>
         return getOrCreateCachedComponent(
           environment,
-          readerArtifact.fieldName,
           {
             kind: 'FragmentReference',
             readerWithRefetchQueries: wrapResolvedValue({
@@ -372,6 +372,7 @@ function readDataForOnComplete<
               nestedRefetchQueries:
                 resolvedReaderWithRefetchQueries.nestedRefetchQueries,
             }),
+            fieldName: readerArtifact.fieldName,
             root,
             variables,
             networkRequest: fakeNetworkRequest,
@@ -388,7 +389,6 @@ function readDataForOnComplete<
                 startUpdate: getOrCreateCachedStartUpdate(
                   environment,
                   fragment,
-                  resolvedReaderWithRefetchQueries.readerArtifact.fieldName,
                   fakeNetworkRequestOptions,
                 ),
               }
