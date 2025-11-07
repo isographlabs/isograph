@@ -346,7 +346,7 @@ export function readLoadablySelectedFieldData(
           const fragmentReferenceAndDisposeFromEntrypoint = (
             entrypoint: IsographEntrypoint<any, any, any, {}>,
           ): [FragmentReference<any, any>, CleanupFn] => {
-            const typeAndField =
+            const fieldName =
               entrypoint.readerWithRefetchQueries.kind ===
               'ReaderWithRefetchQueriesLoader'
                 ? entrypoint.readerWithRefetchQueries.fieldName
@@ -368,7 +368,7 @@ export function readLoadablySelectedFieldData(
             const fragmentReference: FragmentReference<any, any> = {
               kind: 'FragmentReference',
               readerWithRefetchQueries,
-              fieldName: typeAndField,
+              fieldName: fieldName,
               // TODO localVariables is not guaranteed to have an id field
               root,
               variables: localVariables,
