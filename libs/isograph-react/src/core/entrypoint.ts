@@ -1,6 +1,5 @@
 import type { UnknownTReadFromStore } from './FragmentReference';
 import type { ComponentOrFieldName, TypeName } from './IsographEnvironment';
-import type { TypeName } from './IsographEnvironment';
 import { TopLevelReaderArtifact } from './reader';
 import { Arguments } from './util';
 
