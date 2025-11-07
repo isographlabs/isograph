@@ -277,6 +277,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         &operation_text,
         parent_object_entity,
         &refetch_query_artifact_import,
+        entrypoint.name.item,
         concrete_object_entity.name.item,
         &directive_set,
     );
@@ -404,12 +405,14 @@ fn generate_refetch_query_artifact_import(
     RefetchQueryArtifactImport(output)
 }
 
+#[expect(clippy::too_many_arguments)]
 fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol + 'static>(
     file_extensions: GenerateFileExtensionsOption,
     query_name: QueryOperationName,
     operation_text: &OperationText,
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
     refetch_query_artifact_import: &RefetchQueryArtifactImport,
+    field_name: ClientScalarSelectableName,
     concrete_type: ServerObjectEntityName,
     directive_set: &EntrypointDirectiveSet,
 ) -> String {
@@ -458,6 +461,7 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol + 'static>(
                 format!(
                     "{indent}readerWithRefetchQueries: {{\n\
                      {indent}  kind: \"ReaderWithRefetchQueriesLoader\",\n\
+                     {indent}  fieldName: \"{field_name}\",\n\
                      {indent}  loader: () => import({reader_resolver_file_path})\n\
                      {indent}    .then(module => ({{\n\
                      {indent}      kind: \"ReaderWithRefetchQueries\",\n\
