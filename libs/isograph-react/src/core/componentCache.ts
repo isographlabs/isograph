@@ -8,10 +8,10 @@ import { logMessage } from './logging';
 import { readPromise } from './PromiseWrapper';
 import { NetworkRequestReaderOptions } from './read';
 import { createStartUpdate } from './startUpdate';
+import { maybeUnwrapNetworkRequest } from '../react/useResult'
 
 export function getOrCreateCachedComponent(
   environment: IsographEnvironment,
-  componentName: string,
   fragmentReference: FragmentReference<any, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
 ): React.FC<any> {
@@ -23,9 +23,13 @@ export function getOrCreateCachedComponent(
   );
 
   return (environment.componentCache[
-    stableIdForFragmentReference(fragmentReference, componentName)
+    stableIdForFragmentReference(fragmentReference)
   ] ??= (() => {
     function Component(additionalRuntimeProps: { [key: string]: any }) {
+      maybeUnwrapNetworkRequest(
+        fragmentReference.networkRequest,
+        networkRequestOptions,
+      );
       const readerWithRefetchQueries = readPromise(
         fragmentReference.readerWithRefetchQueries,
       );
@@ -38,7 +42,7 @@ export function getOrCreateCachedComponent(
 
       logMessage(environment, () => ({
         kind: 'ComponentRerendered',
-        componentName,
+        componentName: fragmentReference.fieldName,
         rootLink: fragmentReference.root,
       }));
 
@@ -54,7 +58,7 @@ export function getOrCreateCachedComponent(
       );
     }
     const idString = `(type: ${fragmentReference.root.__typename}, id: ${fragmentReference.root.__link})`;
-    Component.displayName = `${componentName} ${idString} @component`;
+    Component.displayName = `${fragmentReference.fieldName} ${idString} @component`;
     return Component;
   })());
 }

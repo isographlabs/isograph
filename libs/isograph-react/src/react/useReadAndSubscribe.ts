@@ -75,13 +75,7 @@ export function useSubscribeToMultiple<
     [
       items
         .map(({ fragmentReference }) => {
-          const readerWithRefetchQueries = readPromise(
-            fragmentReference.readerWithRefetchQueries,
-          );
-          stableIdForFragmentReference(
-            fragmentReference,
-            readerWithRefetchQueries.readerArtifact.fieldName,
-          );
+          stableIdForFragmentReference(fragmentReference);
         })
         .join('.'),
     ],

@@ -346,6 +346,11 @@ export function readLoadablySelectedFieldData(
           const fragmentReferenceAndDisposeFromEntrypoint = (
             entrypoint: IsographEntrypoint<any, any, any, {}>,
           ): [FragmentReference<any, any>, CleanupFn] => {
+            const typeAndField =
+              entrypoint.readerWithRefetchQueries.kind ===
+              'ReaderWithRefetchQueriesLoader'
+                ? entrypoint.readerWithRefetchQueries.fieldName
+                : entrypoint.readerWithRefetchQueries.readerArtifact.fieldName;
             const readerWithRefetchQueries =
               entrypoint.readerWithRefetchQueries.kind ===
               'ReaderWithRefetchQueriesLoader'
@@ -363,7 +368,7 @@ export function readLoadablySelectedFieldData(
             const fragmentReference: FragmentReference<any, any> = {
               kind: 'FragmentReference',
               readerWithRefetchQueries,
-
+              fieldName: typeAndField,
               // TODO localVariables is not guaranteed to have an id field
               root,
               variables: localVariables,
@@ -377,7 +382,7 @@ export function readLoadablySelectedFieldData(
           } else {
             const isographArtifactPromiseWrapper = getOrLoadIsographArtifact(
               environment,
-              field.entrypoint.typeAndField,
+              `${root.__typename}/${field.entrypoint.fieldName}`,
               field.entrypoint.loader,
             );
             const state = getPromiseState(isographArtifactPromiseWrapper);
@@ -427,7 +432,7 @@ export function readLoadablySelectedFieldData(
               const fragmentReference: FragmentReference<any, any> = {
                 kind: 'FragmentReference',
                 readerWithRefetchQueries,
-
+                fieldName: field.entrypoint.fieldName,
                 // TODO localVariables is not guaranteed to have an id field
                 root,
                 variables: localVariables,
@@ -563,6 +568,7 @@ export function readResolverFieldData(
   const fragment = {
     kind: 'FragmentReference',
     readerWithRefetchQueries: wrapResolvedValue(readerWithRefetchQueries),
+    fieldName: field.readerArtifact.fieldName,
     root,
     variables: generateChildVariableMap(variables, field.arguments),
     networkRequest,
@@ -595,7 +601,6 @@ export function readResolverFieldData(
           ? getOrCreateCachedStartUpdate(
               environment,
               fragment,
-              readerWithRefetchQueries.readerArtifact.fieldName,
               networkRequestOptions,
             )
           : undefined,
@@ -610,7 +615,6 @@ export function readResolverFieldData(
         kind: 'Success',
         data: getOrCreateCachedComponent(
           environment,
-          field.readerArtifact.fieldName,
           fragment,
           networkRequestOptions,
         ),
@@ -688,6 +692,7 @@ export function readLinkedFieldData(
       kind: 'FragmentReference',
       readerWithRefetchQueries: wrapResolvedValue(readerWithRefetchQueries),
       root,
+      fieldName: field.condition.fieldName,
       variables: generateChildVariableMap(
         variables,
         // TODO this is wrong
@@ -706,7 +711,6 @@ export function readLinkedFieldData(
             startUpdate: getOrCreateCachedStartUpdate(
               environment,
               fragment,
-              readerWithRefetchQueries.readerArtifact.fieldName,
               networkRequestOptions,
             ),
           }
@@ -965,6 +969,7 @@ export function readClientPointerData(
 
           const fragmentReference: FragmentReference<any, any> = {
             kind: 'FragmentReference',
+            fieldName: field.fieldName,
             readerWithRefetchQueries: readerWithRefetchQueries,
             root,
             variables,
