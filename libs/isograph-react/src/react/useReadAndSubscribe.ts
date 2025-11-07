@@ -6,7 +6,6 @@ import {
   stableIdForFragmentReference,
   type UnknownTReadFromStore,
 } from '../core/FragmentReference';
-import { readPromise } from '../core/PromiseWrapper';
 import {
   NetworkRequestReaderOptions,
   readButDoNotEvaluate,
