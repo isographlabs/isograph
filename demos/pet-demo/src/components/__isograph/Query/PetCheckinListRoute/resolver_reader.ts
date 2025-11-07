@@ -49,7 +49,7 @@ const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
         ],
         entrypoint: {
           kind: "EntrypointLoader",
-          typeAndField: "Pet__PetCheckinsCardList",
+          fieldName: "PetCheckinsCardList",
           loader: () => import("../../Pet/PetCheckinsCardList/entrypoint").then(module => module.default),
         },
       },
@@ -62,7 +62,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  fieldName: "Query.PetCheckinListRoute",
+  fieldName: "PetCheckinListRoute",
   resolver,
   readerAst,
   hasUpdatable: false,

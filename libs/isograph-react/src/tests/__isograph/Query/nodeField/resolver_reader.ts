@@ -34,7 +34,7 @@ const artifact: EagerReaderArtifact<
   Query__nodeField__output_type
 > = {
   kind: "EagerReaderArtifact",
-  fieldName: "Query.nodeField",
+  fieldName: "nodeField",
   resolver,
   readerAst,
   hasUpdatable: false,

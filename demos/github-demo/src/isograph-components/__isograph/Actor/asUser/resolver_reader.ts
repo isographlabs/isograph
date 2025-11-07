@@ -19,7 +19,7 @@ const artifact: EagerReaderArtifact<
   Link<"User"> | null
 > = {
   kind: "EagerReaderArtifact",
-  fieldName: "Actor.asUser",
+  fieldName: "asUser",
   resolver: ({ data }) => data.__typename === "User" ? data.__link : null,
   readerAst,
   hasUpdatable: false,

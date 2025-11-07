@@ -41,7 +41,7 @@ const readerAst: ReaderAst<BlogItem__BlogItemDisplay__param> = [
     ],
     entrypoint: {
       kind: "EntrypointLoader",
-      typeAndField: "BlogItem__BlogItemMoreDetail",
+      fieldName: "BlogItemMoreDetail",
       loader: () => import("../../BlogItem/BlogItemMoreDetail/entrypoint").then(module => module.default),
     },
   },
@@ -70,7 +70,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  fieldName: "BlogItem.BlogItemDisplay",
+  fieldName: "BlogItemDisplay",
   resolver,
   readerAst,
   hasUpdatable: false,

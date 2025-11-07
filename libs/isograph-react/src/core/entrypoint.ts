@@ -1,5 +1,5 @@
 import type { UnknownTReadFromStore } from './FragmentReference';
-import type { TypeName } from './IsographEnvironment';
+import type { ComponentOrFieldName, TypeName } from './IsographEnvironment';
 import { TopLevelReaderArtifact } from './reader';
 import { Arguments } from './util';
 
@@ -22,6 +22,7 @@ export type ReaderWithRefetchQueriesLoader<
   TClientFieldValue,
 > = {
   readonly kind: 'ReaderWithRefetchQueriesLoader';
+  readonly fieldName: ComponentOrFieldName;
   readonly loader: () => Promise<
     ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
   >;
@@ -69,7 +70,7 @@ export type IsographEntrypointLoader<
   TClientFieldValue,
 > = {
   readonly kind: 'EntrypointLoader';
-  readonly typeAndField: string;
+  readonly fieldName: ComponentOrFieldName;
   readonly loader: () => Promise<
     IsographEntrypoint<TReadFromStore, TClientFieldValue, NormalizationAst>
   >;

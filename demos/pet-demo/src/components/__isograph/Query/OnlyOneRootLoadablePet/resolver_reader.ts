@@ -25,7 +25,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  fieldName: "Query.OnlyOneRootLoadablePet",
+  fieldName: "OnlyOneRootLoadablePet",
   resolver,
   readerAst,
   hasUpdatable: false,

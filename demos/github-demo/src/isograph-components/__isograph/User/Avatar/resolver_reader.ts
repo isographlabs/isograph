@@ -24,7 +24,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  fieldName: "User.Avatar",
+  fieldName: "Avatar",
   resolver,
   readerAst,
   hasUpdatable: false,
