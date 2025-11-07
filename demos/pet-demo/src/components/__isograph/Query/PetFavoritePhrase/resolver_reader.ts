@@ -41,7 +41,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  fieldName: "Query.PetFavoritePhrase",
+  fieldName: "PetFavoritePhrase",
   resolver,
   readerAst,
   hasUpdatable: false,

@@ -41,7 +41,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  fieldName: "Query.PullRequest",
+  fieldName: "PullRequest",
   resolver,
   readerAst,
   hasUpdatable: false,

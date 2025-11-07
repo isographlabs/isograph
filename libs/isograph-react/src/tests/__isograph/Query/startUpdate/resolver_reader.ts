@@ -46,7 +46,7 @@ const artifact: EagerReaderArtifact<
   Query__startUpdate__output_type
 > = {
   kind: "EagerReaderArtifact",
-  fieldName: "Query.startUpdate",
+  fieldName: "startUpdate",
   resolver,
   readerAst,
   hasUpdatable: true,

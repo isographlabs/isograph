@@ -79,11 +79,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol 
     );
 
     let reader_content = if let ClientFieldDirectiveSet::None(_) = user_written_component_variant {
-        let eager_reader_name = format!(
-            "{}.{}",
-            parent_object_entity.name.item,
-            client_selectable.name()
-        );
+        let eager_reader_name = client_selectable.name();
         let reader_output_type = format!(
             "{}__{}__output_type",
             parent_object_entity.name.item,
@@ -112,11 +108,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol 
             "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         )
     } else {
-        let component_name = format!(
-            "{}.{}",
-            parent_object_entity.name.item,
-            client_selectable.name()
-        );
+        let component_name = client_selectable.name();
         let param_type_file_name = *RESOLVER_PARAM_TYPE;
         format!(
             "import type {{ComponentReaderArtifact, ExtractSecondParam, \
@@ -237,10 +229,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<
 
     let reader_output_type = format!("Link<\"{}\"> | null", concrete_type);
 
-    let eager_reader_name = format!(
-        "{}.{}",
-        parent_object_entity.name.item, server_object_selectable_name
-    );
+    let eager_reader_name = server_object_selectable_name;
 
     let link_field_name = *LINK_FIELD_NAME;
     let reader_content = format!(

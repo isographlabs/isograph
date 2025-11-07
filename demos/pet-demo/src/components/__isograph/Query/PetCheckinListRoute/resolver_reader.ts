@@ -62,7 +62,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  fieldName: "Query.PetCheckinListRoute",
+  fieldName: "PetCheckinListRoute",
   resolver,
   readerAst,
   hasUpdatable: false,

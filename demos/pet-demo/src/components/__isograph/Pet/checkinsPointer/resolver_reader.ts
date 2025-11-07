@@ -31,7 +31,7 @@ const artifact: EagerReaderArtifact<
   Pet__checkinsPointer__output_type
 > = {
   kind: "EagerReaderArtifact",
-  fieldName: "Pet.checkinsPointer",
+  fieldName: "checkinsPointer",
   resolver,
   readerAst,
   hasUpdatable: false,
