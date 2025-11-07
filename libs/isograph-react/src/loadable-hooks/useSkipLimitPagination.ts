@@ -128,7 +128,7 @@ export function useSkipLimitPagination<
               startUpdate: getOrCreateCachedStartUpdate(
                 environment,
                 fragmentReference,
-                readerWithRefetchQueries.readerArtifact.kind,
+                readerWithRefetchQueries.readerArtifact.fieldName,
                 networkRequestOptions,
               ),
             }
