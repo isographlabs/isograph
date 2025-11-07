@@ -1,4 +1,5 @@
 import { useReadAndSubscribe } from '../react/useReadAndSubscribe';
+import { maybeUnwrapNetworkRequest } from '../react/useResult';
 import {
   FragmentReference,
   stableIdForFragmentReference,
@@ -8,7 +9,6 @@ import { logMessage } from './logging';
 import { readPromise } from './PromiseWrapper';
 import { NetworkRequestReaderOptions } from './read';
 import { createStartUpdate } from './startUpdate';
-import { maybeUnwrapNetworkRequest } from '../react/useResult'
 
 export function getOrCreateCachedComponent(
   environment: IsographEnvironment,
