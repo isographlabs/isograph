@@ -106,6 +106,11 @@ export function getOrCreateCacheForArtifact<
       break;
   }
   const factory = () => {
+    const fieldName =
+      entrypoint.readerWithRefetchQueries.kind ===
+      'ReaderWithRefetchQueriesLoader'
+        ? entrypoint.readerWithRefetchQueries.fieldName
+        : entrypoint.readerWithRefetchQueries.readerArtifact.fieldName;
     const readerWithRefetchQueries =
       entrypoint.readerWithRefetchQueries.kind ===
       'ReaderWithRefetchQueriesLoader'
@@ -125,6 +130,7 @@ export function getOrCreateCacheForArtifact<
       {
         kind: 'FragmentReference',
         readerWithRefetchQueries,
+        fieldName,
         root: { __link: ROOT_ID, __typename: entrypoint.concreteType },
         variables,
         networkRequest: networkRequest,
