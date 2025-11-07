@@ -45,7 +45,7 @@ const artifact: EagerReaderArtifact<
   Query__subquery__output_type
 > = {
   kind: "EagerReaderArtifact",
-  fieldName: "Query.subquery",
+  fieldName: "subquery",
   resolver,
   readerAst,
   hasUpdatable: false,

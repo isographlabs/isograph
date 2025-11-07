@@ -25,7 +25,7 @@ const artifact: EagerReaderArtifact<
   Pet__fullName__output_type
 > = {
   kind: "EagerReaderArtifact",
-  fieldName: "Pet.fullName",
+  fieldName: "fullName",
   resolver,
   readerAst,
   hasUpdatable: false,

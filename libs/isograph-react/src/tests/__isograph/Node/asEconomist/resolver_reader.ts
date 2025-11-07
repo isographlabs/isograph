@@ -19,7 +19,7 @@ const artifact: EagerReaderArtifact<
   Link<"Economist"> | null
 > = {
   kind: "EagerReaderArtifact",
-  fieldName: "Node.asEconomist",
+  fieldName: "asEconomist",
   resolver: ({ data }) => data.__typename === "Economist" ? data.__link : null,
   readerAst,
   hasUpdatable: false,

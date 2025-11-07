@@ -44,7 +44,7 @@ const artifact: EagerReaderArtifact<
   Query__smartestPet__output_type
 > = {
   kind: "EagerReaderArtifact",
-  fieldName: "Query.smartestPet",
+  fieldName: "smartestPet",
   resolver,
   readerAst,
   hasUpdatable: false,
