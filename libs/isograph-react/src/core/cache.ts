@@ -34,7 +34,10 @@ import {
 } from './IsographEnvironment';
 import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
-import { readOptimisticRecord, type StoreLayer } from './optimisticProxy';
+import {
+  readOptimisticRecord,
+  type StoreLayerWithData,
+} from './optimisticProxy';
 import { wrapPromise, wrapResolvedValue } from './PromiseWrapper';
 import { readButDoNotEvaluate, WithEncounteredRecords } from './read';
 import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
@@ -155,7 +158,7 @@ export type NetworkResponseObject = {
 
 export function normalizeData(
   environment: IsographEnvironment,
-  storeLayer: StoreLayer,
+  storeLayer: StoreLayerWithData,
   normalizationAst: NormalizationAstNodes,
   networkResponse: NetworkResponseObject,
   variables: Variables,
@@ -415,7 +418,7 @@ export type EncounteredIds = Map<TypeName, Set<DataId>>;
  */
 function normalizeDataIntoRecord(
   environment: IsographEnvironment,
-  storeLayer: StoreLayer,
+  storeLayer: StoreLayerWithData,
   normalizationAst: NormalizationAstNodes,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
@@ -523,7 +526,7 @@ function normalizeScalarField(
  */
 function normalizeLinkedField(
   environment: IsographEnvironment,
-  storeLayer: StoreLayer,
+  storeLayer: StoreLayerWithData,
   astNode: NormalizationLinkedField,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
@@ -622,7 +625,7 @@ function normalizeLinkedField(
  */
 function normalizeInlineFragment(
   environment: IsographEnvironment,
-  storeLayer: StoreLayer,
+  storeLayer: StoreLayerWithData,
   astNode: NormalizationInlineFragment,
   networkResponseParentRecord: NetworkResponseObject,
   targetParentRecord: StoreRecord,
@@ -672,7 +675,7 @@ function dataIdsAreTheSame(
 
 function normalizeNetworkResponseObject(
   environment: IsographEnvironment,
-  storeLayer: StoreLayer,
+  storeLayer: StoreLayerWithData,
   astNode: NormalizationLinkedField,
   networkResponseData: NetworkResponseObject,
   targetParentRecordLink: StoreLink,

@@ -359,6 +359,8 @@ export type StoreLayer =
   | StartUpdateStoreLayer
   | BaseStoreLayer;
 
+export type StoreLayerWithData = BaseStoreLayer | NetworkResponseStoreLayer;
+
 function compareData(
   oldData: StoreLayerData,
   newData: StoreLayerData,
