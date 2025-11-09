@@ -69,7 +69,7 @@ export function readOptimisticRecord(
 export type BaseStoreLayer = {
   readonly kind: 'BaseStoreLayer';
   childStoreLayer: OptimisticStoreLayer | null;
-  parentStoreLayer: null;
+  readonly parentStoreLayer: null;
   readonly data: BaseStoreLayerData;
 };
 
@@ -77,7 +77,7 @@ export type NetworkResponseStoreLayer = {
   readonly kind: 'NetworkResponseStoreLayer';
   childStoreLayer: OptimisticStoreLayer | StartUpdateStoreLayer | null;
   parentStoreLayer: OptimisticStoreLayer | StartUpdateStoreLayer;
-  data: StoreLayerData;
+  readonly data: StoreLayerData;
 };
 
 export type DataUpdate<TStoreLayer extends StoreLayer> = (
@@ -105,7 +105,7 @@ export type OptimisticStoreLayer = {
     | NetworkResponseStoreLayer
     | BaseStoreLayer;
   data: StoreLayerData;
-  startUpdate: DataUpdate<OptimisticStoreLayer>;
+  readonly startUpdate: DataUpdate<OptimisticStoreLayer>;
 };
 
 export function addNetworkResponseStoreLayer(
