@@ -243,14 +243,15 @@ function mergeChildNodes(
 }
 
 function reexecuteUpdates(
-  node:
-    | OptimisticStoreLayer
-    | NetworkResponseStoreLayer
-    | StartUpdateStoreLayer
-    | null,
+  initialNode: OptimisticStoreLayer | StartUpdateStoreLayer | null,
   oldData: StoreLayerData,
   newData: StoreLayerData,
 ): void {
+  let node:
+    | OptimisticStoreLayer
+    | NetworkResponseStoreLayer
+    | StartUpdateStoreLayer
+    | null = initialNode;
   while (node !== null) {
     mergeDataLayer(oldData, node.data);
     switch (node.kind) {
