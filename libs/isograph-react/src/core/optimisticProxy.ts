@@ -281,12 +281,12 @@ function reexecuteUpdates(
 function replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
   environment: IsographEnvironment,
   optimisticNode: OptimisticStoreLayer,
-  normalizeData: (storeLayer: StoreLayer) => void,
+  normalizeData: (storeLayer: StoreLayerWithData) => void,
 ): void {
   const oldData = optimisticNode.data;
-  //  we cannot replace optimistic node with network response directly
+  // we cannot replace the optimistic node with the network response directly
   // because of the types so we have to:
-  //  1. reset the optimistic node
+  // 1. reset the optimistic node
   optimisticNode.data = {};
   // 2. append the network response as child
   const networkResponseNode: NetworkResponseStoreLayer = {
