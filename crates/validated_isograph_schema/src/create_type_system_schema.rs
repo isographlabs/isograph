@@ -70,7 +70,7 @@ pub(crate) fn create_type_system_schema_with_type_system_client_selectables<
 
     let mut unvalidated_isograph_schema = Schema::new();
 
-    process_field_queue(db, &mut unvalidated_isograph_schema, field_queue)?;
+    process_field_queue(db, &mut unvalidated_isograph_schema, &field_queue)?;
 
     let mut unprocessed_selection_set = vec![];
 
@@ -124,7 +124,7 @@ pub(crate) fn create_type_system_schema_with_type_system_client_selectables<
 fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
-    field_queue: HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
+    field_queue: &HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
 ) -> Result<(), CreateSchemaError<TNetworkProtocol>> {
     for selectable in process_field_queue_inner(db, field_queue) {
         match selectable? {
@@ -158,9 +158,9 @@ fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok(())
 }
 
-fn process_field_queue_inner<TNetworkProtocol: NetworkProtocol + 'static>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    field_queue: HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
+fn process_field_queue_inner<'db, TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &'db IsographDatabase<TNetworkProtocol>,
+    field_queue: &'db HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
 ) -> impl Iterator<
     Item = Result<
         SelectionType<
@@ -169,16 +169,16 @@ fn process_field_queue_inner<TNetworkProtocol: NetworkProtocol + 'static>(
         >,
         CreateSchemaError<TNetworkProtocol>,
     >,
-> {
-    field_queue.into_iter().flat_map(
+> + 'db {
+    field_queue.iter().flat_map(
         move |(parent_object_entity_name, field_definitions_to_insert)| {
             field_definitions_to_insert
-                .into_iter()
+                .iter()
                 .map(move |server_field_to_insert| {
                     field_to_insert_to_server_selectable(
                         db,
-                        parent_object_entity_name,
-                        &server_field_to_insert,
+                        *parent_object_entity_name,
+                        server_field_to_insert,
                     )
                     .map_err(|e| e.into())
                 })
