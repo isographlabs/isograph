@@ -24,7 +24,7 @@ pub fn create_type_system_schema_with_server_selectables<
 ) -> Result<
     (
         HashMap<ServerObjectEntityName, Vec<ExposeFieldToInsert>>,
-        Schema<TNetworkProtocol>,
+        HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
     ),
     CreateSchemaError<TNetworkProtocol>,
 > {
@@ -49,11 +49,7 @@ pub fn create_type_system_schema_with_server_selectables<
         );
     }
 
-    let mut unvalidated_isograph_schema = Schema::new();
-
-    process_field_queue(db, &mut unvalidated_isograph_schema, field_queue)?;
-
-    Ok((expose_as_field_queue, unvalidated_isograph_schema))
+    Ok((expose_as_field_queue, field_queue))
 }
 
 /// Create a schema from the type system document, i.e. avoid parsing any
@@ -69,8 +65,12 @@ pub(crate) fn create_type_system_schema_with_type_system_client_selectables<
     (Schema<TNetworkProtocol>, Vec<UnprocessedSelectionSet>),
     CreateSchemaError<TNetworkProtocol>,
 > {
-    let (expose_as_field_queue, mut unvalidated_isograph_schema) =
+    let (expose_as_field_queue, field_queue) =
         create_type_system_schema_with_server_selectables(db).to_owned()?;
+
+    let mut unvalidated_isograph_schema = Schema::new();
+
+    process_field_queue(db, &mut unvalidated_isograph_schema, field_queue)?;
 
     let mut unprocessed_selection_set = vec![];
 
