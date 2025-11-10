@@ -26,6 +26,12 @@ command = ["cargo", "check", "--color", "always"]
 watch = ["crates"]
 need_stdout = false
 
+[jobs.check-cli]
+command = ["cargo", "check", "--color", "always", "-p", "isograph_cli"]
+watch = ["crates"]
+need_stdout = false
+
+
 [jobs.check-all]
 command = ["cargo", "check", "--all-targets", "--color", "always"]
 need_stdout = false
@@ -113,6 +119,7 @@ background = true
 c = "job:clippy-all" # comment this to have 'c' run clippy on only the default target
 b = "job:build"
 x = "job:check"
+z = "job:check-cli"
 
 [jobs.build-swc]
 command = [
