@@ -24,6 +24,9 @@ use crate::process_iso_literals::ParsedIsoLiteralsMap;
 pub fn parse_iso_literals_in_file_content<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     relative_path_to_source_file: RelativePathToSourceFile,
+    // Normally, this would not be a parameter, but instead read from the db. But,
+    // we are using it in crates/isograph_fixture_tests/src/main.rs.
+    // We should reconsider this!
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<
     Vec<(IsoLiteralExtractionResult, TextSource)>,
