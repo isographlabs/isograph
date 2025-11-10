@@ -65,8 +65,8 @@ pub(crate) fn create_type_system_schema_with_type_system_client_selectables<
     (Schema<TNetworkProtocol>, Vec<UnprocessedSelectionSet>),
     CreateSchemaError<TNetworkProtocol>,
 > {
-    let (expose_as_field_queue, field_queue) =
-        create_type_system_schema_with_server_selectables(db).to_owned()?;
+    let memo_ref = create_type_system_schema_with_server_selectables(db);
+    let (expose_as_field_queue, field_queue) = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
 
     let mut unvalidated_isograph_schema = Schema::new();
 
@@ -80,7 +80,7 @@ pub(crate) fn create_type_system_schema_with_type_system_client_selectables<
                 unprocessed_client_scalar_selection_set,
                 exposed_field_client_scalar_selectable,
                 payload_object_entity_name,
-            ) = create_new_exposed_field(db, &expose_as_field, parent_object_entity_name)?;
+            ) = create_new_exposed_field(db, &expose_as_field, *parent_object_entity_name)?;
 
             let client_scalar_selectable_name = exposed_field_client_scalar_selectable.name.item;
             let parent_object_entity_name =
