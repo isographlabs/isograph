@@ -250,13 +250,17 @@ fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol + 's
     ),
     TNetworkProtocol,
 > {
-    let query_id = *fetchable_types(db)
+    let query_id_memo_ref = fetchable_types(db);
+
+    let query_id = query_id_memo_ref
         .deref()
         .as_ref()
-        .expect(
-            "Expected parsing to have succeeded. \
-            This is indicative of a bug in Isograph.",
-        )
+        .map_err(|e| {
+            WithSpan::new(
+                ProcessClientFieldDeclarationError::ParseTypeSystemDocumentsError(e.clone()),
+                Span::todo_generated(),
+            )
+        })?
         .iter()
         .find(|(_, root_operation_name)| root_operation_name.0 == "query")
         .expect("Expected query to be found")
@@ -339,7 +343,7 @@ fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol + 's
             // Assume that if we have an id field, this implements Node
             RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
                 vec![id_selection()],
-                query_id,
+                *query_id,
                 vec![
                     WrappedSelectionMapSelection::InlineFragment(parent_server_object_entity_name),
                     WrappedSelectionMapSelection::LinkedField {
@@ -599,6 +603,9 @@ pub enum ProcessClientFieldDeclarationError<TNetworkProtocol: NetworkProtocol + 
 
     #[error("{0}")]
     FieldToInsertToServerSelectableError(FieldToInsertToServerSelectableError),
+
+    #[error("{0}")]
+    ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
