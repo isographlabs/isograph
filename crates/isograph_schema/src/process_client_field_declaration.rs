@@ -13,6 +13,7 @@ use isograph_lang_types::{
     ServerObjectEntityNameWrapper, TypeAnnotation, UnvalidatedSelection, VariableDefinition,
 };
 
+use pico_macros::legacy_memo;
 use thiserror::Error;
 
 use crate::{
@@ -195,11 +196,12 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
         .span;
     let client_scalar_selectable_name = client_field_declaration.item.client_field_name.item;
 
-    let (result, client_scalar_selectable) = add_client_field_to_object_inner(
+    let (result, client_scalar_selectable) = process_client_field_declaration_inner(
         db,
         parent_server_object_entity_name,
         client_field_declaration,
-    )?;
+    )
+    .to_owned()?;
 
     if schema
         .server_entity_data
@@ -236,7 +238,8 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok(result)
 }
 
-fn add_client_field_to_object_inner<TNetworkProtocol: NetworkProtocol + 'static>(
+#[legacy_memo]
+fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
     client_field_declaration: WithSpan<ClientFieldDeclaration>,
