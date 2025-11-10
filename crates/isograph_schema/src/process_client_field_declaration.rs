@@ -71,8 +71,8 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol + 'sta
             ))?;
 
     let unprocess_client_field_items = match parent_type_id {
-        ServerEntityName::Object(object_entity_name) => {
-            add_client_field_to_object(db, schema, object_entity_name, client_field_declaration)
+        ServerEntityName::Object(_) => {
+            add_client_field_to_object(db, schema, client_field_declaration)
                 .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?
         }
         ServerEntityName::Scalar(scalar_entity_name) => {
@@ -183,7 +183,6 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol + 's
 fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
-    parent_server_object_entity_name: ServerObjectEntityName,
     client_field_declaration: WithSpan<ClientFieldDeclaration>,
 ) -> ProcessClientFieldDeclarationResult<
     UnprocessedClientScalarSelectableSelectionSet,
@@ -195,23 +194,20 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
         .location
         .span;
     let client_scalar_selectable_name = client_field_declaration.item.client_field_name.item;
+    let client_field_parent_object_entity_name = client_field_declaration.item.parent_type.item.0;
 
-    let (result, client_scalar_selectable) = process_client_field_declaration_inner(
-        db,
-        parent_server_object_entity_name,
-        client_field_declaration,
-    )
-    .to_owned()?;
+    let (result, client_scalar_selectable) =
+        process_client_field_declaration_inner(db, client_field_declaration).to_owned()?;
 
     if schema
         .server_entity_data
-        .entry(parent_server_object_entity_name)
+        .entry(client_field_parent_object_entity_name)
         .or_default()
         .selectables
         .insert(
             client_scalar_selectable_name.0.into(),
             DefinitionLocation::Client(SelectionType::Scalar((
-                parent_server_object_entity_name,
+                client_field_parent_object_entity_name,
                 client_scalar_selectable_name.0,
             ))),
         )
@@ -220,7 +216,7 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
         // Did not insert, so this object already has a field with the same name :(
         return Err(WithSpan::new(
             ProcessClientFieldDeclarationError::ParentAlreadyHasField {
-                parent_object_entity_name: parent_server_object_entity_name,
+                parent_object_entity_name: client_field_parent_object_entity_name,
                 client_selectable_name: client_scalar_selectable_name.0.into(),
             },
             name_span,
@@ -229,7 +225,7 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
 
     schema.client_scalar_selectables.insert(
         (
-            parent_server_object_entity_name,
+            client_field_parent_object_entity_name,
             client_scalar_selectable_name.0,
         ),
         client_scalar_selectable,
@@ -241,7 +237,6 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
 #[legacy_memo]
 fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_server_object_entity_name: ServerObjectEntityName,
     client_field_declaration: WithSpan<ClientFieldDeclaration>,
 ) -> ProcessClientFieldDeclarationResult<
     (
@@ -287,17 +282,17 @@ fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol + 's
                 validate_variable_definition(
                     db,
                     variable_definition,
-                    parent_server_object_entity_name,
+                    client_field_declaration.item.parent_type.item.0,
                     client_scalar_selectable_name.0.into(),
                 )
             })
             .collect::<Result<_, _>>()?,
         type_and_field: ParentObjectEntityNameAndSelectableName {
-            parent_object_entity_name: parent_server_object_entity_name,
+            parent_object_entity_name: client_field_declaration.item.parent_type.item.0,
             selectable_name: client_scalar_selectable_name.0.into(),
         },
 
-        parent_object_entity_name: parent_server_object_entity_name,
+        parent_object_entity_name: client_field_declaration.item.parent_type.item.0,
         refetch_strategy: None,
         network_protocol: std::marker::PhantomData,
     };
@@ -311,14 +306,14 @@ fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol + 's
             "Expected parsing to have succeeded. \
             This is indicative of a bug in Isograph.",
         )
-        .contains_key(&parent_server_object_entity_name);
+        .contains_key(&client_field_declaration.item.parent_type.item.0);
 
     let refetch_strategy = if is_fetchable {
         Some(RefetchStrategy::RefetchFromRoot)
     } else {
         let id_field_memo_ref = server_selectable_named(
             db,
-            parent_server_object_entity_name,
+            client_field_declaration.item.parent_type.item.0,
             (*ID_FIELD_NAME).into(),
         );
 
@@ -345,7 +340,9 @@ fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol + 's
                 vec![id_selection()],
                 *query_id,
                 vec![
-                    WrappedSelectionMapSelection::InlineFragment(parent_server_object_entity_name),
+                    WrappedSelectionMapSelection::InlineFragment(
+                        client_field_declaration.item.parent_type.item.0,
+                    ),
                     WrappedSelectionMapSelection::LinkedField {
                         server_object_selectable_name: *NODE_FIELD_NAME,
                         arguments: id_top_level_arguments(),
@@ -358,7 +355,7 @@ fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol + 's
 
     Ok((
         UnprocessedClientScalarSelectableSelectionSet {
-            parent_object_entity_name: parent_server_object_entity_name,
+            parent_object_entity_name: client_field_declaration.item.parent_type.item.0,
             client_scalar_selectable_name: *client_scalar_selectable_name,
             reader_selection_set: selections,
             refetch_strategy,
