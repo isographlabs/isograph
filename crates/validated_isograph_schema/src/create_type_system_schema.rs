@@ -6,14 +6,12 @@ use isograph_schema::{
     CreateAdditionalFieldsError, ExposeFieldToInsert, FieldToInsert,
     FieldToInsertToServerSelectableError, ID_FIELD_NAME, IsographDatabase, NetworkProtocol,
     ScalarSelectionAndNonNullType, Schema, ServerObjectEntityExtraInfo, ServerObjectSelectable,
-    UnprocessedSelectionSet, create_new_exposed_field, field_to_insert_to_server_selectable,
+    field_to_insert_to_server_selectable,
 };
 use pico_macros::legacy_memo;
 use thiserror::Error;
 
-use crate::{
-    add_link_fields::add_link_fields, set_and_validate_id_field::set_and_validate_id_field,
-};
+use crate::set_and_validate_id_field::set_and_validate_id_field;
 
 #[legacy_memo]
 #[expect(clippy::type_complexity)]
@@ -52,67 +50,6 @@ pub fn create_type_system_schema_with_server_selectables<
     Ok((expose_as_field_queue, field_queue))
 }
 
-/// Create a schema from the type system document, i.e. avoid parsing any
-/// iso literals. It *does* set server fields. Parsing iso literals is done in a future step.
-///
-/// This is sufficient for some queries, like answering "Where is a server field defined."
-#[legacy_memo]
-pub(crate) fn create_type_system_schema_with_type_system_client_selectables<
-    TNetworkProtocol: NetworkProtocol + 'static,
->(
-    db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<
-    (Schema<TNetworkProtocol>, Vec<UnprocessedSelectionSet>),
-    CreateSchemaError<TNetworkProtocol>,
-> {
-    let memo_ref = create_type_system_schema_with_server_selectables(db);
-    let (expose_as_field_queue, field_queue) = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
-
-    let mut unvalidated_isograph_schema = Schema::new();
-
-    process_field_queue(db, &mut unvalidated_isograph_schema, &field_queue)?;
-
-    let mut unprocessed_selection_set = vec![];
-
-    for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
-        for expose_as_field in expose_as_fields_to_insert {
-            let (
-                unprocessed_client_scalar_selection_set,
-                exposed_field_client_scalar_selectable,
-                payload_object_entity_name,
-            ) = create_new_exposed_field(db, &expose_as_field, *parent_object_entity_name)?;
-
-            let client_scalar_selectable_name = exposed_field_client_scalar_selectable.name.item;
-            let parent_object_entity_name =
-                exposed_field_client_scalar_selectable.parent_object_entity_name;
-
-            unvalidated_isograph_schema
-                .client_scalar_selectables
-                .insert(
-                    (
-                        exposed_field_client_scalar_selectable.parent_object_entity_name,
-                        client_scalar_selectable_name,
-                    ),
-                    exposed_field_client_scalar_selectable,
-                );
-
-            unvalidated_isograph_schema.insert_client_field_on_object(
-                parent_object_entity_name,
-                client_scalar_selectable_name,
-                payload_object_entity_name,
-            )?;
-
-            unprocessed_selection_set.push(SelectionType::Scalar(
-                unprocessed_client_scalar_selection_set,
-            ));
-        }
-    }
-
-    add_link_fields(db, &mut unvalidated_isograph_schema)?;
-
-    Ok((unvalidated_isograph_schema, unprocessed_selection_set))
-}
-
 /// Now that we have processed all objects and scalars, we can process fields (i.e.
 /// selectables), as we have the knowledge of whether the field points to a scalar
 /// or object.
@@ -121,7 +58,7 @@ pub(crate) fn create_type_system_schema_with_type_system_client_selectables<
 /// - insert it into to the parent object's encountered_fields
 /// - append it to schema.server_fields
 /// - if it is an id field, modify the parent object
-fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
     field_queue: &HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
@@ -198,9 +135,6 @@ pub enum CreateSchemaError<TNetworkProtocol: NetworkProtocol + 'static> {
         message: CreateAdditionalFieldsError<TNetworkProtocol>,
     },
 
-    #[error("{0}")]
-    FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),
-
     #[error(
         "The Isograph compiler attempted to create a field named \
         `{selectable_name}` on type `{parent_object_entity_name}`, but a field with that name already exists."
@@ -209,6 +143,9 @@ pub enum CreateSchemaError<TNetworkProtocol: NetworkProtocol + 'static> {
         selectable_name: SelectableName,
         parent_object_entity_name: ServerObjectEntityName,
     },
+
+    #[error("{0}")]
+    FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),
 }
 
 impl<TNetworkProtocol: NetworkProtocol + 'static>
