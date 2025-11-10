@@ -700,7 +700,7 @@ function normalizeNetworkResponseObject(
     );
   }
 
-  const link = { __link: newStoreRecordId, __typename: __typename };
+  const link = { __link: newStoreRecordId, __typename };
   const newStoreRecord = readOptimisticRecord(storeLayer, link);
 
   normalizeDataIntoRecord(
