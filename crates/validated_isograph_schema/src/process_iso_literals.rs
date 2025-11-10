@@ -146,6 +146,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> From<Vec<WithLocation<AddSelec
     }
 }
 
+// This should not be used. It returns an Err variant if there is a single parse error.
 #[legacy_memo]
 fn parse_iso_literals<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
@@ -155,16 +156,19 @@ fn parse_iso_literals<TNetworkProtocol: NetworkProtocol + 'static>(
     let mut contains_iso = ParsedIsoLiteralsMap::default();
     let mut iso_literal_parse_errors = vec![];
     for (relative_path, iso_literals_source_id) in db.get_iso_literal_map().tracked().0.iter() {
-        match parse_iso_literal_in_source(db, *iso_literals_source_id).to_owned() {
-            Ok(iso_literals) => {
-                if !iso_literals.is_empty() {
-                    contains_iso.insert(*relative_path, iso_literals);
+        for literal in parse_iso_literal_in_source(db, *iso_literals_source_id).to_owned() {
+            match literal {
+                Ok(iso_literal) => {
+                    contains_iso
+                        .entry(*relative_path)
+                        .or_default()
+                        .push(iso_literal);
+                }
+                Err(e) => {
+                    iso_literal_parse_errors.push(e);
                 }
             }
-            Err(e) => {
-                iso_literal_parse_errors.extend(e);
-            }
-        };
+        }
     }
     if iso_literal_parse_errors.is_empty() {
         Ok(contains_iso)

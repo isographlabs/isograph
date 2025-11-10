@@ -28,34 +28,24 @@ pub fn parse_iso_literals_in_file_content<TNetworkProtocol: NetworkProtocol + 's
     // we are using it in crates/isograph_fixture_tests/src/main.rs.
     // We should reconsider this!
     current_working_directory: CurrentWorkingDirectory,
-) -> Result<
-    Vec<(IsoLiteralExtractionResult, TextSource)>,
-    Vec<WithLocation<IsographLiteralParseError>>,
-> {
+) -> Vec<Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>>>
+{
     let mut extraction_results = vec![];
-    let mut isograph_literal_parse_errors = vec![];
 
     for iso_literal_extraction in
         extract_iso_literals_from_file_content(db, relative_path_to_source_file)
             .deref()
             .iter()
     {
-        match process_iso_literal_extraction(
+        extraction_results.push(process_iso_literal_extraction(
             db,
             iso_literal_extraction,
             relative_path_to_source_file,
             current_working_directory,
-        ) {
-            Ok(result) => extraction_results.push(result),
-            Err(e) => isograph_literal_parse_errors.push(e),
-        }
+        ))
     }
 
-    if isograph_literal_parse_errors.is_empty() {
-        Ok(extraction_results)
-    } else {
-        Err(isograph_literal_parse_errors)
-    }
+    extraction_results
 }
 
 // TODO this (and the previous function) smell
@@ -85,10 +75,8 @@ pub fn parse_iso_literals_in_file_content_and_return_all<
 pub fn parse_iso_literal_in_source<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     iso_literals_source_id: SourceId<IsoLiteralsSource>,
-) -> Result<
-    Vec<(IsoLiteralExtractionResult, TextSource)>,
-    Vec<WithLocation<IsographLiteralParseError>>,
-> {
+) -> Vec<Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>>>
+{
     let memo_ref = read_iso_literals_source(db, iso_literals_source_id);
     let IsoLiteralsSource {
         relative_path,
