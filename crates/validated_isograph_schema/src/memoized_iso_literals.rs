@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 
-use common_lang_types::{ClientSelectableName, ServerObjectEntityName};
+use common_lang_types::{ClientScalarSelectableName, ClientSelectableName, ServerObjectEntityName};
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{ClientFieldDeclaration, ClientPointerDeclaration, SelectionType};
 use isograph_schema::{IsographDatabase, NetworkProtocol};
@@ -124,4 +124,45 @@ pub enum MemoizedIsoLiteralError {
         duplicate_entity_name: ServerObjectEntityName,
         duplicate_client_selectable_name: ClientSelectableName,
     },
+
+    #[error(
+        "Expected `{parent_object_entity_name}.{client_selectable_name}` to be {intended_type}. But it was {actual_type}."
+    )]
+    SelectableIsWrongType {
+        parent_object_entity_name: ServerObjectEntityName,
+        client_selectable_name: ClientSelectableName,
+        intended_type: &'static str,
+        actual_type: &'static str,
+    },
+}
+
+#[legacy_memo]
+pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    parent_object_entity_name: ServerObjectEntityName,
+    client_scalar_selectable_name: ClientScalarSelectableName,
+) -> Result<Option<ClientFieldDeclaration>, MemoizedIsoLiteralError> {
+    let memo_ref = client_selectable_declaration(
+        db,
+        parent_object_entity_name,
+        client_scalar_selectable_name.into(),
+    );
+
+    let x = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
+
+    let item = match x {
+        Some(item) => item,
+        None => return Ok(None),
+    };
+    match item {
+        SelectionType::Scalar(client_field_declaration) => {
+            Ok(Some(client_field_declaration.clone()))
+        }
+        SelectionType::Object(_) => Err(MemoizedIsoLiteralError::SelectableIsWrongType {
+            parent_object_entity_name,
+            client_selectable_name: client_scalar_selectable_name.into(),
+            intended_type: "a scalar",
+            actual_type: "an object",
+        }),
+    }
 }
