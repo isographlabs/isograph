@@ -410,6 +410,7 @@ fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol>(
     Ok(unprocessed_fields)
 }
 
+#[legacy_memo]
 pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_pointer_declaration: WithSpan<ClientPointerDeclaration>,

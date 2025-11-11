@@ -2,13 +2,15 @@ use std::collections::HashMap;
 use std::ops::Deref;
 
 use common_lang_types::{
-    ClientScalarSelectableName, ClientSelectableName, ServerObjectEntityName, Span, WithSpan,
+    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName,
+    ServerObjectEntityName, Span, WithSpan,
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{ClientFieldDeclaration, ClientPointerDeclaration, SelectionType};
 use isograph_schema::{
-    ClientScalarSelectable, IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError,
-    process_client_field_declaration_inner,
+    ClientObjectSelectable, ClientScalarSelectable, IsographDatabase, NetworkProtocol,
+    ProcessClientFieldDeclarationError, process_client_field_declaration_inner,
+    process_client_pointer_declaration_inner,
 };
 use pico_macros::legacy_memo;
 use thiserror::Error;
@@ -178,6 +180,37 @@ pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[legacy_memo]
+pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    parent_object_entity_name: ServerObjectEntityName,
+    client_object_selectable_name: ClientObjectSelectableName,
+) -> Result<Option<ClientPointerDeclaration>, MemoizedIsoLiteralError<TNetworkProtocol>> {
+    let memo_ref = client_selectable_declaration(
+        db,
+        parent_object_entity_name,
+        client_object_selectable_name.into(),
+    );
+
+    let x = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
+
+    let item = match x {
+        Some(item) => item,
+        None => return Ok(None),
+    };
+    match item {
+        SelectionType::Object(client_pointer_declaration) => {
+            Ok(Some(client_pointer_declaration.clone()))
+        }
+        SelectionType::Scalar(_) => Err(MemoizedIsoLiteralError::SelectableIsWrongType {
+            parent_object_entity_name,
+            client_selectable_name: client_object_selectable_name.into(),
+            intended_type: "an object",
+            actual_type: "a scalar",
+        }),
+    }
+}
+
+#[legacy_memo]
 pub fn client_scalar_selectable<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
@@ -207,4 +240,36 @@ pub fn client_scalar_selectable<TNetworkProtocol: NetworkProtocol>(
         .map_err(|e| MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(e.clone()))?;
 
     Ok(Some(scalar_selectable.clone()))
+}
+
+#[legacy_memo]
+pub fn client_object_selectable<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    parent_object_entity_name: ServerObjectEntityName,
+    client_object_selectable_name: ClientObjectSelectableName,
+) -> Result<
+    Option<ClientObjectSelectable<TNetworkProtocol>>,
+    MemoizedIsoLiteralError<TNetworkProtocol>,
+> {
+    let memo_ref =
+        client_pointer_declaration(db, parent_object_entity_name, client_object_selectable_name);
+
+    let declaration = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
+
+    let declaration = match declaration {
+        Some(declaration) => declaration.clone(),
+        None => return Ok(None),
+    };
+
+    let selectable_memo_ref = process_client_pointer_declaration_inner(
+        db,
+        WithSpan::new(declaration, Span::todo_generated()),
+    );
+
+    let (_, object_selectable) = selectable_memo_ref
+        .deref()
+        .as_ref()
+        .map_err(|e| MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(e.clone()))?;
+
+    Ok(Some(object_selectable.clone()))
 }
