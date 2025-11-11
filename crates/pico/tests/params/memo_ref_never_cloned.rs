@@ -20,7 +20,7 @@ fn memo_ref_never_cloned() {
     assert_eq!(OUTPUT_CLONE_COUNTER.load(Ordering::SeqCst), 0);
 
     // We cannot mutate the db while the MemoRef exists, since it
-    // contains a reference to 'db.
+    // contains a reference to 'db'.
 }
 
 #[derive(PartialEq, Eq)]

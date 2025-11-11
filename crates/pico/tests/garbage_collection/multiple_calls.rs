@@ -19,6 +19,10 @@ impl TestDatabase {
     }
 }
 
+/// Calling a memoized function multiple times with the same arguments
+/// does not double count in the cache.
+/// Calling `memoized_b` many times does NOT fill the cache with repeats and
+/// cause others to be evicted.
 #[test]
 fn multiple_calls() {
     // When we garbage collect, we will only keep the most recently called top-level field

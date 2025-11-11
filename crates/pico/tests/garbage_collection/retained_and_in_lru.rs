@@ -19,6 +19,9 @@ impl TestDatabase {
     }
 }
 
+/// When a result is retained for both reasons of being
+/// most recently used and marked for permanent retention, it is retained
+/// and it is the only one retained because the capacity is only 1.
 #[test]
 fn basic_retained() {
     // When we garbage collect, we will only keep the most recently called top-level field
@@ -30,8 +33,8 @@ fn basic_retained() {
     memoized_b(&db);
     assert_eq!(B_COUNTER.load(Ordering::SeqCst), 1);
 
-    let retain = retain(&db, memo_ref_a);
-    retain.never_garbage_collect();
+    let retain_a = retain(&db, memo_ref_a);
+    retain_a.never_garbage_collect();
 
     memoized_a(&db);
 
