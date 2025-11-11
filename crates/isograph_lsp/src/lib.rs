@@ -18,7 +18,7 @@ pub mod server;
 pub mod text_document;
 mod uri_file_path_ext;
 
-pub async fn start_language_server<TNetworkProtocol: NetworkProtocol + 'static>(
+pub async fn start_language_server<TNetworkProtocol: NetworkProtocol>(
     config_location: &PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> LSPProcessResult<(), TNetworkProtocol> {

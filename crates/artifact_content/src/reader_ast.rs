@@ -24,7 +24,7 @@ use crate::{
 
 // Can we do this when visiting the client field in when generating entrypoints?
 #[expect(clippy::too_many_arguments)]
-fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
+fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection: &WithSpan<ValidatedSelection>,
     schema: &Schema<TNetworkProtocol>,
@@ -186,7 +186,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[expect(clippy::too_many_arguments)]
-fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
+fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     linked_field: &ValidatedObjectSelection,
@@ -308,7 +308,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[expect(clippy::too_many_arguments)]
-fn scalar_client_defined_field_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
+fn scalar_client_defined_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     scalar_field_selection: &ValidatedScalarSelection,
     schema: &Schema<TNetworkProtocol>,
@@ -388,7 +388,7 @@ fn link_variant_ast_node(
 }
 
 #[expect(clippy::too_many_arguments)]
-fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
+fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     scalar_field_selection: &ValidatedScalarSelection,
     indentation_level: u8,
@@ -454,7 +454,7 @@ fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
     )
 }
 
-fn imperatively_loaded_variant_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
+fn imperatively_loaded_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
     nested_client_field: &ClientScalarSelectable<TNetworkProtocol>,
     reader_imports: &mut ReaderImports,
     root_refetched_paths: &RefetchedPathsMap,
@@ -499,7 +499,7 @@ fn imperatively_loaded_variant_ast_node<TNetworkProtocol: NetworkProtocol + 'sta
 }
 
 #[expect(clippy::too_many_arguments)]
-fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol + 'static>(
+fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
@@ -620,7 +620,7 @@ fn server_defined_scalar_field_ast_node(
 }
 
 #[expect(clippy::too_many_arguments)]
-fn generate_reader_ast_with_path<'schema, TNetworkProtocol: NetworkProtocol + 'static>(
+fn generate_reader_ast_with_path<'schema, TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &'schema Schema<TNetworkProtocol>,
     selection_set: &'schema [WithSpan<ValidatedSelection>],
@@ -704,7 +704,7 @@ fn find_imperatively_fetchable_query_index(
         )
 }
 
-pub(crate) fn generate_reader_ast<'schema, TNetworkProtocol: NetworkProtocol + 'static>(
+pub(crate) fn generate_reader_ast<'schema, TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &'schema Schema<TNetworkProtocol>,
     selection_set: &'schema [WithSpan<ValidatedSelection>],
@@ -730,7 +730,7 @@ pub(crate) fn generate_reader_ast<'schema, TNetworkProtocol: NetworkProtocol + '
     (reader_ast, client_field_imports)
 }
 
-fn refetched_paths_for_client_field<TNetworkProtocol: NetworkProtocol + 'static>(
+fn refetched_paths_for_client_field<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     nested_client_field: &ClientScalarSelectable<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
@@ -754,7 +754,7 @@ fn refetched_paths_for_client_field<TNetworkProtocol: NetworkProtocol + 'static>
     paths
 }
 
-fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol + 'static>(
+fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_set: &[WithSpan<ValidatedSelection>],
     schema: &Schema<TNetworkProtocol>,

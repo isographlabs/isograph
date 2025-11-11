@@ -27,7 +27,7 @@ use crate::{
     uri_file_path_ext::UriFilePathExt,
 };
 
-pub fn on_hover<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn on_hover<TNetworkProtocol: NetworkProtocol>(
     compiler_state: &CompilerState<TNetworkProtocol>,
     params: <HoverRequest as Request>::Params,
 ) -> LSPRuntimeResult<<HoverRequest as Request>::Result> {
@@ -41,7 +41,7 @@ pub fn on_hover<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[legacy_memo]
-fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
+fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     url: Uri,
     position: Position,
@@ -141,9 +141,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[legacy_memo]
-pub fn get_iso_literal_extraction_from_text_position_params<
-    TNetworkProtocol: NetworkProtocol + 'static,
->(
+pub fn get_iso_literal_extraction_from_text_position_params<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     url: Uri,
     line_char: LineChar,
@@ -319,7 +317,7 @@ fn hover_text_for_selectable(
     )
 }
 
-fn format_hover_for_entity<TNetworkProtocol: NetworkProtocol + 'static>(
+fn format_hover_for_entity<TNetworkProtocol: NetworkProtocol>(
     entity: &ServerObjectEntity<TNetworkProtocol>,
 ) -> String {
     let object_entity_name = entity.name.item;

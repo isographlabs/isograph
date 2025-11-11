@@ -19,7 +19,7 @@ use crate::{
     watch::{ChangedFileKind, SourceEventKind, SourceFileEvent},
 };
 
-pub fn initialize_sources<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn initialize_sources<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
 ) -> Result<(), SourceError> {
     let schema = db.get_isograph_config().schema.clone();
@@ -32,7 +32,7 @@ pub fn initialize_sources<TNetworkProtocol: NetworkProtocol + 'static>(
     read_iso_literals_from_project_root(db)
 }
 
-pub fn update_sources<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn update_sources<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     changes: &[SourceFileEvent],
 ) -> Result<(), SourceError> {
@@ -55,7 +55,7 @@ pub fn update_sources<TNetworkProtocol: NetworkProtocol + 'static>(
     }
 }
 
-fn handle_update_schema<TNetworkProtocol: NetworkProtocol + 'static>(
+fn handle_update_schema<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     event_kind: &SourceEventKind,
 ) -> Result<(), SourceError> {
@@ -82,7 +82,7 @@ fn handle_update_schema<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok(())
 }
 
-fn handle_update_schema_extensions<TNetworkProtocol: NetworkProtocol + 'static>(
+fn handle_update_schema_extensions<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     event_kind: &SourceEventKind,
 ) -> Result<(), SourceError> {
@@ -117,7 +117,7 @@ fn handle_update_schema_extensions<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok(())
 }
 
-fn create_or_update_schema_extension<TNetworkProtocol: NetworkProtocol + 'static>(
+fn create_or_update_schema_extension<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     path: &Path,
 ) -> Result<(), SourceError> {
@@ -131,7 +131,7 @@ fn create_or_update_schema_extension<TNetworkProtocol: NetworkProtocol + 'static
     Ok(())
 }
 
-fn handle_update_source_file<TNetworkProtocol: NetworkProtocol + 'static>(
+fn handle_update_source_file<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     event_kind: &SourceEventKind,
 ) -> Result<(), SourceError> {
@@ -159,7 +159,7 @@ fn handle_update_source_file<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok(())
 }
 
-fn create_or_update_iso_literals<TNetworkProtocol: NetworkProtocol + 'static>(
+fn create_or_update_iso_literals<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     path: &Path,
 ) -> Result<(), SourceError> {
@@ -170,7 +170,7 @@ fn create_or_update_iso_literals<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok(())
 }
 
-fn handle_update_source_folder<TNetworkProtocol: NetworkProtocol + 'static>(
+fn handle_update_source_folder<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     event_kind: &SourceEventKind,
 ) -> Result<(), SourceError> {
@@ -189,7 +189,7 @@ fn handle_update_source_folder<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok(())
 }
 
-fn remove_iso_literals_from_folder<TNetworkProtocol: NetworkProtocol + 'static>(
+fn remove_iso_literals_from_folder<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     folder: &PathBuf,
 ) {
@@ -202,7 +202,7 @@ fn remove_iso_literals_from_folder<TNetworkProtocol: NetworkProtocol + 'static>(
     db.remove_iso_literals_from_path(&relative_path);
 }
 
-fn read_schema<TNetworkProtocol: NetworkProtocol + 'static>(
+fn read_schema<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     schema_path: &AbsolutePathAndRelativePath,
 ) -> Result<SourceId<SchemaSource>, SourceError> {
@@ -254,7 +254,7 @@ fn read_schema_file(path: &PathBuf) -> Result<String, SourceError> {
     Ok(contents)
 }
 
-fn read_schema_extensions<TNetworkProtocol: NetworkProtocol + 'static>(
+fn read_schema_extensions<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
 ) -> Result<BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>, SourceError> {
     let config_schema_extensions = db.get_isograph_config().schema_extensions.clone();
@@ -266,14 +266,14 @@ fn read_schema_extensions<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok(schema_extensions)
 }
 
-fn read_iso_literals_from_project_root<TNetworkProtocol: NetworkProtocol + 'static>(
+fn read_iso_literals_from_project_root<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
 ) -> Result<(), SourceError> {
     let project_root = db.get_isograph_config().project_root.clone();
     read_iso_literals_from_folder(db, &project_root)
 }
 
-fn read_iso_literals_from_folder<TNetworkProtocol: NetworkProtocol + 'static>(
+fn read_iso_literals_from_folder<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     folder: &Path,
 ) -> Result<(), SourceError> {

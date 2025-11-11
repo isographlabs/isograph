@@ -11,7 +11,7 @@ use intern::{Lookup, string_key::Intern};
 use serde::Deserialize;
 use thiserror::Error;
 
-impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {}
+impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {}
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, PartialOrd, Ord, Hash)]
 #[serde(deny_unknown_fields)]
@@ -53,7 +53,7 @@ pub type ProcessTypeDefinitionResult<T, TNetworkProtocol> =
 /// WithLocation<CreateAdditionalFieldsError> everywhere, but we removed that. But it makes sense
 /// in some cases!
 #[derive(Error, Clone, Eq, PartialEq, Debug)]
-pub enum CreateAdditionalFieldsError<TNetworkProtocol: NetworkProtocol + 'static> {
+pub enum CreateAdditionalFieldsError<TNetworkProtocol: NetworkProtocol> {
     #[error(
         "The Isograph compiler attempted to create a field named \
         `{client_scalar_selectable_name}` on entity `{parent_object_entity_name}`, \

@@ -7,7 +7,7 @@ use crate::{IsographDatabase, NetworkProtocol, RootOperationName};
 
 /// This is a GraphQL-ism and this function should probably not exist.
 #[legacy_memo]
-pub fn fetchable_types<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn fetchable_types<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
     BTreeMap<ServerObjectEntityName, RootOperationName>,

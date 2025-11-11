@@ -11,7 +11,7 @@ use isograph_schema::{
 /// If we have encountered an id field, we can:
 /// - validate that the id field is properly defined, i.e. has type ID!
 /// - set the id field
-pub(crate) fn set_and_validate_id_field<TNetworkProtocol: NetworkProtocol + 'static>(
+pub(crate) fn set_and_validate_id_field<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     id_field: &mut Option<ServerScalarIdSelectableName>,
     current_field_selectable_name: ServerScalarSelectableName,

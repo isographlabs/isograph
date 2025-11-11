@@ -13,7 +13,7 @@ pub trait ServerScalarOrObjectSelectable {
     fn arguments(&self) -> &[WithLocation<VariableDefinition<ServerEntityName>>];
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static> ServerScalarOrObjectSelectable
+impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
     for ServerObjectSelectable<TNetworkProtocol>
 {
     fn description(&self) -> Option<Description> {
@@ -39,7 +39,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> ServerScalarOrObjectSelectable
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static> ServerScalarOrObjectSelectable
+impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
     for ServerScalarSelectable<TNetworkProtocol>
 {
     fn description(&self) -> Option<Description> {

@@ -124,7 +124,7 @@ fn variable_type_satisfies_argument_type(
     }
 }
 
-pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
     field_argument_definition_type: &GraphQLTypeAnnotation<ServerEntityName>,
@@ -279,7 +279,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol + 'static>(
     }
 }
 
-fn object_satisfies_type<TNetworkProtocol: NetworkProtocol + 'static>(
+fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
     variable_definitions: &[WithSpan<VariableDefinition<ServerEntityName>>],
@@ -344,7 +344,7 @@ enum ObjectLiteralFieldType {
     Missing(SelectableName),
 }
 
-fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtocol + 'static>(
+fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_entity_data: &ServerEntityData,
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
@@ -500,7 +500,7 @@ fn enum_satisfies_type(
     }
 }
 
-fn list_satisfies_type<TNetworkProtocol: NetworkProtocol + 'static>(
+fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     list: &[WithLocation<NonConstantValue>],
     list_type: GraphQLListTypeAnnotation<ServerEntityName>,

@@ -11,7 +11,7 @@ use thiserror::Error;
 use crate::parse_iso_literal_in_source;
 
 #[legacy_memo]
-pub fn client_selectable_declaration_map<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn client_selectable_declaration_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> HashMap<
     (ServerObjectEntityName, ClientSelectableName),
@@ -71,7 +71,7 @@ pub fn client_selectable_declaration_map<TNetworkProtocol: NetworkProtocol + 'st
 }
 
 #[legacy_memo]
-pub fn client_selectable_declarations<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn client_selectable_declarations<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_selectable_name: ClientSelectableName,
@@ -86,7 +86,7 @@ pub fn client_selectable_declarations<TNetworkProtocol: NetworkProtocol + 'stati
 }
 
 #[legacy_memo]
-pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_selectable_name: ClientSelectableName,
@@ -137,7 +137,7 @@ pub enum MemoizedIsoLiteralError {
 }
 
 #[legacy_memo]
-pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_scalar_selectable_name: ClientScalarSelectableName,

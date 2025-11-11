@@ -14,7 +14,7 @@ type OwnedSelectableResult<TNetworkProtocol> =
 
 /// A vector of all server selectables that are defined in the type system schema
 #[legacy_memo]
-pub fn server_selectables_vec<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn server_selectables_vec<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
 ) -> Result<
@@ -50,7 +50,7 @@ pub fn server_selectables_vec<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[legacy_memo]
-pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
 ) -> Result<
@@ -69,7 +69,7 @@ pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[legacy_memo]
-pub fn server_selectables_named<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn server_selectables_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
     server_selectable_name: ServerSelectableName,
@@ -87,7 +87,7 @@ pub fn server_selectables_named<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[legacy_memo]
-pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
     server_selectable_name: ServerSelectableName,
@@ -117,7 +117,7 @@ pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
-pub enum ServerSelectableNamedError<TNetworkProtocol: NetworkProtocol + 'static> {
+pub enum ServerSelectableNamedError<TNetworkProtocol: NetworkProtocol> {
     #[error("{0}")]
     ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),
 
@@ -147,7 +147,7 @@ pub enum ServerSelectableNamedError<TNetworkProtocol: NetworkProtocol + 'static>
 }
 
 #[legacy_memo]
-pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
     server_selectable_name: ServerSelectableName,
@@ -177,7 +177,7 @@ pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol + 'stati
 }
 
 #[legacy_memo]
-pub fn server_scalar_selectable_named<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn server_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
     server_selectable_name: ServerSelectableName,

@@ -31,7 +31,7 @@ impl<T: ServerScalarOrObjectEntity> ServerScalarOrObjectEntity for WithLocation<
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static> ServerScalarOrObjectEntity
+impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
     for ServerScalarEntity<TNetworkProtocol>
 {
     fn name(&self) -> SelectionType<ServerScalarEntityName, ServerObjectEntityName> {
@@ -43,7 +43,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> ServerScalarOrObjectEntity
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static> ServerScalarOrObjectEntity
+impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
     for ServerObjectEntity<TNetworkProtocol>
 {
     fn name(&self) -> SelectionType<ServerScalarEntityName, ServerObjectEntityName> {
@@ -55,10 +55,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> ServerScalarOrObjectEntity
     }
 }
 
-pub fn get_parent_and_selectable_for_scalar_path<
-    'a,
-    TNetworkProtocol: NetworkProtocol + 'static,
->(
+pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     scalar_path: &ScalarSelectionPath<'a>,
     validated_schema: &'a Schema<TNetworkProtocol>,
@@ -92,10 +89,7 @@ pub fn get_parent_and_selectable_for_scalar_path<
     Ok((parent, selectable))
 }
 
-pub fn get_parent_and_selectable_for_object_path<
-    'a,
-    TNetworkProtocol: NetworkProtocol + 'static,
->(
+pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     object_path: &ObjectSelectionPath<'a>,
     validated_schema: &'a Schema<TNetworkProtocol>,
@@ -129,10 +123,7 @@ pub fn get_parent_and_selectable_for_object_path<
     Ok((parent, selectable))
 }
 
-pub fn get_parent_and_selectable_for_selection_parent<
-    'a,
-    TNetworkProtocol: NetworkProtocol + 'static,
->(
+pub fn get_parent_and_selectable_for_selection_parent<'a, TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_parent: &SelectionParentType<'a>,
     selectable_name: SelectableName,
@@ -184,7 +175,7 @@ pub fn get_parent_and_selectable_for_selection_parent<
     }
 }
 
-pub fn parent_object_entity_and_selectable<'a, TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn parent_object_entity_and_selectable<'a, TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     validated_schema: &'a Schema<TNetworkProtocol>,
     parent_type_name: ServerObjectEntityNameWrapper,
@@ -275,7 +266,7 @@ pub fn parent_object_entity_and_selectable<'a, TNetworkProtocol: NetworkProtocol
 }
 
 #[derive(Error, Debug)]
-pub enum GetParentAndSelectableError<TNetworkProtocol: NetworkProtocol + 'static> {
+pub enum GetParentAndSelectableError<TNetworkProtocol: NetworkProtocol> {
     #[error("`{parent_type_name}` is not a type that has been defined.")]
     ParentTypeNotDefined {
         parent_type_name: ServerObjectEntityNameWrapper,

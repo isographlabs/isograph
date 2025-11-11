@@ -19,7 +19,7 @@ use crate::{
     parse_iso_literal_in_source, process_iso_literals,
 };
 
-pub(crate) fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol + 'static>(
+pub(crate) fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     mut unvalidated_isograph_schema: Schema<TNetworkProtocol>,
     mut unprocessed_selection_sets: Vec<UnprocessedSelectionSet>,
@@ -54,7 +54,7 @@ pub(crate) fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol 
 }
 
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
-pub enum ProcessIsoLiteralsForSchemaError<TNetworkProtocol: NetworkProtocol + 'static> {
+pub enum ProcessIsoLiteralsForSchemaError<TNetworkProtocol: NetworkProtocol> {
     #[error(
         "{}{}",
         if messages.len() == 1 { "Unable to process Isograph literal:" } else { "Unable to process Isograph literals:" },
@@ -110,7 +110,7 @@ pub enum ProcessIsoLiteralsForSchemaError<TNetworkProtocol: NetworkProtocol + 's
     },
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static>
+impl<TNetworkProtocol: NetworkProtocol>
     From<Vec<WithLocation<ProcessClientFieldDeclarationError<TNetworkProtocol>>>>
     for ProcessIsoLiteralsForSchemaError<TNetworkProtocol>
 {
@@ -121,7 +121,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static>
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static> From<Vec<WithLocation<IsographLiteralParseError>>>
+impl<TNetworkProtocol: NetworkProtocol> From<Vec<WithLocation<IsographLiteralParseError>>>
     for ProcessIsoLiteralsForSchemaError<TNetworkProtocol>
 {
     fn from(messages: Vec<WithLocation<IsographLiteralParseError>>) -> Self {
@@ -129,8 +129,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> From<Vec<WithLocation<Isograph
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static>
-    From<Vec<WithLocation<ValidateEntrypointDeclarationError>>>
+impl<TNetworkProtocol: NetworkProtocol> From<Vec<WithLocation<ValidateEntrypointDeclarationError>>>
     for ProcessIsoLiteralsForSchemaError<TNetworkProtocol>
 {
     fn from(messages: Vec<WithLocation<ValidateEntrypointDeclarationError>>) -> Self {
@@ -138,7 +137,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static>
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static> From<Vec<WithLocation<AddSelectionSetsError>>>
+impl<TNetworkProtocol: NetworkProtocol> From<Vec<WithLocation<AddSelectionSetsError>>>
     for ProcessIsoLiteralsForSchemaError<TNetworkProtocol>
 {
     fn from(messages: Vec<WithLocation<AddSelectionSetsError>>) -> Self {
@@ -148,7 +147,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> From<Vec<WithLocation<AddSelec
 
 // This should not be used. It returns an Err variant if there is a single parse error.
 #[legacy_memo]
-fn parse_iso_literals<TNetworkProtocol: NetworkProtocol + 'static>(
+fn parse_iso_literals<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<ParsedIsoLiteralsMap, Vec<WithLocation<IsographLiteralParseError>>> {
     // TODO we are not checking the open file map here. This will probably be fixed when we

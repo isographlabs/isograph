@@ -15,9 +15,7 @@ use crate::set_and_validate_id_field::set_and_validate_id_field;
 
 #[legacy_memo]
 #[expect(clippy::type_complexity)]
-pub fn create_type_system_schema_with_server_selectables<
-    TNetworkProtocol: NetworkProtocol + 'static,
->(
+pub fn create_type_system_schema_with_server_selectables<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
     (
@@ -58,7 +56,7 @@ pub fn create_type_system_schema_with_server_selectables<
 /// - insert it into to the parent object's encountered_fields
 /// - append it to schema.server_fields
 /// - if it is an id field, modify the parent object
-pub fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
     field_queue: &HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
@@ -95,7 +93,7 @@ pub fn process_field_queue<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok(())
 }
 
-fn process_field_queue_inner<'db, TNetworkProtocol: NetworkProtocol + 'static>(
+fn process_field_queue_inner<'db, TNetworkProtocol: NetworkProtocol>(
     db: &'db IsographDatabase<TNetworkProtocol>,
     field_queue: &'db HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
 ) -> impl Iterator<
@@ -124,7 +122,7 @@ fn process_field_queue_inner<'db, TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[derive(Error, Debug, PartialEq, Eq, Clone)]
-pub enum CreateSchemaError<TNetworkProtocol: NetworkProtocol + 'static> {
+pub enum CreateSchemaError<TNetworkProtocol: NetworkProtocol> {
     #[error("{message}")]
     ParseAndProcessTypeSystemDocument {
         message: TNetworkProtocol::ParseTypeSystemDocumentsError,
@@ -148,8 +146,8 @@ pub enum CreateSchemaError<TNetworkProtocol: NetworkProtocol + 'static> {
     FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static>
-    From<CreateAdditionalFieldsError<TNetworkProtocol>> for CreateSchemaError<TNetworkProtocol>
+impl<TNetworkProtocol: NetworkProtocol> From<CreateAdditionalFieldsError<TNetworkProtocol>>
+    for CreateSchemaError<TNetworkProtocol>
 {
     fn from(value: CreateAdditionalFieldsError<TNetworkProtocol>) -> Self {
         CreateSchemaError::CreateAdditionalFields { message: value }

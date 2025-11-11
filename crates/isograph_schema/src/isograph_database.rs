@@ -11,7 +11,7 @@ use pico_macros::{Db, Source};
 use crate::NetworkProtocol;
 
 #[derive(Default, Debug, Db)]
-pub struct IsographDatabase<TNetworkProtocol: NetworkProtocol + 'static> {
+pub struct IsographDatabase<TNetworkProtocol: NetworkProtocol> {
     storage: Storage<Self>,
     #[tracked]
     iso_literal_map: IsoLiteralMap,
@@ -64,7 +64,7 @@ pub struct StandardSources {
     pub schema_extension_sources: BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static> IsographDatabase<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol> IsographDatabase<TNetworkProtocol> {
     pub fn get_current_working_directory(&self) -> CurrentWorkingDirectory {
         *self
             .get_singleton::<CurrentWorkingDirectory>()

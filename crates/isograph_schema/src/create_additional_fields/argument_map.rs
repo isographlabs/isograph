@@ -34,7 +34,7 @@ impl ArgumentMap {
     }
 }
 
-pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol + 'static>(
+pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     argument_map: &mut ArgumentMap,
     field_map_item: FieldMapItem,
@@ -179,7 +179,7 @@ impl ModifiedArgument {
     /// an existing object.
     ///
     /// This panics if unmodified's type is a scalar.
-    fn from_unmodified<TNetworkProtocol: NetworkProtocol + 'static>(
+    fn from_unmodified<TNetworkProtocol: NetworkProtocol>(
         db: &IsographDatabase<TNetworkProtocol>,
         unmodified: &VariableDefinition<ServerEntityName>,
     ) -> Self {
@@ -233,7 +233,7 @@ impl ModifiedArgument {
         }
     }
 
-    fn remove_to_field<TNetworkProtocol: NetworkProtocol + 'static>(
+    fn remove_to_field<TNetworkProtocol: NetworkProtocol>(
         &mut self,
         first: StringLiteralValue,
         rest: &[StringLiteralValue],

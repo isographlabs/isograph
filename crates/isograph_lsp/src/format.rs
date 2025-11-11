@@ -21,7 +21,7 @@ use validated_isograph_schema::{
 
 use crate::{lsp_runtime_error::LSPRuntimeResult, uri_file_path_ext::UriFilePathExt};
 
-pub fn on_format<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn on_format<TNetworkProtocol: NetworkProtocol>(
     compiler_state: &CompilerState<TNetworkProtocol>,
     params: <Formatting as Request>::Params,
 ) -> LSPRuntimeResult<<Formatting as Request>::Result> {
@@ -98,7 +98,7 @@ pub fn char_index_to_position(content: &str, char_index: usize) -> Position {
 }
 
 #[legacy_memo]
-fn format_extraction<TNetworkProtocol: NetworkProtocol + 'static>(
+fn format_extraction<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     extraction: &IsoLiteralExtraction,
     relative_path_to_source_file: RelativePathToSourceFile,

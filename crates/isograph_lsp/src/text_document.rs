@@ -10,7 +10,7 @@ use lsp_types::{
 
 use crate::{lsp_runtime_error::LSPRuntimeResult, uri_file_path_ext::UriFilePathExt};
 
-pub fn on_did_open_text_document<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn on_did_open_text_document<TNetworkProtocol: NetworkProtocol>(
     compiler_state: &mut CompilerState<TNetworkProtocol>,
     params: <DidOpenTextDocument as Notification>::Params,
 ) -> LSPRuntimeResult<()> {
@@ -29,7 +29,7 @@ pub fn on_did_open_text_document<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok(())
 }
 
-pub fn on_did_close_text_document<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn on_did_close_text_document<TNetworkProtocol: NetworkProtocol>(
     compiler_state: &mut CompilerState<TNetworkProtocol>,
     params: <DidCloseTextDocument as Notification>::Params,
 ) -> LSPRuntimeResult<()> {
@@ -48,7 +48,7 @@ pub fn on_did_close_text_document<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok(())
 }
 
-pub fn on_did_change_text_document<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn on_did_change_text_document<TNetworkProtocol: NetworkProtocol>(
     compiler_state: &mut CompilerState<TNetworkProtocol>,
     params: <DidChangeTextDocument as Notification>::Params,
 ) -> LSPRuntimeResult<()> {

@@ -29,7 +29,7 @@ use crate::{
 };
 
 #[expect(clippy::too_many_arguments)]
-pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol + 'static>(
+pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     client_selectable: &ClientSelectable<TNetworkProtocol>,
@@ -175,9 +175,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol 
     path_and_contents
 }
 
-pub(crate) fn generate_eager_reader_condition_artifact<
-    TNetworkProtocol: NetworkProtocol + 'static,
->(
+pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     server_object_selectable: &ServerObjectSelectable<TNetworkProtocol>,
@@ -271,9 +269,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<
     }
 }
 
-pub(crate) fn generate_eager_reader_param_type_artifact<
-    TNetworkProtocol: NetworkProtocol + 'static,
->(
+pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     client_scalar_selectable: &ClientSelectable<TNetworkProtocol>,
@@ -389,9 +385,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<
     }
 }
 
-pub(crate) fn generate_eager_reader_output_type_artifact<
-    TNetworkProtocol: NetworkProtocol + 'static,
->(
+pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_field: &ClientSelectable<TNetworkProtocol>,
     config: &CompilerConfig,
@@ -453,7 +447,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<
     }
 }
 
-pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtocol + 'static>(
+pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ArtifactPathAndContent {

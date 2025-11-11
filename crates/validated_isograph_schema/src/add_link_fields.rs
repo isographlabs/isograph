@@ -10,7 +10,7 @@ use isograph_schema::{
 
 use crate::create_type_system_schema::CreateSchemaError;
 
-pub fn add_link_fields<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn add_link_fields<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
 ) -> Result<(), CreateSchemaError<TNetworkProtocol>> {

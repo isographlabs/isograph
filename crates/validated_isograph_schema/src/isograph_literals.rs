@@ -21,7 +21,7 @@ use crate::process_iso_literals::ParsedIsoLiteralsMap;
 
 // TODO this should return a Vec of Results, since a file can contain
 // both valid and invalid iso literals.
-pub fn parse_iso_literals_in_file_content<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn parse_iso_literals_in_file_content<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     relative_path_to_source_file: RelativePathToSourceFile,
     // Normally, this would not be a parameter, but instead read from the db. But,
@@ -49,9 +49,7 @@ pub fn parse_iso_literals_in_file_content<TNetworkProtocol: NetworkProtocol + 's
 }
 
 // TODO this (and the previous function) smell
-pub fn parse_iso_literals_in_file_content_and_return_all<
-    TNetworkProtocol: NetworkProtocol + 'static,
->(
+pub fn parse_iso_literals_in_file_content_and_return_all<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     relative_path_to_source_file: RelativePathToSourceFile,
     current_working_directory: CurrentWorkingDirectory,
@@ -72,7 +70,7 @@ pub fn parse_iso_literals_in_file_content_and_return_all<
 }
 
 #[legacy_memo]
-pub fn parse_iso_literal_in_source<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn parse_iso_literal_in_source<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     iso_literals_source_id: SourceId<IsoLiteralsSource>,
 ) -> Vec<Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>>>
@@ -87,7 +85,7 @@ pub fn parse_iso_literal_in_source<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[legacy_memo]
-pub fn read_iso_literals_source_from_relative_path<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn read_iso_literals_source_from_relative_path<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     relative_path_to_source_file: RelativePathToSourceFile,
 ) -> Option<IsoLiteralsSource> {
@@ -98,7 +96,7 @@ pub fn read_iso_literals_source_from_relative_path<TNetworkProtocol: NetworkProt
 /// We should (probably) never directly read SourceId<IsoLiteralsSource>, since if we do so,
 /// we will ignore open files.
 #[legacy_memo]
-pub fn read_iso_literals_source<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn read_iso_literals_source<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     iso_literals_source_id: SourceId<IsoLiteralsSource>,
 ) -> IsoLiteralsSource {
@@ -119,7 +117,7 @@ pub fn read_iso_literals_source<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[expect(clippy::type_complexity)]
-pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol + 'static>(
+pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
     contains_iso: ParsedIsoLiteralsMap,
@@ -180,7 +178,7 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol + 'static>(
     }
 }
 
-pub fn process_iso_literal_extraction<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn process_iso_literal_extraction<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     iso_literal_extraction: &IsoLiteralExtraction,
     relative_path_to_source_file: RelativePathToSourceFile,
@@ -252,7 +250,7 @@ pub struct IsoLiteralExtraction {
 }
 
 #[legacy_memo]
-pub fn extract_iso_literals_from_file_content<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn extract_iso_literals_from_file_content<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     relative_path_to_source_file: RelativePathToSourceFile,
 ) -> Vec<IsoLiteralExtraction> {
@@ -288,7 +286,7 @@ pub fn extract_iso_literals_from_file_content<TNetworkProtocol: NetworkProtocol 
 }
 
 #[legacy_memo]
-pub fn memoized_parse_iso_literal<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn memoized_parse_iso_literal<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     iso_literal_text: String,
     definition_file_path: RelativePathToSourceFile,

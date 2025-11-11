@@ -9,7 +9,7 @@ use crate::{
 use isograph_lang_types::SelectionType;
 
 // This should really be replaced with a proper visitor, or something
-pub fn accessible_client_fields<'a, TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn accessible_client_fields<'a, TNetworkProtocol: NetworkProtocol>(
     selection_type: &'a ClientSelectable<'a, TNetworkProtocol>,
     schema: &'a Schema<TNetworkProtocol>,
 ) -> impl Iterator<Item = ClientSelectableId> + 'a {
@@ -21,14 +21,14 @@ pub fn accessible_client_fields<'a, TNetworkProtocol: NetworkProtocol + 'static>
     }
 }
 
-struct AccessibleClientFieldIterator<'a, TNetworkProtocol: NetworkProtocol + 'static> {
+struct AccessibleClientFieldIterator<'a, TNetworkProtocol: NetworkProtocol> {
     selection_set: &'a [WithSpan<ValidatedSelection>],
     schema: &'a Schema<TNetworkProtocol>,
     index: usize,
     sub_iterator: Option<Box<AccessibleClientFieldIterator<'a, TNetworkProtocol>>>,
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static> Iterator
+impl<TNetworkProtocol: NetworkProtocol> Iterator
     for AccessibleClientFieldIterator<'_, TNetworkProtocol>
 {
     type Item = ClientSelectableId;

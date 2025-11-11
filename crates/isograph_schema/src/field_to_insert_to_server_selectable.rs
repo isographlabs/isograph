@@ -17,7 +17,7 @@ pub type ScalarSelectionAndNonNullType<TNetworkProtocol> = (
     Option<GraphQLNamedTypeAnnotation<UnvalidatedTypeName>>,
 );
 
-pub fn field_to_insert_to_server_selectable<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn field_to_insert_to_server_selectable<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     server_field_to_insert: &WithLocation<FieldToInsert>,
@@ -124,9 +124,7 @@ pub enum FieldToInsertToServerSelectableError {
     },
 }
 
-pub fn graphql_input_value_definition_to_variable_definition<
-    TNetworkProtocol: NetworkProtocol + 'static,
->(
+pub fn graphql_input_value_definition_to_variable_definition<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     input_value_definition: WithLocation<GraphQLInputValueDefinition>,
     parent_type_name: ServerObjectEntityName,

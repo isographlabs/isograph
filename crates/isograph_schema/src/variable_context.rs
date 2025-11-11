@@ -85,7 +85,7 @@ impl VariableContext {
     }
 }
 
-pub fn initial_variable_context<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn initial_variable_context<TNetworkProtocol: NetworkProtocol>(
     selection_type: &SelectionType<
         &ClientScalarSelectable<TNetworkProtocol>,
         &ClientObjectSelectable<TNetworkProtocol>,
@@ -121,7 +121,7 @@ pub fn initial_variable_context<TNetworkProtocol: NetworkProtocol + 'static>(
     VariableContext(variable_context)
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static> ServerScalarSelectable<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol> ServerScalarSelectable<TNetworkProtocol> {
     pub fn initial_variable_context(&self) -> VariableContext {
         let variable_context = self
             .arguments
@@ -138,7 +138,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> ServerScalarSelectable<TNetwor
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static> ServerObjectSelectable<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol> ServerObjectSelectable<TNetworkProtocol> {
     pub fn initial_variable_context(&self) -> VariableContext {
         let variable_context = self
             .arguments

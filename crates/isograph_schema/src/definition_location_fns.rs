@@ -3,7 +3,7 @@ use isograph_lang_types::{DefinitionLocation, Description, TypeAnnotation};
 
 use crate::{NetworkProtocol, ObjectSelectable};
 
-pub fn description<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn description<TNetworkProtocol: NetworkProtocol>(
     definition_location: &ObjectSelectable<TNetworkProtocol>,
 ) -> Option<Description> {
     match definition_location {
@@ -12,7 +12,7 @@ pub fn description<TNetworkProtocol: NetworkProtocol + 'static>(
     }
 }
 
-pub fn output_type_annotation<'a, TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn output_type_annotation<'a, TNetworkProtocol: NetworkProtocol>(
     definition_location: &'a ObjectSelectable<'a, TNetworkProtocol>,
 ) -> &'a TypeAnnotation<ServerObjectEntityName> {
     match definition_location {

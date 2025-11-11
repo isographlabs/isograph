@@ -16,7 +16,7 @@ use crate::{
     reader_ast::generate_reader_ast,
 };
 
-pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol + 'static>(
+pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
@@ -80,7 +80,7 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
     }
 }
 
-pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkProtocol + 'static>(
+pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ArtifactPathAndContent {

@@ -20,9 +20,7 @@ use thiserror::Error;
 pub type ValidateAddSelectionSetsResultWithMultipleErrors<T> =
     Result<T, Vec<WithLocation<AddSelectionSetsError>>>;
 
-pub(crate) fn add_selection_sets_to_client_selectables<
-    TNetworkProtocol: NetworkProtocol + 'static,
->(
+pub(crate) fn add_selection_sets_to_client_selectables<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
     unprocessed_selection_sets: Vec<UnprocessedSelectionSet>,
@@ -59,7 +57,7 @@ pub(crate) fn add_selection_sets_to_client_selectables<
 
 // TODO we should not be mutating items in the schema. Instead, we should be creating
 // new items (the refetch and reader selection sets).
-fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol + 'static>(
+fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
     unprocessed_scalar_selection_set: UnprocessedClientScalarSelectableSelectionSet,
@@ -125,7 +123,7 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol + 'st
 
 // TODO we should not be mutating items in the schema. Instead, we should be creating
 // new items (the refetch and reader selection sets).
-fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol + 'static>(
+fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
     unprocessed_client_object_selection_set: UnprocessedClientObjectSelectableSelectionSet,
@@ -185,7 +183,7 @@ fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol + '
 ///   as scalars, etc)
 /// - validate loadability/selectability (e.g. client fields cannot be selected updatably), and
 /// - include the selectable id in the associated data
-fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol + 'static>(
+fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     selection_set: Vec<WithSpan<UnvalidatedSelection>>,
@@ -205,7 +203,7 @@ fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol + 'static>(
     }))
 }
 
-fn get_validated_selection<TNetworkProtocol: NetworkProtocol + 'static>(
+fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     with_span: WithSpan<UnvalidatedSelection>,
@@ -238,7 +236,7 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol + 'static>(
     })
 }
 
-fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol + 'static>(
+fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
@@ -357,7 +355,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol + 'static>(
     })
 }
 
-fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol + 'static>(
+fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
@@ -518,7 +516,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol + 'static>(
     })
 }
 
-fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol + 'static>(
+fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     refetch_strategy: Option<RefetchStrategy<(), ()>>,

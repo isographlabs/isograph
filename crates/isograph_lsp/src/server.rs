@@ -38,7 +38,7 @@ use thiserror::Error;
 
 /// Initializes an LSP connection, handling the `initialize` message and `initialized` notification
 /// handshake.
-pub fn initialize<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn initialize<TNetworkProtocol: NetworkProtocol>(
     connection: &Connection,
 ) -> LSPProcessResult<InitializeParams, TNetworkProtocol> {
     let server_capabilities = ServerCapabilities {
@@ -65,7 +65,7 @@ pub fn initialize<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 /// Run the main server loop
-pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
+pub async fn run<TNetworkProtocol: NetworkProtocol>(
     connection: Connection,
     config_location: &PathBuf,
     _params: InitializeParams,
@@ -150,7 +150,7 @@ pub async fn run<TNetworkProtocol: NetworkProtocol + 'static>(
     Ok(())
 }
 
-fn dispatch_notification<TNetworkProtocol: NetworkProtocol + 'static>(
+fn dispatch_notification<TNetworkProtocol: NetworkProtocol>(
     notification: lsp_server::Notification,
     compiler_state: &mut CompilerState<TNetworkProtocol>,
 ) -> ControlFlow<Option<LSPRuntimeError>, ()> {
@@ -162,7 +162,7 @@ fn dispatch_notification<TNetworkProtocol: NetworkProtocol + 'static>(
 
     ControlFlow::Continue(())
 }
-fn dispatch_request<TNetworkProtocol: NetworkProtocol + 'static>(
+fn dispatch_request<TNetworkProtocol: NetworkProtocol>(
     request: lsp_server::Request,
     compiler_state: &CompilerState<TNetworkProtocol>,
 ) -> Response {
@@ -198,7 +198,7 @@ pub(crate) type LSPProcessResult<T, TNetworkProtocol> =
     Result<T, LSPProcessError<TNetworkProtocol>>;
 
 #[derive(Debug, Error)]
-pub enum LSPProcessError<TNetworkProtocol: NetworkProtocol + 'static> {
+pub enum LSPProcessError<TNetworkProtocol: NetworkProtocol> {
     #[error("{error}")]
     Serde {
         #[from]

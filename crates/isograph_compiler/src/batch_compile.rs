@@ -23,7 +23,7 @@ pub struct CompilationStats {
     pub total_artifacts_written: usize,
 }
 
-pub fn compile_and_print<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn compile_and_print<TNetworkProtocol: NetworkProtocol>(
     config_location: &PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(), BatchCompileError<TNetworkProtocol>> {
@@ -32,7 +32,7 @@ pub fn compile_and_print<TNetworkProtocol: NetworkProtocol + 'static>(
     print_result(WithDuration::new(|| compile::<TNetworkProtocol>(&state.db)))
 }
 
-pub fn print_result<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn print_result<TNetworkProtocol: NetworkProtocol>(
     result: WithDuration<Result<CompilationStats, BatchCompileError<TNetworkProtocol>>>,
 ) -> Result<(), BatchCompileError<TNetworkProtocol>> {
     match result.item {
@@ -78,7 +78,7 @@ fn print_stats(elapsed_time: Duration, stats: CompilationStats) {
 
 /// This the "workhorse" command of batch compilation.
 #[tracing::instrument(skip(db))]
-pub fn compile<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn compile<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<CompilationStats, BatchCompileError<TNetworkProtocol>> {
     // Note: we calculate all of the artifact paths and contents first, so that writing to
@@ -99,7 +99,7 @@ pub fn compile<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[derive(Error, Debug)]
-pub enum BatchCompileError<TNetworkProtocol: NetworkProtocol + 'static> {
+pub enum BatchCompileError<TNetworkProtocol: NetworkProtocol> {
     #[error("{error}")]
     SourceError {
         #[from]
@@ -128,7 +128,7 @@ pub enum BatchCompileError<TNetworkProtocol: NetworkProtocol + 'static> {
     },
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static> From<Vec<notify::Error>>
+impl<TNetworkProtocol: NetworkProtocol> From<Vec<notify::Error>>
     for BatchCompileError<TNetworkProtocol>
 {
     fn from(messages: Vec<notify::Error>) -> Self {

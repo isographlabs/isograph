@@ -107,7 +107,7 @@ lazy_static! {
 ///
 /// TODO this should go through OutputFormat
 #[tracing::instrument]
-pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
     (Vec<ArtifactPathAndContent>, ContainsIsoStats),
@@ -130,7 +130,7 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol + 'static
     Ok((artifact_path_and_content, stats.clone()))
 }
 
-fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol + 'static>(
+fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     config: &CompilerConfig,
@@ -647,7 +647,7 @@ fn get_serialized_field_argument(
     }
 }
 
-pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol + 'static>(
+pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ClientFieldOutputType {
@@ -674,7 +674,7 @@ pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol + 'static>(
     }
 }
 
-pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProtocol + 'static>(
+pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     selection_map: &[WithSpan<ValidatedSelection>],
@@ -701,9 +701,7 @@ pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProt
     ClientFieldParameterType(client_field_parameter_type)
 }
 
-pub(crate) fn generate_client_field_updatable_data_type<
-    TNetworkProtocol: NetworkProtocol + 'static,
->(
+pub(crate) fn generate_client_field_updatable_data_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     selection_map: &[WithSpan<ValidatedSelection>],
@@ -735,7 +733,7 @@ pub(crate) fn generate_client_field_updatable_data_type<
     ClientFieldUpdatableDataType(client_field_updatable_data_type)
 }
 
-fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol + 'static>(
+fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     query_type_declaration: &mut String,
@@ -867,7 +865,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[expect(clippy::too_many_arguments)]
-fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol + 'static>(
+fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     query_type_declaration: &mut String,
@@ -943,7 +941,7 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol + 'stati
 }
 
 #[expect(clippy::too_many_arguments)]
-fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol + 'static>(
+fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     query_type_declaration: &mut String,
@@ -1118,7 +1116,7 @@ fn write_getter_and_setter(
     ));
 }
 
-fn get_loadable_field_type_from_arguments<TNetworkProtocol: NetworkProtocol + 'static>(
+fn get_loadable_field_type_from_arguments<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     arguments: Vec<ValidatedVariableDefinition>,
 ) -> String {
@@ -1141,7 +1139,7 @@ fn get_loadable_field_type_from_arguments<TNetworkProtocol: NetworkProtocol + 's
     loadable_field_type
 }
 
-fn format_type_for_js<TNetworkProtocol: NetworkProtocol + 'static>(
+fn format_type_for_js<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     type_: GraphQLTypeAnnotation<ServerEntityName>,
 ) -> String {
@@ -1192,7 +1190,7 @@ fn format_type_for_js_inner(
     }
 }
 
-pub(crate) fn generate_parameters<'a, TNetworkProtocol: NetworkProtocol + 'static>(
+pub(crate) fn generate_parameters<'a, TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     argument_definitions: impl Iterator<Item = &'a VariableDefinition<ServerEntityName>>,
 ) -> String {
@@ -1341,7 +1339,7 @@ pub fn get_provided_arguments<'a>(
 }
 
 #[derive(Error, Debug, Clone)]
-pub enum GetArtifactPathAndContentError<TNetworkProtocol: NetworkProtocol + 'static> {
+pub enum GetArtifactPathAndContentError<TNetworkProtocol: NetworkProtocol> {
     #[error("{0}")]
     GetValidatedSchemaError(#[from] GetValidatedSchemaError<TNetworkProtocol>),
 }

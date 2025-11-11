@@ -11,7 +11,7 @@ use isograph_lang_types::{
 use crate::{NetworkProtocol, SelectableTrait, ServerEntityName, ServerObjectSelectableVariant};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol + 'static> {
+pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
     pub name: WithLocation<ServerScalarSelectableName>,
 
@@ -25,7 +25,7 @@ pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol + 'static> {
     pub phantom_data: PhantomData<TNetworkProtocol>,
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static> SelectableTrait
+impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     for ServerScalarSelectable<TNetworkProtocol>
 {
     fn description(&self) -> Option<Description> {
@@ -48,7 +48,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> SelectableTrait
 impl_with_target_id!(ServerScalarSelectable<TNetworkProtocol: NetworkProtocol>, ServerEntityName);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol + 'static> {
+pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
     pub name: WithLocation<ServerObjectSelectableName>,
 
@@ -61,7 +61,7 @@ pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol + 'static> {
     pub phantom_data: PhantomData<TNetworkProtocol>,
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static> SelectableTrait
+impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     for ServerObjectSelectable<TNetworkProtocol>
 {
     fn description(&self) -> Option<Description> {

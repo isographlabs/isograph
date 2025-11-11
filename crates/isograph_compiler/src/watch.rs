@@ -20,7 +20,7 @@ use crate::{
     with_duration::WithDuration,
 };
 
-pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol + 'static>(
+pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
     config_location: &PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(), BatchCompileError<TNetworkProtocol>> {

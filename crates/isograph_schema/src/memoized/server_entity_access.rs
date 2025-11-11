@@ -17,7 +17,7 @@ use crate::{
 /// already fully parses the schema, so until that's refactored, there isn't much upside in
 /// not materializing a map here.
 #[legacy_memo]
-fn server_entity_map<TNetworkProtocol: NetworkProtocol + 'static>(
+fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
     HashMap<UnvalidatedTypeName, Vec<OwnedServerEntity<TNetworkProtocol>>>,
@@ -50,7 +50,7 @@ fn server_entity_map<TNetworkProtocol: NetworkProtocol + 'static>(
 // TODO consider adding a memoized function that creates a map of entities (maybe
 // with untracked access?) and going through that.
 #[legacy_memo]
-pub fn server_entities_named<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn server_entities_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: UnvalidatedTypeName,
 ) -> Result<Vec<OwnedServerEntity<TNetworkProtocol>>, TNetworkProtocol::ParseTypeSystemDocumentsError>
@@ -62,7 +62,7 @@ pub fn server_entities_named<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[legacy_memo]
-pub fn server_object_entities<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
     Vec<WithLocation<ServerObjectEntity<TNetworkProtocol>>>,
@@ -82,7 +82,7 @@ pub fn server_object_entities<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
-pub enum EntityAccessError<TNetworkProtocol: NetworkProtocol + 'static> {
+pub enum EntityAccessError<TNetworkProtocol: NetworkProtocol> {
     #[error("{0}")]
     ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),
 
@@ -102,7 +102,7 @@ pub enum EntityAccessError<TNetworkProtocol: NetworkProtocol + 'static> {
 }
 
 #[legacy_memo]
-pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_object_entity_name: ServerObjectEntityName,
 ) -> Result<
@@ -139,7 +139,7 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[legacy_memo]
-pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_scalar_entity_name: ServerScalarEntityName,
 ) -> Result<
@@ -177,7 +177,7 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
 
 /// TODO remove once we return references
 #[legacy_memo]
-pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_scalar_entity_name: ServerScalarEntityName,
 ) -> Result<Option<JavascriptName>, EntityAccessError<TNetworkProtocol>> {
@@ -193,7 +193,7 @@ pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol + 
 }
 
 #[legacy_memo]
-pub fn server_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     name: ServerEntityName,
 ) -> Result<Option<OwnedServerEntity<TNetworkProtocol>>, EntityAccessError<TNetworkProtocol>> {
@@ -221,7 +221,7 @@ pub fn server_entity_named<TNetworkProtocol: NetworkProtocol + 'static>(
 
 // TODO define this in terms of server_entities_vec??
 #[legacy_memo]
-pub fn defined_entities<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn defined_entities<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
     HashMap<UnvalidatedTypeName, Vec<ServerEntityName>>,
@@ -254,7 +254,7 @@ pub fn defined_entities<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[legacy_memo]
-pub fn defined_entity<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn defined_entity<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: UnvalidatedTypeName,
 ) -> Result<Option<ServerEntityName>, DefinedEntityError<TNetworkProtocol>> {
@@ -286,7 +286,7 @@ pub fn defined_entity<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
-pub enum DefinedEntityError<TNetworkProtocol: NetworkProtocol + 'static> {
+pub enum DefinedEntityError<TNetworkProtocol: NetworkProtocol> {
     #[error("{0}")]
     ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),
 

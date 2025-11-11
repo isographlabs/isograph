@@ -47,7 +47,7 @@ pub type UnprocessedSelectionSet = SelectionType<
     UnprocessedClientObjectSelectableSelectionSet,
 >;
 
-pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
     client_field_declaration: WithSpan<ClientFieldDeclaration>,
@@ -89,7 +89,7 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol + 'sta
     Ok(unprocess_client_field_items)
 }
 
-pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
     client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
@@ -180,7 +180,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol + 's
     Ok(unprocessed_client_object_selection_set)
 }
 
-fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
+fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
     client_field_declaration: WithSpan<ClientFieldDeclaration>,
@@ -235,7 +235,7 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[legacy_memo]
-pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_field_declaration: WithSpan<ClientFieldDeclaration>,
 ) -> ProcessClientFieldDeclarationResult<
@@ -364,7 +364,7 @@ pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol 
     ))
 }
 
-fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
+fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
@@ -534,7 +534,7 @@ type ProcessClientFieldDeclarationResult<T, TNetworkProtocol> =
     Result<T, WithSpan<ProcessClientFieldDeclarationError<TNetworkProtocol>>>;
 
 #[derive(Error, Eq, PartialEq, Debug, Clone)]
-pub enum ProcessClientFieldDeclarationError<TNetworkProtocol: NetworkProtocol + 'static> {
+pub enum ProcessClientFieldDeclarationError<TNetworkProtocol: NetworkProtocol> {
     #[error("`{parent_object_entity_name}` is not a type that has been defined.")]
     ParentTypeNotDefined {
         parent_object_entity_name: ServerObjectEntityNameWrapper,
@@ -657,7 +657,7 @@ pub fn id_top_level_arguments() -> Vec<ArgumentKeyAndValue> {
     }]
 }
 
-pub fn validate_variable_definition<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn validate_variable_definition<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     variable_definition: WithSpan<VariableDefinition<UnvalidatedTypeName>>,
     parent_object_entity_name: ServerObjectEntityName,

@@ -23,7 +23,7 @@ pub type ParseTypeSystemOutcome<TNetworkProtocol> = Vec<
 pub trait NetworkProtocol:
     Debug + Clone + Copy + Eq + PartialEq + Ord + PartialOrd + Hash + Default
 where
-    Self: Sized,
+    Self: Sized + 'static,
 {
     type SchemaObjectAssociatedData: Debug + PartialEq + Eq + Clone;
     type ParseTypeSystemDocumentsError: Error + PartialEq + Eq + Clone + 'static;
@@ -66,7 +66,7 @@ where
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol + 'static> {
+pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol> {
     pub server_object_entity: WithLocation<ServerObjectEntity<TNetworkProtocol>>,
     pub fields_to_insert: Vec<WithLocation<FieldToInsert>>,
     // TODO this seems sketch

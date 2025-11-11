@@ -37,7 +37,7 @@ lazy_static! {
 /// This should not be validated here, and can be fixed with better modeling (i.e.
 /// have different associated data for fields that points to server objects and
 /// fields that point to client objects.)
-pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     validated_schema: &Schema<TNetworkProtocol>,
 ) -> Result<(), Vec<WithLocation<ValidateUseOfArgumentsError>>> {
@@ -66,7 +66,7 @@ pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol + 'static>(
     }
 }
 
-fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol + 'static>(
+fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     client_type: impl ClientScalarOrObjectSelectable,
@@ -214,7 +214,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol +
 }
 
 #[expect(clippy::too_many_arguments)]
-fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol + 'static>(
+fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError>>,

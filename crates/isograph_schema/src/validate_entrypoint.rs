@@ -25,7 +25,7 @@ pub struct EntrypointDeclarationInfo {
 }
 
 #[expect(clippy::type_complexity)]
-pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     entrypoint_declarations: Vec<(TextSource, WithSpan<EntrypointDeclaration>)>,
@@ -83,7 +83,7 @@ pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol + 'static>(
     }
 }
 
-fn validate_entrypoint_type_and_field<TNetworkProtocol: NetworkProtocol + 'static>(
+fn validate_entrypoint_type_and_field<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     text_source: TextSource,
@@ -104,7 +104,7 @@ fn validate_entrypoint_type_and_field<TNetworkProtocol: NetworkProtocol + 'stati
     Ok(client_field_id)
 }
 
-fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol + 'static>(
+fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: WithSpan<ServerObjectEntityNameWrapper>,
     text_source: TextSource,
@@ -167,7 +167,7 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol + 'stati
     }
 }
 
-fn validate_client_field<TNetworkProtocol: NetworkProtocol + 'static>(
+fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
     field_name: WithSpan<ClientScalarSelectableNameWrapper>,
     text_source: TextSource,

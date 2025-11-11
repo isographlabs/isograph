@@ -9,7 +9,7 @@ use crate::{format::char_index_to_position, uri_file_path_ext::UriFilePathExt};
 
 // TODO we should have a function that goes from Uri to Option<ProjectFile>
 // and use ProfileFile everywhere in the LSP, instead of this one-off check
-pub(crate) fn uri_is_project_file<TNetworkProtocol: NetworkProtocol + 'static>(
+pub(crate) fn uri_is_project_file<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     uri: &Uri,
 ) -> bool {
@@ -23,7 +23,7 @@ pub(crate) fn uri_is_project_file<TNetworkProtocol: NetworkProtocol + 'static>(
         && !uri_path.starts_with(&config.artifact_directory.absolute_path)
 }
 
-pub fn isograph_location_to_lsp_location<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn isograph_location_to_lsp_location<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     location: EmbeddedLocation,
     content: &str,

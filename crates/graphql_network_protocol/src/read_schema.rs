@@ -9,7 +9,7 @@ use pico_macros::legacy_memo;
 
 #[expect(clippy::type_complexity)]
 #[legacy_memo]
-pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
     (
@@ -43,7 +43,7 @@ pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[legacy_memo]
-pub fn parse_schema_extensions_file<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn parse_schema_extensions_file<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema_extension_source_id: SourceId<SchemaSource>,
 ) -> Result<MemoRef<GraphQLTypeSystemExtensionDocument>, WithLocation<SchemaParseError>> {

@@ -58,7 +58,7 @@ impl ExposeFieldDirective {
     }
 }
 
-pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     expose_field_to_insert: &ExposeFieldToInsert,
     parent_object_entity_name: ServerObjectEntityName,
@@ -284,7 +284,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol + 'static>(
     ))
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     // TODO this should be defined elsewhere, probably
     pub fn insert_client_field_on_object(
         &mut self,
@@ -321,7 +321,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
 
 /// Here, we are turning "pet" (the field_arg) to the ServerFieldId
 /// of that specific field
-fn parse_mutation_subfield_id<TNetworkProtocol: NetworkProtocol + 'static>(
+fn parse_mutation_subfield_id<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     field_arg: &str,
     mutation_object_entity_name: ServerObjectEntityName,
@@ -355,7 +355,7 @@ fn parse_mutation_subfield_id<TNetworkProtocol: NetworkProtocol + 'static>(
     }
 }
 
-fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol + 'static>(
+fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     arguments: Vec<WithLocation<VariableDefinition<ServerEntityName>>>,
     primary_type_name: ServerObjectEntityName,
@@ -383,7 +383,7 @@ fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol + 'st
     Ok(processed_field_map_items)
 }
 
-fn traverse_object_selections<TNetworkProtocol: NetworkProtocol + 'static>(
+fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     root_object_name: ServerObjectEntityName,
     selections: &[ServerSelectableName],

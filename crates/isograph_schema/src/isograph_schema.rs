@@ -38,7 +38,7 @@ pub struct RootOperationName(pub &'static str);
 
 /// The in-memory representation of a schema.
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Schema<TNetworkProtocol: NetworkProtocol + 'static> {
+pub struct Schema<TNetworkProtocol: NetworkProtocol> {
     pub client_scalar_selectables: HashMap<
         (ServerObjectEntityName, ClientScalarSelectableName),
         ClientScalarSelectable<TNetworkProtocol>,
@@ -52,13 +52,13 @@ pub struct Schema<TNetworkProtocol: NetworkProtocol + 'static> {
     pub server_entity_data: ServerEntityData,
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static> Default for Schema<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol> Default for Schema<TNetworkProtocol> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn new() -> Self {
         Self {
             client_scalar_selectables: HashMap::new(),
@@ -70,7 +70,7 @@ impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
     }
 }
 
-pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     root_object_name: ServerObjectEntityName,
     selections: impl Iterator<Item = ServerSelectableName>,
@@ -128,7 +128,7 @@ pub struct ServerObjectEntityExtraInfo {
 // This type alias is a bit outdated. It should be gone soon anyway, though.
 pub type ServerEntityData = HashMap<ServerObjectEntityName, ServerObjectEntityExtraInfo>;
 
-impl<TNetworkProtocol: NetworkProtocol + 'static> Schema<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     // TODO this function should not exist
     pub fn insert_server_scalar_selectable(
         &mut self,

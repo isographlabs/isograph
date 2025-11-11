@@ -27,7 +27,7 @@ use validated_isograph_schema::{
     read_iso_literals_source_from_relative_path,
 };
 
-pub fn on_goto_definition<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn on_goto_definition<TNetworkProtocol: NetworkProtocol>(
     compiler_state: &CompilerState<TNetworkProtocol>,
     params: <GotoDefinition as Request>::Params,
 ) -> LSPRuntimeResult<Option<GotoDefinitionResponse>> {
@@ -41,7 +41,7 @@ pub fn on_goto_definition<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[legacy_memo]
-pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     url: Uri,
     position: Position,

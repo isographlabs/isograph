@@ -18,7 +18,7 @@ use crate::{
 };
 
 #[legacy_memo]
-pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), GetValidatedSchemaError<TNetworkProtocol>>
 {
@@ -78,7 +78,7 @@ pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[derive(Error, Debug, PartialEq, Eq, Clone)]
-pub enum GetValidatedSchemaError<TNetworkProtocol: NetworkProtocol + 'static> {
+pub enum GetValidatedSchemaError<TNetworkProtocol: NetworkProtocol> {
     #[error(
         "{}",
         messages.iter().fold(String::new(), |mut output, x| {
@@ -106,8 +106,7 @@ pub enum GetValidatedSchemaError<TNetworkProtocol: NetworkProtocol + 'static> {
     CreateAdditionalFieldsError(#[from] CreateAdditionalFieldsError<TNetworkProtocol>),
 }
 
-impl<TNetworkProtocol: NetworkProtocol + 'static>
-    From<Vec<WithLocation<ValidateUseOfArgumentsError>>>
+impl<TNetworkProtocol: NetworkProtocol> From<Vec<WithLocation<ValidateUseOfArgumentsError>>>
     for GetValidatedSchemaError<TNetworkProtocol>
 {
     fn from(messages: Vec<WithLocation<ValidateUseOfArgumentsError>>) -> Self {
