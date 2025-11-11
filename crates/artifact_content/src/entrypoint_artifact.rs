@@ -23,7 +23,8 @@ use isograph_schema::{
     FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, Format, IsographDatabase,
     MergedSelectionMap, NetworkProtocol, NormalizationKey, RootOperationName, RootRefetchedPath,
     ScalarClientFieldTraversalState, Schema, ServerObjectEntity, ValidatedVariableDefinition,
-    WrappedSelectionMapSelection, client_scalar_selectable_selection_set_for_parent_query,
+    WrappedSelectionMapSelection, client_scalar_selectable_named,
+    client_scalar_selectable_selection_set_for_parent_query,
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, fetchable_types, get_reachable_variables,
     initial_variable_context, server_object_entity_named,
@@ -41,12 +42,21 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     file_extensions: GenerateFileExtensionsOption,
     persisted_documents: &mut Option<PersistedDocuments>,
 ) -> Vec<ArtifactPathAndContent> {
-    let entrypoint = schema
-        .client_scalar_selectable(parent_object_entity_name, entrypoint_scalar_selectable_name)
-        .expect(
-            "Expected selectable to exist. \
+    let entrypoint = client_scalar_selectable_named(
+        db,
+        parent_object_entity_name,
+        entrypoint_scalar_selectable_name,
+    )
+    .as_ref()
+    .expect(
+        "Expected parsing to have succeeded by this point. \
             This is indicative of a bug in Isograph.",
-        );
+    )
+    .as_ref()
+    .expect(
+        "Expected selectable to exist. \
+            This is indicative of a bug in Isograph.",
+    );
 
     let parent_object_entity =
         &server_object_entity_named(db, entrypoint.parent_object_entity_name())
