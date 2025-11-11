@@ -13,7 +13,7 @@ use isograph_schema::{
     NetworkProtocol, NormalizationKey, PathToRefetchField, RefetchedPathsMap, Schema,
     ServerObjectSelectableVariant, ValidatedObjectSelection, ValidatedScalarSelection,
     ValidatedSelection, VariableContext, categorize_field_loadability,
-    client_object_selectable_selection_set_for_parent_query,
+    client_object_selectable_selection_set_for_parent_query, client_scalar_selectable_named,
     client_scalar_selectable_selection_set_for_parent_query, server_object_selectable_named,
     transform_arguments_with_child_context,
     validated_refetch_strategy_for_client_scalar_selectable_named,
@@ -45,18 +45,30 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                     indentation_level,
                     initial_variable_context,
                 ),
-                DefinitionLocation::Client((parent_object_entity_name, client_field_name)) => {
-                    let client_field = schema
-                        .client_scalar_selectable(parent_object_entity_name, client_field_name)
-                        .expect(
-                            "Expected selectable to exist. \
+                DefinitionLocation::Client((
+                    parent_object_entity_name,
+                    client_scalar_selectable_name,
+                )) => {
+                    let client_scalar_selectable = client_scalar_selectable_named(
+                        db,
+                        parent_object_entity_name,
+                        client_scalar_selectable_name,
+                    )
+                    .as_ref()
+                    .expect(
+                        "Expected parsing to have succeeded by this point. \
                             This is indicative of a bug in Isograph.",
-                        );
+                    )
+                    .as_ref()
+                    .expect(
+                        "Expected selectable to exist. \
+                            This is indicative of a bug in Isograph.",
+                    );
                     scalar_client_defined_field_ast_node(
                         db,
                         scalar_field_selection,
                         schema,
-                        client_field,
+                        client_scalar_selectable,
                         indentation_level,
                         path,
                         root_refetched_paths,
@@ -783,21 +795,36 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                     DefinitionLocation::Server(_) => {
                         // Do nothing, we encountered a server field
                     }
-                    DefinitionLocation::Client((parent_object_entity_name, client_field_name)) => {
-                        let client_field = schema
-                            .client_scalar_selectable(parent_object_entity_name, client_field_name)
-                            .expect(
-                                "Expected selectable to exist. \
-                                This is indicative of a bug in Isograph.",
-                            );
+                    DefinitionLocation::Client((
+                        parent_object_entity_name,
+                        client_scalar_selectable_name,
+                    )) => {
+                        let client_scalar_selectable = client_scalar_selectable_named(
+                            db,
+                            parent_object_entity_name,
+                            client_scalar_selectable_name,
+                        )
+                        .as_ref()
+                        .expect(
+                            "Expected parsing to have succeeded by this point. \
+                            This is indicative of a bug in Isograph.",
+                        )
+                        .as_ref()
+                        .expect(
+                            "Expected selectable to exist. \
+                            This is indicative of a bug in Isograph.",
+                        );
+
                         match categorize_field_loadability(
-                            client_field,
+                            client_scalar_selectable,
                             &scalar_field_selection.scalar_selection_directive_set,
                         ) {
                             Some(Loadability::ImperativelyLoadedField(_)) => {
                                 paths.insert(PathToRefetchField {
                                     linked_fields: path.clone(),
-                                    field_name: SelectionType::Scalar(client_field.name.item),
+                                    field_name: SelectionType::Scalar(
+                                        client_scalar_selectable.name.item,
+                                    ),
                                 });
                             }
                             Some(Loadability::LoadablySelectedField(_)) => {
@@ -808,15 +835,15 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                                     db,
                                     &client_scalar_selectable_selection_set_for_parent_query(
                                         db,
-                                        client_field.parent_object_entity_name,
-                                        client_field.name.item,
+                                        client_scalar_selectable.parent_object_entity_name,
+                                        client_scalar_selectable.name.item,
                                     )
                                     .expect("Expected selection set to be valid."),
                                     schema,
                                     path,
                                     &initial_variable_context.child_variable_context(
                                         &scalar_field_selection.arguments,
-                                        &client_field.variable_definitions,
+                                        &client_scalar_selectable.variable_definitions,
                                         &ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
                                     ),
                                 );
