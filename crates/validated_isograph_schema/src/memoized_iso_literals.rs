@@ -211,7 +211,7 @@ pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[legacy_memo]
-pub fn client_scalar_selectable<TNetworkProtocol: NetworkProtocol>(
+pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_scalar_selectable_name: ClientScalarSelectableName,
@@ -243,7 +243,7 @@ pub fn client_scalar_selectable<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[legacy_memo]
-pub fn client_object_selectable<TNetworkProtocol: NetworkProtocol>(
+pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_object_selectable_name: ClientObjectSelectableName,
