@@ -135,23 +135,23 @@ fn generate_content_for_output_file(
         current_working_directory,
         &absolute_path,
     );
-    match parse_iso_literals_in_file_content(
+    let mut out_str = String::new();
+    for result in parse_iso_literals_in_file_content(
         db,
         relative_path_to_source_file,
         current_working_directory,
     ) {
-        Ok(item) => {
-            let item: Result<_, ()> = Ok(item);
-            format!("{item:#?}")
-        }
-        Err(errs) => {
-            let mut s = String::new();
-            for err in errs {
+        match result {
+            Ok(item) => {
+                let item: Result<_, ()> = Ok(item);
+                out_str.push_str(&format!("{item:#?}"))
+            }
+            Err(err) => {
                 let err_printed = format!("{}", err.for_display());
                 let wrapped_err: Result<(), _> = Err(err);
-                s.push_str(&format!("{wrapped_err:#?}\n\n{err_printed}\n---\n"));
+                out_str.push_str(&format!("{wrapped_err:#?}\n\n{err_printed}\n---\n"));
             }
-            s
         }
     }
+    out_str
 }
