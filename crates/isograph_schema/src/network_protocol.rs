@@ -21,9 +21,7 @@ pub type ParseTypeSystemOutcome<TNetworkProtocol> = Vec<
 >;
 
 pub trait NetworkProtocol:
-    Debug + Clone + Copy + Eq + PartialEq + Ord + PartialOrd + Hash + Default
-where
-    Self: Sized + 'static,
+    Debug + Clone + Copy + Eq + PartialEq + Ord + PartialOrd + Hash + Default + Sized + 'static
 {
     type SchemaObjectAssociatedData: Debug + PartialEq + Eq + Clone;
     type ParseTypeSystemDocumentsError: Error + PartialEq + Eq + Clone + 'static;
