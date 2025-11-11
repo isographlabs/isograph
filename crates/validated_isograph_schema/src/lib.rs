@@ -3,6 +3,7 @@ mod add_selection_sets;
 mod create_type_system_schema;
 mod get_validated_schema;
 mod isograph_literals;
+mod memoized_iso_literals;
 mod process_iso_literals;
 mod set_and_validate_id_field;
 

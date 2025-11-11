@@ -235,7 +235,7 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol + 'static>(
 }
 
 #[legacy_memo]
-fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol + 'static>(
+pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol + 'static>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_field_declaration: WithSpan<ClientFieldDeclaration>,
 ) -> ProcessClientFieldDeclarationResult<
