@@ -2,11 +2,12 @@ use intern::Lookup;
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{ClientFieldDirectiveSet, SelectionType};
 use std::{cmp::Ordering, collections::BTreeSet};
+use validated_isograph_schema::client_scalar_selectable_named;
 
 use common_lang_types::{ArtifactPathAndContent, SelectableName, ServerObjectEntityName};
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable,
-    EntrypointDeclarationInfo, LINK_FIELD_NAME, NetworkProtocol, Schema,
+    EntrypointDeclarationInfo, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol, Schema,
 };
 
 use crate::generate_artifacts::{ISO_TS_FILE_NAME, print_javascript_type_declaration};
@@ -112,6 +113,7 @@ export function iso<T>(
 }
 
 pub(crate) fn build_iso_overload_artifact<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     file_extensions: GenerateFileExtensionsOption,
     no_babel_transform: bool,
@@ -196,9 +198,9 @@ type MatchesWhitespaceAndString<
         ));
     }
 
-    let entrypoint_overloads = sorted_entrypoints(schema)
+    let entrypoint_overloads = sorted_entrypoints(db, schema)
         .into_iter()
-        .map(|(field, _)| build_iso_overload_for_entrypoint(field, file_extensions));
+        .map(|(field, _)| build_iso_overload_for_entrypoint(&field, file_extensions));
     for (import, entrypoint_overload) in entrypoint_overloads {
         imports.push_str(&import);
         content.push_str(&entrypoint_overload);
@@ -220,7 +222,7 @@ export function iso(_isographLiteralText: string):
       'set options.no_babel_transform to true in your Isograph config. ');\n}")
         }
         true => {
-            let switch_cases = sorted_entrypoints(schema).into_iter().map(
+            let switch_cases = sorted_entrypoints(db, schema).into_iter().map(
                 |(field, entrypoint_declaration_info)| {
                     format!(
                         "    case '{}':
@@ -287,26 +289,39 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
     client_types
 }
 
-fn sorted_entrypoints<TNetworkProtocol: NetworkProtocol>(
-    schema: &Schema<TNetworkProtocol>,
+fn sorted_entrypoints<'schema, TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    schema: &'schema Schema<TNetworkProtocol>,
 ) -> Vec<(
-    &ClientScalarSelectable<TNetworkProtocol>,
-    &EntrypointDeclarationInfo,
+    ClientScalarSelectable<TNetworkProtocol>,
+    &'schema EntrypointDeclarationInfo,
 )> {
     let mut entrypoints = schema
         .entrypoints
         .iter()
         .map(
-            |((parent_object_entity_name, client_field_name), entrypoint_declaration_info)| {
-                (
-                    schema
-                        .client_scalar_selectable(*parent_object_entity_name, *client_field_name)
-                        .expect(
-                            "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
-                        ),
-                    entrypoint_declaration_info,
-                )
+            |(
+                (parent_object_entity_name, client_scalar_selectable_name),
+                entrypoint_declaration_info,
+            )| {
+                let memo_ref = client_scalar_selectable_named(
+                    db,
+                    *parent_object_entity_name,
+                    *client_scalar_selectable_name,
+                );
+                // TODO don't clone, this is only required for lifetime reasons (because
+                // we cannot return references with a 'db lifetime)
+                let client_scalar_selectable = memo_ref
+                    .to_owned()
+                    .expect(
+                        "Expected parsing to have succeeded by this point. \
+                        This is indicative of a bug in Isograph.",
+                    )
+                    .expect(
+                        "Expected selectable to exist. \
+                        This is indicative of a bug in Isograph.",
+                    );
+                (client_scalar_selectable, entrypoint_declaration_info)
             },
         )
         .collect::<Vec<_>>();
