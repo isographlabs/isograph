@@ -466,7 +466,7 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
     } else {
         let id_field_memo_ref = server_selectable_named(
             db,
-            client_pointer_declaration.item.parent_type.item.0,
+            client_pointer_declaration.item.target_type.inner().0,
             (*ID_FIELD_NAME).into(),
         );
 
