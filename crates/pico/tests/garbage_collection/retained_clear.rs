@@ -21,7 +21,7 @@ impl TestDatabase {
 
 /// When a result is temporarily retained and then cleared, that does not
 /// cause it to be retained unless it was actually most recently used
-/// or the `RetainedQuery` was still existing at the time of garbage collection 
+/// or the `RetainedQuery` was still existing at the time of garbage collection
 #[test]
 fn clear_retained() {
     let mut db = TestDatabase::new();
@@ -71,7 +71,6 @@ fn clear_retained() {
 
     memoized_b(&db);
     assert_eq!(B_COUNTER.load(Ordering::SeqCst), 2);
-
 }
 
 #[legacy_memo]
