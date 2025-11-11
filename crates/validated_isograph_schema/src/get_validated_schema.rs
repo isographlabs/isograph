@@ -28,7 +28,7 @@ pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol + 'static>(
 
     let mut unvalidated_isograph_schema = Schema::new();
 
-    process_field_queue(db, &mut unvalidated_isograph_schema, &field_queue)?;
+    process_field_queue(db, &mut unvalidated_isograph_schema, field_queue)?;
 
     let mut unprocessed_selection_set = std::vec![];
 
@@ -38,7 +38,7 @@ pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol + 'static>(
                 unprocessed_client_scalar_selection_set,
                 exposed_field_client_scalar_selectable,
                 payload_object_entity_name,
-            ) = create_new_exposed_field(db, &expose_as_field, *parent_object_entity_name)?;
+            ) = create_new_exposed_field(db, expose_as_field, *parent_object_entity_name)?;
 
             let client_scalar_selectable_name = exposed_field_client_scalar_selectable.name.item;
             let parent_object_entity_name =

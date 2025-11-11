@@ -1,10 +1,12 @@
 use std::collections::HashMap;
+use std::ops::Deref;
 
 use common_lang_types::{ClientSelectableName, ServerObjectEntityName};
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{ClientFieldDeclaration, ClientPointerDeclaration, SelectionType};
 use isograph_schema::{IsographDatabase, NetworkProtocol};
 use pico_macros::legacy_memo;
+use thiserror::Error;
 
 use crate::parse_iso_literal_in_source;
 
@@ -66,4 +68,60 @@ pub fn client_selectable_declaration_map<TNetworkProtocol: NetworkProtocol + 'st
     }
 
     out
+}
+
+#[legacy_memo]
+pub fn client_selectable_declarations<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    parent_object_entity_name: ServerObjectEntityName,
+    client_selectable_name: ClientSelectableName,
+) -> Vec<SelectionType<ClientFieldDeclaration, ClientPointerDeclaration>> {
+    let memo_ref = client_selectable_declaration_map(db);
+
+    memo_ref
+        .deref()
+        .get(&(parent_object_entity_name, client_selectable_name))
+        .cloned()
+        .unwrap_or_default()
+}
+
+#[legacy_memo]
+pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol + 'static>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    parent_object_entity_name: ServerObjectEntityName,
+    client_selectable_name: ClientSelectableName,
+) -> Result<
+    Option<SelectionType<ClientFieldDeclaration, ClientPointerDeclaration>>,
+    MemoizedIsoLiteralError,
+> {
+    let memo_ref =
+        client_selectable_declarations(db, parent_object_entity_name, client_selectable_name);
+
+    match memo_ref.deref().split_first() {
+        Some((first, rest)) => {
+            if rest.is_empty() {
+                Ok(Some(first.clone()))
+            } else {
+                Err(MemoizedIsoLiteralError::MultipleDefinitionsFound {
+                    duplicate_entity_name: parent_object_entity_name,
+                    duplicate_client_selectable_name: client_selectable_name,
+                })
+            }
+        }
+        None => {
+            // Empty, this shouldn't happen. We can consider having a NonEmptyVec or something
+            Ok(None)
+        }
+    }
+}
+
+#[derive(Clone, Error, Debug, Eq, PartialEq)]
+pub enum MemoizedIsoLiteralError {
+    #[error(
+        "Multiple definitions of `{duplicate_entity_name}.{duplicate_client_selectable_name}` were found"
+    )]
+    MultipleDefinitionsFound {
+        duplicate_entity_name: ServerObjectEntityName,
+        duplicate_client_selectable_name: ClientSelectableName,
+    },
 }
