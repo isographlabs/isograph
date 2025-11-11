@@ -1,10 +1,15 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 
-use common_lang_types::{ClientScalarSelectableName, ClientSelectableName, ServerObjectEntityName};
+use common_lang_types::{
+    ClientScalarSelectableName, ClientSelectableName, ServerObjectEntityName, Span, WithSpan,
+};
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{ClientFieldDeclaration, ClientPointerDeclaration, SelectionType};
-use isograph_schema::{IsographDatabase, NetworkProtocol};
+use isograph_schema::{
+    ClientScalarSelectable, IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError,
+    process_client_field_declaration_inner,
+};
 use pico_macros::legacy_memo;
 use thiserror::Error;
 
@@ -92,7 +97,7 @@ pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
     client_selectable_name: ClientSelectableName,
 ) -> Result<
     Option<SelectionType<ClientFieldDeclaration, ClientPointerDeclaration>>,
-    MemoizedIsoLiteralError,
+    MemoizedIsoLiteralError<TNetworkProtocol>,
 > {
     let memo_ref =
         client_selectable_declarations(db, parent_object_entity_name, client_selectable_name);
@@ -116,7 +121,7 @@ pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[derive(Clone, Error, Debug, Eq, PartialEq)]
-pub enum MemoizedIsoLiteralError {
+pub enum MemoizedIsoLiteralError<TNetworkProtocol: NetworkProtocol> {
     #[error(
         "Multiple definitions of `{duplicate_entity_name}.{duplicate_client_selectable_name}` were found"
     )]
@@ -134,6 +139,11 @@ pub enum MemoizedIsoLiteralError {
         intended_type: &'static str,
         actual_type: &'static str,
     },
+
+    #[error("{0}")]
+    ProcessClientFieldDeclarationError(
+        WithSpan<ProcessClientFieldDeclarationError<TNetworkProtocol>>,
+    ),
 }
 
 #[legacy_memo]
@@ -141,7 +151,7 @@ pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_scalar_selectable_name: ClientScalarSelectableName,
-) -> Result<Option<ClientFieldDeclaration>, MemoizedIsoLiteralError> {
+) -> Result<Option<ClientFieldDeclaration>, MemoizedIsoLiteralError<TNetworkProtocol>> {
     let memo_ref = client_selectable_declaration(
         db,
         parent_object_entity_name,
@@ -165,4 +175,36 @@ pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
             actual_type: "an object",
         }),
     }
+}
+
+#[legacy_memo]
+pub fn client_scalar_selectable<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    parent_object_entity_name: ServerObjectEntityName,
+    client_scalar_selectable_name: ClientScalarSelectableName,
+) -> Result<
+    Option<ClientScalarSelectable<TNetworkProtocol>>,
+    MemoizedIsoLiteralError<TNetworkProtocol>,
+> {
+    let memo_ref =
+        client_field_declaration(db, parent_object_entity_name, client_scalar_selectable_name);
+
+    let declaration = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
+
+    let declaration = match declaration {
+        Some(declaration) => declaration.clone(),
+        None => return Ok(None),
+    };
+
+    let selectable_memo_ref = process_client_field_declaration_inner(
+        db,
+        WithSpan::new(declaration, Span::todo_generated()),
+    );
+
+    let (_, scalar_selectable) = selectable_memo_ref
+        .deref()
+        .as_ref()
+        .map_err(|e| MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(e.clone()))?;
+
+    Ok(Some(scalar_selectable.clone()))
 }
