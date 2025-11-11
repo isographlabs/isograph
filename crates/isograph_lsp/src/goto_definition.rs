@@ -23,7 +23,7 @@ use pico_macros::legacy_memo;
 use resolve_position::ResolvePosition;
 use std::ops::Deref;
 use validated_isograph_schema::{
-    get_validated_schema, process_iso_literal_extraction,
+    client_scalar_selectable_named, get_validated_schema, process_iso_literal_extraction,
     read_iso_literals_source_from_relative_path,
 };
 
@@ -190,12 +190,6 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                 }
             }
             IsographResolvedNode::ClientScalarSelectableNameWrapper(wrapper) => {
-                let memo_ref = get_validated_schema(db);
-                let (validated_schema, _stats) = match memo_ref.deref() {
-                    Ok(schema) => schema,
-                    Err(_) => return Ok(None),
-                };
-
                 let parent_type_name = match wrapper.parent {
                     ClientScalarSelectableNameWrapperParent::EntrypointDeclaration(
                         position_resolution_path,
@@ -209,11 +203,18 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                     }
                 };
 
-                validated_schema
-                    .client_scalar_selectable(
-                        parent_type_name.0.unchecked_conversion(),
-                        wrapper.inner.0,
-                    )
+                let memo_ref = client_scalar_selectable_named(
+                    db,
+                    parent_type_name.0.unchecked_conversion(),
+                    wrapper.inner.0,
+                );
+                let client_scalar_selectable = match memo_ref.deref().as_ref() {
+                    Ok(item) => item,
+                    Err(_) => return Ok(None),
+                };
+
+                client_scalar_selectable
+                    .as_ref()
                     .and_then(|referenced_selectable| {
                         referenced_selectable
                             .name
