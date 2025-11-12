@@ -252,6 +252,13 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
             if let Some(link_field) = link_fields
                 .get(&(parent_object_entity_name, client_scalar_selectable_name))
                 .cloned()
+                .map(|mut selectable| {
+                    // Wat?! Here, we are explicitly clearing these, in order to make it obvious if we depend on these!
+                    // These fields will be removed (i.e. will be separate structs.)
+                    selectable.reader_selection_set = vec![];
+                    selectable.refetch_strategy = None;
+                    selectable
+                })
             {
                 return Ok(Some(link_field));
             }
@@ -263,7 +270,14 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
                 .as_ref()
                 .map_err(|e| e.clone())?
                 .get(&(parent_object_entity_name, client_scalar_selectable_name))
-                .cloned());
+                .cloned()
+                .map(|mut selectable| {
+                    // Wat?! Here, we are explicitly clearing these, in order to make it obvious if we depend on these!
+                    // These fields will be removed (i.e. will be separate structs.)
+                    selectable.reader_selection_set = vec![];
+                    selectable.refetch_strategy = None;
+                    selectable
+                }));
         }
     };
 
@@ -277,7 +291,13 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
         .as_ref()
         .map_err(|e| MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(e.clone()))?;
 
-    Ok(Some(scalar_selectable.clone()))
+    // Wat?! Here, we are explicitly clearing these, in order to make it obvious if we depend on these!
+    // These fields will be removed (i.e. will be separate structs.)
+    let mut selectable = scalar_selectable.clone();
+    selectable.reader_selection_set = vec![];
+    selectable.refetch_strategy = None;
+
+    Ok(Some(selectable))
 }
 
 #[legacy_memo]
