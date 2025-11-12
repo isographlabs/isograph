@@ -12,6 +12,13 @@ pub type ObjectSelectableId = DefinitionLocation<
     (ServerObjectEntityName, ClientObjectSelectableName),
 >;
 
+pub type OwnedObjectSelectable<TNetworkProtocol> = DefinitionLocation<
+    // HACK: Note the owned server selectable
+    // This is fixable when memoized functions can return references with 'db lifetime
+    ServerObjectSelectable<TNetworkProtocol>,
+    ClientObjectSelectable<TNetworkProtocol>,
+>;
+
 pub type ObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
     // HACK: Note the owned server selectable
     // This is fixable when memoized functions can return references with 'db lifetime
@@ -29,6 +36,26 @@ pub trait ClientOrServerObjectSelectable {
 
 impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
     for &ClientObjectSelectable<TNetworkProtocol>
+{
+    fn description(&self) -> Option<Description> {
+        self.description
+    }
+
+    fn name(&self) -> ObjectSelectableName {
+        self.name.item.into()
+    }
+
+    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
+        self.parent_object_entity_name
+    }
+
+    fn target_object_entity_name(&self) -> TypeAnnotation<ServerObjectEntityName> {
+        self.target_object_entity_name.clone()
+    }
+}
+
+impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
+    for ClientObjectSelectable<TNetworkProtocol>
 {
     fn description(&self) -> Option<Description> {
         self.description

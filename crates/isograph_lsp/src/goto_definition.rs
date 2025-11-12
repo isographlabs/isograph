@@ -93,14 +93,8 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
             }
             IsographResolvedNode::Description(_) => None,
             IsographResolvedNode::ScalarSelection(scalar_path) => {
-                let memo_ref = get_validated_schema(db);
-                let (validated_schema, _stats) = match memo_ref.deref() {
-                    Ok(schema) => schema,
-                    Err(_) => return Ok(None),
-                };
-
                 if let Ok((_, selectable)) =
-                    get_parent_and_selectable_for_scalar_path(db, &scalar_path, validated_schema)
+                    get_parent_and_selectable_for_scalar_path(db, &scalar_path)
                 {
                     match selectable {
                         DefinitionLocation::Server(server_selectable) => server_selectable
@@ -141,14 +135,8 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                 }
             }
             IsographResolvedNode::ObjectSelection(object_path) => {
-                let memo_ref = get_validated_schema(db);
-                let (validated_schema, _stats) = match memo_ref.deref() {
-                    Ok(schema) => schema,
-                    Err(_) => return Ok(None),
-                };
-
                 if let Ok((_, selectable)) =
-                    get_parent_and_selectable_for_object_path(db, &object_path, validated_schema)
+                    get_parent_and_selectable_for_object_path(db, &object_path)
                 {
                     match selectable {
                         DefinitionLocation::Server(server_selectable) => server_selectable

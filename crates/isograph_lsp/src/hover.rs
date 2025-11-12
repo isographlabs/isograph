@@ -6,8 +6,8 @@ use common_lang_types::{
 use isograph_compiler::CompilerState;
 use isograph_lang_types::{Description, IsographResolvedNode, VariableDefinition};
 use isograph_schema::{
-    IsoLiteralExtraction, extract_iso_literals_from_file_content, get_validated_schema,
-    process_iso_literal_extraction, read_iso_literals_source_from_relative_path,
+    IsoLiteralExtraction, extract_iso_literals_from_file_content, process_iso_literal_extraction,
+    read_iso_literals_source_from_relative_path,
 };
 use isograph_schema::{
     IsographDatabase, NetworkProtocol, SelectableTrait, ServerEntityName, ServerObjectEntity,
@@ -83,13 +83,8 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
             }
             IsographResolvedNode::Description(_) => None,
             IsographResolvedNode::ScalarSelection(scalar_path) => {
-                let memo_ref = get_validated_schema(db);
-                let (validated_schema, _stats) = match memo_ref.deref() {
-                    Ok(schema) => schema,
-                    Err(_) => return Ok(None),
-                };
                 if let Ok((parent_object, selectable)) =
-                    get_parent_and_selectable_for_scalar_path(db, &scalar_path, validated_schema)
+                    get_parent_and_selectable_for_scalar_path(db, &scalar_path)
                 {
                     Some(hover_text_for_selectable(
                         selectable.variant_name(),
@@ -104,13 +99,8 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                 }
             }
             IsographResolvedNode::ObjectSelection(object_path) => {
-                let memo_ref = get_validated_schema(db);
-                let (validated_schema, _stats) = match memo_ref.deref() {
-                    Ok(schema) => schema,
-                    Err(_) => return Ok(None),
-                };
                 if let Ok((parent_object, selectable)) =
-                    get_parent_and_selectable_for_object_path(db, &object_path, validated_schema)
+                    get_parent_and_selectable_for_object_path(db, &object_path)
                 {
                     Some(hover_text_for_selectable(
                         selectable.variant_name(),
