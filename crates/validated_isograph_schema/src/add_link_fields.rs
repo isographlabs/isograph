@@ -1,6 +1,9 @@
-use std::ops::Deref;
+use std::{collections::HashMap, ops::Deref};
 
-use common_lang_types::{Location, ParentObjectEntityNameAndSelectableName, WithLocation};
+use common_lang_types::{
+    ClientScalarSelectableName, Location, ParentObjectEntityNameAndSelectableName,
+    ServerObjectEntityName, WithLocation,
+};
 use intern::string_key::Intern;
 use isograph_lang_types::{DefinitionLocation, Description, SelectionType};
 use isograph_schema::{
@@ -79,6 +82,29 @@ pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
                 refetch_strategy: None,
                 network_protocol: std::marker::PhantomData,
             }
+        })
+        .collect())
+}
+
+#[legacy_memo]
+pub fn get_link_fields_map<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+) -> Result<
+    HashMap<
+        (ServerObjectEntityName, ClientScalarSelectableName),
+        ClientScalarSelectable<TNetworkProtocol>,
+    >,
+    CreateSchemaError<TNetworkProtocol>,
+> {
+    let memo_ref = get_link_fields(db);
+    Ok(memo_ref
+        .to_owned()?
+        .into_iter()
+        .map(|link_selectable| {
+            (
+                (link_selectable.parent_object_entity_name, *LINK_FIELD_NAME),
+                link_selectable,
+            )
         })
         .collect())
 }

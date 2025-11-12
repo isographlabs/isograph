@@ -15,10 +15,14 @@ use isograph_schema::{
 use pico_macros::legacy_memo;
 use thiserror::Error;
 
-use crate::parse_iso_literal_in_source;
+use crate::{
+    add_link_fields::get_link_fields_map, create_type_system_schema::CreateSchemaError,
+    parse_iso_literal_in_source,
+};
 
+/// client selectables defined by iso literals.
 #[legacy_memo]
-pub fn client_selectable_declaration_map<TNetworkProtocol: NetworkProtocol>(
+pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> HashMap<
     (ServerObjectEntityName, ClientSelectableName),
@@ -83,10 +87,9 @@ pub fn client_selectable_declarations<TNetworkProtocol: NetworkProtocol>(
     parent_object_entity_name: ServerObjectEntityName,
     client_selectable_name: ClientSelectableName,
 ) -> Vec<SelectionType<ClientFieldDeclaration, ClientPointerDeclaration>> {
-    let memo_ref = client_selectable_declaration_map(db);
+    let memo_ref = client_selectable_declaration_map_from_iso_literals(db);
 
     memo_ref
-        .deref()
         .get(&(parent_object_entity_name, client_selectable_name))
         .cloned()
         .unwrap_or_default()
@@ -146,6 +149,9 @@ pub enum MemoizedIsoLiteralError<TNetworkProtocol: NetworkProtocol> {
     ProcessClientFieldDeclarationError(
         WithSpan<ProcessClientFieldDeclarationError<TNetworkProtocol>>,
     ),
+
+    #[error("{0}")]
+    CreateSchemaError(#[from] CreateSchemaError<TNetworkProtocol>),
 }
 
 #[legacy_memo]
@@ -226,7 +232,19 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
 
     let declaration = match declaration {
         Some(declaration) => declaration.clone(),
-        None => return Ok(None),
+        None => {
+            // This is an awkward situation! We didn't find any client scalar selectable defined
+            // by an iso literal. But, we still need to check for linked fields.
+            //
+            // What's nice, though, is that we don't actually need the schema to successfully
+            // compile if we've already found the field we need! That's neat.
+            let memo_ref = get_link_fields_map(db);
+            let link_fields = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
+
+            return Ok(link_fields
+                .get(&(parent_object_entity_name, client_scalar_selectable_name))
+                .cloned());
+        }
     };
 
     let selectable_memo_ref = process_client_field_declaration_inner(
