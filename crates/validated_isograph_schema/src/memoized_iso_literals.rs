@@ -312,6 +312,7 @@ pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
     Ok(Some(object_selectable.clone()))
 }
 
+#[expect(clippy::type_complexity)]
 #[legacy_memo]
 pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,

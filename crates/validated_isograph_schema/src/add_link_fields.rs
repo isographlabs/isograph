@@ -86,6 +86,7 @@ pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
         .collect())
 }
 
+#[expect(clippy::type_complexity)]
 #[legacy_memo]
 pub fn get_link_fields_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
