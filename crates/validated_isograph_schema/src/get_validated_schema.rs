@@ -11,7 +11,9 @@ use thiserror::Error;
 use crate::{
     CreateSchemaError,
     add_link_fields::add_link_fields_to_schema,
-    create_type_system_schema::process_field_queue,
+    create_type_system_schema::{
+        create_type_system_schema_with_server_selectables, process_field_queue,
+    },
     process_iso_literals::{
         ContainsIsoStats, ProcessIsoLiteralsForSchemaError, process_iso_literals_for_schema,
     },
@@ -22,8 +24,7 @@ pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), GetValidatedSchemaError<TNetworkProtocol>>
 {
-    let memo_ref =
-        crate::create_type_system_schema::create_type_system_schema_with_server_selectables(db);
+    let memo_ref = create_type_system_schema_with_server_selectables(db);
     let (expose_as_field_queue, field_queue) = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
 
     let mut unvalidated_isograph_schema = Schema::new();

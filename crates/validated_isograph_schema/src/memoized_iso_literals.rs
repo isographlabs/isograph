@@ -8,15 +8,18 @@ use common_lang_types::{
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{ClientFieldDeclaration, ClientPointerDeclaration, SelectionType};
 use isograph_schema::{
-    ClientObjectSelectable, ClientScalarSelectable, IsographDatabase, NetworkProtocol,
-    ProcessClientFieldDeclarationError, process_client_field_declaration_inner,
-    process_client_pointer_declaration_inner,
+    ClientObjectSelectable, ClientScalarSelectable, CreateAdditionalFieldsError, IsographDatabase,
+    NetworkProtocol, ProcessClientFieldDeclarationError, create_new_exposed_field,
+    process_client_field_declaration_inner, process_client_pointer_declaration_inner,
 };
 use pico_macros::legacy_memo;
 use thiserror::Error;
 
 use crate::{
-    add_link_fields::get_link_fields_map, create_type_system_schema::CreateSchemaError,
+    add_link_fields::get_link_fields_map,
+    create_type_system_schema::{
+        CreateSchemaError, create_type_system_schema_with_server_selectables,
+    },
     parse_iso_literal_in_source,
 };
 
@@ -152,6 +155,9 @@ pub enum MemoizedIsoLiteralError<TNetworkProtocol: NetworkProtocol> {
 
     #[error("{0}")]
     CreateSchemaError(#[from] CreateSchemaError<TNetworkProtocol>),
+
+    #[error("{0}")]
+    CreateAdditionalFieldsError(#[from] CreateAdditionalFieldsError<TNetworkProtocol>),
 }
 
 #[legacy_memo]
@@ -238,10 +244,24 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
             //
             // What's nice, though, is that we don't actually need the schema to successfully
             // compile if we've already found the field we need! That's neat.
+            //
+            // We could theoretically skip this if the name is not *LINK_FIELD_NAME /shrug
             let memo_ref = get_link_fields_map(db);
             let link_fields = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
 
-            return Ok(link_fields
+            if let Some(link_field) = link_fields
+                .get(&(parent_object_entity_name, client_scalar_selectable_name))
+                .cloned()
+            {
+                return Ok(Some(link_field));
+            }
+
+            // Awkward! We also need to check for expose fields. Ay ay ay
+            let expose_field_map_memo_ref = expose_field_map(db);
+            return Ok(expose_field_map_memo_ref
+                .deref()
+                .as_ref()
+                .map_err(|e| e.clone())?
                 .get(&(parent_object_entity_name, client_scalar_selectable_name))
                 .cloned());
         }
@@ -290,4 +310,39 @@ pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
         .map_err(|e| MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(e.clone()))?;
 
     Ok(Some(object_selectable.clone()))
+}
+
+#[legacy_memo]
+pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+) -> Result<
+    HashMap<
+        (ServerObjectEntityName, ClientScalarSelectableName),
+        ClientScalarSelectable<TNetworkProtocol>,
+    >,
+    MemoizedIsoLiteralError<TNetworkProtocol>,
+> {
+    let memo_ref = create_type_system_schema_with_server_selectables(db);
+    let (expose_as_field_queue, _field_queue) = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
+
+    let mut map = HashMap::new();
+    for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
+        for expose_as_field in expose_as_fields_to_insert {
+            let (
+                _unprocessed_client_scalar_selection_set,
+                exposed_field_client_scalar_selectable,
+                _payload_object_entity_name,
+            ) = create_new_exposed_field(db, expose_as_field, *parent_object_entity_name)?;
+
+            map.insert(
+                (
+                    exposed_field_client_scalar_selectable.parent_object_entity_name,
+                    exposed_field_client_scalar_selectable.name.item,
+                ),
+                exposed_field_client_scalar_selectable,
+            );
+        }
+    }
+
+    Ok(map)
 }
