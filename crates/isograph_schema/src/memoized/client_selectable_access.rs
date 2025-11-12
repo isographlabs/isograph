@@ -5,8 +5,8 @@ use crate::{
     ClientObjectSelectable, ClientScalarSelectable, CreateAdditionalFieldsError, CreateSchemaError,
     IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError,
     create_new_exposed_field, create_type_system_schema_with_server_selectables,
-    process_client_field_declaration_inner, process_client_pointer_declaration_inner,
-    validated_isograph_schema::add_link_fields::get_link_fields_map,
+    get_link_fields_map, process_client_field_declaration_inner,
+    process_client_pointer_declaration_inner,
 };
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName,

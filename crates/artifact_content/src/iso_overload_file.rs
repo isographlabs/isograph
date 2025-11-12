@@ -1,13 +1,13 @@
 use intern::Lookup;
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{ClientFieldDirectiveSet, SelectionType};
-use isograph_schema::client_scalar_selectable_named;
 use std::{cmp::Ordering, collections::BTreeSet};
 
 use common_lang_types::{ArtifactPathAndContent, SelectableName, ServerObjectEntityName};
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable,
     EntrypointDeclarationInfo, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol, Schema,
+    client_scalar_selectable_named,
 };
 
 use crate::generate_artifacts::{ISO_TS_FILE_NAME, print_javascript_type_declaration};
