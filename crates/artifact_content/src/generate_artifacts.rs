@@ -211,7 +211,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                             db,
                             schema,
                             server_object_selectable,
-                            &inline_fragment_reader_selection_set(schema, server_object_selectable),
+                            &inline_fragment_reader_selection_set(server_object_selectable),
                             &traversal_state.refetch_paths,
                             config.options.include_file_extensions_in_import_statements,
                         ));
