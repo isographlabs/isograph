@@ -10,7 +10,7 @@ use thiserror::Error;
 
 use crate::{
     CreateSchemaError,
-    add_link_fields::add_link_fields,
+    add_link_fields::add_link_fields_to_schema,
     create_type_system_schema::process_field_queue,
     process_iso_literals::{
         ContainsIsoStats, ProcessIsoLiteralsForSchemaError, process_iso_literals_for_schema,
@@ -66,7 +66,7 @@ pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol>(
         }
     }
 
-    add_link_fields(db, &mut unvalidated_isograph_schema)?;
+    add_link_fields_to_schema(db, &mut unvalidated_isograph_schema)?;
 
     let (isograph_schema, stats) = process_iso_literals_for_schema(
         db,
