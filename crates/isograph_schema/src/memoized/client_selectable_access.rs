@@ -328,6 +328,41 @@ pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
     Ok(Some(object_selectable.clone()))
 }
 
+#[legacy_memo]
+#[expect(clippy::type_complexity)]
+pub fn client_selectable_named<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    parent_object_entity_name: ServerObjectEntityName,
+    client_selectable_name: ClientSelectableName,
+) -> Result<
+    Option<
+        SelectionType<
+            ClientScalarSelectable<TNetworkProtocol>,
+            ClientObjectSelectable<TNetworkProtocol>,
+        >,
+    >,
+    MemoizedIsoLiteralError<TNetworkProtocol>,
+> {
+    // we can do this better by reordering functions in this file
+    if let Some(object_selectable) = client_object_selectable_named(
+        db,
+        parent_object_entity_name,
+        client_selectable_name.unchecked_conversion(),
+    )
+    .to_owned()?
+    {
+        return Ok(Some(SelectionType::Object(object_selectable)));
+    }
+
+    Ok(client_scalar_selectable_named(
+        db,
+        parent_object_entity_name,
+        client_selectable_name.unchecked_conversion(),
+    )
+    .to_owned()?
+    .map(SelectionType::Scalar))
+}
+
 #[expect(clippy::type_complexity)]
 #[legacy_memo]
 pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
