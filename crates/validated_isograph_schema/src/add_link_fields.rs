@@ -19,10 +19,7 @@ pub fn add_link_fields<TNetworkProtocol: NetworkProtocol>(
     for object in memo_ref
         .deref()
         .as_ref()
-        .expect(
-            "Expected validation to have worked. \
-            This is indicative of a bug in Isograph.",
-        )
+        .map_err(|e| CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e.clone() })?
         .iter()
     {
         let object = &object.item;
