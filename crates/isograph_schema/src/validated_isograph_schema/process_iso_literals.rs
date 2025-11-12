@@ -32,8 +32,7 @@ pub(crate) fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol>
         process_iso_literals(db, &mut unvalidated_isograph_schema, contains_iso)?;
     unprocessed_selection_sets.extend(unprocessed_client_types);
 
-    unvalidated_isograph_schema.entrypoints =
-        validate_entrypoints(db, &unvalidated_isograph_schema, unprocessed_entrypoints)?;
+    unvalidated_isograph_schema.entrypoints = validate_entrypoints(db, unprocessed_entrypoints)?;
 
     // Step two: now, we can create the selection sets. Creating a selection set involves
     // looking up client selectables, to:
@@ -104,7 +103,7 @@ pub enum ProcessIsoLiteralsForSchemaError<TNetworkProtocol: NetworkProtocol> {
         })
     )]
     ValidateEntrypointDeclaration {
-        messages: Vec<WithLocation<ValidateEntrypointDeclarationError>>,
+        messages: Vec<WithLocation<ValidateEntrypointDeclarationError<TNetworkProtocol>>>,
     },
 }
 
@@ -127,10 +126,13 @@ impl<TNetworkProtocol: NetworkProtocol> From<Vec<WithLocation<IsographLiteralPar
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol> From<Vec<WithLocation<ValidateEntrypointDeclarationError>>>
+impl<TNetworkProtocol: NetworkProtocol>
+    From<Vec<WithLocation<ValidateEntrypointDeclarationError<TNetworkProtocol>>>>
     for ProcessIsoLiteralsForSchemaError<TNetworkProtocol>
 {
-    fn from(messages: Vec<WithLocation<ValidateEntrypointDeclarationError>>) -> Self {
+    fn from(
+        messages: Vec<WithLocation<ValidateEntrypointDeclarationError<TNetworkProtocol>>>,
+    ) -> Self {
         ProcessIsoLiteralsForSchemaError::ValidateEntrypointDeclaration { messages }
     }
 }

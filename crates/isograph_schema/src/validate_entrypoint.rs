@@ -9,13 +9,15 @@ use common_lang_types::{
 };
 use intern::Lookup;
 use isograph_lang_types::{
-    ClientScalarSelectableNameWrapper, DefinitionLocation, EntrypointDeclaration,
-    EntrypointDirectiveSet, SelectionType, ServerObjectEntityNameWrapper,
+    ClientScalarSelectableNameWrapper, EntrypointDeclaration, EntrypointDirectiveSet,
+    ServerObjectEntityNameWrapper,
 };
 use thiserror::Error;
 
 use crate::{
-    IsographDatabase, NetworkProtocol, Schema, ServerEntityName, defined_entity, fetchable_types,
+    IsographDatabase, MemoizedIsoLiteralError, NetworkProtocol, SelectableNamedError,
+    ServerEntityName, client_scalar_selectable_named, defined_entity, fetchable_types,
+    selectable_named,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -27,11 +29,10 @@ pub struct EntrypointDeclarationInfo {
 #[expect(clippy::type_complexity)]
 pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
     entrypoint_declarations: Vec<(TextSource, WithSpan<EntrypointDeclaration>)>,
 ) -> Result<
     HashMap<(ServerObjectEntityName, ClientScalarSelectableName), EntrypointDeclarationInfo>,
-    Vec<WithLocation<ValidateEntrypointDeclarationError>>,
+    Vec<WithLocation<ValidateEntrypointDeclarationError<TNetworkProtocol>>>,
 > {
     let mut errors = vec![];
     let mut entrypoints: HashMap<
@@ -39,7 +40,7 @@ pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol>(
         EntrypointDeclarationInfo,
     > = HashMap::new();
     for (text_source, entrypoint_declaration) in entrypoint_declarations {
-        match validate_entrypoint_type_and_field(db, schema, text_source, &entrypoint_declaration) {
+        match validate_entrypoint_type_and_field(db, text_source, &entrypoint_declaration) {
             Ok(client_field_id) => {
                 let new_entrypoint = EntrypointDeclarationInfo {
                     iso_literal_text: entrypoint_declaration.item.iso_literal_text,
@@ -85,30 +86,36 @@ pub fn validate_entrypoints<TNetworkProtocol: NetworkProtocol>(
 
 fn validate_entrypoint_type_and_field<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
     text_source: TextSource,
     entrypoint_declaration: &WithSpan<EntrypointDeclaration>,
-) -> Result<ClientScalarSelectableName, WithLocation<ValidateEntrypointDeclarationError>> {
+) -> Result<
+    ClientScalarSelectableName,
+    WithLocation<ValidateEntrypointDeclarationError<TNetworkProtocol>>,
+> {
     let parent_object_entity_name = validate_parent_object_entity_name(
         db,
         entrypoint_declaration.item.parent_type,
         text_source,
     )?;
-    let client_field_id = validate_client_field(
-        schema,
+
+    validate_client_field_exists(
+        db,
         entrypoint_declaration.item.client_field_name,
         text_source,
         parent_object_entity_name,
     )?;
 
-    Ok(client_field_id)
+    Ok(entrypoint_declaration.item.client_field_name.item.0)
 }
 
 fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: WithSpan<ServerObjectEntityNameWrapper>,
     text_source: TextSource,
-) -> Result<ServerObjectEntityName, WithLocation<ValidateEntrypointDeclarationError>> {
+) -> Result<
+    ServerObjectEntityName,
+    WithLocation<ValidateEntrypointDeclarationError<TNetworkProtocol>>,
+> {
     let parent_type_id = defined_entity(db, parent_object_entity_name.item.0.into())
         .to_owned()
         .expect(
@@ -167,48 +174,51 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn validate_client_field<TNetworkProtocol: NetworkProtocol>(
-    schema: &Schema<TNetworkProtocol>,
+fn validate_client_field_exists<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
     field_name: WithSpan<ClientScalarSelectableNameWrapper>,
     text_source: TextSource,
     parent_object_entity_name: ServerObjectEntityName,
-) -> Result<ClientScalarSelectableName, WithLocation<ValidateEntrypointDeclarationError>> {
-    match schema
-        .server_entity_data
-        .get(&parent_object_entity_name)
-        .expect(
-            "Expected parent_object_entity_name to exist \
-            in server_object_entity_available_selectables",
-        )
-        .selectables
-        .get(&field_name.item.0.into())
+) -> Result<(), WithLocation<ValidateEntrypointDeclarationError<TNetworkProtocol>>> {
+    let memo_ref = client_scalar_selectable_named(db, parent_object_entity_name, field_name.item.0);
+
+    match memo_ref
+        .deref()
+        .as_ref()
+        .map_err(|e| WithLocation::new(e.clone().into(), Location::Generated))?
     {
-        Some(defined_field) => match defined_field {
-            DefinitionLocation::Client(SelectionType::Object(_))
-            | DefinitionLocation::Server(_) => Err(WithLocation::new(
-                ValidateEntrypointDeclarationError::FieldMustBeClientField {
-                    parent_object_entity_name,
-                    client_field_name: field_name.item,
-                },
-                Location::new(text_source, field_name.span),
-            )),
-            DefinitionLocation::Client(SelectionType::Scalar((
-                _parent_object_entity_name,
-                client_field_name,
-            ))) => Ok(*client_field_name),
-        },
-        None => Err(WithLocation::new(
-            ValidateEntrypointDeclarationError::ClientFieldMustExist {
-                parent_object_entity_name,
-                client_field_name: field_name.item,
-            },
-            Location::new(text_source, field_name.span),
-        )),
+        Some(_) => Ok(()),
+        None => {
+            // check whether it is anything else
+            let other_memo_ref =
+                selectable_named(db, parent_object_entity_name, field_name.item.0.into());
+
+            match other_memo_ref
+                .deref()
+                .as_ref()
+                .map_err(|e| WithLocation::new(e.clone().into(), Location::Generated))?
+            {
+                Some(_) => Err(WithLocation::new(
+                    ValidateEntrypointDeclarationError::FieldMustBeClientField {
+                        parent_object_entity_name,
+                        client_field_name: field_name.item,
+                    },
+                    Location::new(text_source, field_name.span),
+                )),
+                None => Err(WithLocation::new(
+                    ValidateEntrypointDeclarationError::ClientFieldMustExist {
+                        parent_object_entity_name,
+                        client_field_name: field_name.item,
+                    },
+                    Location::new(text_source, field_name.span),
+                )),
+            }
+        }
     }
 }
 
 #[derive(Error, Eq, PartialEq, Debug, Clone)]
-pub enum ValidateEntrypointDeclarationError {
+pub enum ValidateEntrypointDeclarationError<TNetworkProtocol: NetworkProtocol> {
     #[error("`{parent_object_entity_name}` is not a type that has been defined.")]
     ParentTypeNotDefined {
         parent_object_entity_name: ServerObjectEntityNameWrapper,
@@ -249,4 +259,10 @@ pub enum ValidateEntrypointDeclarationError {
         "Entrypoint declared lazy in one location and declared eager in another location. Entrypoint must be either lazy or non-lazy in all instances."
     )]
     LazyLoadInconsistentEntrypoint,
+
+    #[error("{0}")]
+    MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError<TNetworkProtocol>),
+
+    #[error("{0}")]
+    SelectableNamedError(#[from] SelectableNamedError<TNetworkProtocol>),
 }
