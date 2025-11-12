@@ -149,7 +149,7 @@ pub fn get_parent_and_selectable_for_selection_parent<'a, TNetworkProtocol: Netw
     }
 }
 
-pub fn parent_object_entity_and_selectable<'a, TNetworkProtocol: NetworkProtocol>(
+pub fn parent_object_entity_and_selectable<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityNameWrapper,
     selectable_name: SelectableName,
