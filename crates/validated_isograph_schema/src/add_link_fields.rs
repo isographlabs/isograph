@@ -47,14 +47,14 @@ pub fn add_link_fields<TNetworkProtocol: NetworkProtocol>(
             },
         );
 
-        selectables_to_process.push((parent_object_entity_name, field_name, object.name));
+        selectables_to_process.push((parent_object_entity_name, field_name));
     }
 
     // Awkward: we can only get one mutable reference to schema at once, so within the server_object_entities_and_ids_mut()
     // loop, we can't also update schema.server_entity_data.server_object_entity_available_selectables!
     //
     // This is temporary: when everything moves to pico, this will be easier!
-    for (parent_object_entity_name, field_name, object_entity_name) in selectables_to_process {
+    for (parent_object_entity_name, field_name) in selectables_to_process {
         if schema
             .server_entity_data
             .entry(parent_object_entity_name.item)
@@ -71,7 +71,7 @@ pub fn add_link_fields<TNetworkProtocol: NetworkProtocol>(
         {
             return Err(CreateSchemaError::CompilerCreatedFieldExistsOnType {
                 selectable_name: field_name.into(),
-                parent_object_entity_name: object_entity_name.item,
+                parent_object_entity_name: parent_object_entity_name.item,
             });
         }
     }
