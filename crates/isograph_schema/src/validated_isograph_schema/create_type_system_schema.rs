@@ -1,17 +1,16 @@
 use std::{collections::HashMap, ops::Deref};
 
-use common_lang_types::{SelectableName, ServerObjectEntityName, WithLocation};
-use isograph_lang_types::SelectionType;
-use isograph_schema::{
+use crate::{
     CreateAdditionalFieldsError, ExposeFieldToInsert, FieldToInsert,
     FieldToInsertToServerSelectableError, ID_FIELD_NAME, IsographDatabase, NetworkProtocol,
     ScalarSelectionAndNonNullType, Schema, ServerObjectEntityExtraInfo, ServerObjectSelectable,
     field_to_insert_to_server_selectable,
+    validated_isograph_schema::set_and_validate_id_field::set_and_validate_id_field,
 };
+use common_lang_types::{SelectableName, ServerObjectEntityName, WithLocation};
+use isograph_lang_types::SelectionType;
 use pico_macros::legacy_memo;
 use thiserror::Error;
-
-use crate::set_and_validate_id_field::set_and_validate_id_field;
 
 #[legacy_memo]
 #[expect(clippy::type_complexity)]

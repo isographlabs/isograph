@@ -6,6 +6,10 @@ use common_lang_types::{
 use isograph_compiler::CompilerState;
 use isograph_lang_types::{Description, IsographResolvedNode, VariableDefinition};
 use isograph_schema::{
+    IsoLiteralExtraction, extract_iso_literals_from_file_content, get_validated_schema,
+    process_iso_literal_extraction, read_iso_literals_source_from_relative_path,
+};
+use isograph_schema::{
     IsographDatabase, NetworkProtocol, SelectableTrait, ServerEntityName, ServerObjectEntity,
     get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
     server_object_entity_named,
@@ -16,10 +20,6 @@ use lsp_types::{
 };
 use pico_macros::legacy_memo;
 use resolve_position::ResolvePosition;
-use validated_isograph_schema::{
-    IsoLiteralExtraction, extract_iso_literals_from_file_content, get_validated_schema,
-    process_iso_literal_extraction, read_iso_literals_source_from_relative_path,
-};
 
 use crate::{
     lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult},

@@ -8,7 +8,7 @@ mod process_iso_literals;
 mod set_and_validate_id_field;
 
 pub use add_selection_sets::*;
-use create_type_system_schema::*;
+pub use create_type_system_schema::*;
 pub use get_validated_schema::*;
 pub use isograph_literals::*;
 pub use memoized::*;

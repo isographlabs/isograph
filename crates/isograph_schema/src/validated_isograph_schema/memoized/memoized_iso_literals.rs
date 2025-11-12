@@ -1,27 +1,23 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 
+use crate::{
+    ClientObjectSelectable, ClientScalarSelectable, CreateAdditionalFieldsError, CreateSchemaError,
+    IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError,
+    create_new_exposed_field, create_type_system_schema_with_server_selectables,
+    process_client_field_declaration_inner, process_client_pointer_declaration_inner,
+    validated_isograph_schema::add_link_fields::get_link_fields_map,
+};
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName,
     ServerObjectEntityName, Span, WithSpan,
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{ClientFieldDeclaration, ClientPointerDeclaration, SelectionType};
-use isograph_schema::{
-    ClientObjectSelectable, ClientScalarSelectable, CreateAdditionalFieldsError, IsographDatabase,
-    NetworkProtocol, ProcessClientFieldDeclarationError, create_new_exposed_field,
-    process_client_field_declaration_inner, process_client_pointer_declaration_inner,
-};
 use pico_macros::legacy_memo;
 use thiserror::Error;
 
-use crate::{
-    add_link_fields::get_link_fields_map,
-    create_type_system_schema::{
-        CreateSchemaError, create_type_system_schema_with_server_selectables,
-    },
-    parse_iso_literal_in_source,
-};
+use crate::parse_iso_literal_in_source;
 
 /// client selectables defined by iso literals.
 #[legacy_memo]

@@ -15,7 +15,6 @@ isograph_schema = { path = "../isograph_schema" }
 pico = { path = "../pico" }
 pico_macros = { path = "../pico_macros" }
 resolve_position = { path = "../resolve_position" }
-validated_isograph_schema = { path = "../validated_isograph_schema" }
 colored = { workspace = true }
 crossbeam = { workspace = true }
 log = { workspace = true, features = ["kv_unstable", "kv_unstable_std"] }

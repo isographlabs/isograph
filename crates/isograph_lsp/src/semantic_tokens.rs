@@ -12,15 +12,15 @@ use isograph_compiler::CompilerState;
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::IsographSemanticToken;
 use isograph_schema::{IsographDatabase, NetworkProtocol};
+use isograph_schema::{
+    parse_iso_literals_in_file_content_and_return_all, read_iso_literals_source_from_relative_path,
+};
 use lsp_types::{
     SemanticToken as LspSemanticToken, SemanticTokens as LspSemanticTokens,
     SemanticTokensResult as LspSemanticTokensResult, Uri,
     request::{Request, SemanticTokensFullRequest},
 };
 use pico_macros::legacy_memo;
-use validated_isograph_schema::{
-    parse_iso_literals_in_file_content_and_return_all, read_iso_literals_source_from_relative_path,
-};
 
 pub fn on_semantic_token_full_request<TNetworkProtocol: NetworkProtocol>(
     compiler_state: &CompilerState<TNetworkProtocol>,

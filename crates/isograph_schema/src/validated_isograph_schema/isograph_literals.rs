@@ -1,3 +1,8 @@
+use crate::{
+    IsoLiteralsSource, IsographDatabase, NetworkProtocol, ParsedIsoLiteralsMap,
+    ProcessClientFieldDeclarationError, Schema, UnprocessedSelectionSet,
+    process_client_field_declaration, process_client_pointer_declaration,
+};
 use common_lang_types::{
     CurrentWorkingDirectory, Location, RelativePathToSourceFile, Span, TextSource, WithLocation,
     WithSpan,
@@ -6,18 +11,11 @@ use isograph_lang_parser::{
     IsoLiteralExtractionResult, IsographLiteralParseError, parse_iso_literal,
 };
 use isograph_lang_types::{EntrypointDeclaration, SelectionType};
-use isograph_schema::{
-    IsoLiteralsSource, IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError,
-    Schema, UnprocessedSelectionSet, process_client_field_declaration,
-    process_client_pointer_declaration,
-};
 use lazy_static::lazy_static;
 use pico::SourceId;
 use pico_macros::legacy_memo;
 use regex::Regex;
 use std::ops::Deref;
-
-use crate::process_iso_literals::ParsedIsoLiteralsMap;
 
 // TODO this should return a Vec of Results, since a file can contain
 // both valid and invalid iso literals.

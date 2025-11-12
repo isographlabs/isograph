@@ -1,23 +1,20 @@
 use std::ops::Deref;
 
-use common_lang_types::WithLocation;
-use isograph_schema::{
-    CreateAdditionalFieldsError, IsographDatabase, NetworkProtocol, Schema,
-    ValidateUseOfArgumentsError, create_new_exposed_field, validate_use_of_arguments,
+use crate::{
+    ContainsIsoStats, CreateAdditionalFieldsError, IsographDatabase, NetworkProtocol,
+    ProcessIsoLiteralsForSchemaError, Schema, ValidateUseOfArgumentsError,
+    create_new_exposed_field, process_iso_literals_for_schema, validate_use_of_arguments,
+    validated_isograph_schema::{
+        add_link_fields::add_link_fields_to_schema,
+        create_type_system_schema::{
+            CreateSchemaError, create_type_system_schema_with_server_selectables,
+            process_field_queue,
+        },
+    },
 };
+use common_lang_types::WithLocation;
 use pico_macros::legacy_memo;
 use thiserror::Error;
-
-use crate::{
-    CreateSchemaError,
-    add_link_fields::add_link_fields_to_schema,
-    create_type_system_schema::{
-        create_type_system_schema_with_server_selectables, process_field_queue,
-    },
-    process_iso_literals::{
-        ContainsIsoStats, ProcessIsoLiteralsForSchemaError, process_iso_literals_for_schema,
-    },
-};
 
 #[legacy_memo]
 pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol>(

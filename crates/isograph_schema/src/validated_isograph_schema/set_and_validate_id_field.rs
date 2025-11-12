@@ -1,12 +1,12 @@
+use crate::{
+    CreateAdditionalFieldsError, CreateAdditionalFieldsResult, ID_ENTITY_NAME, IsographDatabase,
+    NetworkProtocol,
+};
 use common_lang_types::{
     ServerObjectEntityName, ServerScalarIdSelectableName, ServerScalarSelectableName,
     UnvalidatedTypeName,
 };
 use graphql_lang_types::GraphQLNamedTypeAnnotation;
-use isograph_schema::{
-    CreateAdditionalFieldsError, CreateAdditionalFieldsResult, ID_ENTITY_NAME, IsographDatabase,
-    NetworkProtocol,
-};
 
 /// If we have encountered an id field, we can:
 /// - validate that the id field is properly defined, i.e. has type ID!

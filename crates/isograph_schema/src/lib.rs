@@ -15,6 +15,7 @@ mod refetch_strategy;
 mod validate_argument_types;
 mod validate_entrypoint;
 mod validate_use_of_arguments;
+mod validated_isograph_schema;
 mod variable_context;
 mod visit_selection_set;
 
@@ -34,4 +35,5 @@ pub use process_client_field_declaration::*;
 pub use refetch_strategy::*;
 pub use validate_entrypoint::*;
 pub use validate_use_of_arguments::*;
+pub use validated_isograph_schema::*;
 pub use variable_context::*;

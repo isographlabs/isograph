@@ -15,7 +15,6 @@ isograph_config = { path = "../isograph_config" }
 graphql_network_protocol = { path = "../graphql_network_protocol" }
 isograph_lang_types = { path = "../isograph_lang_types" }
 isograph_schema = { path = "../isograph_schema" }
-validated_isograph_schema = { path = "../validated_isograph_schema" }
 pico = { path = "../pico" }
 clap = { workspace = true }
 regex = { workspace = true }

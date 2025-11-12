@@ -7,9 +7,9 @@ use common_lang_types::{
 use graphql_network_protocol::GraphQLNetworkProtocol;
 use intern::{Lookup, string_key::Intern};
 use isograph_schema::IsographDatabase;
+use isograph_schema::parse_iso_literals_in_file_content;
 use lazy_static::lazy_static;
 use regex::Regex;
-use validated_isograph_schema::parse_iso_literals_in_file_content;
 
 fn main() {
     let args = FixtureOpt::parse();

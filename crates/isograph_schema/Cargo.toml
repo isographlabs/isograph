@@ -12,10 +12,12 @@ graphql_lang_types = { path = "../graphql_lang_types" }
 impl_base_types_macro = { path = "../impl_base_types_macro" }
 intern = { path = "../../relay-crates/intern" }
 isograph_config = { path = "../isograph_config" }
+isograph_lang_parser = { path = "../isograph_lang_parser" }
 isograph_lang_types = { path = "../isograph_lang_types" }
 pico = { path = "../pico" }
 pico_macros = { path = "../pico_macros" }
-thiserror = { workspace = true }
 lazy_static = { workspace = true }
+regex = { workspace = true }
 serde = { workspace = true }
+thiserror = { workspace = true }
 tracing = { workspace = true }

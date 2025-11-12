@@ -8,16 +8,16 @@ use isograph_compiler::CompilerState;
 use isograph_lang_types::{
     InlineBehavior, LineBehavior, SpaceAfter, SpaceBefore, semantic_token_legend::IndentChange,
 };
+use isograph_schema::{
+    IsoLiteralExtraction, extract_iso_literals_from_file_content, process_iso_literal_extraction,
+    read_iso_literals_source_from_relative_path,
+};
 use isograph_schema::{IsographDatabase, NetworkProtocol};
 use lsp_types::{
     Position, Range, TextEdit,
     request::{Formatting, Request},
 };
 use pico_macros::legacy_memo;
-use validated_isograph_schema::{
-    IsoLiteralExtraction, extract_iso_literals_from_file_content, process_iso_literal_extraction,
-    read_iso_literals_source_from_relative_path,
-};
 
 use crate::{lsp_runtime_error::LSPRuntimeResult, uri_file_path_ext::UriFilePathExt};
 

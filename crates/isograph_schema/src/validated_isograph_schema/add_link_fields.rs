@@ -1,18 +1,17 @@
 use std::{collections::HashMap, ops::Deref};
 
+use crate::{
+    ClientFieldVariant, ClientScalarSelectable, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol,
+    Schema, server_object_entities,
+    validated_isograph_schema::create_type_system_schema::CreateSchemaError,
+};
 use common_lang_types::{
     ClientScalarSelectableName, Location, ParentObjectEntityNameAndSelectableName,
     ServerObjectEntityName, WithLocation,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{DefinitionLocation, Description, SelectionType};
-use isograph_schema::{
-    ClientFieldVariant, ClientScalarSelectable, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol,
-    Schema, server_object_entities,
-};
 use pico_macros::legacy_memo;
-
-use crate::create_type_system_schema::CreateSchemaError;
 
 pub fn add_link_fields_to_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,

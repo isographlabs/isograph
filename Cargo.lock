@@ -152,7 +152,6 @@ dependencies = [
  "sha2",
  "thiserror 1.0.69",
  "tracing",
- "validated_isograph_schema",
 ]
 
 [[package]]
@@ -1673,7 +1672,6 @@ dependencies = [
  "lazy_static",
  "pico",
  "regex",
- "validated_isograph_schema",
 ]
 
 [[package]]
@@ -1729,7 +1727,6 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
- "validated_isograph_schema",
 ]
 
 [[package]]
@@ -1741,10 +1738,12 @@ dependencies = [
  "impl_base_types_macro",
  "intern",
  "isograph_config",
+ "isograph_lang_parser",
  "isograph_lang_types",
  "lazy_static",
  "pico",
  "pico_macros",
+ "regex",
  "serde",
  "thiserror 1.0.69",
  "tracing",
@@ -4113,25 +4112,6 @@ name = "uuid"
 version = "1.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0f540e3240398cce6128b64ba83fdbdd86129c16a3aa1a3a252efd66eb3d587"
-
-[[package]]
-name = "validated_isograph_schema"
-version = "0.4.3"
-dependencies = [
- "common_lang_types",
- "graphql_lang_types",
- "intern",
- "isograph_config",
- "isograph_lang_parser",
- "isograph_lang_types",
- "isograph_schema",
- "lazy_static",
- "pico",
- "pico_macros",
- "regex",
- "thiserror 1.0.69",
- "tracing",
-]
 
 [[package]]
 name = "valuable"

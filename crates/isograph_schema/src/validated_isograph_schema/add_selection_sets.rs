@@ -1,19 +1,19 @@
 use std::ops::Deref;
 
-use common_lang_types::{
-    Location, SelectableName, ServerObjectEntityName, UnvalidatedTypeName, WithLocation, WithSpan,
-};
-use isograph_lang_types::{
-    DefinitionLocation, ObjectSelection, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionType, UnvalidatedScalarFieldSelection, UnvalidatedSelection,
-};
-use isograph_schema::{
+use crate::{
     ClientScalarOrObjectSelectable, IsographDatabase, NetworkProtocol, ObjectSelectableId,
     RefetchStrategy, ScalarSelectableId, Schema, ServerObjectEntity,
     UnprocessedClientObjectSelectableSelectionSet, UnprocessedClientScalarSelectableSelectionSet,
     UnprocessedSelectionSet, UseRefetchFieldRefetchStrategy, ValidatedObjectSelection,
     ValidatedScalarSelection, ValidatedSelection, server_object_entity_named,
     server_object_selectable_named, server_scalar_selectable_named,
+};
+use common_lang_types::{
+    Location, SelectableName, ServerObjectEntityName, UnvalidatedTypeName, WithLocation, WithSpan,
+};
+use isograph_lang_types::{
+    DefinitionLocation, ObjectSelection, ScalarSelection, ScalarSelectionDirectiveSet,
+    SelectionType, UnvalidatedScalarFieldSelection, UnvalidatedSelection,
 };
 use thiserror::Error;
 

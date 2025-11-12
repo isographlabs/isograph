@@ -11,7 +11,6 @@ intern = { path = "../../relay-crates/intern" }
 isograph_schema = { path = "../isograph_schema" }
 isograph_config = { path = "../isograph_config" }
 isograph_lang_types = { path = "../isograph_lang_types" }
-validated_isograph_schema = { path = "../validated_isograph_schema" }
 indexmap = { workspace = true }
 md-5 = { workspace = true }
 sha2 = { workspace = true }

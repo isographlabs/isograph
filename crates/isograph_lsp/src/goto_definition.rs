@@ -15,6 +15,10 @@ use isograph_schema::{
     get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
     server_entities_named,
 };
+use isograph_schema::{
+    client_scalar_selectable_named, get_validated_schema, process_iso_literal_extraction,
+    read_iso_literals_source_from_relative_path,
+};
 use lsp_types::{
     GotoDefinitionResponse, Position, Uri,
     request::{GotoDefinition, Request},
@@ -22,10 +26,6 @@ use lsp_types::{
 use pico_macros::legacy_memo;
 use resolve_position::ResolvePosition;
 use std::ops::Deref;
-use validated_isograph_schema::{
-    client_scalar_selectable_named, get_validated_schema, process_iso_literal_extraction,
-    read_iso_literals_source_from_relative_path,
-};
 
 pub fn on_goto_definition<TNetworkProtocol: NetworkProtocol>(
     compiler_state: &CompilerState<TNetworkProtocol>,

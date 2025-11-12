@@ -26,6 +26,7 @@ use isograph_schema::{
     server_object_selectable_named, server_scalar_entity_javascript_name,
     server_scalar_selectable_named,
 };
+use isograph_schema::{ContainsIsoStats, GetValidatedSchemaError, get_validated_schema};
 use lazy_static::lazy_static;
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
@@ -33,7 +34,6 @@ use std::{
     ops::Deref,
 };
 use thiserror::Error;
-use validated_isograph_schema::{ContainsIsoStats, GetValidatedSchemaError, get_validated_schema};
 
 use crate::{
     eager_reader_artifact::{

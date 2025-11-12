@@ -3,21 +3,19 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use crate::{
+    AddSelectionSetsError, IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError,
+    Schema, UnprocessedSelectionSet, ValidateEntrypointDeclarationError,
+    add_selection_sets_to_client_selectables, validate_entrypoints,
+};
 use common_lang_types::{
     RelativePathToSourceFile, SelectableName, ServerObjectEntityName, TextSource, WithLocation,
 };
 use isograph_lang_parser::{IsoLiteralExtractionResult, IsographLiteralParseError};
-use isograph_schema::{
-    IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError, Schema,
-    UnprocessedSelectionSet, ValidateEntrypointDeclarationError, validate_entrypoints,
-};
 use pico_macros::legacy_memo;
 use thiserror::Error;
 
-use crate::{
-    add_selection_sets::{AddSelectionSetsError, add_selection_sets_to_client_selectables},
-    parse_iso_literal_in_source, process_iso_literals,
-};
+use crate::{parse_iso_literal_in_source, process_iso_literals};
 
 pub(crate) fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
