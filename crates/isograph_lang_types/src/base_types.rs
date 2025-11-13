@@ -128,6 +128,15 @@ pub enum SelectionType<TScalar, TObject> {
     Object(TObject),
 }
 
+impl<TScalar, TObject> SelectionType<TScalar, TObject> {
+    pub fn client_type(&self) -> &'static str {
+        match self {
+            SelectionType::Scalar(_) => "field",
+            SelectionType::Object(_) => "pointer",
+        }
+    }
+}
+
 // For traits that we define, we can use crates in the impl_base_traits crate.
 // For others, we implement them manually. This can be fixed!
 impl<T0: Lookup, T1: Lookup> Lookup for SelectionType<T0, T1> {
