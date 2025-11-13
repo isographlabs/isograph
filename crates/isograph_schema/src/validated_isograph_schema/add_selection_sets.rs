@@ -239,13 +239,13 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
 
 fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
+    selection_parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
     scalar_selection: UnvalidatedScalarFieldSelection,
 ) -> AddSelectionSetsResult<ValidatedScalarSelection, TNetworkProtocol> {
     let location_memo_ref = selectable_named(
         db,
-        selection_parent_object.name.item,
+        selection_parent_object_entity.name.item,
         scalar_selection.name.item.into(),
     );
     let location = location_memo_ref
@@ -260,7 +260,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
                         .type_and_field()
                         .parent_object_entity_name,
                     client_field_name: top_level_field_or_pointer.type_and_field().selectable_name,
-                    field_parent_type_name: selection_parent_object.name.item,
+                    field_parent_type_name: selection_parent_object_entity.name.item,
                     field_name: scalar_selection.name.item.into(),
                     client_type: top_level_field_or_pointer.client_type().to_string(),
                 },
@@ -294,7 +294,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
                                 .type_and_field()
                                 .parent_object_entity_name,
                             client_field_name: top_level_field_or_pointer.name().into(),
-                            field_parent_type_name: selection_parent_object.name.item,
+                            field_parent_type_name: selection_parent_object_entity.name.item,
                             field_name: scalar_selection.name.item.into(),
                             target_type_name: (*object_selectable.target_object_entity.inner())
                                 .into(),
@@ -321,7 +321,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
                         client_field_name: top_level_field_or_pointer
                             .type_and_field()
                             .selectable_name,
-                        field_parent_type_name: selection_parent_object.name.item,
+                        field_parent_type_name: selection_parent_object_entity.name.item,
                         field_name: scalar_selection.name.item.into(),
                         client_type: top_level_field_or_pointer.client_type().to_string(),
                     },
@@ -346,7 +346,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
 
 fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
+    selection_parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
     object_selection: ObjectSelection<(), ()>,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<ValidatedObjectSelection, TNetworkProtocol> {
@@ -355,7 +355,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
 
     let selectable_memo_ref = selectable_named(
         db,
-        selection_parent_object.name.item,
+        selection_parent_object_entity.name.item,
         object_selection.name.item.into(),
     );
     let selectable = selectable_memo_ref
@@ -370,7 +370,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                         .type_and_field()
                         .parent_object_entity_name,
                     client_field_name: top_level_field_or_pointer.type_and_field().selectable_name,
-                    field_parent_type_name: selection_parent_object.name.item,
+                    field_parent_type_name: selection_parent_object_entity.name.item,
                     field_name: object_selection.name.item.into(),
                     client_type: top_level_field_or_pointer.client_type().to_string(),
                 },
@@ -411,7 +411,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                                 .type_and_field()
                                 .parent_object_entity_name,
                             client_field_name: top_level_field_or_pointer.name().into(),
-                            field_parent_type_name: selection_parent_object.name.item,
+                            field_parent_type_name: selection_parent_object_entity.name.item,
                             field_name: object_selection.name.item.into(),
                             target_type_name: server_scalar_entity_name.into(),
                             client_type: top_level_field_or_pointer.client_type().to_string(),
@@ -439,7 +439,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                         client_field_name: top_level_field_or_pointer
                             .type_and_field()
                             .selectable_name,
-                        field_parent_type_name: selection_parent_object.name.item,
+                        field_parent_type_name: selection_parent_object_entity.name.item,
                         field_name: object_selection.name.item.into(),
                         client_type: top_level_field_or_pointer.client_type().to_string(),
                     },
