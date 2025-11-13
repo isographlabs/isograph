@@ -344,23 +344,52 @@ pub fn client_selectable_named<TNetworkProtocol: NetworkProtocol>(
     MemoizedIsoLiteralError<TNetworkProtocol>,
 > {
     // we can do this better by reordering functions in this file
-    if let Some(object_selectable) = client_object_selectable_named(
-        db,
-        parent_object_entity_name,
-        client_selectable_name.unchecked_conversion(),
-    )
-    .to_owned()?
-    {
-        return Ok(Some(SelectionType::Object(object_selectable)));
-    }
+    // just in general, we can do better! This is awkward!
+    // TODO don't call to_owned, since that clones an error unnecessarily
 
-    Ok(client_scalar_selectable_named(
+    let object_selectable = client_object_selectable_named(
         db,
         parent_object_entity_name,
         client_selectable_name.unchecked_conversion(),
     )
-    .to_owned()?
-    .map(SelectionType::Scalar))
+    .to_owned();
+
+    let client_selectable = client_scalar_selectable_named(
+        db,
+        parent_object_entity_name,
+        client_selectable_name.unchecked_conversion(),
+    )
+    .to_owned();
+
+    match (object_selectable, client_selectable) {
+        (Ok(Some(_)), Ok(Some(_))) => panic!(
+            "Unexpected duplicate. \
+            This is indicative of a bug in Isograph."
+        ),
+        (Ok(object), Ok(scalar)) => {
+            // If we received two Ok's, that can only be because the field is not defined.
+            //
+            // Just kidding! That's true if the field is defined in an iso literal, but for __link
+            // or an exposed field, object will be None and scalar might be Some.
+            //
+            // So it's sufficient to ensure that at least one is None.
+            assert!(
+                object.is_none() || scalar.is_none(),
+                "Expected at least one case to be None. \
+                This is indicative of a bug in Isograph."
+            );
+            Ok(object
+                .map(SelectionType::Object)
+                .or(scalar.map(SelectionType::Scalar)))
+        }
+        (Ok(object_selectable), Err(_)) => {
+            Ok(object_selectable.map(|object_selectable| SelectionType::Object(object_selectable)))
+        }
+        (Err(_), Ok(scalar_selectable)) => {
+            Ok(scalar_selectable.map(|scalar_selectable| SelectionType::Scalar(scalar_selectable)))
+        }
+        (Err(e), Err(_)) => Err(e.into()),
+    }
 }
 
 #[expect(clippy::type_complexity)]
