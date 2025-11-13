@@ -1,12 +1,13 @@
 use std::ops::Deref;
 
 use crate::{
-    ClientScalarOrObjectSelectable, IsographDatabase, NetworkProtocol, ObjectSelectableId,
-    RefetchStrategy, ScalarSelectableId, Schema, ServerObjectEntity,
+    ClientScalarOrObjectSelectable, IsographDatabase, MemoizedIsoLiteralError, NetworkProtocol,
+    ObjectSelectableId, RefetchStrategy, ScalarSelectableId, Schema, ServerObjectEntity,
     UnprocessedClientObjectSelectableSelectionSet, UnprocessedClientScalarSelectableSelectionSet,
     UnprocessedSelectionSet, UseRefetchFieldRefetchStrategy, ValidatedObjectSelection,
-    ValidatedScalarSelection, ValidatedSelection, server_object_entity_named,
-    server_object_selectable_named, server_scalar_selectable_named,
+    ValidatedScalarSelection, ValidatedSelection, client_object_selectable_named,
+    client_scalar_selectable_named, server_object_entity_named, server_object_selectable_named,
+    server_scalar_selectable_named,
 };
 use common_lang_types::{
     Location, SelectableName, ServerObjectEntityName, UnvalidatedTypeName, WithLocation, WithSpan,
@@ -17,14 +18,14 @@ use isograph_lang_types::{
 };
 use thiserror::Error;
 
-pub type ValidateAddSelectionSetsResultWithMultipleErrors<T> =
-    Result<T, Vec<WithLocation<AddSelectionSetsError>>>;
+pub type ValidateAddSelectionSetsResultWithMultipleErrors<T, TNetworkProtocol> =
+    Result<T, Vec<WithLocation<AddSelectionSetsError<TNetworkProtocol>>>>;
 
 pub(crate) fn add_selection_sets_to_client_selectables<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
     unprocessed_selection_sets: Vec<UnprocessedSelectionSet>,
-) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
+) -> ValidateAddSelectionSetsResultWithMultipleErrors<(), TNetworkProtocol> {
     let mut errors = vec![];
     for unprocessed_selection_set in unprocessed_selection_sets {
         match unprocessed_selection_set {
@@ -61,18 +62,24 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
     unprocessed_scalar_selection_set: UnprocessedClientScalarSelectableSelectionSet,
-) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
-    let client_field = schema
-        .client_scalar_selectable(
-            unprocessed_scalar_selection_set.parent_object_entity_name,
-            unprocessed_scalar_selection_set.client_scalar_selectable_name,
-        )
+) -> ValidateAddSelectionSetsResultWithMultipleErrors<(), TNetworkProtocol> {
+    let memo_ref = client_scalar_selectable_named(
+        db,
+        unprocessed_scalar_selection_set.parent_object_entity_name,
+        unprocessed_scalar_selection_set.client_scalar_selectable_name,
+    );
+    let client_scalar_selectable = memo_ref
+        .deref()
+        .as_ref()
+        .map_err(|e| vec![WithLocation::new(e.clone().into(), Location::Generated)])?
+        .as_ref()
         .expect(
             "Expected selectable to exist. \
             This is indicative of a bug in Isograph.",
         );
 
-    let memo_ref = server_object_entity_named(db, client_field.parent_object_entity_name());
+    let memo_ref =
+        server_object_entity_named(db, client_scalar_selectable.parent_object_entity_name());
     let parent_object_entity = &memo_ref
         .deref()
         .as_ref()
@@ -92,8 +99,8 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
         schema,
         unprocessed_scalar_selection_set.reader_selection_set,
         parent_object_entity,
-        client_field.parent_object_entity_name,
-        &client_field,
+        client_scalar_selectable.parent_object_entity_name,
+        &client_scalar_selectable,
     )?;
 
     let refetch_strategy = get_validated_refetch_strategy(
@@ -101,8 +108,8 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
         schema,
         unprocessed_scalar_selection_set.refetch_strategy,
         parent_object_entity,
-        client_field.parent_object_entity_name,
-        &client_field,
+        client_scalar_selectable.parent_object_entity_name,
+        &client_scalar_selectable,
     )?;
 
     let client_field = schema
@@ -127,18 +134,24 @@ fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &mut Schema<TNetworkProtocol>,
     unprocessed_client_object_selection_set: UnprocessedClientObjectSelectableSelectionSet,
-) -> ValidateAddSelectionSetsResultWithMultipleErrors<()> {
-    let client_pointer = schema
-        .client_object_selectable(
-            unprocessed_client_object_selection_set.parent_object_entity_name,
-            unprocessed_client_object_selection_set.client_object_selectable_name,
-        )
+) -> ValidateAddSelectionSetsResultWithMultipleErrors<(), TNetworkProtocol> {
+    let memo_ref = client_object_selectable_named(
+        db,
+        unprocessed_client_object_selection_set.parent_object_entity_name,
+        unprocessed_client_object_selection_set.client_object_selectable_name,
+    );
+    let client_object_selectable = memo_ref
+        .deref()
+        .as_ref()
+        .map_err(|e| vec![WithLocation::new(e.clone().into(), Location::Generated)])?
+        .as_ref()
         .expect(
             "Expected selectable to exist. \
             This is indicative of a bug in Isograph.",
         );
 
-    let memo_ref = server_object_entity_named(db, client_pointer.parent_object_entity_name());
+    let memo_ref =
+        server_object_entity_named(db, client_object_selectable.parent_object_entity_name());
     let parent_object_entity = &memo_ref
         .deref()
         .as_ref()
@@ -158,8 +171,8 @@ fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol>(
         schema,
         unprocessed_client_object_selection_set.reader_selection_set,
         parent_object_entity,
-        client_pointer.parent_object_entity_name,
-        &client_pointer,
+        client_object_selectable.parent_object_entity_name,
+        &client_object_selectable,
     )?;
 
     let client_pointer = schema
@@ -190,7 +203,10 @@ fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol>(
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     selection_parent_object_name: ServerObjectEntityName,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
-) -> ValidateAddSelectionSetsResultWithMultipleErrors<Vec<WithSpan<ValidatedSelection>>> {
+) -> ValidateAddSelectionSetsResultWithMultipleErrors<
+    Vec<WithSpan<ValidatedSelection>>,
+    TNetworkProtocol,
+> {
     get_all_errors_or_all_ok(selection_set.into_iter().map(|selection| {
         get_validated_selection(
             db,
@@ -210,7 +226,8 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
     selection_parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     selection_parent_object_name: ServerObjectEntityName,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
-) -> ValidateAddSelectionSetsResultWithMultipleErrors<WithSpan<ValidatedSelection>> {
+) -> ValidateAddSelectionSetsResultWithMultipleErrors<WithSpan<ValidatedSelection>, TNetworkProtocol>
+{
     with_span.and_then(|selection| match selection {
         SelectionType::Scalar(scalar_selection) => Ok(SelectionType::Scalar(
             get_validated_scalar_selection(
@@ -243,7 +260,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
     selection_parent_object_name: ServerObjectEntityName,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
     scalar_selection: UnvalidatedScalarFieldSelection,
-) -> AddSelectionSetsResult<ValidatedScalarSelection> {
+) -> AddSelectionSetsResult<ValidatedScalarSelection, TNetworkProtocol> {
     let location = schema
         .server_entity_data
         .get(&selection_parent_object_name)
@@ -362,7 +379,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     selection_parent_object_name: ServerObjectEntityName,
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
     object_selection: ObjectSelection<(), ()>,
-) -> ValidateAddSelectionSetsResultWithMultipleErrors<ValidatedObjectSelection> {
+) -> ValidateAddSelectionSetsResultWithMultipleErrors<ValidatedObjectSelection, TNetworkProtocol> {
     let location = schema
         .server_entity_data
         .get(&selection_parent_object_name)
@@ -525,6 +542,7 @@ fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol>(
     top_level_field_or_pointer: &impl ClientScalarOrObjectSelectable,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<
     Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>,
+    TNetworkProtocol,
 > {
     match refetch_strategy {
         Some(RefetchStrategy::UseRefetchField(use_refetch_field_strategy)) => Ok(Some(
@@ -566,10 +584,11 @@ pub fn get_all_errors_or_all_ok<T, E>(
     }
 }
 
-type AddSelectionSetsResult<T> = Result<T, WithLocation<AddSelectionSetsError>>;
+type AddSelectionSetsResult<T, TNetworkProtocol> =
+    Result<T, WithLocation<AddSelectionSetsError<TNetworkProtocol>>>;
 
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
-pub enum AddSelectionSetsError {
+pub enum AddSelectionSetsError<TNetworkProtocol: NetworkProtocol> {
     #[error(
         "In the client {client_type} `{client_field_parent_type_name}.{client_field_name}`, \
         the field `{field_parent_type_name}.{field_name}` is selected, but that \
@@ -627,4 +646,7 @@ pub enum AddSelectionSetsError {
 
     #[error("`{server_field_name}` is a server field, and cannot be selected with `@loadable`")]
     ServerFieldCannotBeSelectedLoadably { server_field_name: SelectableName },
+
+    #[error("{0}")]
+    MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError<TNetworkProtocol>),
 }

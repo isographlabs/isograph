@@ -81,7 +81,7 @@ pub enum ProcessIsoLiteralsForSchemaError<TNetworkProtocol: NetworkProtocol> {
         })
     )]
     AddSelectionSets {
-        messages: Vec<WithLocation<AddSelectionSetsError>>,
+        messages: Vec<WithLocation<AddSelectionSetsError<TNetworkProtocol>>>,
     },
 
     #[error(
@@ -137,10 +137,11 @@ impl<TNetworkProtocol: NetworkProtocol>
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol> From<Vec<WithLocation<AddSelectionSetsError>>>
+impl<TNetworkProtocol: NetworkProtocol>
+    From<Vec<WithLocation<AddSelectionSetsError<TNetworkProtocol>>>>
     for ProcessIsoLiteralsForSchemaError<TNetworkProtocol>
 {
-    fn from(messages: Vec<WithLocation<AddSelectionSetsError>>) -> Self {
+    fn from(messages: Vec<WithLocation<AddSelectionSetsError<TNetworkProtocol>>>) -> Self {
         ProcessIsoLiteralsForSchemaError::AddSelectionSets { messages }
     }
 }
