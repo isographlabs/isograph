@@ -25,7 +25,6 @@ use lsp_types::{
 };
 use pico_macros::legacy_memo;
 use resolve_position::ResolvePosition;
-use std::ops::Deref;
 
 pub fn on_goto_definition<TNetworkProtocol: NetworkProtocol>(
     compiler_state: &CompilerState<TNetworkProtocol>,
@@ -73,7 +72,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
             IsographResolvedNode::EntrypointDeclaration(_) => None,
             IsographResolvedNode::ServerObjectEntityNameWrapper(entity) => {
                 let memo_ref = server_entities_named(db, entity.inner.0.into());
-                let server_entities = match memo_ref.deref() {
+                let server_entities = match memo_ref.lookup() {
                     Ok(s) => s,
                     Err(_) => return Err(LSPRuntimeError::ExpectedError),
                 };
@@ -123,7 +122,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                                     relative_path: _,
                                     content,
                                 } = memo_ref
-                                    .deref()
+                                    .lookup()
                                     .as_ref()
                                     .expect("Expected relative path to exist");
                                 isograph_location_to_lsp_location(db, location, content)
@@ -165,7 +164,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                                     relative_path: _,
                                     content,
                                 } = memo_ref
-                                    .deref()
+                                    .lookup()
                                     .as_ref()
                                     .expect("Expected relative path to exist");
 
@@ -196,7 +195,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                     parent_type_name.0.unchecked_conversion(),
                     wrapper.inner.0,
                 );
-                let client_scalar_selectable = match memo_ref.deref().as_ref() {
+                let client_scalar_selectable = match memo_ref.lookup().as_ref() {
                     Ok(item) => item,
                     Err(_) => return Ok(None),
                 };
@@ -218,7 +217,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                                     relative_path: _,
                                     content,
                                 } = memo_ref
-                                    .deref()
+                                    .lookup()
                                     .as_ref()
                                     .expect("Expected relative path to exist");
                                 isograph_location_to_lsp_location(db, location, content)
@@ -228,7 +227,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
             }
             IsographResolvedNode::ClientObjectSelectableNameWrapper(object_wrapper_path) => {
                 let memo_ref = get_validated_schema(db);
-                let (validated_schema, _stats) = match memo_ref.deref() {
+                let (validated_schema, _stats) = match memo_ref.lookup() {
                     Ok(schema) => schema,
                     Err(_) => return Ok(None),
                 };
@@ -260,7 +259,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                                     relative_path: _,
                                     content,
                                 } = memo_ref
-                                    .deref()
+                                    .lookup()
                                     .as_ref()
                                     .expect("Expected relative path to exist");
                                 isograph_location_to_lsp_location(db, location, content)

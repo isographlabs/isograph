@@ -1,5 +1,4 @@
 use std::collections::BTreeSet;
-use std::ops::Deref;
 
 use common_lang_types::{
     FieldArgumentName, Location, ParentObjectEntityNameAndSelectableName, SelectableName,
@@ -89,7 +88,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                             server_scalar_selectable_name.into(),
                         );
                         let server_scalar_selectable = memo_ref
-                            .deref()
+                            .lookup()
                             .as_ref()
                             .expect(
                                 "Expected validation to have succeeded. \
@@ -152,7 +151,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                             server_object_selectable_name.into(),
                         );
                         memo_ref
-                            .deref()
+                            .lookup()
                             .as_ref()
                             .expect(
                                 "Expected validation to have succeeded. \

@@ -27,7 +27,7 @@ use isograph_schema::{
     current_target_merged_selections, fetchable_types, get_reachable_variables,
     initial_variable_context, server_object_entity_named,
 };
-use std::{collections::BTreeSet, ops::Deref};
+use std::collections::BTreeSet;
 
 #[expect(clippy::too_many_arguments)]
 pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
@@ -49,7 +49,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
 
     let memo_ref = server_object_entity_named(db, entrypoint.parent_object_entity_name());
     let parent_object_entity = &memo_ref
-        .deref()
+        .lookup()
         .as_ref()
         .expect(
             "Expected validation to have worked. \
@@ -92,12 +92,13 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
             .map(|variable_definition| &variable_definition.item)
             .collect(),
         &fetchable_types(db)
-            .deref()
+            .lookup()
             .as_ref()
             .expect(
                 "Expected parsing to have succeeded. \
                 This is indicative of a bug in Isograph.",
             )
+            .lookup()
             .iter()
             .find(|(_, root_operation_name)| root_operation_name.0 == "mutation"),
         file_extensions,
@@ -127,11 +128,14 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     // we can panic instead of using a default entrypoint type
     // TODO model this better so that the RootOperationName is somehow a
     // parameter
-    let memo_ref = fetchable_types(db);
-    let fetchable_types_map = memo_ref.deref().as_ref().expect(
-        "Expected parsing to have succeeded. \
-        This is indicative of a bug in Isograph.",
-    );
+    let fetchable_types_map = fetchable_types(db)
+        .lookup()
+        .as_ref()
+        .expect(
+            "Expected parsing to have succeeded. \
+                This is indicative of a bug in Isograph.",
+        )
+        .lookup();
 
     let root_operation_name = fetchable_types_map
         .get(&entrypoint.parent_object_entity_name)
@@ -148,7 +152,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
 
     let memo_ref = server_object_entity_named(db, entrypoint.parent_object_entity_name());
     let parent_object_entity = &memo_ref
-        .deref()
+        .lookup()
         .as_ref()
         .expect(
             "Expected validation to have worked. \
@@ -240,7 +244,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         };
     let memo_ref = server_object_entity_named(db, concrete_type_entity_name);
     let concrete_object_entity = &memo_ref
-        .deref()
+        .lookup()
         .as_ref()
         .expect(
             "Expected validation to have worked. \

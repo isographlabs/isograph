@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug, ops::Deref};
+use std::{collections::HashMap, fmt::Debug};
 
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, JavascriptName, SelectableName,
@@ -33,7 +33,7 @@ lazy_static! {
     pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct RootOperationName(pub &'static str);
 
 /// The in-memory representation of a schema.
@@ -84,7 +84,7 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
     for selection_name in selections {
         let memo_ref = server_selectable_named(db, current_entity_name, selection_name);
 
-        let current_selectable = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
+        let current_selectable = memo_ref.try_lookup()?;
 
         match current_selectable {
             Some(entity) => {
@@ -227,7 +227,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     server_object_selectable_name.into(),
                 );
                 let server_object_selectable = memo_ref
-                    .deref()
+                    .lookup()
                     .as_ref()
                     .expect(
                         "Expected validation to have succeeded. \

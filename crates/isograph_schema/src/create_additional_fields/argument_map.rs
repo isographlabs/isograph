@@ -1,6 +1,3 @@
-use std::collections::HashMap;
-use std::ops::Deref;
-
 use common_lang_types::{
     SelectableName, ServerObjectEntityName, ServerSelectableName, StringLiteralValue, VariableName,
     WithLocation,
@@ -8,6 +5,7 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
 use isograph_lang_types::{SelectionType, VariableDefinition};
+use std::collections::HashMap;
 
 use crate::{
     IsographDatabase, NetworkProtocol, ServerEntityName, ServerSelectableId,
@@ -190,7 +188,7 @@ impl ModifiedArgument {
                 ServerEntityName::Object(object_entity_name) => {
                     let field_map_memo_ref = server_selectables_vec(db, object_entity_name);
                     let field_map = field_map_memo_ref
-                        .deref()
+                        .lookup()
                         .as_ref()
                         .expect(
                             "Expected parsing to have worked. \

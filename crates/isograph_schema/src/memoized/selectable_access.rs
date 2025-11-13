@@ -1,7 +1,6 @@
 use common_lang_types::{SelectableName, ServerObjectEntityName};
 use isograph_lang_types::{DefinitionLocation, SelectionType};
 use pico_macros::legacy_memo;
-use std::ops::Deref;
 use thiserror::Error;
 
 use crate::{
@@ -39,14 +38,14 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
         parent_server_object_entity_name,
         selectable_name.unchecked_conversion(),
     );
-    let server_selectable = server_selectable_memo_ref.deref().as_ref();
+    let server_selectable = server_selectable_memo_ref.lookup().as_ref();
 
     let client_selectable_memo_ref = client_selectable_named(
         db,
         parent_server_object_entity_name,
         selectable_name.unchecked_conversion(),
     );
-    let client_selectable = client_selectable_memo_ref.deref().as_ref();
+    let client_selectable = client_selectable_memo_ref.lookup().as_ref();
 
     // case 1: both are error -> return error
     // case 2: one is error -> assume that is an unrelated error and return the other one

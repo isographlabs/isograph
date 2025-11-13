@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, ops::Deref};
+use std::collections::BTreeSet;
 
 use common_lang_types::{
     ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName, VariableName,
@@ -84,12 +84,13 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     let root_parent_object = entrypoint.parent_object_entity_name();
 
     let root_operation_name = fetchable_types(db)
-        .deref()
+        .lookup()
         .as_ref()
         .expect(
             "Expected parsing to have succeeded. \
             This is indicative of a bug in Isograph.",
         )
+        .lookup()
         .get(&root_object_entity_name)
         .cloned()
         .expect(

@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, hash_map::Entry},
-    ops::Deref,
-};
+use std::collections::{HashMap, hash_map::Entry};
 
 use common_lang_types::{
     ClientScalarSelectableName, IsoLiteralText, Location, ServerObjectEntityName, TextSource,
@@ -117,7 +114,8 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
     WithLocation<ValidateEntrypointDeclarationError<TNetworkProtocol>>,
 > {
     let parent_type_id = defined_entity(db, parent_object_entity_name.item.0.into())
-        .to_owned()
+        .lookup()
+        .clone()
         .expect(
             "Expected parsing to have succeeded. \
             This is indicative of a bug in Isograph.",
@@ -132,22 +130,24 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
     match parent_type_id {
         ServerEntityName::Object(object_entity_name) => {
             let is_fetchable = fetchable_types(db)
-                .deref()
+                .lookup()
                 .as_ref()
                 .expect(
                     "Expected parsing to have succeeded. \
                 This is indicative of a bug in Isograph.",
                 )
+                .lookup()
                 .contains_key(&object_entity_name);
 
             if !is_fetchable {
                 let fetchable_types = fetchable_types(db)
-                    .deref()
+                    .lookup()
                     .as_ref()
                     .expect(
                         "Expected parsing to have succeeded. \
                         This is indicative of a bug in Isograph.",
                     )
+                    .lookup()
                     .keys()
                     .map(|object_entity_name| object_entity_name.lookup())
                     .collect::<Vec<_>>()
@@ -183,9 +183,8 @@ fn validate_client_field_exists<TNetworkProtocol: NetworkProtocol>(
     let memo_ref = client_scalar_selectable_named(db, parent_object_entity_name, field_name.item.0);
 
     match memo_ref
-        .deref()
-        .as_ref()
-        .map_err(|e| WithLocation::new(e.clone().into(), Location::Generated))?
+        .try_lookup()
+        .map_err(|e| WithLocation::new(e.into(), Location::Generated))?
     {
         Some(_) => Ok(()),
         None => {
@@ -194,9 +193,8 @@ fn validate_client_field_exists<TNetworkProtocol: NetworkProtocol>(
                 selectable_named(db, parent_object_entity_name, field_name.item.0.into());
 
             match other_memo_ref
-                .deref()
-                .as_ref()
-                .map_err(|e| WithLocation::new(e.clone().into(), Location::Generated))?
+                .try_lookup()
+                .map_err(|e| WithLocation::new(e.into(), Location::Generated))?
             {
                 Some(_) => Err(WithLocation::new(
                     ValidateEntrypointDeclarationError::FieldMustBeClientField {

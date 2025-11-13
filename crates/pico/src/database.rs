@@ -1,14 +1,14 @@
 use std::{any::Any, hash::Hash, num::NonZeroUsize};
 
 use crate::{
-    InnerFn, MemoRef, Singleton,
+    InnerFn, MemoRef, MemoRefKind, RawPtr, Singleton,
     dependency::{Dependency, DependencyStack, NodeKind},
     dyn_eq::DynEq,
     epoch::Epoch,
     execute_memoized_function,
     index::Index,
     intern::{Key, ParamId},
-    macro_fns::{get_param, init_param_vec, intern_borrowed_param, intern_owned_param},
+    macro_fns::{get_param, hash, init_param_vec, intern_owned_param},
     source::{Source, SourceId, SourceNode},
 };
 use boxcar::Vec as BoxcarVec;
@@ -359,30 +359,49 @@ impl<Db: Database> Default for Storage<Db> {
 
 pub fn intern<Db: Database, T: Clone + Hash + DynEq + 'static>(db: &Db, value: T) -> MemoRef<T> {
     let param_id = intern_owned_param(db, value);
-    intern_from_param(db, param_id)
+    intern_from_param(db, param_id, MemoRefKind::Value)
 }
 
 pub fn intern_ref<Db: Database, T: Clone + Hash + DynEq + 'static>(
     db: &Db,
     value: &T,
 ) -> MemoRef<T> {
-    let param_id = intern_borrowed_param(db, value);
-    intern_from_param(db, param_id)
+    let param_id = hash(value).into();
+    if let Entry::Vacant(v) = db.get_storage().internal.param_id_to_index.entry(param_id) {
+        let idx = db
+            .get_storage()
+            .internal
+            .params
+            .push(Box::new(RawPtr::from_ref(value)));
+        v.insert(Index::new(idx));
+    }
+    intern_from_param(db, param_id, MemoRefKind::RawPtr)
 }
 
-fn intern_from_param<Db: Database, T: Clone + DynEq>(db: &Db, param_id: ParamId) -> MemoRef<T> {
+fn intern_from_param<Db: Database, T: Clone + DynEq>(
+    db: &Db,
+    param_id: ParamId,
+    kind: MemoRefKind,
+) -> MemoRef<T> {
     let mut param_ids = init_param_vec();
     param_ids.push(param_id);
     let derived_node_id = DerivedNodeId::new(param_id.inner().into(), param_ids);
-    execute_memoized_function(
-        db,
-        derived_node_id,
-        InnerFn::new(|db, derived_node_id| {
-            let param = get_param(db, derived_node_id.params[0])?
+    let inner_fn = match kind {
+        MemoRefKind::Value => InnerFn::new(|db, derived_node_id| {
+            let param_ref = get_param(db, derived_node_id.params[0])?;
+            let param = param_ref
                 .downcast_ref::<T>()
                 .expect("Unexpected param type. This is indicative of a bug in Pico.");
             Some(Box::new(param.clone()))
         }),
-    );
-    MemoRef::new(db, derived_node_id)
+        MemoRefKind::RawPtr => InnerFn::new(|db, derived_node_id| {
+            let param_ref = get_param(db, derived_node_id.params[0])?;
+            let param = param_ref
+                .downcast_ref::<RawPtr<T>>()
+                .expect("Unexpected param type. This is indicative of a bug in Pico.");
+            Some(Box::new(*param))
+        }),
+    };
+    execute_memoized_function(db, derived_node_id, inner_fn);
+    MemoRef::new_with_kind(db, derived_node_id, kind)
 }

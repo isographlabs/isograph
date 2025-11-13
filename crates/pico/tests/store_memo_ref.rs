@@ -20,7 +20,9 @@ fn store_memo_ref() {
         value: "asdf".to_string(),
     });
 
-    assert_eq!(**first_letter_as_memo_ref(&db, id), 'a');
+    let memo_ref = first_letter_as_memo_ref(&db, id);
+    let inner = memo_ref.lookup();
+    assert_eq!(*inner.lookup(), 'a');
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 1);
     assert_eq!(FIRST_LETTER_AS_MEMO_REF_COUNTER.load(Ordering::SeqCst), 1);
 
@@ -29,7 +31,9 @@ fn store_memo_ref() {
         value: "alto".to_string(),
     });
 
-    assert_eq!(**first_letter_as_memo_ref(&db, id), 'a');
+    let memo_ref = first_letter_as_memo_ref(&db, id);
+    let inner = memo_ref.lookup();
+    assert_eq!(*inner.lookup(), 'a');
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 2);
     assert_eq!(FIRST_LETTER_AS_MEMO_REF_COUNTER.load(Ordering::SeqCst), 1);
 }

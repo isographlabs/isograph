@@ -30,7 +30,7 @@ fn multi_function_chain() {
         value: "asdf".to_string(),
     });
 
-    assert_eq!(*capitalized_first_letter(&db, input_id), 'A');
+    assert_eq!(*capitalized_first_letter(&db, input_id).lookup(), 'A');
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 1);
     assert_eq!(CAPITALIZED_LETTER_COUNTER.load(Ordering::SeqCst), 1);
 
@@ -39,7 +39,7 @@ fn multi_function_chain() {
         value: "qwer".to_string(),
     });
 
-    assert_eq!(*capitalized_first_letter(&db, input_id), 'Q');
+    assert_eq!(*capitalized_first_letter(&db, input_id).lookup(), 'Q');
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 2);
     assert_eq!(CAPITALIZED_LETTER_COUNTER.load(Ordering::SeqCst), 2);
 }
@@ -57,7 +57,7 @@ fn multi_function_chain_with_irrelevant_change() {
         value: "asdf".to_string(),
     });
 
-    assert_eq!(*capitalized_first_letter(&db, id), 'A');
+    assert_eq!(*capitalized_first_letter(&db, id).lookup(), 'A');
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 1);
     assert_eq!(CAPITALIZED_LETTER_COUNTER.load(Ordering::SeqCst), 1);
 
@@ -66,7 +66,7 @@ fn multi_function_chain_with_irrelevant_change() {
         value: "alto".to_string(),
     });
 
-    assert_eq!(*capitalized_first_letter(&db, id), 'A');
+    assert_eq!(*capitalized_first_letter(&db, id).lookup(), 'A');
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 2);
     assert_eq!(CAPITALIZED_LETTER_COUNTER.load(Ordering::SeqCst), 1);
 }
@@ -85,7 +85,7 @@ fn sequential_functions_with_memoref_param() {
     });
 
     assert_eq!(
-        *capitalized_first_letter_from_memoref(&db, first_letter(&db, id)),
+        *capitalized_first_letter_from_memoref(&db, first_letter(&db, id)).lookup(),
         'A',
     );
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 1);
@@ -96,9 +96,9 @@ fn sequential_functions_with_memoref_param() {
         value: "bsdf".to_string(),
     });
 
-    assert_eq!(*first_letter(&db, id), 'b');
+    assert_eq!(*first_letter(&db, id).lookup(), 'b');
     assert_eq!(
-        *capitalized_first_letter_from_memoref(&db, first_letter(&db, id)),
+        *capitalized_first_letter_from_memoref(&db, first_letter(&db, id)).lookup(),
         'B',
     );
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 2);
@@ -110,7 +110,7 @@ fn sequential_functions_with_memoref_param() {
     });
 
     assert_eq!(
-        *capitalized_first_letter_from_memoref(&db, first_letter(&db, id)),
+        *capitalized_first_letter_from_memoref(&db, first_letter(&db, id)).lookup(),
         'B',
     );
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 3);
@@ -135,11 +135,11 @@ fn first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
 fn capitalized_first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
     CAPITALIZED_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     let first = first_letter(db, input_id);
-    first.to_ascii_uppercase()
+    first.lookup().to_ascii_uppercase()
 }
 
 #[legacy_memo]
 fn capitalized_first_letter_from_memoref(db: &TestDatabase, first: MemoRef<char>) -> char {
     MEMO_REF_PARAM_COUNTER.fetch_add(1, Ordering::SeqCst);
-    first.to_ascii_uppercase()
+    first.lookup_tracked().to_ascii_uppercase()
 }

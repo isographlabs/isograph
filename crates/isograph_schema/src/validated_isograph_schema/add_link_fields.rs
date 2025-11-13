@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Deref};
+use std::collections::HashMap;
 
 use crate::{
     ClientFieldVariant, ClientScalarSelectable, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol,
@@ -55,9 +55,8 @@ pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
 ) -> Result<Vec<ClientScalarSelectable<TNetworkProtocol>>, CreateSchemaError<TNetworkProtocol>> {
     let memo_ref = server_object_entities(db);
     Ok(memo_ref
-        .deref()
-        .as_ref()
-        .map_err(|e| CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e.clone() })?
+        .try_lookup()
+        .map_err(|e| CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e })?
         .iter()
         .map(|object| {
             let object = &object.item;

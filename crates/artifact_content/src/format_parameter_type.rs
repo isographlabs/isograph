@@ -1,5 +1,4 @@
 use std::fmt::Debug;
-use std::ops::Deref;
 
 use common_lang_types::ServerSelectableName;
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
@@ -57,7 +56,7 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
 
             let memo_ref = server_selectables_vec(db, parent_object_entity_name);
 
-            for (name, server_selectable) in memo_ref.deref().as_ref().expect(
+            for (name, server_selectable) in memo_ref.lookup().as_ref().expect(
                 "Expected type system document to be valid. \
                     This is indicative of a bug in Isograph.",
             ) {
@@ -105,7 +104,7 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
                 server_scalar_selectable_name.into(),
             );
             let server_scalar_selectable = memo_ref
-                .deref()
+                .lookup()
                 .as_ref()
                 .expect(
                     "Expected validation to have succeeded. \
@@ -134,7 +133,7 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
                 server_object_selectable_name.into(),
             );
             let server_object_selectable = memo_ref
-                .deref()
+                .lookup()
                 .as_ref()
                 .expect(
                     "Expected validation to have succeeded. \

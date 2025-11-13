@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Deref};
+use std::collections::HashMap;
 
 use crate::{
     CreateAdditionalFieldsError, ExposeFieldToInsert, FieldToInsert,
@@ -25,7 +25,7 @@ pub fn create_type_system_schema_with_server_selectables<TNetworkProtocol: Netwo
 > {
     let memo_ref = TNetworkProtocol::parse_type_system_documents(db);
     let (items, _fetchable_types) = memo_ref
-        .deref()
+        .lookup()
         .as_ref()
         .map_err(|e| CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e.clone() })?;
 

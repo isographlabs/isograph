@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use common_lang_types::{
     ClientScalarSelectableName, Location, ParentObjectEntityNameAndSelectableName, SelectableName,
     ServerObjectEntityName, ServerObjectSelectableName, ServerSelectableName, Span,
@@ -94,7 +92,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
     let mutation_field_memo_ref =
         server_selectable_named(db, parent_object_entity_name, mutation_subfield_name.into());
     let mutation_field = mutation_field_memo_ref
-        .deref()
+        .lookup()
         .as_ref()
         .map_err(|e| e.clone())?
         .as_ref()
@@ -136,7 +134,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
 
     let payload_object_entity_memo_ref = server_object_entity_named(db, payload_object_entity_name);
     let top_level_schema_field_concrete_type = payload_object_entity_memo_ref
-        .deref()
+        .lookup()
         .as_ref()
         .map_err(|e| e.clone())?
         .as_ref()
@@ -213,7 +211,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
                             db,
                             *server_object_selectable.target_object_entity.inner(),
                         )
-                        .deref()
+                        .lookup()
                         .as_ref()
                         .map_err(|e| e.clone())?
                         .as_ref()
@@ -331,7 +329,7 @@ fn parse_mutation_subfield_id<TNetworkProtocol: NetworkProtocol>(
 > {
     let memo_ref =
         server_selectable_named(db, mutation_object_entity_name, field_arg.intern().into());
-    let opt_field = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
+    let opt_field = memo_ref.try_lookup()?;
 
     match opt_field {
         Some(s) => {
@@ -398,7 +396,7 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
             server_selectable_named(db, current_entity_name, *selection_name);
 
         let current_selectable = current_selectable_memo_ref
-            .deref()
+            .lookup()
             .as_ref()
             .map_err(|e| e.clone())?;
 
@@ -428,7 +426,7 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
 
     let current_entity_memo_ref = server_object_entity_named(db, current_entity_name);
     let current_entity_concrete_type = current_entity_memo_ref
-        .deref()
+        .lookup()
         .as_ref()
         .map_err(|e| e.clone())?
         .as_ref()

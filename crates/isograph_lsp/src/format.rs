@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use common_lang_types::{
     CurrentWorkingDirectory, RelativePathToSourceFile,
     relative_path_from_absolute_and_working_directory,
@@ -36,14 +34,14 @@ pub fn on_format<TNetworkProtocol: NetworkProtocol>(
     );
 
     let memo_ref = read_iso_literals_source_from_relative_path(db, relative_path_to_source_file);
-    let content = match memo_ref.deref() {
+    let content = match memo_ref.lookup() {
         Some(s) => &s.content,
         // Is this the correct behavior?
         None => return Ok(None),
     };
 
     let memo_ref = extract_iso_literals_from_file_content(db, relative_path_to_source_file);
-    let extracted_items = memo_ref.deref();
+    let extracted_items = memo_ref.lookup();
 
     let text_edits = extracted_items
         .iter()

@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use common_lang_types::{
     SelectableName, ServerObjectEntityName, Span, relative_path_from_absolute_and_working_directory,
 };
@@ -73,7 +71,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
             IsographResolvedNode::ServerObjectEntityNameWrapper(entity) => {
                 let memo_ref = server_object_entity_named(db, entity.inner.0);
                 let server_object_entity = memo_ref
-                    .deref()
+                    .lookup()
                     .as_ref()
                     .map_err(|_| LSPRuntimeError::ExpectedError)?
                     .as_ref()
@@ -144,14 +142,14 @@ pub fn get_iso_literal_extraction_from_text_position_params<TNetworkProtocol: Ne
     );
 
     let memo_ref = read_iso_literals_source_from_relative_path(db, relative_path_to_source_file);
-    let content = match memo_ref.deref() {
+    let content = match memo_ref.lookup() {
         Some(s) => &s.content,
         // Is this the correct behavior?
         None => return None,
     };
 
     let memo_ref = extract_iso_literals_from_file_content(db, relative_path_to_source_file);
-    let extracted_items = memo_ref.deref();
+    let extracted_items = memo_ref.lookup();
     find_iso_literal_extraction_under_cursor(line_char, content, extracted_items)
 }
 

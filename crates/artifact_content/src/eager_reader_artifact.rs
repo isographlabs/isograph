@@ -10,7 +10,6 @@ use isograph_schema::{
     initial_variable_context, server_object_entity_named,
 };
 use isograph_schema::{RefetchedPathsMap, UserWrittenClientTypeInfo};
-use std::ops::Deref;
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
 use crate::{
@@ -44,7 +43,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
 
     let memo_ref = server_object_entity_named(db, client_selectable.parent_object_entity_name());
     let parent_object_entity = &memo_ref
-        .deref()
+        .lookup()
         .as_ref()
         .expect(
             "Expected validation to have worked. \
@@ -188,7 +187,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
     let memo_ref =
         server_object_entity_named(db, server_object_selectable.parent_object_entity_name);
     let parent_object_entity = &memo_ref
-        .deref()
+        .lookup()
         .as_ref()
         .expect(
             "Expected validation to have worked. \
@@ -204,7 +203,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
     let concrete_type_memo_ref =
         server_object_entity_named(db, *server_object_selectable.target_object_entity.inner());
     let concrete_type = &concrete_type_memo_ref
-        .deref()
+        .lookup()
         .as_ref()
         .expect(
             "Expected validation to have worked. \
@@ -279,7 +278,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     let memo_ref =
         server_object_entity_named(db, client_scalar_selectable.parent_object_entity_name());
     let parent_object_entity = &memo_ref
-        .deref()
+        .lookup()
         .as_ref()
         .expect(
             "Expected validation to have worked. \
@@ -394,7 +393,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
 ) -> ArtifactPathAndContent {
     let memo_ref = server_object_entity_named(db, client_field.parent_object_entity_name());
     let parent_object_entity = &memo_ref
-        .deref()
+        .lookup()
         .as_ref()
         .expect(
             "Expected validation to have worked. \
@@ -453,7 +452,7 @@ pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtoc
 ) -> ArtifactPathAndContent {
     let memo_ref = server_object_entity_named(db, client_field.parent_object_entity_name());
     let parent_object_entity = &memo_ref
-        .deref()
+        .lookup()
         .as_ref()
         .expect(
             "Expected validation to have worked. \
