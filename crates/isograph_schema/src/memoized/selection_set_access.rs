@@ -57,7 +57,7 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
         .collect()
 }
 
-// #[legacy_memo]
+#[legacy_memo]
 pub fn memoized_validated_reader_selection_set_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> HashMap<
