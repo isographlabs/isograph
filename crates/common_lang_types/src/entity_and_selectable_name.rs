@@ -8,6 +8,15 @@ pub struct ParentObjectEntityNameAndSelectableName {
     pub selectable_name: SelectableName,
 }
 
+impl From<(ServerObjectEntityName, SelectableName)> for ParentObjectEntityNameAndSelectableName {
+    fn from(value: (ServerObjectEntityName, SelectableName)) -> Self {
+        Self {
+            parent_object_entity_name: value.0,
+            selectable_name: value.1,
+        }
+    }
+}
+
 impl ParentObjectEntityNameAndSelectableName {
     pub fn underscore_separated(&self) -> String {
         format!(

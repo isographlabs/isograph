@@ -137,6 +137,15 @@ impl<TScalar, TObject> SelectionType<TScalar, TObject> {
     }
 }
 
+impl<T> SelectionType<T, T> {
+    pub fn inner(self) -> T {
+        match self {
+            SelectionType::Scalar(s) => s,
+            SelectionType::Object(o) => o,
+        }
+    }
+}
+
 // For traits that we define, we can use crates in the impl_base_traits crate.
 // For others, we implement them manually. This can be fixed!
 impl<T0: Lookup, T1: Lookup> Lookup for SelectionType<T0, T1> {
