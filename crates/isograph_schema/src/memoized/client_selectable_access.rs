@@ -382,13 +382,9 @@ pub fn client_selectable_named<TNetworkProtocol: NetworkProtocol>(
                 .map(SelectionType::Object)
                 .or(scalar.map(SelectionType::Scalar)))
         }
-        (Ok(object_selectable), Err(_)) => {
-            Ok(object_selectable.map(|object_selectable| SelectionType::Object(object_selectable)))
-        }
-        (Err(_), Ok(scalar_selectable)) => {
-            Ok(scalar_selectable.map(|scalar_selectable| SelectionType::Scalar(scalar_selectable)))
-        }
-        (Err(e), Err(_)) => Err(e.into()),
+        (Ok(object_selectable), Err(_)) => Ok(object_selectable.map(SelectionType::Object)),
+        (Err(_), Ok(scalar_selectable)) => Ok(scalar_selectable.map(SelectionType::Scalar)),
+        (Err(e), Err(_)) => Err(e),
     }
 }
 
