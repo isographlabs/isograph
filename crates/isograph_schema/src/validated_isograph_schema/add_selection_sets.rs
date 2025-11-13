@@ -191,7 +191,7 @@ fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol>(
 ///   as scalars, etc)
 /// - validate loadability/selectability (e.g. client fields cannot be selected updatably), and
 /// - include the selectable id in the associated data
-fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol>(
+pub fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_set: Vec<WithSpan<UnvalidatedSelection>>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
