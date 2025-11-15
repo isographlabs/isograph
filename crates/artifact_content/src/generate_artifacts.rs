@@ -31,7 +31,6 @@ use lazy_static::lazy_static;
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
     fmt::{Debug, Display},
-    ops::Deref,
 };
 use thiserror::Error;
 
@@ -115,7 +114,7 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
 > {
     let config = db.get_isograph_config();
     let validated_schema = get_validated_schema(db);
-    let (schema, stats) = match validated_schema.deref() {
+    let (schema, stats) = match validated_schema.lookup() {
         Ok((schema, stats)) => (schema, stats),
         Err(e) => return Err(e.clone())?,
     };
@@ -192,7 +191,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     (*server_object_selectable_name).into(),
                 );
                 let server_object_selectable = memo_ref
-                    .deref()
+                    .lookup()
                     .as_ref()
                     .expect(
                         "Expected validation to have succeeded. \
@@ -302,7 +301,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 client_scalar_selectable.parent_object_entity_name(),
                             );
                             let type_to_refine_to = &memo_ref
-                                .deref()
+                                .lookup()
                                 .as_ref()
                                 .expect(
                                     "Expected validation to have worked. \
@@ -392,12 +391,13 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
 
                             let memo_ref = fetchable_types(db);
                             let query_type = memo_ref
-                                .deref()
+                                .lookup()
                                 .as_ref()
                                 .expect(
                                     "Expected parsing to have succeeded. \
                                     This is indicative of a bug in Isograph.",
                                 )
+                                .lookup()
                                 .iter()
                                 .find(|(_, root_operation_name)| root_operation_name.0 == "query");
 
@@ -756,7 +756,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         server_scalar_selectable_name.into(),
                     );
                     let server_scalar_selectable = memo_ref
-                        .deref()
+                        .lookup()
                         .as_ref()
                         .expect(
                             "Expected validation to have succeeded. \
@@ -965,7 +965,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         server_scalar_selectable_name.into(),
                     );
                     let server_scalar_selectable = memo_ref
-                        .deref()
+                        .lookup()
                         .as_ref()
                         .expect(
                             "Expected validation to have succeeded. \

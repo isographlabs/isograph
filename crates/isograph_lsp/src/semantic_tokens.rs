@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use crate::{
     location_utils::uri_is_project_file,
     lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult},
@@ -78,7 +76,7 @@ fn get_semantic_tokens<TNetworkProtocol: NetworkProtocol>(
     let page_content_memo_ref =
         read_iso_literals_source_from_relative_path(db, relative_path_to_source_file);
     let page_content: &str = &page_content_memo_ref
-        .deref()
+        .lookup()
         .as_ref()
         .expect("Expected source to exist")
         .content;

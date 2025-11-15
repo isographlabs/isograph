@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use crate::{
     ClientScalarOrObjectSelectable, IsographDatabase, MemoizedIsoLiteralError, NetworkProtocol,
     ObjectSelectableId, RefetchStrategy, ScalarSelectableId, Schema, SelectableNamedError,
@@ -70,9 +68,8 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
         unprocessed_scalar_selection_set.client_scalar_selectable_name,
     );
     let client_scalar_selectable = memo_ref
-        .deref()
-        .as_ref()
-        .map_err(|e| vec![WithLocation::new(e.clone().into(), Location::Generated)])?
+        .try_lookup()
+        .map_err(|e| vec![WithLocation::new(e.into(), Location::Generated)])?
         .as_ref()
         .expect(
             "Expected selectable to exist. \
@@ -82,7 +79,7 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
     let memo_ref =
         server_object_entity_named(db, client_scalar_selectable.parent_object_entity_name());
     let parent_object_entity = &memo_ref
-        .deref()
+        .lookup()
         .as_ref()
         .expect(
             "Expected validation to have worked. \
@@ -138,9 +135,8 @@ fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol>(
         unprocessed_client_object_selection_set.client_object_selectable_name,
     );
     let client_object_selectable = memo_ref
-        .deref()
-        .as_ref()
-        .map_err(|e| vec![WithLocation::new(e.clone().into(), Location::Generated)])?
+        .try_lookup()
+        .map_err(|e| vec![WithLocation::new(e.into(), Location::Generated)])?
         .as_ref()
         .expect(
             "Expected selectable to exist. \
@@ -150,7 +146,7 @@ fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol>(
     let memo_ref =
         server_object_entity_named(db, client_object_selectable.parent_object_entity_name());
     let parent_object_entity = &memo_ref
-        .deref()
+        .lookup()
         .as_ref()
         .expect(
             "Expected validation to have worked. \
@@ -264,9 +260,8 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
         scalar_selection.name.item.into(),
     );
     let location = location_memo_ref
-        .deref()
-        .as_ref()
-        .map_err(|e| WithLocation::new(e.clone().into(), Location::Generated))?
+        .try_lookup()
+        .map_err(|e| WithLocation::new(e.into(), Location::Generated))?
         .as_ref()
         .ok_or_else(|| {
             WithLocation::new(
@@ -374,9 +369,8 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
         object_selection.name.item.into(),
     );
     let selectable = selectable_memo_ref
-        .deref()
-        .as_ref()
-        .map_err(|e| vec![WithLocation::new(e.clone().into(), Location::Generated)])?
+        .try_lookup()
+        .map_err(|e| vec![WithLocation::new(e.into(), Location::Generated)])?
         .as_ref()
         .ok_or_else(|| {
             vec![WithLocation::new(
@@ -404,7 +398,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                         (server_scalar_selectable.name.item).into(),
                     );
                     let server_scalar_selectable = memo_ref
-                        .deref()
+                        .lookup()
                         .as_ref()
                         .expect(
                             "Expected validation to have succeeded. \
@@ -466,7 +460,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
 
     let memo_ref = server_object_entity_named(db, new_parent_object_entity_name);
     let new_parent_object_entity = &memo_ref
-        .deref()
+        .lookup()
         .as_ref()
         .expect(
             "Expected validation to have worked. \

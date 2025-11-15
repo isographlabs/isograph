@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, ConstExportName,
     IsographDirectiveName, Location, ParentObjectEntityNameAndSelectableName,
@@ -241,14 +239,14 @@ pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>
     let query_id_memo_ref = fetchable_types(db);
 
     let query_id = query_id_memo_ref
-        .deref()
-        .as_ref()
+        .try_lookup()
         .map_err(|e| {
             WithSpan::new(
-                ProcessClientFieldDeclarationError::ParseTypeSystemDocumentsError(e.clone()),
+                ProcessClientFieldDeclarationError::ParseTypeSystemDocumentsError(e),
                 Span::todo_generated(),
             )
         })?
+        .lookup()
         .iter()
         .find(|(_, root_operation_name)| root_operation_name.0 == "query")
         .expect("Expected query to be found")
@@ -293,12 +291,13 @@ pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>
     let selections = client_field_declaration.item.selection_set;
 
     let is_fetchable = fetchable_types(db)
-        .deref()
+        .lookup()
         .as_ref()
         .expect(
             "Expected parsing to have succeeded. \
             This is indicative of a bug in Isograph.",
         )
+        .lookup()
         .contains_key(&client_field_declaration.item.parent_type.item.0);
 
     let refetch_strategy = if is_fetchable {
@@ -426,12 +425,13 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
     let client_pointer_name = client_pointer_declaration.item.client_pointer_name.item.0;
 
     let query_id = *fetchable_types(db)
-        .deref()
+        .lookup()
         .as_ref()
         .expect(
             "Expected parsing to have succeeded. \
             This is indicative of a bug in Isograph.",
         )
+        .lookup()
         .iter()
         .find(|(_, root_operation_name)| root_operation_name.0 == "query")
         .expect("Expected query to be found")
@@ -453,12 +453,13 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
     let unprocessed_fields = client_pointer_declaration.item.selection_set;
 
     let is_fetchable = fetchable_types(db)
-        .deref()
+        .lookup()
         .as_ref()
         .expect(
             "Expected parsing to have succeeded. \
             This is indicative of a bug in Isograph.",
         )
+        .lookup()
         .contains_key(&to_object_entity_name);
 
     // TODO extract this into a helper function, probably on TNetworkProtocol
@@ -712,7 +713,6 @@ pub fn validate_variable_definition<TNetworkProtocol: NetworkProtocol>(
         .clone()
         .and_then(|input_type_name| {
             defined_entity(db, *variable_definition.item.type_.inner())
-                .deref()
                 .to_owned()
                 .expect(
                     "Expected parsing to have succeeded. \

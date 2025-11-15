@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use common_lang_types::{
     EnumLiteralValue, Location, SelectableName, ServerObjectEntityName, ServerScalarEntityName,
     UnvalidatedTypeName, ValueKeyName, VariableName, WithLocation, WithSpan,
@@ -370,7 +368,7 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
                         (*server_scalar_selectable_name).into(),
                     );
                     let server_scalar_selectable = memo_ref
-                        .deref()
+                        .lookup()
                         .as_ref()
                         .expect(
                             "Expected validation to have succeeded. \
@@ -397,7 +395,7 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
                         (*server_object_selectable_name).into(),
                     );
                     let server_object_selectable = memo_ref
-                        .deref()
+                        .lookup()
                         .as_ref()
                         .expect(
                             "Expected validation to have succeeded. \

@@ -39,4 +39,4 @@ fn get_output(_db: &TestDatabase) -> Output {
 }
 
 #[legacy_memo]
-fn consume_output(db: &TestDatabase, _output: MemoRef<Output>) {}
+fn consume_output(_db: &TestDatabase, _output: MemoRef<Output>) {}

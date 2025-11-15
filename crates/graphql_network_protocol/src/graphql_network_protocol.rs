@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::ops::Deref;
 
 use common_lang_types::{
     DirectiveName, QueryExtraInfo, QueryOperationName, QueryText, ServerObjectEntityName,
@@ -179,7 +178,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
     ) -> String {
         let memo_ref = server_object_entity_named(db, *server_object_entity_name);
         let server_object_entity = &memo_ref
-            .deref()
+            .lookup()
             .as_ref()
             .expect(
                 "Expected validation to have worked. \

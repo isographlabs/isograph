@@ -19,8 +19,8 @@ fn same_source_key() {
         value: "this is b".to_string(),
     });
 
-    assert_eq!(*memoized_a(&db, input_a), 'a');
-    assert_eq!(*memoized_b(&db, input_b), 't');
+    assert_eq!(*memoized_a(&db, input_a).lookup(), 'a');
+    assert_eq!(*memoized_b(&db, input_b).lookup(), 't');
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Source)]

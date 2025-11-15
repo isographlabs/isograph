@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Deref};
+use std::collections::HashMap;
 
 use common_lang_types::{ServerObjectEntityName, ServerSelectableName};
 use pico_macros::legacy_memo;
@@ -27,7 +27,7 @@ pub fn server_selectables_vec<TNetworkProtocol: NetworkProtocol>(
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
     let memo_ref = TNetworkProtocol::parse_type_system_documents(db);
-    let (items, _fetchable_types) = memo_ref.deref().as_ref().map_err(|e| e.clone())?;
+    let (items, _fetchable_types) = memo_ref.try_lookup()?;
 
     Ok(items
         .iter()
@@ -78,7 +78,7 @@ pub fn server_selectables_named<TNetworkProtocol: NetworkProtocol>(
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
     let memo_ref = server_selectables_map(db, parent_server_object_entity_name);
-    let map = memo_ref.as_ref().map_err(|e| e.clone())?;
+    let map = memo_ref.try_lookup()?;
 
     Ok(map
         .get(&server_selectable_name)
@@ -98,6 +98,7 @@ pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol>(
     let memo_ref =
         server_selectables_named(db, parent_server_object_entity_name, server_selectable_name);
     let vec = memo_ref
+        .lookup()
         .as_ref()
         .map_err(|e| ServerSelectableNamedError::ParseTypeSystemDocumentsError(e.clone()))?;
 
@@ -157,7 +158,7 @@ pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
 > {
     let memo_ref =
         server_selectable_named(db, parent_server_object_entity_name, server_selectable_name);
-    let item = memo_ref.as_ref().map_err(|e| e.clone())?;
+    let item = memo_ref.try_lookup()?;
 
     match item {
         Some(item) => {
@@ -187,7 +188,7 @@ pub fn server_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
 > {
     let memo_ref =
         server_selectable_named(db, parent_server_object_entity_name, server_selectable_name);
-    let item = memo_ref.as_ref().map_err(|e| e.clone())?;
+    let item = memo_ref.try_lookup()?;
 
     match item {
         Some(item) => {

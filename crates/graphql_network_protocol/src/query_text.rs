@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use common_lang_types::{QueryOperationName, QueryText, UnvalidatedTypeName};
 use graphql_lang_types::GraphQLTypeAnnotation;
 use isograph_lang_types::{ArgumentKeyAndValue, NonConstantValue};
@@ -54,7 +52,7 @@ fn write_variables_to_string<'a>(
             variable.type_.clone().map(|input_type_id| {
                 let memo_ref = server_entity_named(db, input_type_id);
                 let schema_input_type = memo_ref
-                    .deref()
+                    .lookup()
                     .as_ref()
                     .expect(
                         "Expected this not to have failed. \

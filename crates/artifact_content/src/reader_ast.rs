@@ -1,5 +1,4 @@
 use std::collections::{BTreeSet, HashSet};
-use std::ops::Deref;
 
 use common_lang_types::{
     ClientScalarSelectableName, ParentObjectEntityNameAndSelectableName, WithSpan,
@@ -117,7 +116,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                         server_object_selectable_name.into(),
                     );
                     let server_object_selectable = memo_ref
-                        .deref()
+                        .lookup()
                         .as_ref()
                         .expect(
                             "Expected validation to have succeeded. \
@@ -244,7 +243,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
                 server_object_selectable_name.into(),
             );
             let server_object_selectable = memo_ref
-                .deref()
+                .lookup()
                 .as_ref()
                 .expect(
                     "Expected validation to have succeeded. \
@@ -884,7 +883,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                             server_object_selectable_name.into(),
                         );
                         let server_object_selectable = memo_ref
-                            .deref()
+                            .lookup()
                             .as_ref()
                             .expect(
                                 "Expected validation to have succeeded. \
