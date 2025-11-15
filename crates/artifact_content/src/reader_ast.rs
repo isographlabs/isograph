@@ -110,23 +110,22 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                     parent_object_entity_name,
                     server_object_selectable_name,
                 )) => {
-                    let memo_ref = server_object_selectable_named(
+                    let server_object_selectable = server_object_selectable_named(
                         db,
                         parent_object_entity_name,
                         server_object_selectable_name.into(),
+                    )
+                    .lookup()
+                    .as_ref()
+                    .expect(
+                        "Expected validation to have succeeded. \
+                            This is indicative of a bug in Isograph.",
+                    )
+                    .as_ref()
+                    .expect(
+                        "Expected selectable to exist. \
+                            This is indicative of a bug in Isograph.",
                     );
-                    let server_object_selectable = memo_ref
-                        .lookup()
-                        .as_ref()
-                        .expect(
-                            "Expected validation to have succeeded. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .as_ref()
-                        .expect(
-                            "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
-                        );
 
                     let normalization_key = match server_object_selectable.object_selectable_variant
                     {
@@ -237,23 +236,22 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
             reader_artifact_import_name
         }
         DefinitionLocation::Server((parent_object_entity_name, server_object_selectable_name)) => {
-            let memo_ref = server_object_selectable_named(
+            let server_object_selectable = server_object_selectable_named(
                 db,
                 parent_object_entity_name,
                 server_object_selectable_name.into(),
-            );
-            let server_object_selectable = memo_ref
-                .lookup()
-                .as_ref()
-                .expect(
-                    "Expected validation to have succeeded. \
+            )
+            .lookup()
+            .as_ref()
+            .expect(
+                "Expected validation to have succeeded. \
                     This is indicative of a bug in Isograph.",
-                )
-                .as_ref()
-                .expect(
-                    "Expected selectable to exist. \
+            )
+            .as_ref()
+            .expect(
+                "Expected selectable to exist. \
                         This is indicative of a bug in Isograph.",
-                );
+            );
             match &server_object_selectable.object_selectable_variant {
                 ServerObjectSelectableVariant::InlineFragment => {
                     let type_and_field = ParentObjectEntityNameAndSelectableName {
@@ -877,23 +875,22 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                         parent_object_entity_name,
                         server_object_selectable_name,
                     )) => {
-                        let memo_ref = server_object_selectable_named(
+                        let server_object_selectable = server_object_selectable_named(
                             db,
                             parent_object_entity_name,
                             server_object_selectable_name.into(),
+                        )
+                        .lookup()
+                        .as_ref()
+                        .expect(
+                            "Expected validation to have succeeded. \
+                                This is indicative of a bug in Isograph.",
+                        )
+                        .as_ref()
+                        .expect(
+                            "Expected selectable to exist. \
+                                This is indicative of a bug in Isograph.",
                         );
-                        let server_object_selectable = memo_ref
-                            .lookup()
-                            .as_ref()
-                            .expect(
-                                "Expected validation to have succeeded. \
-                                This is indicative of a bug in Isograph.",
-                            )
-                            .as_ref()
-                            .expect(
-                                "Expected selectable to exist. \
-                                This is indicative of a bug in Isograph.",
-                            );
 
                         let normalization_key =
                             match server_object_selectable.object_selectable_variant {

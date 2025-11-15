@@ -585,20 +585,20 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                     .target_object_entity_name()
                     .inner();
 
-                let memo_ref = server_object_entity_named(db, parent_object_entity_name);
-                let object_selection_parent_object_entity = &memo_ref
-                    .lookup()
-                    .as_ref()
-                    .expect(
-                        "Expected validation to have worked. \
+                let object_selection_parent_object_entity =
+                    &server_object_entity_named(db, parent_object_entity_name)
+                        .lookup()
+                        .as_ref()
+                        .expect(
+                            "Expected validation to have worked. \
                         This is indicative of a bug in Isograph.",
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected entity to exist. \
+                        )
+                        .as_ref()
+                        .expect(
+                            "Expected entity to exist. \
                         This is indicative of a bug in Isograph.",
-                    )
-                    .item;
+                        )
+                        .item;
 
                 match object_selection.associated_data {
                     DefinitionLocation::Client((
@@ -689,23 +689,22 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
         merge_traversal_state.has_updatable = true;
     }
 
-    let memo_ref = server_object_selectable_named(
+    let server_object_selectable = server_object_selectable_named(
         db,
         field_parent_object_entity_name,
         field_server_object_selectable_name.into(),
+    )
+    .lookup()
+    .as_ref()
+    .expect(
+        "Expected validation to have succeeded. \
+            This is indicative of a bug in Isograph.",
+    )
+    .as_ref()
+    .expect(
+        "Expected selectable to exist. \
+            This is indicative of a bug in Isograph.",
     );
-    let server_object_selectable = memo_ref
-        .lookup()
-        .as_ref()
-        .expect(
-            "Expected validation to have succeeded. \
-            This is indicative of a bug in Isograph.",
-        )
-        .as_ref()
-        .expect(
-            "Expected selectable to exist. \
-            This is indicative of a bug in Isograph.",
-        );
 
     match &server_object_selectable.object_selectable_variant {
         ServerObjectSelectableVariant::InlineFragment => {
@@ -733,20 +732,20 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                     )
                 }
                 MergedServerSelection::InlineFragment(existing_inline_fragment) => {
-                    let memo_ref = server_object_entity_named(db, parent_object_entity_name);
-                    let object_selection_parent_object_entity = &memo_ref
-                        .lookup()
-                        .as_ref()
-                        .expect(
-                            "Expected validation to have worked. \
+                    let object_selection_parent_object_entity =
+                        &server_object_entity_named(db, parent_object_entity_name)
+                            .lookup()
+                            .as_ref()
+                            .expect(
+                                "Expected validation to have worked. \
                             This is indicative of a bug in Isograph.",
-                        )
-                        .as_ref()
-                        .expect(
-                            "Expected entity to exist. \
+                            )
+                            .as_ref()
+                            .expect(
+                                "Expected entity to exist. \
                             This is indicative of a bug in Isograph.",
-                        )
-                        .item;
+                            )
+                            .item;
 
                     let reader_selection_set =
                         inline_fragment_reader_selection_set(server_object_selectable);
@@ -813,8 +812,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                     )
                     .target_object_entity_name()
                     .inner();
-                let memo_ref = server_object_entity_named(db, concrete_object_entity_name);
-                let concrete_type = memo_ref
+                let concrete_type = server_object_entity_named(db, concrete_object_entity_name)
                     .lookup()
                     .as_ref()
                     .expect(
@@ -1110,20 +1108,20 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
     let target_server_object_entity_name = *newly_encountered_client_object_selectable
         .target_object_entity_name
         .inner();
-    let memo_ref = server_object_entity_named(db, target_server_object_entity_name);
-    let target_server_object_entity = &memo_ref
-        .lookup()
-        .as_ref()
-        .expect(
-            "Expected validation to have worked. \
+    let target_server_object_entity =
+        &server_object_entity_named(db, target_server_object_entity_name)
+            .lookup()
+            .as_ref()
+            .expect(
+                "Expected validation to have worked. \
             This is indicative of a bug in Isograph.",
-        )
-        .as_ref()
-        .expect(
-            "Expected entity to exist. \
+            )
+            .as_ref()
+            .expect(
+                "Expected entity to exist. \
             This is indicative of a bug in Isograph.",
-        )
-        .item;
+            )
+            .item;
 
     let parent_object_entity_name = ClientOrServerObjectSelectable::parent_object_entity_name(
         &newly_encountered_client_object_selectable,

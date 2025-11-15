@@ -47,20 +47,20 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
             This is indicative of a bug in Isograph.",
         );
 
-    let memo_ref = server_object_entity_named(db, entrypoint.parent_object_entity_name());
-    let parent_object_entity = &memo_ref
-        .lookup()
-        .as_ref()
-        .expect(
-            "Expected validation to have worked. \
+    let parent_object_entity =
+        &server_object_entity_named(db, entrypoint.parent_object_entity_name())
+            .lookup()
+            .as_ref()
+            .expect(
+                "Expected validation to have worked. \
                 This is indicative of a bug in Isograph.",
-        )
-        .as_ref()
-        .expect(
-            "Expected entity to exist. \
+            )
+            .as_ref()
+            .expect(
+                "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-        )
-        .item;
+            )
+            .item;
     let FieldTraversalResult {
         traversal_state,
         merged_selection_map,
@@ -150,20 +150,20 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
                 })
         });
 
-    let memo_ref = server_object_entity_named(db, entrypoint.parent_object_entity_name());
-    let parent_object_entity = &memo_ref
-        .lookup()
-        .as_ref()
-        .expect(
-            "Expected validation to have worked. \
+    let parent_object_entity =
+        &server_object_entity_named(db, entrypoint.parent_object_entity_name())
+            .lookup()
+            .as_ref()
+            .expect(
+                "Expected validation to have worked. \
                 This is indicative of a bug in Isograph.",
-        )
-        .as_ref()
-        .expect(
-            "Expected entity to exist. \
+            )
+            .as_ref()
+            .expect(
+                "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-        )
-        .item;
+            )
+            .item;
 
     let reachable_variables =
         get_used_variable_definitions(merged_selection_map, variable_definitions);
@@ -242,8 +242,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
                         .expect("Expected at least one fetchable type to exist")
                 })
         };
-    let memo_ref = server_object_entity_named(db, concrete_type_entity_name);
-    let concrete_object_entity = &memo_ref
+    let concrete_object_entity = &server_object_entity_named(db, concrete_type_entity_name)
         .lookup()
         .as_ref()
         .expect(

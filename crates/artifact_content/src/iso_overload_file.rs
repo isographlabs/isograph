@@ -304,23 +304,22 @@ fn sorted_entrypoints<'schema, TNetworkProtocol: NetworkProtocol>(
                 (parent_object_entity_name, client_scalar_selectable_name),
                 entrypoint_declaration_info,
             )| {
-                let memo_ref = client_scalar_selectable_named(
+                // TODO don't clone, this is only required for lifetime reasons (because
+                // we cannot return references with a 'db lifetime)
+                let client_scalar_selectable = client_scalar_selectable_named(
                     db,
                     *parent_object_entity_name,
                     *client_scalar_selectable_name,
+                )
+                .to_owned()
+                .expect(
+                    "Expected parsing to have succeeded by this point. \
+                        This is indicative of a bug in Isograph.",
+                )
+                .expect(
+                    "Expected selectable to exist. \
+                        This is indicative of a bug in Isograph.",
                 );
-                // TODO don't clone, this is only required for lifetime reasons (because
-                // we cannot return references with a 'db lifetime)
-                let client_scalar_selectable = memo_ref
-                    .to_owned()
-                    .expect(
-                        "Expected parsing to have succeeded by this point. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .expect(
-                        "Expected selectable to exist. \
-                        This is indicative of a bug in Isograph.",
-                    );
                 (client_scalar_selectable, entrypoint_declaration_info)
             },
         )

@@ -33,19 +33,21 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
     // we don't obviously have a better way to do this besides checking whether this
     // a server selectable and also checking whether it is a client selectable, and
     // error'ing if we have multiple definitions.
-    let server_selectable_memo_ref = server_selectable_named(
+    let server_selectable = server_selectable_named(
         db,
         parent_server_object_entity_name,
         selectable_name.unchecked_conversion(),
-    );
-    let server_selectable = server_selectable_memo_ref.lookup().as_ref();
+    )
+    .lookup()
+    .as_ref();
 
-    let client_selectable_memo_ref = client_selectable_named(
+    let client_selectable = client_selectable_named(
         db,
         parent_server_object_entity_name,
         selectable_name.unchecked_conversion(),
-    );
-    let client_selectable = client_selectable_memo_ref.lookup().as_ref();
+    )
+    .lookup()
+    .as_ref();
 
     // case 1: both are error -> return error
     // case 2: one is error -> assume that is an unrelated error and return the other one

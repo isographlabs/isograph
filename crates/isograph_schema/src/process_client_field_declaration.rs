@@ -236,9 +236,7 @@ pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>
     ),
     TNetworkProtocol,
 > {
-    let query_id_memo_ref = fetchable_types(db);
-
-    let query_id = query_id_memo_ref
+    let query_id = fetchable_types(db)
         .try_lookup()
         .map_err(|e| {
             WithSpan::new(
@@ -303,28 +301,26 @@ pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>
     let refetch_strategy = if is_fetchable {
         Some(RefetchStrategy::RefetchFromRoot)
     } else {
-        let id_field_memo_ref = server_selectable_named(
+        let id_field = server_selectable_named(
             db,
             client_field_declaration.item.parent_type.item.0,
             (*ID_FIELD_NAME).into(),
-        );
-
-        let id_field = id_field_memo_ref
-            // TODO don't call to_owned
-            .to_owned()
-            .map_err(|e| {
-                WithSpan::new(
-                    ProcessClientFieldDeclarationError::ServerSelectableNamedError(e),
-                    Span::todo_generated(),
-                )
-            })?
-            .transpose()
-            .map_err(|e| {
-                WithSpan::new(
-                    ProcessClientFieldDeclarationError::FieldToInsertToServerSelectableError(e),
-                    Span::todo_generated(),
-                )
-            })?;
+        )
+        // TODO don't call to_owned
+        .to_owned()
+        .map_err(|e| {
+            WithSpan::new(
+                ProcessClientFieldDeclarationError::ServerSelectableNamedError(e),
+                Span::todo_generated(),
+            )
+        })?
+        .transpose()
+        .map_err(|e| {
+            WithSpan::new(
+                ProcessClientFieldDeclarationError::FieldToInsertToServerSelectableError(e),
+                Span::todo_generated(),
+            )
+        })?;
 
         id_field.map(|_| {
             // Assume that if we have an id field, this implements Node
@@ -466,28 +462,26 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
     let refetch_strategy = if is_fetchable {
         RefetchStrategy::RefetchFromRoot
     } else {
-        let id_field_memo_ref = server_selectable_named(
+        let id_field = server_selectable_named(
             db,
             client_pointer_declaration.item.target_type.inner().0,
             (*ID_FIELD_NAME).into(),
-        );
-
-        let id_field = id_field_memo_ref
-            // TODO don't call to_owned
-            .to_owned()
-            .map_err(|e| {
-                WithSpan::new(
-                    ProcessClientFieldDeclarationError::ServerSelectableNamedError(e),
-                    Span::todo_generated(),
-                )
-            })?
-            .transpose()
-            .map_err(|e| {
-                WithSpan::new(
-                    ProcessClientFieldDeclarationError::FieldToInsertToServerSelectableError(e),
-                    Span::todo_generated(),
-                )
-            })?;
+        )
+        // TODO don't call to_owned
+        .to_owned()
+        .map_err(|e| {
+            WithSpan::new(
+                ProcessClientFieldDeclarationError::ServerSelectableNamedError(e),
+                Span::todo_generated(),
+            )
+        })?
+        .transpose()
+        .map_err(|e| {
+            WithSpan::new(
+                ProcessClientFieldDeclarationError::FieldToInsertToServerSelectableError(e),
+                Span::todo_generated(),
+            )
+        })?;
 
         match id_field {
             None => Err(WithSpan::new(

@@ -82,9 +82,8 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
     let mut current_entity_name = root_object_name;
 
     for selection_name in selections {
-        let memo_ref = server_selectable_named(db, current_entity_name, selection_name);
-
-        let current_selectable = memo_ref.try_lookup()?;
+        let current_selectable =
+            server_selectable_named(db, current_entity_name, selection_name).try_lookup()?;
 
         match current_selectable {
             Some(entity) => {
@@ -221,19 +220,18 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 parent_object_entity_name,
                 server_object_selectable_name,
             )) => {
-                let memo_ref = server_object_selectable_named(
+                let server_object_selectable = server_object_selectable_named(
                     db,
                     parent_object_entity_name,
                     server_object_selectable_name.into(),
-                );
-                let server_object_selectable = memo_ref
-                    .lookup()
-                    .as_ref()
-                    .expect(
-                        "Expected validation to have succeeded. \
+                )
+                .lookup()
+                .as_ref()
+                .expect(
+                    "Expected validation to have succeeded. \
                         This is indicative of a bug in Isograph.",
-                    )
-                    .clone();
+                )
+                .clone();
 
                 server_object_selectable.map(DefinitionLocation::Server)
             }

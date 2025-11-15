@@ -180,19 +180,14 @@ fn validate_client_field_exists<TNetworkProtocol: NetworkProtocol>(
     text_source: TextSource,
     parent_object_entity_name: ServerObjectEntityName,
 ) -> Result<(), WithLocation<ValidateEntrypointDeclarationError<TNetworkProtocol>>> {
-    let memo_ref = client_scalar_selectable_named(db, parent_object_entity_name, field_name.item.0);
-
-    match memo_ref
+    match client_scalar_selectable_named(db, parent_object_entity_name, field_name.item.0)
         .try_lookup()
         .map_err(|e| WithLocation::new(e.into(), Location::Generated))?
     {
         Some(_) => Ok(()),
         None => {
             // check whether it is anything else
-            let other_memo_ref =
-                selectable_named(db, parent_object_entity_name, field_name.item.0.into());
-
-            match other_memo_ref
+            match selectable_named(db, parent_object_entity_name, field_name.item.0.into())
                 .try_lookup()
                 .map_err(|e| WithLocation::new(e.into(), Location::Generated))?
             {

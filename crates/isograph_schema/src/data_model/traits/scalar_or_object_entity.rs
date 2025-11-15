@@ -167,10 +167,7 @@ pub fn parent_object_entity_and_selectable<TNetworkProtocol: NetworkProtocol>(
         })?
         .item;
 
-    let selectable_memo_ref =
-        selectable_named(db, parent_server_object_entity_name.0, selectable_name);
-
-    match selectable_memo_ref.to_owned()? {
+    match selectable_named(db, parent_server_object_entity_name.0, selectable_name).to_owned()? {
         Some(selectable) => Ok((parent_entity, selectable)),
         None => Err(GetParentAndSelectableError::FieldMustExist {
             parent_type_name: parent_server_object_entity_name,

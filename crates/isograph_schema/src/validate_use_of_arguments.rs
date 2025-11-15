@@ -82,23 +82,22 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         parent_object_entity_name,
                         server_scalar_selectable_name,
                     )) => {
-                        let memo_ref = server_scalar_selectable_named(
+                        let server_scalar_selectable = server_scalar_selectable_named(
                             db,
                             parent_object_entity_name,
                             server_scalar_selectable_name.into(),
+                        )
+                        .lookup()
+                        .as_ref()
+                        .expect(
+                            "Expected validation to have succeeded. \
+                                This is indicative of a bug in Isograph.",
+                        )
+                        .as_ref()
+                        .expect(
+                            "Expected selectable to exist. \
+                                This is indicative of a bug in Isograph.",
                         );
-                        let server_scalar_selectable = memo_ref
-                            .lookup()
-                            .as_ref()
-                            .expect(
-                                "Expected validation to have succeeded. \
-                                This is indicative of a bug in Isograph.",
-                            )
-                            .as_ref()
-                            .expect(
-                                "Expected selectable to exist. \
-                                This is indicative of a bug in Isograph.",
-                            );
 
                         server_scalar_selectable
                             .arguments
@@ -144,29 +143,26 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                     DefinitionLocation::Server((
                         parent_object_entity_name,
                         server_object_selectable_name,
-                    )) => {
-                        let memo_ref = server_object_selectable_named(
-                            db,
-                            parent_object_entity_name,
-                            server_object_selectable_name.into(),
-                        );
-                        memo_ref
-                            .lookup()
-                            .as_ref()
-                            .expect(
-                                "Expected validation to have succeeded. \
+                    )) => server_object_selectable_named(
+                        db,
+                        parent_object_entity_name,
+                        server_object_selectable_name.into(),
+                    )
+                    .lookup()
+                    .as_ref()
+                    .expect(
+                        "Expected validation to have succeeded. \
                                 This is indicative of a bug in Isograph.",
-                            )
-                            .as_ref()
-                            .expect(
-                                "Expected selectable to exist. \
+                    )
+                    .as_ref()
+                    .expect(
+                        "Expected selectable to exist. \
                                 This is indicative of a bug in Isograph.",
-                            )
-                            .arguments
-                            .iter()
-                            .map(|x| x.item.clone())
-                            .collect::<Vec<_>>()
-                    }
+                    )
+                    .arguments
+                    .iter()
+                    .map(|x| x.item.clone())
+                    .collect::<Vec<_>>(),
                     DefinitionLocation::Client((
                         parent_object_entity_name,
                         client_object_selectable_name,

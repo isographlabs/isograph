@@ -89,27 +89,26 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
     let (parent_object_entity_name, mutation_subfield_name) =
         parse_mutation_subfield_id(db, field, parent_object_entity_name)?;
 
-    let mutation_field_memo_ref =
-        server_selectable_named(db, parent_object_entity_name, mutation_subfield_name.into());
-    let mutation_field = mutation_field_memo_ref
-        .lookup()
-        .as_ref()
-        .map_err(|e| e.clone())?
-        .as_ref()
-        // TODO propagate this errors instead of panicking
-        .expect(
-            "Expected selectable to exist. \
+    let mutation_field =
+        server_selectable_named(db, parent_object_entity_name, mutation_subfield_name.into())
+            .lookup()
+            .as_ref()
+            .map_err(|e| e.clone())?
+            .as_ref()
+            // TODO propagate this errors instead of panicking
+            .expect(
+                "Expected selectable to exist. \
             This is indicative of a bug in Isograph.",
-        )
-        .as_ref()
-        .map_err(|e| e.clone())?
-        .as_ref()
-        .as_object()
-        // TODO propagate this errors instead of panicking
-        .expect(
-            "Expected selectable to be an object selectable. \
+            )
+            .as_ref()
+            .map_err(|e| e.clone())?
+            .as_ref()
+            .as_object()
+            // TODO propagate this errors instead of panicking
+            .expect(
+                "Expected selectable to be an object selectable. \
             This is indicative of a bug in Isograph.",
-        );
+            );
 
     let payload_object_type_annotation = &mutation_field.target_object_entity;
     let payload_object_entity_name = *payload_object_type_annotation.inner();
@@ -132,18 +131,18 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
         field_map.clone(),
     )?;
 
-    let payload_object_entity_memo_ref = server_object_entity_named(db, payload_object_entity_name);
-    let top_level_schema_field_concrete_type = payload_object_entity_memo_ref
-        .lookup()
-        .as_ref()
-        .map_err(|e| e.clone())?
-        .as_ref()
-        .expect(
-            "Expected entity to exist. \
+    let top_level_schema_field_concrete_type =
+        server_object_entity_named(db, payload_object_entity_name)
+            .lookup()
+            .as_ref()
+            .map_err(|e| e.clone())?
+            .as_ref()
+            .expect(
+                "Expected entity to exist. \
             This is indicative of a bug in Isograph.",
-        )
-        .item
-        .concrete_type;
+            )
+            .item
+            .concrete_type;
 
     let (maybe_abstract_parent_object_entity_name, primary_field_concrete_type) =
         traverse_object_selections(
@@ -327,9 +326,9 @@ fn parse_mutation_subfield_id<TNetworkProtocol: NetworkProtocol>(
     (ServerObjectEntityName, ServerObjectSelectableName),
     TNetworkProtocol,
 > {
-    let memo_ref =
-        server_selectable_named(db, mutation_object_entity_name, field_arg.intern().into());
-    let opt_field = memo_ref.try_lookup()?;
+    let opt_field =
+        server_selectable_named(db, mutation_object_entity_name, field_arg.intern().into())
+            .try_lookup()?;
 
     match opt_field {
         Some(s) => {
@@ -392,10 +391,7 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
     let mut current_entity_name = root_object_name;
 
     for selection_name in selections {
-        let current_selectable_memo_ref =
-            server_selectable_named(db, current_entity_name, *selection_name);
-
-        let current_selectable = current_selectable_memo_ref
+        let current_selectable = server_selectable_named(db, current_entity_name, *selection_name)
             .lookup()
             .as_ref()
             .map_err(|e| e.clone())?;
@@ -424,8 +420,7 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
         };
     }
 
-    let current_entity_memo_ref = server_object_entity_named(db, current_entity_name);
-    let current_entity_concrete_type = current_entity_memo_ref
+    let current_entity_concrete_type = server_object_entity_named(db, current_entity_name)
         .lookup()
         .as_ref()
         .map_err(|e| e.clone())?

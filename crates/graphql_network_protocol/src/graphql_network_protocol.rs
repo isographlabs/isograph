@@ -176,8 +176,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         db: &IsographDatabase<Self>,
         server_object_entity_name: &ServerObjectEntityName,
     ) -> String {
-        let memo_ref = server_object_entity_named(db, *server_object_entity_name);
-        let server_object_entity = &memo_ref
+        let server_object_entity = &server_object_entity_named(db, *server_object_entity_name)
             .lookup()
             .as_ref()
             .expect(

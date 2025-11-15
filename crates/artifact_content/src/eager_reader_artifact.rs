@@ -41,20 +41,20 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
     let ts_file_extension = file_extensions.ts();
     let user_written_component_variant = info.client_field_directive_set;
 
-    let memo_ref = server_object_entity_named(db, client_selectable.parent_object_entity_name());
-    let parent_object_entity = &memo_ref
-        .lookup()
-        .as_ref()
-        .expect(
-            "Expected validation to have worked. \
+    let parent_object_entity =
+        &server_object_entity_named(db, client_selectable.parent_object_entity_name())
+            .lookup()
+            .as_ref()
+            .expect(
+                "Expected validation to have worked. \
                 This is indicative of a bug in Isograph.",
-        )
-        .as_ref()
-        .expect(
-            "Expected entity to exist. \
+            )
+            .as_ref()
+            .expect(
+                "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-        )
-        .item;
+            )
+            .item;
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         db,
@@ -184,39 +184,37 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
 ) -> ArtifactPathAndContent {
     let server_object_selectable_name = server_object_selectable.name.item;
 
-    let memo_ref =
-        server_object_entity_named(db, server_object_selectable.parent_object_entity_name);
-    let parent_object_entity = &memo_ref
-        .lookup()
-        .as_ref()
-        .expect(
-            "Expected validation to have worked. \
+    let parent_object_entity =
+        &server_object_entity_named(db, server_object_selectable.parent_object_entity_name)
+            .lookup()
+            .as_ref()
+            .expect(
+                "Expected validation to have worked. \
                 This is indicative of a bug in Isograph.",
-        )
-        .as_ref()
-        .expect(
-            "Expected entity to exist. \
+            )
+            .as_ref()
+            .expect(
+                "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-        )
-        .item;
+            )
+            .item;
 
-    let concrete_type_memo_ref =
-        server_object_entity_named(db, *server_object_selectable.target_object_entity.inner());
-    let concrete_type = &concrete_type_memo_ref
-        .lookup()
-        .as_ref()
-        .expect(
-            "Expected validation to have worked. \
+    let concrete_type =
+        &server_object_entity_named(db, *server_object_selectable.target_object_entity.inner())
+            .lookup()
+            .as_ref()
+            .expect(
+                "Expected validation to have worked. \
                 This is indicative of a bug in Isograph.",
-        )
-        .as_ref()
-        .expect(
-            "Expected entity to exist. \
+            )
+            .as_ref()
+            .expect(
+                "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-        )
-        .item
-        .name
-        .item;
+            )
+            .item
+            .name
+            .item;
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         db,
@@ -275,21 +273,20 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
     let ts_file_extension = file_extensions.ts();
-    let memo_ref =
-        server_object_entity_named(db, client_scalar_selectable.parent_object_entity_name());
-    let parent_object_entity = &memo_ref
-        .lookup()
-        .as_ref()
-        .expect(
-            "Expected validation to have worked. \
+    let parent_object_entity =
+        &server_object_entity_named(db, client_scalar_selectable.parent_object_entity_name())
+            .lookup()
+            .as_ref()
+            .expect(
+                "Expected validation to have worked. \
                 This is indicative of a bug in Isograph.",
-        )
-        .as_ref()
-        .expect(
-            "Expected entity to exist. \
+            )
+            .as_ref()
+            .expect(
+                "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-        )
-        .item;
+            )
+            .item;
 
     let mut param_type_imports = BTreeSet::new();
     let mut loadable_fields = BTreeSet::new();
@@ -391,20 +388,20 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
     info: UserWrittenClientTypeInfo,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
-    let memo_ref = server_object_entity_named(db, client_field.parent_object_entity_name());
-    let parent_object_entity = &memo_ref
-        .lookup()
-        .as_ref()
-        .expect(
-            "Expected validation to have worked. \
+    let parent_object_entity =
+        &server_object_entity_named(db, client_field.parent_object_entity_name())
+            .lookup()
+            .as_ref()
+            .expect(
+                "Expected validation to have worked. \
                 This is indicative of a bug in Isograph.",
-        )
-        .as_ref()
-        .expect(
-            "Expected entity to exist. \
+            )
+            .as_ref()
+            .expect(
+                "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-        )
-        .item;
+            )
+            .item;
 
     let function_import_statement =
         generate_function_import_statement(config, info, file_extensions);
@@ -450,20 +447,20 @@ pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtoc
     db: &IsographDatabase<TNetworkProtocol>,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ArtifactPathAndContent {
-    let memo_ref = server_object_entity_named(db, client_field.parent_object_entity_name());
-    let parent_object_entity = &memo_ref
-        .lookup()
-        .as_ref()
-        .expect(
-            "Expected validation to have worked. \
+    let parent_object_entity =
+        &server_object_entity_named(db, client_field.parent_object_entity_name())
+            .lookup()
+            .as_ref()
+            .expect(
+                "Expected validation to have worked. \
                 This is indicative of a bug in Isograph.",
-        )
-        .as_ref()
-        .expect(
-            "Expected entity to exist. \
+            )
+            .as_ref()
+            .expect(
+                "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-        )
-        .item;
+            )
+            .item;
 
     let client_field_output_type = generate_output_type(db, client_field);
 

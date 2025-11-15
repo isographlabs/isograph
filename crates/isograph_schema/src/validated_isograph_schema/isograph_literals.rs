@@ -52,8 +52,7 @@ pub fn parse_iso_literals_in_file_content_and_return_all<TNetworkProtocol: Netwo
     current_working_directory: CurrentWorkingDirectory,
 ) -> Vec<Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>>>
 {
-    let memo_ref = extract_iso_literals_from_file_content(db, relative_path_to_source_file);
-    memo_ref
+    extract_iso_literals_from_file_content(db, relative_path_to_source_file)
         .lookup()
         .iter()
         .map(|iso_literal_extraction| {
@@ -73,11 +72,10 @@ pub fn parse_iso_literal_in_source<TNetworkProtocol: NetworkProtocol>(
     iso_literals_source_id: SourceId<IsoLiteralsSource>,
 ) -> Vec<Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>>>
 {
-    let memo_ref = read_iso_literals_source(db, iso_literals_source_id);
     let IsoLiteralsSource {
         relative_path,
         content: _,
-    } = memo_ref.lookup();
+    } = read_iso_literals_source(db, iso_literals_source_id).lookup();
 
     parse_iso_literals_in_file_content(db, *relative_path, db.get_current_working_directory())
 }
@@ -252,11 +250,10 @@ pub fn extract_iso_literals_from_file_content<TNetworkProtocol: NetworkProtocol>
     db: &IsographDatabase<TNetworkProtocol>,
     relative_path_to_source_file: RelativePathToSourceFile,
 ) -> Vec<IsoLiteralExtraction> {
-    let memo_ref = read_iso_literals_source_from_relative_path(db, relative_path_to_source_file);
     let IsoLiteralsSource {
         relative_path: _,
         content,
-    } = memo_ref
+    } = read_iso_literals_source_from_relative_path(db, relative_path_to_source_file)
         .lookup()
         .as_ref()
         .expect("Expected relative path to exist");

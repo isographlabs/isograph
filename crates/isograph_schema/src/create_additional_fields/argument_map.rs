@@ -186,8 +186,7 @@ impl ModifiedArgument {
         let object = unmodified.type_.clone().map(|input_type_name| {
             match input_type_name {
                 ServerEntityName::Object(object_entity_name) => {
-                    let field_map_memo_ref = server_selectables_vec(db, object_entity_name);
-                    let field_map = field_map_memo_ref
+                    let field_map = server_selectables_vec(db, object_entity_name)
                         .lookup()
                         .as_ref()
                         .expect(

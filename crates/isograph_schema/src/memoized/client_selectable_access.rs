@@ -85,9 +85,7 @@ pub fn client_selectable_declarations<TNetworkProtocol: NetworkProtocol>(
     parent_object_entity_name: ServerObjectEntityName,
     client_selectable_name: ClientSelectableName,
 ) -> Vec<SelectionType<ClientFieldDeclaration, ClientPointerDeclaration>> {
-    let memo_ref = client_selectable_declaration_map_from_iso_literals(db);
-
-    memo_ref
+    client_selectable_declaration_map_from_iso_literals(db)
         .lookup()
         .get(&(parent_object_entity_name, client_selectable_name))
         .cloned()
@@ -103,10 +101,10 @@ pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
     Option<SelectionType<ClientFieldDeclaration, ClientPointerDeclaration>>,
     MemoizedIsoLiteralError<TNetworkProtocol>,
 > {
-    let memo_ref =
-        client_selectable_declarations(db, parent_object_entity_name, client_selectable_name);
-
-    match memo_ref.lookup().split_first() {
+    match client_selectable_declarations(db, parent_object_entity_name, client_selectable_name)
+        .lookup()
+        .split_first()
+    {
         Some((first, rest)) => {
             if rest.is_empty() {
                 Ok(Some(first.clone()))
@@ -162,13 +160,12 @@ pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     parent_object_entity_name: ServerObjectEntityName,
     client_scalar_selectable_name: ClientScalarSelectableName,
 ) -> Result<Option<ClientFieldDeclaration>, MemoizedIsoLiteralError<TNetworkProtocol>> {
-    let memo_ref = client_selectable_declaration(
+    let x = client_selectable_declaration(
         db,
         parent_object_entity_name,
         client_scalar_selectable_name.into(),
-    );
-
-    let x = memo_ref.try_lookup()?;
+    )
+    .try_lookup()?;
 
     let item = match x {
         Some(item) => item,
@@ -193,13 +190,12 @@ pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     parent_object_entity_name: ServerObjectEntityName,
     client_object_selectable_name: ClientObjectSelectableName,
 ) -> Result<Option<ClientPointerDeclaration>, MemoizedIsoLiteralError<TNetworkProtocol>> {
-    let memo_ref = client_selectable_declaration(
+    let x = client_selectable_declaration(
         db,
         parent_object_entity_name,
         client_object_selectable_name.into(),
-    );
-
-    let x = memo_ref.try_lookup()?;
+    )
+    .try_lookup()?;
 
     let item = match x {
         Some(item) => item,
@@ -227,10 +223,9 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     Option<ClientScalarSelectable<TNetworkProtocol>>,
     MemoizedIsoLiteralError<TNetworkProtocol>,
 > {
-    let memo_ref =
-        client_field_declaration(db, parent_object_entity_name, client_scalar_selectable_name);
-
-    let declaration = memo_ref.try_lookup()?;
+    let declaration =
+        client_field_declaration(db, parent_object_entity_name, client_scalar_selectable_name)
+            .try_lookup()?;
 
     let declaration = match declaration {
         Some(declaration) => declaration.clone(),
@@ -242,8 +237,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
             // compile if we've already found the field we need! That's neat.
             //
             // We could theoretically skip this if the name is not *LINK_FIELD_NAME /shrug
-            let memo_ref = get_link_fields_map(db);
-            let link_fields = memo_ref.try_lookup()?;
+            let link_fields = get_link_fields_map(db).try_lookup()?;
 
             if let Some(link_field) = link_fields
                 .get(&(parent_object_entity_name, client_scalar_selectable_name))
@@ -260,8 +254,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
             }
 
             // Awkward! We also need to check for expose fields. Ay ay ay
-            let expose_field_map_memo_ref = expose_field_map(db);
-            return Ok(expose_field_map_memo_ref
+            return Ok(expose_field_map(db)
                 .try_lookup()?
                 .get(&(parent_object_entity_name, client_scalar_selectable_name))
                 .cloned()
@@ -275,14 +268,12 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
         }
     };
 
-    let selectable_memo_ref = process_client_field_declaration_inner(
+    let (_, scalar_selectable) = process_client_field_declaration_inner(
         db,
         WithSpan::new(declaration, Span::todo_generated()),
-    );
-
-    let (_, scalar_selectable) = selectable_memo_ref
-        .try_lookup()
-        .map_err(|e| MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(e))?;
+    )
+    .try_lookup()
+    .map_err(|e| MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(e))?;
 
     // Wat?! Here, we are explicitly clearing these, in order to make it obvious if we depend on these!
     // These fields will be removed (i.e. will be separate structs.)
@@ -302,24 +293,21 @@ pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
     Option<ClientObjectSelectable<TNetworkProtocol>>,
     MemoizedIsoLiteralError<TNetworkProtocol>,
 > {
-    let memo_ref =
-        client_pointer_declaration(db, parent_object_entity_name, client_object_selectable_name);
-
-    let declaration = memo_ref.try_lookup()?;
+    let declaration =
+        client_pointer_declaration(db, parent_object_entity_name, client_object_selectable_name)
+            .try_lookup()?;
 
     let declaration = match declaration {
         Some(declaration) => declaration.clone(),
         None => return Ok(None),
     };
 
-    let selectable_memo_ref = process_client_pointer_declaration_inner(
+    let (_, object_selectable) = process_client_pointer_declaration_inner(
         db,
         WithSpan::new(declaration, Span::todo_generated()),
-    );
-
-    let (_, object_selectable) = selectable_memo_ref
-        .try_lookup()
-        .map_err(|e| MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(e))?;
+    )
+    .try_lookup()
+    .map_err(|e| MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(e))?;
 
     Ok(Some(object_selectable.clone()))
 }
@@ -395,8 +383,8 @@ pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
     >,
     MemoizedIsoLiteralError<TNetworkProtocol>,
 > {
-    let memo_ref = create_type_system_schema_with_server_selectables(db);
-    let (expose_as_field_queue, _field_queue) = memo_ref.try_lookup()?;
+    let (expose_as_field_queue, _field_queue) =
+        create_type_system_schema_with_server_selectables(db).try_lookup()?;
 
     let mut map = HashMap::new();
     for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {

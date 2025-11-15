@@ -26,8 +26,8 @@ pub fn server_selectables_vec<TNetworkProtocol: NetworkProtocol>(
     )>,
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
-    let memo_ref = TNetworkProtocol::parse_type_system_documents(db);
-    let (items, _fetchable_types) = memo_ref.try_lookup()?;
+    let (items, _fetchable_types) =
+        TNetworkProtocol::parse_type_system_documents(db).try_lookup()?;
 
     Ok(items
         .iter()
@@ -77,8 +77,7 @@ pub fn server_selectables_named<TNetworkProtocol: NetworkProtocol>(
     Vec<OwnedSelectableResult<TNetworkProtocol>>,
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
-    let memo_ref = server_selectables_map(db, parent_server_object_entity_name);
-    let map = memo_ref.try_lookup()?;
+    let map = server_selectables_map(db, parent_server_object_entity_name).try_lookup()?;
 
     Ok(map
         .get(&server_selectable_name)
@@ -95,12 +94,11 @@ pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol>(
     Option<OwnedSelectableResult<TNetworkProtocol>>,
     ServerSelectableNamedError<TNetworkProtocol>,
 > {
-    let memo_ref =
-        server_selectables_named(db, parent_server_object_entity_name, server_selectable_name);
-    let vec = memo_ref
-        .lookup()
-        .as_ref()
-        .map_err(|e| ServerSelectableNamedError::ParseTypeSystemDocumentsError(e.clone()))?;
+    let vec =
+        server_selectables_named(db, parent_server_object_entity_name, server_selectable_name)
+            .lookup()
+            .as_ref()
+            .map_err(|e| ServerSelectableNamedError::ParseTypeSystemDocumentsError(e.clone()))?;
 
     match vec.split_first() {
         Some((first, rest)) => {
@@ -156,9 +154,9 @@ pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
     Option<ServerObjectSelectable<TNetworkProtocol>>,
     ServerSelectableNamedError<TNetworkProtocol>,
 > {
-    let memo_ref =
-        server_selectable_named(db, parent_server_object_entity_name, server_selectable_name);
-    let item = memo_ref.try_lookup()?;
+    let item =
+        server_selectable_named(db, parent_server_object_entity_name, server_selectable_name)
+            .try_lookup()?;
 
     match item {
         Some(item) => {
@@ -186,9 +184,9 @@ pub fn server_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     Option<ServerScalarSelectable<TNetworkProtocol>>,
     ServerSelectableNamedError<TNetworkProtocol>,
 > {
-    let memo_ref =
-        server_selectable_named(db, parent_server_object_entity_name, server_selectable_name);
-    let item = memo_ref.try_lookup()?;
+    let item =
+        server_selectable_named(db, parent_server_object_entity_name, server_selectable_name)
+            .try_lookup()?;
 
     match item {
         Some(item) => {

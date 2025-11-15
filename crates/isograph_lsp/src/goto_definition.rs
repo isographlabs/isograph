@@ -71,11 +71,11 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
             IsographResolvedNode::ClientPointerDeclaration(_) => None,
             IsographResolvedNode::EntrypointDeclaration(_) => None,
             IsographResolvedNode::ServerObjectEntityNameWrapper(entity) => {
-                let memo_ref = server_entities_named(db, entity.inner.0.into());
-                let server_entities = match memo_ref.lookup() {
-                    Ok(s) => s,
-                    Err(_) => return Err(LSPRuntimeError::ExpectedError),
-                };
+                let server_entities =
+                    match server_entities_named(db, entity.inner.0.into()).lookup() {
+                        Ok(s) => s,
+                        Err(_) => return Err(LSPRuntimeError::ExpectedError),
+                    };
 
                 Some(GotoDefinitionResponse::Array(
                     server_entities
@@ -113,18 +113,16 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                             .location
                             .as_embedded_location()
                             .and_then(|location| {
-                                let memo_ref = read_iso_literals_source_from_relative_path(
-                                    db,
-                                    location.text_source.relative_path_to_source_file,
-                                );
-
                                 let IsoLiteralsSource {
                                     relative_path: _,
                                     content,
-                                } = memo_ref
-                                    .lookup()
-                                    .as_ref()
-                                    .expect("Expected relative path to exist");
+                                } = read_iso_literals_source_from_relative_path(
+                                    db,
+                                    location.text_source.relative_path_to_source_file,
+                                )
+                                .lookup()
+                                .as_ref()
+                                .expect("Expected relative path to exist");
                                 isograph_location_to_lsp_location(db, location, content)
                             })
                             .map(lsp_location_to_scalar_response),
@@ -155,18 +153,16 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                             .location
                             .as_embedded_location()
                             .and_then(|location| {
-                                let memo_ref = read_iso_literals_source_from_relative_path(
-                                    db,
-                                    location.text_source.relative_path_to_source_file,
-                                );
-
                                 let IsoLiteralsSource {
                                     relative_path: _,
                                     content,
-                                } = memo_ref
-                                    .lookup()
-                                    .as_ref()
-                                    .expect("Expected relative path to exist");
+                                } = read_iso_literals_source_from_relative_path(
+                                    db,
+                                    location.text_source.relative_path_to_source_file,
+                                )
+                                .lookup()
+                                .as_ref()
+                                .expect("Expected relative path to exist");
 
                                 isograph_location_to_lsp_location(db, location, content)
                             })
@@ -190,12 +186,14 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                     }
                 };
 
-                let memo_ref = client_scalar_selectable_named(
+                let client_scalar_selectable = match client_scalar_selectable_named(
                     db,
                     parent_type_name.0.unchecked_conversion(),
                     wrapper.inner.0,
-                );
-                let client_scalar_selectable = match memo_ref.lookup().as_ref() {
+                )
+                .lookup()
+                .as_ref()
+                {
                     Ok(item) => item,
                     Err(_) => return Ok(None),
                 };
@@ -208,26 +206,23 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                             .location
                             .as_embedded_location()
                             .and_then(|location| {
-                                let memo_ref = read_iso_literals_source_from_relative_path(
-                                    db,
-                                    location.text_source.relative_path_to_source_file,
-                                );
-
                                 let IsoLiteralsSource {
                                     relative_path: _,
                                     content,
-                                } = memo_ref
-                                    .lookup()
-                                    .as_ref()
-                                    .expect("Expected relative path to exist");
+                                } = read_iso_literals_source_from_relative_path(
+                                    db,
+                                    location.text_source.relative_path_to_source_file,
+                                )
+                                .lookup()
+                                .as_ref()
+                                .expect("Expected relative path to exist");
                                 isograph_location_to_lsp_location(db, location, content)
                             })
                     })
                     .map(lsp_location_to_scalar_response)
             }
             IsographResolvedNode::ClientObjectSelectableNameWrapper(object_wrapper_path) => {
-                let memo_ref = get_validated_schema(db);
-                let (validated_schema, _stats) = match memo_ref.lookup() {
+                let (validated_schema, _stats) = match get_validated_schema(db).lookup() {
                     Ok(schema) => schema,
                     Err(_) => return Ok(None),
                 };
@@ -250,18 +245,16 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                             .location
                             .as_embedded_location()
                             .and_then(|location| {
-                                let memo_ref = read_iso_literals_source_from_relative_path(
-                                    db,
-                                    location.text_source.relative_path_to_source_file,
-                                );
-
                                 let IsoLiteralsSource {
                                     relative_path: _,
                                     content,
-                                } = memo_ref
-                                    .lookup()
-                                    .as_ref()
-                                    .expect("Expected relative path to exist");
+                                } = read_iso_literals_source_from_relative_path(
+                                    db,
+                                    location.text_source.relative_path_to_source_file,
+                                )
+                                .lookup()
+                                .as_ref()
+                                .expect("Expected relative path to exist");
                                 isograph_location_to_lsp_location(db, location, content)
                             })
                     })

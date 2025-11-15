@@ -73,13 +73,12 @@ fn get_semantic_tokens<TNetworkProtocol: NetworkProtocol>(
     );
 
     // TODO call this earlier, pass it as a param to parse_iso_literal_in_relative_file
-    let page_content_memo_ref =
-        read_iso_literals_source_from_relative_path(db, relative_path_to_source_file);
-    let page_content: &str = &page_content_memo_ref
-        .lookup()
-        .as_ref()
-        .expect("Expected source to exist")
-        .content;
+    let page_content: &str =
+        &read_iso_literals_source_from_relative_path(db, relative_path_to_source_file)
+            .lookup()
+            .as_ref()
+            .expect("Expected source to exist")
+            .content;
 
     let absolute_tokens = concatenate_and_absolutize_relative_tokens(
         parse_results

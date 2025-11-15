@@ -23,8 +23,7 @@ pub fn create_type_system_schema_with_server_selectables<TNetworkProtocol: Netwo
     ),
     CreateSchemaError<TNetworkProtocol>,
 > {
-    let memo_ref = TNetworkProtocol::parse_type_system_documents(db);
-    let (items, _fetchable_types) = memo_ref
+    let (items, _fetchable_types) = TNetworkProtocol::parse_type_system_documents(db)
         .lookup()
         .as_ref()
         .map_err(|e| CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e.clone() })?;

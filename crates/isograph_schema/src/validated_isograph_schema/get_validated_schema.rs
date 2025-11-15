@@ -20,8 +20,8 @@ pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), GetValidatedSchemaError<TNetworkProtocol>>
 {
-    let memo_ref = create_type_system_schema_with_server_selectables(db);
-    let (expose_as_field_queue, field_queue) = memo_ref.try_lookup()?;
+    let (expose_as_field_queue, field_queue) =
+        create_type_system_schema_with_server_selectables(db).try_lookup()?;
 
     let mut unvalidated_isograph_schema = Schema::new();
 

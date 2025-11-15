@@ -54,12 +54,14 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
             // consider how to do this is a not obviously broken manner.
             let mut s = "{\n".to_string();
 
-            let memo_ref = server_selectables_vec(db, parent_object_entity_name);
-
-            for (name, server_selectable) in memo_ref.lookup().as_ref().expect(
-                "Expected type system document to be valid. \
+            for (name, server_selectable) in server_selectables_vec(db, parent_object_entity_name)
+                .lookup()
+                .as_ref()
+                .expect(
+                    "Expected type system document to be valid. \
                     This is indicative of a bug in Isograph.",
-            ) {
+                )
+            {
                 let server_selectable = server_selectable.as_ref().expect(
                     "Expected selectable to be valid. \
                     This is indicative of a bug in Isograph.",
@@ -98,23 +100,22 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
         SelectionType::Scalar(server_scalar_selectable) => {
             let parent_object_entity_name = server_scalar_selectable.parent_object_entity_name;
             let server_scalar_selectable_name = server_scalar_selectable.name.item;
-            let memo_ref = server_scalar_selectable_named(
+            let server_scalar_selectable = server_scalar_selectable_named(
                 db,
                 parent_object_entity_name,
                 server_scalar_selectable_name.into(),
+            )
+            .lookup()
+            .as_ref()
+            .expect(
+                "Expected validation to have succeeded. \
+                    This is indicative of a bug in Isograph.",
+            )
+            .as_ref()
+            .expect(
+                "Expected selectable to exist. \
+                    This is indicative of a bug in Isograph.",
             );
-            let server_scalar_selectable = memo_ref
-                .lookup()
-                .as_ref()
-                .expect(
-                    "Expected validation to have succeeded. \
-                    This is indicative of a bug in Isograph.",
-                )
-                .as_ref()
-                .expect(
-                    "Expected selectable to exist. \
-                    This is indicative of a bug in Isograph.",
-                );
 
             (
                 is_nullable(&server_scalar_selectable.target_scalar_entity),
@@ -127,23 +128,22 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
         SelectionType::Object(server_object_selectable) => {
             let parent_object_entity_name = server_object_selectable.parent_object_entity_name;
             let server_object_selectable_name = server_object_selectable.name.item;
-            let memo_ref = server_object_selectable_named(
+            let server_object_selectable = server_object_selectable_named(
                 db,
                 parent_object_entity_name,
                 server_object_selectable_name.into(),
+            )
+            .lookup()
+            .as_ref()
+            .expect(
+                "Expected validation to have succeeded. \
+                    This is indicative of a bug in Isograph.",
+            )
+            .as_ref()
+            .expect(
+                "Expected selectable to exist. \
+                    This is indicative of a bug in Isograph.",
             );
-            let server_object_selectable = memo_ref
-                .lookup()
-                .as_ref()
-                .expect(
-                    "Expected validation to have succeeded. \
-                    This is indicative of a bug in Isograph.",
-                )
-                .as_ref()
-                .expect(
-                    "Expected selectable to exist. \
-                    This is indicative of a bug in Isograph.",
-                );
             (
                 is_nullable(&server_object_selectable.target_object_entity),
                 server_object_selectable

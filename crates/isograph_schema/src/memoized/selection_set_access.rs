@@ -25,8 +25,7 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
         MemoizedSelectionSetError<TNetworkProtocol>,
     >,
 > {
-    let declaration_map_memo_ref = client_selectable_declaration_map_from_iso_literals(db);
-    let declaration_map = declaration_map_memo_ref.lookup();
+    let declaration_map = client_selectable_declaration_map_from_iso_literals(db).lookup();
 
     declaration_map
         .iter()
@@ -72,9 +71,10 @@ pub fn memoized_validated_reader_selection_set_map<TNetworkProtocol: NetworkProt
             (
                 key,
                 value.and_then(|unvalidated_selection_set| {
-                    let parent_object_entity_memo_ref = server_object_entity_named(db, key.0);
-                    let parent_object_entity =
-                        parent_object_entity_memo_ref.try_lookup()?.as_ref().expect(
+                    let parent_object_entity = server_object_entity_named(db, key.0)
+                        .try_lookup()?
+                        .as_ref()
+                        .expect(
                             "Expected entity to exist. \
                             This is indicative of a bug in Isograph.",
                         );

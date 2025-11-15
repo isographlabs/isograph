@@ -62,35 +62,33 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
     schema: &mut Schema<TNetworkProtocol>,
     unprocessed_scalar_selection_set: UnprocessedClientScalarSelectableSelectionSet,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<(), TNetworkProtocol> {
-    let memo_ref = client_scalar_selectable_named(
+    let client_scalar_selectable = client_scalar_selectable_named(
         db,
         unprocessed_scalar_selection_set.parent_object_entity_name,
         unprocessed_scalar_selection_set.client_scalar_selectable_name,
+    )
+    .try_lookup()
+    .map_err(|e| vec![WithLocation::new(e.into(), Location::Generated)])?
+    .as_ref()
+    .expect(
+        "Expected selectable to exist. \
+            This is indicative of a bug in Isograph.",
     );
-    let client_scalar_selectable = memo_ref
-        .try_lookup()
-        .map_err(|e| vec![WithLocation::new(e.into(), Location::Generated)])?
-        .as_ref()
-        .expect(
-            "Expected selectable to exist. \
-            This is indicative of a bug in Isograph.",
-        );
 
-    let memo_ref =
-        server_object_entity_named(db, client_scalar_selectable.parent_object_entity_name());
-    let parent_object_entity = &memo_ref
-        .lookup()
-        .as_ref()
-        .expect(
-            "Expected validation to have worked. \
+    let parent_object_entity =
+        &server_object_entity_named(db, client_scalar_selectable.parent_object_entity_name())
+            .lookup()
+            .as_ref()
+            .expect(
+                "Expected validation to have worked. \
             This is indicative of a bug in Isograph.",
-        )
-        .as_ref()
-        .expect(
-            "Expected entity to exist. \
+            )
+            .as_ref()
+            .expect(
+                "Expected entity to exist. \
             This is indicative of a bug in Isograph.",
-        )
-        .item;
+            )
+            .item;
 
     let new_selection_set = get_validated_selection_set(
         db,
@@ -134,35 +132,33 @@ fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol>(
     schema: &mut Schema<TNetworkProtocol>,
     unprocessed_client_object_selection_set: UnprocessedClientObjectSelectableSelectionSet,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<(), TNetworkProtocol> {
-    let memo_ref = client_object_selectable_named(
+    let client_object_selectable = client_object_selectable_named(
         db,
         unprocessed_client_object_selection_set.parent_object_entity_name,
         unprocessed_client_object_selection_set.client_object_selectable_name,
+    )
+    .try_lookup()
+    .map_err(|e| vec![WithLocation::new(e.into(), Location::Generated)])?
+    .as_ref()
+    .expect(
+        "Expected selectable to exist. \
+            This is indicative of a bug in Isograph.",
     );
-    let client_object_selectable = memo_ref
-        .try_lookup()
-        .map_err(|e| vec![WithLocation::new(e.into(), Location::Generated)])?
-        .as_ref()
-        .expect(
-            "Expected selectable to exist. \
-            This is indicative of a bug in Isograph.",
-        );
 
-    let memo_ref =
-        server_object_entity_named(db, client_object_selectable.parent_object_entity_name());
-    let parent_object_entity = &memo_ref
-        .lookup()
-        .as_ref()
-        .expect(
-            "Expected validation to have worked. \
+    let parent_object_entity =
+        &server_object_entity_named(db, client_object_selectable.parent_object_entity_name())
+            .lookup()
+            .as_ref()
+            .expect(
+                "Expected validation to have worked. \
             This is indicative of a bug in Isograph.",
-        )
-        .as_ref()
-        .expect(
-            "Expected entity to exist. \
+            )
+            .as_ref()
+            .expect(
+                "Expected entity to exist. \
             This is indicative of a bug in Isograph.",
-        )
-        .item;
+            )
+            .item;
 
     let new_selection_set = get_validated_selection_set(
         db,
@@ -259,27 +255,26 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
         SelectionType::Object(o) => o,
     };
 
-    let location_memo_ref = selectable_named(
+    let location = selectable_named(
         db,
         selection_parent_object_entity.name.item,
         scalar_selection.name.item.into(),
-    );
-    let location = location_memo_ref
-        .try_lookup()
-        .map_err(|e| WithLocation::new(e.into(), Location::Generated))?
-        .as_ref()
-        .ok_or_else(|| {
-            WithLocation::new(
-                AddSelectionSetsError::SelectionTypeSelectionFieldDoesNotExist {
-                    client_field_parent_type_name: type_and_field.parent_object_entity_name,
-                    client_field_name: type_and_field.selectable_name,
-                    field_parent_type_name: selection_parent_object_entity.name.item,
-                    field_name: scalar_selection.name.item.into(),
-                    client_type: top_level_field_or_pointer.client_type().to_string(),
-                },
-                scalar_selection.name.location,
-            )
-        })?;
+    )
+    .try_lookup()
+    .map_err(|e| WithLocation::new(e.into(), Location::Generated))?
+    .as_ref()
+    .ok_or_else(|| {
+        WithLocation::new(
+            AddSelectionSetsError::SelectionTypeSelectionFieldDoesNotExist {
+                client_field_parent_type_name: type_and_field.parent_object_entity_name,
+                client_field_name: type_and_field.selectable_name,
+                field_parent_type_name: selection_parent_object_entity.name.item,
+                field_name: scalar_selection.name.item.into(),
+                client_type: top_level_field_or_pointer.client_type().to_string(),
+            },
+            scalar_selection.name.location,
+        )
+    })?;
 
     let associated_data = match location {
         DefinitionLocation::Server(server_selectable_id) => {
@@ -368,27 +363,26 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     // TODO this can be vastly simplified... it looks like we're looking up the same object
     // multiple times :) and the result we're returning might be in the parameters anyway.
 
-    let selectable_memo_ref = selectable_named(
+    let selectable = selectable_named(
         db,
         selection_parent_object_entity.name.item,
         object_selection.name.item.into(),
-    );
-    let selectable = selectable_memo_ref
-        .try_lookup()
-        .map_err(|e| vec![WithLocation::new(e.into(), Location::Generated)])?
-        .as_ref()
-        .ok_or_else(|| {
-            vec![WithLocation::new(
-                AddSelectionSetsError::SelectionTypeSelectionFieldDoesNotExist {
-                    client_field_parent_type_name: type_and_field.parent_object_entity_name,
-                    client_field_name: type_and_field.selectable_name,
-                    field_parent_type_name: selection_parent_object_entity.name.item,
-                    field_name: object_selection.name.item.into(),
-                    client_type: top_level_field_or_pointer.client_type().to_string(),
-                },
-                object_selection.name.location,
-            )]
-        })?;
+    )
+    .try_lookup()
+    .map_err(|e| vec![WithLocation::new(e.into(), Location::Generated)])?
+    .as_ref()
+    .ok_or_else(|| {
+        vec![WithLocation::new(
+            AddSelectionSetsError::SelectionTypeSelectionFieldDoesNotExist {
+                client_field_parent_type_name: type_and_field.parent_object_entity_name,
+                client_field_name: type_and_field.selectable_name,
+                field_parent_type_name: selection_parent_object_entity.name.item,
+                field_name: object_selection.name.item.into(),
+                client_type: top_level_field_or_pointer.client_type().to_string(),
+            },
+            object_selection.name.location,
+        )]
+    })?;
 
     let (associated_data, new_parent_object_entity_name) = match selectable {
         DefinitionLocation::Server(server_selectable) => {
@@ -397,23 +391,22 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                 .as_object_result()
                 .as_ref()
                 .map_err(|server_scalar_selectable| {
-                    let memo_ref = server_scalar_selectable_named(
+                    let server_scalar_selectable = server_scalar_selectable_named(
                         db,
                         server_scalar_selectable.parent_object_entity_name,
                         (server_scalar_selectable.name.item).into(),
+                    )
+                    .lookup()
+                    .as_ref()
+                    .expect(
+                        "Expected validation to have succeeded. \
+                            This is indicative of a bug in Isograph.",
+                    )
+                    .as_ref()
+                    .expect(
+                        "Expected selectable to exist. \
+                            This is indicative of a bug in Isograph.",
                     );
-                    let server_scalar_selectable = memo_ref
-                        .lookup()
-                        .as_ref()
-                        .expect(
-                            "Expected validation to have succeeded. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .as_ref()
-                        .expect(
-                            "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
-                        );
                     let server_scalar_entity_name =
                         *server_scalar_selectable.target_scalar_entity.inner();
 
@@ -463,8 +456,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
         }
     };
 
-    let memo_ref = server_object_entity_named(db, new_parent_object_entity_name);
-    let new_parent_object_entity = &memo_ref
+    let new_parent_object_entity = &server_object_entity_named(db, new_parent_object_entity_name)
         .lookup()
         .as_ref()
         .expect(

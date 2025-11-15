@@ -362,23 +362,22 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
                     parent_object_entity_name,
                     server_scalar_selectable_name,
                 )) => {
-                    let memo_ref = server_scalar_selectable_named(
+                    let server_scalar_selectable = server_scalar_selectable_named(
                         db,
                         *parent_object_entity_name,
                         (*server_scalar_selectable_name).into(),
+                    )
+                    .lookup()
+                    .as_ref()
+                    .expect(
+                        "Expected validation to have succeeded. \
+                            This is indicative of a bug in Isograph.",
+                    )
+                    .as_ref()
+                    .expect(
+                        "Expected selectable to exist. \
+                            This is indicative of a bug in Isograph.",
                     );
-                    let server_scalar_selectable = memo_ref
-                        .lookup()
-                        .as_ref()
-                        .expect(
-                            "Expected validation to have succeeded. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .as_ref()
-                        .expect(
-                            "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
-                        );
 
                     let field_type_annotation = &server_scalar_selectable.target_scalar_entity;
                     field_type_annotation
@@ -389,23 +388,22 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
                     parent_object_entity_name,
                     server_object_selectable_name,
                 )) => {
-                    let memo_ref = server_object_selectable_named(
+                    let server_object_selectable = server_object_selectable_named(
                         db,
                         *parent_object_entity_name,
                         (*server_object_selectable_name).into(),
+                    )
+                    .lookup()
+                    .as_ref()
+                    .expect(
+                        "Expected validation to have succeeded. \
+                            This is indicative of a bug in Isograph.",
+                    )
+                    .as_ref()
+                    .expect(
+                        "Expected selectable to exist. \
+                            This is indicative of a bug in Isograph.",
                     );
-                    let server_object_selectable = memo_ref
-                        .lookup()
-                        .as_ref()
-                        .expect(
-                            "Expected validation to have succeeded. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .as_ref()
-                        .expect(
-                            "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
-                        );
                     let field_type_annotation = &server_object_selectable.target_object_entity;
                     field_type_annotation
                         .clone()
