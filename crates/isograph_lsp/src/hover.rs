@@ -35,7 +35,7 @@ pub fn on_hover<TNetworkProtocol: NetworkProtocol>(
         params.text_document_position_params.text_document.uri,
         params.text_document_position_params.position,
     )
-    .to_owned(db)
+    .to_owned()
 }
 
 #[legacy_memo]
@@ -52,7 +52,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
     );
 
     let extraction_option =
-        get_iso_literal_extraction_from_text_position_params(db, url, position.into()).to_owned(db);
+        get_iso_literal_extraction_from_text_position_params(db, url, position.into()).to_owned();
     let (extraction, offset) = match extraction_option {
         Some(e) => e,
         None => return Ok(None),
@@ -70,7 +70,6 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
             IsographResolvedNode::EntrypointDeclaration(_) => None,
             IsographResolvedNode::ServerObjectEntityNameWrapper(entity) => {
                 let server_object_entity = server_object_entity_named(db, entity.inner.0)
-                    .lookup(db)
                     .as_ref()
                     .map_err(|_| LSPRuntimeError::ExpectedError)?
                     .as_ref()
@@ -141,16 +140,13 @@ pub fn get_iso_literal_extraction_from_text_position_params<TNetworkProtocol: Ne
     );
 
     let content =
-        match read_iso_literals_source_from_relative_path(db, relative_path_to_source_file)
-            .lookup(db)
-        {
+        match read_iso_literals_source_from_relative_path(db, relative_path_to_source_file) {
             Some(s) => &s.content,
             // Is this the correct behavior?
             None => return None,
         };
 
-    let extracted_items =
-        extract_iso_literals_from_file_content(db, relative_path_to_source_file).lookup(db);
+    let extracted_items = extract_iso_literals_from_file_content(db, relative_path_to_source_file);
     find_iso_literal_extraction_under_cursor(line_char, content, extracted_items)
 }
 

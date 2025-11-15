@@ -91,7 +91,6 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
 
     let mutation_field =
         server_selectable_named(db, parent_object_entity_name, mutation_subfield_name.into())
-            .lookup(db)
             .as_ref()
             .map_err(|e| e.clone())?
             .as_ref()
@@ -133,7 +132,6 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
 
     let top_level_schema_field_concrete_type =
         server_object_entity_named(db, payload_object_entity_name)
-            .lookup(db)
             .as_ref()
             .map_err(|e| e.clone())?
             .as_ref()
@@ -210,7 +208,6 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
                             db,
                             *server_object_selectable.target_object_entity.inner(),
                         )
-                        .lookup(db)
                         .as_ref()
                         .map_err(|e| e.clone())?
                         .as_ref()
@@ -328,7 +325,8 @@ fn parse_mutation_subfield_id<TNetworkProtocol: NetworkProtocol>(
 > {
     let opt_field =
         server_selectable_named(db, mutation_object_entity_name, field_arg.intern().into())
-            .try_lookup(db)?;
+            .as_ref()
+            .map_err(|e| e.clone())?;
 
     match opt_field {
         Some(s) => {
@@ -392,7 +390,6 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
 
     for selection_name in selections {
         let current_selectable = server_selectable_named(db, current_entity_name, *selection_name)
-            .lookup(db)
             .as_ref()
             .map_err(|e| e.clone())?;
 
@@ -421,7 +418,6 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
     }
 
     let current_entity_concrete_type = server_object_entity_named(db, current_entity_name)
-        .lookup(db)
         .as_ref()
         .map_err(|e| e.clone())?
         .as_ref()

@@ -2353,6 +2353,7 @@ name = "pico_macros"
 version = "0.4.3"
 dependencies = [
  "convert_case",
+ "deluxe",
  "proc-macro2",
  "quote",
  "syn 2.0.98",

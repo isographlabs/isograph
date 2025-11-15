@@ -23,15 +23,10 @@ fn single_chain_reuse() {
         value: "asdf".to_string(),
     });
 
-    assert_eq!(*first_letter(&db, id).lookup(&db), 'a');
+    assert_eq!(*first_letter(&db, id), 'a');
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 1);
 
-    assert_eq!(
-        first_letter_and_exclamation_point(&db, id)
-            .lookup(&db)
-            .as_str(),
-        "a!"
-    );
+    assert_eq!(first_letter_and_exclamation_point(&db, id).as_str(), "a!");
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 1);
     assert_eq!(
         FIRST_LETTER_AND_EXCLAMATION_POINT_COUNTER.load(Ordering::SeqCst),
@@ -56,6 +51,6 @@ fn first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
 #[legacy_memo]
 fn first_letter_and_exclamation_point(db: &TestDatabase, input_id: SourceId<Input>) -> String {
     FIRST_LETTER_AND_EXCLAMATION_POINT_COUNTER.fetch_add(1, Ordering::SeqCst);
-    let capitalized_first_letter = *first_letter(db, input_id).lookup(db);
+    let capitalized_first_letter = *first_letter(db, input_id);
     format!("{capitalized_first_letter}!")
 }

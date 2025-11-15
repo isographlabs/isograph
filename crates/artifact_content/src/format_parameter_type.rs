@@ -55,7 +55,6 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
             let mut s = "{\n".to_string();
 
             for (name, server_selectable) in server_selectables_vec(db, parent_object_entity_name)
-                .lookup(db)
                 .as_ref()
                 .expect(
                     "Expected type system document to be valid. \
@@ -76,7 +75,7 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
         }
         ServerEntityName::Scalar(scalar_entity_name) => {
             server_scalar_entity_javascript_name(db, scalar_entity_name)
-                .to_owned(db)
+                .as_ref()
                 .expect(
                     "Expected parsing to not have failed. \
                     This is indicative of a bug in Isograph.",
@@ -105,7 +104,6 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
                 parent_object_entity_name,
                 server_scalar_selectable_name.into(),
             )
-            .lookup(db)
             .as_ref()
             .expect(
                 "Expected validation to have succeeded. \
@@ -133,7 +131,6 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
                 parent_object_entity_name,
                 server_object_selectable_name.into(),
             )
-            .lookup(db)
             .as_ref()
             .expect(
                 "Expected validation to have succeeded. \

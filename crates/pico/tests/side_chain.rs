@@ -24,17 +24,14 @@ fn side_chain() {
         value: "asdf".to_string(),
     });
 
-    assert_eq!(
-        *capitalized_first_letter(&db, input_id.clone()).lookup(&db),
-        'A'
-    );
+    assert_eq!(*capitalized_first_letter(&db, input_id.clone()), 'A');
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 1);
     assert_eq!(CAPITALIZED_LETTER_COUNTER.load(Ordering::SeqCst), 1);
     assert_eq!(UNCHANGED_SUBTREE.load(Ordering::SeqCst), 1);
 
     // capitalized_first_letter is not re-executed
     // Every part was re-used so nothing has changed
-    assert_eq!(*capitalized_first_letter(&db, input_id).lookup(&db), 'A');
+    assert_eq!(*capitalized_first_letter(&db, input_id), 'A');
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 1);
     assert_eq!(CAPITALIZED_LETTER_COUNTER.load(Ordering::SeqCst), 1);
     assert_eq!(UNCHANGED_SUBTREE.load(Ordering::SeqCst), 1);
@@ -44,7 +41,7 @@ fn side_chain() {
         value: "qwer".to_string(),
     });
 
-    assert_eq!(*capitalized_first_letter(&db, input_id).lookup(&db), 'Q');
+    assert_eq!(*capitalized_first_letter(&db, input_id), 'Q');
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 2);
     assert_eq!(CAPITALIZED_LETTER_COUNTER.load(Ordering::SeqCst), 2);
 
@@ -72,7 +69,7 @@ fn capitalized_first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> cha
     CAPITALIZED_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     unchanged_subtree(db);
     let first = first_letter(db, input_id);
-    first.lookup(db).to_ascii_uppercase()
+    first.to_ascii_uppercase()
 }
 
 #[legacy_memo]

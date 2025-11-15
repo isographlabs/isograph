@@ -17,7 +17,7 @@ fn intern() {
     });
 
     let memoized_result = process_input(&db, id);
-    let memo_ref = memoized_result.lookup(&db).as_ref().unwrap();
+    let memo_ref = memoized_result.as_ref().unwrap();
     assert_eq!(*memo_ref.lookup(&db), 'a');
 }
 
@@ -40,7 +40,7 @@ enum ProcessInputError {
     ReadError(#[from] FirstLetterError),
 }
 
-#[legacy_memo]
+#[legacy_memo(raw)]
 fn first_letter(
     db: &TestDatabase,
     input_id: SourceId<Input>,
@@ -58,6 +58,6 @@ fn process_input(
     db: &TestDatabase,
     input_id: SourceId<Input>,
 ) -> Result<MemoRef<char>, ProcessInputError> {
-    let result = first_letter(db, input_id).lookup(db).to_owned()?;
+    let result = *first_letter(db, input_id).try_lookup(db)?;
     Ok(result)
 }

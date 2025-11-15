@@ -311,7 +311,7 @@ fn sorted_entrypoints<'schema, TNetworkProtocol: NetworkProtocol>(
                     *parent_object_entity_name,
                     *client_scalar_selectable_name,
                 )
-                .to_owned(db)
+                .to_owned()
                 .expect(
                     "Expected parsing to have succeeded by this point. \
                         This is indicative of a bug in Isograph.",

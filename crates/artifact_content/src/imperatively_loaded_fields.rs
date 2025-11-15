@@ -84,7 +84,6 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     let root_parent_object = entrypoint.parent_object_entity_name();
 
     let root_operation_name = fetchable_types(db)
-        .lookup(db)
         .as_ref()
         .expect(
             "Expected parsing to have succeeded. \

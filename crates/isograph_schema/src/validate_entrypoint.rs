@@ -114,7 +114,6 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
     WithLocation<ValidateEntrypointDeclarationError<TNetworkProtocol>>,
 > {
     let parent_type_id = defined_entity(db, parent_object_entity_name.item.0.into())
-        .lookup(db)
         .clone()
         .expect(
             "Expected parsing to have succeeded. \
@@ -130,7 +129,6 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
     match parent_type_id {
         ServerEntityName::Object(object_entity_name) => {
             let is_fetchable = fetchable_types(db)
-                .lookup(db)
                 .as_ref()
                 .expect(
                     "Expected parsing to have succeeded. \
@@ -141,7 +139,6 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
 
             if !is_fetchable {
                 let fetchable_types = fetchable_types(db)
-                    .lookup(db)
                     .as_ref()
                     .expect(
                         "Expected parsing to have succeeded. \
@@ -181,15 +178,15 @@ fn validate_client_field_exists<TNetworkProtocol: NetworkProtocol>(
     parent_object_entity_name: ServerObjectEntityName,
 ) -> Result<(), WithLocation<ValidateEntrypointDeclarationError<TNetworkProtocol>>> {
     match client_scalar_selectable_named(db, parent_object_entity_name, field_name.item.0)
-        .try_lookup(db)
-        .map_err(|e| WithLocation::new(e.into(), Location::Generated))?
+        .as_ref()
+        .map_err(|e| WithLocation::new(e.clone().into(), Location::Generated))?
     {
         Some(_) => Ok(()),
         None => {
             // check whether it is anything else
             match selectable_named(db, parent_object_entity_name, field_name.item.0.into())
-                .try_lookup(db)
-                .map_err(|e| WithLocation::new(e.into(), Location::Generated))?
+                .as_ref()
+                .map_err(|e| WithLocation::new(e.clone().into(), Location::Generated))?
             {
                 Some(_) => Err(WithLocation::new(
                     ValidateEntrypointDeclarationError::FieldMustBeClientField {

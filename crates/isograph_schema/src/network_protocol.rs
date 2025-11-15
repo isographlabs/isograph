@@ -6,7 +6,6 @@ use common_lang_types::{
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation};
 use isograph_lang_types::{Description, SelectionType};
-use pico::MemoRef;
 
 use crate::{
     ExposeFieldDirective, MergedSelectionMap, RootOperationName, ServerObjectEntity,
@@ -26,19 +25,17 @@ pub trait NetworkProtocol:
     type SchemaObjectAssociatedData: Debug + PartialEq + Eq + Clone;
     type ParseTypeSystemDocumentsError: Error + PartialEq + Eq + Clone + 'static;
 
+    // TODO this should return a Vec<Result<...>>, not a Result<Vec<...>>, probably
     #[expect(clippy::type_complexity)]
     fn parse_type_system_documents(
         db: &IsographDatabase<Self>,
-    ) -> MemoRef<
-        // TODO this should return a Vec<Result<...>>, not a Result<Vec<...>>, probably
-        Result<
-            (
-                ParseTypeSystemOutcome<Self>,
-                // TODO just seems awkward that we return fetchable types
-                BTreeMap<ServerObjectEntityName, RootOperationName>,
-            ),
-            Self::ParseTypeSystemDocumentsError,
-        >,
+    ) -> &Result<
+        (
+            ParseTypeSystemOutcome<Self>,
+            // TODO just seems awkward that we return fetchable types
+            BTreeMap<ServerObjectEntityName, RootOperationName>,
+        ),
+        Self::ParseTypeSystemDocumentsError,
     >;
 
     fn generate_query_text<'a>(

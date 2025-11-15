@@ -82,8 +82,9 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
     let mut current_entity_name = root_object_name;
 
     for selection_name in selections {
-        let current_selectable =
-            server_selectable_named(db, current_entity_name, selection_name).try_lookup(db)?;
+        let current_selectable = server_selectable_named(db, current_entity_name, selection_name)
+            .as_ref()
+            .map_err(|e| e.clone())?;
 
         match current_selectable {
             Some(entity) => {
@@ -225,7 +226,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     parent_object_entity_name,
                     server_object_selectable_name.into(),
                 )
-                .lookup(db)
                 .as_ref()
                 .expect(
                     "Expected validation to have succeeded. \

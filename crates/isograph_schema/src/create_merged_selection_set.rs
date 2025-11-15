@@ -587,7 +587,6 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
 
                 let object_selection_parent_object_entity =
                     &server_object_entity_named(db, parent_object_entity_name)
-                        .lookup(db)
                         .as_ref()
                         .expect(
                             "Expected validation to have worked. \
@@ -694,7 +693,6 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
         field_parent_object_entity_name,
         field_server_object_selectable_name.into(),
     )
-    .lookup(db)
     .as_ref()
     .expect(
         "Expected validation to have succeeded. \
@@ -734,7 +732,6 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                 MergedServerSelection::InlineFragment(existing_inline_fragment) => {
                     let object_selection_parent_object_entity =
                         &server_object_entity_named(db, parent_object_entity_name)
-                            .lookup(db)
                             .as_ref()
                             .expect(
                                 "Expected validation to have worked. \
@@ -813,7 +810,6 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                     .target_object_entity_name()
                     .inner();
                 let concrete_type = server_object_entity_named(db, concrete_object_entity_name)
-                    .lookup(db)
                     .as_ref()
                     .expect(
                         "Expected validation to have worked. \
@@ -1110,7 +1106,6 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
         .inner();
     let target_server_object_entity =
         &server_object_entity_named(db, target_server_object_entity_name)
-            .lookup(db)
             .as_ref()
             .expect(
                 "Expected validation to have worked. \
@@ -1172,7 +1167,6 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
             subfields_or_inline_fragments,
             root_object_entity_name: {
                 *fetchable_types(db)
-                    .lookup(db)
                     .as_ref()
                     .expect(
                         "Expected parsing to have succeeded. \

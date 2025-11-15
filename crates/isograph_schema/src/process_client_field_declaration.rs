@@ -56,7 +56,7 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
 > {
     let parent_type_id =
         defined_entity(db, client_field_declaration.item.parent_type.item.0.into())
-            .to_owned(db)
+            .to_owned()
             .expect(
                 "Expected parsing to have succeeded. \
                 This is indicative of a bug in Isograph.",
@@ -100,7 +100,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
         db,
         client_pointer_declaration.item.parent_type.item.0.into(),
     )
-    .to_owned(db)
+    .to_owned()
     .expect(
         "Expected parsing to have succeeded. \
         This is indicative of a bug in Isograph.",
@@ -119,7 +119,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
         db,
         client_pointer_declaration.item.target_type.inner().0.into(),
     )
-    .to_owned(db)
+    .to_owned()
     .expect(
         "Expected parsing to have succeeded. \
             This is indicative of a bug in Isograph.",
@@ -188,7 +188,7 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol>(
     let client_field_parent_object_entity_name = client_field_declaration.item.parent_type.item.0;
 
     let (result, client_scalar_selectable) =
-        process_client_field_declaration_inner(db, client_field_declaration).to_owned(db)?;
+        process_client_field_declaration_inner(db, client_field_declaration).to_owned()?;
 
     if schema
         .server_entity_data
@@ -293,7 +293,6 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
     parent_object_entity_name: ServerObjectEntityName,
 ) -> ProcessClientFieldDeclarationResult<Option<RefetchStrategy<(), ()>>, TNetworkProtocol> {
     let is_fetchable = fetchable_types(db)
-        .lookup(db)
         .as_ref()
         .expect(
             "Expected parsing to have succeeded. \
@@ -308,7 +307,7 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
         let id_field =
             server_selectable_named(db, parent_object_entity_name, (*ID_FIELD_NAME).into())
                 // TODO don't call to_owned
-                .to_owned(db)
+                .to_owned()
                 .map_err(|e| {
                     WithSpan::new(
                         ProcessClientFieldDeclarationError::ServerSelectableNamedError(e),
@@ -324,10 +323,10 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
                 })?;
 
         let query_id = fetchable_types(db)
-            .try_lookup(db)
+            .as_ref()
             .map_err(|e| {
                 WithSpan::new(
-                    ProcessClientFieldDeclarationError::ParseTypeSystemDocumentsError(e),
+                    ProcessClientFieldDeclarationError::ParseTypeSystemDocumentsError(e.clone()),
                     Span::todo_generated(),
                 )
             })?
@@ -399,7 +398,7 @@ fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol>(
     }
 
     let (unprocessed_fields, client_object_selectable) =
-        process_client_pointer_declaration_inner(db, client_pointer_declaration).to_owned(db)?;
+        process_client_pointer_declaration_inner(db, client_pointer_declaration).to_owned()?;
 
     schema.client_object_selectables.insert(
         (parent_object_entity_name, client_pointer_name),
@@ -425,7 +424,6 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
     let client_pointer_name = client_pointer_declaration.item.client_pointer_name.item.0;
 
     let query_id = *fetchable_types(db)
-        .lookup(db)
         .as_ref()
         .expect(
             "Expected parsing to have succeeded. \
@@ -453,7 +451,6 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
     let unprocessed_fields = client_pointer_declaration.item.selection_set;
 
     let is_fetchable = fetchable_types(db)
-        .lookup(db)
         .as_ref()
         .expect(
             "Expected parsing to have succeeded. \
@@ -472,7 +469,7 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
             (*ID_FIELD_NAME).into(),
         )
         // TODO don't call to_owned
-        .to_owned(db)
+        .to_owned()
         .map_err(|e| {
             WithSpan::new(
                 ProcessClientFieldDeclarationError::ServerSelectableNamedError(e),
@@ -711,7 +708,7 @@ pub fn validate_variable_definition<TNetworkProtocol: NetworkProtocol>(
         .clone()
         .and_then(|input_type_name| {
             defined_entity(db, *variable_definition.item.type_.inner())
-                .to_owned(db)
+                .to_owned()
                 .expect(
                     "Expected parsing to have succeeded. \
                     This is indicative of a bug in Isograph.",
