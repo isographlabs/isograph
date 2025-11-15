@@ -6,6 +6,7 @@ mod imperatively_loaded_fields;
 mod import_statements;
 mod iso_overload_file;
 mod normalization_ast_text;
+mod raw_response_type;
 mod operation_text;
 mod persisted_documents;
 mod reader_ast;
