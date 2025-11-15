@@ -87,7 +87,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                             parent_object_entity_name,
                             server_scalar_selectable_name.into(),
                         )
-                        .lookup()
+                        .lookup(db)
                         .as_ref()
                         .expect(
                             "Expected validation to have succeeded. \
@@ -148,7 +148,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         parent_object_entity_name,
                         server_object_selectable_name.into(),
                     )
-                    .lookup()
+                    .lookup(db)
                     .as_ref()
                     .expect(
                         "Expected validation to have succeeded. \

@@ -83,7 +83,7 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
 
     for selection_name in selections {
         let current_selectable =
-            server_selectable_named(db, current_entity_name, selection_name).try_lookup()?;
+            server_selectable_named(db, current_entity_name, selection_name).try_lookup(db)?;
 
         match current_selectable {
             Some(entity) => {
@@ -225,7 +225,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                     parent_object_entity_name,
                     server_object_selectable_name.into(),
                 )
-                .lookup()
+                .lookup(db)
                 .as_ref()
                 .expect(
                     "Expected validation to have succeeded. \

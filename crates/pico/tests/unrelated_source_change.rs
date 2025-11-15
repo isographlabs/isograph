@@ -23,7 +23,7 @@ fn unrelated_source_changes() {
         value: "isograph".to_string(),
     });
 
-    assert_eq!(*first_letter(&db, input_id).lookup(), 'a');
+    assert_eq!(*first_letter(&db, input_id).lookup(&db), 'a');
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 1);
 
     db.set(Input {
@@ -31,7 +31,7 @@ fn unrelated_source_changes() {
         value: "pico".to_string(),
     });
 
-    assert_eq!(*first_letter(&db, input_id).lookup(), 'a');
+    assert_eq!(*first_letter(&db, input_id).lookup(&db), 'a');
     // After an unrelated input was changed, we reused the value and
     // did not re-execute first_letter
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 1);

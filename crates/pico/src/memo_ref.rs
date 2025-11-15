@@ -6,7 +6,6 @@ use crate::{DatabaseDyn, DerivedNodeId, ParamId, RawPtr, dependency::NodeKind};
 
 #[derive(Debug)]
 pub struct MemoRef<T> {
-    pub(crate) db: *const dyn DatabaseDyn,
     pub(crate) derived_node_id: DerivedNodeId,
     kind: MemoRefKind,
     phantom: PhantomData<T>,
@@ -28,39 +27,30 @@ impl<T> Clone for MemoRef<T> {
 
 impl<T> PartialEq for MemoRef<T> {
     fn eq(&self, other: &Self) -> bool {
-        std::ptr::eq(self.db, other.db) && self.derived_node_id == other.derived_node_id
+        self.derived_node_id == other.derived_node_id
     }
 }
 
 impl<T> Eq for MemoRef<T> {}
 
-#[expect(clippy::unnecessary_cast)]
 impl<T: 'static> MemoRef<T> {
-    pub fn new(db: &dyn DatabaseDyn, derived_node_id: DerivedNodeId) -> Self {
+    pub fn new(derived_node_id: DerivedNodeId) -> Self {
         Self {
             derived_node_id,
-            db: db as *const _ as *const dyn DatabaseDyn,
             kind: MemoRefKind::Value,
             phantom: PhantomData,
         }
     }
 
-    pub(crate) fn new_with_kind(
-        db: &dyn DatabaseDyn,
-        derived_node_id: DerivedNodeId,
-        kind: MemoRefKind,
-    ) -> Self {
+    pub(crate) fn new_with_kind(derived_node_id: DerivedNodeId, kind: MemoRefKind) -> Self {
         Self {
-            db: db as *const _ as *const dyn DatabaseDyn,
             derived_node_id,
             kind,
             phantom: PhantomData,
         }
     }
 
-    pub fn lookup_tracked<'db>(&self) -> &'db T {
-        // SAFETY: Database outlives this MemoRef
-        let db = unsafe { &*self.db };
+    pub fn lookup_tracked<'db>(&self, db: &'db dyn DatabaseDyn) -> &'db T {
         let storage = db.get_storage_dyn();
         let (value, revision) = storage
             .get_derived_node_value_and_revision(self.derived_node_id)
@@ -83,9 +73,7 @@ impl<T: 'static> MemoRef<T> {
         }
     }
 
-    pub fn lookup<'db>(&self) -> &'db T {
-        // SAFETY: Database outlives this MemoRef
-        let db = unsafe { &*self.db };
+    pub fn lookup<'db>(&self, db: &'db dyn DatabaseDyn) -> &'db T {
         let storage = db.get_storage_dyn();
         let (value, _) = storage
             .get_derived_node_value_and_revision(self.derived_node_id)
@@ -106,18 +94,18 @@ impl<T: 'static> MemoRef<T> {
 }
 
 impl<T: 'static + Clone> MemoRef<T> {
-    pub fn to_owned(&self) -> T {
-        self.lookup().clone()
+    pub fn to_owned(&self, db: &dyn DatabaseDyn) -> T {
+        self.lookup(db).clone()
     }
 }
 
 impl<T: 'static, E: Clone + 'static> MemoRef<Result<T, E>> {
-    pub fn try_lookup<'db>(&self) -> Result<&'db T, E> {
-        self.lookup().as_ref().map_err(|e| e.clone())
+    pub fn try_lookup<'db>(&self, db: &'db dyn DatabaseDyn) -> Result<&'db T, E> {
+        self.lookup(db).as_ref().map_err(|e| e.clone())
     }
 
-    pub fn try_lookup_tracked<'db>(&self) -> Result<&'db T, E> {
-        self.lookup_tracked().as_ref().map_err(|e| e.clone())
+    pub fn try_lookup_tracked<'db>(&self, db: &'db dyn DatabaseDyn) -> Result<&'db T, E> {
+        self.lookup_tracked(db).as_ref().map_err(|e| e.clone())
     }
 }
 

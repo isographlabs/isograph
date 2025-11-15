@@ -25,7 +25,7 @@ pub(crate) fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol>
     (Schema<TNetworkProtocol>, ContainsIsoStats),
     ProcessIsoLiteralsForSchemaError<TNetworkProtocol>,
 > {
-    let contains_iso = parse_iso_literals(db).to_owned()?;
+    let contains_iso = parse_iso_literals(db).to_owned(db)?;
     let contains_iso_stats = contains_iso.stats();
 
     let (unprocessed_client_selection_sets, unprocessed_entrypoints) =
@@ -156,7 +156,7 @@ fn parse_iso_literals<TNetworkProtocol: NetworkProtocol>(
     let mut contains_iso = ParsedIsoLiteralsMap::default();
     let mut iso_literal_parse_errors = vec![];
     for (relative_path, iso_literals_source_id) in db.get_iso_literal_map().tracked().0.iter() {
-        for literal in parse_iso_literal_in_source(db, *iso_literals_source_id).to_owned() {
+        for literal in parse_iso_literal_in_source(db, *iso_literals_source_id).to_owned(db) {
             match literal {
                 Ok(iso_literal) => {
                     contains_iso

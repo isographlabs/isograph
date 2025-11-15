@@ -114,7 +114,7 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
 > {
     let config = db.get_isograph_config();
     let validated_schema = get_validated_schema(db);
-    let (schema, stats) = match validated_schema.lookup() {
+    let (schema, stats) = match validated_schema.lookup(db) {
         Ok((schema, stats)) => (schema, stats),
         Err(e) => return Err(e.clone())?,
     };
@@ -190,7 +190,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     *parent_object_entity_name,
                     (*server_object_selectable_name).into(),
                 )
-                .lookup()
+                .lookup(db)
                 .as_ref()
                 .expect(
                     "Expected validation to have succeeded. \
@@ -299,7 +299,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 db,
                                 client_scalar_selectable.parent_object_entity_name(),
                             )
-                            .lookup()
+                            .lookup(db)
                             .as_ref()
                             .expect(
                                 "Expected validation to have worked. \
@@ -388,13 +388,13 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 .collect();
 
                             let query_type = fetchable_types(db)
-                                .lookup()
+                                .lookup(db)
                                 .as_ref()
                                 .expect(
                                     "Expected parsing to have succeeded. \
                                     This is indicative of a bug in Isograph.",
                                 )
-                                .lookup()
+                                .lookup(db)
                                 .iter()
                                 .find(|(_, root_operation_name)| root_operation_name.0 == "query");
 
@@ -752,7 +752,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         parent_object_entity_name,
                         server_scalar_selectable_name.into(),
                     )
-                    .lookup()
+                    .lookup(db)
                     .as_ref()
                     .expect(
                         "Expected validation to have succeeded. \
@@ -778,7 +778,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         {
                             Some(javascript_name) => javascript_name,
                             None => server_scalar_entity_javascript_name(db, *scalar_entity_name)
-                                .to_owned()
+                                .to_owned(db)
                                 .expect(
                                     "Expected parsing to not have failed. \
                                         This is indicative of a bug in Isograph.",
@@ -960,7 +960,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         parent_object_entity_name,
                         server_scalar_selectable_name.into(),
                     )
-                    .lookup()
+                    .lookup(db)
                     .as_ref()
                     .expect(
                         "Expected validation to have succeeded. \
@@ -983,7 +983,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     let output_type = server_scalar_selectable.target_scalar_entity.clone().map(
                         &mut |scalar_entity_name| {
                             server_scalar_entity_javascript_name(db, scalar_entity_name)
-                                .to_owned()
+                                .to_owned(db)
                                 .expect(
                                     "Expected parsing to not have failed. \
                                         This is indicative of a bug in Isograph.",
@@ -1149,7 +1149,7 @@ fn format_type_for_js<TNetworkProtocol: NetworkProtocol>(
             }
             ServerEntityName::Scalar(scalar_entity_name) => {
                 server_scalar_entity_javascript_name(db, scalar_entity_name)
-                    .to_owned()
+                    .to_owned(db)
                     .expect(
                         "Expected parsing to not have failed. \
                         This is indicative of a bug in Isograph.",

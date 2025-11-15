@@ -76,18 +76,18 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         let mut graphql_root_types = None;
 
         let (type_system_document, type_system_extension_documents) =
-            parse_graphql_schema(db).to_owned()?;
+            parse_graphql_schema(db).to_owned(db)?;
 
         let (mut result, mut directives, mut refetch_fields) =
             process_graphql_type_system_document(
-                type_system_document.to_owned(),
+                type_system_document.to_owned(db),
                 &mut graphql_root_types,
             )?;
 
         for type_system_extension_document in type_system_extension_documents.values() {
             let (outcome, objects_and_directives, new_refetch_fields) =
                 process_graphql_type_extension_document(
-                    type_system_extension_document.to_owned(),
+                    type_system_extension_document.to_owned(db),
                     &mut graphql_root_types,
                 )?;
 
@@ -177,7 +177,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         server_object_entity_name: &ServerObjectEntityName,
     ) -> String {
         let server_object_entity = &server_object_entity_named(db, *server_object_entity_name)
-            .lookup()
+            .lookup(db)
             .as_ref()
             .expect(
                 "Expected validation to have worked. \

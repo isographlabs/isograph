@@ -187,7 +187,7 @@ impl ModifiedArgument {
             match input_type_name {
                 ServerEntityName::Object(object_entity_name) => {
                     let field_map = server_selectables_vec(db, object_entity_name)
-                        .lookup()
+                        .lookup(db)
                         .as_ref()
                         .expect(
                             "Expected parsing to have worked. \

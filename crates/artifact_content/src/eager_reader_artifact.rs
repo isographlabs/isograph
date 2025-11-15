@@ -43,7 +43,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
 
     let parent_object_entity =
         &server_object_entity_named(db, client_selectable.parent_object_entity_name())
-            .lookup()
+            .lookup(db)
             .as_ref()
             .expect(
                 "Expected validation to have worked. \
@@ -186,7 +186,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
 
     let parent_object_entity =
         &server_object_entity_named(db, server_object_selectable.parent_object_entity_name)
-            .lookup()
+            .lookup(db)
             .as_ref()
             .expect(
                 "Expected validation to have worked. \
@@ -201,7 +201,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
 
     let concrete_type =
         &server_object_entity_named(db, *server_object_selectable.target_object_entity.inner())
-            .lookup()
+            .lookup(db)
             .as_ref()
             .expect(
                 "Expected validation to have worked. \
@@ -275,7 +275,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     let ts_file_extension = file_extensions.ts();
     let parent_object_entity =
         &server_object_entity_named(db, client_scalar_selectable.parent_object_entity_name())
-            .lookup()
+            .lookup(db)
             .as_ref()
             .expect(
                 "Expected validation to have worked. \
@@ -390,7 +390,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
 ) -> ArtifactPathAndContent {
     let parent_object_entity =
         &server_object_entity_named(db, client_field.parent_object_entity_name())
-            .lookup()
+            .lookup(db)
             .as_ref()
             .expect(
                 "Expected validation to have worked. \
@@ -449,7 +449,7 @@ pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtoc
 ) -> ArtifactPathAndContent {
     let parent_object_entity =
         &server_object_entity_named(db, client_field.parent_object_entity_name())
-            .lookup()
+            .lookup(db)
             .as_ref()
             .expect(
                 "Expected validation to have worked. \

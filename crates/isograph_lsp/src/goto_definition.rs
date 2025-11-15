@@ -36,7 +36,7 @@ pub fn on_goto_definition<TNetworkProtocol: NetworkProtocol>(
         params.text_document_position_params.text_document.uri,
         params.text_document_position_params.position,
     )
-    .to_owned()
+    .to_owned(db)
 }
 
 #[legacy_memo]
@@ -54,7 +54,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
 
     let extraction_option =
         get_iso_literal_extraction_from_text_position_params(db, url.clone(), position.into())
-            .to_owned();
+            .to_owned(db);
     let (extraction, offset) = match extraction_option {
         Some(e) => e,
         None => return Ok(None),
@@ -72,7 +72,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
             IsographResolvedNode::EntrypointDeclaration(_) => None,
             IsographResolvedNode::ServerObjectEntityNameWrapper(entity) => {
                 let server_entities =
-                    match server_entities_named(db, entity.inner.0.into()).lookup() {
+                    match server_entities_named(db, entity.inner.0.into()).lookup(db) {
                         Ok(s) => s,
                         Err(_) => return Err(LSPRuntimeError::ExpectedError),
                     };
@@ -120,7 +120,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                                     db,
                                     location.text_source.relative_path_to_source_file,
                                 )
-                                .lookup()
+                                .lookup(db)
                                 .as_ref()
                                 .expect("Expected relative path to exist");
                                 isograph_location_to_lsp_location(db, location, content)
@@ -160,7 +160,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                                     db,
                                     location.text_source.relative_path_to_source_file,
                                 )
-                                .lookup()
+                                .lookup(db)
                                 .as_ref()
                                 .expect("Expected relative path to exist");
 
@@ -191,7 +191,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                     parent_type_name.0.unchecked_conversion(),
                     wrapper.inner.0,
                 )
-                .lookup()
+                .lookup(db)
                 .as_ref()
                 {
                     Ok(item) => item,
@@ -213,7 +213,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                                     db,
                                     location.text_source.relative_path_to_source_file,
                                 )
-                                .lookup()
+                                .lookup(db)
                                 .as_ref()
                                 .expect("Expected relative path to exist");
                                 isograph_location_to_lsp_location(db, location, content)
@@ -222,7 +222,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                     .map(lsp_location_to_scalar_response)
             }
             IsographResolvedNode::ClientObjectSelectableNameWrapper(object_wrapper_path) => {
-                let (validated_schema, _stats) = match get_validated_schema(db).lookup() {
+                let (validated_schema, _stats) = match get_validated_schema(db).lookup(db) {
                     Ok(schema) => schema,
                     Err(_) => return Ok(None),
                 };
@@ -252,7 +252,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                                     db,
                                     location.text_source.relative_path_to_source_file,
                                 )
-                                .lookup()
+                                .lookup(db)
                                 .as_ref()
                                 .expect("Expected relative path to exist");
                                 isograph_location_to_lsp_location(db, location, content)

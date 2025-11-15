@@ -43,7 +43,6 @@ impl std::ops::Drop for RetainedQuery {
 }
 
 pub fn retain<Db: Database, T>(db: &Db, memo_ref: MemoRef<T>) -> RetainedQuery {
-    debug_assert!(std::ptr::eq(db, memo_ref.db as *const _));
     match db
         .get_storage()
         .retained_calls

@@ -36,7 +36,7 @@ pub fn field_to_insert_to_server_selectable<TNetworkProtocol: NetworkProtocol>(
         .cloned();
 
     let selection_type = defined_entity(db, *target_entity_type_name)
-        .to_owned()
+        .to_owned(db)
         .expect(
             "Expected parsing to have succeeded. \
             This is indicative of a bug in Isograph.",
@@ -152,7 +152,7 @@ pub fn graphql_input_value_definition_to_variable_definition<TNetworkProtocol: N
             let entity_name: UnvalidatedTypeName =
                 (*input_value_definition.item.type_.inner()).into();
             defined_entity(db, entity_name)
-                .to_owned()
+                .to_owned(db)
                 .expect(
                     "Expected parsing to have succeeded. \
                     This is indicative of a bug in Isograph.",

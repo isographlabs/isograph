@@ -25,7 +25,7 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
         MemoizedSelectionSetError<TNetworkProtocol>,
     >,
 > {
-    let declaration_map = client_selectable_declaration_map_from_iso_literals(db).lookup();
+    let declaration_map = client_selectable_declaration_map_from_iso_literals(db).lookup(db);
 
     declaration_map
         .iter()
@@ -63,7 +63,7 @@ pub fn memoized_validated_reader_selection_set_map<TNetworkProtocol: NetworkProt
     (ServerObjectEntityName, ClientSelectableName),
     Result<ValidatedSelectionSet, MemoizedSelectionSetError<TNetworkProtocol>>,
 > {
-    let unvalidated_map = memoized_unvalidated_reader_selection_set_map(db).to_owned();
+    let unvalidated_map = memoized_unvalidated_reader_selection_set_map(db).to_owned(db);
 
     unvalidated_map
         .into_iter()

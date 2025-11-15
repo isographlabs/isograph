@@ -15,7 +15,7 @@ pub fn fetchable_types<TNetworkProtocol: NetworkProtocol>(
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
     let (_items, fetchable_types) =
-        TNetworkProtocol::parse_type_system_documents(db).try_lookup()?;
+        TNetworkProtocol::parse_type_system_documents(db).try_lookup(db)?;
 
     Ok(db.intern_ref(fetchable_types))
 }

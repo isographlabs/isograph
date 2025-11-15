@@ -161,13 +161,13 @@ pub fn parent_object_entity_and_selectable<TNetworkProtocol: NetworkProtocol>(
     GetParentAndSelectableError<TNetworkProtocol>,
 > {
     let parent_entity = server_object_entity_named(db, parent_server_object_entity_name.0)
-        .to_owned()?
+        .to_owned(db)?
         .ok_or(GetParentAndSelectableError::ParentTypeNotDefined {
             parent_type_name: parent_server_object_entity_name,
         })?
         .item;
 
-    match selectable_named(db, parent_server_object_entity_name.0, selectable_name).to_owned()? {
+    match selectable_named(db, parent_server_object_entity_name.0, selectable_name).to_owned(db)? {
         Some(selectable) => Ok((parent_entity, selectable)),
         None => Err(GetParentAndSelectableError::FieldMustExist {
             parent_type_name: parent_server_object_entity_name,

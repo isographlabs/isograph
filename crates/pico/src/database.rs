@@ -403,5 +403,5 @@ fn intern_from_param<Db: Database, T: Clone + DynEq>(
         }),
     };
     execute_memoized_function(db, derived_node_id, inner_fn);
-    MemoRef::new_with_kind(db, derived_node_id, kind)
+    MemoRef::new_with_kind(derived_node_id, kind)
 }

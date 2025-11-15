@@ -49,7 +49,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
 
     let parent_object_entity =
         &server_object_entity_named(db, entrypoint.parent_object_entity_name())
-            .lookup()
+            .lookup(db)
             .as_ref()
             .expect(
                 "Expected validation to have worked. \
@@ -92,13 +92,13 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
             .map(|variable_definition| &variable_definition.item)
             .collect(),
         &fetchable_types(db)
-            .lookup()
+            .lookup(db)
             .as_ref()
             .expect(
                 "Expected parsing to have succeeded. \
                 This is indicative of a bug in Isograph.",
             )
-            .lookup()
+            .lookup(db)
             .iter()
             .find(|(_, root_operation_name)| root_operation_name.0 == "mutation"),
         file_extensions,
@@ -129,13 +129,13 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     // TODO model this better so that the RootOperationName is somehow a
     // parameter
     let fetchable_types_map = fetchable_types(db)
-        .lookup()
+        .lookup(db)
         .as_ref()
         .expect(
             "Expected parsing to have succeeded. \
                 This is indicative of a bug in Isograph.",
         )
-        .lookup();
+        .lookup(db);
 
     let root_operation_name = fetchable_types_map
         .get(&entrypoint.parent_object_entity_name)
@@ -152,7 +152,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
 
     let parent_object_entity =
         &server_object_entity_named(db, entrypoint.parent_object_entity_name())
-            .lookup()
+            .lookup(db)
             .as_ref()
             .expect(
                 "Expected validation to have worked. \
@@ -243,7 +243,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
                 })
         };
     let concrete_object_entity = &server_object_entity_named(db, concrete_type_entity_name)
-        .lookup()
+        .lookup(db)
         .as_ref()
         .expect(
             "Expected validation to have worked. \

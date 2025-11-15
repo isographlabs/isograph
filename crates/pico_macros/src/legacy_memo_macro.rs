@@ -86,8 +86,8 @@ pub(crate) fn legacy_memo_macro(_args: TokenStream, item: TokenStream) -> TokenS
                 }
                 ArgType::MemoRef => {
                     let binding_expr = match **ty {
-                        syn::Type::Reference(_) => quote!(&::pico::MemoRef::new(#db_arg, param_id.into())),
-                        _ => quote!(::pico::MemoRef::new(#db_arg, param_id.into())),
+                        syn::Type::Reference(_) => quote!(&::pico::MemoRef::new(param_id.into())),
+                        _ => quote!(::pico::MemoRef::new(param_id.into())),
                     };
                     quote! {
                         let #arg: #ty = {
@@ -140,7 +140,7 @@ pub(crate) fn legacy_memo_macro(_args: TokenStream, item: TokenStream) -> TokenS
                 !matches!(did_recalculate, pico::DidRecalculate::Error),
                 "Unexpected memo result. This is indicative of a bug in Pico."
             );
-            ::pico::MemoRef::new(#db_arg, derived_node_id)
+            ::pico::MemoRef::new(derived_node_id)
         }
     };
 

@@ -31,7 +31,7 @@ pub fn parse_iso_literals_in_file_content<TNetworkProtocol: NetworkProtocol>(
 
     for iso_literal_extraction in
         extract_iso_literals_from_file_content(db, relative_path_to_source_file)
-            .lookup()
+            .lookup(db)
             .iter()
     {
         extraction_results.push(process_iso_literal_extraction(
@@ -53,7 +53,7 @@ pub fn parse_iso_literals_in_file_content_and_return_all<TNetworkProtocol: Netwo
 ) -> Vec<Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>>>
 {
     extract_iso_literals_from_file_content(db, relative_path_to_source_file)
-        .lookup()
+        .lookup(db)
         .iter()
         .map(|iso_literal_extraction| {
             process_iso_literal_extraction(
@@ -75,7 +75,7 @@ pub fn parse_iso_literal_in_source<TNetworkProtocol: NetworkProtocol>(
     let IsoLiteralsSource {
         relative_path,
         content: _,
-    } = read_iso_literals_source(db, iso_literals_source_id).lookup();
+    } = read_iso_literals_source(db, iso_literals_source_id).lookup(db);
 
     parse_iso_literals_in_file_content(db, *relative_path, db.get_current_working_directory())
 }
@@ -86,7 +86,7 @@ pub fn read_iso_literals_source_from_relative_path<TNetworkProtocol: NetworkProt
     relative_path_to_source_file: RelativePathToSourceFile,
 ) -> Option<IsoLiteralsSource> {
     let iso_literals_source_id = db.get_iso_literal(relative_path_to_source_file)?;
-    Some(read_iso_literals_source(db, iso_literals_source_id).to_owned())
+    Some(read_iso_literals_source(db, iso_literals_source_id).to_owned(db))
 }
 
 /// We should (probably) never directly read SourceId<IsoLiteralsSource>, since if we do so,
@@ -210,7 +210,7 @@ pub fn process_iso_literal_extraction<TNetworkProtocol: NetworkProtocol>(
         const_export_name.clone(),
         text_source,
     )
-    .to_owned()?;
+    .to_owned(db)?;
 
     let is_client_field_declaration = matches!(
         &iso_literal_extraction_result,
@@ -254,7 +254,7 @@ pub fn extract_iso_literals_from_file_content<TNetworkProtocol: NetworkProtocol>
         relative_path: _,
         content,
     } = read_iso_literals_source_from_relative_path(db, relative_path_to_source_file)
-        .lookup()
+        .lookup(db)
         .as_ref()
         .expect("Expected relative path to exist");
 

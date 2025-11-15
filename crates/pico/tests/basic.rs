@@ -19,7 +19,7 @@ fn basic() {
         value: "asdf".to_string(),
     });
 
-    assert_eq!(*first_letter(&db, input_id).lookup(), 'a');
+    assert_eq!(*first_letter(&db, input_id).lookup(&db), 'a');
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 1);
 
     db.set(Input {
@@ -27,7 +27,7 @@ fn basic() {
         value: "qwer".to_string(),
     });
 
-    assert_eq!(*first_letter(&db, input_id).lookup(), 'q');
+    assert_eq!(*first_letter(&db, input_id).lookup(&db), 'q');
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 2);
 }
 

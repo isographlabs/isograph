@@ -27,7 +27,7 @@ pub fn on_semantic_token_full_request<TNetworkProtocol: NetworkProtocol>(
     let uri = params.text_document.uri;
     let db = &compiler_state.db;
 
-    get_semantic_tokens(db, uri).to_owned()
+    get_semantic_tokens(db, uri).to_owned(db)
 }
 
 /// Overall algorithm:
@@ -75,7 +75,7 @@ fn get_semantic_tokens<TNetworkProtocol: NetworkProtocol>(
     // TODO call this earlier, pass it as a param to parse_iso_literal_in_relative_file
     let page_content: &str =
         &read_iso_literals_source_from_relative_path(db, relative_path_to_source_file)
-            .lookup()
+            .lookup(db)
             .as_ref()
             .expect("Expected source to exist")
             .content;
