@@ -8,7 +8,7 @@ use thiserror::Error;
 use crate::{
     AddSelectionSetsError, EntityAccessError, IsographDatabase, NetworkProtocol,
     ValidatedSelection, client_selectable_declaration_map_from_iso_literals,
-    get_validated_selection_set, server_object_entity_named,
+    get_validated_selection_set,
 };
 
 type UnvalidatedSelectionSet = Vec<WithSpan<UnvalidatedSelection>>;
@@ -71,13 +71,6 @@ pub fn memoized_validated_reader_selection_set_map<TNetworkProtocol: NetworkProt
             (
                 key,
                 value.and_then(|unvalidated_selection_set| {
-                    let parent_object_entity = server_object_entity_named(db, key.0)
-                        .try_lookup()?
-                        .as_ref()
-                        .expect(
-                            "Expected entity to exist. \
-                            This is indicative of a bug in Isograph.",
-                        );
                     let top_level_field_or_pointer = match unvalidated_selection_set {
                         SelectionType::Scalar(_) => {
                             SelectionType::Scalar((key.0, key.1.into()).into())
@@ -90,7 +83,7 @@ pub fn memoized_validated_reader_selection_set_map<TNetworkProtocol: NetworkProt
                     get_validated_selection_set(
                         db,
                         unvalidated_selection_set.inner(),
-                        &parent_object_entity.item,
+                        key.0,
                         top_level_field_or_pointer,
                     )
                     .map_err(|e| e.into())
