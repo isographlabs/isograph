@@ -1,13 +1,14 @@
 use crate::{
     generate_artifacts::{
         ENTRYPOINT_FILE_NAME, NORMALIZATION_AST, NORMALIZATION_AST_FILE_NAME, QUERY_TEXT,
-        QUERY_TEXT_FILE_NAME, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER,
-        RefetchQueryArtifactImport,
+        QUERY_TEXT_FILE_NAME, RAW_RESPONSE_TYPE, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE,
+        RESOLVER_READER, RefetchQueryArtifactImport,
     },
     imperatively_loaded_fields::get_paths_and_contents_for_imperatively_loaded_field,
     normalization_ast_text::generate_normalization_ast_text,
     operation_text::{OperationText, generate_operation_text},
     persisted_documents::PersistedDocuments,
+    raw_response_type::generate_raw_response_type,
 };
 use common_lang_types::{
     ArtifactPathAndContent, ClientScalarSelectableName, ParentObjectEntityNameAndSelectableName,
@@ -286,6 +287,8 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         &directive_set,
     );
 
+    let raw_response_type = generate_raw_response_type(schema, merged_selection_map, 0);
+
     let mut path_and_contents = Vec::with_capacity(refetch_paths_with_variables.len() + 3);
     path_and_contents.push(ArtifactPathAndContent {
         file_content: format!("export default '{query_text}';"),
@@ -312,6 +315,17 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
             selectable_name: field_name,
         }
         .some(),
+    });
+    path_and_contents.push(ArtifactPathAndContent {
+        file_content: format!(
+            "export type {}__{}__rawResponse = {raw_response_type}\n",
+            type_name, field_name,
+        ),
+        file_name: *RAW_RESPONSE_TYPE,
+        type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+            parent_object_entity_name: type_name,
+            selectable_name: field_name,
+        }),
     });
     path_and_contents.push(ArtifactPathAndContent {
         file_content: entrypoint_file_content,
