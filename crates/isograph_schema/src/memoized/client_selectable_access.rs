@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, CreateAdditionalFieldsError, CreateSchemaError,
     IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError,
-    create_new_exposed_field, create_type_system_schema_with_server_selectables,
-    get_link_fields_map, process_client_field_declaration_inner,
-    process_client_pointer_declaration_inner,
+    UnprocessedClientScalarSelectableSelectionSet, create_new_exposed_field,
+    create_type_system_schema_with_server_selectables, get_link_fields_map,
+    process_client_field_declaration_inner, process_client_pointer_declaration_inner,
 };
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName,
@@ -258,7 +258,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
                 .try_lookup()?
                 .get(&(parent_object_entity_name, client_scalar_selectable_name))
                 .cloned()
-                .map(|mut selectable| {
+                .map(|(mut selectable, _)| {
                     // Wat?! Here, we are explicitly clearing these, in order to make it obvious if we depend on these!
                     // These fields will be removed (i.e. will be separate structs.)
                     selectable.reader_selection_set = vec![];
@@ -379,7 +379,10 @@ pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
 ) -> Result<
     HashMap<
         (ServerObjectEntityName, ClientScalarSelectableName),
-        ClientScalarSelectable<TNetworkProtocol>,
+        (
+            ClientScalarSelectable<TNetworkProtocol>,
+            UnprocessedClientScalarSelectableSelectionSet,
+        ),
     >,
     MemoizedIsoLiteralError<TNetworkProtocol>,
 > {
@@ -390,7 +393,7 @@ pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
     for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
         for expose_as_field in expose_as_fields_to_insert {
             let (
-                _unprocessed_client_scalar_selection_set,
+                unprocessed_client_scalar_selection_set,
                 exposed_field_client_scalar_selectable,
                 _payload_object_entity_name,
             ) = create_new_exposed_field(db, expose_as_field, *parent_object_entity_name)?;
@@ -400,7 +403,10 @@ pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
                     exposed_field_client_scalar_selectable.parent_object_entity_name,
                     exposed_field_client_scalar_selectable.name.item,
                 ),
-                exposed_field_client_scalar_selectable,
+                (
+                    exposed_field_client_scalar_selectable,
+                    unprocessed_client_scalar_selection_set,
+                ),
             );
         }
     }

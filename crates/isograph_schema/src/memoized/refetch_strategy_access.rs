@@ -24,7 +24,7 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
 > {
     // TODO use a "list of iso declarations" fn
     let declaration_map = client_selectable_declaration_map_from_iso_literals(db).lookup();
-    let _expose_field_map = expose_field_map(db)
+    let expose_field_map = expose_field_map(db)
         .lookup()
         .as_ref()
         .map_err(|e| e.clone())?;
@@ -62,7 +62,19 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
         }
     }
 
-    // for (key, value) in expose_field_map {}
+    for (key, (_, selection_set)) in expose_field_map {
+        match out.entry((key.0, key.1.into())) {
+            Entry::Occupied(mut occupied_entry) => {
+                *occupied_entry.get_mut() = Err(RefetchStrategyAccessError::DuplicateDefinition {
+                    parent_object_entity_name: key.0,
+                    client_selectable_name: key.1.into(),
+                });
+            }
+            Entry::Vacant(vacant_entry) => {
+                vacant_entry.insert(Ok(selection_set.refetch_strategy.clone()));
+            }
+        }
+    }
 
     Ok(out)
 }
