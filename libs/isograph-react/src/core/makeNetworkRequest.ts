@@ -71,7 +71,9 @@ export function maybeMakeNetworkRequest<
       return [
         wrapResolvedValue(undefined),
         () => {
-          unretainAndGarbageCollectIfUndisposed(environment, status);
+          if (status.kind === 'Undisposed') {
+            unretainAndGarbageCollect(environment, status);
+          }
           status = {
             kind: 'Disposed',
           };
@@ -109,7 +111,9 @@ export function maybeMakeNetworkRequest<
         return [
           wrapResolvedValue(undefined),
           () => {
-            unretainAndGarbageCollectIfUndisposed(environment, status);
+            if (status.kind === 'Undisposed') {
+              unretainAndGarbageCollect(environment, status);
+            }
             status = {
               kind: 'Disposed',
             };
@@ -235,7 +239,9 @@ export function makeNetworkRequest<
   const response: ItemCleanupPair<PromiseWrapper<void, AnyError>> = [
     wrapper,
     () => {
-      unretainAndGarbageCollectIfUndisposed(environment, status);
+      if (status.kind === 'Undisposed') {
+        unretainAndGarbageCollect(environment, status);
+      }
       status = {
         kind: 'Disposed',
       };
@@ -244,11 +250,13 @@ export function makeNetworkRequest<
   return response;
 }
 
+type NetworkRequestStatusUndisposed = {
+  readonly kind: 'Undisposed';
+  readonly retainedQuery: RetainedQuery;
+};
+
 type NetworkRequestStatus =
-  | {
-      readonly kind: 'Undisposed';
-      readonly retainedQuery: RetainedQuery;
-    }
+  | NetworkRequestStatusUndisposed
   | {
       readonly kind: 'Disposed';
     };
@@ -384,17 +392,12 @@ function fetchNormalizationAstAndRetainArtifact<
   return retainedQuery;
 }
 
-function unretainAndGarbageCollectIfUndisposed(
+function unretainAndGarbageCollect(
   environment: IsographEnvironment,
-  status: NetworkRequestStatus,
+  status: NetworkRequestStatusUndisposed,
 ) {
-  if (status.kind === 'Undisposed') {
-    const didUnretainSomeQuery = unretainQuery(
-      environment,
-      status.retainedQuery,
-    );
-    if (didUnretainSomeQuery) {
-      garbageCollectEnvironment(environment);
-    }
+  const didUnretainSomeQuery = unretainQuery(environment, status.retainedQuery);
+  if (didUnretainSomeQuery) {
+    garbageCollectEnvironment(environment);
   }
 }
