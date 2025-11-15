@@ -31,7 +31,7 @@ export function readOptimisticRecord(
 
         while (node !== null) {
           const storeRecord = node.data[link.__typename]?.[link.__link];
-          if (storeRecord != undefined) {
+          if (storeRecord != null) {
             const value = Reflect.get(storeRecord, p);
             if (value !== undefined) {
               return value;
@@ -45,7 +45,7 @@ export function readOptimisticRecord(
 
         while (node !== null) {
           const storeRecord = node.data[link.__typename]?.[link.__link];
-          if (storeRecord != undefined) {
+          if (storeRecord != null) {
             const value = Reflect.has(storeRecord, p);
             if (value) {
               return true;
@@ -284,7 +284,7 @@ function setChildOfNode<TStoreLayer extends StoreLayer>(
   newChild: TStoreLayer['childStoreLayer'],
 ) {
   node.childStoreLayer = newChild;
-  if (newChild) {
+  if (newChild !== null) {
     newChild.parentStoreLayer = node;
   } else {
     environment.store = node;
@@ -337,7 +337,7 @@ function replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
       childOptimisticNode,
     );
   } else if (
-    optimisticNode.parentStoreLayer.kind == 'NetworkResponseStoreLayer'
+    optimisticNode.parentStoreLayer.kind === 'NetworkResponseStoreLayer'
   ) {
     mergeDataLayer(
       optimisticNode.parentStoreLayer.data,
@@ -383,12 +383,12 @@ function compareData(
   }
 
   for (const [typeName, newRecords] of Object.entries(newData)) {
-    if (!newRecords) {
+    if (newRecords == null) {
       continue;
     }
     const oldRecords = oldData[typeName];
     outer: for (const [id, newRecord] of Object.entries(newRecords)) {
-      if (!newRecord) {
+      if (newRecord == null) {
         continue;
       }
       const oldRecord = oldRecords?.[id];
