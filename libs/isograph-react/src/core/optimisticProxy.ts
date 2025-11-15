@@ -139,11 +139,15 @@ export function addNetworkResponseStoreLayer(
 }
 
 function mergeDataLayer(target: StoreLayerData, source: StoreLayerData): void {
-  for (const typeName in source) {
-    target[typeName] ??= {};
-    for (const id in source[typeName]) {
-      target[typeName][id] ??= {};
-      Object.assign(target[typeName][id], source[typeName][id]);
+  for (const [typeName, sourceById] of Object.entries(source)) {
+    if (sourceById == null) {
+      target[typeName] = sourceById;
+      continue;
+    }
+    const targetRecordById = (target[typeName] ??= {});
+    for (const [id, source] of Object.entries(sourceById)) {
+      const targetRecord = (targetRecordById[id] ??= {});
+      Object.assign(targetRecord, source);
     }
   }
 }
