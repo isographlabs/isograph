@@ -28,9 +28,9 @@ pub(crate) fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol>
     let contains_iso = parse_iso_literals(db).to_owned()?;
     let contains_iso_stats = contains_iso.stats();
 
-    let (unprocessed_client_types, unprocessed_entrypoints) =
+    let (unprocessed_client_selection_sets, unprocessed_entrypoints) =
         process_iso_literals(db, &mut unvalidated_isograph_schema, contains_iso)?;
-    unprocessed_selection_sets.extend(unprocessed_client_types);
+    unprocessed_selection_sets.extend(unprocessed_client_selection_sets);
 
     unvalidated_isograph_schema.entrypoints = validate_entrypoints(db, unprocessed_entrypoints)?;
 

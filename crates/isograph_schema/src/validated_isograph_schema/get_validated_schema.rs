@@ -11,6 +11,7 @@ use crate::{
     },
 };
 use common_lang_types::WithLocation;
+use isograph_lang_types::SelectionType;
 use pico_macros::legacy_memo;
 use thiserror::Error;
 
@@ -26,7 +27,7 @@ pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol>(
 
     process_field_queue(db, &mut unvalidated_isograph_schema, field_queue)?;
 
-    let mut unprocessed_selection_set = std::vec![];
+    let mut unprocessed_selection_sets = vec![];
 
     for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
         for expose_as_field in expose_as_fields_to_insert {
@@ -56,7 +57,7 @@ pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol>(
                 payload_object_entity_name,
             )?;
 
-            unprocessed_selection_set.push(isograph_lang_types::SelectionType::Scalar(
+            unprocessed_selection_sets.push(SelectionType::Scalar(
                 unprocessed_client_scalar_selection_set,
             ));
         }
@@ -67,7 +68,7 @@ pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol>(
     let (isograph_schema, stats) = process_iso_literals_for_schema(
         db,
         unvalidated_isograph_schema,
-        unprocessed_selection_set,
+        unprocessed_selection_sets,
     )?;
     validate_use_of_arguments(db, &isograph_schema)?;
     Ok((isograph_schema, stats))
