@@ -22,6 +22,13 @@ export type PromiseWrapper<T, E = any> = {
   result: Result<Exclude<T, NotSet>, E> | NotSet;
 };
 
+export interface PromiseWrapperOk<T, E = any> extends PromiseWrapper<T, E> {
+  result: {
+    readonly kind: 'Ok';
+    readonly value: Exclude<T, NotSet>;
+  };
+}
+
 export function wrapPromise<T>(
   promise: Promise<Exclude<T, NotSet>>,
 ): PromiseWrapper<T, unknown> {
@@ -39,7 +46,7 @@ export function wrapPromise<T>(
 
 export function wrapResolvedValue<T>(
   value: Exclude<T, NotSet>,
-): PromiseWrapper<T, never> {
+): PromiseWrapperOk<T, never> {
   return {
     promise: Promise.resolve(value),
     result: {

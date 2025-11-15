@@ -10,31 +10,29 @@ import {
   type StoreLink,
   type TypeName,
 } from './IsographEnvironment';
+import {
+  NOT_SET,
+  type PromiseWrapper,
+  type PromiseWrapperOk,
+} from './PromiseWrapper';
 
 export type RetainedQuery = {
-  normalizationAst:
-    | {
-        kind: 'Loading';
-      }
-    | {
-        kind: 'Ready';
-        value: NormalizationAst;
-      };
+  readonly normalizationAst: PromiseWrapper<NormalizationAst>;
   readonly variables: {};
   readonly root: StoreLink;
 };
 
 export interface ReadyRetainedQuery extends RetainedQuery {
-  readonly normalizationAst: {
-    kind: 'Ready';
-    value: NormalizationAst;
-  };
+  readonly normalizationAst: PromiseWrapperOk<NormalizationAst>;
 }
 
 function isRetainedQueryReady(
   query: RetainedQuery,
 ): query is ReadyRetainedQuery {
-  return query.normalizationAst.kind === 'Ready';
+  return (
+    query.normalizationAst.result !== NOT_SET &&
+    query.normalizationAst.result.kind === 'Ok'
+  );
 }
 
 export type DidUnretainSomeQuery = boolean;
@@ -43,6 +41,7 @@ export function unretainQuery(
   retainedQuery: RetainedQuery,
 ): DidUnretainSomeQuery {
   environment.retainedQueries.delete(retainedQuery);
+
   if (isRetainedQueryReady(retainedQuery)) {
     environment.gcBuffer.push(retainedQuery);
   } else if (environment.gcBuffer.length > environment.gcBufferSize) {
@@ -74,6 +73,7 @@ export function garbageCollectEnvironment(environment: IsographEnvironment) {
       return;
     }
   }
+
   for (const query of environment.gcBuffer) {
     recordReachableIds(environment.store, query, retainedIds);
   }
@@ -123,7 +123,7 @@ function recordReachableIds(
       store,
       record,
       mutableRetainedIds,
-      retainedQuery.normalizationAst.value.selections,
+      retainedQuery.normalizationAst.result.value.selections,
       retainedQuery.variables,
     );
   }
