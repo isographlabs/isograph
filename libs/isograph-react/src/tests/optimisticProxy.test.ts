@@ -472,6 +472,311 @@ describe('optimisticLayer', () => {
         ).toBe(6);
       });
     });
+
+    describe('network error', () => {
+      describe('subscriptions', () => {
+        test('calls if network response differs', () => {
+          const revert = addOptimisticStoreLayer(environment, () => 1);
+
+          revert(null);
+
+          expect(callSubscriptions).toHaveBeenCalledTimes(1);
+          expect(callSubscriptions).toHaveBeenNthCalledWith(
+            1,
+            expect.anything(),
+            CHANGES,
+          );
+        });
+
+        test('calls subscriptions if reverted unrelated field', () => {
+          const { revert, node } = addOptimisticStoreLayerInner(
+            environment.store,
+            (storeLayer) => {
+              ignoreReadonly(storeLayer).data = {
+                Pet: { 1: { surname: 'foo' } },
+              };
+              return new Map([['Pet', new Set(['1'])]]);
+            },
+          );
+          environment.store = node;
+
+          environment.store = addNetworkResponseStoreLayerInner(
+            environment.store,
+            (storeLayer) => {
+              ignoreReadonly(storeLayer).data = {
+                Query: { __ROOT: { name: 'foo' } },
+              };
+              return CHANGES;
+            },
+          );
+
+          revert(environment, null);
+
+          expect(callSubscriptions).toHaveBeenCalledTimes(1);
+          expect(callSubscriptions).toHaveBeenNthCalledWith(
+            1,
+            expect.anything(),
+            new Map([['Pet', new Set(['1'])]]),
+          );
+        });
+      });
+
+      describe('with parent BaseStoreLayer', () => {
+        test('removes self ', () => {
+          const revert = addOptimisticStoreLayer(
+            environment,
+            (counter) => counter + 1,
+          );
+
+          revert(null);
+
+          expect(environment.store).toMatchObject({
+            kind: 'BaseStoreLayer',
+          });
+
+          expect(
+            readOptimisticRecord(environment.store, {
+              __link: '__ROOT',
+              __typename: 'Query',
+            }).counter,
+          ).toBe(0);
+        });
+
+        test('merges children', () => {
+          const revert = addOptimisticStoreLayer(
+            environment,
+            (counter) => counter + 1,
+          );
+          addNetworkResponseStoreLayer(environment, 12);
+
+          revert(null);
+
+          expect(environment.store).toMatchObject({
+            kind: 'BaseStoreLayer',
+          });
+
+          expect(
+            readOptimisticRecord(environment.store, {
+              __link: '__ROOT',
+              __typename: 'Query',
+            }).counter,
+          ).toBe(12);
+        });
+
+        test('merges children and stops at optimistic child node', () => {
+          const revert = addOptimisticStoreLayer(
+            environment,
+            (counter) => counter + 1,
+          );
+          addStartUpdateStoreLayer(environment, (counter) => counter + 1);
+          addNetworkResponseStoreLayer(environment, 12);
+          addOptimisticStoreLayer(environment, (counter) => counter + 1);
+
+          revert(null);
+
+          expect(environment.store).toMatchObject({
+            kind: 'OptimisticStoreLayer',
+            parentStoreLayer: {
+              kind: 'BaseStoreLayer',
+            },
+          });
+          expect(
+            readOptimisticRecord(environment.store, {
+              __link: '__ROOT',
+              __typename: 'Query',
+            }).counter,
+          ).toBe(13);
+        });
+
+        test('reexecutes updates while merging children', () => {
+          const revert = addOptimisticStoreLayer(
+            environment,
+            (counter) => counter + 1,
+          );
+          addStartUpdateStoreLayer(environment, (counter) => counter + 2);
+          addStartUpdateStoreLayer(environment, (counter) => counter * 7);
+          addOptimisticStoreLayer(environment, (counter) => counter + 1);
+
+          revert(null);
+
+          expect(environment.store).toMatchObject({
+            kind: 'OptimisticStoreLayer',
+            parentStoreLayer: {
+              kind: 'BaseStoreLayer',
+            },
+          });
+          expect(
+            readOptimisticRecord(environment.store, {
+              __link: '__ROOT',
+              __typename: 'Query',
+            }).counter,
+          ).toBe(15);
+        });
+
+        test('stops at optimistic child node', () => {
+          const revert = addOptimisticStoreLayer(
+            environment,
+            (counter) => counter + 1,
+          );
+          addOptimisticStoreLayer(environment, (counter) => counter + 1);
+
+          revert(null);
+
+          expect(environment.store).toMatchObject({
+            kind: 'OptimisticStoreLayer',
+            parentStoreLayer: {
+              kind: 'BaseStoreLayer',
+            },
+          });
+
+          expect(
+            readOptimisticRecord(environment.store, {
+              __link: '__ROOT',
+              __typename: 'Query',
+            }).counter,
+          ).toBe(1);
+        });
+      });
+
+      describe('adjacent with NetworkResponseStoreLayer', () => {
+        test('merges with parent NetworkResponseStoreLayer', () => {
+          addOptimisticStoreLayer(environment, (counter) => counter + 1);
+          addNetworkResponseStoreLayer(environment, 10);
+          const revert = addOptimisticStoreLayer(
+            environment,
+            (counter) => counter + 1,
+          );
+          addNetworkResponseStoreLayer(environment, 12);
+          revert(null);
+
+          expect(environment.store).toMatchObject({
+            kind: 'NetworkResponseStoreLayer',
+            parentStoreLayer: {
+              kind: 'OptimisticStoreLayer',
+              parentStoreLayer: {
+                kind: 'BaseStoreLayer',
+              },
+            },
+          });
+
+          expect(
+            readOptimisticRecord(environment.store, {
+              __link: '__ROOT',
+              __typename: 'Query',
+            }).counter,
+          ).toBe(12);
+        });
+
+        test('merges child NetworkResponseStoreLayer', () => {
+          addOptimisticStoreLayer(environment, (counter) => counter + 1);
+          const revert = addOptimisticStoreLayer(
+            environment,
+            (counter) => counter + 1,
+          );
+          addNetworkResponseStoreLayer(environment, 12);
+          revert(null);
+
+          expect(environment.store).toMatchObject({
+            kind: 'NetworkResponseStoreLayer',
+            parentStoreLayer: {
+              kind: 'OptimisticStoreLayer',
+              parentStoreLayer: {
+                kind: 'BaseStoreLayer',
+              },
+            },
+          });
+
+          expect(
+            readOptimisticRecord(environment.store, {
+              __link: '__ROOT',
+              __typename: 'Query',
+            }).counter,
+          ).toBe(12);
+        });
+
+        test('removes self and merges two adjacent NetworkResponseStoreLayers', () => {
+          addOptimisticStoreLayer(environment, (counter) => counter + 1);
+          addNetworkResponseStoreLayer(environment, 10);
+          const revert = addOptimisticStoreLayer(
+            environment,
+            (counter) => counter + 1,
+          );
+          addNetworkResponseStoreLayer(environment, 12);
+          revert(null);
+
+          expect(environment.store).toMatchObject({
+            kind: 'NetworkResponseStoreLayer',
+            parentStoreLayer: {
+              kind: 'OptimisticStoreLayer',
+              parentStoreLayer: {
+                kind: 'BaseStoreLayer',
+              },
+            },
+          });
+
+          expect(
+            readOptimisticRecord(environment.store, {
+              __link: '__ROOT',
+              __typename: 'Query',
+            }).counter,
+          ).toBe(12);
+        });
+      });
+
+      describe('has parent OptimisticStoreLayer', () => {
+        test('removes self', () => {
+          addOptimisticStoreLayer(environment, (counter) => counter + 1);
+          const revert = addOptimisticStoreLayer(
+            environment,
+            (counter) => counter + 1,
+          );
+
+          revert(null);
+
+          expect(environment.store).toMatchObject({
+            kind: 'OptimisticStoreLayer',
+            parentStoreLayer: {
+              kind: 'BaseStoreLayer',
+            },
+          });
+
+          expect(
+            readOptimisticRecord(environment.store, {
+              __link: '__ROOT',
+              __typename: 'Query',
+            }).counter,
+          ).toBe(1);
+        });
+
+        test("doesn't merge child nodes if has parent nodes", () => {
+          addOptimisticStoreLayer(environment, (counter) => counter + 1);
+          const revert = addOptimisticStoreLayer(
+            environment,
+            (counter) => counter + 1,
+          );
+          addStartUpdateStoreLayer(environment, (counter) => counter + 1);
+
+          revert(null);
+
+          expect(environment.store).toMatchObject({
+            kind: 'StartUpdateStoreLayer',
+            parentStoreLayer: {
+              kind: 'OptimisticStoreLayer',
+              parentStoreLayer: {
+                kind: 'BaseStoreLayer',
+              },
+            },
+          });
+
+          expect(
+            readOptimisticRecord(environment.store, {
+              __link: '__ROOT',
+              __typename: 'Query',
+            }).counter,
+          ).toBe(2);
+        });
+      });
+    });
   });
 
   // utils
@@ -499,8 +804,13 @@ describe('optimisticLayer', () => {
       },
     );
     environment.store = node;
-    return (counter: number) => {
-      revert(environment, (storeLayer) => update(storeLayer, () => counter));
+    return (counter: null | number) => {
+      revert(
+        environment,
+        counter === null
+          ? counter
+          : (storeLayer) => update(storeLayer, () => counter),
+      );
     };
   }
 

@@ -214,7 +214,7 @@ export function addOptimisticStoreLayer(
         node,
         revert: (
           environment: IsographEnvironment,
-          normalizeData: (storeLayer: StoreLayer) => EncounteredIds,
+          normalizeData: null | ((storeLayer: StoreLayer) => EncounteredIds),
         ): void => {
           replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
             environment,
@@ -243,7 +243,11 @@ function mergeChildNodes(
 }
 
 function reexecuteUpdates(
-  initialNode: OptimisticStoreLayer | StartUpdateStoreLayer | null,
+  initialNode:
+    | OptimisticStoreLayer
+    | NetworkResponseStoreLayer
+    | StartUpdateStoreLayer
+    | null,
   oldData: StoreLayerData,
   newData: StoreLayerData,
 ): void {
@@ -294,36 +298,39 @@ function setChildOfNode<TStoreLayer extends StoreLayer>(
 function replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
   environment: IsographEnvironment,
   optimisticNode: OptimisticStoreLayer,
-  normalizeData: (storeLayer: StoreLayerWithData) => void,
+  normalizeData: null | ((storeLayer: StoreLayerWithData) => void),
 ): void {
   const oldData = optimisticNode.data;
   // we cannot replace the optimistic node with the network response directly
   // because of the types so we have to:
   // 1. reset the optimistic node
   optimisticNode.data = {};
-  // 2. append the network response as child
-  const networkResponseNode: NetworkResponseStoreLayer = {
-    kind: 'NetworkResponseStoreLayer',
-    data: {},
-    parentStoreLayer: optimisticNode,
-    childStoreLayer: null,
-  };
-  normalizeData(networkResponseNode);
-
+  // 2. append the network response as child if no network error
+  // otherwise operate on child node
+  let networkResponseNode = optimisticNode.childStoreLayer;
+  let newData = {};
   let childNode = optimisticNode.childStoreLayer;
+  if (normalizeData !== null) {
+    networkResponseNode = {
+      kind: 'NetworkResponseStoreLayer',
+      data: {},
+      parentStoreLayer: optimisticNode,
+      childStoreLayer: null,
+    };
+    normalizeData(networkResponseNode);
 
-  if (childNode?.kind === 'NetworkResponseStoreLayer') {
-    mergeDataLayer(networkResponseNode.data, childNode.data);
-    mergeDataLayer(oldData, childNode.data);
-    childNode = childNode.childStoreLayer;
+    if (childNode?.kind === 'NetworkResponseStoreLayer') {
+      mergeDataLayer(networkResponseNode.data, childNode.data);
+      mergeDataLayer(oldData, childNode.data);
+      childNode = childNode.childStoreLayer;
+    }
+    newData = structuredClone(networkResponseNode.data);
+    setChildOfNode(environment, networkResponseNode, childNode);
+    optimisticNode.childStoreLayer = networkResponseNode;
   }
-  const newData = structuredClone(networkResponseNode.data);
-
-  setChildOfNode(environment, networkResponseNode, childNode);
-  optimisticNode.childStoreLayer = networkResponseNode;
 
   // reexecute all updates after the network response
-  reexecuteUpdates(networkResponseNode.childStoreLayer, oldData, newData);
+  reexecuteUpdates(childNode, oldData, newData);
   // merge the child nodes if possible and remove them or remove the optimistic node
   if (optimisticNode.parentStoreLayer.kind === 'BaseStoreLayer') {
     const childOptimisticNode = mergeChildNodes(
@@ -337,7 +344,8 @@ function replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
       childOptimisticNode,
     );
   } else if (
-    optimisticNode.parentStoreLayer.kind === 'NetworkResponseStoreLayer'
+    optimisticNode.parentStoreLayer.kind === 'NetworkResponseStoreLayer' &&
+    networkResponseNode?.kind === 'NetworkResponseStoreLayer'
   ) {
     mergeDataLayer(
       optimisticNode.parentStoreLayer.data,
@@ -350,8 +358,11 @@ function replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
       networkResponseNode.childStoreLayer,
     );
   } else {
-    optimisticNode.parentStoreLayer.childStoreLayer = networkResponseNode;
-    networkResponseNode.parentStoreLayer = optimisticNode.parentStoreLayer;
+    setChildOfNode(
+      environment,
+      optimisticNode.parentStoreLayer,
+      networkResponseNode,
+    );
   }
 
   let encounteredIds: EncounteredIds = new Map();
