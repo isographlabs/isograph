@@ -236,20 +236,6 @@ pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>
     ),
     TNetworkProtocol,
 > {
-    let query_id = fetchable_types(db)
-        .try_lookup()
-        .map_err(|e| {
-            WithSpan::new(
-                ProcessClientFieldDeclarationError::ParseTypeSystemDocumentsError(e),
-                Span::todo_generated(),
-            )
-        })?
-        .lookup()
-        .iter()
-        .find(|(_, root_operation_name)| root_operation_name.0 == "query")
-        .expect("Expected query to be found")
-        .0;
-
     let client_scalar_selectable_name = client_field_declaration.item.client_field_name.item;
 
     let variant = get_client_variant(&client_field_declaration.item);
@@ -288,58 +274,8 @@ pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>
 
     let selections = client_field_declaration.item.selection_set;
 
-    let is_fetchable = fetchable_types(db)
-        .lookup()
-        .as_ref()
-        .expect(
-            "Expected parsing to have succeeded. \
-            This is indicative of a bug in Isograph.",
-        )
-        .lookup()
-        .contains_key(&client_field_declaration.item.parent_type.item.0);
-
-    let refetch_strategy = if is_fetchable {
-        Some(RefetchStrategy::RefetchFromRoot)
-    } else {
-        let id_field = server_selectable_named(
-            db,
-            client_field_declaration.item.parent_type.item.0,
-            (*ID_FIELD_NAME).into(),
-        )
-        // TODO don't call to_owned
-        .to_owned()
-        .map_err(|e| {
-            WithSpan::new(
-                ProcessClientFieldDeclarationError::ServerSelectableNamedError(e),
-                Span::todo_generated(),
-            )
-        })?
-        .transpose()
-        .map_err(|e| {
-            WithSpan::new(
-                ProcessClientFieldDeclarationError::FieldToInsertToServerSelectableError(e),
-                Span::todo_generated(),
-            )
-        })?;
-
-        id_field.map(|_| {
-            // Assume that if we have an id field, this implements Node
-            RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
-                vec![id_selection()],
-                *query_id,
-                vec![
-                    WrappedSelectionMapSelection::InlineFragment(
-                        client_field_declaration.item.parent_type.item.0,
-                    ),
-                    WrappedSelectionMapSelection::LinkedField {
-                        server_object_selectable_name: *NODE_FIELD_NAME,
-                        arguments: id_top_level_arguments(),
-                        concrete_type: None,
-                    },
-                ],
-            ))
-        })
-    };
+    let parent_object_entity_name = client_field_declaration.item.parent_type.item.0;
+    let refetch_strategy = get_unvalidated_refetch_stategy(db, parent_object_entity_name)?;
 
     Ok((
         UnprocessedClientScalarSelectableSelectionSet {
@@ -350,6 +286,74 @@ pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>
         },
         selectable,
     ))
+}
+
+pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    parent_object_entity_name: ServerObjectEntityName,
+) -> ProcessClientFieldDeclarationResult<Option<RefetchStrategy<(), ()>>, TNetworkProtocol> {
+    let is_fetchable = fetchable_types(db)
+        .lookup()
+        .as_ref()
+        .expect(
+            "Expected parsing to have succeeded. \
+            This is indicative of a bug in Isograph.",
+        )
+        .lookup()
+        .contains_key(&parent_object_entity_name);
+
+    let refetch_strategy = if is_fetchable {
+        Some(RefetchStrategy::RefetchFromRoot)
+    } else {
+        let id_field =
+            server_selectable_named(db, parent_object_entity_name, (*ID_FIELD_NAME).into())
+                // TODO don't call to_owned
+                .to_owned()
+                .map_err(|e| {
+                    WithSpan::new(
+                        ProcessClientFieldDeclarationError::ServerSelectableNamedError(e),
+                        Span::todo_generated(),
+                    )
+                })?
+                .transpose()
+                .map_err(|e| {
+                    WithSpan::new(
+                        ProcessClientFieldDeclarationError::FieldToInsertToServerSelectableError(e),
+                        Span::todo_generated(),
+                    )
+                })?;
+
+        let query_id = fetchable_types(db)
+            .try_lookup()
+            .map_err(|e| {
+                WithSpan::new(
+                    ProcessClientFieldDeclarationError::ParseTypeSystemDocumentsError(e),
+                    Span::todo_generated(),
+                )
+            })?
+            .lookup()
+            .iter()
+            .find(|(_, root_operation_name)| root_operation_name.0 == "query")
+            .expect("Expected query to be found")
+            .0;
+
+        id_field.map(|_| {
+            // Assume that if we have an id field, this implements Node
+            RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
+                vec![id_selection()],
+                *query_id,
+                vec![
+                    WrappedSelectionMapSelection::InlineFragment(parent_object_entity_name),
+                    WrappedSelectionMapSelection::LinkedField {
+                        server_object_selectable_name: *NODE_FIELD_NAME,
+                        arguments: id_top_level_arguments(),
+                        concrete_type: None,
+                    },
+                ],
+            ))
+        })
+    };
+    Ok(refetch_strategy)
 }
 
 fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol>(
