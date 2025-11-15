@@ -60,25 +60,11 @@ export function maybeMakeNetworkRequest<
       );
     }
     case 'No': {
-      let status: NetworkRequestStatus = {
-        kind: 'Undisposed',
-        retainedQuery: fetchNormalizationAstAndRetainArtifact(
-          environment,
-          artifact,
-          variables,
-        ),
-      };
-      return [
-        wrapResolvedValue(undefined),
-        () => {
-          if (status.kind === 'Undisposed') {
-            unretainAndGarbageCollect(environment, status);
-          }
-          status = {
-            kind: 'Disposed',
-          };
-        },
-      ];
+      return retainQueryWithoutMakingNetworkRequest(
+        environment,
+        artifact,
+        variables,
+      );
     }
     case 'IfNecessary': {
       if (
@@ -100,25 +86,11 @@ export function maybeMakeNetworkRequest<
       );
 
       if (result.kind === 'EnoughData') {
-        let status: NetworkRequestStatus = {
-          kind: 'Undisposed',
-          retainedQuery: fetchNormalizationAstAndRetainArtifact(
-            environment,
-            artifact,
-            variables,
-          ),
-        };
-        return [
-          wrapResolvedValue(undefined),
-          () => {
-            if (status.kind === 'Undisposed') {
-              unretainAndGarbageCollect(environment, status);
-            }
-            status = {
-              kind: 'Disposed',
-            };
-          },
-        ];
+        return retainQueryWithoutMakingNetworkRequest(
+          environment,
+          artifact,
+          variables,
+        );
       } else {
         return makeNetworkRequest(
           environment,
@@ -130,6 +102,41 @@ export function maybeMakeNetworkRequest<
       }
     }
   }
+}
+
+function retainQueryWithoutMakingNetworkRequest<
+  TReadFromStore extends UnknownTReadFromStore,
+  TClientFieldValue,
+>(
+  environment: IsographEnvironment,
+  artifact:
+    | RefetchQueryNormalizationArtifact
+    | IsographEntrypoint<
+        TReadFromStore,
+        TClientFieldValue,
+        NormalizationAst | NormalizationAstLoader
+      >,
+  variables: ExtractParameters<TReadFromStore>,
+): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
+  let status: NetworkRequestStatus = {
+    kind: 'Undisposed',
+    retainedQuery: fetchNormalizationAstAndRetainArtifact(
+      environment,
+      artifact,
+      variables,
+    ),
+  };
+  return [
+    wrapResolvedValue(undefined),
+    () => {
+      if (status.kind === 'Undisposed') {
+        unretainAndGarbageCollect(environment, status);
+      }
+      status = {
+        kind: 'Disposed',
+      };
+    },
+  ];
 }
 
 export function makeNetworkRequest<
