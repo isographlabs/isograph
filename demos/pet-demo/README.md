@@ -8,34 +8,25 @@ In the root of this repository, run:
 
 ```sh
 pnpm i
-pnpm -r compile
 ```
 
-You must have `pnpm` installed.
+You must have `pnpm`, `cargo`, `bacon`, and `rust`. See [the development instructions](https://isograph.dev/docs/development-workflow/).
 
 ## Running the app
 
-In order to run the demo, run the following commands in two separate terminals from the `demos/pet-demo` folder:
+You should run two commands, in separate terminals, both from the root of the repository:
 
 ```sh
-npm run backend
+pnpm watch-libs
+pnpm dev-pet-demo
 ```
+
+Alternatively, you could run, in separate terminals:
 
 ```sh
-pnpm run start
+cd demos/pet-demo && pnpm iso --watch
+pnpm watch-libs
+pnpm watch-rs
+cd demos/pet-demo && pnpm backend
+cd demos/pet-demo && pnpm dev
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the demo in action.
-
-## Modifying the app
-
-You must also run the compiler from the root of the repository:
-
-```sh
-cargo build
-pnpm run watch-pet-demo
-```
-
-Changes to the `libs/*` folders must be followed by a `pnpm -r compile`.
-
-Changes to the components in the demo will automatically be picked up by Next, but you will probably have to manually refresh the page.
