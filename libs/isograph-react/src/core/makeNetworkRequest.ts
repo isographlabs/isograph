@@ -62,7 +62,11 @@ export function maybeMakeNetworkRequest<
     case 'No': {
       let status: NetworkRequestStatus = {
         kind: 'UndisposedIncomplete',
-        retainedQuery: retainArtifact(environment, artifact, variables),
+        retainedQuery: fetchNormalizationAstAndRetainArtifact(
+          environment,
+          artifact,
+          variables,
+        ),
       };
       return [
         wrapResolvedValue(undefined),
@@ -96,7 +100,11 @@ export function maybeMakeNetworkRequest<
       if (result.kind === 'EnoughData') {
         let status: NetworkRequestStatus = {
           kind: 'UndisposedIncomplete',
-          retainedQuery: retainArtifact(environment, artifact, variables),
+          retainedQuery: fetchNormalizationAstAndRetainArtifact(
+            environment,
+            artifact,
+            variables,
+          ),
         };
         return [
           wrapResolvedValue(undefined),
@@ -141,7 +149,11 @@ export function makeNetworkRequest<
   networkRequestId++;
   let status: NetworkRequestStatus = {
     kind: 'UndisposedIncomplete',
-    retainedQuery: retainArtifact(environment, artifact, variables),
+    retainedQuery: fetchNormalizationAstAndRetainArtifact(
+      environment,
+      artifact,
+      variables,
+    ),
   };
 
   logMessage(environment, () => ({
@@ -347,7 +359,7 @@ function readDataForOnComplete<
   return null;
 }
 
-function retainArtifact<
+function fetchNormalizationAstAndRetainArtifact<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
 >(
