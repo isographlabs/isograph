@@ -278,6 +278,19 @@ function reexecuteUpdates(
   }
 }
 
+function setChildOfNode<TStoreLayer extends StoreLayer>(
+  environment: IsographEnvironment,
+  node: TStoreLayer,
+  newChild: TStoreLayer['childStoreLayer'],
+) {
+  node.childStoreLayer = newChild;
+  if (newChild) {
+    newChild.parentStoreLayer = node;
+  } else {
+    environment.store = node;
+  }
+}
+
 function replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
   environment: IsographEnvironment,
   optimisticNode: OptimisticStoreLayer,
@@ -306,12 +319,7 @@ function replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
   }
   const newData = structuredClone(networkResponseNode.data);
 
-  networkResponseNode.childStoreLayer = childNode;
-  if (childNode) {
-    childNode.parentStoreLayer = networkResponseNode;
-  } else {
-    environment.store = networkResponseNode;
-  }
+  setChildOfNode(environment, networkResponseNode, childNode);
   optimisticNode.childStoreLayer = networkResponseNode;
 
   // reexecute all updates after the network response
@@ -323,12 +331,11 @@ function replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
       optimisticNode.parentStoreLayer,
     );
 
-    optimisticNode.parentStoreLayer.childStoreLayer = childOptimisticNode;
-    if (childOptimisticNode) {
-      childOptimisticNode.parentStoreLayer = optimisticNode.parentStoreLayer;
-    } else {
-      environment.store = optimisticNode.parentStoreLayer;
-    }
+    setChildOfNode(
+      environment,
+      optimisticNode.parentStoreLayer,
+      childOptimisticNode,
+    );
   } else if (
     optimisticNode.parentStoreLayer.kind == 'NetworkResponseStoreLayer'
   ) {
@@ -336,14 +343,12 @@ function replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
       optimisticNode.parentStoreLayer.data,
       networkResponseNode.data,
     );
-    optimisticNode.parentStoreLayer.childStoreLayer =
-      networkResponseNode.childStoreLayer;
-    if (networkResponseNode.childStoreLayer) {
-      networkResponseNode.childStoreLayer.parentStoreLayer =
-        optimisticNode.parentStoreLayer;
-    } else {
-      environment.store = optimisticNode.parentStoreLayer;
-    }
+
+    setChildOfNode(
+      environment,
+      optimisticNode.parentStoreLayer,
+      networkResponseNode.childStoreLayer,
+    );
   } else {
     optimisticNode.parentStoreLayer.childStoreLayer = networkResponseNode;
     networkResponseNode.parentStoreLayer = optimisticNode.parentStoreLayer;
