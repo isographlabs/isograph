@@ -11,6 +11,8 @@ import {
   addOptimisticStoreLayer as addOptimisticStoreLayerInner,
   addStartUpdateStoreLayer as addStartUpdateStoreLayerInner,
   readOptimisticRecord,
+  replaceOptimisticStoreLayerWithNetworkResponseStoreLayer,
+  type OptimisticStoreLayer,
   type StoreLayer,
 } from '../core/optimisticProxy';
 
@@ -133,7 +135,7 @@ describe('optimisticLayer', () => {
       });
 
       test('calls subscriptions if nodes update different fields', () => {
-        const { revert, node } = addOptimisticStoreLayerInner(
+        const node = addOptimisticStoreLayerInner(
           environment.store,
           (storeLayer) => {
             ignoreReadonly(storeLayer).data = {
@@ -161,12 +163,16 @@ describe('optimisticLayer', () => {
           },
         );
 
-        revert(environment, (storeLayer) => {
-          ignoreReadonly(storeLayer).data = {
-            Query: { __ROOT: { surname: 'bar' } },
-          };
-          return CHANGES;
-        });
+        replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
+          environment,
+          node,
+          (storeLayer) => {
+            ignoreReadonly(storeLayer).data = {
+              Query: { __ROOT: { surname: 'bar' } },
+            };
+            return CHANGES;
+          },
+        );
 
         expect(callSubscriptions).toHaveBeenCalledTimes(1);
         expect(callSubscriptions).toHaveBeenNthCalledWith(
@@ -177,7 +183,7 @@ describe('optimisticLayer', () => {
       });
 
       test('calls subscriptions if reverted unrelated field', () => {
-        const { revert, node } = addOptimisticStoreLayerInner(
+        const node = addOptimisticStoreLayerInner(
           environment.store,
           (storeLayer) => {
             ignoreReadonly(storeLayer).data = {
@@ -198,10 +204,14 @@ describe('optimisticLayer', () => {
           },
         );
 
-        revert(environment, (storeLayer) => {
-          ignoreReadonly(storeLayer).data = {};
-          return new Map();
-        });
+        replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
+          environment,
+          node,
+          (storeLayer) => {
+            ignoreReadonly(storeLayer).data = {};
+            return new Map();
+          },
+        );
 
         expect(callSubscriptions).toHaveBeenCalledTimes(1);
         expect(callSubscriptions).toHaveBeenNthCalledWith(
@@ -489,7 +499,7 @@ describe('optimisticLayer', () => {
         });
 
         test('calls subscriptions if reverted unrelated field', () => {
-          const { revert, node } = addOptimisticStoreLayerInner(
+          const node = addOptimisticStoreLayerInner(
             environment.store,
             (storeLayer) => {
               ignoreReadonly(storeLayer).data = {
@@ -510,7 +520,7 @@ describe('optimisticLayer', () => {
             },
           );
 
-          revert(environment, null);
+          revert(environment, node, null);
 
           expect(callSubscriptions).toHaveBeenCalledTimes(1);
           expect(callSubscriptions).toHaveBeenNthCalledWith(
@@ -797,7 +807,7 @@ describe('optimisticLayer', () => {
     environment: IsographEnvironment,
     updater: (prev: number) => number,
   ) {
-    const { revert, node } = addOptimisticStoreLayerInner(
+    const node = addOptimisticStoreLayerInner(
       environment.store,
       (storeLayer) => {
         return update(storeLayer, updater);
@@ -805,13 +815,22 @@ describe('optimisticLayer', () => {
     );
     environment.store = node;
     return (counter: null | number) => {
-      revert(
-        environment,
-        counter === null
-          ? counter
-          : (storeLayer) => update(storeLayer, () => counter),
-      );
+      revert(environment, node, counter);
     };
+  }
+
+  function revert(
+    environment: IsographEnvironment,
+    node: OptimisticStoreLayer,
+    counter: null | number,
+  ) {
+    return replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
+      environment,
+      node,
+      counter === null
+        ? counter
+        : (storeLayer) => update(storeLayer, () => counter),
+    );
   }
 
   function addStartUpdateStoreLayer(

@@ -193,7 +193,7 @@ export function addStartUpdateStoreLayer(
 export function addOptimisticStoreLayer(
   parent: StoreLayer,
   startUpdate: OptimisticStoreLayer['startUpdate'],
-) {
+): OptimisticStoreLayer {
   switch (parent.kind) {
     case 'BaseStoreLayer':
     case 'StartUpdateStoreLayer':
@@ -210,19 +210,7 @@ export function addOptimisticStoreLayer(
       startUpdate(node);
       parent.childStoreLayer = node;
 
-      return {
-        node,
-        revert: (
-          environment: IsographEnvironment,
-          normalizeData: null | ((storeLayer: StoreLayer) => EncounteredIds),
-        ): void => {
-          replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
-            environment,
-            node,
-            normalizeData,
-          );
-        },
-      };
+      return node;
     }
     default: {
       parent satisfies never;
@@ -295,7 +283,7 @@ function setChildOfNode<TStoreLayer extends StoreLayer>(
   }
 }
 
-function replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
+export function replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
   environment: IsographEnvironment,
   optimisticNode: OptimisticStoreLayer,
   normalizeData: null | ((storeLayer: StoreLayerWithData) => void),
