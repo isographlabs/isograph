@@ -99,12 +99,17 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
         SelectionType::Scalar(client_scalar_selectable.type_and_field),
     )?;
 
-    let refetch_strategy = get_validated_refetch_strategy(
-        db,
-        unprocessed_scalar_selection_set.refetch_strategy,
-        parent_object_entity,
-        SelectionType::Scalar(client_scalar_selectable.type_and_field),
-    )?;
+    let refetch_strategy = unprocessed_scalar_selection_set
+        .refetch_strategy
+        .map(|refetch_strategy| {
+            get_validated_refetch_strategy(
+                db,
+                refetch_strategy,
+                parent_object_entity,
+                SelectionType::Scalar(client_scalar_selectable.type_and_field),
+            )
+        })
+        .transpose()?;
 
     let client_field = schema
         .client_scalar_selectable_mut(
@@ -490,18 +495,18 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
 
 fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    refetch_strategy: Option<RefetchStrategy<(), ()>>,
+    unvalidated_refetch_strategy: RefetchStrategy<(), ()>,
     parent_object: &ServerObjectEntity<TNetworkProtocol>,
     top_level_field_or_pointer: SelectionType<
         ParentObjectEntityNameAndSelectableName,
         ParentObjectEntityNameAndSelectableName,
     >,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<
-    Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>,
+    RefetchStrategy<ScalarSelectableId, ObjectSelectableId>,
     TNetworkProtocol,
 > {
-    match refetch_strategy {
-        Some(RefetchStrategy::UseRefetchField(use_refetch_field_strategy)) => Ok(Some(
+    match unvalidated_refetch_strategy {
+        RefetchStrategy::UseRefetchField(use_refetch_field_strategy) => Ok(
             RefetchStrategy::UseRefetchField(UseRefetchFieldRefetchStrategy {
                 refetch_selection_set: get_validated_selection_set(
                     db,
@@ -512,9 +517,8 @@ fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol>(
                 root_fetchable_type_name: use_refetch_field_strategy.root_fetchable_type_name,
                 generate_refetch_query: use_refetch_field_strategy.generate_refetch_query,
             }),
-        )),
-        Some(RefetchStrategy::RefetchFromRoot) => Ok(Some(RefetchStrategy::RefetchFromRoot)),
-        None => Ok(None),
+        ),
+        RefetchStrategy::RefetchFromRoot => Ok(RefetchStrategy::RefetchFromRoot),
     }
 }
 
