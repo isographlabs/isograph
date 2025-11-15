@@ -299,26 +299,26 @@ export function replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
   optimisticNode.data = {};
   // 2. append the network response as child if no network error
   // otherwise operate on child node
-  let networkResponseNode = optimisticNode.childStoreLayer;
+
   let newData = {};
   let childNode = optimisticNode.childStoreLayer;
   if (normalizeData !== null) {
-    networkResponseNode = {
+    const networkResponse: NetworkResponseStoreLayer = {
       kind: 'NetworkResponseStoreLayer',
       data: {},
       parentStoreLayer: optimisticNode,
       childStoreLayer: null,
     };
-    normalizeData(networkResponseNode);
+    normalizeData(networkResponse);
 
     if (childNode?.kind === 'NetworkResponseStoreLayer') {
-      mergeDataLayer(networkResponseNode.data, childNode.data);
+      mergeDataLayer(networkResponse.data, childNode.data);
       mergeDataLayer(oldData, childNode.data);
       childNode = childNode.childStoreLayer;
     }
-    newData = structuredClone(networkResponseNode.data);
-    setChildOfNode(environment, networkResponseNode, childNode);
-    optimisticNode.childStoreLayer = networkResponseNode;
+    newData = structuredClone(networkResponse.data);
+    setChildOfNode(environment, networkResponse, childNode);
+    optimisticNode.childStoreLayer = networkResponse;
   }
 
   // reexecute all updates after the network response
@@ -337,23 +337,23 @@ export function replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
     );
   } else if (
     optimisticNode.parentStoreLayer.kind === 'NetworkResponseStoreLayer' &&
-    networkResponseNode?.kind === 'NetworkResponseStoreLayer'
+    optimisticNode.childStoreLayer?.kind === 'NetworkResponseStoreLayer'
   ) {
     mergeDataLayer(
       optimisticNode.parentStoreLayer.data,
-      networkResponseNode.data,
+      optimisticNode.childStoreLayer.data,
     );
 
     setChildOfNode(
       environment,
       optimisticNode.parentStoreLayer,
-      networkResponseNode.childStoreLayer,
+      optimisticNode.childStoreLayer.childStoreLayer,
     );
   } else {
     setChildOfNode(
       environment,
       optimisticNode.parentStoreLayer,
-      networkResponseNode,
+      optimisticNode.childStoreLayer,
     );
   }
 
