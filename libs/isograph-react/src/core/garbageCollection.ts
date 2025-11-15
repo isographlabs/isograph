@@ -41,10 +41,9 @@ export function unretainQuery(
   retainedQuery: RetainedQuery,
 ): DidUnretainSomeQuery {
   environment.retainedQueries.delete(retainedQuery);
+  environment.gcBuffer.push(retainedQuery);
 
-  if (isRetainedQueryWithNormalizationAst(retainedQuery)) {
-    environment.gcBuffer.push(retainedQuery);
-  } else if (environment.gcBuffer.length > environment.gcBufferSize) {
+  if (environment.gcBuffer.length > environment.gcBufferSize) {
     environment.gcBuffer.shift();
     return true;
   }
@@ -65,16 +64,22 @@ export function retainQuery(
 export function garbageCollectEnvironment(environment: IsographEnvironment) {
   const retainedIds: RetainedIds = {};
 
+  const retainedQueries: RetainedQueryWithNormalizationAst[] = [];
   for (const query of environment.retainedQueries) {
-    if (isRetainedQueryWithNormalizationAst(query)) {
-      recordReachableIds(environment.store, query, retainedIds);
-    } else {
-      // if we have any queries with loading normalizationAst, we can't garbage collect
+    if (!isRetainedQueryWithNormalizationAst(query)) {
       return;
     }
+    retainedQueries.push(query);
   }
 
   for (const query of environment.gcBuffer) {
+    if (!isRetainedQueryWithNormalizationAst(query)) {
+      return;
+    }
+    retainedQueries.push(query);
+  }
+
+  for (const query of retainedQueries) {
     recordReachableIds(environment.store, query, retainedIds);
   }
 
