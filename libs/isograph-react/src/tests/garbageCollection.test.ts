@@ -7,14 +7,14 @@ import {
 import {
   createIsographEnvironment,
   ROOT_ID,
-  type IsographStore,
+  type BaseStoreLayerData,
 } from '../core/IsographEnvironment';
 import { wrapResolvedValue } from '../core/PromiseWrapper';
 import { iso } from './__isograph/iso';
 import { meNameSuccessorRetainedQuery } from './meNameSuccessor';
 import { nodeFieldRetainedQuery } from './nodeQuery';
 
-const getDefaultStore = (): IsographStore => ({
+const getDefaultStore = (): BaseStoreLayerData => ({
   Query: {
     [ROOT_ID]: {
       me: { __link: '0', __typename: 'Economist' },
