@@ -1,14 +1,18 @@
 use std::collections::{HashMap, hash_map::Entry};
 
-use common_lang_types::{ClientSelectableName, ServerObjectEntityName, WithSpan};
+use common_lang_types::{
+    ClientSelectableName, ParentObjectEntityNameAndSelectableName, ServerObjectEntityName,
+    WithLocation, WithSpan,
+};
 use isograph_lang_types::SelectionType;
 use pico_macros::legacy_memo;
 use thiserror::Error;
 
 use crate::{
-    IsographDatabase, MemoizedIsoLiteralError, NetworkProtocol, ProcessClientFieldDeclarationError,
-    RefetchStrategy, client_selectable_declaration_map_from_iso_literals, expose_field_map,
-    get_unvalidated_refetch_stategy,
+    AddSelectionSetsError, IsographDatabase, MemoizedIsoLiteralError, NetworkProtocol,
+    ObjectSelectableId, ProcessClientFieldDeclarationError, RefetchStrategy, ScalarSelectableId,
+    client_selectable_declaration_map_from_iso_literals, expose_field_map,
+    get_unvalidated_refetch_stategy, get_validated_refetch_strategy,
 };
 
 #[expect(clippy::type_complexity)]
@@ -18,7 +22,10 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
 ) -> Result<
     HashMap<
         (ServerObjectEntityName, ClientSelectableName),
-        Result<Option<RefetchStrategy<(), ()>>, RefetchStrategyAccessError<TNetworkProtocol>>,
+        Result<
+            Option<SelectionType<RefetchStrategy<(), ()>, RefetchStrategy<(), ()>>>,
+            RefetchStrategyAccessError<TNetworkProtocol>,
+        >,
     >,
     RefetchStrategyAccessError<TNetworkProtocol>,
 > {
@@ -44,8 +51,9 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                 }
                 Entry::Vacant(vacant_entry) => match item {
                     SelectionType::Scalar(_) => {
-                        let refetch_strategy =
-                            get_unvalidated_refetch_stategy(db, key.0).map_err(|e| e.into());
+                        let refetch_strategy = get_unvalidated_refetch_stategy(db, key.0)
+                            .map_err(|e| e.into())
+                            .map(|x| x.map(SelectionType::Scalar));
                         vacant_entry.insert(refetch_strategy);
                     }
                     SelectionType::Object(o) => {
@@ -54,7 +62,8 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                         // This is extremely weird, and we should fix this!
                         let refetch_strategy =
                             get_unvalidated_refetch_stategy(db, o.target_type.inner().0)
-                                .map_err(|e| e.into());
+                                .map_err(|e| e.into())
+                                .map(|x| x.map(SelectionType::Object));
                         vacant_entry.insert(refetch_strategy);
                     }
                 },
@@ -71,12 +80,67 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                 });
             }
             Entry::Vacant(vacant_entry) => {
-                vacant_entry.insert(Ok(selection_set.refetch_strategy.clone()));
+                vacant_entry.insert(Ok(selection_set
+                    .refetch_strategy
+                    .clone()
+                    .map(SelectionType::Scalar)));
             }
         }
     }
 
     Ok(out)
+}
+
+pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+) -> Result<
+    HashMap<
+        (ServerObjectEntityName, ClientSelectableName),
+        Result<
+            Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>,
+            RefetchStrategyAccessError<TNetworkProtocol>,
+        >,
+    >,
+    RefetchStrategyAccessError<TNetworkProtocol>,
+> {
+    let map = unvalidated_refetch_strategy_map(db).lookup().clone()?;
+
+    Ok(map
+        .into_iter()
+        .map(|(key, value)| {
+            let value: Result<_, RefetchStrategyAccessError<_>> = value.and_then(|opt| match opt {
+                Some(selection_type) => match selection_type {
+                    SelectionType::Scalar(refetch_strategy) => Ok(Some(
+                        get_validated_refetch_strategy(
+                            db,
+                            refetch_strategy,
+                            key.0,
+                            SelectionType::Scalar(ParentObjectEntityNameAndSelectableName::new(
+                                key.0,
+                                key.1.into(),
+                            )),
+                        )
+                        .map_err(|e| RefetchStrategyAccessError::ValidateAddSelectionSetsResultWithMultipleErrors { errors: e })?,
+                    )),
+                    SelectionType::Object(refetch_strategy) => Ok(Some(
+                        get_validated_refetch_strategy(
+                            db,
+                            refetch_strategy,
+                            key.0,
+                            SelectionType::Object(ParentObjectEntityNameAndSelectableName::new(
+                                key.0,
+                                key.1.into(),
+                            )),
+                        )
+                        .map_err(|e| RefetchStrategyAccessError::ValidateAddSelectionSetsResultWithMultipleErrors { errors: e })?,
+                    )),
+                },
+                None => Ok(None),
+            });
+
+            (key, value)
+        })
+        .collect())
 }
 
 #[derive(Clone, Error, Eq, PartialEq, Debug)]
@@ -93,5 +157,13 @@ pub enum RefetchStrategyAccessError<TNetworkProtocol: NetworkProtocol> {
     DuplicateDefinition {
         parent_object_entity_name: ServerObjectEntityName,
         client_selectable_name: ClientSelectableName,
+    },
+
+    #[error("{0}", 
+        errors.iter().map(|error| format!("{}", error.for_display())).collect::<Vec<_>>().join("\n")
+    )]
+    ValidateAddSelectionSetsResultWithMultipleErrors {
+        #[from]
+        errors: Vec<WithLocation<AddSelectionSetsError<TNetworkProtocol>>>,
     },
 }

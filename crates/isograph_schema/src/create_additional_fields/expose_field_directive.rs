@@ -98,7 +98,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
             // TODO propagate this errors instead of panicking
             .expect(
                 "Expected selectable to exist. \
-            This is indicative of a bug in Isograph.",
+                This is indicative of a bug in Isograph.",
             )
             .as_ref()
             .map_err(|e| e.clone())?
@@ -107,7 +107,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
             // TODO propagate this errors instead of panicking
             .expect(
                 "Expected selectable to be an object selectable. \
-            This is indicative of a bug in Isograph.",
+                This is indicative of a bug in Isograph.",
             );
 
     let payload_object_type_annotation = &mutation_field.target_object_entity;

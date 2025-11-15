@@ -40,4 +40,14 @@ impl ParentObjectEntityNameAndSelectableName {
             format!("../{field_name}/{file_type}")
         }
     }
+
+    pub fn new(
+        parent_object_entity_name: ServerObjectEntityName,
+        selectable_name: SelectableName,
+    ) -> Self {
+        Self {
+            parent_object_entity_name,
+            selectable_name,
+        }
+    }
 }

@@ -435,7 +435,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     })
 }
 
-fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol>(
+pub fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     unvalidated_refetch_strategy: RefetchStrategy<(), ()>,
     parent_object_entity_name: ServerObjectEntityName,
