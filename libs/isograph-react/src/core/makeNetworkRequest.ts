@@ -61,7 +61,7 @@ export function maybeMakeNetworkRequest<
     }
     case 'No': {
       let status: NetworkRequestStatus = {
-        kind: 'UndisposedIncomplete',
+        kind: 'Undisposed',
         retainedQuery: fetchNormalizationAstAndRetainArtifact(
           environment,
           artifact,
@@ -71,7 +71,7 @@ export function maybeMakeNetworkRequest<
       return [
         wrapResolvedValue(undefined),
         () => {
-          unretainAndGarbageCollectIfNotDisposed(environment, status);
+          unretainAndGarbageCollectIfUndisposed(environment, status);
           status = {
             kind: 'Disposed',
           };
@@ -99,7 +99,7 @@ export function maybeMakeNetworkRequest<
 
       if (result.kind === 'EnoughData') {
         let status: NetworkRequestStatus = {
-          kind: 'UndisposedIncomplete',
+          kind: 'Undisposed',
           retainedQuery: fetchNormalizationAstAndRetainArtifact(
             environment,
             artifact,
@@ -109,7 +109,7 @@ export function maybeMakeNetworkRequest<
         return [
           wrapResolvedValue(undefined),
           () => {
-            unretainAndGarbageCollectIfNotDisposed(environment, status);
+            unretainAndGarbageCollectIfUndisposed(environment, status);
             status = {
               kind: 'Disposed',
             };
@@ -148,7 +148,7 @@ export function makeNetworkRequest<
   const myNetworkRequestId = networkRequestId + '';
   networkRequestId++;
   let status: NetworkRequestStatus = {
-    kind: 'UndisposedIncomplete',
+    kind: 'Undisposed',
     retainedQuery: fetchNormalizationAstAndRetainArtifact(
       environment,
       artifact,
@@ -189,7 +189,7 @@ export function makeNetworkRequest<
       }
 
       const root = { __link: ROOT_ID, __typename: artifact.concreteType };
-      if (status.kind === 'UndisposedIncomplete') {
+      if (status.kind === 'Undisposed') {
         normalizeData(
           environment,
           normalizationAst.selections,
@@ -235,7 +235,7 @@ export function makeNetworkRequest<
   const response: ItemCleanupPair<PromiseWrapper<void, AnyError>> = [
     wrapper,
     () => {
-      unretainAndGarbageCollectIfNotDisposed(environment, status);
+      unretainAndGarbageCollectIfUndisposed(environment, status);
       status = {
         kind: 'Disposed',
       };
@@ -246,15 +246,11 @@ export function makeNetworkRequest<
 
 type NetworkRequestStatus =
   | {
-      readonly kind: 'UndisposedIncomplete';
+      readonly kind: 'Undisposed';
       readonly retainedQuery: RetainedQuery;
     }
   | {
       readonly kind: 'Disposed';
-    }
-  | {
-      readonly kind: 'UndisposedComplete';
-      readonly retainedQuery: RetainedQuery;
     };
 
 function readDataForOnComplete<
@@ -388,11 +384,11 @@ function fetchNormalizationAstAndRetainArtifact<
   return retainedQuery;
 }
 
-function unretainAndGarbageCollectIfNotDisposed(
+function unretainAndGarbageCollectIfUndisposed(
   environment: IsographEnvironment,
   status: NetworkRequestStatus,
 ) {
-  if (status.kind !== 'Disposed') {
+  if (status.kind === 'Undisposed') {
     const didUnretainSomeQuery = unretainQuery(
       environment,
       status.retainedQuery,
