@@ -10,7 +10,10 @@ import {
   type StableIdForFragmentReference,
   type UnknownTReadFromStore,
 } from './FragmentReference';
-import { RetainedQuery, type ReadyRetainedQuery } from './garbageCollection';
+import {
+  RetainedQuery,
+  type RetainedQueryWithNormalizationAst,
+} from './garbageCollection';
 import { LogFunction, WrappedLogFunction } from './logging';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { WithEncounteredRecords } from './read';
@@ -71,7 +74,7 @@ export type IsographEnvironment = {
     PromiseWrapper<IsographEntrypoint<any, any, any>>
   >;
   readonly retainedQueries: Set<RetainedQuery>;
-  readonly gcBuffer: Array<ReadyRetainedQuery>;
+  readonly gcBuffer: Array<RetainedQueryWithNormalizationAst>;
   readonly gcBufferSize: number;
   readonly loggers: Set<WrappedLogFunction>;
 };

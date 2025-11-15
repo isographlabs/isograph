@@ -22,13 +22,13 @@ export type RetainedQuery = {
   readonly root: StoreLink;
 };
 
-export interface ReadyRetainedQuery extends RetainedQuery {
+export interface RetainedQueryWithNormalizationAst extends RetainedQuery {
   readonly normalizationAst: PromiseWrapperOk<NormalizationAst>;
 }
 
-function isRetainedQueryReady(
+function isRetainedQueryWithNormalizationAst(
   query: RetainedQuery,
-): query is ReadyRetainedQuery {
+): query is RetainedQueryWithNormalizationAst {
   return (
     query.normalizationAst.result !== NOT_SET &&
     query.normalizationAst.result.kind === 'Ok'
@@ -42,7 +42,7 @@ export function unretainQuery(
 ): DidUnretainSomeQuery {
   environment.retainedQueries.delete(retainedQuery);
 
-  if (isRetainedQueryReady(retainedQuery)) {
+  if (isRetainedQueryWithNormalizationAst(retainedQuery)) {
     environment.gcBuffer.push(retainedQuery);
   } else if (environment.gcBuffer.length > environment.gcBufferSize) {
     environment.gcBuffer.shift();
@@ -66,7 +66,7 @@ export function garbageCollectEnvironment(environment: IsographEnvironment) {
   const retainedIds: RetainedIds = {};
 
   for (const query of environment.retainedQueries) {
-    if (isRetainedQueryReady(query)) {
+    if (isRetainedQueryWithNormalizationAst(query)) {
       recordReachableIds(environment.store, query, retainedIds);
     } else {
       // if we have any queries with loading normalizationAst, we can't garbage collect
@@ -107,7 +107,7 @@ interface RetainedIds {
 
 function recordReachableIds(
   store: IsographStore,
-  retainedQuery: ReadyRetainedQuery,
+  retainedQuery: RetainedQueryWithNormalizationAst,
   mutableRetainedIds: RetainedIds,
 ) {
   const record =
