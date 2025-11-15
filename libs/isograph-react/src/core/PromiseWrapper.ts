@@ -5,12 +5,12 @@ export type NotSet = typeof NOT_SET;
 
 export type Result<T, E> =
   | {
-      kind: 'Ok';
-      value: T;
+      readonly kind: 'Ok';
+      readonly value: T;
     }
   | {
-      kind: 'Err';
-      error: E;
+      readonly kind: 'Err';
+      readonly error: E;
     };
 
 /**
@@ -65,8 +65,8 @@ export function readPromise<T, E>(p: PromiseWrapper<T, E>): T {
 
 export type PromiseState<T, E> =
   | {
-      kind: 'Pending';
-      promise: Promise<T>;
+      readonly kind: 'Pending';
+      readonly promise: Promise<T>;
     }
   | Result<T, E>;
 
