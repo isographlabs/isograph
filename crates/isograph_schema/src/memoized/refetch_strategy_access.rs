@@ -89,6 +89,7 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[expect(clippy::type_complexity)]
+#[legacy_memo]
 pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<

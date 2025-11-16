@@ -38,6 +38,7 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     // None -> not refetchable
     // TODO - this is only used if variant === imperatively loaded field
     // consider moving it into that struct.
+    // NOTE: do not use this field, use fns in refetch_strategy_access instead
     pub refetch_strategy: Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>,
 
     // TODO we should probably model this differently
