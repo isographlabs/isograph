@@ -114,7 +114,6 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
     WithLocation<ValidateEntrypointDeclarationError<TNetworkProtocol>>,
 > {
     let parent_type_id = defined_entity(db, parent_object_entity_name.item.0.into())
-        .lookup()
         .clone()
         .expect(
             "Expected parsing to have succeeded. \
@@ -130,24 +129,22 @@ fn validate_parent_object_entity_name<TNetworkProtocol: NetworkProtocol>(
     match parent_type_id {
         ServerEntityName::Object(object_entity_name) => {
             let is_fetchable = fetchable_types(db)
-                .lookup()
                 .as_ref()
                 .expect(
                     "Expected parsing to have succeeded. \
                 This is indicative of a bug in Isograph.",
                 )
-                .lookup()
+                .lookup(db)
                 .contains_key(&object_entity_name);
 
             if !is_fetchable {
                 let fetchable_types = fetchable_types(db)
-                    .lookup()
                     .as_ref()
                     .expect(
                         "Expected parsing to have succeeded. \
                         This is indicative of a bug in Isograph.",
                     )
-                    .lookup()
+                    .lookup(db)
                     .keys()
                     .map(|object_entity_name| object_entity_name.lookup())
                     .collect::<Vec<_>>()
@@ -181,15 +178,15 @@ fn validate_client_field_exists<TNetworkProtocol: NetworkProtocol>(
     parent_object_entity_name: ServerObjectEntityName,
 ) -> Result<(), WithLocation<ValidateEntrypointDeclarationError<TNetworkProtocol>>> {
     match client_scalar_selectable_named(db, parent_object_entity_name, field_name.item.0)
-        .try_lookup()
-        .map_err(|e| WithLocation::new(e.into(), Location::Generated))?
+        .as_ref()
+        .map_err(|e| WithLocation::new(e.clone().into(), Location::Generated))?
     {
         Some(_) => Ok(()),
         None => {
             // check whether it is anything else
             match selectable_named(db, parent_object_entity_name, field_name.item.0.into())
-                .try_lookup()
-                .map_err(|e| WithLocation::new(e.into(), Location::Generated))?
+                .as_ref()
+                .map_err(|e| WithLocation::new(e.clone().into(), Location::Generated))?
             {
                 Some(_) => Err(WithLocation::new(
                     ValidateEntrypointDeclarationError::FieldMustBeClientField {

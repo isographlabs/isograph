@@ -17,8 +17,8 @@ fn intern_ref() {
     });
 
     let memoized_result = process_input(&db, id);
-    let memo_ref = *memoized_result.lookup().as_ref().unwrap();
-    assert_eq!(*memo_ref.lookup(), 'a');
+    let memo_ref = *memoized_result.as_ref().unwrap();
+    assert_eq!(*memo_ref.lookup(&db), 'a');
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Source)]
@@ -40,7 +40,7 @@ enum ProcessInputError {
     ReadError(#[from] FirstLetterError),
 }
 
-#[legacy_memo]
+#[legacy_memo(raw)]
 fn first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> Result<char, FirstLetterError> {
     db.get(input_id)
         .value
@@ -54,6 +54,6 @@ fn process_input(
     db: &TestDatabase,
     input_id: SourceId<Input>,
 ) -> Result<MemoRef<char>, ProcessInputError> {
-    let result = first_letter(db, input_id).try_lookup()?;
+    let result = first_letter(db, input_id).try_lookup(db)?;
     Ok(pico::intern_ref(db, result))
 }

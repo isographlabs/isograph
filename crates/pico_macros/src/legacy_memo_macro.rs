@@ -1,16 +1,32 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use quote::{ToTokens, quote};
-use syn::{Error, FnArg, ItemFn, PatType, ReturnType, Signature, parse_macro_input, parse_quote};
+use syn::{
+    Error, FnArg, GenericParam, ItemFn, Lifetime, LifetimeParam, PatType, ReturnType, Signature,
+    parse_macro_input, parse_quote,
+};
 
-pub(crate) fn legacy_memo_macro(_args: TokenStream, item: TokenStream) -> TokenStream {
+#[derive(Default, deluxe::ParseMetaItem)]
+#[deluxe(default)]
+struct LegacyMemoArgs {
+    #[deluxe(default)]
+    raw: bool,
+}
+
+pub(crate) fn legacy_memo_macro(args: TokenStream, item: TokenStream) -> TokenStream {
     let ItemFn {
         sig,
         vis,
         block,
         attrs,
     } = parse_macro_input!(item as ItemFn);
+
+    let LegacyMemoArgs { raw } = match deluxe::parse::<LegacyMemoArgs>(args) {
+        Ok(args) => args,
+        Err(err) => return err.into_compile_error().into(),
+    };
 
     let fn_hash = hash(&sig);
 
@@ -63,10 +79,36 @@ pub(crate) fn legacy_memo_macro(_args: TokenStream, item: TokenStream) -> TokenS
     };
 
     let mut new_sig = sig.clone();
-    new_sig.output = ReturnType::Type(
-        parse_quote!(->),
-        Box::new(parse_quote!(::pico::MemoRef<#return_type>)),
-    );
+
+    let (return_ty, memo_return_expr) = if raw {
+        (
+            parse_quote!(::pico::MemoRef<#return_type>),
+            quote!(memo_ref),
+        )
+    } else {
+        let db_lifetime = match new_sig.inputs.iter_mut().next() {
+            Some(FnArg::Typed(PatType { ty, .. })) => match ty.as_mut() {
+                syn::Type::Reference(type_reference) => {
+                    ensure_db_lifetime(&mut new_sig.generics, type_reference)
+                }
+                other => {
+                    return Error::new_spanned(
+                        other,
+                        "First argument to a memoized function must be a reference to the database.",
+                    )
+                    .to_compile_error()
+                    .into();
+                }
+            },
+            _ => unreachable!(),
+        };
+        (
+            parse_quote!(&#db_lifetime #return_type),
+            quote!(memo_ref.lookup(#db_arg)),
+        )
+    };
+
+    new_sig.output = ReturnType::Type(parse_quote!(->), Box::new(return_ty));
 
     let extract_parameters = args
         .enumerate()
@@ -86,8 +128,8 @@ pub(crate) fn legacy_memo_macro(_args: TokenStream, item: TokenStream) -> TokenS
                 }
                 ArgType::MemoRef => {
                     let binding_expr = match **ty {
-                        syn::Type::Reference(_) => quote!(&::pico::MemoRef::new(#db_arg, param_id.into())),
-                        _ => quote!(::pico::MemoRef::new(#db_arg, param_id.into())),
+                        syn::Type::Reference(_) => quote!(&::pico::MemoRef::new(param_id.into())),
+                        _ => quote!(::pico::MemoRef::new(param_id.into())),
                     };
                     quote! {
                         let #arg: #ty = {
@@ -140,7 +182,8 @@ pub(crate) fn legacy_memo_macro(_args: TokenStream, item: TokenStream) -> TokenS
                 !matches!(did_recalculate, pico::DidRecalculate::Error),
                 "Unexpected memo result. This is indicative of a bug in Pico."
             );
-            ::pico::MemoRef::new(#db_arg, derived_node_id)
+            let memo_ref = ::pico::MemoRef::new(derived_node_id);
+            #memo_return_expr
         }
     };
 
@@ -182,4 +225,20 @@ fn type_is(ty: &syn::Type, target: &'static str) -> bool {
         return segment.ident == target;
     }
     false
+}
+
+fn ensure_db_lifetime(
+    generics: &mut syn::Generics,
+    type_reference: &mut syn::TypeReference,
+) -> Lifetime {
+    if let Some(lifetime) = &type_reference.lifetime {
+        lifetime.clone()
+    } else {
+        let lifetime = Lifetime::new("'db", Span::call_site());
+        type_reference.lifetime = Some(lifetime.clone());
+        generics
+            .params
+            .push(GenericParam::Lifetime(LifetimeParam::new(lifetime.clone())));
+        lifetime
+    }
 }

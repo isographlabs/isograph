@@ -23,7 +23,7 @@ fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
     HashMap<UnvalidatedTypeName, Vec<OwnedServerEntity<TNetworkProtocol>>>,
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
-    let (outcome, _) = match TNetworkProtocol::parse_type_system_documents(db).lookup() {
+    let (outcome, _) = match TNetworkProtocol::parse_type_system_documents(db) {
         Ok(outcome) => outcome,
         Err(e) => return Err(e.clone()),
     };
@@ -54,7 +54,7 @@ pub fn server_entities_named<TNetworkProtocol: NetworkProtocol>(
     entity_name: UnvalidatedTypeName,
 ) -> Result<Vec<OwnedServerEntity<TNetworkProtocol>>, TNetworkProtocol::ParseTypeSystemDocumentsError>
 {
-    let map = server_entity_map(db).try_lookup()?;
+    let map = server_entity_map(db).as_ref().map_err(|e| e.clone())?;
 
     Ok(map.get(&entity_name).cloned().unwrap_or_default())
 }
@@ -66,7 +66,7 @@ pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
     Vec<WithLocation<ServerObjectEntity<TNetworkProtocol>>>,
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
-    let (outcome, _) = match TNetworkProtocol::parse_type_system_documents(db).lookup() {
+    let (outcome, _) = match TNetworkProtocol::parse_type_system_documents(db) {
         Ok(outcome) => outcome,
         Err(e) => return Err(e.clone()),
     };
@@ -107,7 +107,6 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
     EntityAccessError<TNetworkProtocol>,
 > {
     let entities = server_entities_named(db, server_object_entity_name.into())
-        .lookup()
         .as_ref()
         .map_err(|e| EntityAccessError::ParseTypeSystemDocumentsError(e.clone()))?;
 
@@ -143,7 +142,6 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
     EntityAccessError<TNetworkProtocol>,
 > {
     let entities = server_entities_named(db, server_scalar_entity_name.into())
-        .lookup()
         .as_ref()
         .map_err(|e| EntityAccessError::ParseTypeSystemDocumentsError(e.clone()))?;
 
@@ -177,7 +175,6 @@ pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol>(
     server_scalar_entity_name: ServerScalarEntityName,
 ) -> Result<Option<JavascriptName>, EntityAccessError<TNetworkProtocol>> {
     let value = server_scalar_entity_named(db, server_scalar_entity_name)
-        .lookup()
         .as_ref()
         .map_err(|e| e.clone())?
         .as_ref();
@@ -225,7 +222,7 @@ pub fn defined_entities<TNetworkProtocol: NetworkProtocol>(
     HashMap<UnvalidatedTypeName, Vec<ServerEntityName>>,
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
-    let (outcome, _) = match TNetworkProtocol::parse_type_system_documents(db).lookup() {
+    let (outcome, _) = match TNetworkProtocol::parse_type_system_documents(db) {
         Ok(outcome) => outcome,
         Err(e) => return Err(e.clone()),
     };
@@ -256,7 +253,6 @@ pub fn defined_entity<TNetworkProtocol: NetworkProtocol>(
     entity_name: UnvalidatedTypeName,
 ) -> Result<Option<ServerEntityName>, DefinedEntityError<TNetworkProtocol>> {
     match defined_entities(db)
-        .lookup()
         .as_ref()
         .map_err(|e| DefinedEntityError::ParseTypeSystemDocumentsError(e.clone()))?
         .get(&entity_name)

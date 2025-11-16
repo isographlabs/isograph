@@ -38,7 +38,6 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
         parent_server_object_entity_name,
         selectable_name.unchecked_conversion(),
     )
-    .lookup()
     .as_ref();
 
     let client_selectable = client_selectable_named(
@@ -46,7 +45,6 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
         parent_server_object_entity_name,
         selectable_name.unchecked_conversion(),
     )
-    .lookup()
     .as_ref();
 
     // case 1: both are error -> return error

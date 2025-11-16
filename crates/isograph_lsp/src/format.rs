@@ -33,19 +33,14 @@ pub fn on_format<TNetworkProtocol: NetworkProtocol>(
         &url.to_file_path().expect("Expected file path to be valid."),
     );
 
-    let content = match read_iso_literals_source_from_relative_path(
-        db,
-        relative_path_to_source_file,
-    )
-    .lookup()
-    {
-        Some(s) => &s.content,
-        // Is this the correct behavior?
-        None => return Ok(None),
-    };
+    let content =
+        match read_iso_literals_source_from_relative_path(db, relative_path_to_source_file) {
+            Some(s) => &s.content,
+            // Is this the correct behavior?
+            None => return Ok(None),
+        };
 
-    let extracted_items =
-        extract_iso_literals_from_file_content(db, relative_path_to_source_file).lookup();
+    let extracted_items = extract_iso_literals_from_file_content(db, relative_path_to_source_file);
 
     let text_edits = extracted_items
         .iter()

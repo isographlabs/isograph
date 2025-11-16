@@ -26,8 +26,9 @@ pub fn server_selectables_vec<TNetworkProtocol: NetworkProtocol>(
     )>,
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
-    let (items, _fetchable_types) =
-        TNetworkProtocol::parse_type_system_documents(db).try_lookup()?;
+    let (items, _fetchable_types) = TNetworkProtocol::parse_type_system_documents(db)
+        .as_ref()
+        .map_err(|e| e.clone())?;
 
     Ok(items
         .iter()
@@ -77,7 +78,9 @@ pub fn server_selectables_named<TNetworkProtocol: NetworkProtocol>(
     Vec<OwnedSelectableResult<TNetworkProtocol>>,
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
-    let map = server_selectables_map(db, parent_server_object_entity_name).try_lookup()?;
+    let map = server_selectables_map(db, parent_server_object_entity_name)
+        .as_ref()
+        .map_err(|e| e.clone())?;
 
     Ok(map
         .get(&server_selectable_name)
@@ -96,7 +99,6 @@ pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol>(
 > {
     let vec =
         server_selectables_named(db, parent_server_object_entity_name, server_selectable_name)
-            .lookup()
             .as_ref()
             .map_err(|e| ServerSelectableNamedError::ParseTypeSystemDocumentsError(e.clone()))?;
 
@@ -156,7 +158,8 @@ pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
 > {
     let item =
         server_selectable_named(db, parent_server_object_entity_name, server_selectable_name)
-            .try_lookup()?;
+            .as_ref()
+            .map_err(|e| e.clone())?;
 
     match item {
         Some(item) => {
@@ -186,7 +189,8 @@ pub fn server_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
 > {
     let item =
         server_selectable_named(db, parent_server_object_entity_name, server_selectable_name)
-            .try_lookup()?;
+            .as_ref()
+            .map_err(|e| e.clone())?;
 
     match item {
         Some(item) => {

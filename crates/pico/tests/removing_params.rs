@@ -56,5 +56,5 @@ fn first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
 #[legacy_memo]
 fn capitalized_first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
     let first = first_letter(db, input_id);
-    first.lookup().to_ascii_uppercase()
+    first.to_ascii_uppercase()
 }

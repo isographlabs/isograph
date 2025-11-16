@@ -22,14 +22,14 @@ fn singleton() {
 
     assert!(db.get_singleton::<Input>().is_some());
 
-    assert_eq!(*first_letter(&db).lookup(), 'a');
+    assert_eq!(*first_letter(&db), 'a');
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 1);
 
     let id_2 = db.set(Input {
         value: "qwer".to_string(),
     });
 
-    assert_eq!(*first_letter(&db).lookup(), 'q');
+    assert_eq!(*first_letter(&db), 'q');
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 2);
 
     assert_eq!(id_1, id_2);

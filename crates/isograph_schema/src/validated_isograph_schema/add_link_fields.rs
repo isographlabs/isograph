@@ -54,8 +54,8 @@ pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<Vec<ClientScalarSelectable<TNetworkProtocol>>, CreateSchemaError<TNetworkProtocol>> {
     Ok(server_object_entities(db)
-        .try_lookup()
-        .map_err(|e| CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e })?
+        .as_ref()
+        .map_err(|e| CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e.clone() })?
         .iter()
         .map(|object| {
             let object = &object.item;

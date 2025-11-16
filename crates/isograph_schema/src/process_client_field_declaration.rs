@@ -293,13 +293,12 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
     parent_object_entity_name: ServerObjectEntityName,
 ) -> ProcessClientFieldDeclarationResult<Option<RefetchStrategy<(), ()>>, TNetworkProtocol> {
     let is_fetchable = fetchable_types(db)
-        .lookup()
         .as_ref()
         .expect(
             "Expected parsing to have succeeded. \
             This is indicative of a bug in Isograph.",
         )
-        .lookup()
+        .lookup(db)
         .contains_key(&parent_object_entity_name);
 
     let refetch_strategy = if is_fetchable {
@@ -324,14 +323,14 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
                 })?;
 
         let query_id = fetchable_types(db)
-            .try_lookup()
+            .as_ref()
             .map_err(|e| {
                 WithSpan::new(
-                    ProcessClientFieldDeclarationError::ParseTypeSystemDocumentsError(e),
+                    ProcessClientFieldDeclarationError::ParseTypeSystemDocumentsError(e.clone()),
                     Span::todo_generated(),
                 )
             })?
-            .lookup()
+            .lookup(db)
             .iter()
             .find(|(_, root_operation_name)| root_operation_name.0 == "query")
             .expect("Expected query to be found")
@@ -425,13 +424,12 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
     let client_pointer_name = client_pointer_declaration.item.client_pointer_name.item.0;
 
     let query_id = *fetchable_types(db)
-        .lookup()
         .as_ref()
         .expect(
             "Expected parsing to have succeeded. \
             This is indicative of a bug in Isograph.",
         )
-        .lookup()
+        .lookup(db)
         .iter()
         .find(|(_, root_operation_name)| root_operation_name.0 == "query")
         .expect("Expected query to be found")
@@ -453,13 +451,12 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
     let unprocessed_fields = client_pointer_declaration.item.selection_set;
 
     let is_fetchable = fetchable_types(db)
-        .lookup()
         .as_ref()
         .expect(
             "Expected parsing to have succeeded. \
             This is indicative of a bug in Isograph.",
         )
-        .lookup()
+        .lookup(db)
         .contains_key(&to_object_entity_name);
 
     // TODO extract this into a helper function, probably on TNetworkProtocol

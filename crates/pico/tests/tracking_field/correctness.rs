@@ -27,7 +27,7 @@ fn tracking_field_correctness() {
         .0
         .insert("key".to_string(), input_id_1);
     // The first time we run a function, it will always have the correct value.
-    assert_eq!(get_values_untracked(&db).lookup().len(), 1);
+    assert_eq!(get_values_untracked(&db).len(), 1);
 
     let input_id_2 = db.set(Input {
         key: "key2",
@@ -39,7 +39,7 @@ fn tracking_field_correctness() {
         .tracked()
         .0
         .insert("key2".to_string(), input_id_2);
-    assert_eq!(get_values_untracked(&db).lookup().len(), 1);
+    assert_eq!(get_values_untracked(&db).len(), 1);
 
     // What? We're showing incorrect results? Why?!
     // Note that you should never do an untracked iter! Untracked is for reading
@@ -49,7 +49,7 @@ fn tracking_field_correctness() {
 
     // Instead we have to use tracked iter together with tracked insert
     // (first call here, so value is correct anyway)
-    assert_eq!(get_values_tracked(&db).lookup().len(), 2);
+    assert_eq!(get_values_tracked(&db).len(), 2);
 
     let input_id_3 = db.set(Input {
         key: "key3",
@@ -60,7 +60,7 @@ fn tracking_field_correctness() {
         .0
         .insert("key3".to_string(), input_id_3);
     // and now we got a correct value!
-    assert_eq!(get_values_tracked(&db).lookup().len(), 3);
+    assert_eq!(get_values_tracked(&db).len(), 3);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Source)]

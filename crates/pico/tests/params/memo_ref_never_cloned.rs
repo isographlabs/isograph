@@ -33,7 +33,7 @@ impl Clone for Output {
     }
 }
 
-#[legacy_memo]
+#[legacy_memo(raw)]
 fn get_output(_db: &TestDatabase) -> Output {
     Output {}
 }

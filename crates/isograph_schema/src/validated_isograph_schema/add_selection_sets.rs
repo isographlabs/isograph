@@ -66,8 +66,8 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
         unprocessed_scalar_selection_set.parent_object_entity_name,
         unprocessed_scalar_selection_set.client_scalar_selectable_name,
     )
-    .try_lookup()
-    .map_err(|e| vec![WithLocation::new(e.into(), Location::Generated)])?
+    .as_ref()
+    .map_err(|e| vec![WithLocation::new(e.clone().into(), Location::Generated)])?
     .as_ref()
     .expect(
         "Expected selectable to exist. \
@@ -224,8 +224,8 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
         parent_object_entity_name,
         scalar_selection.name.item.into(),
     )
-    .try_lookup()
-    .map_err(|e| WithLocation::new(e.into(), Location::Generated))?
+    .as_ref()
+    .map_err(|e| WithLocation::new(e.clone().into(), Location::Generated))?
     .as_ref()
     .ok_or_else(|| {
         WithLocation::new(
@@ -332,8 +332,8 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
         parent_object_entity_name,
         object_selection.name.item.into(),
     )
-    .try_lookup()
-    .map_err(|e| vec![WithLocation::new(e.into(), Location::Generated)])?
+    .as_ref()
+    .map_err(|e| vec![WithLocation::new(e.clone().into(), Location::Generated)])?
     .as_ref()
     .ok_or_else(|| {
         vec![WithLocation::new(
@@ -360,7 +360,6 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                         server_scalar_selectable.parent_object_entity_name,
                         (server_scalar_selectable.name.item).into(),
                     )
-                    .lookup()
                     .as_ref()
                     .expect(
                         "Expected validation to have succeeded. \

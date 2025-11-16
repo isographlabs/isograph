@@ -367,7 +367,6 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
                         *parent_object_entity_name,
                         (*server_scalar_selectable_name).into(),
                     )
-                    .lookup()
                     .as_ref()
                     .expect(
                         "Expected validation to have succeeded. \
@@ -393,7 +392,6 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
                         *parent_object_entity_name,
                         (*server_object_selectable_name).into(),
                     )
-                    .lookup()
                     .as_ref()
                     .expect(
                         "Expected validation to have succeeded. \

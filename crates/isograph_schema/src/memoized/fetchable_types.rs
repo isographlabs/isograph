@@ -14,8 +14,9 @@ pub fn fetchable_types<TNetworkProtocol: NetworkProtocol>(
     MemoRef<BTreeMap<ServerObjectEntityName, RootOperationName>>,
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
-    let (_items, fetchable_types) =
-        TNetworkProtocol::parse_type_system_documents(db).try_lookup()?;
+    let (_items, fetchable_types) = TNetworkProtocol::parse_type_system_documents(db)
+        .as_ref()
+        .map_err(|e| e.clone())?;
 
     Ok(db.intern_ref(fetchable_types))
 }

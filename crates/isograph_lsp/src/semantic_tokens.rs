@@ -75,7 +75,6 @@ fn get_semantic_tokens<TNetworkProtocol: NetworkProtocol>(
     // TODO call this earlier, pass it as a param to parse_iso_literal_in_relative_file
     let page_content: &str =
         &read_iso_literals_source_from_relative_path(db, relative_path_to_source_file)
-            .lookup()
             .as_ref()
             .expect("Expected source to exist")
             .content;

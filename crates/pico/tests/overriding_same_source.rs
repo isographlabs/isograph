@@ -19,7 +19,7 @@ fn overriding_same_source() {
         value: "asdf".to_string(),
     });
 
-    assert_eq!(*first_letter(&db, input_id).lookup(), 'a');
+    assert_eq!(*first_letter(&db, input_id), 'a');
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 1);
 
     db.set(Input {
@@ -27,7 +27,7 @@ fn overriding_same_source() {
         value: "asdf".to_string(),
     });
 
-    assert_eq!(*first_letter(&db, input_id).lookup(), 'a');
+    assert_eq!(*first_letter(&db, input_id), 'a');
     // Since the source (which first_letter depends on) was updated,
     // we would expect that first_letter would need to be re-evaluated.
     // But, since we changed it to the same value, we don't re-evaluate.

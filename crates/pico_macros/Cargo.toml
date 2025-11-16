@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 convert_case = { workspace = true }
+deluxe = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true }
