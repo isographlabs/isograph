@@ -47,7 +47,7 @@ export function readOptimisticRecord(
           const storeRecord = node.data[link.__typename]?.[link.__link];
           if (storeRecord != null) {
             const value = Reflect.has(storeRecord, p);
-            if (value) {
+            if (value !== undefined) {
               return true;
             }
           }
