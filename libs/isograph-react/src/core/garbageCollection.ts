@@ -1,5 +1,5 @@
 import { getParentRecordKey } from './cache';
-import { NormalizationAstNodes } from './entrypoint';
+import { NormalizationAstNodes, type NormalizationAst } from './entrypoint';
 import { Variables } from './FragmentReference';
 import {
   assertLink,
@@ -10,12 +10,30 @@ import {
   type StoreLink,
   type TypeName,
 } from './IsographEnvironment';
+import {
+  NOT_SET,
+  type PromiseWrapper,
+  type PromiseWrapperOk,
+} from './PromiseWrapper';
 
 export type RetainedQuery = {
-  readonly normalizationAst: NormalizationAstNodes;
+  readonly normalizationAst: PromiseWrapper<NormalizationAst>;
   readonly variables: {};
   readonly root: StoreLink;
 };
+
+export interface RetainedQueryWithNormalizationAst extends RetainedQuery {
+  readonly normalizationAst: PromiseWrapperOk<NormalizationAst>;
+}
+
+function isRetainedQueryWithNormalizationAst(
+  query: RetainedQuery,
+): query is RetainedQueryWithNormalizationAst {
+  return (
+    query.normalizationAst.result !== NOT_SET &&
+    query.normalizationAst.result.kind === 'Ok'
+  );
+}
 
 export type DidUnretainSomeQuery = boolean;
 export function unretainQuery(
@@ -46,10 +64,22 @@ export function retainQuery(
 export function garbageCollectEnvironment(environment: IsographEnvironment) {
   const retainedIds: RetainedIds = {};
 
+  const retainedQueries: RetainedQueryWithNormalizationAst[] = [];
   for (const query of environment.retainedQueries) {
-    recordReachableIds(environment.store, query, retainedIds);
+    if (!isRetainedQueryWithNormalizationAst(query)) {
+      return;
+    }
+    retainedQueries.push(query);
   }
+
   for (const query of environment.gcBuffer) {
+    if (!isRetainedQueryWithNormalizationAst(query)) {
+      return;
+    }
+    retainedQueries.push(query);
+  }
+
+  for (const query of retainedQueries) {
     recordReachableIds(environment.store, query, retainedIds);
   }
 
@@ -82,7 +112,7 @@ interface RetainedIds {
 
 function recordReachableIds(
   store: IsographStore,
-  retainedQuery: RetainedQuery,
+  retainedQuery: RetainedQueryWithNormalizationAst,
   mutableRetainedIds: RetainedIds,
 ) {
   const record =
@@ -98,7 +128,7 @@ function recordReachableIds(
       store,
       record,
       mutableRetainedIds,
-      retainedQuery.normalizationAst,
+      retainedQuery.normalizationAst.result.value.selections,
       retainedQuery.variables,
     );
   }

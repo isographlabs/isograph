@@ -10,7 +10,7 @@ import {
   type StableIdForFragmentReference,
   type UnknownTReadFromStore,
 } from './FragmentReference';
-import { RetainedQuery } from './garbageCollection';
+import type { RetainedQuery } from './garbageCollection';
 import { LogFunction, WrappedLogFunction } from './logging';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { WithEncounteredRecords } from './read';

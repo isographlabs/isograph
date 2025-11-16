@@ -60,7 +60,11 @@ export function maybeMakeNetworkRequest<
       );
     }
     case 'No': {
-      return [wrapResolvedValue(undefined), () => {}];
+      return retainQueryWithoutMakingNetworkRequest(
+        environment,
+        artifact,
+        variables,
+      );
     }
     case 'IfNecessary': {
       if (
@@ -82,7 +86,11 @@ export function maybeMakeNetworkRequest<
       );
 
       if (result.kind === 'EnoughData') {
-        return [wrapResolvedValue(undefined), () => {}];
+        return retainQueryWithoutMakingNetworkRequest(
+          environment,
+          artifact,
+          variables,
+        );
       } else {
         return makeNetworkRequest(
           environment,
@@ -96,17 +104,39 @@ export function maybeMakeNetworkRequest<
   }
 }
 
-function loadNormalizationAst(
-  normalizationAst: NormalizationAstLoader | NormalizationAst,
-) {
-  switch (normalizationAst.kind) {
-    case 'NormalizationAst': {
-      return normalizationAst;
-    }
-    case 'NormalizationAstLoader': {
-      return normalizationAst.loader();
-    }
-  }
+function retainQueryWithoutMakingNetworkRequest<
+  TReadFromStore extends UnknownTReadFromStore,
+  TClientFieldValue,
+>(
+  environment: IsographEnvironment,
+  artifact:
+    | RefetchQueryNormalizationArtifact
+    | IsographEntrypoint<
+        TReadFromStore,
+        TClientFieldValue,
+        NormalizationAst | NormalizationAstLoader
+      >,
+  variables: ExtractParameters<TReadFromStore>,
+): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
+  let status: NetworkRequestStatus = {
+    kind: 'Undisposed',
+    retainedQuery: fetchNormalizationAstAndRetainArtifact(
+      environment,
+      artifact,
+      variables,
+    ),
+  };
+  return [
+    wrapResolvedValue(undefined),
+    () => {
+      if (status.kind === 'Undisposed') {
+        unretainAndGarbageCollect(environment, status);
+      }
+      status = {
+        kind: 'Disposed',
+      };
+    },
+  ];
 }
 
 export function makeNetworkRequest<
@@ -128,6 +158,14 @@ export function makeNetworkRequest<
   // TODO this should be a DataId and stored in the store
   const myNetworkRequestId = networkRequestId + '';
   networkRequestId++;
+  let status: NetworkRequestStatus = {
+    kind: 'Undisposed',
+    retainedQuery: fetchNormalizationAstAndRetainArtifact(
+      environment,
+      artifact,
+      variables,
+    ),
+  };
 
   logMessage(environment, () => ({
     kind: 'MakeNetworkRequest',
@@ -136,16 +174,13 @@ export function makeNetworkRequest<
     networkRequestId: myNetworkRequestId,
   }));
 
-  let status: NetworkRequestStatus = {
-    kind: 'UndisposedIncomplete',
-  };
   // This should be an observable, not a promise
   const promise = Promise.all([
     environment.networkFunction(
       artifact.networkRequestInfo.operation,
       variables,
     ),
-    loadNormalizationAst(artifact.networkRequestInfo.normalizationAst),
+    status.retainedQuery.normalizationAst.promise,
     readerWithRefetchQueries?.promise,
   ])
     .then(([networkResponse, normalizationAst, readerWithRefetchQueries]) => {
@@ -165,7 +200,7 @@ export function makeNetworkRequest<
       }
 
       const root = { __link: ROOT_ID, __typename: artifact.concreteType };
-      if (status.kind === 'UndisposedIncomplete') {
+      if (status.kind === 'Undisposed') {
         normalizeData(
           environment,
           normalizationAst.selections,
@@ -173,16 +208,6 @@ export function makeNetworkRequest<
           variables,
           root,
         );
-        const retainedQuery = {
-          normalizationAst: normalizationAst.selections,
-          variables,
-          root,
-        };
-        status = {
-          kind: 'UndisposedComplete',
-          retainedQuery,
-        };
-        retainQuery(environment, retainedQuery);
       }
 
       const onComplete = fetchOptions?.onComplete;
@@ -221,14 +246,8 @@ export function makeNetworkRequest<
   const response: ItemCleanupPair<PromiseWrapper<void, AnyError>> = [
     wrapper,
     () => {
-      if (status.kind === 'UndisposedComplete') {
-        const didUnretainSomeQuery = unretainQuery(
-          environment,
-          status.retainedQuery,
-        );
-        if (didUnretainSomeQuery) {
-          garbageCollectEnvironment(environment);
-        }
+      if (status.kind === 'Undisposed') {
+        unretainAndGarbageCollect(environment, status);
       }
       status = {
         kind: 'Disposed',
@@ -238,16 +257,15 @@ export function makeNetworkRequest<
   return response;
 }
 
+type NetworkRequestStatusUndisposed = {
+  readonly kind: 'Undisposed';
+  readonly retainedQuery: RetainedQuery;
+};
+
 type NetworkRequestStatus =
-  | {
-      readonly kind: 'UndisposedIncomplete';
-    }
+  | NetworkRequestStatusUndisposed
   | {
       readonly kind: 'Disposed';
-    }
-  | {
-      readonly kind: 'UndisposedComplete';
-      readonly retainedQuery: RetainedQuery;
     };
 
 function readDataForOnComplete<
@@ -350,4 +368,43 @@ function readDataForOnComplete<
     }
   }
   return null;
+}
+
+function fetchNormalizationAstAndRetainArtifact<
+  TReadFromStore extends UnknownTReadFromStore,
+  TClientFieldValue,
+>(
+  environment: IsographEnvironment,
+  artifact:
+    | RefetchQueryNormalizationArtifact
+    | IsographEntrypoint<
+        TReadFromStore,
+        TClientFieldValue,
+        NormalizationAst | NormalizationAstLoader
+      >,
+  variables: ExtractParameters<TReadFromStore>,
+): RetainedQuery {
+  const normalizationAst =
+    artifact.networkRequestInfo.normalizationAst.kind === 'NormalizationAst'
+      ? wrapResolvedValue(artifact.networkRequestInfo.normalizationAst)
+      : wrapPromise(artifact.networkRequestInfo.normalizationAst.loader());
+
+  const root = { __link: ROOT_ID, __typename: artifact.concreteType };
+  const retainedQuery: RetainedQuery = {
+    normalizationAst: normalizationAst,
+    variables,
+    root,
+  };
+  retainQuery(environment, retainedQuery);
+  return retainedQuery;
+}
+
+function unretainAndGarbageCollect(
+  environment: IsographEnvironment,
+  status: NetworkRequestStatusUndisposed,
+) {
+  const didUnretainSomeQuery = unretainQuery(environment, status.retainedQuery);
+  if (didUnretainSomeQuery) {
+    garbageCollectEnvironment(environment);
+  }
 }

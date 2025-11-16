@@ -2,12 +2,14 @@ import { describe, expect, test } from 'vitest';
 import {
   garbageCollectEnvironment,
   retainQuery,
+  type RetainedQuery,
 } from '../core/garbageCollection';
 import {
   createIsographEnvironment,
   ROOT_ID,
   type IsographStore,
 } from '../core/IsographEnvironment';
+import { wrapResolvedValue } from '../core/PromiseWrapper';
 import { iso } from './__isograph/iso';
 import { meNameSuccessorRetainedQuery } from './meNameSuccessor';
 import { nodeFieldRetainedQuery } from './nodeQuery';
@@ -55,9 +57,10 @@ export const meNameField = iso(`
 `)(() => {});
 
 const meNameEntrypoint = iso(`entrypoint Query.meName`);
-const meNameRetainedQuery = {
-  normalizationAst:
-    meNameEntrypoint.networkRequestInfo.normalizationAst.selections,
+const meNameRetainedQuery: RetainedQuery = {
+  normalizationAst: wrapResolvedValue(
+    meNameEntrypoint.networkRequestInfo.normalizationAst,
+  ),
   variables: {},
   root: { __link: ROOT_ID, __typename: 'Query' },
 };
