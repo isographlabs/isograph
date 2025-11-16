@@ -292,7 +292,15 @@ function setChildOfNode<TStoreLayer extends StoreLayer>(
   }
 }
 
-export function replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
+/**
+ * Remove an optimistic store layer from the stack, potentially replacing it
+ * with a network response.
+ *
+ * After we do this, we must re-execute all child startUpdate and optimistic
+ * layers (since their data may have changed.) We also keep track of changed
+ * records, in order to call affected subscriptions.
+ */
+export function revertOptimisticStoreLayerAndMaybeReplace(
   environment: IsographEnvironment,
   optimisticNode: OptimisticStoreLayer,
   normalizeData: null | ((storeLayer: StoreLayerWithData) => void),
