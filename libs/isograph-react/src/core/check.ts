@@ -8,7 +8,7 @@ import {
   StoreRecord,
 } from './IsographEnvironment';
 import { logMessage } from './logging';
-import { readOptimisticRecord } from './optimisticProxy';
+import { getStoreRecordProxy } from './optimisticProxy';
 
 export type ShouldFetch = RequiredShouldFetch | 'IfNecessary';
 export type RequiredShouldFetch = 'Yes' | 'No';
@@ -40,7 +40,7 @@ export function check(
   variables: Variables,
   root: StoreLink,
 ): CheckResult {
-  const newStoreRecord = readOptimisticRecord(environment.store, root);
+  const newStoreRecord = getStoreRecordProxy(environment.store, root);
 
   const checkResult = checkFromRecord(
     environment,
@@ -107,7 +107,7 @@ function checkFromRecord(
               );
             }
 
-            const linkedRecord = readOptimisticRecord(environment.store, link);
+            const linkedRecord = getStoreRecordProxy(environment.store, link);
 
             if (linkedRecord === undefined) {
               return {
@@ -140,7 +140,7 @@ function checkFromRecord(
             );
           }
 
-          const linkedRecord = readOptimisticRecord(environment.store, link);
+          const linkedRecord = getStoreRecordProxy(environment.store, link);
 
           if (linkedRecord === undefined) {
             return {

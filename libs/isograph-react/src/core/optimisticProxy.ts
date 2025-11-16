@@ -19,7 +19,12 @@ export function getOrInsertRecord(
   return (recordsById[link.__link] ??= {});
 }
 
-export function readOptimisticRecord(
+/**
+ * Given the child-most store layer (i.e. environment.store) and a link (identifying a
+ * store record), create a proxy object that attempts to read through each successive
+ * store layer until a value (i.e. field name) is found. If found, return that value.
+ */
+export function getStoreRecordProxy(
   storeLayer: StoreLayer,
   link: StoreLink,
 ): StoreRecord {

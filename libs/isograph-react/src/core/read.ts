@@ -28,7 +28,7 @@ import {
 } from './IsographEnvironment';
 import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
-import { readOptimisticRecord } from './optimisticProxy';
+import { getStoreRecordProxy } from './optimisticProxy';
 import {
   getPromiseState,
   NOT_SET,
@@ -154,7 +154,7 @@ function readData<TReadFromStore>(
     root.__typename,
   );
   encounteredIds.add(root.__link);
-  let storeRecord = readOptimisticRecord(environment.store, root);
+  let storeRecord = getStoreRecordProxy(environment.store, root);
   if (storeRecord === undefined) {
     return {
       kind: 'MissingData',

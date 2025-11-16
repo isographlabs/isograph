@@ -22,7 +22,7 @@ import { logMessage } from './logging';
 import {
   addStartUpdateStoreLayer,
   getOrInsertRecord,
-  readOptimisticRecord,
+  getStoreRecordProxy,
   type StartUpdateStoreLayer,
   type StoreLayer,
 } from './optimisticProxy';
@@ -183,7 +183,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
   mutableState: MutableInvalidationState,
   mutableUpdatedIds: EncounteredIds,
 ): ReadDataResultSuccess<ExtractUpdatableData<TReadFromStore>> {
-  let storeRecord = readOptimisticRecord(storeLayer, root);
+  let storeRecord = getStoreRecordProxy(storeLayer, root);
   if (storeRecord == null) {
     return {
       kind: 'Success',

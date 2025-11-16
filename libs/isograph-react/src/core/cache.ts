@@ -35,7 +35,7 @@ import {
 import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
 import {
-  readOptimisticRecord,
+  getStoreRecordProxy,
   type StoreLayerWithData,
 } from './optimisticProxy';
 import { wrapPromise, wrapResolvedValue } from './PromiseWrapper';
@@ -172,7 +172,7 @@ export function normalizeData(
     variables,
   }));
 
-  const newStoreRecord = readOptimisticRecord(storeLayer, root);
+  const newStoreRecord = getStoreRecordProxy(storeLayer, root);
 
   normalizeDataIntoRecord(
     environment,
@@ -701,7 +701,7 @@ function normalizeNetworkResponseObject(
   }
 
   const link = { __link: newStoreRecordId, __typename };
-  const newStoreRecord = readOptimisticRecord(storeLayer, link);
+  const newStoreRecord = getStoreRecordProxy(storeLayer, link);
 
   normalizeDataIntoRecord(
     environment,
