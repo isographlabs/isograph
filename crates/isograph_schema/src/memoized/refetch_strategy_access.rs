@@ -1,8 +1,8 @@
 use std::collections::{HashMap, hash_map::Entry};
 
 use common_lang_types::{
-    ClientSelectableName, ParentObjectEntityNameAndSelectableName, ServerObjectEntityName,
-    WithLocation, WithSpan,
+    ClientScalarSelectableName, ClientSelectableName, ParentObjectEntityNameAndSelectableName,
+    ServerObjectEntityName, WithLocation, WithSpan,
 };
 use isograph_lang_types::SelectionType;
 use pico_macros::legacy_memo;
@@ -149,6 +149,83 @@ pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
         .collect())
 }
 
+#[expect(clippy::type_complexity)]
+#[legacy_memo]
+pub fn validated_refetch_strategy_for_client_scalar_selectable_named<
+    TNetworkProtocol: NetworkProtocol,
+>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    parent_server_object_entity_name: ServerObjectEntityName,
+    client_scalar_selectable_name: ClientScalarSelectableName,
+) -> Result<
+    Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>,
+    RefetchStrategyAccessError<TNetworkProtocol>,
+> {
+    let map = validated_refetch_strategy_map(db)
+        .as_ref()
+        .map_err(|e| e.clone())?;
+
+    match map.get(&(
+        parent_server_object_entity_name,
+        client_scalar_selectable_name.into(),
+    )) {
+        Some(result) => match result {
+            Ok(selection_type) => match selection_type {
+                SelectionType::Object(_) => Err(RefetchStrategyAccessError::IncorrectType {
+                    parent_object_entity_name: parent_server_object_entity_name,
+                    selectable_name: client_scalar_selectable_name.into(),
+                    expected_type: "a scalar",
+                    actual_type: "an object",
+                }),
+                SelectionType::Scalar(s) => Ok(s.clone()),
+            },
+            Err(e) => Err(e.clone()),
+        },
+        None => Err(RefetchStrategyAccessError::NotFound {
+            parent_server_object_entity_name,
+            selectable_name: client_scalar_selectable_name.into(),
+        }),
+    }
+}
+
+#[expect(clippy::type_complexity)]
+#[legacy_memo]
+pub fn validated_refetch_strategy_for_object_scalar_selectable_named<
+    TNetworkProtocol: NetworkProtocol,
+>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    parent_server_object_entity_name: ServerObjectEntityName,
+    client_object_selectable_name: ClientScalarSelectableName,
+) -> Result<
+    RefetchStrategy<ScalarSelectableId, ObjectSelectableId>,
+    RefetchStrategyAccessError<TNetworkProtocol>,
+> {
+    let map = validated_refetch_strategy_map(db)
+        .as_ref()
+        .map_err(|e| e.clone())?;
+
+    match map.get(&(
+        parent_server_object_entity_name,
+        client_object_selectable_name.into(),
+    )) {
+        Some(result) => match result {
+            Ok(selection_type) => match selection_type {
+                SelectionType::Scalar(_) => Err(RefetchStrategyAccessError::IncorrectType {
+                    parent_object_entity_name: parent_server_object_entity_name,
+                    selectable_name: client_object_selectable_name.into(),
+                    expected_type: "an object",
+                    actual_type: "a scalar",
+                }),
+                SelectionType::Object(s) => Ok(s.clone()),
+            },
+            Err(e) => Err(e.clone()),
+        },
+        None => Err(RefetchStrategyAccessError::NotFound {
+            parent_server_object_entity_name,
+            selectable_name: client_object_selectable_name.into(),
+        }),
+    }
+}
 #[derive(Clone, Error, Eq, PartialEq, Debug)]
 pub enum RefetchStrategyAccessError<TNetworkProtocol: NetworkProtocol> {
     #[error("{0}")]
@@ -171,5 +248,24 @@ pub enum RefetchStrategyAccessError<TNetworkProtocol: NetworkProtocol> {
     ValidateAddSelectionSetsResultWithMultipleErrors {
         #[from]
         errors: Vec<WithLocation<AddSelectionSetsError<TNetworkProtocol>>>,
+    },
+
+    #[error(
+        "Expected `{parent_object_entity_name}.{selectable_name}` to be {expected_type}, \
+        but it was {actual_type}."
+    )]
+    IncorrectType {
+        parent_object_entity_name: ServerObjectEntityName,
+        selectable_name: ClientSelectableName,
+        expected_type: &'static str,
+        actual_type: &'static str,
+    },
+
+    // TODO this should be an option in the return value, not an error variant, but
+    // realistically, that's super annoying.
+    #[error("`{parent_server_object_entity_name}.{selectable_name}` is not defined.")]
+    NotFound {
+        parent_server_object_entity_name: ServerObjectEntityName,
+        selectable_name: ClientSelectableName,
     },
 }
