@@ -30,11 +30,8 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
     RefetchStrategyAccessError<TNetworkProtocol>,
 > {
     // TODO use a "list of iso declarations" fn
-    let declaration_map = client_selectable_declaration_map_from_iso_literals(db).lookup();
-    let expose_field_map = expose_field_map(db)
-        .lookup()
-        .as_ref()
-        .map_err(|e| e.clone())?;
+    let declaration_map = client_selectable_declaration_map_from_iso_literals(db);
+    let expose_field_map = expose_field_map(db).as_ref().map_err(|e| e.clone())?;
 
     let mut out = HashMap::new();
 
@@ -91,6 +88,7 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
     Ok(out)
 }
 
+#[expect(clippy::type_complexity)]
 pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
@@ -103,7 +101,7 @@ pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
     >,
     RefetchStrategyAccessError<TNetworkProtocol>,
 > {
-    let map = unvalidated_refetch_strategy_map(db).lookup().clone()?;
+    let map = unvalidated_refetch_strategy_map(db).clone()?;
 
     Ok(map
         .into_iter()
