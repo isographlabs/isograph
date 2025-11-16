@@ -240,7 +240,7 @@ function mergeChildNodes(
 }
 
 function reexecuteUpdates(
-  initialNode:
+  initialStoreLayer:
     | OptimisticStoreLayer
     | NetworkResponseStoreLayer
     | StartUpdateStoreLayer
@@ -252,7 +252,7 @@ function reexecuteUpdates(
     | OptimisticStoreLayer
     | NetworkResponseStoreLayer
     | StartUpdateStoreLayer
-    | null = initialNode;
+    | null = initialStoreLayer;
   while (node !== null) {
     mergeDataLayer(oldData, node.data);
     switch (node.kind) {
