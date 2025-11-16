@@ -10,8 +10,8 @@ import {
   addNetworkResponseStoreLayer as addNetworkResponseStoreLayerInner,
   addOptimisticStoreLayer as addOptimisticStoreLayerInner,
   addStartUpdateStoreLayer as addStartUpdateStoreLayerInner,
-  readOptimisticRecord,
-  replaceOptimisticStoreLayerWithNetworkResponseStoreLayer,
+  getStoreRecordProxy,
+  revertOptimisticStoreLayerAndMaybeReplace,
   type OptimisticStoreLayer,
   type StoreLayer,
 } from '../core/optimisticProxy';
@@ -59,7 +59,7 @@ describe('optimisticLayer', () => {
       });
 
       expect(
-        readOptimisticRecord(environment.store, {
+        getStoreRecordProxy(environment.store, {
           __link: '__ROOT',
           __typename: 'Query',
         }).counter,
@@ -83,7 +83,7 @@ describe('optimisticLayer', () => {
         },
       });
       expect(
-        readOptimisticRecord(environment.store, {
+        getStoreRecordProxy(environment.store, {
           __link: '__ROOT',
           __typename: 'Query',
         }).counter,
@@ -98,7 +98,7 @@ describe('optimisticLayer', () => {
       addOptimisticStoreLayer(environment, (counter) => counter + 1);
 
       expect(
-        readOptimisticRecord(environment.store, {
+        getStoreRecordProxy(environment.store, {
           __link: '__ROOT',
           __typename: 'Query',
         }).counter,
@@ -163,7 +163,7 @@ describe('optimisticLayer', () => {
           },
         );
 
-        replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
+        revertOptimisticStoreLayerAndMaybeReplace(
           environment,
           node,
           (storeLayer) => {
@@ -204,7 +204,7 @@ describe('optimisticLayer', () => {
           },
         );
 
-        replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
+        revertOptimisticStoreLayerAndMaybeReplace(
           environment,
           node,
           (storeLayer) => {
@@ -236,7 +236,7 @@ describe('optimisticLayer', () => {
         });
 
         expect(
-          readOptimisticRecord(environment.store, {
+          getStoreRecordProxy(environment.store, {
             __link: '__ROOT',
             __typename: 'Query',
           }).counter,
@@ -257,7 +257,7 @@ describe('optimisticLayer', () => {
         });
 
         expect(
-          readOptimisticRecord(environment.store, {
+          getStoreRecordProxy(environment.store, {
             __link: '__ROOT',
             __typename: 'Query',
           }).counter,
@@ -282,7 +282,7 @@ describe('optimisticLayer', () => {
           },
         });
         expect(
-          readOptimisticRecord(environment.store, {
+          getStoreRecordProxy(environment.store, {
             __link: '__ROOT',
             __typename: 'Query',
           }).counter,
@@ -307,7 +307,7 @@ describe('optimisticLayer', () => {
           },
         });
         expect(
-          readOptimisticRecord(environment.store, {
+          getStoreRecordProxy(environment.store, {
             __link: '__ROOT',
             __typename: 'Query',
           }).counter,
@@ -331,7 +331,7 @@ describe('optimisticLayer', () => {
         });
 
         expect(
-          readOptimisticRecord(environment.store, {
+          getStoreRecordProxy(environment.store, {
             __link: '__ROOT',
             __typename: 'Query',
           }).counter,
@@ -361,7 +361,7 @@ describe('optimisticLayer', () => {
         });
 
         expect(
-          readOptimisticRecord(environment.store, {
+          getStoreRecordProxy(environment.store, {
             __link: '__ROOT',
             __typename: 'Query',
           }).counter,
@@ -388,7 +388,7 @@ describe('optimisticLayer', () => {
         });
 
         expect(
-          readOptimisticRecord(environment.store, {
+          getStoreRecordProxy(environment.store, {
             __link: '__ROOT',
             __typename: 'Query',
           }).counter,
@@ -416,7 +416,7 @@ describe('optimisticLayer', () => {
         });
 
         expect(
-          readOptimisticRecord(environment.store, {
+          getStoreRecordProxy(environment.store, {
             __link: '__ROOT',
             __typename: 'Query',
           }).counter,
@@ -445,7 +445,7 @@ describe('optimisticLayer', () => {
         });
 
         expect(
-          readOptimisticRecord(environment.store, {
+          getStoreRecordProxy(environment.store, {
             __link: '__ROOT',
             __typename: 'Query',
           }).counter,
@@ -475,7 +475,7 @@ describe('optimisticLayer', () => {
         });
 
         expect(
-          readOptimisticRecord(environment.store, {
+          getStoreRecordProxy(environment.store, {
             __link: '__ROOT',
             __typename: 'Query',
           }).counter,
@@ -545,7 +545,7 @@ describe('optimisticLayer', () => {
           });
 
           expect(
-            readOptimisticRecord(environment.store, {
+            getStoreRecordProxy(environment.store, {
               __link: '__ROOT',
               __typename: 'Query',
             }).counter,
@@ -566,7 +566,7 @@ describe('optimisticLayer', () => {
           });
 
           expect(
-            readOptimisticRecord(environment.store, {
+            getStoreRecordProxy(environment.store, {
               __link: '__ROOT',
               __typename: 'Query',
             }).counter,
@@ -591,7 +591,7 @@ describe('optimisticLayer', () => {
             },
           });
           expect(
-            readOptimisticRecord(environment.store, {
+            getStoreRecordProxy(environment.store, {
               __link: '__ROOT',
               __typename: 'Query',
             }).counter,
@@ -616,7 +616,7 @@ describe('optimisticLayer', () => {
             },
           });
           expect(
-            readOptimisticRecord(environment.store, {
+            getStoreRecordProxy(environment.store, {
               __link: '__ROOT',
               __typename: 'Query',
             }).counter,
@@ -640,7 +640,7 @@ describe('optimisticLayer', () => {
           });
 
           expect(
-            readOptimisticRecord(environment.store, {
+            getStoreRecordProxy(environment.store, {
               __link: '__ROOT',
               __typename: 'Query',
             }).counter,
@@ -670,7 +670,7 @@ describe('optimisticLayer', () => {
           });
 
           expect(
-            readOptimisticRecord(environment.store, {
+            getStoreRecordProxy(environment.store, {
               __link: '__ROOT',
               __typename: 'Query',
             }).counter,
@@ -697,7 +697,7 @@ describe('optimisticLayer', () => {
           });
 
           expect(
-            readOptimisticRecord(environment.store, {
+            getStoreRecordProxy(environment.store, {
               __link: '__ROOT',
               __typename: 'Query',
             }).counter,
@@ -725,7 +725,7 @@ describe('optimisticLayer', () => {
           });
 
           expect(
-            readOptimisticRecord(environment.store, {
+            getStoreRecordProxy(environment.store, {
               __link: '__ROOT',
               __typename: 'Query',
             }).counter,
@@ -751,7 +751,7 @@ describe('optimisticLayer', () => {
           });
 
           expect(
-            readOptimisticRecord(environment.store, {
+            getStoreRecordProxy(environment.store, {
               __link: '__ROOT',
               __typename: 'Query',
             }).counter,
@@ -779,7 +779,7 @@ describe('optimisticLayer', () => {
           });
 
           expect(
-            readOptimisticRecord(environment.store, {
+            getStoreRecordProxy(environment.store, {
               __link: '__ROOT',
               __typename: 'Query',
             }).counter,
@@ -824,7 +824,7 @@ describe('optimisticLayer', () => {
     node: OptimisticStoreLayer,
     counter: null | number,
   ) {
-    return replaceOptimisticStoreLayerWithNetworkResponseStoreLayer(
+    return revertOptimisticStoreLayerAndMaybeReplace(
       environment,
       node,
       counter === null
@@ -850,7 +850,7 @@ describe('optimisticLayer', () => {
     storeLayer: StoreLayer,
     value: (counter: number) => number,
   ): EncounteredIds => {
-    const { counter } = readOptimisticRecord(storeLayer, {
+    const { counter } = getStoreRecordProxy(storeLayer, {
       __link: '__ROOT',
       __typename: 'Query',
     });
