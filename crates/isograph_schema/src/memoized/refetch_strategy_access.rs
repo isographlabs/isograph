@@ -23,7 +23,7 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
     HashMap<
         (ServerObjectEntityName, ClientSelectableName),
         Result<
-            Option<SelectionType<RefetchStrategy<(), ()>, RefetchStrategy<(), ()>>>,
+            SelectionType<Option<RefetchStrategy<(), ()>>, RefetchStrategy<(), ()>>,
             RefetchStrategyAccessError<TNetworkProtocol>,
         >,
     >,
@@ -50,7 +50,7 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                     SelectionType::Scalar(_) => {
                         let refetch_strategy = get_unvalidated_refetch_stategy(db, key.0)
                             .map_err(|e| e.into())
-                            .map(|x| x.map(SelectionType::Scalar));
+                            .map(|x| SelectionType::Scalar(x));
                         vacant_entry.insert(refetch_strategy);
                     }
                     SelectionType::Object(o) => {
@@ -60,7 +60,12 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                         let refetch_strategy =
                             get_unvalidated_refetch_stategy(db, o.target_type.inner().0)
                                 .map_err(|e| e.into())
-                                .map(|x| x.map(SelectionType::Object));
+                                .map(|item| {
+                                    SelectionType::Object(item.expect(
+                                "Expected client object selectable to have a refetch strategy. \
+                                This is indicative of a bug in Isograph.",
+                            ))
+                                });
                         vacant_entry.insert(refetch_strategy);
                     }
                 },
@@ -77,10 +82,9 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                 });
             }
             Entry::Vacant(vacant_entry) => {
-                vacant_entry.insert(Ok(selection_set
-                    .refetch_strategy
-                    .clone()
-                    .map(SelectionType::Scalar)));
+                vacant_entry.insert(Ok(SelectionType::Scalar(
+                    selection_set.refetch_strategy.clone(),
+                )));
             }
         }
     }
@@ -96,7 +100,10 @@ pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
     HashMap<
         (ServerObjectEntityName, ClientSelectableName),
         Result<
-            Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>,
+            SelectionType<
+                Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>,
+                RefetchStrategy<ScalarSelectableId, ObjectSelectableId>,
+            >,
             RefetchStrategyAccessError<TNetworkProtocol>,
         >,
     >,
@@ -108,8 +115,8 @@ pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
         .into_iter()
         .map(|(key, value)| {
             let value: Result<_, RefetchStrategyAccessError<_>> = value.and_then(|opt| match opt {
-                Some(selection_type) => match selection_type {
-                    SelectionType::Scalar(refetch_strategy) => Ok(Some(
+                SelectionType::Scalar(refetch_strategy) => {
+                    Ok(SelectionType::Scalar(refetch_strategy.map(|refetch_strategy| {
                         get_validated_refetch_strategy(
                             db,
                             refetch_strategy,
@@ -119,22 +126,22 @@ pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                                 key.1.into(),
                             )),
                         )
-                        .map_err(|e| RefetchStrategyAccessError::ValidateAddSelectionSetsResultWithMultipleErrors { errors: e })?,
+                    }).transpose()?))
+                }
+                SelectionType::Object(refetch_strategy) => Ok(SelectionType::Object(get_validated_refetch_strategy(
+                    db,
+                    refetch_strategy,
+                    key.0,
+                    SelectionType::Object(ParentObjectEntityNameAndSelectableName::new(
+                        key.0,
+                        key.1.into(),
                     )),
-                    SelectionType::Object(refetch_strategy) => Ok(Some(
-                        get_validated_refetch_strategy(
-                            db,
-                            refetch_strategy,
-                            key.0,
-                            SelectionType::Object(ParentObjectEntityNameAndSelectableName::new(
-                                key.0,
-                                key.1.into(),
-                            )),
-                        )
-                        .map_err(|e| RefetchStrategyAccessError::ValidateAddSelectionSetsResultWithMultipleErrors { errors: e })?,
-                    )),
-                },
-                None => Ok(None),
+                )
+                .map_err(|e| {
+                    RefetchStrategyAccessError::ValidateAddSelectionSetsResultWithMultipleErrors {
+                        errors: e,
+                    }
+                })?)),
             });
 
             (key, value)
