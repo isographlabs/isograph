@@ -228,15 +228,31 @@ export function addOptimisticStoreLayer(
   }
 }
 
-function mergeChildNodes(
-  node: StoreLayer | null,
-  baseNode: BaseStoreLayer | NetworkResponseStoreLayer,
-): OptimisticStoreLayer | null {
-  while (node && node.kind !== 'OptimisticStoreLayer') {
-    mergeDataLayer(baseNode.data, node.data);
-    node = node.childStoreLayer;
+/**
+ * Merge storeLayerToMerge, and its children, into baseStoreLayer.
+ * We can merge until we reach a revertible layer (i.e. an optimistic layer).
+ * All other layers cannot be reverted, so for housekeeping + perf, we merge
+ * them into a single layer.
+ *
+ * Note that BaseStoreLayer.childStoreLayer has type OptimisticStoreLayer | null.
+ * So, the state of the stack is never e.g. base <- network response. Instead,
+ * we have a base + a child that we would like to attach to the base. So, we merge
+ * (flatten) until we reach an optimistic layer or null, at which point, we can
+ * set baseStoreLayer.childStoreLayer = storeLayerToMerge (via setChildOfNode).
+ */
+function mergeLayersWithDataIntoBaseLayer(
+  environment: IsographEnvironment,
+  storeLayerToMerge: StoreLayer | null,
+  baseStoreLayer: BaseStoreLayer,
+) {
+  while (
+    storeLayerToMerge &&
+    storeLayerToMerge.kind !== 'OptimisticStoreLayer'
+  ) {
+    mergeDataLayer(baseStoreLayer.data, storeLayerToMerge.data);
+    storeLayerToMerge = storeLayerToMerge.childStoreLayer;
   }
-  return node;
+  setChildOfNode(environment, baseStoreLayer, storeLayerToMerge);
 }
 
 /**
@@ -248,7 +264,7 @@ function mergeChildNodes(
  * - we will compare the new and old merged data in order to determine the changed records
  *   and trigger subscriptions.
  *
- * Here, "data" means all of the records + fields that were modified, starting at
+ * Here, "merged data" means all of the records + fields that were modified, starting at
  * storeLayer, e.g. in BaseLayer <- OptimisticLayer <- StartUpdateLayer, if we
  * are replacing Optimistic, then oldData will contain the records + fields modified by
  * OptimisticLayer + StartUpdateLayer.
@@ -290,16 +306,22 @@ function reexecuteUpdatesAndMergeData(
   }
 }
 
+/**
+ * Set storeLayerToModify's child to a given layer. This may be null!
+ * If it is null, set the environment.store to storeLayerToModify.
+ * If it is not null, then the existing environment.store value remains
+ * valid.
+ */
 function setChildOfNode<TStoreLayer extends StoreLayer>(
   environment: IsographEnvironment,
-  node: TStoreLayer,
-  newChild: TStoreLayer['childStoreLayer'],
+  storeLayerToModify: TStoreLayer,
+  newChildStoreLayer: TStoreLayer['childStoreLayer'],
 ) {
-  node.childStoreLayer = newChild;
-  if (newChild !== null) {
-    newChild.parentStoreLayer = node;
+  storeLayerToModify.childStoreLayer = newChildStoreLayer;
+  if (newChildStoreLayer !== null) {
+    newChildStoreLayer.parentStoreLayer = storeLayerToModify;
   } else {
-    environment.store = node;
+    environment.store = storeLayerToModify;
   }
 }
 
@@ -316,53 +338,76 @@ export function revertOptimisticStoreLayerAndMaybeReplace(
   optimisticNode: OptimisticStoreLayer,
   normalizeData: null | ((storeLayer: StoreLayerWithData) => void),
 ): void {
-  const oldData = optimisticNode.data;
-  // we cannot replace the optimistic node with the network response directly
-  // because of the types so we have to:
-  // 1. reset the optimistic node
+  // We cannot just replace the optimistic node with the network response node,
+  // because (e.g.) the types allow Base <- Opt, but not Base <- NetworkResponse.
+  // We also may be removing the optimistic layer without replacing it with
+  // anything, which would also be disallowed if the original stack was
+  // Base <- Opt <- NetworkResponse.
+  //
+  // Thus, instead, we will (1) replace the optimistic node's data with an empty object
+  // and attach the network response as a child.
+  const oldMergedData = optimisticNode.data;
   optimisticNode.data = {};
-  // 2. append the network response as child if no network error
-  // otherwise operate on child node
 
-  let newData = {};
+  let newMergedData = {};
   let childNode = optimisticNode.childStoreLayer;
   if (normalizeData !== null) {
-    const networkResponse: NetworkResponseStoreLayer = {
+    const networkResponseStoreLayer: NetworkResponseStoreLayer = {
       kind: 'NetworkResponseStoreLayer',
       data: {},
       parentStoreLayer: optimisticNode,
       childStoreLayer: null,
     };
-    normalizeData(networkResponse);
+    normalizeData(networkResponseStoreLayer);
 
     if (childNode?.kind === 'NetworkResponseStoreLayer') {
-      mergeDataLayer(networkResponse.data, childNode.data);
-      mergeDataLayer(oldData, childNode.data);
+      // (2) if the optimistic layer's child was a network response, and we are
+      // replacing it with a network response, we must merge the replacement
+      // and the child.
+      mergeDataLayer(networkResponseStoreLayer.data, childNode.data);
+      mergeDataLayer(oldMergedData, childNode.data);
       childNode = childNode.childStoreLayer;
     }
-    newData = structuredClone(networkResponse.data);
-    setChildOfNode(environment, networkResponse, childNode);
-    optimisticNode.childStoreLayer = networkResponse;
+    newMergedData = structuredClone(networkResponseStoreLayer.data);
+    setChildOfNode(environment, networkResponseStoreLayer, childNode);
+    optimisticNode.childStoreLayer = networkResponseStoreLayer;
   }
 
-  // reexecute all updates after the network response
-  reexecuteUpdatesAndMergeData(childNode, oldData, newData);
-  // merge the child nodes if possible and remove them or remove the optimistic node
+  // (3) Re-execute all updates, accumulating all changed values into newMergedData.
+  // Since we have already written the network response into newMergedData, we
+  // can proceed from the child of the (potentially merged) network response layer.
+  //
+  // Note that it is important that reexecuteUpdatesAndMergeData is called here!
+  // That is because we created newMergedData from the network response layer's data,
+  // and later, we may merge that network response into the parent layer (if it is
+  // a base layer). That merged layer will contain many extraneous records (unless the
+  // base layer is empty).
+  //
+  // This would cause us to re-execute subscriptions unnecessarily, as these records
+  // do not represent changes between the optimistic and network response layers.
+  reexecuteUpdatesAndMergeData(childNode, oldMergedData, newMergedData);
+
+  // (4) Now, we can finally remove the optimistic layer, i.e. do
+  // optimistic.parent.child = optimistic.child.
+  // But the types don't line up, so we handle the cases differently, based on the
+  // parent layer type.
   if (optimisticNode.parentStoreLayer.kind === 'BaseStoreLayer') {
-    const childOptimisticNode = mergeChildNodes(
+    // (4a) If the optimistic parent is the base layer, then we have a problem: base.child
+    // must be an optimistic layer or null. So, we merge the optimistic children into the
+    // base layer until we reach an optimistic layer.
+    mergeLayersWithDataIntoBaseLayer(
+      environment,
       optimisticNode.childStoreLayer,
       optimisticNode.parentStoreLayer,
-    );
-
-    setChildOfNode(
-      environment,
-      optimisticNode.parentStoreLayer,
-      childOptimisticNode,
     );
   } else if (
     optimisticNode.parentStoreLayer.kind === 'NetworkResponseStoreLayer' &&
     optimisticNode.childStoreLayer?.kind === 'NetworkResponseStoreLayer'
   ) {
+    // (4b) if the parent is a network response layer, simply merge those. (We do not
+    // attempt to merge other layers, e.g. startUpdate layers, because there is some
+    // optimistic layer between this layer and the base, and the startUpdate will need
+    // to be recalculated if the optimistic layer is reverted.)
     mergeDataLayer(
       optimisticNode.parentStoreLayer.data,
       optimisticNode.childStoreLayer.data,
@@ -374,6 +419,8 @@ export function revertOptimisticStoreLayerAndMaybeReplace(
       optimisticNode.childStoreLayer.childStoreLayer,
     );
   } else {
+    // (4c) Otherwise, the parent is an optimistic or start update layer, and we can
+    // set optimistic.parent.child = optimistic.child.
     setChildOfNode(
       environment,
       optimisticNode.parentStoreLayer,
@@ -381,8 +428,10 @@ export function revertOptimisticStoreLayerAndMaybeReplace(
     );
   }
 
+  // (5) finally, compare the oldMergedData and newMergedData objects, in order to extract
+  // the modified IDs, and re-execute subscriptions.
   let encounteredIds: EncounteredIds = new Map();
-  compareData(oldData, newData, encounteredIds);
+  compareData(oldMergedData, newMergedData, encounteredIds);
   callSubscriptions(environment, encounteredIds);
 }
 
