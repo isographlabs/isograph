@@ -239,43 +239,54 @@ function mergeChildNodes(
   return node;
 }
 
-function reexecuteUpdates(
-  initialStoreLayer:
+/**
+ * Now that we have replaced the optimistic layer with a network response layer, we need
+ * to
+ * - re-execute startUpdate and optimistic nodes, in light of the replaced data, and
+ * - create two objects containing the old merged data (from the optimistic update layer
+ *   onward) and the new merged data (from the network response layer onward).
+ * - we will compare the new and old merged data in order to determine the changed records
+ *   and trigger subscriptions.
+ *
+ * Here, "data" means all of the records + fields that were modified, starting at
+ * storeLayer, e.g. in BaseLayer <- OptimisticLayer <- StartUpdateLayer, if we
+ * are replacing Optimistic, then oldData will contain the records + fields modified by
+ * OptimisticLayer + StartUpdateLayer.
+ */
+function reexecuteUpdatesAndMergeData(
+  storeLayer:
     | OptimisticStoreLayer
     | NetworkResponseStoreLayer
     | StartUpdateStoreLayer
     | null,
-  oldData: StoreLayerData,
-  newData: StoreLayerData,
+  // reflects the (now reverted) optimistic layer
+  oldMergedData: StoreLayerData,
+  // reflects whatever replaced the optimistic layer
+  newMergedData: StoreLayerData,
 ): void {
-  let node:
-    | OptimisticStoreLayer
-    | NetworkResponseStoreLayer
-    | StartUpdateStoreLayer
-    | null = initialStoreLayer;
-  while (node !== null) {
-    mergeDataLayer(oldData, node.data);
-    switch (node.kind) {
+  while (storeLayer !== null) {
+    mergeDataLayer(oldMergedData, storeLayer.data);
+    switch (storeLayer.kind) {
       case 'NetworkResponseStoreLayer':
         break;
       case 'StartUpdateStoreLayer': {
-        node.data = {};
-        node.startUpdate(node);
+        storeLayer.data = {};
+        storeLayer.startUpdate(storeLayer);
         break;
       }
       case 'OptimisticStoreLayer': {
-        node.data = {};
-        node.startUpdate(node);
+        storeLayer.data = {};
+        storeLayer.startUpdate(storeLayer);
         break;
       }
       default: {
-        node satisfies never;
+        storeLayer satisfies never;
         throw new Error('Unreachable. This is a bug in Isograph.');
       }
     }
-    mergeDataLayer(newData, node.data);
+    mergeDataLayer(newMergedData, storeLayer.data);
 
-    node = node.childStoreLayer;
+    storeLayer = storeLayer.childStoreLayer;
   }
 }
 
@@ -335,7 +346,7 @@ export function revertOptimisticStoreLayerAndMaybeReplace(
   }
 
   // reexecute all updates after the network response
-  reexecuteUpdates(childNode, oldData, newData);
+  reexecuteUpdatesAndMergeData(childNode, oldData, newData);
   // merge the child nodes if possible and remove them or remove the optimistic node
   if (optimisticNode.parentStoreLayer.kind === 'BaseStoreLayer') {
     const childOptimisticNode = mergeChildNodes(
