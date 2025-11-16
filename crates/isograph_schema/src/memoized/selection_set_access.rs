@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use common_lang_types::{ClientSelectableName, ServerObjectEntityName, WithLocation, WithSpan};
+use common_lang_types::{
+    ClientSelectableName, ParentObjectEntityNameAndSelectableName, ServerObjectEntityName,
+    WithLocation, WithSpan,
+};
 use isograph_lang_types::{SelectionType, UnvalidatedSelection};
 use pico_macros::legacy_memo;
 use thiserror::Error;
@@ -72,12 +75,12 @@ pub fn memoized_validated_reader_selection_set_map<TNetworkProtocol: NetworkProt
                 key,
                 value.and_then(|unvalidated_selection_set| {
                     let top_level_field_or_pointer = match unvalidated_selection_set {
-                        SelectionType::Scalar(_) => {
-                            SelectionType::Scalar((key.0, key.1.into()).into())
-                        }
-                        SelectionType::Object(_) => {
-                            SelectionType::Object((key.0, key.1.into()).into())
-                        }
+                        SelectionType::Scalar(_) => SelectionType::Scalar(
+                            ParentObjectEntityNameAndSelectableName::new(key.0, key.1.into()),
+                        ),
+                        SelectionType::Object(_) => SelectionType::Object(
+                            ParentObjectEntityNameAndSelectableName::new(key.0, key.1.into()),
+                        ),
                     };
 
                     get_validated_selection_set(

@@ -120,15 +120,12 @@ fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol>(
         db,
         unprocessed_client_object_selection_set.reader_selection_set,
         unprocessed_client_object_selection_set.parent_object_entity_name,
-        SelectionType::Object(
-            (
-                unprocessed_client_object_selection_set.parent_object_entity_name,
-                unprocessed_client_object_selection_set
-                    .client_object_selectable_name
-                    .into(),
-            )
+        SelectionType::Object(ParentObjectEntityNameAndSelectableName::new(
+            unprocessed_client_object_selection_set.parent_object_entity_name,
+            unprocessed_client_object_selection_set
+                .client_object_selectable_name
                 .into(),
-        ),
+        )),
     )?;
 
     let client_pointer = schema
