@@ -14,6 +14,7 @@ use isograph_schema::{
     RefetchedPathsMap, Schema, ServerObjectSelectableVariant, ValidatedObjectSelection,
     ValidatedScalarSelection, ValidatedSelection, VariableContext, categorize_field_loadability,
     server_object_selectable_named, transform_arguments_with_child_context,
+    validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 
 use crate::{
@@ -539,17 +540,27 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         indentation_level + 1,
     );
 
+    let validated_refetch_strategy = validated_refetch_strategy_for_client_scalar_selectable_named(
+        db,
+        client_field.parent_object_entity_name,
+        client_field.name.item,
+    )
+    .as_ref()
+    .expect(
+        "Expected refetch strategy to be valid. \
+        This is indicative of a bug in Isograph.",
+    )
+    .as_ref()
+    .expect(
+        "Expected refetch strategy. \
+        This is indicative of a bug in Isograph.",
+    );
+
     let empty_selection_set = vec![];
     let (reader_ast, additional_reader_imports) = generate_reader_ast(
         db,
         schema,
-        client_field
-            .refetch_strategy
-            .as_ref()
-            .expect(
-                "Expected refetch strategy. \
-                This is indicative of a bug in Isograph.",
-            )
+        validated_refetch_strategy
             .refetch_selection_set()
             .unwrap_or(&empty_selection_set),
         indentation_level + 1,

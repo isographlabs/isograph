@@ -50,7 +50,7 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                     SelectionType::Scalar(_) => {
                         let refetch_strategy = get_unvalidated_refetch_stategy(db, key.0)
                             .map_err(|e| e.into())
-                            .map(|x| SelectionType::Scalar(x));
+                            .map(SelectionType::Scalar);
                         vacant_entry.insert(refetch_strategy);
                     }
                     SelectionType::Object(o) => {
