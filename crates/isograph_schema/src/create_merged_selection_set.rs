@@ -28,6 +28,7 @@ use crate::{
     initial_variable_context, server_object_entity_named, server_object_selectable_named,
     transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context,
+    validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -1064,18 +1065,28 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
 
     let empty_selection_set = vec![];
 
+    let validated_refetch_strategy = validated_refetch_strategy_for_client_scalar_selectable_named(
+        db,
+        newly_encountered_client_scalar_selectable.parent_object_entity_name,
+        newly_encountered_client_scalar_selectable.name.item,
+    )
+    .as_ref()
+    .expect(
+        "Expected refetch strategy to be valid. \
+        This is indicative of a bug in Isograph.",
+    )
+    .as_ref()
+    .expect(
+        "Expected refetch strategy. \
+        This is indicative of a bug in Isograph.",
+    );
+
     // Generate a merged selection set, but using the refetch strategy
     create_merged_selection_map_for_field_and_insert_into_global_map(
         db,
         schema,
         parent_object_entity,
-        newly_encountered_client_scalar_selectable
-            .refetch_strategy
-            .as_ref()
-            .expect(
-                "Expected refetch strategy. \
-                This is indicative of a bug in Isograph.",
-            )
+        validated_refetch_strategy
             .refetch_selection_set()
             .unwrap_or(&empty_selection_set),
         encountered_client_type_map,

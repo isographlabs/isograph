@@ -149,7 +149,6 @@ pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
         .collect())
 }
 
-#[expect(clippy::type_complexity)]
 #[legacy_memo]
 pub fn validated_refetch_strategy_for_client_scalar_selectable_named<
     TNetworkProtocol: NetworkProtocol,
@@ -188,7 +187,6 @@ pub fn validated_refetch_strategy_for_client_scalar_selectable_named<
     }
 }
 
-#[expect(clippy::type_complexity)]
 #[legacy_memo]
 pub fn validated_refetch_strategy_for_object_scalar_selectable_named<
     TNetworkProtocol: NetworkProtocol,

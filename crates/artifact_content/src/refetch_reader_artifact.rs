@@ -5,6 +5,7 @@ use isograph_lang_types::SelectionType;
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, FieldMapItem, IsographDatabase,
     NetworkProtocol, RefetchedPathsMap, Schema, initial_variable_context,
+    validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 
 use crate::{
@@ -30,18 +31,28 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
 
     let empty_selection_set = vec![];
 
+    let validated_refetch_strategy = validated_refetch_strategy_for_client_scalar_selectable_named(
+        db,
+        client_field.parent_object_entity_name,
+        client_field.name.item,
+    )
+    .as_ref()
+    .expect(
+        "Expected refetch strategy to be valid. \
+        This is indicative of a bug in Isograph.",
+    )
+    .as_ref()
+    .expect(
+        "Expected refetch strategy. \
+        This is indicative of a bug in Isograph.",
+    );
+
     let (reader_ast, reader_imports) = generate_reader_ast(
         db,
         schema,
+        // TODO model this better
         if was_selected_loadably {
-            // TODO model this better
-            client_field
-                .refetch_strategy
-                .as_ref()
-                .expect(
-                    "Expected refetch strategy. \
-                    This is indicative of a bug in Isograph.",
-                )
+            validated_refetch_strategy
                 .refetch_selection_set()
                 .unwrap_or(&empty_selection_set)
         } else {

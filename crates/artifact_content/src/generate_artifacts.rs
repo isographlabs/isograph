@@ -24,7 +24,7 @@ use isograph_schema::{
     accessible_client_fields, description, fetchable_types, inline_fragment_reader_selection_set,
     output_type_annotation, selection_map_wrapped, server_object_entity_named,
     server_object_selectable_named, server_scalar_entity_javascript_name,
-    server_scalar_selectable_named,
+    server_scalar_selectable_named, validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 use isograph_schema::{ContainsIsoStats, GetValidatedSchemaError, get_validated_schema};
 use lazy_static::lazy_static;
@@ -328,11 +328,25 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 default_value: None,
                             };
 
-                            let (wrapped_map, variable_definitions_iter) =
-                                match client_scalar_selectable.refetch_strategy.as_ref().expect(
-                                    "Expected a refetch strategy. \
+                            let validated_refetch_strategy =
+                                validated_refetch_strategy_for_client_scalar_selectable_named(
+                                    db,
+                                    client_scalar_selectable.parent_object_entity_name,
+                                    client_scalar_selectable.name.item,
+                                )
+                                .as_ref()
+                                .expect(
+                                    "Expected refetch strategy to be valid. \
                                     This is indicative of a bug in Isograph.",
-                                ) {
+                                )
+                                .as_ref()
+                                .expect(
+                                    "Expected refetch strategy. \
+                                    This is indicative of a bug in Isograph.",
+                                );
+
+                            let (wrapped_map, variable_definitions_iter) =
+                                match validated_refetch_strategy {
                                     RefetchStrategy::RefetchFromRoot => (
                                         selection_map_wrapped(merged_selection_map.clone(), vec![]),
                                         variable_definitions_iter.collect::<Vec<_>>(),
