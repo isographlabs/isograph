@@ -8,9 +8,9 @@ use isograph_lang_types::{Description, VariableDefinition};
 
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, IsographDatabase,
-    MemoizedIsoLiteralError, MemoizedSelectionSetError, NetworkProtocol, ObjectSelectableId,
-    RefetchStrategy, ScalarSelectableId, SelectableTrait, ServerEntityName, ValidatedSelection,
-    client_scalar_selectable_named, selectable_validated_reader_selection_set,
+    MemoizedIsoLiteralError, MemoizedSelectionSetError, NetworkProtocol, SelectableTrait,
+    ServerEntityName, ValidatedSelection, client_scalar_selectable_named,
+    selectable_validated_reader_selection_set,
     validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 
@@ -21,8 +21,6 @@ pub trait ClientScalarOrObjectSelectable {
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName;
     fn parent_object_entity_name(&self) -> ServerObjectEntityName;
     fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>];
-    fn refetch_strategy(&self) -> Option<&RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>;
-    fn selection_set_for_parent_query(&self) -> &[WithSpan<ValidatedSelection>];
 
     fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityName>>];
 
@@ -50,24 +48,6 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 
     fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>] {
         &self.reader_selection_set
-    }
-
-    fn refetch_strategy(&self) -> Option<&RefetchStrategy<ScalarSelectableId, ObjectSelectableId>> {
-        self.refetch_strategy.as_ref()
-    }
-
-    fn selection_set_for_parent_query(&self) -> &[WithSpan<ValidatedSelection>] {
-        match self.variant {
-            ClientFieldVariant::ImperativelyLoadedField(_) => self
-                .refetch_strategy
-                .as_ref()
-                .and_then(|strategy| strategy.refetch_selection_set())
-                .expect(
-                    "Expected imperatively loaded field to have refetch selection set. \
-                    This is indicative of a bug in Isograph.",
-                ),
-            _ => &self.reader_selection_set,
-        }
     }
 
     fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityName>>] {
@@ -99,14 +79,6 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     }
 
     fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>] {
-        &self.reader_selection_set
-    }
-
-    fn refetch_strategy(&self) -> Option<&RefetchStrategy<ScalarSelectableId, ObjectSelectableId>> {
-        Some(&self.refetch_strategy)
-    }
-
-    fn selection_set_for_parent_query(&self) -> &[WithSpan<ValidatedSelection>] {
         &self.reader_selection_set
     }
 
@@ -207,16 +179,15 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
                 .clone()
         }
         _ => {
-            let selection_set = selectable_validated_reader_selection_set(
+            // TODO don't clone
+            selectable_validated_reader_selection_set(
                 db,
                 parent_object_entity_name,
                 client_scalar_selectable_name.into(),
             )
             .as_ref()
             .expect("Expected selection set to be valid.")
-            .clone();
-            // TODO don't clone
-            selection_set
+            .clone()
         }
     })
 }
