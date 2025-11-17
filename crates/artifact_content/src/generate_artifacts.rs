@@ -23,7 +23,7 @@ use isograph_schema::{
     ValidatedSelection, ValidatedVariableDefinition, WrappedSelectionMapSelection,
     accessible_client_fields, client_object_selectable_named, client_scalar_selectable_named,
     client_selectable_named, description, fetchable_types, inline_fragment_reader_selection_set,
-    output_type_annotation, selection_map_wrapped, server_object_entity_named,
+    output_type_annotation, selectable_named, selection_map_wrapped, server_object_entity_named,
     server_object_selectable_named, server_scalar_entity_javascript_name,
     server_scalar_selectable_named, validated_refetch_strategy_for_client_scalar_selectable_named,
 };
@@ -848,36 +848,69 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             }
         }
         SelectionTypeContainingSelections::Object(linked_field) => {
-            let field = schema
-                .object_selectable(db, linked_field.associated_data)
-                .expect(
-                    "Expected selectable to exist. \
+            let (parent_object_entity_name, object_selectable_name) =
+                match linked_field.associated_data {
+                    DefinitionLocation::Server((
+                        parent_object_entity_name,
+                        server_object_selectable_name,
+                    )) => (
+                        parent_object_entity_name,
+                        server_object_selectable_name.into(),
+                    ),
+                    DefinitionLocation::Client((
+                        parent_object_entity_name,
+                        client_object_selectable_name,
+                    )) => (
+                        parent_object_entity_name,
+                        client_object_selectable_name.into(),
+                    ),
+                };
+
+            let object_selectable =
+                selectable_named(db, parent_object_entity_name, object_selectable_name)
+                    // TODO why do we have to clone?
+                    .clone()
+                    .expect(
+                        "Expected selectable to be valid. \
                         This is indicative of a bug in Isograph.",
-                );
+                    )
+                    .expect(
+                        "Expected selectable to exist. \
+                        This is indicative of a bug in Isograph.",
+                    )
+                    .as_object()
+                    // TODO have an object_selectable_named method
+                    .expect(
+                        "Expected selectable to be object. \
+                        This is indicative of a bug in Isograph.",
+                    );
 
             write_optional_description(
-                description(&field),
+                description(&object_selectable),
                 query_type_declaration,
                 indentation_level,
             );
             query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
             let name_or_alias = linked_field.name_or_alias().item;
 
-            let type_annotation = output_type_annotation(&field).clone().map(&mut |_| {
-                generate_client_field_parameter_type(
-                    db,
-                    schema,
-                    &linked_field.selection_set,
-                    nested_client_field_imports,
-                    loadable_fields,
-                    indentation_level,
-                )
-            });
+            let type_annotation =
+                output_type_annotation(&object_selectable)
+                    .clone()
+                    .map(&mut |_| {
+                        generate_client_field_parameter_type(
+                            db,
+                            schema,
+                            &linked_field.selection_set,
+                            nested_client_field_imports,
+                            loadable_fields,
+                            indentation_level,
+                        )
+                    });
 
             query_type_declaration.push_str(&format!(
                 "readonly {}: {},\n",
                 name_or_alias,
-                match field {
+                match object_selectable {
                     DefinitionLocation::Client(client_pointer) => {
                         loadable_fields.insert(client_pointer.type_and_field);
 
@@ -1086,32 +1119,65 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             }
         }
         SelectionTypeContainingSelections::Object(linked_field) => {
-            let field = schema
-                .object_selectable(db, linked_field.associated_data)
-                .expect(
-                    "Expected selectable to exist. \
-                    This is indicative of a bug in Isograph.",
-                );
+            let (parent_object_entity_name, object_selectable_name) =
+                match linked_field.associated_data {
+                    DefinitionLocation::Server((
+                        parent_object_entity_name,
+                        server_object_selectable_name,
+                    )) => (
+                        parent_object_entity_name,
+                        server_object_selectable_name.into(),
+                    ),
+                    DefinitionLocation::Client((
+                        parent_object_entity_name,
+                        client_object_selectable_name,
+                    )) => (
+                        parent_object_entity_name,
+                        client_object_selectable_name.into(),
+                    ),
+                };
+
+            let object_selectable =
+                selectable_named(db, parent_object_entity_name, object_selectable_name)
+                    // TODO Why do we have to clone here, instead of calling as_ref?
+                    .clone()
+                    .expect(
+                        "Expected selectable to be valid. \
+                        This is indicative of a bug in Isograph.",
+                    )
+                    .expect(
+                        "Expected selectable to exist. \
+                        This is indicative of a bug in Isograph.",
+                    )
+                    .as_object()
+                    // TODO have an object_selectable_named method
+                    .expect(
+                        "Expected selectable to be object. \
+                        This is indicative of a bug in Isograph.",
+                    );
 
             write_optional_description(
-                description(&field),
+                description(&object_selectable),
                 query_type_declaration,
                 indentation_level,
             );
             query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
             let name_or_alias = linked_field.name_or_alias().item;
 
-            let type_annotation = output_type_annotation(&field).clone().map(&mut |_| {
-                generate_client_field_updatable_data_type(
-                    db,
-                    schema,
-                    &linked_field.selection_set,
-                    nested_client_field_imports,
-                    loadable_fields,
-                    indentation_level,
-                    updatable_fields,
-                )
-            });
+            let type_annotation =
+                output_type_annotation(&object_selectable)
+                    .clone()
+                    .map(&mut |_| {
+                        generate_client_field_updatable_data_type(
+                            db,
+                            schema,
+                            &linked_field.selection_set,
+                            nested_client_field_imports,
+                            loadable_fields,
+                            indentation_level,
+                            updatable_fields,
+                        )
+                    });
 
             match linked_field.object_selection_directive_set {
                 ObjectSelectionDirectiveSet::Updatable(_) => {
@@ -1120,7 +1186,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         query_type_declaration,
                         indentation_level,
                         name_or_alias,
-                        output_type_annotation(&field),
+                        output_type_annotation(&object_selectable),
                         &type_annotation,
                     );
                 }
