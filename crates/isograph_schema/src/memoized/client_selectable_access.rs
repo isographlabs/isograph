@@ -9,7 +9,7 @@ use crate::{
 };
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName,
-    ServerObjectEntityName, Span, WithSpan,
+    ServerObjectEntityName, WithSpan,
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{ClientFieldDeclaration, ClientPointerDeclaration, SelectionType};
@@ -262,12 +262,9 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
         }
     };
 
-    let (_, scalar_selectable) = process_client_field_declaration_inner(
-        db,
-        WithSpan::new(declaration, Span::todo_generated()),
-    )
-    .as_ref()
-    .map_err(|e| MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(e.clone()))?;
+    let (_, scalar_selectable) = process_client_field_declaration_inner(db, declaration)
+        .as_ref()
+        .map_err(|e| MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(e.clone()))?;
 
     Ok(Some(scalar_selectable.clone()))
 }
@@ -291,12 +288,9 @@ pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
         None => return Ok(None),
     };
 
-    let (_, object_selectable) = process_client_pointer_declaration_inner(
-        db,
-        WithSpan::new(declaration, Span::todo_generated()),
-    )
-    .as_ref()
-    .map_err(|e| MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(e.clone()))?;
+    let (_, object_selectable) = process_client_pointer_declaration_inner(db, declaration)
+        .as_ref()
+        .map_err(|e| MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(e.clone()))?;
 
     Ok(Some(object_selectable.clone()))
 }

@@ -188,7 +188,7 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol>(
     let client_field_parent_object_entity_name = client_field_declaration.item.parent_type.item.0;
 
     let (result, client_scalar_selectable) =
-        process_client_field_declaration_inner(db, client_field_declaration).to_owned()?;
+        process_client_field_declaration_inner(db, client_field_declaration.item).to_owned()?;
 
     if schema
         .server_entity_data
@@ -228,7 +228,7 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    client_field_declaration: WithSpan<ClientFieldDeclaration>,
+    client_field_declaration: ClientFieldDeclaration,
 ) -> ProcessClientFieldDeclarationResult<
     (
         UnprocessedClientScalarSelectableSelectionSet,
@@ -236,48 +236,46 @@ pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>
     ),
     TNetworkProtocol,
 > {
-    let client_scalar_selectable_name = client_field_declaration.item.client_field_name.item;
+    let client_scalar_selectable_name = client_field_declaration.client_field_name.item;
 
-    let variant = get_client_variant(&client_field_declaration.item);
+    let variant = get_client_variant(&client_field_declaration);
 
     let selectable = ClientScalarSelectable {
-        description: client_field_declaration.item.description.map(|x| x.item),
+        description: client_field_declaration.description.map(|x| x.item),
         name: client_field_declaration
-            .item
             .client_field_name
             .map(|client_scalar_selectable_name| *client_scalar_selectable_name)
             .into_with_location(),
         variant,
         variable_definitions: client_field_declaration
-            .item
             .variable_definitions
             .into_iter()
             .map(|variable_definition| {
                 validate_variable_definition(
                     db,
                     variable_definition,
-                    client_field_declaration.item.parent_type.item.0,
+                    client_field_declaration.parent_type.item.0,
                     client_scalar_selectable_name.0.into(),
                 )
             })
             .collect::<Result<_, _>>()?,
         type_and_field: ParentObjectEntityNameAndSelectableName {
-            parent_object_entity_name: client_field_declaration.item.parent_type.item.0,
+            parent_object_entity_name: client_field_declaration.parent_type.item.0,
             selectable_name: client_scalar_selectable_name.0.into(),
         },
 
-        parent_object_entity_name: client_field_declaration.item.parent_type.item.0,
+        parent_object_entity_name: client_field_declaration.parent_type.item.0,
         network_protocol: std::marker::PhantomData,
     };
 
-    let selections = client_field_declaration.item.selection_set;
+    let selections = client_field_declaration.selection_set;
 
-    let parent_object_entity_name = client_field_declaration.item.parent_type.item.0;
+    let parent_object_entity_name = client_field_declaration.parent_type.item.0;
     let refetch_strategy = get_unvalidated_refetch_stategy(db, parent_object_entity_name)?;
 
     Ok((
         UnprocessedClientScalarSelectableSelectionSet {
-            parent_object_entity_name: client_field_declaration.item.parent_type.item.0,
+            parent_object_entity_name: client_field_declaration.parent_type.item.0,
             client_scalar_selectable_name: *client_scalar_selectable_name,
             reader_selection_set: selections,
             refetch_strategy,
@@ -396,7 +394,7 @@ fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol>(
     }
 
     let (unprocessed_fields, client_object_selectable) =
-        process_client_pointer_declaration_inner(db, client_pointer_declaration).to_owned()?;
+        process_client_pointer_declaration_inner(db, client_pointer_declaration.item).to_owned()?;
 
     schema.client_object_selectables.insert(
         (parent_object_entity_name, client_pointer_name),
@@ -409,7 +407,7 @@ fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
+    client_pointer_declaration: ClientPointerDeclaration,
 ) -> ProcessClientFieldDeclarationResult<
     (
         UnprocessedClientObjectSelectableSelectionSet,
@@ -417,15 +415,10 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
     ),
     TNetworkProtocol,
 > {
-    let parent_object_entity_name = client_pointer_declaration.item.parent_type.item.0;
-    let client_pointer_name = client_pointer_declaration.item.client_pointer_name.item.0;
+    let parent_object_entity_name = client_pointer_declaration.parent_type.item.0;
+    let client_pointer_name = client_pointer_declaration.client_pointer_name.item.0;
 
-    if let Some(directive) = client_pointer_declaration
-        .item
-        .directives
-        .into_iter()
-        .next()
-    {
+    if let Some(directive) = client_pointer_declaration.directives.into_iter().next() {
         return Err(directive.map(|directive| {
             ProcessClientFieldDeclarationError::DirectiveNotSupportedOnClientPointer {
                 directive_name: directive.name.item,
@@ -433,18 +426,16 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
         }));
     }
 
-    let unprocessed_fields = client_pointer_declaration.item.selection_set;
+    let unprocessed_fields = client_pointer_declaration.selection_set;
 
     let client_object_selectable = ClientObjectSelectable {
-        description: client_pointer_declaration.item.description.map(|x| x.item),
+        description: client_pointer_declaration.description.map(|x| x.item),
         name: client_pointer_declaration
-            .item
             .client_pointer_name
             .map(|client_object_selectable_name| *client_object_selectable_name)
             .into_with_location(),
 
         variable_definitions: client_pointer_declaration
-            .item
             .variable_definitions
             .into_iter()
             .map(|variable_definition| {
@@ -463,17 +454,13 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
 
         parent_object_entity_name,
         target_object_entity_name: TypeAnnotation::from_graphql_type_annotation(
-            client_pointer_declaration
-                .item
-                .target_type
-                .clone()
-                .map(|x| x.0),
+            client_pointer_declaration.target_type.clone().map(|x| x.0),
         ),
         network_protocol: std::marker::PhantomData,
 
         info: UserWrittenClientPointerInfo {
-            const_export_name: client_pointer_declaration.item.const_export_name,
-            file_path: client_pointer_declaration.item.definition_path,
+            const_export_name: client_pointer_declaration.const_export_name,
+            file_path: client_pointer_declaration.definition_path,
         },
     };
 
