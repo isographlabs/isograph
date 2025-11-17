@@ -10,8 +10,8 @@ use thiserror::Error;
 
 use crate::{
     AddSelectionSetsError, EntityAccessError, IsographDatabase, NetworkProtocol,
-    ValidatedSelection, client_selectable_declaration_map_from_iso_literals, get_link_fields,
-    get_validated_selection_set,
+    ValidatedSelection, client_selectable_declaration_map_from_iso_literals, expose_field_map,
+    get_link_fields, get_validated_selection_set,
 };
 
 type UnvalidatedSelectionSet = Vec<WithSpan<UnvalidatedSelection>>;
@@ -72,6 +72,23 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
         Err(_) => {
             // TODO do not silently ignore errors in link fields. Instead, return a Result
             // from this fn
+        }
+    }
+
+    // And we must also do it for expose fields. Ay ay ay
+    match expose_field_map(db) {
+        Ok(expose_field_map) => {
+            for (key, (_, selection_set)) in expose_field_map {
+                map.insert(
+                    (key.0, key.1.into()),
+                    Ok(SelectionType::Scalar(
+                        selection_set.reader_selection_set.clone(),
+                    )),
+                );
+            }
+        }
+        Err(_) => {
+            // TODO don't silently ignore this error.
         }
     }
 
