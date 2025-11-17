@@ -268,7 +268,6 @@ pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>
         },
 
         parent_object_entity_name: client_field_declaration.item.parent_type.item.0,
-        refetch_strategy: None,
         network_protocol: std::marker::PhantomData,
     };
 
@@ -420,20 +419,7 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
     TNetworkProtocol,
 > {
     let parent_object_entity_name = client_pointer_declaration.item.parent_type.item.0;
-    let to_object_entity_name = client_pointer_declaration.item.target_type.inner().0;
     let client_pointer_name = client_pointer_declaration.item.client_pointer_name.item.0;
-
-    let query_id = *fetchable_types(db)
-        .as_ref()
-        .expect(
-            "Expected parsing to have succeeded. \
-            This is indicative of a bug in Isograph.",
-        )
-        .lookup(db)
-        .iter()
-        .find(|(_, root_operation_name)| root_operation_name.0 == "query")
-        .expect("Expected query to be found")
-        .0;
 
     if let Some(directive) = client_pointer_declaration
         .item
@@ -449,67 +435,6 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
     }
 
     let unprocessed_fields = client_pointer_declaration.item.selection_set;
-
-    let is_fetchable = fetchable_types(db)
-        .as_ref()
-        .expect(
-            "Expected parsing to have succeeded. \
-            This is indicative of a bug in Isograph.",
-        )
-        .lookup(db)
-        .contains_key(&to_object_entity_name);
-
-    // TODO extract this into a helper function, probably on TNetworkProtocol
-    let refetch_strategy = if is_fetchable {
-        RefetchStrategy::RefetchFromRoot
-    } else {
-        let id_field = server_selectable_named(
-            db,
-            client_pointer_declaration.item.target_type.inner().0,
-            (*ID_FIELD_NAME).into(),
-        )
-        // TODO don't call to_owned
-        .to_owned()
-        .map_err(|e| {
-            WithSpan::new(
-                ProcessClientFieldDeclarationError::ServerSelectableNamedError(e),
-                Span::todo_generated(),
-            )
-        })?
-        .transpose()
-        .map_err(|e| {
-            WithSpan::new(
-                ProcessClientFieldDeclarationError::FieldToInsertToServerSelectableError(e),
-                Span::todo_generated(),
-            )
-        })?;
-
-        match id_field {
-            None => Err(WithSpan::new(
-                ProcessClientFieldDeclarationError::ClientPointerTargetTypeHasNoId {
-                    target_object_entity_name: *client_pointer_declaration.item.target_type.inner(),
-                },
-                client_pointer_declaration.item.target_type.span(),
-            )),
-            Some(_) => {
-                // Assume that if we have an id field, this implements Node
-                Ok(RefetchStrategy::UseRefetchField(
-                    generate_refetch_field_strategy(
-                        vec![],
-                        query_id,
-                        vec![
-                            WrappedSelectionMapSelection::InlineFragment(to_object_entity_name),
-                            WrappedSelectionMapSelection::LinkedField {
-                                server_object_selectable_name: *NODE_FIELD_NAME,
-                                arguments: id_top_level_arguments(),
-                                concrete_type: None,
-                            },
-                        ],
-                    ),
-                ))
-            }
-        }?
-    };
 
     let client_object_selectable = ClientObjectSelectable {
         description: client_pointer_declaration.item.description.map(|x| x.item),
@@ -539,7 +464,6 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
         },
 
         parent_object_entity_name,
-        refetch_strategy,
         target_object_entity_name: TypeAnnotation::from_graphql_type_annotation(
             client_pointer_declaration
                 .item

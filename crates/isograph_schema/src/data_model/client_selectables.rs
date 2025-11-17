@@ -7,8 +7,8 @@ use common_lang_types::{
 use isograph_lang_types::{Description, SelectionType, TypeAnnotation, VariableDefinition};
 
 use crate::{
-    ClientFieldVariant, NetworkProtocol, ObjectSelectableId, RefetchStrategy, ScalarSelectableId,
-    ServerEntityName, UserWrittenClientPointerInfo, ValidatedSelection,
+    ClientFieldVariant, NetworkProtocol, ServerEntityName, UserWrittenClientPointerInfo,
+    ValidatedSelection,
 };
 
 // TODO rename
@@ -35,12 +35,6 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub name: WithLocation<ClientScalarSelectableName>,
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 
-    // None -> not refetchable
-    // TODO - this is only used if variant === imperatively loaded field
-    // consider moving it into that struct.
-    // NOTE: do not use this field, use fns in refetch_strategy_access instead
-    pub refetch_strategy: Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>,
-
     // TODO we should probably model this differently
     pub variant: ClientFieldVariant,
 
@@ -62,8 +56,6 @@ pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub target_object_entity_name: TypeAnnotation<ServerObjectEntityName>,
 
     pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
-
-    pub refetch_strategy: RefetchStrategy<ScalarSelectableId, ObjectSelectableId>,
 
     pub variable_definitions: Vec<WithSpan<VariableDefinition<ServerEntityName>>>,
 

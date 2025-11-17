@@ -76,7 +76,6 @@ pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
                     selectable_name: field_name.into(),
                     parent_object_entity_name: object.name.item,
                 },
-                refetch_strategy: None,
                 network_protocol: std::marker::PhantomData,
             }
         })

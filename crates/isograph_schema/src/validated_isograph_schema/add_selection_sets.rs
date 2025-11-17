@@ -81,18 +81,6 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
         SelectionType::Scalar(client_scalar_selectable.type_and_field),
     )?;
 
-    let refetch_strategy = unprocessed_scalar_selection_set
-        .refetch_strategy
-        .map(|refetch_strategy| {
-            get_validated_refetch_strategy(
-                db,
-                refetch_strategy,
-                client_scalar_selectable.parent_object_entity_name,
-                SelectionType::Scalar(client_scalar_selectable.type_and_field),
-            )
-        })
-        .transpose()?;
-
     let client_field = schema
         .client_scalar_selectable_mut(
             unprocessed_scalar_selection_set.parent_object_entity_name,
@@ -104,7 +92,6 @@ fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
         );
 
     client_field.reader_selection_set = new_selection_set;
-    client_field.refetch_strategy = refetch_strategy;
 
     Ok(())
 }

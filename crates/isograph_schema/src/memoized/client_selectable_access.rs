@@ -247,7 +247,6 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
                     // Wat?! Here, we are explicitly clearing these, in order to make it obvious if we depend on these!
                     // These fields will be removed (i.e. will be separate structs.)
                     selectable.reader_selection_set = vec![];
-                    selectable.refetch_strategy = None;
                     selectable
                 })
             {
@@ -264,7 +263,6 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
                     // Wat?! Here, we are explicitly clearing these, in order to make it obvious if we depend on these!
                     // These fields will be removed (i.e. will be separate structs.)
                     selectable.reader_selection_set = vec![];
-                    selectable.refetch_strategy = None;
                     selectable
                 }));
         }
@@ -281,7 +279,6 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     // These fields will be removed (i.e. will be separate structs.)
     let mut selectable = scalar_selectable.clone();
     selectable.reader_selection_set = vec![];
-    selectable.refetch_strategy = None;
 
     Ok(Some(selectable))
 }

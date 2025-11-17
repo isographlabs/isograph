@@ -254,7 +254,6 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
             selectable_name: client_field_scalar_selection_name, // set_pet_best_friend
         },
         parent_object_entity_name: maybe_abstract_parent_object_entity_name,
-        refetch_strategy: None,
         network_protocol: std::marker::PhantomData,
     };
 
