@@ -23,9 +23,9 @@ use crate::{
     NameAndArguments, NetworkProtocol, PathToRefetchField, Schema, ServerEntityName,
     ServerObjectEntity, ServerObjectEntityExtraInfo, ServerObjectSelectable,
     ServerObjectSelectableVariant, ValidatedObjectSelection, ValidatedScalarSelection,
-    ValidatedSelection, VariableContext, client_scalar_selectable_named,
-    client_scalar_selectable_selection_set_for_parent_query, create_transformed_name_and_arguments,
-    fetchable_types,
+    ValidatedSelection, VariableContext, client_object_selectable_named,
+    client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
+    create_transformed_name_and_arguments, fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
     initial_variable_context, selectable_validated_reader_selection_set,
     server_object_entity_named, server_object_selectable_named,
@@ -584,7 +584,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                     .object_selectable(db, object_selection.associated_data)
                     .expect(
                         "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
+                        This is indicative of a bug in Isograph.",
                     )
                     .target_object_entity_name()
                     .inner();
@@ -594,25 +594,32 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                         .as_ref()
                         .expect(
                             "Expected validation to have worked. \
-                        This is indicative of a bug in Isograph.",
+                            This is indicative of a bug in Isograph.",
                         )
                         .as_ref()
                         .expect(
                             "Expected entity to exist. \
-                        This is indicative of a bug in Isograph.",
+                            This is indicative of a bug in Isograph.",
                         )
                         .item;
 
                 match object_selection.associated_data {
                     DefinitionLocation::Client((
                         parent_object_entity_name,
-                        newly_encountered_client_object_selectable_id,
+                        newly_encountered_client_object_selectable_name,
                     )) => {
-                        let newly_encountered_client_object_selectable = schema
-                            .client_object_selectable(
+                        let newly_encountered_client_object_selectable =
+                            client_object_selectable_named(
+                                db,
                                 parent_object_entity_name,
-                                newly_encountered_client_object_selectable_id,
+                                newly_encountered_client_object_selectable_name,
                             )
+                            .as_ref()
+                            .expect(
+                                "Expected selectable to be valid. \
+                                This is indicative of a bug in Isograph.",
+                            )
+                            .as_ref()
                             .expect(
                                 "Expected selectable to exist. \
                                 This is indicative of a bug in Isograph.",
@@ -627,7 +634,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             variable_context,
                             object_selection,
                             parent_object_entity_name,
-                            newly_encountered_client_object_selectable_id,
+                            newly_encountered_client_object_selectable_name,
                         );
 
                         insert_client_pointer_into_refetch_paths(
@@ -636,7 +643,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             parent_map,
                             encountered_client_type_map,
                             merge_traversal_state,
-                            newly_encountered_client_object_selectable_id,
+                            newly_encountered_client_object_selectable_name,
                             newly_encountered_client_object_selectable,
                             object_selection,
                             variable_context,
@@ -877,17 +884,23 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
     variable_context: &VariableContext,
     object_selection: &ValidatedObjectSelection,
     parent_object_entity_name: ServerObjectEntityName,
-    newly_encountered_client_object_selectable_id: ClientObjectSelectableName,
+    newly_encountered_client_object_selectable_name: ClientObjectSelectableName,
 ) {
-    let newly_encountered_client_object_selectable = schema
-        .client_object_selectable(
-            parent_object_entity_name,
-            newly_encountered_client_object_selectable_id,
-        )
-        .expect(
-            "Expected selectable to exist. \
-            This is indicative of a bug in Isograph.",
-        );
+    let newly_encountered_client_object_selectable = client_object_selectable_named(
+        db,
+        parent_object_entity_name,
+        newly_encountered_client_object_selectable_name,
+    )
+    .as_ref()
+    .expect(
+        "Expected selectable to be valid. \
+        This is indicative of a bug in Isograph.",
+    )
+    .as_ref()
+    .expect(
+        "Expected selectable to exist. \
+        This is indicative of a bug in Isograph.",
+    );
 
     merge_non_loadable_client_type(
         db,
@@ -897,7 +910,7 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
         merge_traversal_state,
         SelectionType::Object((
             parent_object_entity_name,
-            newly_encountered_client_object_selectable_id,
+            newly_encountered_client_object_selectable_name,
         )),
         SelectionType::Object(newly_encountered_client_object_selectable),
         encountered_client_type_map,
@@ -909,7 +922,7 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
         .accessible_client_fields
         .insert(SelectionType::Object((
             parent_object_entity_name,
-            newly_encountered_client_object_selectable_id,
+            newly_encountered_client_object_selectable_name,
         )));
 
     // this is theoretically wrong, we should be adding this to the client pointer
