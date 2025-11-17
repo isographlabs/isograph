@@ -15,10 +15,10 @@ use isograph_lang_types::{
 use lazy_static::lazy_static;
 
 use crate::{
-    ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectableId,
-    EntrypointDeclarationInfo, IsographDatabase, NetworkProtocol, NormalizationKey,
-    ObjectSelectable, ObjectSelectableId, ServerEntityName, ServerObjectEntityAvailableSelectables,
-    ServerObjectSelectable, ServerScalarSelectable, UseRefetchFieldRefetchStrategy,
+    ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, EntrypointDeclarationInfo,
+    IsographDatabase, NetworkProtocol, NormalizationKey, ObjectSelectable, ObjectSelectableId,
+    ServerEntityName, ServerObjectEntityAvailableSelectables, ServerObjectSelectable,
+    ServerScalarSelectable, UseRefetchFieldRefetchStrategy,
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
     server_object_selectable_named, server_selectable_named,
 };
@@ -192,15 +192,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         Ok(())
     }
 
-    pub fn client_scalar_selectable(
-        &self,
-        parent_type_name: ServerObjectEntityName,
-        client_field_name: ClientScalarSelectableName,
-    ) -> Option<&ClientScalarSelectable<TNetworkProtocol>> {
-        self.client_scalar_selectables
-            .get(&(parent_type_name, client_field_name))
-    }
-
     pub fn object_selectable(
         &self,
         db: &IsographDatabase<TNetworkProtocol>,
@@ -241,25 +232,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     ) -> Option<&ClientObjectSelectable<TNetworkProtocol>> {
         self.client_object_selectables
             .get(&(parent_object_entity_name, client_object_selectable_name))
-    }
-
-    pub fn client_selectable(
-        &self,
-        client_selectable_id: ClientSelectableId,
-    ) -> Option<
-        SelectionType<
-            &ClientScalarSelectable<TNetworkProtocol>,
-            &ClientObjectSelectable<TNetworkProtocol>,
-        >,
-    > {
-        match client_selectable_id {
-            SelectionType::Scalar((parent_entity_object_name, client_field_name)) => self
-                .client_scalar_selectable(parent_entity_object_name, client_field_name)
-                .map(SelectionType::Scalar),
-            SelectionType::Object((parent_entity_object_name, client_pointer_name)) => self
-                .client_object_selectable(parent_entity_object_name, client_pointer_name)
-                .map(SelectionType::Object),
-        }
     }
 
     #[expect(clippy::type_complexity)]

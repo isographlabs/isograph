@@ -21,9 +21,9 @@ use isograph_schema::{
     NameAndArguments, NetworkProtocol, NormalizationKey, RefetchStrategy, ScalarSelectableId,
     Schema, ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo,
     ValidatedSelection, ValidatedVariableDefinition, WrappedSelectionMapSelection,
-    accessible_client_fields, client_scalar_selectable_named, description, fetchable_types,
-    inline_fragment_reader_selection_set, output_type_annotation, selection_map_wrapped,
-    server_object_entity_named, server_object_selectable_named,
+    accessible_client_fields, client_scalar_selectable_named, client_selectable_named, description,
+    fetchable_types, inline_fragment_reader_selection_set, output_type_annotation,
+    selection_map_wrapped, server_object_entity_named, server_object_selectable_named,
     server_scalar_entity_javascript_name, server_scalar_selectable_named,
     validated_refetch_strategy_for_client_scalar_selectable_named,
 };
@@ -479,12 +479,24 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
     }
 
     for output_type_id in encountered_output_types {
-        let client_type = schema.client_selectable(output_type_id).expect(
-            "Expected selectable to exist. \
-            This is indicative of a bug in Isograph.",
-        );
+        let (parent_object_entity_name, client_selectable_name) = match output_type_id {
+            SelectionType::Scalar(s) => (s.0, s.1.into()),
+            SelectionType::Object(o) => (o.0, o.1.into()),
+        };
+        let client_selectable =
+            client_selectable_named(db, parent_object_entity_name, client_selectable_name)
+                .as_ref()
+                .expect(
+                    "Expected selectable to be valid. \
+                    This is indicative of a bug in Isograph.",
+                )
+                .as_ref()
+                .expect(
+                    "Expected selectable to exist. \
+                    This is indicative of a bug in Isograph.",
+                );
 
-        let artifact_path_and_content = match client_type {
+        let artifact_path_and_content = match client_selectable {
             SelectionType::Object(client_pointer) => {
                 Some(generate_eager_reader_output_type_artifact(
                     db,

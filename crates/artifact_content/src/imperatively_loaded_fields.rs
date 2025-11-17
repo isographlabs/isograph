@@ -5,12 +5,12 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
-use isograph_lang_types::VariableDefinition;
+use isograph_lang_types::{SelectionType, VariableDefinition};
 use isograph_schema::{
-    ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, Format,
-    ImperativelyLoadedFieldVariant, IsographDatabase, MergedSelectionMap, NetworkProtocol,
+    ClientScalarOrObjectSelectable, ClientScalarSelectable, Format, ImperativelyLoadedFieldVariant,
+    IsographDatabase, MergedSelectionMap, NetworkProtocol, OwnedClientSelectable,
     PathToRefetchFieldInfo, REFETCH_FIELD_NAME, RootRefetchedPath, Schema, ServerEntityName,
-    WrappedSelectionMapSelection, fetchable_types, selection_map_wrapped,
+    WrappedSelectionMapSelection, client_selectable_named, fetchable_types, selection_map_wrapped,
 };
 
 use crate::{
@@ -42,12 +42,23 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         client_selectable_id,
     } = path_to_refetch_field_info;
 
-    let client_selectable = schema.client_selectable(client_selectable_id).expect(
-        "Expected selectable to exist. \
-        This is indicative of a bug in Isograph.",
-    );
+    let (parent_object_entity_name, client_selectable_name) = match client_selectable_id {
+        SelectionType::Scalar(s) => (s.0, s.1.into()),
+        SelectionType::Object(o) => (o.0, o.1.into()),
+    };
+    let client_selectable =
+        client_selectable_named(db, parent_object_entity_name, client_selectable_name)
+            .as_ref()
+            .expect(
+                "Expected selectable to be valid. \
+                This is indicative of a bug in Isograph.",
+            )
+            .as_ref()
+            .expect(
+                "Expected selectable to exist. \
+                This is indicative of a bug in Isograph.",
+            );
 
-    let client_selectable: &ClientSelectable<TNetworkProtocol> = &client_selectable;
     let ImperativelyLoadedFieldVariant {
         client_selection_name,
         root_object_entity_name,
@@ -190,7 +201,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
 
 fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
     reachable_variables: &BTreeSet<VariableName>,
-    entrypoint: &ClientSelectable<TNetworkProtocol>,
+    entrypoint: &OwnedClientSelectable<TNetworkProtocol>,
 ) -> Vec<VariableDefinition<ServerEntityName>> {
     reachable_variables
         .iter()
@@ -201,6 +212,7 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
             } else {
                 Some(
                     entrypoint
+                        .as_ref()
                         .variable_definitions()
                         .iter()
                         .find(|definition| definition.item.name.item == *variable_name)
@@ -210,7 +222,7 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
                                 This might not be validated yet. For now, each client field \
                                 containing a __refetch field must re-defined all used variables. \
                                 Client field {} is missing variable definition {}",
-                                entrypoint.name(),
+                                entrypoint.as_ref().name(),
                                 variable_name
                             )
                         })
