@@ -580,7 +580,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                 };
             }
             SelectionType::Object(object_selection) => {
-                let parent_object_entity_name = *schema
+                let target_object_entity_name = *schema
                     .object_selectable(db, object_selection.associated_data)
                     .expect(
                         "Expected selectable to exist. \
@@ -590,7 +590,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                     .inner();
 
                 let object_selection_parent_object_entity =
-                    &server_object_entity_named(db, parent_object_entity_name)
+                    &server_object_entity_named(db, target_object_entity_name)
                         .as_ref()
                         .expect(
                             "Expected validation to have worked. \
@@ -662,7 +662,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             encountered_client_type_map,
                             variable_context,
                             object_selection,
-                            parent_object_entity_name,
+                            target_object_entity_name,
                             object_selection_parent_object_entity,
                             field_parent_object_entity_name,
                             field_object_selectable_name,
