@@ -42,6 +42,14 @@ cargo install bacon@3.1.1
 
 Versions newer than 3.6 will not work. (This is fixable, but we haven't yet needed to.)
 
+## Targets
+
+You will need to install a target, so that the swc plugin can install:
+
+```sh
+rustup target add wasm32-wasip1
+```
+
 ## Commands related to the compiler and Rust
 
 ### Building the compiler
