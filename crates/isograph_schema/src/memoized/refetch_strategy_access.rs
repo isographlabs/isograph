@@ -1,8 +1,8 @@
 use std::collections::{HashMap, hash_map::Entry};
 
 use common_lang_types::{
-    ClientScalarSelectableName, ClientSelectableName, ParentObjectEntityNameAndSelectableName,
-    ServerObjectEntityName, WithLocation, WithSpan,
+    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName,
+    ParentObjectEntityNameAndSelectableName, ServerObjectEntityName, WithLocation, WithSpan,
 };
 use isograph_lang_types::SelectionType;
 use pico_macros::legacy_memo;
@@ -193,7 +193,7 @@ pub fn validated_refetch_strategy_for_object_scalar_selectable_named<
 >(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
-    client_object_selectable_name: ClientScalarSelectableName,
+    client_object_selectable_name: ClientObjectSelectableName,
 ) -> Result<
     RefetchStrategy<ScalarSelectableId, ObjectSelectableId>,
     RefetchStrategyAccessError<TNetworkProtocol>,
