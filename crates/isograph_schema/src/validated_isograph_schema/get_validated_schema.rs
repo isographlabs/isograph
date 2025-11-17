@@ -43,16 +43,6 @@ pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol>(
             let parent_object_entity_name =
                 exposed_field_client_scalar_selectable.parent_object_entity_name;
 
-            unvalidated_isograph_schema
-                .client_scalar_selectables
-                .insert(
-                    (
-                        exposed_field_client_scalar_selectable.parent_object_entity_name,
-                        client_scalar_selectable_name,
-                    ),
-                    exposed_field_client_scalar_selectable,
-                );
-
             unvalidated_isograph_schema.insert_client_field_on_object(
                 parent_object_entity_name,
                 client_scalar_selectable_name,

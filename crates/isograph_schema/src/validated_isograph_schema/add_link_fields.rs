@@ -39,11 +39,6 @@ pub fn add_link_fields_to_schema<TNetworkProtocol: NetworkProtocol>(
                 parent_object_entity_name: link_field.parent_object_entity_name,
             });
         }
-
-        schema.client_scalar_selectables.insert(
-            (link_field.parent_object_entity_name, link_field.name.item),
-            link_field,
-        );
     }
 
     Ok(())

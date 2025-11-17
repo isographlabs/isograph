@@ -14,10 +14,9 @@ use isograph_lang_types::{
 use lazy_static::lazy_static;
 
 use crate::{
-    ClientObjectSelectable, ClientScalarSelectable, EntrypointDeclarationInfo, IsographDatabase,
-    NetworkProtocol, NormalizationKey, ObjectSelectableId, ServerEntityName,
-    ServerObjectEntityAvailableSelectables, ServerObjectSelectable, ServerScalarSelectable,
-    UseRefetchFieldRefetchStrategy,
+    ClientObjectSelectable, EntrypointDeclarationInfo, IsographDatabase, NetworkProtocol,
+    NormalizationKey, ObjectSelectableId, ServerEntityName, ServerObjectEntityAvailableSelectables,
+    ServerObjectSelectable, ServerScalarSelectable, UseRefetchFieldRefetchStrategy,
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
     server_selectable_named,
 };
@@ -38,10 +37,6 @@ pub struct RootOperationName(pub &'static str);
 /// The in-memory representation of a schema.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Schema<TNetworkProtocol: NetworkProtocol> {
-    pub client_scalar_selectables: HashMap<
-        (ServerObjectEntityName, ClientScalarSelectableName),
-        ClientScalarSelectable<TNetworkProtocol>,
-    >,
     pub client_object_selectables: HashMap<
         (ServerObjectEntityName, ClientObjectSelectableName),
         ClientObjectSelectable<TNetworkProtocol>,
@@ -60,7 +55,6 @@ impl<TNetworkProtocol: NetworkProtocol> Default for Schema<TNetworkProtocol> {
 impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     pub fn new() -> Self {
         Self {
-            client_scalar_selectables: HashMap::new(),
             client_object_selectables: HashMap::new(),
 
             entrypoints: Default::default(),

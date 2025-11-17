@@ -401,6 +401,7 @@ pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
 
 // TODO use this as a source for the other functions, especially for
 // client_scalar_selectable_named
+#[expect(clippy::type_complexity)]
 #[memo]
 pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,

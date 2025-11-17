@@ -188,7 +188,7 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol>(
     let client_scalar_selectable_name = client_field_declaration.item.client_field_name.item;
     let client_field_parent_object_entity_name = client_field_declaration.item.parent_type.item.0;
 
-    let (result, client_scalar_selectable) =
+    let (result, _) =
         process_client_field_declaration_inner(db, client_field_declaration.item).to_owned()?;
 
     if schema
@@ -214,14 +214,6 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol>(
             name_span,
         ));
     }
-
-    schema.client_scalar_selectables.insert(
-        (
-            client_field_parent_object_entity_name,
-            client_scalar_selectable_name.0,
-        ),
-        client_scalar_selectable,
-    );
 
     Ok(result)
 }
