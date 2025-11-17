@@ -26,7 +26,8 @@ use crate::{
     ValidatedSelection, VariableContext, client_scalar_selectable_selection_set_for_parent_query,
     create_transformed_name_and_arguments, fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
-    initial_variable_context, server_object_entity_named, server_object_selectable_named,
+    initial_variable_context, selectable_validated_reader_selection_set,
+    server_object_entity_named, server_object_selectable_named,
     transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context,
     validated_refetch_strategy_for_client_scalar_selectable_named,
@@ -1271,6 +1272,13 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
     parent_variable_context: &VariableContext,
     selection_arguments: &[WithLocation<SelectionFieldArgument>],
 ) {
+    let validated_selections = selectable_validated_reader_selection_set(
+        db,
+        newly_encountered_client_type.parent_object_entity_name(),
+        newly_encountered_client_type.name(),
+    )
+    .expect("Expected selections to be valid.");
+
     // Here, we are doing a bunch of work, just so that we can have the refetched paths,
     // which is really really silly.
     let FieldTraversalResult {
@@ -1281,7 +1289,7 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
         db,
         schema,
         parent_object_entity,
-        newly_encountered_client_type.reader_selection_set(),
+        &validated_selections,
         encountered_client_type_map,
         DefinitionLocation::Client(newly_encountered_client_type_id),
         &initial_variable_context(&newly_encountered_client_type),
