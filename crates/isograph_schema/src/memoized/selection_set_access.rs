@@ -28,6 +28,7 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
         MemoizedSelectionSetError<TNetworkProtocol>,
     >,
 > {
+    // TODO use client_selectable_map
     let declaration_map = client_selectable_declaration_map_from_iso_literals(db);
 
     let mut map = declaration_map

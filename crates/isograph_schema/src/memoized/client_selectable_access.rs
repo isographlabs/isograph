@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, CreateAdditionalFieldsError, CreateSchemaError,
-    IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError,
+    IsographDatabase, NetworkProtocol, OwnedClientSelectable, ProcessClientFieldDeclarationError,
     UnprocessedClientScalarSelectableSelectionSet, create_new_exposed_field,
     create_type_system_schema_with_server_selectables, get_link_fields_map,
     process_client_field_declaration_inner, process_client_pointer_declaration_inner,
@@ -143,7 +143,7 @@ pub enum MemoizedIsoLiteralError<TNetworkProtocol: NetworkProtocol> {
 
     #[error("{0}")]
     ProcessClientFieldDeclarationError(
-        WithSpan<ProcessClientFieldDeclarationError<TNetworkProtocol>>,
+        #[from] WithSpan<ProcessClientFieldDeclarationError<TNetworkProtocol>>,
     ),
 
     #[error("{0}")]
@@ -397,4 +397,65 @@ pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
     }
 
     Ok(map)
+}
+
+// TODO use this as a source for the other functions, especially for
+// client_scalar_selectable_named
+#[memo]
+pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+) -> Result<
+    HashMap<
+        (ServerObjectEntityName, ClientSelectableName),
+        Result<OwnedClientSelectable<TNetworkProtocol>, MemoizedIsoLiteralError<TNetworkProtocol>>,
+    >,
+    MemoizedIsoLiteralError<TNetworkProtocol>,
+> {
+    let iso_literal_map = client_selectable_declaration_map_from_iso_literals(db);
+
+    Ok(iso_literal_map
+        .iter()
+        .map(|(key, value)| {
+            let value = (|| match value.split_first() {
+                Some((first, rest)) => {
+                    if rest.is_empty() {
+                        Ok(match first.clone() {
+                            SelectionType::Scalar(scalar_declaration) => SelectionType::Scalar(
+                                process_client_field_declaration_inner(db, scalar_declaration)
+                                    .clone()
+                                    .map(|(_, selectable)| selectable)?,
+                            ),
+                            SelectionType::Object(object_declaration) => SelectionType::Object(
+                                process_client_pointer_declaration_inner(db, object_declaration)
+                                    .clone()
+                                    .map(|(_, selectable)| selectable)?,
+                            ),
+                        })
+                    } else {
+                        Err(MemoizedIsoLiteralError::MultipleDefinitionsFound {
+                            duplicate_entity_name: key.0,
+                            duplicate_client_selectable_name: key.1,
+                        })
+                    }
+                }
+                None => panic!("Unexpected empty vec. This is indicative of a bug in Isograph."),
+            })();
+
+            (*key, value)
+        })
+        .chain(
+            get_link_fields_map(db)
+                .clone()?
+                .into_iter()
+                .map(|(key, value)| ((key.0, key.1.into()), Ok(SelectionType::Scalar(value)))),
+        )
+        .chain(
+            expose_field_map(db)
+                .clone()?
+                .into_iter()
+                .map(|(key, (selectable, _))| {
+                    ((key.0, key.1.into()), Ok(SelectionType::Scalar(selectable)))
+                }),
+        )
+        .collect())
 }
