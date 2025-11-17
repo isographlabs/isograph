@@ -466,6 +466,15 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 .as_ref()
                 .expect("Expected client selectable to be valid");
 
+            match &value {
+                SelectionType::Scalar(s) => match &s.variant {
+                    isograph_schema::ClientFieldVariant::UserWritten(_) => {}
+                    isograph_schema::ClientFieldVariant::ImperativelyLoadedField(_) => return None,
+                    isograph_schema::ClientFieldVariant::Link => return None,
+                },
+                SelectionType::Object(_) => {}
+            };
+
             let client_type_name = match value {
                 SelectionType::Scalar(_) => {
                     SelectionType::Scalar((key.0, key.1.unchecked_conversion()))

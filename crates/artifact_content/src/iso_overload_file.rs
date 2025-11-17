@@ -5,9 +5,9 @@ use std::{cmp::Ordering, collections::BTreeSet};
 
 use common_lang_types::{ArtifactPathAndContent, SelectableName, ServerObjectEntityName};
 use isograph_schema::{
-    ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable,
-    EntrypointDeclarationInfo, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol, Schema,
-    client_scalar_selectable_named,
+    ClientScalarOrObjectSelectable, ClientScalarSelectable, EntrypointDeclarationInfo,
+    IsographDatabase, LINK_FIELD_NAME, NetworkProtocol, OwnedClientSelectable, Schema,
+    client_scalar_selectable_named, client_selectable_map,
 };
 
 use crate::generate_artifacts::{ISO_TS_FILE_NAME, print_javascript_type_declaration};
@@ -47,19 +47,21 @@ export function iso<T>(
 
 fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol>(
     client_type_and_variant: (
-        ClientSelectable<TNetworkProtocol>,
+        OwnedClientSelectable<TNetworkProtocol>,
         ClientScalarSelectionDirectiveSet,
     ),
     file_extensions: GenerateFileExtensionsOption,
     link_types: &mut BTreeSet<ServerObjectEntityName>,
 ) -> (String, String) {
     let (client_type, variant) = client_type_and_variant;
+    let type_and_field = client_type.as_ref().type_and_field();
+
     let mut s: String = "".to_string();
     let import = format!(
         "import {{ type {}__param }} from './{}/{}/param_type{}';\n",
-        client_type.type_and_field().underscore_separated(),
-        client_type.type_and_field().parent_object_entity_name,
-        client_type.type_and_field().selectable_name,
+        type_and_field.underscore_separated(),
+        type_and_field.parent_object_entity_name,
+        type_and_field.selectable_name,
         file_extensions.ts()
     );
 
@@ -69,8 +71,8 @@ fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol>
             SelectionType::Scalar(_) => "field",
             SelectionType::Object(_) => "pointer",
         },
-        client_type.type_and_field().parent_object_entity_name,
-        client_type.type_and_field().selectable_name
+        type_and_field.parent_object_entity_name,
+        type_and_field.selectable_name
     );
     if matches!(variant, ClientScalarSelectionDirectiveSet::Component(_)) {
         s.push_str(&format!(
@@ -79,7 +81,7 @@ export function iso<T>(
   param: T & MatchesWhitespaceAndString<'{}', T>
 ): IdentityWithParamComponent<{}__param>;\n",
             formatted_field,
-            client_type.type_and_field().underscore_separated(),
+            type_and_field.underscore_separated(),
         ));
     } else if let SelectionType::Object(client_pointer) = client_type {
         link_types.insert(*client_pointer.target_object_entity_name.inner());
@@ -89,7 +91,7 @@ export function iso<T>(
   param: T & MatchesWhitespaceAndString<'{}', T>
 ): IdentityWithParam<{}__param, {}>;\n",
             formatted_field,
-            client_type.type_and_field().underscore_separated(),
+            type_and_field.underscore_separated(),
             print_javascript_type_declaration(
                 &client_pointer.target_object_entity_name.clone().map(
                     &mut |target_object_entity_name| {
@@ -109,7 +111,7 @@ export function iso<T>(
   param: T & MatchesWhitespaceAndString<'{}', T>
 ): IdentityWithParam<{}__param>;\n",
             formatted_field,
-            client_type.type_and_field().underscore_separated(),
+            type_and_field.underscore_separated(),
         ));
     }
     (import, s)
@@ -176,7 +178,7 @@ type MatchesWhitespaceAndString<
     let mut target_object_entity_names = BTreeSet::new();
 
     let client_defined_type_overloads =
-        sorted_user_written_types(schema)
+        sorted_user_written_types(db)
             .into_iter()
             .map(|client_type| {
                 build_iso_overload_for_client_defined_type(
@@ -265,16 +267,34 @@ export function iso(isographLiteralText: string):
 }
 
 fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
-    schema: &Schema<TNetworkProtocol>,
+    db: &IsographDatabase<TNetworkProtocol>,
 ) -> Vec<(
-    ClientSelectable<'_, TNetworkProtocol>,
+    OwnedClientSelectable<TNetworkProtocol>,
     ClientScalarSelectionDirectiveSet,
 )> {
-    let mut client_types = schema
-        .user_written_client_types()
-        .map(|x| {
-            (x.1, {
-                match x.1 {
+    let mut client_types = client_selectable_map(db)
+        .as_ref()
+        .expect("Expected client selectable map to be valid.")
+        .iter()
+        .flat_map(|(_, value)| {
+            let value = value
+                .as_ref()
+                .expect("Expected client selectable to be valid");
+
+            match value {
+                SelectionType::Scalar(s) => match &s.variant {
+                    isograph_schema::ClientFieldVariant::UserWritten(_) => {}
+                    isograph_schema::ClientFieldVariant::ImperativelyLoadedField(_) => return None,
+                    isograph_schema::ClientFieldVariant::Link => return None,
+                },
+                SelectionType::Object(_) => {}
+            };
+
+            Some(value.clone())
+        })
+        .map(|selection_type| {
+            let client_scalar_selection_directive_set = {
+                match &selection_type {
                     SelectionType::Scalar(scalar) => match &scalar.variant {
                         isograph_schema::ClientFieldVariant::UserWritten(
                             user_written_client_type_info,
@@ -290,21 +310,29 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
                         ClientScalarSelectionDirectiveSet::None(EmptyDirectiveSet {})
                     }
                 }
-            })
+            };
+            (selection_type, client_scalar_selection_directive_set)
         })
         .collect::<Vec<_>>();
+
     client_types.sort_by(|client_type_1, client_type_2| {
         match client_type_1
             .0
+            .as_ref()
             .type_and_field()
             .parent_object_entity_name
-            .cmp(&client_type_2.0.type_and_field().parent_object_entity_name)
-        {
+            .cmp(
+                &client_type_2
+                    .0
+                    .as_ref()
+                    .type_and_field()
+                    .parent_object_entity_name,
+            ) {
             Ordering::Less => Ordering::Less,
             Ordering::Greater => Ordering::Greater,
             Ordering::Equal => sort_field_name(
-                client_type_1.0.type_and_field().selectable_name,
-                client_type_2.0.type_and_field().selectable_name,
+                client_type_1.0.as_ref().type_and_field().selectable_name,
+                client_type_2.0.as_ref().type_and_field().selectable_name,
             ),
         }
     });
