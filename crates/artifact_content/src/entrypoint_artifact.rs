@@ -23,7 +23,8 @@ use isograph_schema::{
     FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, Format, IsographDatabase,
     MergedSelectionMap, NetworkProtocol, NormalizationKey, RootOperationName, RootRefetchedPath,
     ScalarClientFieldTraversalState, Schema, ServerObjectEntity, ValidatedVariableDefinition,
-    WrappedSelectionMapSelection, create_merged_selection_map_for_field_and_insert_into_global_map,
+    WrappedSelectionMapSelection, client_scalar_selectable_selection_set_for_parent_query,
+    create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, fetchable_types, get_reachable_variables,
     initial_variable_context, server_object_entity_named,
 };
@@ -68,7 +69,12 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
         db,
         schema,
         parent_object_entity,
-        entrypoint.selection_set_for_parent_query(),
+        &client_scalar_selectable_selection_set_for_parent_query(
+            db,
+            entrypoint.parent_object_entity_name,
+            entrypoint.name.item,
+        )
+        .expect("Expected selection set to be valid."),
         encountered_client_type_map,
         DefinitionLocation::Client(SelectionType::Scalar((
             entrypoint.parent_object_entity_name,
