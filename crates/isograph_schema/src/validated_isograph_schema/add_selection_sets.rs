@@ -1,9 +1,7 @@
 use crate::{
     IsographDatabase, MemoizedIsoLiteralError, NetworkProtocol, ObjectSelectableId,
-    RefetchStrategy, ScalarSelectableId, Schema, SelectableNamedError,
-    UnprocessedClientObjectSelectableSelectionSet, UnprocessedClientScalarSelectableSelectionSet,
-    UnprocessedSelectionSet, UseRefetchFieldRefetchStrategy, ValidatedObjectSelection,
-    ValidatedScalarSelection, ValidatedSelection, client_scalar_selectable_named, selectable_named,
+    RefetchStrategy, ScalarSelectableId, SelectableNamedError, UseRefetchFieldRefetchStrategy,
+    ValidatedObjectSelection, ValidatedScalarSelection, ValidatedSelection, selectable_named,
     server_scalar_selectable_named,
 };
 use common_lang_types::{
@@ -18,117 +16,6 @@ use thiserror::Error;
 
 pub type ValidateAddSelectionSetsResultWithMultipleErrors<T, TNetworkProtocol> =
     Result<T, Vec<WithLocation<AddSelectionSetsError<TNetworkProtocol>>>>;
-
-pub(crate) fn add_selection_sets_to_client_selectables<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    schema: &mut Schema<TNetworkProtocol>,
-    unprocessed_selection_sets: Vec<UnprocessedSelectionSet>,
-) -> ValidateAddSelectionSetsResultWithMultipleErrors<(), TNetworkProtocol> {
-    let mut errors = vec![];
-    for unprocessed_selection_set in unprocessed_selection_sets {
-        match unprocessed_selection_set {
-            SelectionType::Scalar(unprocessed_client_scalar_selection_set) => {
-                if let Err(e) = process_unprocessed_client_field_item(
-                    db,
-                    schema,
-                    unprocessed_client_scalar_selection_set,
-                ) {
-                    errors.extend(e)
-                }
-            }
-            SelectionType::Object(unprocessed_client_object_selection_set) => {
-                if let Err(e) = process_unprocessed_client_pointer_item(
-                    db,
-                    schema,
-                    unprocessed_client_object_selection_set,
-                ) {
-                    errors.extend(e)
-                }
-            }
-        }
-    }
-    if !errors.is_empty() {
-        Err(errors)
-    } else {
-        Ok(())
-    }
-}
-
-// TODO we should not be mutating items in the schema. Instead, we should be creating
-// new items (the refetch and reader selection sets).
-fn process_unprocessed_client_field_item<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    schema: &mut Schema<TNetworkProtocol>,
-    unprocessed_scalar_selection_set: UnprocessedClientScalarSelectableSelectionSet,
-) -> ValidateAddSelectionSetsResultWithMultipleErrors<(), TNetworkProtocol> {
-    let client_scalar_selectable = client_scalar_selectable_named(
-        db,
-        unprocessed_scalar_selection_set.parent_object_entity_name,
-        unprocessed_scalar_selection_set.client_scalar_selectable_name,
-    )
-    .as_ref()
-    .map_err(|e| vec![WithLocation::new(e.clone().into(), Location::Generated)])?
-    .as_ref()
-    .expect(
-        "Expected selectable to exist. \
-            This is indicative of a bug in Isograph.",
-    );
-
-    let new_selection_set = get_validated_selection_set(
-        db,
-        unprocessed_scalar_selection_set.reader_selection_set,
-        client_scalar_selectable.parent_object_entity_name,
-        SelectionType::Scalar(client_scalar_selectable.type_and_field),
-    )?;
-
-    let client_field = schema
-        .client_scalar_selectable_mut(
-            unprocessed_scalar_selection_set.parent_object_entity_name,
-            unprocessed_scalar_selection_set.client_scalar_selectable_name,
-        )
-        .expect(
-            "Expected selectable to exist. \
-            This is indicative of a bug in Isograph.",
-        );
-
-    client_field.reader_selection_set = new_selection_set;
-
-    Ok(())
-}
-
-// TODO we should not be mutating items in the schema. Instead, we should be creating
-// new items (the refetch and reader selection sets).
-fn process_unprocessed_client_pointer_item<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    schema: &mut Schema<TNetworkProtocol>,
-    unprocessed_client_object_selection_set: UnprocessedClientObjectSelectableSelectionSet,
-) -> ValidateAddSelectionSetsResultWithMultipleErrors<(), TNetworkProtocol> {
-    let new_selection_set = get_validated_selection_set(
-        db,
-        unprocessed_client_object_selection_set.reader_selection_set,
-        unprocessed_client_object_selection_set.parent_object_entity_name,
-        SelectionType::Object(ParentObjectEntityNameAndSelectableName::new(
-            unprocessed_client_object_selection_set.parent_object_entity_name,
-            unprocessed_client_object_selection_set
-                .client_object_selectable_name
-                .into(),
-        )),
-    )?;
-
-    let client_pointer = schema
-        .client_object_selectable_mut(
-            unprocessed_client_object_selection_set.parent_object_entity_name,
-            unprocessed_client_object_selection_set.client_object_selectable_name,
-        )
-        .expect(
-            "Expected selectable to exist. \
-            This is indicative of a bug in Isograph.",
-        );
-
-    client_pointer.reader_selection_set = new_selection_set;
-
-    Ok(())
-}
 
 /// At this point, all selectables have been defined. So, we can validate the parsed
 /// selection set by confirming:

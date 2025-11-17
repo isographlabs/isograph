@@ -20,7 +20,6 @@ pub trait ClientScalarOrObjectSelectable {
     fn name(&self) -> ClientSelectableName;
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName;
     fn parent_object_entity_name(&self) -> ServerObjectEntityName;
-    fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>];
 
     fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityName>>];
 
@@ -44,10 +43,6 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 
     fn parent_object_entity_name(&self) -> ServerObjectEntityName {
         self.parent_object_entity_name
-    }
-
-    fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>] {
-        &self.reader_selection_set
     }
 
     fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityName>>] {
@@ -76,10 +71,6 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 
     fn parent_object_entity_name(&self) -> ServerObjectEntityName {
         self.parent_object_entity_name
-    }
-
-    fn reader_selection_set(&self) -> &[WithSpan<ValidatedSelection>] {
-        &self.reader_selection_set
     }
 
     fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityName>>] {

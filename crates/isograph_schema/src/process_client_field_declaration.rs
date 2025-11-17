@@ -247,7 +247,6 @@ pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>
             .client_field_name
             .map(|client_scalar_selectable_name| *client_scalar_selectable_name)
             .into_with_location(),
-        reader_selection_set: vec![],
         variant,
         variable_definitions: client_field_declaration
             .item
@@ -443,7 +442,6 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
             .client_pointer_name
             .map(|client_object_selectable_name| *client_object_selectable_name)
             .into_with_location(),
-        reader_selection_set: vec![],
 
         variable_definitions: client_pointer_declaration
             .item

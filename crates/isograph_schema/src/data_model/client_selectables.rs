@@ -6,10 +6,7 @@ use common_lang_types::{
 };
 use isograph_lang_types::{Description, SelectionType, TypeAnnotation, VariableDefinition};
 
-use crate::{
-    ClientFieldVariant, NetworkProtocol, ServerEntityName, UserWrittenClientPointerInfo,
-    ValidatedSelection,
-};
+use crate::{ClientFieldVariant, NetworkProtocol, ServerEntityName, UserWrittenClientPointerInfo};
 
 // TODO rename
 pub type ClientSelectableId = SelectionType<
@@ -33,7 +30,6 @@ pub type OwnedClientSelectable<TNetworkProtocol> = SelectionType<
 pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
     pub name: WithLocation<ClientScalarSelectableName>,
-    pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 
     // TODO we should probably model this differently
     pub variant: ClientFieldVariant,
@@ -54,8 +50,6 @@ pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
     pub name: WithLocation<ClientObjectSelectableName>,
     pub target_object_entity_name: TypeAnnotation<ServerObjectEntityName>,
-
-    pub reader_selection_set: Vec<WithSpan<ValidatedSelection>>,
 
     pub variable_definitions: Vec<WithSpan<VariableDefinition<ServerEntityName>>>,
 

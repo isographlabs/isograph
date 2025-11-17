@@ -5,8 +5,7 @@ use std::{
 
 use crate::{
     AddSelectionSetsError, IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError,
-    Schema, UnprocessedSelectionSet, ValidateEntrypointDeclarationError,
-    add_selection_sets_to_client_selectables, validate_entrypoints,
+    Schema, UnprocessedSelectionSet, ValidateEntrypointDeclarationError, validate_entrypoints,
 };
 use common_lang_types::{
     RelativePathToSourceFile, SelectableName, ServerObjectEntityName, TextSource, WithLocation,
@@ -33,19 +32,6 @@ pub(crate) fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol>
     unprocessed_selection_sets.extend(unprocessed_client_selection_sets);
 
     unvalidated_isograph_schema.entrypoints = validate_entrypoints(db, unprocessed_entrypoints)?;
-
-    // Step two: now, we can create the selection sets. Creating a selection set involves
-    // looking up client selectables, to:
-    // - determine if the selectable exists,
-    // - to determine if we are selecting it appropriately (e.g. client fields as scalars, etc)
-    // - to validate arguments (e.g. no missing arguments, etc.)
-    // - validate loadability/updatability, and
-    // - to store the selectable id,
-    add_selection_sets_to_client_selectables(
-        db,
-        &mut unvalidated_isograph_schema,
-        unprocessed_selection_sets,
-    )?;
 
     Ok((unvalidated_isograph_schema, contains_iso_stats))
 }

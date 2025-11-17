@@ -70,7 +70,6 @@ pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
                 name: WithLocation::new(field_name, Location::generated()),
                 parent_object_entity_name: parent_object_entity_name.item,
                 variable_definitions: vec![],
-                reader_selection_set: vec![],
                 variant: ClientFieldVariant::Link,
                 type_and_field: ParentObjectEntityNameAndSelectableName {
                     selectable_name: field_name.into(),

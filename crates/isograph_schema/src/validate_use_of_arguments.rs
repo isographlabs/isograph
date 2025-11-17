@@ -96,12 +96,12 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                     .as_ref()
                     .expect(
                         "Expected validation to have succeeded. \
-                                This is indicative of a bug in Isograph.",
+                        This is indicative of a bug in Isograph.",
                     )
                     .as_ref()
                     .expect(
                         "Expected selectable to exist. \
-                                This is indicative of a bug in Isograph.",
+                        This is indicative of a bug in Isograph.",
                     );
 
                     server_scalar_selectable

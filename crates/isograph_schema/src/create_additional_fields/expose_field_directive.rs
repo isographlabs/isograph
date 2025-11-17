@@ -237,7 +237,6 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
             client_field_scalar_selection_name.unchecked_conversion(),
             Location::generated(),
         ),
-        reader_selection_set: vec![],
 
         variant: ClientFieldVariant::ImperativelyLoadedField(ImperativelyLoadedFieldVariant {
             top_level_schema_field_arguments,

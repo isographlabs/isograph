@@ -201,16 +201,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
             .get(&(parent_type_name, client_field_name))
     }
 
-    // TODO this function should not exist
-    pub fn client_scalar_selectable_mut(
-        &mut self,
-        parent_type_name: ServerObjectEntityName,
-        client_field_name: ClientScalarSelectableName,
-    ) -> Option<&mut ClientScalarSelectable<TNetworkProtocol>> {
-        self.client_scalar_selectables
-            .get_mut(&(parent_type_name, client_field_name))
-    }
-
     pub fn object_selectable(
         &self,
         db: &IsographDatabase<TNetworkProtocol>,
@@ -251,16 +241,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     ) -> Option<&ClientObjectSelectable<TNetworkProtocol>> {
         self.client_object_selectables
             .get(&(parent_object_entity_name, client_object_selectable_name))
-    }
-
-    // TODO this function should not exist
-    pub fn client_object_selectable_mut(
-        &mut self,
-        parent_object_entity_name: ServerObjectEntityName,
-        client_object_selectable_name: ClientObjectSelectableName,
-    ) -> Option<&mut ClientObjectSelectable<TNetworkProtocol>> {
-        self.client_object_selectables
-            .get_mut(&(parent_object_entity_name, client_object_selectable_name))
     }
 
     pub fn client_selectable(
