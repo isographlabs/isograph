@@ -23,7 +23,8 @@ use crate::{
     NameAndArguments, NetworkProtocol, PathToRefetchField, Schema, ServerEntityName,
     ServerObjectEntity, ServerObjectEntityExtraInfo, ServerObjectSelectable,
     ServerObjectSelectableVariant, ValidatedObjectSelection, ValidatedScalarSelection,
-    ValidatedSelection, VariableContext, create_transformed_name_and_arguments, fetchable_types,
+    ValidatedSelection, VariableContext, client_scalar_selectable_selection_set_for_parent_query,
+    create_transformed_name_and_arguments, fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
     initial_variable_context, server_object_entity_named, server_object_selectable_named,
     transform_arguments_with_child_context,
@@ -955,7 +956,12 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
                 db,
                 schema,
                 parent_object_entity,
-                newly_encountered_scalar_client_selectable.selection_set_for_parent_query(),
+                &client_scalar_selectable_selection_set_for_parent_query(
+                    db,
+                    newly_encountered_scalar_client_selectable.parent_object_entity_name,
+                    newly_encountered_scalar_client_selectable.name.item,
+                )
+                .expect("Expected selection set to be valid."),
                 encountered_client_type_map,
                 DefinitionLocation::Client(SelectionType::Scalar((
                     *parent_object_entity_name,
