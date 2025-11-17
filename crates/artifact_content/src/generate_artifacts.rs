@@ -16,16 +16,17 @@ use isograph_lang_types::{
     SelectionTypeContainingSelections, TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
-    ClientFieldVariant, ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectableId,
-    FieldMapItem, FieldTraversalResult, ID_ENTITY_NAME, IsographDatabase, LINK_FIELD_NAME,
-    NameAndArguments, NetworkProtocol, NormalizationKey, RefetchStrategy, ScalarSelectableId,
-    Schema, ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo,
+    ClientFieldVariant, ClientScalarSelectable, ClientSelectableId, FieldMapItem,
+    FieldTraversalResult, ID_ENTITY_NAME, IsographDatabase, LINK_FIELD_NAME, NameAndArguments,
+    NetworkProtocol, NormalizationKey, RefetchStrategy, ScalarSelectableId, Schema,
+    SelectableTrait, ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo,
     ValidatedSelection, ValidatedVariableDefinition, WrappedSelectionMapSelection,
     accessible_client_fields, client_object_selectable_named, client_scalar_selectable_named,
-    client_selectable_named, description, fetchable_types, inline_fragment_reader_selection_set,
-    output_type_annotation, selectable_named, selection_map_wrapped, server_object_entity_named,
-    server_object_selectable_named, server_scalar_entity_javascript_name,
-    server_scalar_selectable_named, validated_refetch_strategy_for_client_scalar_selectable_named,
+    client_selectable_map, client_selectable_named, description, fetchable_types,
+    inline_fragment_reader_selection_set, output_type_annotation, selectable_named,
+    selection_map_wrapped, server_object_entity_named, server_object_selectable_named,
+    server_scalar_entity_javascript_name, server_scalar_selectable_named,
+    validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 use isograph_schema::{ContainsIsoStats, GetValidatedSchemaError, get_validated_schema};
 use lazy_static::lazy_static;
@@ -456,12 +457,32 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
         }
     }
 
-    for (client_type_name, user_written_client_type) in schema.user_written_client_types() {
+    for (client_type_name, user_written_client_type) in client_selectable_map(db)
+        .as_ref()
+        .expect("Expected client selectable map to be valid.")
+        .iter()
+        .flat_map(|(key, value)| {
+            let value = value
+                .as_ref()
+                .expect("Expected client selectable to be valid");
+
+            let client_type_name = match value {
+                SelectionType::Scalar(_) => {
+                    SelectionType::Scalar((key.0, key.1.unchecked_conversion()))
+                }
+                SelectionType::Object(_) => {
+                    SelectionType::Object((key.0, key.1.unchecked_conversion()))
+                }
+            };
+
+            Some((client_type_name, value))
+        })
+    {
         // For each user-written client types, generate a param type artifact
         path_and_contents.push(generate_eager_reader_param_type_artifact(
             db,
             schema,
-            &user_written_client_type,
+            user_written_client_type,
             config.options.include_file_extensions_in_import_statements,
         ));
 
@@ -476,8 +497,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
             None => {
                 // If this field is not reachable from an entrypoint, we need to
                 // encounter all the client fields
-                for nested_client_field_id in
-                    accessible_client_fields(db, &user_written_client_type)
+                for nested_client_field_id in accessible_client_fields(db, user_written_client_type)
                 {
                     encountered_output_types.insert(nested_client_field_id);
                 }

@@ -2,8 +2,8 @@ use common_lang_types::WithSpan;
 use isograph_lang_types::{DefinitionLocation, SelectionTypeContainingSelections};
 
 use crate::{
-    ClientSelectable, ClientSelectableId, IsographDatabase, NetworkProtocol, ValidatedSelection,
-    client_object_selectable_selection_set_for_parent_query,
+    ClientSelectableId, IsographDatabase, NetworkProtocol, OwnedClientSelectable,
+    ValidatedSelection, client_object_selectable_selection_set_for_parent_query,
     client_scalar_selectable_selection_set_for_parent_query,
 };
 
@@ -12,7 +12,7 @@ use isograph_lang_types::SelectionType;
 // This should really be replaced with a proper visitor, or something
 pub fn accessible_client_fields<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    selection_type: &ClientSelectable<'_, TNetworkProtocol>,
+    selection_type: &OwnedClientSelectable<TNetworkProtocol>,
 ) -> impl Iterator<Item = ClientSelectableId> {
     let selection_set = match selection_type {
         SelectionType::Scalar(scalar) => client_scalar_selectable_selection_set_for_parent_query(

@@ -7,10 +7,10 @@ use resolve_position_macros::ResolvePosition;
 use std::fmt::Debug;
 
 use crate::{
-    ClientScalarSelectionDirectiveSet, ClientObjectSelectableNameWrapper, ClientScalarSelectableNameWrapper,
-    IsographFieldDirective, IsographSemanticToken, ServerObjectEntityNameWrapper,
-    UnvalidatedSelection, VariableDefinition, isograph_resolved_node::IsographResolvedNode,
-    string_key_wrappers::Description,
+    ClientObjectSelectableNameWrapper, ClientScalarSelectableNameWrapper,
+    ClientScalarSelectionDirectiveSet, IsographFieldDirective, IsographSemanticToken,
+    ServerObjectEntityNameWrapper, UnvalidatedSelection, VariableDefinition,
+    isograph_resolved_node::IsographResolvedNode, string_key_wrappers::Description,
 };
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]

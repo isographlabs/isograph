@@ -6,8 +6,8 @@ use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 use isograph_lang_types::{ClientScalarSelectionDirectiveSet, SelectionType};
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, IsographDatabase,
-    LINK_FIELD_NAME, NetworkProtocol, Schema, ServerObjectSelectable, ValidatedSelection,
-    client_object_selectable_selection_set_for_parent_query,
+    LINK_FIELD_NAME, NetworkProtocol, OwnedClientSelectable, Schema, ServerObjectSelectable,
+    ValidatedSelection, client_object_selectable_selection_set_for_parent_query,
     client_scalar_selectable_selection_set_for_parent_query, initial_variable_context,
     server_object_entity_named,
 };
@@ -287,23 +287,25 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
 pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
-    client_selectable: &ClientSelectable<TNetworkProtocol>,
+    client_selectable: &OwnedClientSelectable<TNetworkProtocol>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
     let ts_file_extension = file_extensions.ts();
-    let parent_object_entity =
-        &server_object_entity_named(db, client_selectable.parent_object_entity_name())
-            .as_ref()
-            .expect(
-                "Expected validation to have worked. \
+    let parent_object_entity = &server_object_entity_named(
+        db,
+        isograph_schema::SelectableTrait::parent_object_entity_name(&client_selectable),
+    )
+    .as_ref()
+    .expect(
+        "Expected validation to have worked. \
                 This is indicative of a bug in Isograph.",
-            )
-            .as_ref()
-            .expect(
-                "Expected entity to exist. \
+    )
+    .as_ref()
+    .expect(
+        "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-            )
-            .item;
+    )
+    .item;
 
     let mut param_type_imports = BTreeSet::new();
     let mut loadable_fields = BTreeSet::new();
@@ -345,7 +347,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     let reader_param_type = format!(
         "{}__{}__param",
         parent_object_entity.name.item,
-        client_selectable.name()
+        isograph_schema::SelectableTrait::name(&client_selectable).item
     );
 
     let start_update_imports = if updatable_fields {
@@ -366,13 +368,14 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     };
 
     let (parameters_import, parameters_type) = if !client_selectable
+        .as_ref()
         .variable_definitions()
         .is_empty()
     {
         let reader_parameters_type = format!(
             "{}__{}__parameters",
             parent_object_entity.name.item,
-            client_selectable.name()
+            isograph_schema::SelectableTrait::name(&client_selectable).item
         );
         (
             format!(
@@ -407,7 +410,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         file_content: param_type_content,
         type_and_field: Some(ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: parent_object_entity.name.item,
-            selectable_name: client_selectable.name().into(),
+            selectable_name: client_selectable.as_ref().name().into(),
         }),
     }
 }
