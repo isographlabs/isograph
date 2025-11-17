@@ -15,8 +15,9 @@ use thiserror::Error;
 
 use crate::{
     ClientScalarOrObjectSelectable, IsographDatabase, NetworkProtocol, Schema,
-    ValidatedVariableDefinition, selectable_validated_reader_selection_set,
-    server_object_selectable_named, server_scalar_selectable_named,
+    ValidatedVariableDefinition, client_scalar_selectable_named,
+    selectable_validated_reader_selection_set, server_object_selectable_named,
+    server_scalar_selectable_named,
     validate_argument_types::{ValidateArgumentTypesError, value_satisfies_type},
     visit_selection_set::visit_selection_set,
 };
@@ -111,16 +112,25 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         .collect::<Vec<_>>()
                 }
                 DefinitionLocation::Client((parent_object_entity_name, client_selectable_name)) => {
-                    schema
-                        .client_scalar_selectable(parent_object_entity_name, client_selectable_name)
-                        .expect(
-                            "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .variable_definitions
-                        .iter()
-                        .map(|x| x.item.clone())
-                        .collect()
+                    client_scalar_selectable_named(
+                        db,
+                        parent_object_entity_name,
+                        client_selectable_name,
+                    )
+                    .as_ref()
+                    .expect(
+                        "Expected selectable to be valid. \
+                        This is indicative of a bug in Isograph.",
+                    )
+                    .as_ref()
+                    .expect(
+                        "Expected selectable to exist. \
+                        This is indicative of a bug in Isograph.",
+                    )
+                    .variable_definitions
+                    .iter()
+                    .map(|x| x.item.clone())
+                    .collect()
                 }
             };
 
