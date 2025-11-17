@@ -3,8 +3,8 @@ use common_lang_types::{ArtifactPathAndContent, ParentObjectEntityNameAndSelecta
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
-    ClientScalarOrObjectSelectable, ClientScalarSelectable, FieldMapItem, IsographDatabase,
-    NetworkProtocol, RefetchedPathsMap, Schema, initial_variable_context,
+    ClientScalarSelectable, FieldMapItem, IsographDatabase, NetworkProtocol, RefetchedPathsMap,
+    Schema, client_scalar_selectable_selection_set_for_parent_query, initial_variable_context,
     validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 
@@ -47,6 +47,12 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
         This is indicative of a bug in Isograph.",
     );
 
+    let selection_set_for_parent_query = client_scalar_selectable_selection_set_for_parent_query(
+        db,
+        client_field.parent_object_entity_name,
+        client_field.name.item,
+    )
+    .expect("Expected selection set to be valid.");
     let (reader_ast, reader_imports) = generate_reader_ast(
         db,
         schema,
@@ -56,7 +62,7 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
                 .refetch_selection_set()
                 .unwrap_or(&empty_selection_set)
         } else {
-            client_field.selection_set_for_parent_query()
+            &selection_set_for_parent_query
         },
         0,
         refetched_paths,
