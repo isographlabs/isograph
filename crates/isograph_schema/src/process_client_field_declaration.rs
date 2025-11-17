@@ -6,9 +6,10 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldDeclaration, ClientFieldDirectiveSet, ClientPointerDeclaration,
-    DefinitionLocation, DeserializationError, NonConstantValue, SelectionType,
-    ServerObjectEntityNameWrapper, TypeAnnotation, UnvalidatedSelection, VariableDefinition,
+    ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration,
+    ClientScalarSelectionDirectiveSet, DefinitionLocation, DeserializationError, NonConstantValue,
+    SelectionType, ServerObjectEntityNameWrapper, TypeAnnotation, UnvalidatedSelection,
+    VariableDefinition,
 };
 
 use pico_macros::memo;
@@ -570,7 +571,7 @@ pub struct UserWrittenClientTypeInfo {
     // TODO use a shared struct
     pub const_export_name: ConstExportName,
     pub file_path: RelativePathToSourceFile,
-    pub client_field_directive_set: ClientFieldDirectiveSet,
+    pub client_field_directive_set: ClientScalarSelectionDirectiveSet,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

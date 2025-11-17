@@ -3,7 +3,7 @@ use common_lang_types::{
 };
 use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
-use isograph_lang_types::{ClientFieldDirectiveSet, SelectionType};
+use isograph_lang_types::{ClientScalarSelectionDirectiveSet, SelectionType};
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, IsographDatabase,
     LINK_FIELD_NAME, NetworkProtocol, Schema, ServerObjectSelectable, ValidatedSelection,
@@ -95,7 +95,9 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
         client_selectable.name()
     );
 
-    let reader_content = if let ClientFieldDirectiveSet::None(_) = user_written_component_variant {
+    let reader_content = if let ClientScalarSelectionDirectiveSet::None(_) =
+        user_written_component_variant
+    {
         let eager_reader_name = format!(
             "{}.{}",
             parent_object_entity.name.item,
@@ -451,7 +453,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
     );
 
     let final_output_type_text =
-        if let ClientFieldDirectiveSet::None(_) = info.client_field_directive_set {
+        if let ClientScalarSelectionDirectiveSet::None(_) = info.client_field_directive_set {
             output_type_text
         } else {
             format!(

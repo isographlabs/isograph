@@ -10,7 +10,7 @@ use graphql_lang_types::{
 use intern::{Lookup, string_key::Intern};
 use isograph_config::CompilerConfig;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldDirectiveSet, DefinitionLocation, Description,
+    ArgumentKeyAndValue, ClientScalarSelectionDirectiveSet, DefinitionLocation, Description,
     EmptyDirectiveSet, NonConstantValue, ObjectSelectionDirectiveSet, ScalarSelection,
     ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionType,
     SelectionTypeContainingSelections, TypeAnnotation, UnionVariant, VariableDefinition,
@@ -245,7 +245,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     UserWrittenClientTypeInfo {
                         const_export_name: client_object_selectable.info.const_export_name,
                         file_path: client_object_selectable.info.file_path,
-                        client_field_directive_set: ClientFieldDirectiveSet::None(
+                        client_field_directive_set: ClientScalarSelectionDirectiveSet::None(
                             EmptyDirectiveSet {},
                         ),
                     },
@@ -456,7 +456,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
         }
     }
 
-    for (client_type_name, user_written_client_type, _) in schema.user_written_client_types() {
+    for (client_type_name, user_written_client_type) in schema.user_written_client_types() {
         // For each user-written client types, generate a param type artifact
         path_and_contents.push(generate_eager_reader_param_type_artifact(
             db,
@@ -512,7 +512,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     UserWrittenClientTypeInfo {
                         const_export_name: client_pointer.info.const_export_name,
                         file_path: client_pointer.info.file_path,
-                        client_field_directive_set: ClientFieldDirectiveSet::None(
+                        client_field_directive_set: ClientScalarSelectionDirectiveSet::None(
                             EmptyDirectiveSet {},
                         ),
                     },
@@ -693,10 +693,10 @@ pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
             &client_field.parent_object_entity_name,
         )),
         ClientFieldVariant::UserWritten(info) => match info.client_field_directive_set {
-            ClientFieldDirectiveSet::None(_) => {
+            ClientScalarSelectionDirectiveSet::None(_) => {
                 ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
             }
-            ClientFieldDirectiveSet::Component(_) => ClientFieldOutputType(
+            ClientScalarSelectionDirectiveSet::Component(_) => ClientFieldOutputType(
                 "(React.FC<CombineWithIntrinsicAttributes<ExtractSecondParam<typeof resolver>>>)"
                     .to_string(),
             ),

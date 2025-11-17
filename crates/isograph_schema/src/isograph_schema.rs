@@ -8,9 +8,8 @@ use common_lang_types::{
 use intern::Lookup;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldDirectiveSet, DefinitionLocation, EmptyDirectiveSet,
-    ObjectSelection, ScalarSelection, SelectionType, SelectionTypeContainingSelections,
-    VariableDefinition,
+    ArgumentKeyAndValue, DefinitionLocation, ObjectSelection, ScalarSelection, SelectionType,
+    SelectionTypeContainingSelections, VariableDefinition,
 };
 use lazy_static::lazy_static;
 
@@ -205,17 +204,15 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 &ClientScalarSelectable<TNetworkProtocol>,
                 &ClientObjectSelectable<TNetworkProtocol>,
             >,
-            ClientFieldDirectiveSet,
         ),
     > {
         self.client_scalar_selectables
             .values()
             .flat_map(|field| match field.variant {
                 ClientFieldVariant::Link => None,
-                ClientFieldVariant::UserWritten(info) => Some((
+                ClientFieldVariant::UserWritten(_) => Some((
                     SelectionType::Scalar((field.parent_object_entity_name, field.name.item)),
                     SelectionType::Scalar(field),
-                    info.client_field_directive_set,
                 )),
                 ClientFieldVariant::ImperativelyLoadedField(_) => None,
             })
@@ -223,7 +220,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
                 (
                     SelectionType::Object((pointer.parent_object_entity_name, pointer.name.item)),
                     SelectionType::Object(pointer),
-                    ClientFieldDirectiveSet::None(EmptyDirectiveSet {}),
                 )
             }))
     }

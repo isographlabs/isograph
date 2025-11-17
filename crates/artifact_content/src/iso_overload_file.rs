@@ -1,6 +1,6 @@
 use intern::Lookup;
 use isograph_config::GenerateFileExtensionsOption;
-use isograph_lang_types::{ClientFieldDirectiveSet, SelectionType};
+use isograph_lang_types::{ClientScalarSelectionDirectiveSet, EmptyDirectiveSet, SelectionType};
 use std::{cmp::Ordering, collections::BTreeSet};
 
 use common_lang_types::{ArtifactPathAndContent, SelectableName, ServerObjectEntityName};
@@ -46,7 +46,10 @@ export function iso<T>(
 }
 
 fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol>(
-    client_type_and_variant: (ClientSelectable<TNetworkProtocol>, ClientFieldDirectiveSet),
+    client_type_and_variant: (
+        ClientSelectable<TNetworkProtocol>,
+        ClientScalarSelectionDirectiveSet,
+    ),
     file_extensions: GenerateFileExtensionsOption,
     link_types: &mut BTreeSet<ServerObjectEntityName>,
 ) -> (String, String) {
@@ -69,7 +72,7 @@ fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol>
         client_type.type_and_field().parent_object_entity_name,
         client_type.type_and_field().selectable_name
     );
-    if matches!(variant, ClientFieldDirectiveSet::Component(_)) {
+    if matches!(variant, ClientScalarSelectionDirectiveSet::Component(_)) {
         s.push_str(&format!(
             "
 export function iso<T>(
@@ -265,11 +268,30 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
     schema: &Schema<TNetworkProtocol>,
 ) -> Vec<(
     ClientSelectable<'_, TNetworkProtocol>,
-    ClientFieldDirectiveSet,
+    ClientScalarSelectionDirectiveSet,
 )> {
     let mut client_types = schema
         .user_written_client_types()
-        .map(|x| (x.1, x.2))
+        .map(|x| {
+            (x.1, {
+                match x.1 {
+                    SelectionType::Scalar(scalar) => match &scalar.variant {
+                        isograph_schema::ClientFieldVariant::UserWritten(
+                            user_written_client_type_info,
+                        ) => user_written_client_type_info.client_field_directive_set,
+                        isograph_schema::ClientFieldVariant::ImperativelyLoadedField(_) => {
+                            ClientScalarSelectionDirectiveSet::None(EmptyDirectiveSet {})
+                        }
+                        isograph_schema::ClientFieldVariant::Link => {
+                            ClientScalarSelectionDirectiveSet::None(EmptyDirectiveSet {})
+                        }
+                    },
+                    SelectionType::Object(_) => {
+                        ClientScalarSelectionDirectiveSet::None(EmptyDirectiveSet {})
+                    }
+                }
+            })
+        })
         .collect::<Vec<_>>();
     client_types.sort_by(|client_type_1, client_type_2| {
         match client_type_1
