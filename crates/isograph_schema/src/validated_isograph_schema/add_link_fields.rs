@@ -11,7 +11,7 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{DefinitionLocation, Description, SelectionType};
-use pico_macros::legacy_memo;
+use pico_macros::memo;
 
 pub fn add_link_fields_to_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
@@ -49,7 +49,7 @@ pub fn add_link_fields_to_schema<TNetworkProtocol: NetworkProtocol>(
     Ok(())
 }
 
-#[legacy_memo]
+#[memo]
 pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<Vec<ClientScalarSelectable<TNetworkProtocol>>, CreateSchemaError<TNetworkProtocol>> {
@@ -82,7 +82,7 @@ pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[expect(clippy::type_complexity)]
-#[legacy_memo]
+#[memo]
 pub fn get_link_fields_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<

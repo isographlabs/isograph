@@ -15,7 +15,7 @@ struct LegacyMemoArgs {
     raw: bool,
 }
 
-pub(crate) fn legacy_memo_macro(args: TokenStream, item: TokenStream) -> TokenStream {
+pub(crate) fn memo_macro(args: TokenStream, item: TokenStream) -> TokenStream {
     let ItemFn {
         sig,
         vis,

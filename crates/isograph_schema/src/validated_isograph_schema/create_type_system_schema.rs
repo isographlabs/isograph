@@ -9,10 +9,10 @@ use crate::{
 };
 use common_lang_types::{SelectableName, ServerObjectEntityName, WithLocation};
 use isograph_lang_types::SelectionType;
-use pico_macros::legacy_memo;
+use pico_macros::memo;
 use thiserror::Error;
 
-#[legacy_memo]
+#[memo]
 #[expect(clippy::type_complexity)]
 pub fn create_type_system_schema_with_server_selectables<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,

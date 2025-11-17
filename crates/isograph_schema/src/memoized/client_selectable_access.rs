@@ -13,14 +13,14 @@ use common_lang_types::{
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{ClientFieldDeclaration, ClientPointerDeclaration, SelectionType};
-use pico_macros::legacy_memo;
+use pico_macros::memo;
 use thiserror::Error;
 
 use crate::parse_iso_literal_in_source;
 
 /// client selectables defined by iso literals.
 /// Note: this is just the declarations, not the fields!
-#[legacy_memo]
+#[memo]
 pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> HashMap<
@@ -80,7 +80,7 @@ pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: Net
     out
 }
 
-#[legacy_memo]
+#[memo]
 pub fn client_selectable_declarations<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
@@ -92,7 +92,7 @@ pub fn client_selectable_declarations<TNetworkProtocol: NetworkProtocol>(
         .unwrap_or_default()
 }
 
-#[legacy_memo]
+#[memo]
 pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
@@ -153,7 +153,7 @@ pub enum MemoizedIsoLiteralError<TNetworkProtocol: NetworkProtocol> {
     CreateAdditionalFieldsError(#[from] CreateAdditionalFieldsError<TNetworkProtocol>),
 }
 
-#[legacy_memo]
+#[memo]
 pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
@@ -184,7 +184,7 @@ pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-#[legacy_memo]
+#[memo]
 pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
@@ -215,7 +215,7 @@ pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-#[legacy_memo]
+#[memo]
 pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
@@ -272,7 +272,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     Ok(Some(scalar_selectable.clone()))
 }
 
-#[legacy_memo]
+#[memo]
 pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
@@ -301,7 +301,7 @@ pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
     Ok(Some(object_selectable.clone()))
 }
 
-#[legacy_memo]
+#[memo]
 #[expect(clippy::type_complexity)]
 pub fn client_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
@@ -362,7 +362,7 @@ pub fn client_selectable_named<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[expect(clippy::type_complexity)]
-#[legacy_memo]
+#[memo]
 pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<

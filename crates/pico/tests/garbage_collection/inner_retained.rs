@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use pico::{Database, Storage};
-use pico_macros::{Db, legacy_memo};
+use pico_macros::{Db, memo};
 
 static OUTER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static INNER_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -40,14 +40,14 @@ fn inner_retained() {
     assert_eq!(INNER_COUNTER.load(Ordering::SeqCst), 1);
 }
 
-#[legacy_memo]
+#[memo]
 fn outer(db: &TestDatabase) -> &'static str {
     inner(db);
     OUTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     "outer"
 }
 
-#[legacy_memo]
+#[memo]
 fn inner(_db: &TestDatabase) -> &'static str {
     INNER_COUNTER.fetch_add(1, Ordering::SeqCst);
     "inner"

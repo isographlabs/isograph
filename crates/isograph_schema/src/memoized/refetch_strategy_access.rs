@@ -5,7 +5,7 @@ use common_lang_types::{
     ParentObjectEntityNameAndSelectableName, ServerObjectEntityName, WithLocation, WithSpan,
 };
 use isograph_lang_types::SelectionType;
-use pico_macros::legacy_memo;
+use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
@@ -16,7 +16,7 @@ use crate::{
 };
 
 #[expect(clippy::type_complexity)]
-#[legacy_memo]
+#[memo]
 pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
@@ -93,7 +93,7 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[expect(clippy::type_complexity)]
-#[legacy_memo]
+#[memo]
 pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
@@ -149,7 +149,7 @@ pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
         .collect())
 }
 
-#[legacy_memo]
+#[memo]
 pub fn validated_refetch_strategy_for_client_scalar_selectable_named<
     TNetworkProtocol: NetworkProtocol,
 >(
@@ -187,7 +187,7 @@ pub fn validated_refetch_strategy_for_client_scalar_selectable_named<
     }
 }
 
-#[legacy_memo]
+#[memo]
 pub fn validated_refetch_strategy_for_object_scalar_selectable_named<
     TNetworkProtocol: NetworkProtocol,
 >(

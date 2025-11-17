@@ -33,7 +33,7 @@ If the compiler is a batch compiler, it will encounter a validation error, and f
 
 We created a memoization framework, [pico](https://github.com/isographlabs/isograph/commit/0d2745d09298b94fd4cd704965d461a05d66aea1). This framework is undergoing some changes, so some of this may differ from what is eventually settled on.
 
-It exposes a derive macro `#[memo]` (temporarily called `#[legacy_memo]` while we change a few details). When applied to a function, it will cache the results of calling that function. The next time around, if that function is called again with the same arguments, and where none of the inputs it read have changed, it will reuse the cached value. An input is either a source (like the state of a given file) or another memoized function.
+It exposes a derive macro `#[memo]` (temporarily called `#[memo]` while we change a few details). When applied to a function, it will cache the results of calling that function. The next time around, if that function is called again with the same arguments, and where none of the inputs it read have changed, it will reuse the cached value. An input is either a source (like the state of a given file) or another memoized function.
 
 ### Challenge one: parameters
 

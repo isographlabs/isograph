@@ -5,7 +5,7 @@ use common_lang_types::{
     WithLocation,
 };
 use isograph_lang_types::SelectionType;
-use pico_macros::legacy_memo;
+use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
@@ -16,7 +16,7 @@ use crate::{
 /// N.B. we should normally not materialize a map here. However, parse_type_system_documents
 /// already fully parses the schema, so until that's refactored, there isn't much upside in
 /// not materializing a map here.
-#[legacy_memo]
+#[memo]
 fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
@@ -48,7 +48,7 @@ fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
 
 // TODO consider adding a memoized function that creates a map of entities (maybe
 // with untracked access?) and going through that.
-#[legacy_memo]
+#[memo]
 pub fn server_entities_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: UnvalidatedTypeName,
@@ -59,7 +59,7 @@ pub fn server_entities_named<TNetworkProtocol: NetworkProtocol>(
     Ok(map.get(&entity_name).cloned().unwrap_or_default())
 }
 
-#[legacy_memo]
+#[memo]
 pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
@@ -98,7 +98,7 @@ pub enum EntityAccessError<TNetworkProtocol: NetworkProtocol> {
     },
 }
 
-#[legacy_memo]
+#[memo]
 pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_object_entity_name: ServerObjectEntityName,
@@ -133,7 +133,7 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-#[legacy_memo]
+#[memo]
 pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_scalar_entity_name: ServerScalarEntityName,
@@ -169,7 +169,7 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
 }
 
 /// TODO remove once we return references
-#[legacy_memo]
+#[memo]
 pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_scalar_entity_name: ServerScalarEntityName,
@@ -187,7 +187,7 @@ pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol>(
     Ok(Some(entity.item.javascript_name))
 }
 
-#[legacy_memo]
+#[memo]
 pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     name: ServerEntityName,
@@ -215,7 +215,7 @@ pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
 }
 
 // TODO define this in terms of server_entities_vec??
-#[legacy_memo]
+#[memo]
 pub fn defined_entities<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
@@ -247,7 +247,7 @@ pub fn defined_entities<TNetworkProtocol: NetworkProtocol>(
     Ok(defined_entities)
 }
 
-#[legacy_memo]
+#[memo]
 pub fn defined_entity<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: UnvalidatedTypeName,

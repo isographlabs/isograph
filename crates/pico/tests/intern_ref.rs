@@ -1,5 +1,5 @@
 use pico::{Database, MemoRef, SourceId, Storage};
-use pico_macros::{Db, Source, legacy_memo};
+use pico_macros::{Db, Source, memo};
 use thiserror::Error;
 
 #[derive(Db, Default)]
@@ -40,7 +40,7 @@ enum ProcessInputError {
     ReadError(#[from] FirstLetterError),
 }
 
-#[legacy_memo(raw)]
+#[memo(raw)]
 fn first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> Result<char, FirstLetterError> {
     db.get(input_id)
         .value
@@ -49,7 +49,7 @@ fn first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> Result<char, Fi
         .ok_or(FirstLetterError::EmptyString)
 }
 
-#[legacy_memo]
+#[memo]
 fn process_input(
     db: &TestDatabase,
     input_id: SourceId<Input>,

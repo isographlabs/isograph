@@ -13,7 +13,7 @@ use isograph_lang_parser::{
 use isograph_lang_types::{EntrypointDeclaration, SelectionType};
 use lazy_static::lazy_static;
 use pico::SourceId;
-use pico_macros::legacy_memo;
+use pico_macros::memo;
 use regex::Regex;
 
 // TODO this should return a Vec of Results, since a file can contain
@@ -63,7 +63,7 @@ pub fn parse_iso_literals_in_file_content_and_return_all<TNetworkProtocol: Netwo
         .collect()
 }
 
-#[legacy_memo]
+#[memo]
 pub fn parse_iso_literal_in_source<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     iso_literals_source_id: SourceId<IsoLiteralsSource>,
@@ -77,7 +77,7 @@ pub fn parse_iso_literal_in_source<TNetworkProtocol: NetworkProtocol>(
     parse_iso_literals_in_file_content(db, *relative_path, db.get_current_working_directory())
 }
 
-#[legacy_memo]
+#[memo]
 pub fn read_iso_literals_source_from_relative_path<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     relative_path_to_source_file: RelativePathToSourceFile,
@@ -88,7 +88,7 @@ pub fn read_iso_literals_source_from_relative_path<TNetworkProtocol: NetworkProt
 
 /// We should (probably) never directly read SourceId<IsoLiteralsSource>, since if we do so,
 /// we will ignore open files.
-#[legacy_memo]
+#[memo]
 pub fn read_iso_literals_source<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     iso_literals_source_id: SourceId<IsoLiteralsSource>,
@@ -242,7 +242,7 @@ pub struct IsoLiteralExtraction {
     pub iso_function_called_with_paren: bool,
 }
 
-#[legacy_memo]
+#[memo]
 pub fn extract_iso_literals_from_file_content<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     relative_path_to_source_file: RelativePathToSourceFile,
@@ -276,7 +276,7 @@ pub fn extract_iso_literals_from_file_content<TNetworkProtocol: NetworkProtocol>
         .collect()
 }
 
-#[legacy_memo]
+#[memo]
 pub fn memoized_parse_iso_literal<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     iso_literal_text: String,

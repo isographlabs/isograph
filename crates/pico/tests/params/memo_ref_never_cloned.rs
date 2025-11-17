@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use pico::{MemoRef, Storage};
-use pico_macros::{Db, legacy_memo};
+use pico_macros::{Db, memo};
 
 static OUTPUT_CLONE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -33,10 +33,10 @@ impl Clone for Output {
     }
 }
 
-#[legacy_memo(raw)]
+#[memo(raw)]
 fn get_output(_db: &TestDatabase) -> Output {
     Output {}
 }
 
-#[legacy_memo]
+#[memo]
 fn consume_output(_db: &TestDatabase, _output: MemoRef<Output>) {}

@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use pico::{Database, SourceId, Storage};
-use pico_macros::{Db, Source, legacy_memo};
+use pico_macros::{Db, Source, memo};
 
 static RETURN_VALUE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -43,7 +43,7 @@ impl Clone for ReturnValue {
     }
 }
 
-#[legacy_memo]
+#[memo]
 fn first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> ReturnValue {
     let input = db.get(input_id);
     ReturnValue(input.value.chars().next().unwrap())

@@ -18,7 +18,7 @@ use lsp_types::{
     SemanticTokensResult as LspSemanticTokensResult, Uri,
     request::{Request, SemanticTokensFullRequest},
 };
-use pico_macros::legacy_memo;
+use pico_macros::memo;
 
 pub fn on_semantic_token_full_request<TNetworkProtocol: NetworkProtocol>(
     compiler_state: &CompilerState<TNetworkProtocol>,
@@ -48,7 +48,7 @@ pub fn on_semantic_token_full_request<TNetworkProtocol: NetworkProtocol>(
 /// as that implies that if you move the iso literal around (e.g. by typing stuff before it),
 /// we cannot reuse that cached value (as the output changes.) (We already can't reuse the
 /// cached value, but that is a bug.) See https://github.com/isographlabs/isograph/issues/548
-#[legacy_memo]
+#[memo]
 fn get_semantic_tokens<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     uri: Uri,

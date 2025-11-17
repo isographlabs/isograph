@@ -1,5 +1,5 @@
 use pico::{Database, SourceId, Storage};
-use pico_macros::{Db, Source, legacy_memo};
+use pico_macros::{Db, Source, memo};
 
 #[derive(Db, Default)]
 struct TestDatabase {
@@ -37,12 +37,12 @@ struct InputB {
     pub value: String,
 }
 
-#[legacy_memo]
+#[memo]
 fn memoized_a(db: &TestDatabase, input: SourceId<InputA>) -> char {
     db.get(input).value.chars().next().unwrap()
 }
 
-#[legacy_memo]
+#[memo]
 fn memoized_b(db: &TestDatabase, input: SourceId<InputB>) -> char {
     db.get(input).value.chars().next().unwrap()
 }

@@ -12,10 +12,10 @@ use crate::{
 };
 use common_lang_types::WithLocation;
 use isograph_lang_types::SelectionType;
-use pico_macros::legacy_memo;
+use pico_macros::memo;
 use thiserror::Error;
 
-#[legacy_memo]
+#[memo]
 pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<(Schema<TNetworkProtocol>, ContainsIsoStats), GetValidatedSchemaError<TNetworkProtocol>>

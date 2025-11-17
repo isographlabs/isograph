@@ -11,7 +11,7 @@ use common_lang_types::{
     RelativePathToSourceFile, SelectableName, ServerObjectEntityName, TextSource, WithLocation,
 };
 use isograph_lang_parser::{IsoLiteralExtractionResult, IsographLiteralParseError};
-use pico_macros::legacy_memo;
+use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{parse_iso_literal_in_source, process_iso_literals};
@@ -133,7 +133,7 @@ impl<TNetworkProtocol: NetworkProtocol>
 }
 
 // This should not be used. It returns an Err variant if there is a single parse error.
-#[legacy_memo]
+#[memo]
 fn parse_iso_literals<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<ParsedIsoLiteralsMap, Vec<WithLocation<IsographLiteralParseError>>> {

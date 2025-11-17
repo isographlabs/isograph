@@ -11,7 +11,7 @@ use isograph_lang_types::{
     ServerObjectEntityNameWrapper, TypeAnnotation, UnvalidatedSelection, VariableDefinition,
 };
 
-use pico_macros::legacy_memo;
+use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
@@ -225,7 +225,7 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol>(
     Ok(result)
 }
 
-#[legacy_memo]
+#[memo]
 pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_field_declaration: WithSpan<ClientFieldDeclaration>,
@@ -406,7 +406,7 @@ fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol>(
     Ok(unprocessed_fields)
 }
 
-#[legacy_memo]
+#[memo]
 pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_pointer_declaration: WithSpan<ClientPointerDeclaration>,

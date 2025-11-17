@@ -4,7 +4,7 @@ use std::{
 };
 
 use pico::{Database, SourceId, Storage};
-use pico_macros::{Db, Source, legacy_memo};
+use pico_macros::{Db, Source, memo};
 
 static UNTRACKED_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static TRACKED_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -94,7 +94,7 @@ struct Input {
     pub value: String,
 }
 
-#[legacy_memo]
+#[memo]
 fn get_key_untracked(db: &TestDatabase) {
     UNTRACKED_COUNTER.fetch_add(1, Ordering::SeqCst);
     let map = db.get_map();
@@ -109,7 +109,7 @@ fn get_key_untracked(db: &TestDatabase) {
     assert_eq!(value.value, "asdf".to_string());
 }
 
-#[legacy_memo]
+#[memo]
 fn get_key_tracked(db: &TestDatabase) {
     TRACKED_COUNTER.fetch_add(1, Ordering::SeqCst);
     let map = db.get_map();

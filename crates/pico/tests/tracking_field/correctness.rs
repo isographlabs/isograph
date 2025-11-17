@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use pico::{Database, SourceId, Storage};
-use pico_macros::{Db, Source, legacy_memo};
+use pico_macros::{Db, Source, memo};
 
 #[derive(Default)]
 pub struct TestMap(HashMap<String, SourceId<Input>>);
@@ -70,7 +70,7 @@ struct Input {
     pub value: String,
 }
 
-#[legacy_memo]
+#[memo]
 fn get_values_tracked(db: &TestDatabase) -> Vec<String> {
     let mut result = vec![];
     for (_, input_id) in db.get_map().tracked().0.iter() {
@@ -80,7 +80,7 @@ fn get_values_tracked(db: &TestDatabase) -> Vec<String> {
     result
 }
 
-#[legacy_memo]
+#[memo]
 fn get_values_untracked(db: &TestDatabase) -> Vec<String> {
     let mut result = vec![];
     for (_, input_id) in db.get_map().untracked().0.iter() {

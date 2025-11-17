@@ -1,6 +1,6 @@
 use common_lang_types::{SelectableName, ServerObjectEntityName};
 use isograph_lang_types::{DefinitionLocation, SelectionType};
-use pico_macros::legacy_memo;
+use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
 };
 
 #[expect(clippy::type_complexity)]
-#[legacy_memo]
+#[memo]
 pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,

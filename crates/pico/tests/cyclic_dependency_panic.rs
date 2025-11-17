@@ -1,5 +1,5 @@
 use pico::Storage;
-use pico_macros::{Db, legacy_memo};
+use pico_macros::{Db, memo};
 
 #[derive(Db, Default)]
 struct TestDatabase {
@@ -42,27 +42,27 @@ fn test_calls_a() {
     calls_a(&db);
 }
 
-#[legacy_memo]
+#[memo]
 fn calls_itself(database: &TestDatabase) {
     calls_itself(database);
 }
 
-#[legacy_memo]
+#[memo]
 fn calls_calls_itself(database: &TestDatabase) {
     calls_itself(database);
 }
 
-#[legacy_memo]
+#[memo]
 fn a(database: &TestDatabase) {
     b(database);
 }
 
-#[legacy_memo]
+#[memo]
 fn b(database: &TestDatabase) {
     a(database);
 }
 
-#[legacy_memo]
+#[memo]
 fn calls_a(database: &TestDatabase) {
     a(database);
 }

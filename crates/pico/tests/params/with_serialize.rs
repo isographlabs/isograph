@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use pico::{Database, SourceId, Storage, WithSerialize};
-use pico_macros::{Db, Source, legacy_memo};
+use pico_macros::{Db, Source, memo};
 use serde::Serialize;
 
 static FIRST_LETTER_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -52,7 +52,7 @@ impl Clone for Param {
     }
 }
 
-#[legacy_memo]
+#[memo]
 fn accepts_param_with_serialize(
     db: &TestDatabase,
     input_id: SourceId<Input>,

@@ -16,7 +16,7 @@ use lsp_types::{
     Hover, HoverContents, MarkupContent, MarkupKind, Position, Uri,
     request::{HoverRequest, Request},
 };
-use pico_macros::legacy_memo;
+use pico_macros::memo;
 use resolve_position::ResolvePosition;
 
 use crate::{
@@ -38,7 +38,7 @@ pub fn on_hover<TNetworkProtocol: NetworkProtocol>(
     .to_owned()
 }
 
-#[legacy_memo]
+#[memo]
 fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     url: Uri,
@@ -126,7 +126,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
     }))
 }
 
-#[legacy_memo]
+#[memo]
 pub fn get_iso_literal_extraction_from_text_position_params<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     url: Uri,
@@ -217,7 +217,7 @@ fn find_iso_literal_extraction_under_cursor<'a>(
     None
 }
 
-/// A duplicate of an lsp_types type that exists solely to work with `#[legacy_memo]`.
+/// A duplicate of an lsp_types type that exists solely to work with `#[memo]`.
 /// The original does not implement hash.
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Default, Hash)]
 pub struct LineChar {

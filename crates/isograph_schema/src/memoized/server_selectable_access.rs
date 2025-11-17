@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use common_lang_types::{ServerObjectEntityName, ServerSelectableName};
-use pico_macros::legacy_memo;
+use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
@@ -13,7 +13,7 @@ type OwnedSelectableResult<TNetworkProtocol> =
     Result<OwnedServerSelectable<TNetworkProtocol>, FieldToInsertToServerSelectableError>;
 
 /// A vector of all server selectables that are defined in the type system schema
-#[legacy_memo]
+#[memo]
 pub fn server_selectables_vec<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
@@ -50,7 +50,7 @@ pub fn server_selectables_vec<TNetworkProtocol: NetworkProtocol>(
         .collect())
 }
 
-#[legacy_memo]
+#[memo]
 pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
@@ -69,7 +69,7 @@ pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
     Ok(map)
 }
 
-#[legacy_memo]
+#[memo]
 pub fn server_selectables_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
@@ -88,7 +88,7 @@ pub fn server_selectables_named<TNetworkProtocol: NetworkProtocol>(
         .unwrap_or_default())
 }
 
-#[legacy_memo]
+#[memo]
 pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
@@ -147,7 +147,7 @@ pub enum ServerSelectableNamedError<TNetworkProtocol: NetworkProtocol> {
     FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),
 }
 
-#[legacy_memo]
+#[memo]
 pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
@@ -178,7 +178,7 @@ pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-#[legacy_memo]
+#[memo]
 pub fn server_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,

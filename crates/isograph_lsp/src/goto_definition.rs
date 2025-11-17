@@ -23,7 +23,7 @@ use lsp_types::{
     GotoDefinitionResponse, Position, Uri,
     request::{GotoDefinition, Request},
 };
-use pico_macros::legacy_memo;
+use pico_macros::memo;
 use resolve_position::ResolvePosition;
 
 pub fn on_goto_definition<TNetworkProtocol: NetworkProtocol>(
@@ -39,7 +39,7 @@ pub fn on_goto_definition<TNetworkProtocol: NetworkProtocol>(
     .to_owned()
 }
 
-#[legacy_memo]
+#[memo]
 pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     url: Uri,

@@ -5,7 +5,7 @@ use common_lang_types::{
     WithLocation, WithSpan,
 };
 use isograph_lang_types::{SelectionType, UnvalidatedSelection};
-use pico_macros::legacy_memo;
+use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
@@ -18,7 +18,7 @@ type UnvalidatedSelectionSet = Vec<WithSpan<UnvalidatedSelection>>;
 type ValidatedSelectionSet = Vec<WithSpan<ValidatedSelection>>;
 
 #[expect(clippy::type_complexity)]
-#[legacy_memo]
+#[memo]
 pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> HashMap<
@@ -95,7 +95,7 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
     map
 }
 
-#[legacy_memo]
+#[memo]
 pub fn memoized_validated_reader_selection_set_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> HashMap<

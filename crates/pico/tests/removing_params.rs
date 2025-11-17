@@ -1,5 +1,5 @@
 use pico::{Database, SourceId, Storage};
-use pico_macros::{Db, Source, legacy_memo};
+use pico_macros::{Db, Source, memo};
 
 #[derive(Db, Default)]
 struct TestDatabase {
@@ -47,13 +47,13 @@ struct Input {
     pub value: String,
 }
 
-#[legacy_memo]
+#[memo]
 fn first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
     let input = db.get(input_id);
     input.value.chars().next().unwrap()
 }
 
-#[legacy_memo]
+#[memo]
 fn capitalized_first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
     let first = first_letter(db, input_id);
     first.to_ascii_uppercase()

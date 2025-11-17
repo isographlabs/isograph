@@ -4,7 +4,7 @@ use std::sync::{
 };
 
 use pico::{Database, SourceId, Storage};
-use pico_macros::{Db, Source, legacy_memo};
+use pico_macros::{Db, Source, memo};
 
 static FIRST_LETTER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static PARAM_CLONE_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -97,14 +97,14 @@ impl Clone for Param {
     }
 }
 
-#[legacy_memo]
+#[memo]
 fn accepts_owned_param(db: &TestDatabase, input_id: SourceId<Input>, _param: Param) -> char {
     FIRST_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     let input = db.get(input_id);
     input.value.chars().next().unwrap()
 }
 
-#[legacy_memo]
+#[memo]
 fn accepts_borrowed_param(db: &TestDatabase, input_id: SourceId<Input>, _param: &Param) -> char {
     FIRST_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     let input = db.get(input_id);

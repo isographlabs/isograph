@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use pico::{Database, SourceId, Storage};
-use pico_macros::{Db, Source, legacy_memo};
+use pico_macros::{Db, Source, memo};
 
 static INPUT_CLONE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static ASSERT_INPUT_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -55,7 +55,7 @@ impl Clone for Input {
     }
 }
 
-#[legacy_memo]
+#[memo]
 fn assert_input_cloned(db: &TestDatabase, input_id: SourceId<Input>) {
     ASSERT_INPUT_COUNTER.fetch_add(1, Ordering::SeqCst);
     db.get(input_id);

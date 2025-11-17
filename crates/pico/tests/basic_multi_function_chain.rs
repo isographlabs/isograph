@@ -4,7 +4,7 @@ use std::sync::{
 };
 
 use pico::{Database, MemoRef, SourceId, Storage};
-use pico_macros::{Db, Source, legacy_memo};
+use pico_macros::{Db, Source, memo};
 
 static FIRST_LETTER_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static CAPITALIZED_LETTER_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -124,21 +124,21 @@ struct Input {
     pub value: String,
 }
 
-#[legacy_memo(raw)]
+#[memo(raw)]
 fn first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
     FIRST_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     let input = db.get(input_id);
     input.value.chars().next().unwrap()
 }
 
-#[legacy_memo]
+#[memo]
 fn capitalized_first_letter(db: &TestDatabase, input_id: SourceId<Input>) -> char {
     CAPITALIZED_LETTER_COUNTER.fetch_add(1, Ordering::SeqCst);
     let first = first_letter(db, input_id);
     first.lookup(db).to_ascii_uppercase()
 }
 
-#[legacy_memo]
+#[memo]
 fn capitalized_first_letter_from_memoref(db: &TestDatabase, first: MemoRef<char>) -> char {
     MEMO_REF_PARAM_COUNTER.fetch_add(1, Ordering::SeqCst);
     first.lookup_tracked(db).to_ascii_uppercase()

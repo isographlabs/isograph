@@ -2,12 +2,12 @@ use std::collections::BTreeMap;
 
 use common_lang_types::ServerObjectEntityName;
 use pico::MemoRef;
-use pico_macros::legacy_memo;
+use pico_macros::memo;
 
 use crate::{IsographDatabase, NetworkProtocol, RootOperationName};
 
 /// This is a GraphQL-ism and this function should probably not exist.
-#[legacy_memo]
+#[memo]
 pub fn fetchable_types<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<

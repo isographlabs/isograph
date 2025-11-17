@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use pico::{Database, Storage};
-use pico_macros::{Db, legacy_memo};
+use pico_macros::{Db, memo};
 
 static A_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static B_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -42,13 +42,13 @@ fn multiple_calls() {
     assert_eq!(B_COUNTER.load(Ordering::SeqCst), 1);
 }
 
-#[legacy_memo]
+#[memo]
 fn memoized_a(_db: &TestDatabase) -> char {
     A_COUNTER.fetch_add(1, Ordering::SeqCst);
     'a'
 }
 
-#[legacy_memo]
+#[memo]
 fn memoized_b(_db: &TestDatabase) -> char {
     B_COUNTER.fetch_add(1, Ordering::SeqCst);
     'b'
