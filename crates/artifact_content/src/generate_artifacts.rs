@@ -21,11 +21,11 @@ use isograph_schema::{
     NameAndArguments, NetworkProtocol, NormalizationKey, RefetchStrategy, ScalarSelectableId,
     Schema, ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo,
     ValidatedSelection, ValidatedVariableDefinition, WrappedSelectionMapSelection,
-    accessible_client_fields, client_scalar_selectable_named, client_selectable_named, description,
-    fetchable_types, inline_fragment_reader_selection_set, output_type_annotation,
-    selection_map_wrapped, server_object_entity_named, server_object_selectable_named,
-    server_scalar_entity_javascript_name, server_scalar_selectable_named,
-    validated_refetch_strategy_for_client_scalar_selectable_named,
+    accessible_client_fields, client_object_selectable_named, client_scalar_selectable_named,
+    client_selectable_named, description, fetchable_types, inline_fragment_reader_selection_set,
+    output_type_annotation, selection_map_wrapped, server_object_entity_named,
+    server_object_selectable_named, server_scalar_entity_javascript_name,
+    server_scalar_selectable_named, validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 use isograph_schema::{ContainsIsoStats, GetValidatedSchemaError, get_validated_schema};
 use lazy_static::lazy_static;
@@ -219,17 +219,24 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
 
             DefinitionLocation::Client(SelectionType::Object((
                 parent_object_entity_name,
-                client_object_selectable_id,
+                client_object_selectable_name,
             ))) => {
-                let client_object_selectable = schema
-                    .client_object_selectable(
-                        *parent_object_entity_name,
-                        *client_object_selectable_id,
-                    )
-                    .expect(
-                        "Expected selectable to exist. \
-                        This is indicative of a bug in Isograph.",
-                    );
+                let client_object_selectable = client_object_selectable_named(
+                    db,
+                    *parent_object_entity_name,
+                    *client_object_selectable_name,
+                )
+                .as_ref()
+                .expect(
+                    "Expected selectable to be valid. \
+                    This is indicative of a bug in Isograph.",
+                )
+                .as_ref()
+                .expect(
+                    "Expected selectable to exist. \
+                    This is indicative of a bug in Isograph.",
+                );
+
                 path_and_contents.extend(generate_eager_reader_artifacts(
                     db,
                     schema,

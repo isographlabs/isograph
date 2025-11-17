@@ -11,12 +11,12 @@ use isograph_lang_types::{
     DefinitionLocation, IsographResolvedNode,
 };
 use isograph_schema::{
-    IsoLiteralsSource, IsographDatabase, NetworkProtocol,
+    IsoLiteralsSource, IsographDatabase, NetworkProtocol, client_object_selectable_named,
     get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
     server_entities_named,
 };
 use isograph_schema::{
-    client_scalar_selectable_named, get_validated_schema, process_iso_literal_extraction,
+    client_scalar_selectable_named, process_iso_literal_extraction,
     read_iso_literals_source_from_relative_path,
 };
 use lsp_types::{
@@ -217,11 +217,6 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                     .map(lsp_location_to_scalar_response)
             }
             IsographResolvedNode::ClientObjectSelectableNameWrapper(object_wrapper_path) => {
-                let (validated_schema, _stats) = match get_validated_schema(db) {
-                    Ok(schema) => schema,
-                    Err(_) => return Ok(None),
-                };
-
                 // This is a pretty useless goto def! It just takes the user to the pointer that they're currently hovering on.
                 // But, (pre-adding this), the behavior was to say that "No definition found", which is a bad UX.
                 let parent_type_name = match object_wrapper_path.parent {
@@ -229,30 +224,35 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                         position_resolution_path,
                     ) => position_resolution_path.inner.parent_type.item,
                 };
-                validated_schema
-                    .client_object_selectable(
-                        parent_type_name.0.unchecked_conversion(),
-                        object_wrapper_path.inner.0,
-                    )
-                    .and_then(|referenced_selectable| {
-                        referenced_selectable
-                            .name
-                            .location
-                            .as_embedded_location()
-                            .and_then(|location| {
-                                let IsoLiteralsSource {
-                                    relative_path: _,
-                                    content,
-                                } = read_iso_literals_source_from_relative_path(
-                                    db,
-                                    location.text_source.relative_path_to_source_file,
-                                )
-                                .as_ref()
-                                .expect("Expected relative path to exist");
-                                isograph_location_to_lsp_location(db, location, content)
-                            })
-                    })
-                    .map(lsp_location_to_scalar_response)
+
+                let referenced_selectable = client_object_selectable_named(
+                    db,
+                    parent_type_name.0.unchecked_conversion(),
+                    object_wrapper_path.inner.0,
+                )
+                .as_ref()
+                .map_err(|_| LSPRuntimeError::ExpectedError)?
+                .as_ref()
+                .ok_or_else(|| LSPRuntimeError::ExpectedError)?;
+
+                let lsp_location_opt = referenced_selectable
+                    .name
+                    .location
+                    .as_embedded_location()
+                    .and_then(|location| {
+                        let IsoLiteralsSource {
+                            relative_path: _,
+                            content,
+                        } = read_iso_literals_source_from_relative_path(
+                            db,
+                            location.text_source.relative_path_to_source_file,
+                        )
+                        .as_ref()
+                        .expect("Expected relative path to exist");
+                        isograph_location_to_lsp_location(db, location, content)
+                    });
+
+                lsp_location_opt.map(lsp_location_to_scalar_response)
             }
         }
     } else {

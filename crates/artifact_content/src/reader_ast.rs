@@ -13,9 +13,9 @@ use isograph_schema::{
     NetworkProtocol, NormalizationKey, PathToRefetchField, RefetchedPathsMap, Schema,
     ServerObjectSelectableVariant, ValidatedObjectSelection, ValidatedScalarSelection,
     ValidatedSelection, VariableContext, categorize_field_loadability,
-    client_object_selectable_selection_set_for_parent_query, client_scalar_selectable_named,
-    client_scalar_selectable_selection_set_for_parent_query, server_object_selectable_named,
-    transform_arguments_with_child_context,
+    client_object_selectable_named, client_object_selectable_selection_set_for_parent_query,
+    client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
+    server_object_selectable_named, transform_arguments_with_child_context,
     validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 
@@ -111,7 +111,6 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
 
                     linked_field_ast_node(
                         db,
-                        schema,
                         linked_field_selection,
                         indentation_level,
                         inner_reader_ast,
@@ -182,7 +181,6 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
 
                     linked_field_ast_node(
                         db,
-                        schema,
                         linked_field_selection,
                         indentation_level,
                         inner_reader_ast,
@@ -200,7 +198,6 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
 #[expect(clippy::too_many_arguments)]
 fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
     linked_field: &ValidatedObjectSelection,
     indentation_level: u8,
     inner_reader_ast: ReaderAst,
@@ -229,21 +226,32 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
 
     let condition = match linked_field.associated_data {
-        DefinitionLocation::Client((parent_object_entity_name, client_pointer_name)) => {
-            let client_pointer = schema
-                .client_object_selectable(parent_object_entity_name, client_pointer_name)
-                .expect(
-                    "Expected selectable to exist. \
-                    This is indicative of a bug in Isograph.",
-                );
+        DefinitionLocation::Client((parent_object_entity_name, client_object_selectable_name)) => {
+            let client_object_selectable = client_object_selectable_named(
+                db,
+                parent_object_entity_name,
+                client_object_selectable_name,
+            )
+            .as_ref()
+            .expect(
+                "Expected selectable to be valid. \
+                This is indicative of a bug in Isograph.",
+            )
+            .as_ref()
+            .expect(
+                "Expected selectable to exist. \
+                This is indicative of a bug in Isograph.",
+            );
 
             let reader_artifact_import_name = format!(
                 "{}__resolver_reader",
-                client_pointer.type_and_field.underscore_separated()
+                client_object_selectable
+                    .type_and_field
+                    .underscore_separated()
             );
 
             reader_imports.insert((
-                client_pointer.type_and_field,
+                client_object_selectable.type_and_field,
                 ImportedFileCategory::ResolverReader,
             ));
 
@@ -858,31 +866,37 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                 match linked_field_selection.associated_data {
                     DefinitionLocation::Client((
                         parent_object_entity_name,
-                        client_pointer_name,
+                        client_object_selectable_name,
                     )) => {
-                        let client_pointer = schema
-                            .client_object_selectable(
-                                parent_object_entity_name,
-                                client_pointer_name,
-                            )
-                            .expect(
-                                "Expected selectable to exist. \
-                                This is indicative of a bug in Isograph.",
-                            );
+                        let client_object_selectable = client_object_selectable_named(
+                            db,
+                            parent_object_entity_name,
+                            client_object_selectable_name,
+                        )
+                        .as_ref()
+                        .expect(
+                            "Expected selectable to be valid. \
+                            This is indicative of a bug in Isograph.",
+                        )
+                        .as_ref()
+                        .expect(
+                            "Expected selectable to exist. \
+                            This is indicative of a bug in Isograph.",
+                        );
 
                         let new_paths = refetched_paths_with_path(
                             db,
                             &client_object_selectable_selection_set_for_parent_query(
                                 db,
-                                client_pointer.parent_object_entity_name,
-                                client_pointer.name.item,
+                                client_object_selectable.parent_object_entity_name,
+                                client_object_selectable.name.item,
                             )
                             .expect("Expected selection set to be valid."),
                             schema,
                             path,
                             &initial_variable_context.child_variable_context(
                                 &linked_field_selection.arguments,
-                                &client_pointer.variable_definitions,
+                                &client_object_selectable.variable_definitions,
                                 &ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
                             ),
                         );
