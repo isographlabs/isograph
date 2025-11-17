@@ -7,9 +7,9 @@ pub use graphql_network_protocol::*;
 use isograph_schema::{ClientScalarSelectable, Schema, ServerObjectEntity};
 pub use read_schema::*;
 
-pub type ValidatedGraphqlSchema = Schema<GraphQLNetworkProtocol>;
-pub type GraphqlSchema = Schema<GraphQLNetworkProtocol>;
-pub type UnvalidatedGraphqlSchema = Schema<GraphQLNetworkProtocol>;
+pub type ValidatedGraphqlSchema = Schema;
+pub type GraphqlSchema = Schema;
+pub type UnvalidatedGraphqlSchema = Schema;
 
 pub type ValidatedGraphqlClientField = ClientScalarSelectable<GraphQLNetworkProtocol>;
 

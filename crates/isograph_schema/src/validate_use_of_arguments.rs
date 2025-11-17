@@ -41,7 +41,7 @@ lazy_static! {
 /// fields that point to client objects.)
 pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    validated_schema: &Schema<TNetworkProtocol>,
+    validated_schema: &Schema,
 ) -> Result<(), Vec<WithLocation<ValidateUseOfArgumentsError<TNetworkProtocol>>>> {
     let mut errors = vec![];
 
@@ -68,7 +68,7 @@ pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
 
 fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
+    schema: &Schema,
     client_type: impl ClientScalarOrObjectSelectable,
     errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError<TNetworkProtocol>>>,
 ) {
@@ -232,7 +232,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
 #[expect(clippy::too_many_arguments)]
 fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
+    schema: &Schema,
     errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError<TNetworkProtocol>>>,
     reachable_variables: &mut BTreeSet<VariableName>,
     field_argument_definitions: Vec<ValidatedVariableDefinition>,

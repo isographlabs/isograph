@@ -29,7 +29,7 @@ use crate::{
 fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection: &WithSpan<ValidatedSelection>,
-    schema: &Schema<TNetworkProtocol>,
+    schema: &Schema,
     indentation_level: u8,
     reader_imports: &mut ReaderImports,
     // TODO use this to generate usedRefetchQueries
@@ -329,7 +329,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
 fn scalar_client_defined_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     scalar_field_selection: &ValidatedScalarSelection,
-    schema: &Schema<TNetworkProtocol>,
+    schema: &Schema,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
     indentation_level: u8,
     path: &mut Vec<NormalizationKey>,
@@ -516,7 +516,7 @@ fn imperatively_loaded_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
 #[expect(clippy::too_many_arguments)]
 fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
+    schema: &Schema,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
     reader_imports: &mut ReaderImports,
     indentation_level: u8,
@@ -647,7 +647,7 @@ fn server_defined_scalar_field_ast_node(
 #[expect(clippy::too_many_arguments)]
 fn generate_reader_ast_with_path<'schema, TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &'schema Schema<TNetworkProtocol>,
+    schema: &'schema Schema,
     selection_set: &'schema [WithSpan<ValidatedSelection>],
     indentation_level: u8,
     nested_client_field_imports: &mut ReaderImports,
@@ -731,7 +731,7 @@ fn find_imperatively_fetchable_query_index(
 
 pub(crate) fn generate_reader_ast<'schema, TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &'schema Schema<TNetworkProtocol>,
+    schema: &'schema Schema,
     selection_set: &'schema [WithSpan<ValidatedSelection>],
     indentation_level: u8,
     // N.B. this is not root_refetched_paths when we're generating an entrypoint :(

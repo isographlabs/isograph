@@ -19,7 +19,7 @@ use crate::{
 
 pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
+    schema: &Schema,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
     refetched_paths: &RefetchedPathsMap,
     was_selected_loadably: bool,

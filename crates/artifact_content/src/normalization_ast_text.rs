@@ -1,12 +1,12 @@
 use isograph_schema::{
     MergedInlineFragmentSelection, MergedLinkedFieldSelection, MergedScalarFieldSelection,
-    MergedServerSelection, NetworkProtocol, Schema,
+    MergedServerSelection, Schema,
 };
 
 use crate::generate_artifacts::{NormalizationAstText, get_serialized_field_arguments};
 
-pub(crate) fn generate_normalization_ast_text<'schema, 'a, TNetworkProtocol: NetworkProtocol>(
-    schema: &'schema Schema<TNetworkProtocol>,
+pub(crate) fn generate_normalization_ast_text<'schema, 'a>(
+    schema: &'schema Schema,
     selection_map: impl Iterator<Item = &'a MergedServerSelection> + 'a,
     indentation_level: u8,
 ) -> NormalizationAstText {
@@ -19,9 +19,9 @@ pub(crate) fn generate_normalization_ast_text<'schema, 'a, TNetworkProtocol: Net
     NormalizationAstText(normalization_ast_text)
 }
 
-fn generate_normalization_ast_node<TNetworkProtocol: NetworkProtocol>(
+fn generate_normalization_ast_node(
     item: &MergedServerSelection,
-    schema: &Schema<TNetworkProtocol>,
+    schema: &Schema,
     indentation_level: u8,
 ) -> String {
     match &item {

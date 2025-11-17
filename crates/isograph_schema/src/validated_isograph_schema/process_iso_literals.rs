@@ -18,12 +18,9 @@ use crate::{parse_iso_literal_in_source, process_iso_literals};
 
 pub(crate) fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    mut unvalidated_isograph_schema: Schema<TNetworkProtocol>,
+    mut unvalidated_isograph_schema: Schema,
     mut unprocessed_selection_sets: Vec<UnprocessedSelectionSet>,
-) -> Result<
-    (Schema<TNetworkProtocol>, ContainsIsoStats),
-    ProcessIsoLiteralsForSchemaError<TNetworkProtocol>,
-> {
+) -> Result<(Schema, ContainsIsoStats), ProcessIsoLiteralsForSchemaError<TNetworkProtocol>> {
     let contains_iso = parse_iso_literals(db).to_owned()?;
     let contains_iso_stats = contains_iso.stats();
 

@@ -15,7 +15,7 @@ use pico_macros::memo;
 
 pub fn add_link_fields_to_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &mut Schema<TNetworkProtocol>,
+    schema: &mut Schema,
 ) -> Result<(), CreateSchemaError<TNetworkProtocol>> {
     let link_fields = get_link_fields(db).to_owned()?;
 

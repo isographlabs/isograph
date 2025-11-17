@@ -133,7 +133,7 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
 
 fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
+    schema: &Schema,
     config: &CompilerConfig,
 ) -> Vec<ArtifactPathAndContent> {
     let mut encountered_client_type_map = BTreeMap::new();
@@ -740,7 +740,7 @@ pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
 
 pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
+    schema: &Schema,
     selection_map: &[WithSpan<ValidatedSelection>],
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
@@ -767,7 +767,7 @@ pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProt
 
 pub(crate) fn generate_client_field_updatable_data_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
+    schema: &Schema,
     selection_map: &[WithSpan<ValidatedSelection>],
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
@@ -799,7 +799,7 @@ pub(crate) fn generate_client_field_updatable_data_type<TNetworkProtocol: Networ
 
 fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
+    schema: &Schema,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
     nested_client_field_imports: &mut ParamTypeImports,
@@ -1055,7 +1055,7 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
 #[expect(clippy::too_many_arguments)]
 fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
+    schema: &Schema,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
     nested_client_field_imports: &mut ParamTypeImports,

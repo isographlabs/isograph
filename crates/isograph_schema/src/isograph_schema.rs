@@ -1,9 +1,9 @@
 use std::{collections::HashMap, fmt::Debug};
 
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, JavascriptName, SelectableName,
-    ServerObjectEntityName, ServerScalarEntityName, ServerScalarIdSelectableName,
-    ServerScalarSelectableName, ServerSelectableName,
+    ClientScalarSelectableName, JavascriptName, SelectableName, ServerObjectEntityName,
+    ServerScalarEntityName, ServerScalarIdSelectableName, ServerScalarSelectableName,
+    ServerSelectableName,
 };
 use intern::Lookup;
 use intern::string_key::Intern;
@@ -14,8 +14,8 @@ use isograph_lang_types::{
 use lazy_static::lazy_static;
 
 use crate::{
-    ClientObjectSelectable, EntrypointDeclarationInfo, IsographDatabase, NetworkProtocol,
-    NormalizationKey, ObjectSelectableId, ServerEntityName, ServerObjectEntityAvailableSelectables,
+    EntrypointDeclarationInfo, IsographDatabase, NetworkProtocol, NormalizationKey,
+    ObjectSelectableId, ServerEntityName, ServerObjectEntityAvailableSelectables,
     ServerObjectSelectable, ServerScalarSelectable, UseRefetchFieldRefetchStrategy,
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
     server_selectable_named,
@@ -36,27 +36,21 @@ pub struct RootOperationName(pub &'static str);
 
 /// The in-memory representation of a schema.
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Schema<TNetworkProtocol: NetworkProtocol> {
-    pub client_object_selectables: HashMap<
-        (ServerObjectEntityName, ClientObjectSelectableName),
-        ClientObjectSelectable<TNetworkProtocol>,
-    >,
+pub struct Schema {
     pub entrypoints:
         HashMap<(ServerObjectEntityName, ClientScalarSelectableName), EntrypointDeclarationInfo>,
     pub server_entity_data: ServerEntityData,
 }
 
-impl<TNetworkProtocol: NetworkProtocol> Default for Schema<TNetworkProtocol> {
+impl Default for Schema {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
+impl Schema {
     pub fn new() -> Self {
         Self {
-            client_object_selectables: HashMap::new(),
-
             entrypoints: Default::default(),
             server_entity_data: HashMap::new(),
         }
@@ -121,9 +115,9 @@ pub struct ServerObjectEntityExtraInfo {
 // This type alias is a bit outdated. It should be gone soon anyway, though.
 pub type ServerEntityData = HashMap<ServerObjectEntityName, ServerObjectEntityExtraInfo>;
 
-impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
+impl Schema {
     // TODO this function should not exist
-    pub fn insert_server_scalar_selectable(
+    pub fn insert_server_scalar_selectable<TNetworkProtocol: NetworkProtocol>(
         &mut self,
         server_scalar_selectable: ServerScalarSelectable<TNetworkProtocol>,
     ) -> CreateAdditionalFieldsResult<(), TNetworkProtocol> {
@@ -155,7 +149,7 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
     }
 
     // TODO this function should not exist
-    pub fn insert_server_object_selectable(
+    pub fn insert_server_object_selectable<TNetworkProtocol: NetworkProtocol>(
         &mut self,
         server_object_selectable: ServerObjectSelectable<TNetworkProtocol>,
     ) -> CreateAdditionalFieldsResult<(), TNetworkProtocol> {

@@ -55,7 +55,7 @@ pub fn create_type_system_schema_with_server_selectables<TNetworkProtocol: Netwo
 /// - if it is an id field, modify the parent object
 pub fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &mut Schema<TNetworkProtocol>,
+    schema: &mut Schema,
     field_queue: &HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
 ) -> Result<(), CreateSchemaError<TNetworkProtocol>> {
     for selectable in process_field_queue_inner(db, field_queue) {

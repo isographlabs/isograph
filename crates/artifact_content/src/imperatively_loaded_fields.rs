@@ -23,7 +23,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     TNetworkProtocol: NetworkProtocol,
 >(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
+    schema: &Schema,
     file_extensions: GenerateFileExtensionsOption,
     persisted_documents: &mut Option<PersistedDocuments>,
     entrypoint: &ClientScalarSelectable<TNetworkProtocol>,

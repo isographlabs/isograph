@@ -119,7 +119,7 @@ export function iso<T>(
 
 pub(crate) fn build_iso_overload_artifact<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
+    schema: &Schema,
     file_extensions: GenerateFileExtensionsOption,
     no_babel_transform: bool,
 ) -> ArtifactPathAndContent {
@@ -341,7 +341,7 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
 
 fn sorted_entrypoints<'schema, TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &'schema Schema<TNetworkProtocol>,
+    schema: &'schema Schema,
 ) -> Vec<(
     ClientScalarSelectable<TNetworkProtocol>,
     &'schema EntrypointDeclarationInfo,

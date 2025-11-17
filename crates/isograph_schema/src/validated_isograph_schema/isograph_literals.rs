@@ -112,7 +112,7 @@ pub fn read_iso_literals_source<TNetworkProtocol: NetworkProtocol>(
 #[expect(clippy::type_complexity)]
 pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &mut Schema<TNetworkProtocol>,
+    schema: &mut Schema,
     contains_iso: ParsedIsoLiteralsMap,
 ) -> Result<
     (

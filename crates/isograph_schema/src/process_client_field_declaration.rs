@@ -48,7 +48,7 @@ pub type UnprocessedSelectionSet = SelectionType<
 
 pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &mut Schema<TNetworkProtocol>,
+    schema: &mut Schema,
     client_field_declaration: WithSpan<ClientFieldDeclaration>,
     text_source: TextSource,
 ) -> Result<
@@ -90,7 +90,7 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
 
 pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &mut Schema<TNetworkProtocol>,
+    schema: &mut Schema,
     client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
     text_source: TextSource,
 ) -> Result<
@@ -174,7 +174,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
 
 fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &mut Schema<TNetworkProtocol>,
+    schema: &mut Schema,
     client_field_declaration: WithSpan<ClientFieldDeclaration>,
 ) -> ProcessClientFieldDeclarationResult<
     UnprocessedClientScalarSelectableSelectionSet,
@@ -346,7 +346,7 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
 
 fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &mut Schema<TNetworkProtocol>,
+    schema: &mut Schema,
     parent_object_entity_name: ServerObjectEntityName,
     client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
 ) -> ProcessClientFieldDeclarationResult<
@@ -386,13 +386,8 @@ fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol>(
         ));
     }
 
-    let (unprocessed_fields, client_object_selectable) =
+    let (unprocessed_fields, _) =
         process_client_pointer_declaration_inner(db, client_pointer_declaration.item).to_owned()?;
-
-    schema.client_object_selectables.insert(
-        (parent_object_entity_name, client_pointer_name),
-        client_object_selectable,
-    );
 
     Ok(unprocessed_fields)
 }

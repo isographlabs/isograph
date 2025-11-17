@@ -34,7 +34,7 @@ use std::collections::BTreeSet;
 #[expect(clippy::too_many_arguments)]
 pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
+    schema: &Schema,
     parent_object_entity_name: ServerObjectEntityName,
     entrypoint_scalar_selectable_name: ClientScalarSelectableName,
     info: &EntrypointDeclarationInfo,
@@ -125,7 +125,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     TNetworkProtocol: NetworkProtocol,
 >(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
+    schema: &Schema,
     entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
     info: Option<&EntrypointDeclarationInfo>,
     merged_selection_map: &MergedSelectionMap,

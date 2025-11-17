@@ -276,9 +276,9 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
     ))
 }
 
-impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
+impl Schema {
     // TODO this should be defined elsewhere, probably
-    pub fn insert_client_field_on_object(
+    pub fn insert_client_field_on_object<TNetworkProtocol: NetworkProtocol>(
         &mut self,
         client_field_parent_object_entity_name: ServerObjectEntityName,
         client_selectable_name: ClientScalarSelectableName,
