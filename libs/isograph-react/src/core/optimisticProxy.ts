@@ -28,11 +28,19 @@ export function getStoreRecordProxy(
   storeLayer: StoreLayer,
   link: StoreLink,
 ): StoreRecord {
+  let startNode: StoreLayer | null = storeLayer;
+  while (startNode !== null) {
+    const storeRecord = startNode.data[link.__typename]?.[link.__link];
+    if (storeRecord != null) {
+      break;
+    }
+    startNode = startNode.parentStoreLayer;
+  }
   return new Proxy<StoreRecord>(
     {},
     {
       get(_, p) {
-        let node: StoreLayer | null = storeLayer;
+        let node = startNode;
 
         while (node !== null) {
           const storeRecord = node.data[link.__typename]?.[link.__link];
@@ -46,7 +54,7 @@ export function getStoreRecordProxy(
         }
       },
       has(_, p) {
-        let node: StoreLayer | null = storeLayer;
+        let node = startNode;
 
         while (node !== null) {
           const storeRecord = node.data[link.__typename]?.[link.__link];
@@ -61,6 +69,7 @@ export function getStoreRecordProxy(
         return false;
       },
       set(_, p, newValue) {
+        startNode = storeLayer;
         return Reflect.set(
           getOrInsertRecord(storeLayer.data, link),
           p,

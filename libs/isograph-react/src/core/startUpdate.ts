@@ -183,14 +183,6 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
   mutableState: MutableInvalidationState,
   mutableUpdatedIds: EncounteredIds,
 ): ReadDataResultSuccess<ExtractUpdatableData<TReadFromStore>> {
-  let storeRecord = getStoreRecordProxy(storeLayer, root);
-  if (storeRecord == null) {
-    return {
-      kind: 'Success',
-      data: null as any,
-    };
-  }
-
   let target: { [index: string]: any } = {};
 
   for (const field of ast) {
@@ -203,6 +195,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
           field.alias ?? field.fieldName,
           mutableState,
           () => {
+            const storeRecord = getStoreRecordProxy(storeLayer, root);
             const data = readScalarFieldData(
               field,
               storeRecord,
@@ -235,6 +228,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
           field.alias ?? field.fieldName,
           mutableState,
           () => {
+            const storeRecord = getStoreRecordProxy(storeLayer, root);
             const data = readLinkedFieldData(
               environment,
               field,
