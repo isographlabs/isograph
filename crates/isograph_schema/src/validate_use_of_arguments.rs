@@ -14,8 +14,9 @@ use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::{
-    ClientScalarOrObjectSelectable, IsographDatabase, NetworkProtocol, Schema,
-    ValidatedVariableDefinition, client_object_selectable_named, client_scalar_selectable_named,
+    ClientScalarOrObjectSelectable, IsographDatabase, MemoizedIsoLiteralError, NetworkProtocol,
+    Schema, ValidatedVariableDefinition, client_object_selectable_named,
+    client_scalar_selectable_named, client_selectable_map,
     selectable_validated_reader_selection_set, server_object_selectable_named,
     server_scalar_selectable_named,
     validate_argument_types::{ValidateArgumentTypesError, value_satisfies_type},
@@ -41,21 +42,19 @@ lazy_static! {
 pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     validated_schema: &Schema<TNetworkProtocol>,
-) -> Result<(), Vec<WithLocation<ValidateUseOfArgumentsError>>> {
+) -> Result<(), Vec<WithLocation<ValidateUseOfArgumentsError<TNetworkProtocol>>>> {
     let mut errors = vec![];
-    for client_scalar_selectable in validated_schema.client_scalar_selectables.values() {
+
+    for client_selectable in client_selectable_map(db)
+        .as_ref()
+        .map_err(|e| vec![WithLocation::new(e.clone().into(), Location::generated())])?
+        .iter()
+        .flat_map(|(_, value)| value.as_ref().ok())
+    {
         validate_use_of_arguments_for_client_type(
             db,
             validated_schema,
-            client_scalar_selectable,
-            &mut errors,
-        );
-    }
-    for client_object_selectable in validated_schema.client_object_selectables.values() {
-        validate_use_of_arguments_for_client_type(
-            db,
-            validated_schema,
-            client_object_selectable,
+            client_selectable.as_ref(),
             &mut errors,
         );
     }
@@ -71,7 +70,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
     client_type: impl ClientScalarOrObjectSelectable,
-    errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError>>,
+    errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError<TNetworkProtocol>>>,
 ) {
     let mut reachable_variables = BTreeSet::new();
 
@@ -234,7 +233,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
 fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema: &Schema<TNetworkProtocol>,
-    errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError>>,
+    errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError<TNetworkProtocol>>>,
     reachable_variables: &mut BTreeSet<VariableName>,
     field_argument_definitions: Vec<ValidatedVariableDefinition>,
     client_type_variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
@@ -286,12 +285,12 @@ fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn validate_all_variables_are_used(
+fn validate_all_variables_are_used<TNetworkProtocol: NetworkProtocol>(
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     used_variables: UsedVariables,
     top_level_type_and_field_name: ParentObjectEntityNameAndSelectableName,
     location: Location,
-) -> ValidateUseOfArgumentsResult<()> {
+) -> ValidateUseOfArgumentsResult<(), TNetworkProtocol> {
     let unused_variables = variable_definitions
         .iter()
         .filter_map(|variable| {
@@ -317,10 +316,10 @@ fn validate_all_variables_are_used(
     Ok(())
 }
 
-fn assert_no_missing_arguments(
+fn assert_no_missing_arguments<TNetworkProtocol: NetworkProtocol>(
     missing_arguments: Vec<ValidatedVariableDefinition>,
     location: Location,
-) -> ValidateUseOfArgumentsResult<()> {
+) -> ValidateUseOfArgumentsResult<(), TNetworkProtocol> {
     if !missing_arguments.is_empty() {
         return Err(WithLocation::new(
             ValidateUseOfArgumentsError::MissingArguments { missing_arguments },
@@ -364,11 +363,11 @@ fn get_missing_and_provided_arguments<'a>(
         })
 }
 
-fn validate_no_extraneous_arguments(
+fn validate_no_extraneous_arguments<TNetworkProtocol: NetworkProtocol>(
     field_argument_definitions: &[ValidatedVariableDefinition],
     selection_supplied_arguments: &[WithLocation<SelectionFieldArgument>],
     location: Location,
-) -> ValidateUseOfArgumentsResult<()> {
+) -> ValidateUseOfArgumentsResult<(), TNetworkProtocol> {
     let extra_arguments: Vec<_> = selection_supplied_arguments
         .iter()
         .filter_map(|arg| {
@@ -441,10 +440,11 @@ fn maybe_push_errors<E>(errors: &mut Vec<E>, result: Result<(), E>) {
 
 type MissingArguments = Vec<ValidatedVariableDefinition>;
 
-type ValidateUseOfArgumentsResult<T> = Result<T, WithLocation<ValidateUseOfArgumentsError>>;
+type ValidateUseOfArgumentsResult<T, TNetworkProtocol> =
+    Result<T, WithLocation<ValidateUseOfArgumentsError<TNetworkProtocol>>>;
 
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
-pub enum ValidateUseOfArgumentsError {
+pub enum ValidateUseOfArgumentsError<TNetworkProtocol: NetworkProtocol> {
     #[error(
         "This field has missing arguments: {0}",
         missing_arguments.iter().map(|arg| format!("${}", arg.name.item)).collect::<Vec<_>>().join(", ")
@@ -474,4 +474,7 @@ pub enum ValidateUseOfArgumentsError {
         #[from]
         message: ValidateArgumentTypesError,
     },
+
+    #[error("{0}")]
+    MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError<TNetworkProtocol>),
 }

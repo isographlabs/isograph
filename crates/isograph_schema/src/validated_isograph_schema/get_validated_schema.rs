@@ -86,7 +86,7 @@ pub enum GetValidatedSchemaError<TNetworkProtocol: NetworkProtocol> {
         })
     )]
     ValidateUseOfArguments {
-        messages: Vec<WithLocation<ValidateUseOfArgumentsError>>,
+        messages: Vec<WithLocation<ValidateUseOfArgumentsError<TNetworkProtocol>>>,
     },
 
     #[error("{error}")]
@@ -105,10 +105,11 @@ pub enum GetValidatedSchemaError<TNetworkProtocol: NetworkProtocol> {
     CreateAdditionalFieldsError(#[from] CreateAdditionalFieldsError<TNetworkProtocol>),
 }
 
-impl<TNetworkProtocol: NetworkProtocol> From<Vec<WithLocation<ValidateUseOfArgumentsError>>>
+impl<TNetworkProtocol: NetworkProtocol>
+    From<Vec<WithLocation<ValidateUseOfArgumentsError<TNetworkProtocol>>>>
     for GetValidatedSchemaError<TNetworkProtocol>
 {
-    fn from(messages: Vec<WithLocation<ValidateUseOfArgumentsError>>) -> Self {
+    fn from(messages: Vec<WithLocation<ValidateUseOfArgumentsError<TNetworkProtocol>>>) -> Self {
         GetValidatedSchemaError::ValidateUseOfArguments { messages }
     }
 }

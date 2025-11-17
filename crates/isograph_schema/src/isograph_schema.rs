@@ -14,8 +14,8 @@ use isograph_lang_types::{
 use lazy_static::lazy_static;
 
 use crate::{
-    ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, EntrypointDeclarationInfo,
-    IsographDatabase, NetworkProtocol, NormalizationKey, ObjectSelectableId, ServerEntityName,
+    ClientObjectSelectable, ClientScalarSelectable, EntrypointDeclarationInfo, IsographDatabase,
+    NetworkProtocol, NormalizationKey, ObjectSelectableId, ServerEntityName,
     ServerObjectEntityAvailableSelectables, ServerObjectSelectable, ServerScalarSelectable,
     UseRefetchFieldRefetchStrategy,
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},

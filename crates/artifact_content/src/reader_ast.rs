@@ -377,7 +377,6 @@ fn scalar_client_defined_field_ast_node<TNetworkProtocol: NetworkProtocol>(
                     scalar_field_selection,
                     indentation_level,
                     client_field,
-                    schema,
                     path,
                     root_refetched_paths,
                     reader_imports,
@@ -411,7 +410,6 @@ fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
     scalar_field_selection: &ValidatedScalarSelection,
     indentation_level: u8,
     nested_client_field: &ClientScalarSelectable<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
     path: &mut Vec<NormalizationKey>,
     root_refetched_paths: &RefetchedPathsMap,
     reader_imports: &mut ReaderImports,
@@ -427,7 +425,6 @@ fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
     let paths_to_refetch_field_in_client_field = refetched_paths_for_client_field(
         db,
         nested_client_field,
-        schema,
         path,
         client_field_variable_context,
     );
@@ -761,7 +758,6 @@ pub(crate) fn generate_reader_ast<'schema, TNetworkProtocol: NetworkProtocol>(
 fn refetched_paths_for_client_field<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     nested_client_field: &ClientScalarSelectable<TNetworkProtocol>,
-    schema: &Schema<TNetworkProtocol>,
     path: &mut Vec<NormalizationKey>,
     client_field_variable_context: &VariableContext,
 ) -> Vec<PathToRefetchField> {
@@ -777,7 +773,6 @@ fn refetched_paths_for_client_field<TNetworkProtocol: NetworkProtocol>(
             nested_client_field.name.item,
         )
         .expect("Expected selection set to be valid."),
-        schema,
         path,
         client_field_variable_context,
     );
@@ -790,7 +785,6 @@ fn refetched_paths_for_client_field<TNetworkProtocol: NetworkProtocol>(
 fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_set: &[WithSpan<ValidatedSelection>],
-    schema: &Schema<TNetworkProtocol>,
     path: &mut Vec<NormalizationKey>,
     initial_variable_context: &VariableContext,
 ) -> HashSet<PathToRefetchField> {
@@ -847,7 +841,6 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                                         client_scalar_selectable.name.item,
                                     )
                                     .expect("Expected selection set to be valid."),
-                                    schema,
                                     path,
                                     &initial_variable_context.child_variable_context(
                                         &scalar_field_selection.arguments,
@@ -892,7 +885,6 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                                 client_object_selectable.name.item,
                             )
                             .expect("Expected selection set to be valid."),
-                            schema,
                             path,
                             &initial_variable_context.child_variable_context(
                                 &linked_field_selection.arguments,
@@ -929,7 +921,6 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                         let new_paths = refetched_paths_with_path(
                             db,
                             &linked_field_selection.selection_set,
-                            schema,
                             path,
                             initial_variable_context,
                         );
@@ -986,7 +977,6 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                         let new_paths = refetched_paths_with_path(
                             db,
                             &linked_field_selection.selection_set,
-                            schema,
                             path,
                             initial_variable_context,
                         );
