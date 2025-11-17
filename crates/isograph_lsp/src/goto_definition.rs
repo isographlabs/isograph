@@ -233,7 +233,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                 .as_ref()
                 .map_err(|_| LSPRuntimeError::ExpectedError)?
                 .as_ref()
-                .ok_or_else(|| LSPRuntimeError::ExpectedError)?;
+                .ok_or(LSPRuntimeError::ExpectedError)?;
 
                 let lsp_location_opt = referenced_selectable
                     .name

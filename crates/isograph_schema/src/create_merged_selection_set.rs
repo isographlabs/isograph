@@ -27,7 +27,7 @@ use crate::{
     client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
     create_transformed_name_and_arguments, fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
-    initial_variable_context, selectable_validated_reader_selection_set,
+    initial_variable_context, selectable_named, selectable_validated_reader_selection_set,
     server_object_entity_named, server_object_selectable_named,
     transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context,
@@ -580,14 +580,36 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                 };
             }
             SelectionType::Object(object_selection) => {
-                let target_object_entity_name = *schema
-                    .object_selectable(db, object_selection.associated_data)
-                    .expect(
-                        "Expected selectable to exist. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .target_object_entity_name()
-                    .inner();
+                let (parent_object_entity_name, selectable_name) =
+                    match object_selection.associated_data {
+                        DefinitionLocation::Server((
+                            parent_object_entity_name,
+                            server_object_selectable_name,
+                        )) => (
+                            parent_object_entity_name,
+                            server_object_selectable_name.into(),
+                        ),
+                        DefinitionLocation::Client((
+                            parent_object_entity_name,
+                            client_object_selectable_name,
+                        )) => (
+                            parent_object_entity_name,
+                            client_object_selectable_name.into(),
+                        ),
+                    };
+
+                let target_object_entity_name =
+                    *selectable_named(db, parent_object_entity_name, selectable_name)
+                        .clone() // TODO don't clone
+                        .expect("Expected selectable to be valid.")
+                        .expect(
+                            "Expected selectable to exist. \
+                            This is indicative of a bug in Isograph.",
+                        )
+                        .as_object()
+                        .expect("Expected selectable to be object.")
+                        .target_object_entity_name()
+                        .inner();
 
                 let object_selection_parent_object_entity =
                     &server_object_entity_named(db, target_object_entity_name)
@@ -812,14 +834,37 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
             //
             // This might be indicative of poor modeling.
             let linked_field = parent_map.entry(normalization_key).or_insert_with(|| {
-                let concrete_object_entity_name = *schema
-                    .object_selectable(db, object_selection.associated_data)
-                    .expect(
-                        "Expected selectable to exist. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .target_object_entity_name()
-                    .inner();
+                let (parent_object_entity_name, selectable_name) =
+                    match object_selection.associated_data {
+                        DefinitionLocation::Server((
+                            parent_object_entity_name,
+                            server_object_selectable_name,
+                        )) => (
+                            parent_object_entity_name,
+                            server_object_selectable_name.into(),
+                        ),
+                        DefinitionLocation::Client((
+                            parent_object_entity_name,
+                            client_object_selectable_name,
+                        )) => (
+                            parent_object_entity_name,
+                            client_object_selectable_name.into(),
+                        ),
+                    };
+
+                let concrete_object_entity_name =
+                    *selectable_named(db, parent_object_entity_name, selectable_name)
+                        .clone() // TODO don't clone
+                        .expect("Expected selectable to be valid.")
+                        .expect(
+                            "Expected selectable to exist. \
+                            This is indicative of a bug in Isograph.",
+                        )
+                        .as_object()
+                        .expect("Expected selectable to be object.")
+                        .target_object_entity_name()
+                        .inner();
+
                 let concrete_type = server_object_entity_named(db, concrete_object_entity_name)
                     .as_ref()
                     .expect(

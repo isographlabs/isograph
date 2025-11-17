@@ -16,11 +16,11 @@ use lazy_static::lazy_static;
 
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, EntrypointDeclarationInfo,
-    IsographDatabase, NetworkProtocol, NormalizationKey, ObjectSelectable, ObjectSelectableId,
-    ServerEntityName, ServerObjectEntityAvailableSelectables, ServerObjectSelectable,
-    ServerScalarSelectable, UseRefetchFieldRefetchStrategy,
+    IsographDatabase, NetworkProtocol, NormalizationKey, ObjectSelectableId, ServerEntityName,
+    ServerObjectEntityAvailableSelectables, ServerObjectSelectable, ServerScalarSelectable,
+    UseRefetchFieldRefetchStrategy,
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
-    server_object_selectable_named, server_selectable_named,
+    server_selectable_named,
 };
 
 lazy_static! {
@@ -190,48 +190,6 @@ impl<TNetworkProtocol: NetworkProtocol> Schema<TNetworkProtocol> {
         }
 
         Ok(())
-    }
-
-    pub fn object_selectable(
-        &self,
-        db: &IsographDatabase<TNetworkProtocol>,
-        field_id: ObjectSelectableId,
-    ) -> Option<ObjectSelectable<'_, TNetworkProtocol>> {
-        match field_id {
-            DefinitionLocation::Server((
-                parent_object_entity_name,
-                server_object_selectable_name,
-            )) => {
-                let server_object_selectable = server_object_selectable_named(
-                    db,
-                    parent_object_entity_name,
-                    server_object_selectable_name.into(),
-                )
-                .as_ref()
-                .expect(
-                    "Expected validation to have succeeded. \
-                        This is indicative of a bug in Isograph.",
-                )
-                .clone();
-
-                server_object_selectable.map(DefinitionLocation::Server)
-            }
-            DefinitionLocation::Client((
-                parent_object_entity_name,
-                client_object_selectable_name,
-            )) => self
-                .client_object_selectable(parent_object_entity_name, client_object_selectable_name)
-                .map(DefinitionLocation::Client),
-        }
-    }
-
-    pub fn client_object_selectable(
-        &self,
-        parent_object_entity_name: ServerObjectEntityName,
-        client_object_selectable_name: ClientObjectSelectableName,
-    ) -> Option<&ClientObjectSelectable<TNetworkProtocol>> {
-        self.client_object_selectables
-            .get(&(parent_object_entity_name, client_object_selectable_name))
     }
 
     #[expect(clippy::type_complexity)]
