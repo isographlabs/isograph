@@ -8,9 +8,9 @@ use isograph_lang_types::{Description, VariableDefinition};
 
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, IsographDatabase,
-    MemoizedIsoLiteralError, NetworkProtocol, ObjectSelectableId, RefetchStrategy,
-    ScalarSelectableId, SelectableTrait, ServerEntityName, ValidatedSelection,
-    client_object_selectable_named, client_scalar_selectable_named,
+    MemoizedIsoLiteralError, MemoizedSelectionSetError, NetworkProtocol, ObjectSelectableId,
+    RefetchStrategy, ScalarSelectableId, SelectableTrait, ServerEntityName, ValidatedSelection,
+    client_scalar_selectable_named, selectable_validated_reader_selection_set,
     validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 
@@ -165,7 +165,7 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_scalar_selectable_name: ClientScalarSelectableName,
-) -> Result<&[WithSpan<ValidatedSelection>], MemoizedIsoLiteralError<TNetworkProtocol>> {
+) -> Result<Vec<WithSpan<ValidatedSelection>>, MemoizedIsoLiteralError<TNetworkProtocol>> {
     let selectable = client_scalar_selectable_named(
         db,
         parent_object_entity_name,
@@ -197,12 +197,27 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
                 This is indicative of a bug in Isograph.",
             );
 
-            refetch_strategy.refetch_selection_set().expect(
-                "Expected imperatively loaded field to have refetch selection set. \
+            refetch_strategy
+                .refetch_selection_set()
+                .expect(
+                    "Expected imperatively loaded field to have refetch selection set. \
                 This is indicative of a bug in Isograph.",
-            )
+                )
+                // TODO don't clone
+                .clone()
         }
-        _ => &selectable.reader_selection_set,
+        _ => {
+            let selection_set = selectable_validated_reader_selection_set(
+                db,
+                parent_object_entity_name,
+                client_scalar_selectable_name.into(),
+            )
+            .as_ref()
+            .expect("Expected selection set to be valid.")
+            .clone();
+            // TODO don't clone
+            selection_set
+        }
     })
 }
 
@@ -212,19 +227,13 @@ pub fn client_object_selectable_selection_set_for_parent_query<
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_object_selectable_name: ClientObjectSelectableName,
-) -> Result<&[WithSpan<ValidatedSelection>], MemoizedIsoLiteralError<TNetworkProtocol>> {
-    let selectable = client_object_selectable_named(
+) -> Result<Vec<WithSpan<ValidatedSelection>>, MemoizedSelectionSetError<TNetworkProtocol>> {
+    let selection_set = selectable_validated_reader_selection_set(
         db,
         parent_object_entity_name,
-        client_object_selectable_name,
+        client_object_selectable_name.into(),
     )
-    .as_ref()
-    .map_err(|e| e.clone())?
-    .as_ref()
-    .expect(
-        "Expected selectable to exist. \
-        This is indicative of a bug in Isograph.",
-    );
+    .clone()?;
 
-    Ok(&selectable.reader_selection_set)
+    Ok(selection_set)
 }
