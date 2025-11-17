@@ -463,7 +463,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 // If this field is not reachable from an entrypoint, we need to
                 // encounter all the client fields
                 for nested_client_field_id in
-                    accessible_client_fields(&user_written_client_type, schema)
+                    accessible_client_fields(db, &user_written_client_type, schema)
                 {
                     encountered_output_types.insert(nested_client_field_id);
                 }
