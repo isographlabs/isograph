@@ -225,7 +225,6 @@ export function makeNetworkRequest<
         }));
 
         callSubscriptions(environment, encounteredIds);
-
       }
 
       const onComplete = fetchOptions?.onComplete;
