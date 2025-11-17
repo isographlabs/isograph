@@ -4,12 +4,8 @@ mod query_text;
 mod read_schema;
 
 pub use graphql_network_protocol::*;
-use isograph_schema::{ClientScalarSelectable, Schema, ServerObjectEntity};
+use isograph_schema::{ClientScalarSelectable, ServerObjectEntity};
 pub use read_schema::*;
-
-pub type ValidatedGraphqlSchema = Schema;
-pub type GraphqlSchema = Schema;
-pub type UnvalidatedGraphqlSchema = Schema;
 
 pub type ValidatedGraphqlClientField = ClientScalarSelectable<GraphQLNetworkProtocol>;
 
