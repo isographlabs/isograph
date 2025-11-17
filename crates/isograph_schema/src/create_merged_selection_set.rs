@@ -23,8 +23,9 @@ use crate::{
     NameAndArguments, NetworkProtocol, PathToRefetchField, Schema, ServerEntityName,
     ServerObjectEntity, ServerObjectEntityExtraInfo, ServerObjectSelectable,
     ServerObjectSelectableVariant, ValidatedObjectSelection, ValidatedScalarSelection,
-    ValidatedSelection, VariableContext, client_scalar_selectable_selection_set_for_parent_query,
-    create_transformed_name_and_arguments, fetchable_types,
+    ValidatedSelection, VariableContext, client_scalar_selectable_named,
+    client_scalar_selectable_selection_set_for_parent_query, create_transformed_name_and_arguments,
+    fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
     initial_variable_context, selectable_validated_reader_selection_set,
     server_object_entity_named, server_object_selectable_named,
@@ -934,17 +935,20 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
     variable_context: &VariableContext,
     scalar_field_selection: &ValidatedScalarSelection,
     parent_object_entity_name: &ServerObjectEntityName,
-    newly_encountered_scalar_client_selectable_id: &ClientScalarSelectableName,
+    newly_encountered_scalar_client_selectable_name: &ClientScalarSelectableName,
 ) {
-    let newly_encountered_scalar_client_selectable = schema
-        .client_scalar_selectable(
-            *parent_object_entity_name,
-            *newly_encountered_scalar_client_selectable_id,
-        )
-        .expect(
-            "Expected selectable to exist. \
-            This is indicative of a bug in Isograph.",
-        );
+    let newly_encountered_scalar_client_selectable = client_scalar_selectable_named(
+        db,
+        *parent_object_entity_name,
+        *newly_encountered_scalar_client_selectable_name,
+    )
+    .as_ref()
+    .expect(
+        "Expected client scalar selectable to be valid. \
+        This is indicative of a bug in Isograph.",
+    )
+    .as_ref()
+    .expect("Expected client scalar selectable to exist.");
 
     // If the field is selected loadably or is imperative, we must note the refetch path,
     // because this results in an artifact being generated.
@@ -966,7 +970,7 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
                 encountered_client_type_map,
                 DefinitionLocation::Client(SelectionType::Scalar((
                     *parent_object_entity_name,
-                    *newly_encountered_scalar_client_selectable_id,
+                    *newly_encountered_scalar_client_selectable_name,
                 ))),
                 &initial_variable_context(&SelectionType::Scalar(
                     newly_encountered_scalar_client_selectable,
@@ -976,7 +980,7 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
             let state = encountered_client_type_map
                 .get_mut(&DefinitionLocation::Client(SelectionType::Scalar((
                     *parent_object_entity_name,
-                    *newly_encountered_scalar_client_selectable_id,
+                    *newly_encountered_scalar_client_selectable_name,
                 ))))
                 .expect(
                     "Expected field to exist when \
@@ -990,7 +994,7 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
                 schema,
                 encountered_client_type_map,
                 merge_traversal_state,
-                *newly_encountered_scalar_client_selectable_id,
+                *newly_encountered_scalar_client_selectable_name,
                 newly_encountered_scalar_client_selectable,
                 *parent_object_entity_name,
                 parent_object_entity,
@@ -1008,7 +1012,7 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
                     merge_traversal_state,
                     SelectionType::Scalar((
                         *parent_object_entity_name,
-                        *newly_encountered_scalar_client_selectable_id,
+                        *newly_encountered_scalar_client_selectable_name,
                     )),
                     SelectionType::Scalar(newly_encountered_scalar_client_selectable),
                     encountered_client_type_map,
@@ -1023,7 +1027,7 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
         .accessible_client_fields
         .insert(SelectionType::Scalar((
             *parent_object_entity_name,
-            *newly_encountered_scalar_client_selectable_id,
+            *newly_encountered_scalar_client_selectable_name,
         )));
 }
 
