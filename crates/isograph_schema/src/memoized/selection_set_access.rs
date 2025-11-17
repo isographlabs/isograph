@@ -96,6 +96,28 @@ pub fn memoized_validated_reader_selection_set_map<TNetworkProtocol: NetworkProt
         .collect()
 }
 
+pub fn selectable_validated_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    parent_server_object_entity_name: ServerObjectEntityName,
+    client_selectable_name: ClientSelectableName,
+) -> Result<ValidatedSelectionSet, MemoizedSelectionSetError<TNetworkProtocol>> {
+    let map = memoized_validated_reader_selection_set_map(db);
+
+    match map.get(&(
+        parent_server_object_entity_name,
+        client_selectable_name.into(),
+    )) {
+        Some(result) => match result {
+            Ok(selections) => Ok(selections.clone()),
+            Err(e) => Err(e.clone()),
+        },
+        None => Err(MemoizedSelectionSetError::NotFound {
+            parent_server_object_entity_name,
+            selectable_name: client_selectable_name.into(),
+        }),
+    }
+}
+
 #[derive(Clone, Error, Eq, PartialEq, Debug)]
 pub enum MemoizedSelectionSetError<TNetworkProtocol: NetworkProtocol> {
     #[error("`{parent_object_entity_name}.{client_selectable_name}` has been defined twice.")]
@@ -114,4 +136,12 @@ pub enum MemoizedSelectionSetError<TNetworkProtocol: NetworkProtocol> {
 
     #[error("{0}")]
     EntityAccessError(#[from] EntityAccessError<TNetworkProtocol>),
+
+    // TODO this should be an option in the return value, not an error variant, but
+    // realistically, that's super annoying.
+    #[error("`{parent_server_object_entity_name}.{selectable_name}` is not defined.")]
+    NotFound {
+        parent_server_object_entity_name: ServerObjectEntityName,
+        selectable_name: ClientSelectableName,
+    },
 }
