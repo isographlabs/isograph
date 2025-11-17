@@ -19,6 +19,7 @@ use thiserror::Error;
 use crate::parse_iso_literal_in_source;
 
 /// client selectables defined by iso literals.
+/// Note: this is just the declarations, not the fields!
 #[legacy_memo]
 pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
@@ -238,6 +239,10 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
             // compile if we've already found the field we need! That's neat.
             //
             // We could theoretically skip this if the name is not *LINK_FIELD_NAME /shrug
+            //
+            // This is also problematic, because we really actually want a "all client fields map" fn,
+            // but we don't really have one, since we're adding this here. Oh well. See the awkwardness in
+            // selection_set_access.
             let link_fields = get_link_fields_map(db).as_ref().map_err(|e| e.clone())?;
 
             if let Some(link_field) = link_fields

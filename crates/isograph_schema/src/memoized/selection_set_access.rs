@@ -10,7 +10,7 @@ use thiserror::Error;
 
 use crate::{
     AddSelectionSetsError, EntityAccessError, IsographDatabase, NetworkProtocol,
-    ValidatedSelection, client_selectable_declaration_map_from_iso_literals,
+    ValidatedSelection, client_selectable_declaration_map_from_iso_literals, get_link_fields,
     get_validated_selection_set,
 };
 
@@ -30,7 +30,7 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
 > {
     let declaration_map = client_selectable_declaration_map_from_iso_literals(db);
 
-    declaration_map
+    let mut map = declaration_map
         .iter()
         .map(|(key, declarations)| {
             let (first, rest) = declarations.split_first().expect(
@@ -56,7 +56,26 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
                 )
             }
         })
-        .collect()
+        .collect::<HashMap<_, _>>();
+
+    // we must add empty selection sets for __link fields, and TODO perhaps others.
+    // TODO this should be cleaned up and thought about holistically.
+    match get_link_fields(db) {
+        Ok(fields) => {
+            for field in fields {
+                map.insert(
+                    (field.parent_object_entity_name, field.name.item.into()),
+                    Ok(SelectionType::Scalar(vec![])),
+                );
+            }
+        }
+        Err(_) => {
+            // TODO do not silently ignore errors in link fields. Instead, return a Result
+            // from this fn
+        }
+    }
+
+    map
 }
 
 #[legacy_memo]
