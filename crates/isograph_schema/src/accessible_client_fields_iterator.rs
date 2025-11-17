@@ -2,67 +2,49 @@ use common_lang_types::WithSpan;
 use isograph_lang_types::{DefinitionLocation, SelectionTypeContainingSelections};
 
 use crate::{
-    ClientFieldVariant, ClientSelectable, ClientSelectableId, IsographDatabase, NetworkProtocol,
-    Schema, ValidatedSelection, validated_refetch_strategy_for_client_scalar_selectable_named,
+    ClientSelectable, ClientSelectableId, IsographDatabase, NetworkProtocol, ValidatedSelection,
+    client_object_selectable_selection_set_for_parent_query,
+    client_scalar_selectable_selection_set_for_parent_query,
 };
 
 use isograph_lang_types::SelectionType;
 
 // This should really be replaced with a proper visitor, or something
-pub fn accessible_client_fields<'a, TNetworkProtocol: NetworkProtocol>(
-    db: &'a IsographDatabase<TNetworkProtocol>,
-    selection_type: &'a ClientSelectable<'a, TNetworkProtocol>,
-    schema: &'a Schema<TNetworkProtocol>,
-) -> impl Iterator<Item = ClientSelectableId> + 'a {
+pub fn accessible_client_fields<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    selection_type: &ClientSelectable<'_, TNetworkProtocol>,
+) -> impl Iterator<Item = ClientSelectableId> {
     let selection_set = match selection_type {
-        SelectionType::Scalar(scalar) => match scalar.variant {
-            ClientFieldVariant::ImperativelyLoadedField(_) => {
-                // WOT
-                let refetch_strategy =
-                    validated_refetch_strategy_for_client_scalar_selectable_named(
-                        db,
-                        scalar.parent_object_entity_name,
-                        scalar.name.item,
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected imperatively loaded field to have refetch selection set. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected imperatively loaded field to have refetch selection set. \
-                        This is indicative of a bug in Isograph.",
-                    );
+        SelectionType::Scalar(scalar) => client_scalar_selectable_selection_set_for_parent_query(
+            db,
+            scalar.parent_object_entity_name,
+            scalar.name.item,
+        )
+        .expect("Expected selection set to be valid"),
 
-                refetch_strategy.refetch_selection_set().expect(
-                    "Expected imperatively loaded field to have refetch selection set. \
-                    This is indicative of a bug in Isograph.",
-                )
-            }
-            _ => &scalar.reader_selection_set,
-        },
-        SelectionType::Object(o) => &o.reader_selection_set,
+        SelectionType::Object(object) => client_object_selectable_selection_set_for_parent_query(
+            db,
+            object.parent_object_entity_name,
+            object.name.item,
+        )
+        .expect("Expected selection set to be valid"),
     };
 
     AccessibleClientFieldIterator {
         selection_set,
         index: 0,
-        schema,
         sub_iterator: None,
     }
 }
 
-struct AccessibleClientFieldIterator<'a, TNetworkProtocol: NetworkProtocol> {
-    selection_set: &'a [WithSpan<ValidatedSelection>],
-    schema: &'a Schema<TNetworkProtocol>,
+struct AccessibleClientFieldIterator {
+    // TODO have a reference
+    selection_set: Vec<WithSpan<ValidatedSelection>>,
     index: usize,
-    sub_iterator: Option<Box<AccessibleClientFieldIterator<'a, TNetworkProtocol>>>,
+    sub_iterator: Option<Box<AccessibleClientFieldIterator>>,
 }
 
-impl<TNetworkProtocol: NetworkProtocol> Iterator
-    for AccessibleClientFieldIterator<'_, TNetworkProtocol>
-{
+impl Iterator for AccessibleClientFieldIterator {
     type Item = ClientSelectableId;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -100,8 +82,7 @@ impl<TNetworkProtocol: NetworkProtocol> Iterator
                     }
                     SelectionTypeContainingSelections::Object(linked_field) => {
                         let mut iterator = AccessibleClientFieldIterator {
-                            selection_set: &linked_field.selection_set,
-                            schema: self.schema,
+                            selection_set: linked_field.selection_set.clone(),
                             index: 0,
                             sub_iterator: None,
                         };
