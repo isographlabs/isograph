@@ -115,12 +115,10 @@ export type OptimisticStoreLayer = {
 
 export function addNetworkResponseStoreLayer(
   parent: StoreLayer,
-  normalizeData: DataUpdate<NetworkResponseStoreLayer | BaseStoreLayer>,
-): StoreLayer {
+): StoreLayerWithData {
   switch (parent.kind) {
     case 'NetworkResponseStoreLayer':
     case 'BaseStoreLayer': {
-      normalizeData(parent);
       return parent;
     }
     case 'StartUpdateStoreLayer':
@@ -133,7 +131,6 @@ export function addNetworkResponseStoreLayer(
       };
       parent.childStoreLayer = node;
 
-      normalizeData(node);
       return node;
     }
     default: {

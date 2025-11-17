@@ -151,17 +151,14 @@ describe('optimisticLayer', () => {
         environment.store = node;
         environment.store = addNetworkResponseStoreLayerInner(
           environment.store,
-          (storeLayer) => {
-            ignoreReadonly(storeLayer).data = {
-              Query: {
-                __ROOT: {
-                  name: 'foo',
-                },
-              },
-            };
-            return CHANGES;
-          },
         );
+        ignoreReadonly(environment.store).data = {
+          Query: {
+            __ROOT: {
+              name: 'foo',
+            },
+          },
+        };
 
         revertOptimisticStoreLayerAndMaybeReplace(
           environment,
@@ -196,13 +193,10 @@ describe('optimisticLayer', () => {
 
         environment.store = addNetworkResponseStoreLayerInner(
           environment.store,
-          (storeLayer) => {
-            ignoreReadonly(storeLayer).data = {
-              Query: { __ROOT: { name: 'foo' } },
-            };
-            return CHANGES;
-          },
         );
+        ignoreReadonly(environment.store).data = {
+          Query: { __ROOT: { name: 'foo' } },
+        };
 
         revertOptimisticStoreLayerAndMaybeReplace(
           environment,
@@ -512,13 +506,10 @@ describe('optimisticLayer', () => {
 
           environment.store = addNetworkResponseStoreLayerInner(
             environment.store,
-            (storeLayer) => {
-              ignoreReadonly(storeLayer).data = {
-                Query: { __ROOT: { name: 'foo' } },
-              };
-              return CHANGES;
-            },
           );
+          ignoreReadonly(environment.store).data = {
+            Query: { __ROOT: { name: 'foo' } },
+          };
 
           revert(environment, node, null);
 
@@ -794,13 +785,8 @@ describe('optimisticLayer', () => {
     environment: IsographEnvironment,
     counter: number,
   ) {
-    const node = addNetworkResponseStoreLayerInner(
-      environment.store,
-      (storeLayer) => {
-        return update(storeLayer, () => counter);
-      },
-    );
-    environment.store = node;
+    environment.store = addNetworkResponseStoreLayerInner(environment.store);
+    update(environment.store, () => counter);
   }
 
   function addOptimisticStoreLayer(

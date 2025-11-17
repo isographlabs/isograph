@@ -203,19 +203,15 @@ export function makeNetworkRequest<
       const root = { __link: ROOT_ID, __typename: artifact.concreteType };
       if (status.kind === 'Undisposed') {
         const encounteredIds: EncounteredIds = new Map();
-        environment.store = addNetworkResponseStoreLayer(
+        environment.store = addNetworkResponseStoreLayer(environment.store);
+        normalizeData(
+          environment,
           environment.store,
-          (storeLayer) => {
-            normalizeData(
-              environment,
-              storeLayer,
-              normalizationAst.selections,
-              networkResponse.data ?? {},
-              variables,
-              root,
-              encounteredIds,
-            );
-          },
+          normalizationAst.selections,
+          networkResponse.data ?? {},
+          variables,
+          root,
+          encounteredIds,
         );
 
         logMessage(environment, () => ({
