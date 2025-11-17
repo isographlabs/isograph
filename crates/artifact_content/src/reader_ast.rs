@@ -9,11 +9,13 @@ use isograph_lang_types::{
     SelectionTypeContainingSelections,
 };
 use isograph_schema::{
-    ClientFieldVariant, ClientScalarOrObjectSelectable, ClientScalarSelectable, IsographDatabase,
-    Loadability, NameAndArguments, NetworkProtocol, NormalizationKey, PathToRefetchField,
-    RefetchedPathsMap, Schema, ServerObjectSelectableVariant, ValidatedObjectSelection,
-    ValidatedScalarSelection, ValidatedSelection, VariableContext, categorize_field_loadability,
-    server_object_selectable_named, transform_arguments_with_child_context,
+    ClientFieldVariant, ClientScalarSelectable, IsographDatabase, Loadability, NameAndArguments,
+    NetworkProtocol, NormalizationKey, PathToRefetchField, RefetchedPathsMap, Schema,
+    ServerObjectSelectableVariant, ValidatedObjectSelection, ValidatedScalarSelection,
+    ValidatedSelection, VariableContext, categorize_field_loadability,
+    client_object_selectable_selection_set_for_parent_query,
+    client_scalar_selectable_selection_set_for_parent_query, server_object_selectable_named,
+    transform_arguments_with_child_context,
     validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 
@@ -749,7 +751,12 @@ fn refetched_paths_for_client_field<TNetworkProtocol: NetworkProtocol>(
     // TODO return a BTreeSet
     let path_set = refetched_paths_with_path(
         db,
-        nested_client_field.selection_set_for_parent_query(),
+        &client_scalar_selectable_selection_set_for_parent_query(
+            db,
+            nested_client_field.parent_object_entity_name,
+            nested_client_field.name.item,
+        )
+        .expect("Expected selection set to be valid."),
         schema,
         path,
         client_field_variable_context,
@@ -799,7 +806,12 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                             None => {
                                 let new_paths = refetched_paths_with_path(
                                     db,
-                                    client_field.selection_set_for_parent_query(),
+                                    &client_scalar_selectable_selection_set_for_parent_query(
+                                        db,
+                                        client_field.parent_object_entity_name,
+                                        client_field.name.item,
+                                    )
+                                    .expect("Expected selection set to be valid."),
                                     schema,
                                     path,
                                     &initial_variable_context.child_variable_context(
@@ -833,7 +845,12 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
 
                         let new_paths = refetched_paths_with_path(
                             db,
-                            client_pointer.selection_set_for_parent_query(),
+                            &client_object_selectable_selection_set_for_parent_query(
+                                db,
+                                client_pointer.parent_object_entity_name,
+                                client_pointer.name.item,
+                            )
+                            .expect("Expected selection set to be valid."),
                             schema,
                             path,
                             &initial_variable_context.child_variable_context(
