@@ -64,8 +64,6 @@ pub fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
                 let server_scalar_selectable_name = server_scalar_selectable.name.item;
                 let parent_object_entity_name = server_scalar_selectable.parent_object_entity_name;
 
-                schema.insert_server_scalar_selectable(server_scalar_selectable)?;
-
                 let ServerObjectEntityExtraInfo { id_field, .. } = schema
                     .server_entity_data
                     .entry(parent_object_entity_name)
@@ -81,9 +79,7 @@ pub fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
                     )?;
                 }
             }
-            SelectionType::Object(server_object_selectable) => {
-                schema.insert_server_object_selectable(server_object_selectable)?;
-            }
+            SelectionType::Object(_) => {}
         }
     }
 

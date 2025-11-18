@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     ClientFieldVariant, ClientScalarSelectable, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol,
-    Schema, server_object_entities,
+    server_object_entities,
     validated_isograph_schema::create_type_system_schema::CreateSchemaError,
 };
 use common_lang_types::{
@@ -10,39 +10,8 @@ use common_lang_types::{
     ServerObjectEntityName, WithLocation,
 };
 use intern::string_key::Intern;
-use isograph_lang_types::{DefinitionLocation, Description, SelectionType};
+use isograph_lang_types::Description;
 use pico_macros::memo;
-
-pub fn add_link_fields_to_schema<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    schema: &mut Schema,
-) -> Result<(), CreateSchemaError<TNetworkProtocol>> {
-    let link_fields = get_link_fields(db).to_owned()?;
-
-    for link_field in link_fields {
-        if schema
-            .server_entity_data
-            .entry(link_field.parent_object_entity_name)
-            .or_default()
-            .selectables
-            .insert(
-                link_field.name.item.into(),
-                DefinitionLocation::Client(SelectionType::Scalar((
-                    link_field.parent_object_entity_name,
-                    link_field.name.item,
-                ))),
-            )
-            .is_some()
-        {
-            return Err(CreateSchemaError::CompilerCreatedFieldExistsOnType {
-                selectable_name: link_field.name.item.into(),
-                parent_object_entity_name: link_field.parent_object_entity_name,
-            });
-        }
-    }
-
-    Ok(())
-}
 
 #[memo]
 pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(

@@ -1,7 +1,7 @@
 use crate::{
     IsoLiteralsSource, IsographDatabase, NetworkProtocol, ParsedIsoLiteralsMap,
-    ProcessClientFieldDeclarationError, Schema, UnprocessedSelectionSet,
-    process_client_field_declaration, process_client_pointer_declaration,
+    ProcessClientFieldDeclarationError, UnprocessedSelectionSet, process_client_field_declaration,
+    process_client_pointer_declaration,
 };
 use common_lang_types::{
     CurrentWorkingDirectory, Location, RelativePathToSourceFile, Span, TextSource, WithLocation,
@@ -112,7 +112,6 @@ pub fn read_iso_literals_source<TNetworkProtocol: NetworkProtocol>(
 #[expect(clippy::type_complexity)]
 pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &mut Schema,
     contains_iso: ParsedIsoLiteralsMap,
 ) -> Result<
     (
@@ -130,7 +129,6 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
                 IsoLiteralExtractionResult::ClientFieldDeclaration(client_field_declaration) => {
                     match process_client_field_declaration(
                         db,
-                        schema,
                         client_field_declaration,
                         text_source,
                     ) {
@@ -146,7 +144,6 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
                 ) => {
                     match process_client_pointer_declaration(
                         db,
-                        schema,
                         client_pointer_declaration,
                         text_source,
                     ) {

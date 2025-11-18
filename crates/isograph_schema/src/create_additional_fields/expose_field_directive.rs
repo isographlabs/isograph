@@ -1,19 +1,19 @@
 use common_lang_types::{
-    ClientScalarSelectableName, Location, ParentObjectEntityNameAndSelectableName, SelectableName,
-    ServerObjectEntityName, ServerObjectSelectableName, ServerSelectableName, Span,
-    StringLiteralValue, WithLocation, WithSpan,
+    Location, ParentObjectEntityNameAndSelectableName, SelectableName, ServerObjectEntityName,
+    ServerObjectSelectableName, ServerSelectableName, Span, StringLiteralValue, WithLocation,
+    WithSpan,
 };
 use intern::{Lookup, string_key::Intern};
 use isograph_lang_types::{
-    DefinitionLocation, EmptyDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionType, SelectionTypeContainingSelections, VariableDefinition,
+    EmptyDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet, SelectionType,
+    SelectionTypeContainingSelections, VariableDefinition,
 };
 
 use serde::Deserialize;
 
 use crate::{
     ClientFieldVariant, ClientScalarSelectable, ExposeFieldToInsert,
-    ImperativelyLoadedFieldVariant, IsographDatabase, NetworkProtocol, RefetchStrategy, Schema,
+    ImperativelyLoadedFieldVariant, IsographDatabase, NetworkProtocol, RefetchStrategy,
     ServerEntityName, ServerObjectSelectableVariant, UnprocessedClientScalarSelectableSelectionSet,
     WrappedSelectionMapSelection, create_additional_fields::argument_map::remove_field_map_item,
     generate_refetch_field_strategy, get_object_selections_path,
@@ -274,41 +274,6 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
         mutation_client_scalar_selectable,
         payload_object_entity_name,
     ))
-}
-
-impl Schema {
-    // TODO this should be defined elsewhere, probably
-    pub fn insert_client_field_on_object<TNetworkProtocol: NetworkProtocol>(
-        &mut self,
-        client_field_parent_object_entity_name: ServerObjectEntityName,
-        client_selectable_name: ClientScalarSelectableName,
-        payload_object_name: ServerObjectEntityName,
-    ) -> Result<(), CreateAdditionalFieldsError<TNetworkProtocol>> {
-        if self
-            .server_entity_data
-            .entry(client_field_parent_object_entity_name)
-            .or_default()
-            .selectables
-            .insert(
-                client_selectable_name.into(),
-                DefinitionLocation::Client(SelectionType::Scalar((
-                    client_field_parent_object_entity_name,
-                    client_selectable_name,
-                ))),
-            )
-            .is_some()
-        {
-            return Err(
-                // TODO use a more generic error message when making this
-                CreateAdditionalFieldsError::CompilerCreatedFieldExistsOnType {
-                    client_scalar_selectable_name: client_selectable_name,
-                    parent_object_entity_name: payload_object_name,
-                },
-            );
-        }
-
-        Ok(())
-    }
 }
 
 /// Here, we are turning "pet" (the field_arg) to the ServerFieldId

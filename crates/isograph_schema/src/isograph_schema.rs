@@ -15,10 +15,8 @@ use lazy_static::lazy_static;
 
 use crate::{
     IsographDatabase, NetworkProtocol, NormalizationKey, ObjectSelectableId, ServerEntityName,
-    ServerObjectEntityAvailableSelectables, ServerObjectSelectable, ServerScalarSelectable,
-    UseRefetchFieldRefetchStrategy,
-    create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
-    server_selectable_named,
+    ServerObjectSelectable, UseRefetchFieldRefetchStrategy,
+    create_additional_fields::CreateAdditionalFieldsError, server_selectable_named,
 };
 
 lazy_static! {
@@ -102,7 +100,6 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
 
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct ServerObjectEntityExtraInfo {
-    pub selectables: ServerObjectEntityAvailableSelectables,
     pub id_field: Option<ServerScalarIdSelectableName>,
 }
 
@@ -111,71 +108,6 @@ pub struct ServerObjectEntityExtraInfo {
 //
 // This type alias is a bit outdated. It should be gone soon anyway, though.
 pub type ServerEntityData = HashMap<ServerObjectEntityName, ServerObjectEntityExtraInfo>;
-
-impl Schema {
-    // TODO this function should not exist
-    pub fn insert_server_scalar_selectable<TNetworkProtocol: NetworkProtocol>(
-        &mut self,
-        server_scalar_selectable: ServerScalarSelectable<TNetworkProtocol>,
-    ) -> CreateAdditionalFieldsResult<(), TNetworkProtocol> {
-        let parent_object_entity_name = server_scalar_selectable.parent_object_entity_name;
-        let next_scalar_name = server_scalar_selectable.name;
-
-        let ServerObjectEntityExtraInfo { selectables, .. } = self
-            .server_entity_data
-            .entry(parent_object_entity_name)
-            .or_default();
-
-        if selectables
-            .insert(
-                next_scalar_name.item.into(),
-                DefinitionLocation::Server(SelectionType::Scalar((
-                    parent_object_entity_name,
-                    server_scalar_selectable.name.item,
-                ))),
-            )
-            .is_some()
-        {
-            return Err(CreateAdditionalFieldsError::DuplicateField {
-                selectable_name: server_scalar_selectable.name.item.into(),
-                parent_object_entity_name,
-            });
-        }
-
-        Ok(())
-    }
-
-    // TODO this function should not exist
-    pub fn insert_server_object_selectable<TNetworkProtocol: NetworkProtocol>(
-        &mut self,
-        server_object_selectable: ServerObjectSelectable<TNetworkProtocol>,
-    ) -> CreateAdditionalFieldsResult<(), TNetworkProtocol> {
-        let parent_object_entity_name = server_object_selectable.parent_object_entity_name;
-        let next_object_name = server_object_selectable.name;
-
-        if self
-            .server_entity_data
-            .entry(parent_object_entity_name)
-            .or_default()
-            .selectables
-            .insert(
-                next_object_name.item.into(),
-                DefinitionLocation::Server(SelectionType::Object((
-                    parent_object_entity_name,
-                    server_object_selectable.name.item,
-                ))),
-            )
-            .is_some()
-        {
-            return Err(CreateAdditionalFieldsError::DuplicateField {
-                selectable_name: next_object_name.item.into(),
-                parent_object_entity_name,
-            });
-        }
-
-        Ok(())
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PathToRefetchField {

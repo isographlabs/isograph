@@ -7,9 +7,8 @@ use common_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration,
-    ClientScalarSelectionDirectiveSet, DefinitionLocation, DeserializationError, NonConstantValue,
-    SelectionType, ServerObjectEntityNameWrapper, TypeAnnotation, UnvalidatedSelection,
-    VariableDefinition,
+    ClientScalarSelectionDirectiveSet, DeserializationError, NonConstantValue, SelectionType,
+    ServerObjectEntityNameWrapper, TypeAnnotation, UnvalidatedSelection, VariableDefinition,
 };
 
 use pico_macros::memo;
@@ -18,8 +17,8 @@ use thiserror::Error;
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, FieldMapItem,
     FieldToInsertToServerSelectableError, ID_FIELD_NAME, IsographDatabase, NODE_FIELD_NAME,
-    NetworkProtocol, Schema, ServerEntityName, ServerSelectableNamedError,
-    ValidatedVariableDefinition, WrappedSelectionMapSelection, defined_entity, fetchable_types,
+    NetworkProtocol, ServerEntityName, ServerSelectableNamedError, ValidatedVariableDefinition,
+    WrappedSelectionMapSelection, defined_entity, fetchable_types,
     refetch_strategy::{RefetchStrategy, generate_refetch_field_strategy, id_selection},
     server_selectable_named,
 };
@@ -48,7 +47,6 @@ pub type UnprocessedSelectionSet = SelectionType<
 
 pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &mut Schema,
     client_field_declaration: WithSpan<ClientFieldDeclaration>,
     text_source: TextSource,
 ) -> Result<
@@ -70,10 +68,8 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
             ))?;
 
     let unprocess_client_field_items = match parent_type_id {
-        ServerEntityName::Object(_) => {
-            add_client_field_to_object(db, schema, client_field_declaration)
-                .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?
-        }
+        ServerEntityName::Object(_) => add_client_field_to_object(db, client_field_declaration)
+            .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?,
         ServerEntityName::Scalar(scalar_entity_name) => {
             return Err(WithLocation::new(
                 ProcessClientFieldDeclarationError::InvalidParentType {
@@ -90,7 +86,6 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
 
 pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &mut Schema,
     client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
     text_source: TextSource,
 ) -> Result<
@@ -136,14 +131,11 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     ))?;
 
     let unprocessed_client_object_selection_set = match parent_type_id {
-        ServerEntityName::Object(object_entity_name) => match target_type_id {
-            ServerEntityName::Object(_to_object_entity_name) => add_client_pointer_to_object(
-                db,
-                schema,
-                object_entity_name,
-                client_pointer_declaration,
-            )
-            .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?,
+        ServerEntityName::Object(_) => match target_type_id {
+            ServerEntityName::Object(_to_object_entity_name) => {
+                add_client_pointer_to_object(db, client_pointer_declaration)
+                    .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?
+            }
             ServerEntityName::Scalar(scalar_entity_name) => {
                 return Err(WithLocation::new(
                     ProcessClientFieldDeclarationError::ClientPointerInvalidTargetType {
@@ -174,46 +166,13 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
 
 fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &mut Schema,
     client_field_declaration: WithSpan<ClientFieldDeclaration>,
 ) -> ProcessClientFieldDeclarationResult<
     UnprocessedClientScalarSelectableSelectionSet,
     TNetworkProtocol,
 > {
-    let name_span = client_field_declaration
-        .item
-        .client_field_name
-        .location
-        .span;
-    let client_scalar_selectable_name = client_field_declaration.item.client_field_name.item;
-    let client_field_parent_object_entity_name = client_field_declaration.item.parent_type.item.0;
-
     let (result, _) =
         process_client_field_declaration_inner(db, client_field_declaration.item).to_owned()?;
-
-    if schema
-        .server_entity_data
-        .entry(client_field_parent_object_entity_name)
-        .or_default()
-        .selectables
-        .insert(
-            client_scalar_selectable_name.0.into(),
-            DefinitionLocation::Client(SelectionType::Scalar((
-                client_field_parent_object_entity_name,
-                client_scalar_selectable_name.0,
-            ))),
-        )
-        .is_some()
-    {
-        // Did not insert, so this object already has a field with the same name :(
-        return Err(WithSpan::new(
-            ProcessClientFieldDeclarationError::ParentAlreadyHasField {
-                parent_object_entity_name: client_field_parent_object_entity_name,
-                client_selectable_name: client_scalar_selectable_name.0.into(),
-            },
-            name_span,
-        ));
-    }
 
     Ok(result)
 }
@@ -346,46 +305,11 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
 
 fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &mut Schema,
-    parent_object_entity_name: ServerObjectEntityName,
     client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
 ) -> ProcessClientFieldDeclarationResult<
     UnprocessedClientObjectSelectableSelectionSet,
     TNetworkProtocol,
 > {
-    let client_pointer_pointer_name_ws = client_pointer_declaration.item.client_pointer_name;
-    let client_pointer_name = client_pointer_pointer_name_ws.item.0;
-    let client_pointer_name_span = client_pointer_pointer_name_ws.location.span;
-
-    if schema
-        .server_entity_data
-        .entry(parent_object_entity_name)
-        .or_default()
-        .selectables
-        .insert(
-            client_pointer_name.into(),
-            DefinitionLocation::Client(SelectionType::Object((
-                parent_object_entity_name,
-                client_pointer_declaration.item.client_pointer_name.item.0,
-            ))),
-        )
-        .is_some()
-    {
-        // Did not insert, so this object already has a field with the same name :(
-        return Err(WithSpan::new(
-            ProcessClientFieldDeclarationError::ParentAlreadyHasField {
-                parent_object_entity_name,
-                client_selectable_name: client_pointer_declaration
-                    .item
-                    .client_pointer_name
-                    .item
-                    .0
-                    .into(),
-            },
-            client_pointer_name_span,
-        ));
-    }
-
     let (unprocessed_fields, _) =
         process_client_pointer_declaration_inner(db, client_pointer_declaration.item).to_owned()?;
 
