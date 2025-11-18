@@ -6,6 +6,7 @@ use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
     GraphQLTypeAnnotation, NameValuePair,
 };
+use intern::Lookup;
 use thiserror::Error;
 
 use isograph_lang_types::{
@@ -16,8 +17,7 @@ use isograph_lang_types::{
 use crate::{
     BOOLEAN_ENTITY_NAME, FLOAT_ENTITY_NAME, ID_ENTITY_NAME, INT_ENTITY_NAME, IsographDatabase,
     NetworkProtocol, STRING_ENTITY_NAME, ServerEntityData, ServerEntityName,
-    ValidatedVariableDefinition, server_object_selectable_named, server_scalar_selectable_named,
-    server_selectables_map,
+    ValidatedVariableDefinition, server_selectables_map,
 };
 
 fn graphql_type_to_non_null_type<TValue>(
@@ -292,30 +292,26 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
         selection_supplied_argument_value.location,
     )?;
 
-    let missing_fields = get_non_nullable_missing_and_provided_fields(
-        db,
-        server_entity_data,
-        object_literal,
-        object_entity_name,
-    )
-    .iter()
-    .filter_map(|field| match field {
-        ObjectLiteralFieldType::Provided(
-            field_type_annotation,
-            selection_supplied_argument_value,
-        ) => match value_satisfies_type(
-            db,
-            &selection_supplied_argument_value.value,
-            field_type_annotation,
-            variable_definitions,
-            server_entity_data,
-        ) {
-            Ok(_) => None,
-            Err(e) => Some(Err(e)),
-        },
-        ObjectLiteralFieldType::Missing(field_name) => Some(Ok(*field_name)),
-    })
-    .collect::<Result<Vec<_>, _>>()?;
+    let missing_fields =
+        get_non_nullable_missing_and_provided_fields(db, object_literal, object_entity_name)?
+            .iter()
+            .filter_map(|field| match field {
+                ObjectLiteralFieldType::Provided(
+                    field_type_annotation,
+                    selection_supplied_argument_value,
+                ) => match value_satisfies_type(
+                    db,
+                    &selection_supplied_argument_value.value,
+                    field_type_annotation,
+                    variable_definitions,
+                    server_entity_data,
+                ) {
+                    Ok(_) => None,
+                    Err(e) => Some(Err(e)),
+                },
+                ObjectLiteralFieldType::Missing(field_name) => Some(Ok(*field_name)),
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
     if missing_fields.is_empty() {
         Ok(())
@@ -339,64 +335,37 @@ enum ObjectLiteralFieldType {
 
 fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    server_entity_data: &ServerEntityData,
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
-    object_entity_name: ServerObjectEntityName,
-) -> Vec<ObjectLiteralFieldType> {
-    server_entity_data
-        .get(&object_entity_name)
-        .expect(
-            "Expected object_entity_name to exist \
-            in server_object_entity_available_selectables",
-        )
-        .selectables
-        .iter()
-        .filter_map(|(field_name, field_type)| {
-            let iso_type_annotation = match field_type.as_server().as_ref()? {
-                SelectionType::Scalar((
-                    parent_object_entity_name,
-                    server_scalar_selectable_name,
-                )) => {
-                    let server_scalar_selectable = server_scalar_selectable_named(
-                        db,
-                        *parent_object_entity_name,
-                        (*server_scalar_selectable_name).into(),
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected validation to have succeeded. \
-                            This is indicative of a bug in Isograph.",
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
-                    );
+    server_object_entity_name: ServerObjectEntityName,
+) -> Result<Vec<ObjectLiteralFieldType>, WithLocation<ValidateArgumentTypesError<TNetworkProtocol>>>
+{
+    let server_selectables = server_selectables_map(db, server_object_entity_name)
+        .as_ref()
+        .map_err(|e| {
+            WithLocation::new(
+                ValidateArgumentTypesError::ParseTypeSystemDocumentsError(e.clone()),
+                Location::Generated,
+            )
+        })?;
 
+    let value = server_selectables
+        .iter()
+        .filter_map(|(field_name, selectables)| {
+            let first_selectable = selectables
+                .first()
+                .as_ref()
+                .expect("Expected at least one selectable")
+                .as_ref()
+                .ok()?;
+
+            let iso_type_annotation = match first_selectable.as_ref() {
+                SelectionType::Scalar(server_scalar_selectable) => {
                     let field_type_annotation = &server_scalar_selectable.target_scalar_entity;
                     field_type_annotation
                         .clone()
                         .map(&mut SelectionType::Scalar)
                 }
-                SelectionType::Object((
-                    parent_object_entity_name,
-                    server_object_selectable_name,
-                )) => {
-                    let server_object_selectable = server_object_selectable_named(
-                        db,
-                        *parent_object_entity_name,
-                        (*server_object_selectable_name).into(),
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected validation to have succeeded. \
-                            This is indicative of a bug in Isograph.",
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
-                    );
+                SelectionType::Object(server_object_selectable) => {
                     let field_type_annotation = &server_object_selectable.target_object_entity;
                     field_type_annotation
                         .clone()
@@ -409,7 +378,7 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
 
             let object_literal_supplied_field = object_literal
                 .iter()
-                .find(|field| field.name.item == *field_name);
+                .find(|field| field.name.item.lookup() == (*field_name).lookup());
 
             match object_literal_supplied_field {
                 Some(selection_supplied_argument_value) => Some(ObjectLiteralFieldType::Provided(
@@ -418,13 +387,15 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
                 )),
                 None => match field_type_annotation {
                     GraphQLTypeAnnotation::NonNull(_) => {
-                        Some(ObjectLiteralFieldType::Missing(*field_name))
+                        Some(ObjectLiteralFieldType::Missing((*field_name).into()))
                     }
                     GraphQLTypeAnnotation::List(_) | GraphQLTypeAnnotation::Named(_) => None,
                 },
             }
         })
-        .collect()
+        .collect();
+
+    Ok(value)
 }
 
 fn validate_no_extraneous_fields<TNetworkProtocol: NetworkProtocol>(
