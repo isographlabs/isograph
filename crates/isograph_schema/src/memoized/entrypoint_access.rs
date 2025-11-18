@@ -109,11 +109,9 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
                 // confirm that they have the same directives
                 if let (Ok(existing_entrypoint), Ok(new_entrypoint)) =
                     (existing_result.as_ref(), value.as_ref())
+                    && existing_entrypoint.directive_set != new_entrypoint.directive_set
                 {
-                    if existing_entrypoint.directive_set != new_entrypoint.directive_set {
-                        *existing_result =
-                            Err(ValidatedEntrypointError::LazyLoadInconsistentEntrypoint)
-                    }
+                    *existing_result = Err(ValidatedEntrypointError::LazyLoadInconsistentEntrypoint)
                 }
             }
             Entry::Vacant(vacant_entry) => {

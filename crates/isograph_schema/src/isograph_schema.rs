@@ -14,9 +14,9 @@ use isograph_lang_types::{
 use lazy_static::lazy_static;
 
 use crate::{
-    EntrypointDeclarationInfo, IsographDatabase, NetworkProtocol, NormalizationKey,
-    ObjectSelectableId, ServerEntityName, ServerObjectEntityAvailableSelectables,
-    ServerObjectSelectable, ServerScalarSelectable, UseRefetchFieldRefetchStrategy,
+    IsographDatabase, NetworkProtocol, NormalizationKey, ObjectSelectableId, ServerEntityName,
+    ServerObjectEntityAvailableSelectables, ServerObjectSelectable, ServerScalarSelectable,
+    UseRefetchFieldRefetchStrategy,
     create_additional_fields::{CreateAdditionalFieldsError, CreateAdditionalFieldsResult},
     server_selectable_named,
 };
@@ -37,8 +37,6 @@ pub struct RootOperationName(pub &'static str);
 /// The in-memory representation of a schema.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Schema {
-    pub entrypoints:
-        HashMap<(ServerObjectEntityName, ClientScalarSelectableName), EntrypointDeclarationInfo>,
     pub server_entity_data: ServerEntityData,
 }
 
@@ -51,7 +49,6 @@ impl Default for Schema {
 impl Schema {
     pub fn new() -> Self {
         Self {
-            entrypoints: Default::default(),
             server_entity_data: HashMap::new(),
         }
     }
