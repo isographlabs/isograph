@@ -1,15 +1,16 @@
 use std::collections::HashMap;
 
 use common_lang_types::{ServerObjectEntityName, ServerSelectableName};
+use intern::Lookup;
 use isograph_lang_types::SelectionType;
 use pico::MemoRef;
 use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
-    FieldToInsertToServerSelectableError, ID_FIELD_NAME, IsographDatabase, NetworkProtocol,
-    OwnedServerSelectable, ServerObjectSelectable, ServerScalarSelectable,
-    field_to_insert_to_server_selectable,
+    EntityAccessError, FieldToInsertToServerSelectableError, ID_ENTITY_NAME, ID_FIELD_NAME,
+    IsographDatabase, NetworkProtocol, OwnedServerSelectable, ServerObjectSelectable,
+    ServerScalarSelectable, field_to_insert_to_server_selectable, server_scalar_entity_named,
 };
 
 type OwnedSelectableResult<TNetworkProtocol> =
@@ -142,15 +143,44 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     };
 
     // TODO check if it is a client field...
-    match selectable {
-        SelectionType::Scalar(s) => Ok(Some(db.intern_ref(s))),
-        SelectionType::Object(_) => Err(ServerSelectableNamedError::IncorrectType {
+    let selectable = match selectable {
+        SelectionType::Scalar(s) => s,
+        SelectionType::Object(_) => {
+            return Err(ServerSelectableNamedError::IncorrectType {
+                parent_object_entity_name: parent_server_object_entity_name,
+                selectable_name: (*ID_FIELD_NAME).into(),
+                expected_type: "a scalar",
+                actual_type: "an object",
+            });
+        }
+    };
+
+    let target_scalar_entity = selectable.target_scalar_entity.inner();
+    let target_scalar_entity = server_scalar_entity_named(db, *target_scalar_entity)
+        .as_ref()
+        .map_err(|e| e.clone())?
+        .as_ref()
+        // It must exist
+        .ok_or_else(|| ServerSelectableNamedError::IdFieldMustBeNonNullIdType {
+            strong_field_name: selectable.name.item.lookup(),
             parent_object_entity_name: parent_server_object_entity_name,
-            selectable_name: (*ID_FIELD_NAME).into(),
-            expected_type: "a scalar",
-            actual_type: "an object",
-        }),
+        })?;
+
+    let options = &db.get_isograph_config().options;
+
+    // And must have the right inner type
+    if target_scalar_entity.item.name.item != *ID_ENTITY_NAME {
+        options.on_invalid_id_type.on_failure(|| {
+            ServerSelectableNamedError::IdFieldMustBeNonNullIdType {
+                strong_field_name: "id",
+                parent_object_entity_name: parent_server_object_entity_name,
+            }
+        })?;
     }
+
+    // TODO disallow [ID] etc, ID, etc.
+
+    Ok(Some(db.intern_ref(selectable)))
 }
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
@@ -181,6 +211,18 @@ pub enum ServerSelectableNamedError<TNetworkProtocol: NetworkProtocol> {
     // TODO this is probably indicative of bad modeling
     #[error("{0}")]
     FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),
+
+    #[error(
+        "The `{strong_field_name}` field on `{parent_object_entity_name}` must have type `ID!`.\n\
+        This error can be suppressed using the \"on_invalid_id_type\" config parameter."
+    )]
+    IdFieldMustBeNonNullIdType {
+        parent_object_entity_name: ServerObjectEntityName,
+        strong_field_name: &'static str,
+    },
+
+    #[error("{0}")]
+    EntityAccessError(#[from] EntityAccessError<TNetworkProtocol>),
 }
 
 #[memo]

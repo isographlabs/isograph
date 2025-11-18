@@ -4,7 +4,6 @@ mod create_type_system_schema;
 mod get_validated_schema;
 mod isograph_literals;
 mod process_iso_literals;
-mod set_and_validate_id_field;
 
 pub use add_link_fields::*;
 pub use add_selection_sets::*;

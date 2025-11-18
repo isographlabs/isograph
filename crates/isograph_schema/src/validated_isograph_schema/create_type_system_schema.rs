@@ -2,13 +2,9 @@ use std::collections::HashMap;
 
 use crate::{
     CreateAdditionalFieldsError, ExposeFieldToInsert, FieldToInsert,
-    FieldToInsertToServerSelectableError, ID_FIELD_NAME, IsographDatabase, NetworkProtocol,
-    ScalarSelectionAndNonNullType, Schema, ServerObjectEntityExtraInfo, ServerObjectSelectable,
-    field_to_insert_to_server_selectable,
-    validated_isograph_schema::set_and_validate_id_field::set_and_validate_id_field,
+    FieldToInsertToServerSelectableError, IsographDatabase, NetworkProtocol,
 };
 use common_lang_types::{SelectableName, ServerObjectEntityName, WithLocation};
-use isograph_lang_types::SelectionType;
 use pico_macros::memo;
 use thiserror::Error;
 
@@ -43,75 +39,6 @@ pub fn create_type_system_schema_with_server_selectables<TNetworkProtocol: Netwo
     }
 
     Ok((expose_as_field_queue, field_queue))
-}
-
-/// Now that we have processed all objects and scalars, we can process fields (i.e.
-/// selectables), as we have the knowledge of whether the field points to a scalar
-/// or object.
-///
-/// For each field:
-/// - insert it into to the parent object's encountered_fields
-/// - append it to schema.server_fields
-/// - if it is an id field, modify the parent object
-pub fn process_field_queue<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    schema: &mut Schema,
-    field_queue: &HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
-) -> Result<(), CreateSchemaError<TNetworkProtocol>> {
-    for selectable in process_field_queue_inner(db, field_queue) {
-        match selectable? {
-            SelectionType::Scalar((server_scalar_selectable, inner_non_null_named_type)) => {
-                let server_scalar_selectable_name = server_scalar_selectable.name.item;
-                let parent_object_entity_name = server_scalar_selectable.parent_object_entity_name;
-
-                let ServerObjectEntityExtraInfo { id_field, .. } = schema
-                    .server_entity_data
-                    .entry(parent_object_entity_name)
-                    .or_default();
-                // TODO do not do this here, this is a GraphQL-ism
-                if server_scalar_selectable_name == *ID_FIELD_NAME {
-                    set_and_validate_id_field::<TNetworkProtocol>(
-                        db,
-                        id_field,
-                        server_scalar_selectable_name,
-                        parent_object_entity_name,
-                        inner_non_null_named_type.as_ref(),
-                    )?;
-                }
-            }
-            SelectionType::Object(_) => {}
-        }
-    }
-
-    Ok(())
-}
-
-fn process_field_queue_inner<'db, TNetworkProtocol: NetworkProtocol>(
-    db: &'db IsographDatabase<TNetworkProtocol>,
-    field_queue: &'db HashMap<ServerObjectEntityName, Vec<WithLocation<FieldToInsert>>>,
-) -> impl Iterator<
-    Item = Result<
-        SelectionType<
-            ScalarSelectionAndNonNullType<TNetworkProtocol>,
-            ServerObjectSelectable<TNetworkProtocol>,
-        >,
-        CreateSchemaError<TNetworkProtocol>,
-    >,
-> + 'db {
-    field_queue.iter().flat_map(
-        move |(parent_object_entity_name, field_definitions_to_insert)| {
-            field_definitions_to_insert
-                .iter()
-                .map(move |server_field_to_insert| {
-                    field_to_insert_to_server_selectable(
-                        db,
-                        *parent_object_entity_name,
-                        server_field_to_insert,
-                    )
-                    .map_err(|e| e.into())
-                })
-        },
-    )
 }
 
 #[derive(Error, Debug, PartialEq, Eq, Clone)]

@@ -3,7 +3,7 @@ use crate::{
     ProcessIsoLiteralsForSchemaError, Schema, ValidateUseOfArgumentsError,
     create_new_exposed_field, process_iso_literals_for_schema, validate_use_of_arguments,
     validated_isograph_schema::create_type_system_schema::{
-        CreateSchemaError, create_type_system_schema_with_server_selectables, process_field_queue,
+        CreateSchemaError, create_type_system_schema_with_server_selectables,
     },
 };
 use common_lang_types::WithLocation;
@@ -15,14 +15,11 @@ use thiserror::Error;
 pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<(Schema, ContainsIsoStats), GetValidatedSchemaError<TNetworkProtocol>> {
-    let (expose_as_field_queue, field_queue) =
-        create_type_system_schema_with_server_selectables(db)
-            .as_ref()
-            .map_err(|e| e.clone())?;
+    let (expose_as_field_queue, _) = create_type_system_schema_with_server_selectables(db)
+        .as_ref()
+        .map_err(|e| e.clone())?;
 
-    let mut unvalidated_isograph_schema = Schema::new();
-
-    process_field_queue(db, &mut unvalidated_isograph_schema, field_queue)?;
+    let unvalidated_isograph_schema = Schema::new();
 
     let mut unprocessed_selection_sets = vec![];
 
