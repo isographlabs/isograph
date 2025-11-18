@@ -21,14 +21,14 @@ use crate::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, ClientSelectableId,
     ID_ENTITY_NAME, ID_FIELD_NAME, ImperativelyLoadedFieldVariant, IsographDatabase,
     NameAndArguments, NetworkProtocol, PathToRefetchField, Schema, ServerEntityName,
-    ServerObjectEntity, ServerObjectEntityExtraInfo, ServerObjectSelectable,
-    ServerObjectSelectableVariant, ValidatedObjectSelection, ValidatedScalarSelection,
-    ValidatedSelection, VariableContext, client_object_selectable_named,
-    client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
-    create_transformed_name_and_arguments, fetchable_types,
+    ServerObjectEntity, ServerObjectSelectable, ServerObjectSelectableVariant,
+    ValidatedObjectSelection, ValidatedScalarSelection, ValidatedSelection, VariableContext,
+    client_object_selectable_named, client_scalar_selectable_named,
+    client_scalar_selectable_selection_set_for_parent_query, create_transformed_name_and_arguments,
+    fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
     initial_variable_context, selectable_named, selectable_validated_reader_selection_set,
-    server_object_entity_named, server_object_selectable_named,
+    server_id_selectable, server_object_entity_named, server_object_selectable_named,
     transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context,
     validated_refetch_strategy_for_client_scalar_selectable_named,
@@ -697,7 +697,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
         }
     }
 
-    select_typename_and_id_fields_in_merged_selection(schema, parent_map, parent_object_entity);
+    select_typename_and_id_fields_in_merged_selection(db, parent_map, parent_object_entity);
 }
 
 #[expect(clippy::too_many_arguments)]
@@ -1435,7 +1435,7 @@ fn merge_server_scalar_field(
 }
 
 fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkProtocol>(
-    schema: &Schema,
+    db: &IsographDatabase<TNetworkProtocol>,
     merged_selection_map: &mut MergedSelectionMap,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
 ) {
@@ -1443,12 +1443,12 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
         maybe_add_typename_selection(merged_selection_map)
     };
 
+    let id_field = server_id_selectable(db, parent_object_entity.name.item)
+        .as_ref()
+        .expect("Expected this to be valid.");
+
     // If the type has an id field, we must select it.
-    if let Some(id_field) = schema
-        .server_entity_data
-        .get(&parent_object_entity.name.item)
-        .and_then(|ServerObjectEntityExtraInfo { id_field, .. }| *id_field)
-    {
+    if let Some(id_field) = id_field {
         match merged_selection_map.entry(NormalizationKey::Id) {
             Entry::Occupied(occupied) => {
                 match occupied.get() {
@@ -1470,7 +1470,7 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
             Entry::Vacant(vacant_entry) => {
                 vacant_entry.insert(MergedServerSelection::ScalarField(
                     MergedScalarFieldSelection {
-                        name: id_field.into(),
+                        name: id_field.lookup(db).name.item.into(),
                         arguments: vec![],
                     },
                 ));
