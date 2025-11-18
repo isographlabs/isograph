@@ -6,7 +6,7 @@ use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 use isograph_lang_types::{ClientScalarSelectionDirectiveSet, SelectionType};
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, IsographDatabase,
-    LINK_FIELD_NAME, NetworkProtocol, OwnedClientSelectable, Schema, ServerObjectSelectable,
+    LINK_FIELD_NAME, NetworkProtocol, OwnedClientSelectable, ServerObjectSelectable,
     ValidatedSelection, client_object_selectable_selection_set_for_parent_query,
     client_scalar_selectable_selection_set_for_parent_query, initial_variable_context,
     server_object_entity_named,
@@ -29,10 +29,8 @@ use crate::{
     reader_ast::generate_reader_ast,
 };
 
-#[expect(clippy::too_many_arguments)]
 pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     client_selectable: &ClientSelectable<TNetworkProtocol>,
     config: &CompilerConfig,
     info: UserWrittenClientTypeInfo,
@@ -59,7 +57,6 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         db,
-        schema,
         &match client_selectable {
             SelectionType::Scalar(scalar) => {
                 client_scalar_selectable_selection_set_for_parent_query(
@@ -196,7 +193,6 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
 
 pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     server_object_selectable: &ServerObjectSelectable<TNetworkProtocol>,
     inline_fragment_reader_selections: &[WithSpan<ValidatedSelection>],
     refetch_paths: &RefetchedPathsMap,
@@ -236,7 +232,6 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         db,
-        schema,
         inline_fragment_reader_selections,
         0,
         refetch_paths,
@@ -286,7 +281,6 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
 
 pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     client_selectable: &OwnedClientSelectable<TNetworkProtocol>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
@@ -326,7 +320,6 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     };
     let client_field_parameter_type = generate_client_field_parameter_type(
         db,
-        schema,
         &selection_set_for_parent_query,
         &mut param_type_imports,
         &mut loadable_fields,
@@ -334,7 +327,6 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     );
     let updatable_data_type = generate_client_field_updatable_data_type(
         db,
-        schema,
         &selection_set_for_parent_query,
         &mut param_type_imports,
         &mut loadable_fields,

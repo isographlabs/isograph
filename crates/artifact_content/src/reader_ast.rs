@@ -10,7 +10,7 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, IsographDatabase, Loadability, NameAndArguments,
-    NetworkProtocol, NormalizationKey, PathToRefetchField, RefetchedPathsMap, Schema,
+    NetworkProtocol, NormalizationKey, PathToRefetchField, RefetchedPathsMap,
     ServerObjectSelectableVariant, ValidatedObjectSelection, ValidatedScalarSelection,
     ValidatedSelection, VariableContext, categorize_field_loadability,
     client_object_selectable_named, client_object_selectable_selection_set_for_parent_query,
@@ -25,11 +25,9 @@ use crate::{
 };
 
 // Can we do this when visiting the client field in when generating entrypoints?
-#[expect(clippy::too_many_arguments)]
 fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection: &WithSpan<ValidatedSelection>,
-    schema: &Schema,
     indentation_level: u8,
     reader_imports: &mut ReaderImports,
     // TODO use this to generate usedRefetchQueries
@@ -67,7 +65,6 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                     scalar_client_defined_field_ast_node(
                         db,
                         scalar_field_selection,
-                        schema,
                         client_scalar_selectable,
                         indentation_level,
                         path,
@@ -98,7 +95,6 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
 
                     let inner_reader_ast = generate_reader_ast_with_path(
                         db,
-                        schema,
                         &linked_field_selection.selection_set,
                         indentation_level + 1,
                         reader_imports,
@@ -168,7 +164,6 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
 
                     let inner_reader_ast = generate_reader_ast_with_path(
                         db,
-                        schema,
                         &linked_field_selection.selection_set,
                         indentation_level + 1,
                         reader_imports,
@@ -329,7 +324,6 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
 fn scalar_client_defined_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     scalar_field_selection: &ValidatedScalarSelection,
-    schema: &Schema,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
     indentation_level: u8,
     path: &mut Vec<NormalizationKey>,
@@ -350,7 +344,6 @@ fn scalar_client_defined_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         Some(Loadability::LoadablySelectedField(loadable_directive_parameters)) => {
             loadably_selected_field_ast_node(
                 db,
-                schema,
                 client_field,
                 reader_imports,
                 indentation_level,
@@ -513,10 +506,8 @@ fn imperatively_loaded_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
     )
 }
 
-#[expect(clippy::too_many_arguments)]
 fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
     reader_imports: &mut ReaderImports,
     indentation_level: u8,
@@ -578,7 +569,6 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     let empty_selection_set = vec![];
     let (reader_ast, additional_reader_imports) = generate_reader_ast(
         db,
-        schema,
         validated_refetch_strategy
             .refetch_selection_set()
             .unwrap_or(&empty_selection_set),
@@ -644,11 +634,9 @@ fn server_defined_scalar_field_ast_node(
     )
 }
 
-#[expect(clippy::too_many_arguments)]
-fn generate_reader_ast_with_path<'schema, TNetworkProtocol: NetworkProtocol>(
+fn generate_reader_ast_with_path<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &'schema Schema,
-    selection_set: &'schema [WithSpan<ValidatedSelection>],
+    selection_set: &[WithSpan<ValidatedSelection>],
     indentation_level: u8,
     nested_client_field_imports: &mut ReaderImports,
     // N.B. this is not root_refetched_paths when we're generating a non-fetchable client field :(
@@ -661,7 +649,6 @@ fn generate_reader_ast_with_path<'schema, TNetworkProtocol: NetworkProtocol>(
         let s = generate_reader_ast_node(
             db,
             item,
-            schema,
             indentation_level + 1,
             nested_client_field_imports,
             root_refetched_paths,
@@ -729,10 +716,9 @@ fn find_imperatively_fetchable_query_index(
         )
 }
 
-pub(crate) fn generate_reader_ast<'schema, TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_reader_ast<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &'schema Schema,
-    selection_set: &'schema [WithSpan<ValidatedSelection>],
+    selection_set: &[WithSpan<ValidatedSelection>],
     indentation_level: u8,
     // N.B. this is not root_refetched_paths when we're generating an entrypoint :(
     // ????
@@ -742,7 +728,6 @@ pub(crate) fn generate_reader_ast<'schema, TNetworkProtocol: NetworkProtocol>(
     let mut client_field_imports = BTreeSet::new();
     let reader_ast = generate_reader_ast_with_path(
         db,
-        schema,
         selection_set,
         indentation_level,
         &mut client_field_imports,

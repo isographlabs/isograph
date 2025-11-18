@@ -31,22 +31,6 @@ lazy_static! {
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct RootOperationName(pub &'static str);
 
-/// The in-memory representation of a schema.
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Schema {}
-
-impl Default for Schema {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Schema {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
 pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     root_object_name: ServerObjectEntityName,

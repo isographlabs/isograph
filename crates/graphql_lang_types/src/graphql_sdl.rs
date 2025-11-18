@@ -172,7 +172,7 @@ pub enum DirectiveLocation {
     FragmentSpread,
     InlineFragment,
     VariableDefinition,
-    Schema,
+
     Scalar,
     Object,
     FieldDefinition,

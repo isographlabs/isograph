@@ -4,7 +4,7 @@ use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
     ClientScalarSelectable, FieldMapItem, IsographDatabase, NetworkProtocol, RefetchedPathsMap,
-    Schema, client_scalar_selectable_selection_set_for_parent_query, initial_variable_context,
+    client_scalar_selectable_selection_set_for_parent_query, initial_variable_context,
     validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 
@@ -19,7 +19,6 @@ use crate::{
 
 pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     client_field: &ClientScalarSelectable<TNetworkProtocol>,
     refetched_paths: &RefetchedPathsMap,
     was_selected_loadably: bool,
@@ -55,7 +54,6 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
     .expect("Expected selection set to be valid.");
     let (reader_ast, reader_imports) = generate_reader_ast(
         db,
-        schema,
         // TODO model this better
         if was_selected_loadably {
             validated_refetch_strategy

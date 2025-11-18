@@ -20,12 +20,11 @@ use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientOrServerObjectSelectable,
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, ClientSelectableId,
     ID_ENTITY_NAME, ID_FIELD_NAME, ImperativelyLoadedFieldVariant, IsographDatabase,
-    NameAndArguments, NetworkProtocol, PathToRefetchField, Schema, ServerEntityName,
-    ServerObjectEntity, ServerObjectSelectable, ServerObjectSelectableVariant,
-    ValidatedObjectSelection, ValidatedScalarSelection, ValidatedSelection, VariableContext,
-    client_object_selectable_named, client_scalar_selectable_named,
-    client_scalar_selectable_selection_set_for_parent_query, create_transformed_name_and_arguments,
-    fetchable_types,
+    NameAndArguments, NetworkProtocol, PathToRefetchField, ServerEntityName, ServerObjectEntity,
+    ServerObjectSelectable, ServerObjectSelectableVariant, ValidatedObjectSelection,
+    ValidatedScalarSelection, ValidatedSelection, VariableContext, client_object_selectable_named,
+    client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
+    create_transformed_name_and_arguments, fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
     initial_variable_context, selectable_named, selectable_validated_reader_selection_set,
     server_id_selectable, server_object_entity_named, server_object_selectable_named,
@@ -446,7 +445,6 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     TNetworkProtocol: NetworkProtocol,
 >(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
@@ -464,7 +462,6 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
         None => {
             let field_traversal_result = create_field_traversal_result(
                 db,
-                schema,
                 parent_object_entity,
                 validated_selections,
                 encountered_client_type_map,
@@ -482,7 +479,6 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
 
 fn create_field_traversal_result<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     validated_selections: &[WithSpan<ValidatedSelection>],
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
@@ -493,7 +489,6 @@ fn create_field_traversal_result<TNetworkProtocol: NetworkProtocol>(
 
     merge_validated_selections_into_selection_map(
         db,
-        schema,
         &mut merged_selection_map,
         parent_object_entity,
         validated_selections,
@@ -537,10 +532,8 @@ pub fn imperative_field_subfields_or_inline_fragments(
     }
 }
 
-#[expect(clippy::too_many_arguments)]
 fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     parent_map: &mut MergedSelectionMap,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     validated_selections: &[WithSpan<ValidatedSelection>],
@@ -566,7 +559,6 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                     )) => {
                         merge_client_scalar_field(
                             db,
-                            schema,
                             parent_map,
                             parent_object_entity,
                             merge_traversal_state,
@@ -648,7 +640,6 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             );
                         merge_client_object_field(
                             db,
-                            schema,
                             parent_map,
                             parent_object_entity,
                             merge_traversal_state,
@@ -661,7 +652,6 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
 
                         insert_client_pointer_into_refetch_paths(
                             db,
-                            schema,
                             parent_map,
                             encountered_client_type_map,
                             merge_traversal_state,
@@ -677,7 +667,6 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                     )) => {
                         merge_server_object_field(
                             db,
-                            schema,
                             parent_map,
                             parent_object_entity,
                             merge_traversal_state,
@@ -703,7 +692,6 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
 #[expect(clippy::too_many_arguments)]
 fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     parent_map: &mut BTreeMap<NormalizationKey, MergedServerSelection>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
@@ -781,7 +769,6 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         inline_fragment_reader_selection_set(server_object_selectable);
                     merge_validated_selections_into_selection_map(
                         db,
-                        schema,
                         &mut existing_inline_fragment.selection_map,
                         object_selection_parent_object_entity,
                         &reader_selection_set,
@@ -791,7 +778,6 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                     );
                     merge_validated_selections_into_selection_map(
                         db,
-                        schema,
                         &mut existing_inline_fragment.selection_map,
                         object_selection_parent_object_entity,
                         &object_selection.selection_set,
@@ -802,7 +788,6 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
 
                     create_merged_selection_map_for_field_and_insert_into_global_map(
                         db,
-                        schema,
                         parent_object_entity,
                         &object_selection.selection_set,
                         encountered_client_type_map,
@@ -896,7 +881,6 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                 MergedServerSelection::LinkedField(existing_linked_field) => {
                     merge_validated_selections_into_selection_map(
                         db,
-                        schema,
                         &mut existing_linked_field.selection_map,
                         object_selection_parent_object,
                         &object_selection.selection_set,
@@ -921,7 +905,6 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
 #[expect(clippy::too_many_arguments)]
 fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     parent_map: &mut BTreeMap<NormalizationKey, MergedServerSelection>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
@@ -950,7 +933,6 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
     merge_non_loadable_client_type(
         db,
         parent_object_entity,
-        schema,
         parent_map,
         merge_traversal_state,
         SelectionType::Object((
@@ -985,7 +967,6 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
 #[expect(clippy::too_many_arguments)]
 fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     parent_map: &mut BTreeMap<NormalizationKey, MergedServerSelection>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
@@ -1017,7 +998,6 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
         Some(Loadability::LoadablySelectedField(_loadable_variant)) => {
             create_merged_selection_map_for_field_and_insert_into_global_map(
                 db,
-                schema,
                 parent_object_entity,
                 &client_scalar_selectable_selection_set_for_parent_query(
                     db,
@@ -1049,7 +1029,6 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
         Some(Loadability::ImperativelyLoadedField(variant)) => {
             insert_imperative_field_into_refetch_paths(
                 db,
-                schema,
                 encountered_client_type_map,
                 merge_traversal_state,
                 *newly_encountered_scalar_client_selectable_name,
@@ -1065,7 +1044,6 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
                 merge_non_loadable_client_type(
                     db,
                     parent_object_entity,
-                    schema,
                     parent_map,
                     merge_traversal_state,
                     SelectionType::Scalar((
@@ -1092,7 +1070,6 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
 #[expect(clippy::too_many_arguments)]
 fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     newly_encountered_scalar_client_selectable_name: ClientScalarSelectableName,
@@ -1153,7 +1130,6 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
     // Generate a merged selection set, but using the refetch strategy
     create_merged_selection_map_for_field_and_insert_into_global_map(
         db,
-        schema,
         parent_object_entity,
         validated_refetch_strategy
             .refetch_selection_set()
@@ -1172,7 +1148,6 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
 #[expect(clippy::too_many_arguments)]
 fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     parent_map: &mut MergedSelectionMap,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
@@ -1301,7 +1276,6 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
         MergedServerSelection::ClientPointer(existing_client_pointer) => {
             merge_validated_selections_into_selection_map(
                 db,
-                schema,
                 &mut existing_client_pointer.selection_map,
                 target_server_object_entity,
                 &object_selection.selection_set,
@@ -1325,7 +1299,6 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
 fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
-    schema: &Schema,
     parent_map: &mut MergedSelectionMap,
     parent_merge_traversal_state: &mut ScalarClientFieldTraversalState,
     newly_encountered_client_type_id: ClientSelectableId,
@@ -1349,7 +1322,6 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
         ..
     } = create_merged_selection_map_for_field_and_insert_into_global_map(
         db,
-        schema,
         parent_object_entity,
         &validated_selections,
         encountered_client_type_map,

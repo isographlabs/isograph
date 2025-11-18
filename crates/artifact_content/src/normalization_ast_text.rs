@@ -1,29 +1,24 @@
 use isograph_schema::{
     MergedInlineFragmentSelection, MergedLinkedFieldSelection, MergedScalarFieldSelection,
-    MergedServerSelection, Schema,
+    MergedServerSelection,
 };
 
 use crate::generate_artifacts::{NormalizationAstText, get_serialized_field_arguments};
 
 pub(crate) fn generate_normalization_ast_text<'schema, 'a>(
-    schema: &'schema Schema,
     selection_map: impl Iterator<Item = &'a MergedServerSelection> + 'a,
     indentation_level: u8,
 ) -> NormalizationAstText {
     let mut normalization_ast_text = "[\n".to_string();
     for item in selection_map {
-        let s = generate_normalization_ast_node(item, schema, indentation_level + 1);
+        let s = generate_normalization_ast_node(item, indentation_level + 1);
         normalization_ast_text.push_str(&s);
     }
     normalization_ast_text.push_str(&format!("{}]", "  ".repeat(indentation_level as usize)));
     NormalizationAstText(normalization_ast_text)
 }
 
-fn generate_normalization_ast_node(
-    item: &MergedServerSelection,
-    schema: &Schema,
-    indentation_level: u8,
-) -> String {
+fn generate_normalization_ast_node(item: &MergedServerSelection, indentation_level: u8) -> String {
     match &item {
         MergedServerSelection::ScalarField(scalar_field) => {
             let MergedScalarFieldSelection {
@@ -61,11 +56,8 @@ fn generate_normalization_ast_node(
             let serialized_arguments =
                 get_serialized_field_arguments(arguments, indentation_level + 1);
 
-            let selections = generate_normalization_ast_text(
-                schema,
-                selection_map.values(),
-                indentation_level + 1,
-            );
+            let selections =
+                generate_normalization_ast_text(selection_map.values(), indentation_level + 1);
 
             format!(
                 "{indent}{{\n\
@@ -86,11 +78,8 @@ fn generate_normalization_ast_node(
             let indent = "  ".repeat(indentation_level as usize);
             let indent_2 = "  ".repeat((indentation_level + 1) as usize);
 
-            let selections = generate_normalization_ast_text(
-                schema,
-                selection_map.values(),
-                indentation_level + 1,
-            );
+            let selections =
+                generate_normalization_ast_text(selection_map.values(), indentation_level + 1);
 
             format!(
                 "{indent}{{\n\

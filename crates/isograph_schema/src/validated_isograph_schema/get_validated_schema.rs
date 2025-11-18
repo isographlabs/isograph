@@ -1,7 +1,7 @@
 use crate::{
     ContainsIsoStats, CreateAdditionalFieldsError, IsographDatabase, NetworkProtocol,
-    ProcessIsoLiteralsForSchemaError, Schema, ValidateUseOfArgumentsError,
-    create_new_exposed_field, process_iso_literals_for_schema, validate_use_of_arguments,
+    ProcessIsoLiteralsForSchemaError, ValidateUseOfArgumentsError, create_new_exposed_field,
+    process_iso_literals_for_schema, validate_use_of_arguments,
     validated_isograph_schema::create_type_system_schema::{
         CreateSchemaError, create_type_system_schema_with_server_selectables,
     },
@@ -14,12 +14,10 @@ use thiserror::Error;
 #[memo]
 pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<(Schema, ContainsIsoStats), GetValidatedSchemaError<TNetworkProtocol>> {
+) -> Result<ContainsIsoStats, GetValidatedSchemaError<TNetworkProtocol>> {
     let (expose_as_field_queue, _) = create_type_system_schema_with_server_selectables(db)
         .as_ref()
         .map_err(|e| e.clone())?;
-
-    let unvalidated_isograph_schema = Schema::new();
 
     let mut unprocessed_selection_sets = vec![];
 
@@ -36,7 +34,7 @@ pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol>(
 
     let stats = process_iso_literals_for_schema(db, unprocessed_selection_sets)?;
     validate_use_of_arguments(db)?;
-    Ok((unvalidated_isograph_schema, stats))
+    Ok(stats)
 }
 
 #[derive(Error, Debug, PartialEq, Eq, Clone)]

@@ -9,7 +9,7 @@ use isograph_lang_types::{SelectionType, VariableDefinition};
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, Format, ImperativelyLoadedFieldVariant,
     IsographDatabase, MergedSelectionMap, NetworkProtocol, OwnedClientSelectable,
-    PathToRefetchFieldInfo, REFETCH_FIELD_NAME, RootRefetchedPath, Schema, ServerEntityName,
+    PathToRefetchFieldInfo, REFETCH_FIELD_NAME, RootRefetchedPath, ServerEntityName,
     WrappedSelectionMapSelection, client_selectable_named, fetchable_types, selection_map_wrapped,
 };
 
@@ -23,7 +23,6 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     TNetworkProtocol: NetworkProtocol,
 >(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     file_extensions: GenerateFileExtensionsOption,
     persisted_documents: &mut Option<PersistedDocuments>,
     entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
@@ -136,11 +135,8 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         1,
     );
 
-    let normalization_ast_text = generate_normalization_ast_text(
-        schema,
-        normalization_ast_wrapped_selection_map.values(),
-        1,
-    );
+    let normalization_ast_text =
+        generate_normalization_ast_text(normalization_ast_wrapped_selection_map.values(), 1);
 
     let file_name_prefix = format!("{}__{}.ts", *REFETCH_FIELD_NAME, index)
         .intern()

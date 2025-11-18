@@ -22,7 +22,7 @@ use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, EntrypointDeclarationInfo,
     FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, Format, IsographDatabase,
     MergedSelectionMap, NetworkProtocol, NormalizationKey, RootOperationName, RootRefetchedPath,
-    ScalarClientFieldTraversalState, Schema, ServerObjectEntity, ValidatedVariableDefinition,
+    ScalarClientFieldTraversalState, ServerObjectEntity, ValidatedVariableDefinition,
     WrappedSelectionMapSelection, client_scalar_selectable_named,
     client_scalar_selectable_selection_set_for_parent_query,
     create_merged_selection_map_for_field_and_insert_into_global_map,
@@ -31,10 +31,8 @@ use isograph_schema::{
 };
 use std::collections::BTreeSet;
 
-#[expect(clippy::too_many_arguments)]
 pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     parent_object_entity_name: ServerObjectEntityName,
     entrypoint_scalar_selectable_name: ClientScalarSelectableName,
     info: &EntrypointDeclarationInfo,
@@ -77,7 +75,6 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
         ..
     } = create_merged_selection_map_for_field_and_insert_into_global_map(
         db,
-        schema,
         parent_object_entity,
         &client_scalar_selectable_selection_set_for_parent_query(
             db,
@@ -95,7 +92,6 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
 
     generate_entrypoint_artifacts_with_client_field_traversal_result(
         db,
-        schema,
         entrypoint,
         Some(info),
         &merged_selection_map,
@@ -125,7 +121,6 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     TNetworkProtocol: NetworkProtocol,
 >(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
     info: Option<&EntrypointDeclarationInfo>,
     merged_selection_map: &MergedSelectionMap,
@@ -238,8 +233,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     let refetch_query_artifact_import =
         generate_refetch_query_artifact_import(&refetch_paths_with_variables, file_extensions);
 
-    let normalization_ast_text =
-        generate_normalization_ast_text(schema, merged_selection_map.values(), 1);
+    let normalization_ast_text = generate_normalization_ast_text(merged_selection_map.values(), 1);
 
     let concrete_type_entity_name =
         if fetchable_types_map.contains_key(&entrypoint.parent_object_entity_name) {
@@ -337,7 +331,6 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
                 |(index, (root_refetch_path, nested_selection_map, reachable_variables))| {
                     get_paths_and_contents_for_imperatively_loaded_field(
                         db,
-                        schema,
                         file_extensions,
                         persisted_documents,
                         entrypoint,

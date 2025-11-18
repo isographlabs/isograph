@@ -18,14 +18,14 @@ use isograph_lang_types::{
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, ClientSelectableId, FieldMapItem,
     FieldTraversalResult, ID_ENTITY_NAME, IsographDatabase, LINK_FIELD_NAME, NameAndArguments,
-    NetworkProtocol, NormalizationKey, RefetchStrategy, ScalarSelectableId, Schema,
-    SelectableTrait, ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo,
-    ValidatedSelection, ValidatedVariableDefinition, WrappedSelectionMapSelection,
-    accessible_client_fields, client_object_selectable_named, client_scalar_selectable_named,
-    client_selectable_map, client_selectable_named, description, fetchable_types,
-    inline_fragment_reader_selection_set, output_type_annotation, selectable_named,
-    selection_map_wrapped, server_object_entity_named, server_object_selectable_named,
-    server_scalar_entity_javascript_name, server_scalar_selectable_named, validated_entrypoints,
+    NetworkProtocol, NormalizationKey, RefetchStrategy, ScalarSelectableId, SelectableTrait,
+    ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo, ValidatedSelection,
+    ValidatedVariableDefinition, WrappedSelectionMapSelection, accessible_client_fields,
+    client_object_selectable_named, client_scalar_selectable_named, client_selectable_map,
+    client_selectable_named, description, fetchable_types, inline_fragment_reader_selection_set,
+    output_type_annotation, selectable_named, selection_map_wrapped, server_object_entity_named,
+    server_object_selectable_named, server_scalar_entity_javascript_name,
+    server_scalar_selectable_named, validated_entrypoints,
     validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 use isograph_schema::{ContainsIsoStats, GetValidatedSchemaError, get_validated_schema};
@@ -116,12 +116,12 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
 > {
     let config = db.get_isograph_config();
     let validated_schema = get_validated_schema(db);
-    let (schema, stats) = match validated_schema {
-        Ok((schema, stats)) => (schema, stats),
+    let stats = match validated_schema {
+        Ok(stats) => stats,
         Err(e) => return Err(e.clone())?,
     };
 
-    let mut artifact_path_and_content = get_artifact_path_and_content_impl(db, schema, config);
+    let mut artifact_path_and_content = get_artifact_path_and_content_impl(db, config);
     if let Some(header) = config.options.generated_file_header {
         for artifact_path_and_content in artifact_path_and_content.iter_mut() {
             artifact_path_and_content.file_content =
@@ -133,7 +133,6 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
 
 fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     config: &CompilerConfig,
 ) -> Vec<ArtifactPathAndContent> {
     let mut encountered_client_type_map = BTreeMap::new();
@@ -159,7 +158,6 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
 
         let entrypoint_path_and_content = generate_entrypoint_artifacts(
             db,
-            schema,
             *parent_object_entity_name,
             *entrypoint_selectable_name,
             entrypoint_info,
@@ -212,7 +210,6 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     ServerObjectSelectableVariant::InlineFragment => {
                         path_and_contents.push(generate_eager_reader_condition_artifact(
                             db,
-                            schema,
                             server_object_selectable,
                             &inline_fragment_reader_selection_set(server_object_selectable),
                             &traversal_state.refetch_paths,
@@ -244,7 +241,6 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
 
                 path_and_contents.extend(generate_eager_reader_artifacts(
                     db,
-                    schema,
                     &SelectionType::Object(client_object_selectable),
                     config,
                     UserWrittenClientTypeInfo {
@@ -284,7 +280,6 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     ClientFieldVariant::UserWritten(info) => {
                         path_and_contents.extend(generate_eager_reader_artifacts(
                             db,
-                            schema,
                             &SelectionType::Scalar(client_scalar_selectable),
                             config,
                             *info,
@@ -296,7 +291,6 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                         if *was_ever_selected_loadably {
                             path_and_contents.push(generate_refetch_reader_artifact(
                                 db,
-                                schema,
                                 client_scalar_selectable,
                                 &traversal_state.refetch_paths,
                                 true,
@@ -431,7 +425,6 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                             path_and_contents.extend(
                                 generate_entrypoint_artifacts_with_client_field_traversal_result(
                                     db,
-                                    schema,
                                     client_scalar_selectable,
                                     None,
                                     &wrapped_map,
@@ -448,7 +441,6 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     ClientFieldVariant::ImperativelyLoadedField(s) => {
                         path_and_contents.push(generate_refetch_reader_artifact(
                             db,
-                            schema,
                             client_scalar_selectable,
                             &traversal_state.refetch_paths,
                             false,
@@ -494,7 +486,6 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
         // For each user-written client types, generate a param type artifact
         path_and_contents.push(generate_eager_reader_param_type_artifact(
             db,
-            schema,
             user_written_client_type,
             config.options.include_file_extensions_in_import_statements,
         ));
@@ -743,7 +734,6 @@ pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
 
 pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     selection_map: &[WithSpan<ValidatedSelection>],
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
@@ -755,7 +745,6 @@ pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProt
     for selection in selection_map.iter() {
         write_param_type_from_selection(
             db,
-            schema,
             &mut client_field_parameter_type,
             selection,
             nested_client_field_imports,
@@ -770,7 +759,6 @@ pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProt
 
 pub(crate) fn generate_client_field_updatable_data_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     selection_map: &[WithSpan<ValidatedSelection>],
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
@@ -784,7 +772,6 @@ pub(crate) fn generate_client_field_updatable_data_type<TNetworkProtocol: Networ
     for selection in selection_map.iter() {
         write_updatable_data_type_from_selection(
             db,
-            schema,
             &mut client_field_updatable_data_type,
             selection,
             nested_client_field_imports,
@@ -802,7 +789,6 @@ pub(crate) fn generate_client_field_updatable_data_type<TNetworkProtocol: Networ
 
 fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
     nested_client_field_imports: &mut ParamTypeImports,
@@ -931,7 +917,6 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     .map(&mut |_| {
                         generate_client_field_parameter_type(
                             db,
-                            schema,
                             &linked_field.selection_set,
                             nested_client_field_imports,
                             loadable_fields,
@@ -1055,10 +1040,8 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-#[expect(clippy::too_many_arguments)]
 fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
     nested_client_field_imports: &mut ParamTypeImports,
@@ -1202,7 +1185,6 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     .map(&mut |_| {
                         generate_client_field_updatable_data_type(
                             db,
-                            schema,
                             &linked_field.selection_set,
                             nested_client_field_imports,
                             loadable_fields,
