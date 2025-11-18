@@ -578,7 +578,6 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
 
     path_and_contents.push(build_iso_overload_artifact(
         db,
-        schema,
         config.options.include_file_extensions_in_import_statements,
         config.options.no_babel_transform,
     ));

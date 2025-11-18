@@ -6,8 +6,8 @@ use std::{cmp::Ordering, collections::BTreeSet};
 use common_lang_types::{ArtifactPathAndContent, SelectableName, ServerObjectEntityName};
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, EntrypointDeclarationInfo,
-    IsographDatabase, LINK_FIELD_NAME, NetworkProtocol, OwnedClientSelectable, Schema,
-    client_scalar_selectable_named, client_selectable_map,
+    IsographDatabase, LINK_FIELD_NAME, NetworkProtocol, OwnedClientSelectable,
+    client_scalar_selectable_named, client_selectable_map, validated_entrypoints,
 };
 
 use crate::generate_artifacts::{ISO_TS_FILE_NAME, print_javascript_type_declaration};
@@ -119,7 +119,6 @@ export function iso<T>(
 
 pub(crate) fn build_iso_overload_artifact<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     file_extensions: GenerateFileExtensionsOption,
     no_babel_transform: bool,
 ) -> ArtifactPathAndContent {
@@ -203,7 +202,7 @@ type MatchesWhitespaceAndString<
         ));
     }
 
-    let entrypoint_overloads = sorted_entrypoints(db, schema)
+    let entrypoint_overloads = sorted_entrypoints(db)
         .into_iter()
         .map(|(field, _)| build_iso_overload_for_entrypoint(&field, file_extensions));
     for (import, entrypoint_overload) in entrypoint_overloads {
@@ -227,16 +226,17 @@ export function iso(_isographLiteralText: string):
       'set options.no_babel_transform to true in your Isograph config. ');\n}")
         }
         true => {
-            let switch_cases = sorted_entrypoints(db, schema).into_iter().map(
-                |(field, entrypoint_declaration_info)| {
-                    format!(
-                        "    case '{}':
+            let switch_cases =
+                sorted_entrypoints(db)
+                    .into_iter()
+                    .map(|(field, entrypoint_declaration_info)| {
+                        format!(
+                            "    case '{}':
       return entrypoint_{};\n",
-                        entrypoint_declaration_info.iso_literal_text,
-                        field.type_and_field.underscore_separated()
-                    )
-                },
-            );
+                            entrypoint_declaration_info.iso_literal_text,
+                            field.type_and_field.underscore_separated()
+                        )
+                    });
 
             content.push_str(
                 "
@@ -339,21 +339,23 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
     client_types
 }
 
-fn sorted_entrypoints<'schema, TNetworkProtocol: NetworkProtocol>(
+fn sorted_entrypoints<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &'schema Schema,
 ) -> Vec<(
     ClientScalarSelectable<TNetworkProtocol>,
-    &'schema EntrypointDeclarationInfo,
+    &EntrypointDeclarationInfo,
 )> {
-    let mut entrypoints = schema
-        .entrypoints
+    let mut entrypoints = validated_entrypoints(db)
         .iter()
         .map(
             |(
                 (parent_object_entity_name, client_scalar_selectable_name),
                 entrypoint_declaration_info,
             )| {
+                let entrypoint_declaration_info = entrypoint_declaration_info
+                    .as_ref()
+                    .expect("Expected entrypoint to be valid.");
+
                 // TODO don't clone, this is only required for lifetime reasons (because
                 // we cannot return references with a 'db lifetime)
                 let client_scalar_selectable = client_scalar_selectable_named(
