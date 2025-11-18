@@ -1,9 +1,8 @@
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 
 use common_lang_types::{
     ClientScalarSelectableName, JavascriptName, SelectableName, ServerObjectEntityName,
-    ServerScalarEntityName, ServerScalarIdSelectableName, ServerScalarSelectableName,
-    ServerSelectableName,
+    ServerScalarEntityName, ServerScalarSelectableName, ServerSelectableName,
 };
 use intern::Lookup;
 use intern::string_key::Intern;
@@ -34,9 +33,7 @@ pub struct RootOperationName(pub &'static str);
 
 /// The in-memory representation of a schema.
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Schema {
-    pub server_entity_data: ServerEntityData,
-}
+pub struct Schema {}
 
 impl Default for Schema {
     fn default() -> Self {
@@ -46,9 +43,7 @@ impl Default for Schema {
 
 impl Schema {
     pub fn new() -> Self {
-        Self {
-            server_entity_data: HashMap::new(),
-        }
+        Self {}
     }
 }
 
@@ -97,17 +92,6 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
 
     Ok(path)
 }
-
-#[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub struct ServerObjectEntityExtraInfo {
-    pub id_field: Option<ServerScalarIdSelectableName>,
-}
-
-// We keep track of available selectables and id fields outside of server_objects so that
-// we don't need a server_object_entity_mut method, which is incompatible with pico.
-//
-// This type alias is a bit outdated. It should be gone soon anyway, though.
-pub type ServerEntityData = HashMap<ServerObjectEntityName, ServerObjectEntityExtraInfo>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PathToRefetchField {
