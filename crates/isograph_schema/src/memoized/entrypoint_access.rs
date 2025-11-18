@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, hash_map::Entry};
 
 use common_lang_types::{ClientScalarSelectableName, ServerObjectEntityName};
 use isograph_lang_parser::IsoLiteralExtractionResult;
@@ -37,79 +37,92 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
 > {
     let entrypoints = entrypoints(db);
 
+    let mut out: HashMap<_, Result<EntrypointDeclarationInfo, _>> = HashMap::new();
+
     // To validate an entrypoint, we confirm that its parent type exists and the client field is defined,
     // which we can validate by ensuring that the client scalar selectable exists.
     //
     // We also validate that it is a fetchable type.
-    entrypoints
-        .iter()
-        .map(|entrypoint_declaration_info| {
-            let value = (|| {
-                client_scalar_selectable_named(
-                    db,
-                    entrypoint_declaration_info.parent_type.item.0,
-                    entrypoint_declaration_info.client_field_name.item.0,
-                )
-                .as_ref()
-                .map_err(|e| e.clone())?
-                .as_ref()
-                .ok_or_else(|| {
-                    // check if it has a different type
-                    let selectable = selectable_named(
-                        db,
-                        entrypoint_declaration_info.parent_type.item.0,
-                        entrypoint_declaration_info.client_field_name.item.0.into(),
-                    );
-
-                    if let Ok(Some(selectable)) = selectable {
-                        let actual_type = match selectable {
-                            DefinitionLocation::Server(SelectionType::Scalar(_)) => {
-                                "a server scalar"
-                            }
-                            DefinitionLocation::Server(SelectionType::Object(_)) => {
-                                "a server object"
-                            }
-                            DefinitionLocation::Client(SelectionType::Scalar(_)) => {
-                                panic!("Unexpected client scalar")
-                            }
-                            DefinitionLocation::Client(SelectionType::Object(_)) => {
-                                "a client pointer"
-                            }
-                        };
-
-                        return ValidatedEntrypointError::IncorrectType {
-                            parent_object_entity_name: entrypoint_declaration_info
-                                .parent_type
-                                .item
-                                .0,
-                            selectable_name: entrypoint_declaration_info.client_field_name.item.0,
-                            actual_type,
-                        };
-                    }
-
-                    // if not
-                    ValidatedEntrypointError::NotDefined {
-                        parent_object_entity_name: entrypoint_declaration_info.parent_type.item.0,
-                        client_scalar_selectable_name: entrypoint_declaration_info
-                            .client_field_name
-                            .item
-                            .0,
-                    }
-                })?;
-
-                Ok(EntrypointDeclarationInfo {
-                    iso_literal_text: entrypoint_declaration_info.iso_literal_text,
-                    directive_set: entrypoint_declaration_info.entrypoint_directive_set,
-                })
-            })();
-
-            let key = (
+    for entrypoint_declaration_info in entrypoints {
+        let value = (|| {
+            client_scalar_selectable_named(
+                db,
                 entrypoint_declaration_info.parent_type.item.0,
                 entrypoint_declaration_info.client_field_name.item.0,
-            );
-            (key, value)
-        })
-        .collect()
+            )
+            .as_ref()
+            .map_err(|e| e.clone())?
+            .as_ref()
+            .ok_or_else(|| {
+                // check if it has a different type
+                let selectable = selectable_named(
+                    db,
+                    entrypoint_declaration_info.parent_type.item.0,
+                    entrypoint_declaration_info.client_field_name.item.0.into(),
+                );
+
+                if let Ok(Some(selectable)) = selectable {
+                    let actual_type = match selectable {
+                        DefinitionLocation::Server(SelectionType::Scalar(_)) => "a server scalar",
+                        DefinitionLocation::Server(SelectionType::Object(_)) => "a server object",
+                        DefinitionLocation::Client(SelectionType::Scalar(_)) => {
+                            panic!("Unexpected client scalar")
+                        }
+                        DefinitionLocation::Client(SelectionType::Object(_)) => "a client pointer",
+                    };
+
+                    return ValidatedEntrypointError::IncorrectType {
+                        parent_object_entity_name: entrypoint_declaration_info.parent_type.item.0,
+                        selectable_name: entrypoint_declaration_info.client_field_name.item.0,
+                        actual_type,
+                    };
+                }
+
+                // if not
+                ValidatedEntrypointError::NotDefined {
+                    parent_object_entity_name: entrypoint_declaration_info.parent_type.item.0,
+                    client_scalar_selectable_name: entrypoint_declaration_info
+                        .client_field_name
+                        .item
+                        .0,
+                }
+            })?;
+
+            Ok(EntrypointDeclarationInfo {
+                iso_literal_text: entrypoint_declaration_info.iso_literal_text,
+                directive_set: entrypoint_declaration_info.entrypoint_directive_set,
+            })
+        })();
+
+        let key = (
+            entrypoint_declaration_info.parent_type.item.0,
+            entrypoint_declaration_info.client_field_name.item.0,
+        );
+
+        match out.entry(key) {
+            Entry::Occupied(mut occupied_entry) => {
+                let existing_result = occupied_entry.get_mut();
+
+                // TODO we shouldn't validate this here. We can still productively use the entrypoint, even without
+                // a consistent entrypoint set. But that is a theoretical problem, as of right now, it makes no
+                // difference.
+                // confirm that they have the same directives
+                if let (Ok(existing_entrypoint), Ok(new_entrypoint)) =
+                    (existing_result.as_ref(), value.as_ref())
+                {
+                    if existing_entrypoint.directive_set != new_entrypoint.directive_set {
+                        *existing_result =
+                            Err(ValidatedEntrypointError::LazyLoadInconsistentEntrypoint)
+                    }
+                }
+            }
+            Entry::Vacant(vacant_entry) => {
+                vacant_entry.insert(value);
+            }
+        }
+    }
+
+    out
 }
 
 #[derive(Error, Clone, Debug, Eq, PartialEq)]
@@ -132,4 +145,9 @@ pub enum ValidatedEntrypointError<TNetworkProtocol: NetworkProtocol> {
         selectable_name: ClientScalarSelectableName,
         actual_type: &'static str,
     },
+
+    #[error(
+        "Entrypoint declared lazy in one location and declared eager in another location. Entrypoint must be either lazy or non-lazy in all instances."
+    )]
+    LazyLoadInconsistentEntrypoint,
 }
