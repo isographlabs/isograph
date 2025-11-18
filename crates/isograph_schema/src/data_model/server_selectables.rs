@@ -10,7 +10,7 @@ use isograph_lang_types::{
 
 use crate::{NetworkProtocol, SelectableTrait, ServerEntityName, ServerObjectSelectableVariant};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
     pub name: WithLocation<ServerScalarSelectableName>,

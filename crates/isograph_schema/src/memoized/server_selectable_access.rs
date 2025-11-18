@@ -1,12 +1,15 @@
 use std::collections::HashMap;
 
 use common_lang_types::{ServerObjectEntityName, ServerSelectableName};
+use isograph_lang_types::SelectionType;
+use pico::MemoRef;
 use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
-    FieldToInsertToServerSelectableError, IsographDatabase, NetworkProtocol, OwnedServerSelectable,
-    ServerObjectSelectable, ServerScalarSelectable, field_to_insert_to_server_selectable,
+    FieldToInsertToServerSelectableError, ID_FIELD_NAME, IsographDatabase, NetworkProtocol,
+    OwnedServerSelectable, ServerObjectSelectable, ServerScalarSelectable,
+    field_to_insert_to_server_selectable,
 };
 
 type OwnedSelectableResult<TNetworkProtocol> =
@@ -114,6 +117,39 @@ pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol>(
             }
         }
         None => Ok(None),
+    }
+}
+
+#[memo]
+pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    parent_server_object_entity_name: ServerObjectEntityName,
+) -> Result<
+    Option<MemoRef<ServerScalarSelectable<TNetworkProtocol>>>,
+    ServerSelectableNamedError<TNetworkProtocol>,
+> {
+    let selectable = server_selectable_named(
+        db,
+        parent_server_object_entity_name,
+        (*ID_FIELD_NAME).into(),
+    )
+    .as_ref()
+    .map_err(|e| e.clone())?;
+
+    let selectable = match selectable {
+        Some(s) => s.as_ref().map_err(|e| e.clone())?,
+        None => return Ok(None),
+    };
+
+    // TODO check if it is a client field...
+    match selectable {
+        SelectionType::Scalar(s) => Ok(Some(db.intern_ref(s))),
+        SelectionType::Object(_) => Err(ServerSelectableNamedError::IncorrectType {
+            parent_object_entity_name: parent_server_object_entity_name,
+            selectable_name: (*ID_FIELD_NAME).into(),
+            expected_type: "a scalar",
+            actual_type: "an object",
+        }),
     }
 }
 

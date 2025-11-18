@@ -13,7 +13,7 @@ use graphql_lang_types::{
 
 /// This is annoying! We should find a better way to model lists.
 /// This gets us closer to a good solution, so it's fine.
-#[derive(PartialEq, PartialOrd, Ord, Eq, Clone, Debug)]
+#[derive(PartialEq, PartialOrd, Ord, Eq, Clone, Debug, Hash)]
 pub enum TypeAnnotation<TInner> {
     Scalar(TInner),
     Union(UnionTypeAnnotation<TInner>),
@@ -122,7 +122,7 @@ impl<TInner: Ord> TypeAnnotation<TInner> {
     // TODO implement as_ref
 }
 
-#[derive(Default, Ord, PartialEq, PartialOrd, Eq, Clone, Debug)]
+#[derive(Default, Ord, PartialEq, PartialOrd, Eq, Clone, Debug, Hash)]
 pub struct UnionTypeAnnotation<TInner> {
     pub variants: BTreeSet<UnionVariant<TInner>>,
     // TODO this is incredibly hacky. null should be in the variants set, but
@@ -179,7 +179,7 @@ impl<TInner: Ord> UnionTypeAnnotation<TInner> {
     }
 }
 
-#[derive(Ord, PartialEq, PartialOrd, Eq, Clone, Debug)]
+#[derive(Ord, PartialEq, PartialOrd, Eq, Clone, Debug, Hash)]
 pub enum UnionVariant<TInner> {
     Scalar(TInner),
     Plural(TypeAnnotation<TInner>),
