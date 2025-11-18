@@ -35,7 +35,7 @@ import {
 import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
 import {
-  getStoreRecordProxy,
+  getMutableStoreRecordProxy,
   type StoreLayerWithData,
 } from './optimisticProxy';
 import { wrapPromise, wrapResolvedValue } from './PromiseWrapper';
@@ -172,7 +172,7 @@ export function normalizeData(
     variables,
   }));
 
-  const newStoreRecord = getStoreRecordProxy(storeLayer, root);
+  const newStoreRecord = getMutableStoreRecordProxy(storeLayer, root);
 
   normalizeDataIntoRecord(
     environment,
@@ -701,7 +701,7 @@ function normalizeNetworkResponseObject(
   }
 
   const link = { __link: newStoreRecordId, __typename };
-  const newStoreRecord = getStoreRecordProxy(storeLayer, link);
+  const newStoreRecord = getMutableStoreRecordProxy(storeLayer, link);
 
   normalizeDataIntoRecord(
     environment,

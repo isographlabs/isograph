@@ -21,8 +21,8 @@ import {
 import { logMessage } from './logging';
 import {
   addStartUpdateStoreLayer,
+  getMutableStoreRecordProxy,
   getOrInsertRecord,
-  getStoreRecordProxy,
   type StartUpdateStoreLayer,
   type StoreLayer,
 } from './optimisticProxy';
@@ -183,6 +183,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
   mutableState: MutableInvalidationState,
   mutableUpdatedIds: EncounteredIds,
 ): ReadDataResultSuccess<ExtractUpdatableData<TReadFromStore>> {
+  const storeRecord = getMutableStoreRecordProxy(storeLayer, root);
   let target: { [index: string]: any } = {};
 
   for (const field of ast) {
@@ -195,7 +196,6 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
           field.alias ?? field.fieldName,
           mutableState,
           () => {
-            const storeRecord = getStoreRecordProxy(storeLayer, root);
             const data = readScalarFieldData(
               field,
               storeRecord,
@@ -228,7 +228,6 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
           field.alias ?? field.fieldName,
           mutableState,
           () => {
-            const storeRecord = getStoreRecordProxy(storeLayer, root);
             const data = readLinkedFieldData(
               environment,
               field,

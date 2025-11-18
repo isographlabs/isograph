@@ -42,6 +42,13 @@ export function check(
 ): CheckResult {
   const newStoreRecord = getStoreRecordProxy(environment.store, root);
 
+  if (newStoreRecord == null) {
+    return {
+      kind: 'MissingData',
+      record: root,
+    };
+  }
+
   const checkResult = checkFromRecord(
     environment,
     normalizationAst,

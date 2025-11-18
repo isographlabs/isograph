@@ -27,23 +27,37 @@ export function getOrInsertRecord(
 export function getStoreRecordProxy(
   storeLayer: StoreLayer,
   link: StoreLink,
-): StoreRecord {
+): Readonly<StoreRecord> | null | undefined {
   let startNode: StoreLayer | null = storeLayer;
   while (startNode !== null) {
     const storeRecord = startNode.data[link.__typename]?.[link.__link];
+    if (storeRecord === null) {
+      return null;
+    }
     if (storeRecord != null) {
-      break;
+      return getMutableStoreRecordProxy(startNode, link);
     }
     startNode = startNode.parentStoreLayer;
   }
+
+  return undefined;
+}
+
+export function getMutableStoreRecordProxy(
+  storeLayer: StoreLayer,
+  link: StoreLink,
+): StoreRecord {
   return new Proxy<StoreRecord>(
     {},
     {
       get(_, p) {
-        let node = startNode;
+        let node: StoreLayer | null = storeLayer;
 
         while (node !== null) {
           const storeRecord = node.data[link.__typename]?.[link.__link];
+          if (storeRecord === null) {
+            return undefined;
+          }
           if (storeRecord != null) {
             const value = Reflect.get(storeRecord, p);
             if (value !== undefined) {
@@ -54,10 +68,13 @@ export function getStoreRecordProxy(
         }
       },
       has(_, p) {
-        let node = startNode;
+        let node: StoreLayer | null = storeLayer;
 
         while (node !== null) {
           const storeRecord = node.data[link.__typename]?.[link.__link];
+          if (storeRecord === null) {
+            return false;
+          }
           if (storeRecord != null) {
             const value = Reflect.has(storeRecord, p);
             if (value !== undefined) {
@@ -69,7 +86,6 @@ export function getStoreRecordProxy(
         return false;
       },
       set(_, p, newValue) {
-        startNode = storeLayer;
         return Reflect.set(
           getOrInsertRecord(storeLayer.data, link),
           p,
@@ -156,9 +172,13 @@ function mergeDataLayer(target: StoreLayerData, source: StoreLayerData): void {
       continue;
     }
     const targetRecordById = (target[typeName] ??= {});
-    for (const [id, source] of Object.entries(sourceById)) {
+    for (const [id, sourceRecord] of Object.entries(sourceById)) {
+      if (sourceRecord === null) {
+        targetRecordById[id] = null;
+        continue;
+      }
       const targetRecord = (targetRecordById[id] ??= {});
-      Object.assign(targetRecord, source);
+      Object.assign(targetRecord, sourceRecord);
     }
   }
 }
