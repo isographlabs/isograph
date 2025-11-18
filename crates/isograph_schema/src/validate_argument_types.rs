@@ -16,8 +16,8 @@ use isograph_lang_types::{
 
 use crate::{
     BOOLEAN_ENTITY_NAME, FLOAT_ENTITY_NAME, ID_ENTITY_NAME, INT_ENTITY_NAME, IsographDatabase,
-    NetworkProtocol, STRING_ENTITY_NAME, ServerEntityData, ServerEntityName,
-    ValidatedVariableDefinition, server_selectables_map,
+    NetworkProtocol, STRING_ENTITY_NAME, ServerEntityName, ValidatedVariableDefinition,
+    server_selectables_map,
 };
 
 fn graphql_type_to_non_null_type<TValue>(
@@ -127,7 +127,6 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
     field_argument_definition_type: &GraphQLTypeAnnotation<ServerEntityName>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-    schema_data: &ServerEntityData,
 ) -> ValidateArgumentTypesResult<(), TNetworkProtocol> {
     match &selection_supplied_argument_value.item {
         NonConstantValue::Variable(variable_name) => {
@@ -232,7 +231,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
         NonConstantValue::List(list) => {
             match graphql_type_to_non_null_type(field_argument_definition_type.clone()) {
                 GraphQLNonNullTypeAnnotation::List(list_type) => {
-                    list_satisfies_type(db, list, list_type, variable_definitions, schema_data)
+                    list_satisfies_type(db, list, list_type, variable_definitions)
                 }
                 GraphQLNonNullTypeAnnotation::Named(_) => Err(WithLocation::new(
                     ValidateArgumentTypesError::ExpectedTypeFoundList {
@@ -267,7 +266,6 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                         db,
                         selection_supplied_argument_value,
                         variable_definitions,
-                        schema_data,
                         object_literal,
                         object_entity_name,
                     ),
@@ -281,7 +279,6 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
     variable_definitions: &[WithSpan<VariableDefinition<ServerEntityName>>],
-    server_entity_data: &ServerEntityData,
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     object_entity_name: ServerObjectEntityName,
 ) -> Result<(), WithLocation<ValidateArgumentTypesError<TNetworkProtocol>>> {
@@ -304,7 +301,6 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                     &selection_supplied_argument_value.value,
                     field_type_annotation,
                     variable_definitions,
-                    server_entity_data,
                 ) {
                     Ok(_) => None,
                     Err(e) => Some(Err(e)),
@@ -475,10 +471,9 @@ fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     list: &[WithLocation<NonConstantValue>],
     list_type: GraphQLListTypeAnnotation<ServerEntityName>,
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
-    schema_data: &ServerEntityData,
 ) -> ValidateArgumentTypesResult<(), TNetworkProtocol> {
     list.iter().try_for_each(|element| {
-        value_satisfies_type(db, element, &list_type.0, variable_definitions, schema_data)
+        value_satisfies_type(db, element, &list_type.0, variable_definitions)
     })
 }
 

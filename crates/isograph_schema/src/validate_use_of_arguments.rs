@@ -15,10 +15,9 @@ use thiserror::Error;
 
 use crate::{
     ClientScalarOrObjectSelectable, IsographDatabase, MemoizedIsoLiteralError, NetworkProtocol,
-    Schema, ValidatedVariableDefinition, client_object_selectable_named,
-    client_scalar_selectable_named, client_selectable_map,
-    selectable_validated_reader_selection_set, server_object_selectable_named,
-    server_scalar_selectable_named,
+    ValidatedVariableDefinition, client_object_selectable_named, client_scalar_selectable_named,
+    client_selectable_map, selectable_validated_reader_selection_set,
+    server_object_selectable_named, server_scalar_selectable_named,
     validate_argument_types::{ValidateArgumentTypesError, value_satisfies_type},
     visit_selection_set::visit_selection_set,
 };
@@ -41,7 +40,6 @@ lazy_static! {
 /// fields that point to client objects.)
 pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    validated_schema: &Schema,
 ) -> Result<(), Vec<WithLocation<ValidateUseOfArgumentsError<TNetworkProtocol>>>> {
     let mut errors = vec![];
 
@@ -51,12 +49,7 @@ pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
         .iter()
         .flat_map(|(_, value)| value.as_ref().ok())
     {
-        validate_use_of_arguments_for_client_type(
-            db,
-            validated_schema,
-            client_selectable.as_ref(),
-            &mut errors,
-        );
+        validate_use_of_arguments_for_client_type(db, client_selectable.as_ref(), &mut errors);
     }
 
     if errors.is_empty() {
@@ -68,7 +61,6 @@ pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
 
 fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     client_type: impl ClientScalarOrObjectSelectable,
     errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError<TNetworkProtocol>>>,
 ) {
@@ -141,7 +133,6 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
 
             validate_use_of_arguments_impl(
                 db,
-                schema,
                 errors,
                 &mut reachable_variables,
                 field_argument_definitions,
@@ -205,7 +196,6 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
 
             validate_use_of_arguments_impl(
                 db,
-                schema,
                 errors,
                 &mut reachable_variables,
                 field_argument_definitions,
@@ -232,7 +222,6 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
 #[expect(clippy::too_many_arguments)]
 fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    schema: &Schema,
     errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError<TNetworkProtocol>>>,
     reachable_variables: &mut BTreeSet<VariableName>,
     field_argument_definitions: Vec<ValidatedVariableDefinition>,
@@ -258,7 +247,6 @@ fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
                         &selection_supplied_argument.item.value,
                         &field_argument_definition.type_,
                         client_type_variable_definitions,
-                        &schema.server_entity_data,
                     )
                     .map_err(|with_location| with_location.map(|e| e.into())),
                 );

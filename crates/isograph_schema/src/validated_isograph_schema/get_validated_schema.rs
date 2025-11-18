@@ -38,7 +38,7 @@ pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol>(
     }
 
     let stats = process_iso_literals_for_schema(db, unprocessed_selection_sets)?;
-    validate_use_of_arguments(db, &unvalidated_isograph_schema)?;
+    validate_use_of_arguments(db)?;
     Ok((unvalidated_isograph_schema, stats))
 }
 
