@@ -25,7 +25,7 @@ use isograph_schema::{
     client_selectable_map, client_selectable_named, description, fetchable_types,
     inline_fragment_reader_selection_set, output_type_annotation, selectable_named,
     selection_map_wrapped, server_object_entity_named, server_object_selectable_named,
-    server_scalar_entity_javascript_name, server_scalar_selectable_named,
+    server_scalar_entity_javascript_name, server_scalar_selectable_named, validated_entrypoints,
     validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 use isograph_schema::{ContainsIsoStats, GetValidatedSchemaError, get_validated_schema};
@@ -151,8 +151,12 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
 
     // For each entrypoint, generate an entrypoint artifact and refetch artifacts
     for ((parent_object_entity_name, entrypoint_selectable_name), entrypoint_info) in
-        &schema.entrypoints
+        validated_entrypoints(db)
     {
+        let entrypoint_info = entrypoint_info
+            .as_ref()
+            .expect("Expected entrypoints to be validated");
+
         let entrypoint_path_and_content = generate_entrypoint_artifacts(
             db,
             schema,
