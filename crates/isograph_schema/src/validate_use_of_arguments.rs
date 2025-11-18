@@ -472,7 +472,7 @@ pub enum ValidateUseOfArgumentsError<TNetworkProtocol: NetworkProtocol> {
     #[error("{message}")]
     ValidateArgumentType {
         #[from]
-        message: ValidateArgumentTypesError,
+        message: ValidateArgumentTypesError<TNetworkProtocol>,
     },
 
     #[error("{0}")]
