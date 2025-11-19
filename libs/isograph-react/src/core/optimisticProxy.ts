@@ -54,46 +54,46 @@ export function getMutableStoreRecordProxy(
   return new Proxy<StoreRecord>(
     {},
     {
-      get(_, p) {
-        let storeLayerToSearchFrom =
+      get(_, propertyName) {
+        let currentStoreLayer =
           firstStoreLayerWithRecord === undefined
-            ? findFirstStoreLayerWithData(childMostStoreLayer, link)
+            ? findFirstStoreLayerWithRecord(childMostStoreLayer, link)
             : firstStoreLayerWithRecord;
 
-        while (storeLayerToSearchFrom !== null) {
+        while (currentStoreLayer !== null) {
           const storeRecord =
-            storeLayerToSearchFrom.data[link.__typename]?.[link.__link];
+            currentStoreLayer.data[link.__typename]?.[link.__link];
           if (storeRecord === null) {
             return undefined;
           }
           if (storeRecord != null) {
-            const value = Reflect.get(storeRecord, p);
+            const value = Reflect.get(storeRecord, propertyName);
             if (value !== undefined) {
               return value;
             }
           }
-          storeLayerToSearchFrom = storeLayerToSearchFrom.parentStoreLayer;
+          currentStoreLayer = currentStoreLayer.parentStoreLayer;
         }
       },
-      has(_, p) {
-        let storeLayerToSearchFrom =
+      has(_, propertyName) {
+        let currentStoreLayer =
           firstStoreLayerWithRecord === undefined
-            ? findFirstStoreLayerWithData(childMostStoreLayer, link)
+            ? findFirstStoreLayerWithRecord(childMostStoreLayer, link)
             : firstStoreLayerWithRecord;
 
-        while (storeLayerToSearchFrom !== null) {
+        while (currentStoreLayer !== null) {
           const storeRecord =
-            storeLayerToSearchFrom.data[link.__typename]?.[link.__link];
+            currentStoreLayer.data[link.__typename]?.[link.__link];
           if (storeRecord === null) {
             return false;
           }
           if (storeRecord != null) {
-            const value = Reflect.has(storeRecord, p);
+            const value = Reflect.has(storeRecord, propertyName);
             if (value !== undefined) {
               return true;
             }
           }
-          storeLayerToSearchFrom = storeLayerToSearchFrom.parentStoreLayer;
+          currentStoreLayer = currentStoreLayer.parentStoreLayer;
         }
         return false;
       },
@@ -529,7 +529,7 @@ function compareData(
  * Starting from the childMost layer, search in the parent-wise direction,
  * until we find a layer containing a record corresponding to link.
  */
-function findFirstStoreLayerWithData(
+function findFirstStoreLayerWithRecord(
   childMostStoreLayer: StoreLayer | null,
   link: StoreLink,
 ): StoreLayer | null {
