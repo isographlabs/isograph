@@ -47,19 +47,11 @@ export function getMutableStoreRecordProxy(
   childMostStoreLayer: StoreLayer,
   link: StoreLink,
 ): StoreRecord {
-  // Note: this is lazily initialized, to optimize for the (common?) case where
-  // the first thing we do is assign a value.
-  let firstStoreLayerWithRecord: StoreLayer | undefined | null = undefined;
-
   return new Proxy<StoreRecord>(
     {},
     {
       get(_, propertyName) {
-        let currentStoreLayer =
-          firstStoreLayerWithRecord === undefined
-            ? findFirstStoreLayerWithRecord(childMostStoreLayer, link)
-            : firstStoreLayerWithRecord;
-
+        let currentStoreLayer: StoreLayer | null = childMostStoreLayer;
         while (currentStoreLayer !== null) {
           const storeRecord =
             currentStoreLayer.data[link.__typename]?.[link.__link];
@@ -76,11 +68,7 @@ export function getMutableStoreRecordProxy(
         }
       },
       has(_, propertyName) {
-        let currentStoreLayer =
-          firstStoreLayerWithRecord === undefined
-            ? findFirstStoreLayerWithRecord(childMostStoreLayer, link)
-            : firstStoreLayerWithRecord;
-
+        let currentStoreLayer: StoreLayer | null = childMostStoreLayer;
         while (currentStoreLayer !== null) {
           const storeRecord =
             currentStoreLayer.data[link.__typename]?.[link.__link];
@@ -98,10 +86,6 @@ export function getMutableStoreRecordProxy(
         return false;
       },
       set(_, p, newValue) {
-        // Because we are setting a value on the childMost layer, that becomes
-        // the first layer with a record corresponding to link.
-        firstStoreLayerWithRecord = childMostStoreLayer;
-
         return Reflect.set(
           getOrInsertRecord(childMostStoreLayer.data, link),
           p,
@@ -523,22 +507,4 @@ function compareData(
       encounteredIds.get(typeName)?.delete(id);
     }
   }
-}
-
-/**
- * Starting from the childMost layer, search in the parent-wise direction,
- * until we find a layer containing a record corresponding to link.
- */
-function findFirstStoreLayerWithRecord(
-  childMostStoreLayer: StoreLayer | null,
-  link: StoreLink,
-): StoreLayer | null {
-  let currentStoreLayer: StoreLayer | null = childMostStoreLayer;
-  while (
-    currentStoreLayer != null &&
-    currentStoreLayer.data[link.__typename]?.[link.__link] == null
-  ) {
-    currentStoreLayer = currentStoreLayer.parentStoreLayer;
-  }
-  return currentStoreLayer;
 }
