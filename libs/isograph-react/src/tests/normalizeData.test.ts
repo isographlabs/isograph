@@ -4,7 +4,7 @@ import {
   createIsographEnvironment,
   createIsographStore,
   ROOT_ID,
-  type IsographStore,
+  type BaseStoreLayerData,
 } from '../core/IsographEnvironment';
 import {
   readButDoNotEvaluate,
@@ -35,12 +35,14 @@ describe('normalizeData', () => {
 
     normalizeData(
       environment,
+      environment.store,
       entrypoint.networkRequestInfo.normalizationAst.selections,
       {
         query: { node____id___v_id: { __typename: 'Economist', id: '1' } },
       },
       { id: '1' },
       { __link: ROOT_ID, __typename: entrypoint.concreteType },
+      new Map(),
     );
 
     expect(store).toStrictEqual({
@@ -62,13 +64,13 @@ describe('normalizeData', () => {
           },
         },
       },
-    } satisfies IsographStore);
+    } satisfies BaseStoreLayerData);
   });
 });
 
 describe('readData', () => {
   test('nested Query should be read', () => {
-    const store: IsographStore = {
+    const store: BaseStoreLayerData = {
       Economist: {
         '1': {
           __typename: 'Economist',

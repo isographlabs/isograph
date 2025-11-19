@@ -1,5 +1,5 @@
 import { ItemCleanupPair } from '@isograph/disposable-types';
-import { normalizeData } from './cache';
+import { callSubscriptions, normalizeData, type EncounteredIds } from './cache';
 import { check, DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
 import { getOrCreateCachedComponent } from './componentCache';
 import {
@@ -22,6 +22,7 @@ import {
 } from './garbageCollection';
 import { IsographEnvironment, ROOT_ID, StoreLink } from './IsographEnvironment';
 import { logMessage } from './logging';
+import { addNetworkResponseStoreLayer } from './optimisticProxy';
 import {
   AnyError,
   PromiseWrapper,
@@ -201,13 +202,25 @@ export function makeNetworkRequest<
 
       const root = { __link: ROOT_ID, __typename: artifact.concreteType };
       if (status.kind === 'Undisposed') {
+        const encounteredIds: EncounteredIds = new Map();
+        environment.store = addNetworkResponseStoreLayer(environment.store);
         normalizeData(
           environment,
+          environment.store,
           normalizationAst.selections,
           networkResponse.data ?? {},
           variables,
           root,
+          encounteredIds,
         );
+
+        logMessage(environment, () => ({
+          kind: 'AfterNormalization',
+          store: environment.store,
+          encounteredIds: encounteredIds,
+        }));
+
+        callSubscriptions(environment, encounteredIds);
       }
 
       const onComplete = fetchOptions?.onComplete;

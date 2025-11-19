@@ -5,11 +5,12 @@ import {
   assertLink,
   DataId,
   IsographEnvironment,
-  IsographStore,
   StoreRecord,
+  type StoreLayerData,
   type StoreLink,
   type TypeName,
 } from './IsographEnvironment';
+import type { StoreLayer } from './optimisticProxy';
 import {
   NOT_SET,
   type PromiseWrapper,
@@ -62,8 +63,6 @@ export function retainQuery(
 }
 
 export function garbageCollectEnvironment(environment: IsographEnvironment) {
-  const retainedIds: RetainedIds = {};
-
   const retainedQueries: RetainedQueryWithNormalizationAst[] = [];
   for (const query of environment.retainedQueries) {
     if (!isRetainedQueryWithNormalizationAst(query)) {
@@ -79,18 +78,31 @@ export function garbageCollectEnvironment(environment: IsographEnvironment) {
     retainedQueries.push(query);
   }
 
+  let node: StoreLayer | null = environment.store;
+  while (node !== null) {
+    garbageCollectLayer(retainedQueries, node.data);
+    node = node.parentStoreLayer;
+  }
+}
+
+export function garbageCollectLayer(
+  retainedQueries: RetainedQueryWithNormalizationAst[],
+  dataLayer: StoreLayerData,
+) {
+  const retainedIds: RetainedIds = {};
+
   for (const query of retainedQueries) {
-    recordReachableIds(environment.store, query, retainedIds);
+    recordReachableIds(dataLayer, query, retainedIds);
   }
 
-  for (const typeName in environment.store) {
-    const dataById = environment.store[typeName];
+  for (const typeName in dataLayer) {
+    const dataById = dataLayer[typeName];
     if (dataById == null) continue;
     const retainedTypeIds = retainedIds[typeName];
 
     // delete all objects
     if (retainedTypeIds == undefined || retainedTypeIds.size == 0) {
-      delete environment.store[typeName];
+      delete dataLayer[typeName];
       continue;
     }
 
@@ -101,7 +113,7 @@ export function garbageCollectEnvironment(environment: IsographEnvironment) {
     }
 
     if (Object.keys(dataById).length === 0) {
-      delete environment.store[typeName];
+      delete dataLayer[typeName];
     }
   }
 }
@@ -111,12 +123,12 @@ interface RetainedIds {
 }
 
 function recordReachableIds(
-  store: IsographStore,
+  dataLayer: StoreLayerData,
   retainedQuery: RetainedQueryWithNormalizationAst,
   mutableRetainedIds: RetainedIds,
 ) {
   const record =
-    store[retainedQuery.root.__typename]?.[retainedQuery.root.__link];
+    dataLayer[retainedQuery.root.__typename]?.[retainedQuery.root.__link];
 
   const retainedRecordsIds = (mutableRetainedIds[
     retainedQuery.root.__typename
@@ -125,7 +137,7 @@ function recordReachableIds(
 
   if (record) {
     recordReachableIdsFromRecord(
-      store,
+      dataLayer,
       record,
       mutableRetainedIds,
       retainedQuery.normalizationAst.result.value.selections,
@@ -135,7 +147,7 @@ function recordReachableIds(
 }
 
 function recordReachableIdsFromRecord(
-  store: IsographStore,
+  dataLayer: StoreLayerData,
   currentRecord: StoreRecord,
   mutableRetainedIds: RetainedIds,
   selections: NormalizationAstNodes,
@@ -164,7 +176,7 @@ function recordReachableIdsFromRecord(
 
         let typeStore =
           selection.concreteType !== null
-            ? store[selection.concreteType]
+            ? dataLayer[selection.concreteType]
             : null;
 
         if (typeStore == null && selection.concreteType !== null) {
@@ -174,7 +186,7 @@ function recordReachableIdsFromRecord(
         for (const nextRecordLink of links) {
           let __typename = nextRecordLink.__typename;
 
-          const resolvedTypeStore = typeStore ?? store[__typename];
+          const resolvedTypeStore = typeStore ?? dataLayer[__typename];
 
           if (resolvedTypeStore == null) {
             continue;
@@ -186,7 +198,7 @@ function recordReachableIdsFromRecord(
               new Set());
             retainedRecordsIds.add(nextRecordLink.__link);
             recordReachableIdsFromRecord(
-              store,
+              dataLayer,
               nextRecord,
               mutableRetainedIds,
               selection.selections,

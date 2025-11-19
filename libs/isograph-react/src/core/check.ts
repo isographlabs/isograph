@@ -8,6 +8,7 @@ import {
   StoreRecord,
 } from './IsographEnvironment';
 import { logMessage } from './logging';
+import { getStoreRecordProxy } from './optimisticProxy';
 
 export type ShouldFetch = RequiredShouldFetch | 'IfNecessary';
 export type RequiredShouldFetch = 'Yes' | 'No';
@@ -39,8 +40,14 @@ export function check(
   variables: Variables,
   root: StoreLink,
 ): CheckResult {
-  const recordsById = (environment.store[root.__typename] ??= {});
-  const newStoreRecord = (recordsById[root.__link] ??= {});
+  const newStoreRecord = getStoreRecordProxy(environment.store, root);
+
+  if (newStoreRecord == null) {
+    return {
+      kind: 'MissingData',
+      record: root,
+    };
+  }
 
   const checkResult = checkFromRecord(
     environment,
@@ -107,8 +114,7 @@ function checkFromRecord(
               );
             }
 
-            const linkedRecord =
-              environment.store[link.__typename]?.[link.__link];
+            const linkedRecord = getStoreRecordProxy(environment.store, link);
 
             if (linkedRecord === undefined) {
               return {
@@ -141,8 +147,7 @@ function checkFromRecord(
             );
           }
 
-          const linkedRecord =
-            environment.store[link.__typename]?.[link.__link];
+          const linkedRecord = getStoreRecordProxy(environment.store, link);
 
           if (linkedRecord === undefined) {
             return {
