@@ -44,17 +44,25 @@ export function getStoreRecordProxy(
 }
 
 export function getMutableStoreRecordProxy(
-  storeLayer: StoreLayer,
+  childMostStoreLayer: StoreLayer,
   link: StoreLink,
 ): StoreRecord {
+  // Note: this is lazily initialized, to optimize for the (common?) case where
+  // the first thing we do is assign a value.
+  let firstStoreLayerWithRecord: StoreLayer | undefined | null = undefined;
+
   return new Proxy<StoreRecord>(
     {},
     {
       get(_, p) {
-        let node: StoreLayer | null = storeLayer;
+        let storeLayerToSearchFrom =
+          firstStoreLayerWithRecord === undefined
+            ? findFirstStoreLayerWithData(childMostStoreLayer, link)
+            : firstStoreLayerWithRecord;
 
-        while (node !== null) {
-          const storeRecord = node.data[link.__typename]?.[link.__link];
+        while (storeLayerToSearchFrom !== null) {
+          const storeRecord =
+            storeLayerToSearchFrom.data[link.__typename]?.[link.__link];
           if (storeRecord === null) {
             return undefined;
           }
@@ -64,14 +72,18 @@ export function getMutableStoreRecordProxy(
               return value;
             }
           }
-          node = node.parentStoreLayer;
+          storeLayerToSearchFrom = storeLayerToSearchFrom.parentStoreLayer;
         }
       },
       has(_, p) {
-        let node: StoreLayer | null = storeLayer;
+        let storeLayerToSearchFrom =
+          firstStoreLayerWithRecord === undefined
+            ? findFirstStoreLayerWithData(childMostStoreLayer, link)
+            : firstStoreLayerWithRecord;
 
-        while (node !== null) {
-          const storeRecord = node.data[link.__typename]?.[link.__link];
+        while (storeLayerToSearchFrom !== null) {
+          const storeRecord =
+            storeLayerToSearchFrom.data[link.__typename]?.[link.__link];
           if (storeRecord === null) {
             return false;
           }
@@ -81,13 +93,17 @@ export function getMutableStoreRecordProxy(
               return true;
             }
           }
-          node = node.parentStoreLayer;
+          storeLayerToSearchFrom = storeLayerToSearchFrom.parentStoreLayer;
         }
         return false;
       },
       set(_, p, newValue) {
+        // Because we are setting a value on the childMost layer, that becomes
+        // the first layer with a record corresponding to link.
+        firstStoreLayerWithRecord = childMostStoreLayer;
+
         return Reflect.set(
-          getOrInsertRecord(storeLayer.data, link),
+          getOrInsertRecord(childMostStoreLayer.data, link),
           p,
           newValue,
         );
@@ -507,4 +523,22 @@ function compareData(
       encounteredIds.get(typeName)?.delete(id);
     }
   }
+}
+
+/**
+ * Starting from the childMost layer, search in the parent-wise direction,
+ * until we find a layer containing a record corresponding to link.
+ */
+function findFirstStoreLayerWithData(
+  childMostStoreLayer: StoreLayer | null,
+  link: StoreLink,
+): StoreLayer | null {
+  let currentStoreLayer: StoreLayer | null = childMostStoreLayer;
+  while (
+    currentStoreLayer != null &&
+    currentStoreLayer.data[link.__typename]?.[link.__link] == null
+  ) {
+    currentStoreLayer = currentStoreLayer.parentStoreLayer;
+  }
+  return currentStoreLayer;
 }

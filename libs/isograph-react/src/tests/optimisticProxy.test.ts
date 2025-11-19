@@ -62,7 +62,7 @@ describe('optimisticLayer', () => {
         getStoreRecordProxy(environment.store, {
           __link: '__ROOT',
           __typename: 'Query',
-        }).counter,
+        })?.counter,
       ).toBe(4);
     });
   });
@@ -86,7 +86,7 @@ describe('optimisticLayer', () => {
         getStoreRecordProxy(environment.store, {
           __link: '__ROOT',
           __typename: 'Query',
-        }).counter,
+        })?.counter,
       ).toBe(3);
     });
   });
@@ -101,7 +101,7 @@ describe('optimisticLayer', () => {
         getStoreRecordProxy(environment.store, {
           __link: '__ROOT',
           __typename: 'Query',
-        }).counter,
+        })?.counter,
       ).toBe(3);
     });
   });
@@ -233,7 +233,7 @@ describe('optimisticLayer', () => {
           getStoreRecordProxy(environment.store, {
             __link: '__ROOT',
             __typename: 'Query',
-          }).counter,
+          })?.counter,
         ).toBe(5);
       });
 
@@ -254,7 +254,7 @@ describe('optimisticLayer', () => {
           getStoreRecordProxy(environment.store, {
             __link: '__ROOT',
             __typename: 'Query',
-          }).counter,
+          })?.counter,
         ).toBe(12);
       });
 
@@ -279,7 +279,7 @@ describe('optimisticLayer', () => {
           getStoreRecordProxy(environment.store, {
             __link: '__ROOT',
             __typename: 'Query',
-          }).counter,
+          })?.counter,
         ).toBe(13);
       });
 
@@ -304,7 +304,7 @@ describe('optimisticLayer', () => {
           getStoreRecordProxy(environment.store, {
             __link: '__ROOT',
             __typename: 'Query',
-          }).counter,
+          })?.counter,
         ).toBe(16);
       });
 
@@ -328,7 +328,7 @@ describe('optimisticLayer', () => {
           getStoreRecordProxy(environment.store, {
             __link: '__ROOT',
             __typename: 'Query',
-          }).counter,
+          })?.counter,
         ).toBe(6);
       });
     });
@@ -358,7 +358,7 @@ describe('optimisticLayer', () => {
           getStoreRecordProxy(environment.store, {
             __link: '__ROOT',
             __typename: 'Query',
-          }).counter,
+          })?.counter,
         ).toBe(12);
       });
 
@@ -385,7 +385,7 @@ describe('optimisticLayer', () => {
           getStoreRecordProxy(environment.store, {
             __link: '__ROOT',
             __typename: 'Query',
-          }).counter,
+          })?.counter,
         ).toBe(12);
       });
 
@@ -413,7 +413,7 @@ describe('optimisticLayer', () => {
           getStoreRecordProxy(environment.store, {
             __link: '__ROOT',
             __typename: 'Query',
-          }).counter,
+          })?.counter,
         ).toBe(12);
       });
     });
@@ -442,7 +442,7 @@ describe('optimisticLayer', () => {
           getStoreRecordProxy(environment.store, {
             __link: '__ROOT',
             __typename: 'Query',
-          }).counter,
+          })?.counter,
         ).toBe(5);
       });
       test("doesn't merge child nodes if has parent nodes", () => {
@@ -472,7 +472,7 @@ describe('optimisticLayer', () => {
           getStoreRecordProxy(environment.store, {
             __link: '__ROOT',
             __typename: 'Query',
-          }).counter,
+          })?.counter,
         ).toBe(6);
       });
     });
@@ -539,7 +539,7 @@ describe('optimisticLayer', () => {
             getStoreRecordProxy(environment.store, {
               __link: '__ROOT',
               __typename: 'Query',
-            }).counter,
+            })?.counter,
           ).toBe(0);
         });
 
@@ -560,7 +560,7 @@ describe('optimisticLayer', () => {
             getStoreRecordProxy(environment.store, {
               __link: '__ROOT',
               __typename: 'Query',
-            }).counter,
+            })?.counter,
           ).toBe(12);
         });
 
@@ -585,7 +585,7 @@ describe('optimisticLayer', () => {
             getStoreRecordProxy(environment.store, {
               __link: '__ROOT',
               __typename: 'Query',
-            }).counter,
+            })?.counter,
           ).toBe(13);
         });
 
@@ -610,7 +610,7 @@ describe('optimisticLayer', () => {
             getStoreRecordProxy(environment.store, {
               __link: '__ROOT',
               __typename: 'Query',
-            }).counter,
+            })?.counter,
           ).toBe(15);
         });
 
@@ -634,7 +634,7 @@ describe('optimisticLayer', () => {
             getStoreRecordProxy(environment.store, {
               __link: '__ROOT',
               __typename: 'Query',
-            }).counter,
+            })?.counter,
           ).toBe(1);
         });
       });
@@ -664,7 +664,7 @@ describe('optimisticLayer', () => {
             getStoreRecordProxy(environment.store, {
               __link: '__ROOT',
               __typename: 'Query',
-            }).counter,
+            })?.counter,
           ).toBe(12);
         });
 
@@ -691,7 +691,7 @@ describe('optimisticLayer', () => {
             getStoreRecordProxy(environment.store, {
               __link: '__ROOT',
               __typename: 'Query',
-            }).counter,
+            })?.counter,
           ).toBe(12);
         });
 
@@ -719,7 +719,7 @@ describe('optimisticLayer', () => {
             getStoreRecordProxy(environment.store, {
               __link: '__ROOT',
               __typename: 'Query',
-            }).counter,
+            })?.counter,
           ).toBe(12);
         });
       });
@@ -745,7 +745,7 @@ describe('optimisticLayer', () => {
             getStoreRecordProxy(environment.store, {
               __link: '__ROOT',
               __typename: 'Query',
-            }).counter,
+            })?.counter,
           ).toBe(1);
         });
 
@@ -773,7 +773,7 @@ describe('optimisticLayer', () => {
             getStoreRecordProxy(environment.store, {
               __link: '__ROOT',
               __typename: 'Query',
-            }).counter,
+            })?.counter,
           ).toBe(2);
         });
       });
@@ -836,10 +836,11 @@ describe('optimisticLayer', () => {
     storeLayer: StoreLayer,
     value: (counter: number) => number,
   ): EncounteredIds => {
-    const { counter } = getStoreRecordProxy(storeLayer, {
-      __link: '__ROOT',
-      __typename: 'Query',
-    });
+    const { counter } =
+      getStoreRecordProxy(storeLayer, {
+        __link: '__ROOT',
+        __typename: 'Query',
+      }) ?? {};
     const nextCounter = value(Number(counter));
 
     ignoreReadonly(storeLayer).data = {
