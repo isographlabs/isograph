@@ -7,3 +7,6 @@ license = { workspace = true }
 
 [dependencies]
 common_lang_types = { path = "../common_lang_types" }
+
+[lints]
+workspace = true

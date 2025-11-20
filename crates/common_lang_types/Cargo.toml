@@ -11,3 +11,6 @@ string_key_newtype = { path = "../string_key_newtype" }
 pico = { path = "../pico" }
 serde = { workspace = true }
 pathdiff = { workspace = true }
+
+[lints]
+workspace = true

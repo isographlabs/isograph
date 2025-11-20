@@ -10,3 +10,6 @@ common_lang_types = { path = "../common_lang_types" }
 strum = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
+
+[lints]
+workspace = true

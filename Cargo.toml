@@ -67,3 +67,7 @@ codegen-units = 1
 opt-level = "s"
 # Strip debug symbols
 strip = "symbols"
+
+[workspace.lints.clippy]
+print_stderr = "deny"
+print_stdout = "deny"

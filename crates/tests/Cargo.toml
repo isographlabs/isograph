@@ -19,3 +19,6 @@ serde = { workspace = true }
 
 [dev-dependencies]
 graphql_schema_parser = { path = "../graphql_schema_parser" }
+
+[lints]
+workspace = true

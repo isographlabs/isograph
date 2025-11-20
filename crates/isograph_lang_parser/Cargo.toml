@@ -13,3 +13,6 @@ resolve_position = { path = "../resolve_position" }
 resolve_position_macros = { path = "../resolve_position_macros" }
 logos = { workspace = true }
 thiserror = { workspace = true }
+
+[lints]
+workspace = true

@@ -32,3 +32,6 @@ cc = "1.2"
 
 [dev-dependencies]
 tree-sitter = "0.25.8"
+
+[lints]
+workspace = true

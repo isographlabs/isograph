@@ -25,3 +25,6 @@ tracing-subscriber = { workspace = true }
 tracing-opentelemetry = { workspace = true }
 opentelemetry = { workspace = true }
 opentelemetry-otlp = { workspace = true }
+
+[lints]
+workspace = true
