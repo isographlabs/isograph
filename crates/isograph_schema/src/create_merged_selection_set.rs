@@ -109,7 +109,8 @@ fn get_variables(arguments: &[ArgumentKeyAndValue]) -> impl Iterator<Item = Vari
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct MergedScalarFieldSelection {
-    pub name: ScalarSelectableName,
+    pub parent_object_entity_name: ServerObjectEntityName,
+    pub name: ServerScalarSelectableName,
     pub arguments: Vec<ArgumentKeyAndValue>,
 }
 
@@ -311,6 +312,8 @@ fn transform_and_merge_child_selection_map_into_parent_map(
                 let transformed = match selection {
                     MergedServerSelection::ScalarField(scalar_field_selection) => {
                         MergedServerSelection::ScalarField(MergedScalarFieldSelection {
+                            parent_object_entity_name: scalar_field_selection
+                                .parent_object_entity_name,
                             name: scalar_field_selection.name,
                             arguments: transform_arguments_with_child_context(
                                 scalar_field_selection.arguments.into_iter(),
@@ -549,6 +552,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             parent_map,
                             variable_context,
                             merge_traversal_state,
+                            parent_object_entity.name.item,
                         );
                     }
                     DefinitionLocation::Client((
@@ -1359,6 +1363,7 @@ fn merge_server_scalar_field(
     parent_map: &mut MergedSelectionMap,
     variable_context: &VariableContext,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
+    parent_object_entity_name: ServerObjectEntityName,
 ) {
     if let ScalarSelectionDirectiveSet::Updatable(_) =
         scalar_field_selection.scalar_selection_directive_set
@@ -1401,7 +1406,8 @@ fn merge_server_scalar_field(
         Entry::Vacant(vacant_entry) => {
             vacant_entry.insert(MergedServerSelection::ScalarField(
                 MergedScalarFieldSelection {
-                    name: scalar_field_name,
+                    parent_object_entity_name,
+                    name: scalar_field_name.unchecked_conversion(),
                     arguments: transform_arguments_with_child_context(
                         scalar_field_selection
                             .arguments
@@ -1421,7 +1427,7 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
 ) {
     if parent_object_entity.concrete_type.is_none() {
-        maybe_add_typename_selection(merged_selection_map)
+        maybe_add_typename_selection(merged_selection_map, parent_object_entity.name.item)
     };
 
     let id_field = server_id_selectable(db, parent_object_entity.name)
@@ -1451,7 +1457,8 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
             Entry::Vacant(vacant_entry) => {
                 vacant_entry.insert(MergedServerSelection::ScalarField(
                     MergedScalarFieldSelection {
-                        name: id_field.lookup(db).name.item.into(),
+                        parent_object_entity_name: parent_object_entity.name.item,
+                        name: id_field.lookup(db).name.item,
                         arguments: vec![],
                     },
                 ));
@@ -1501,7 +1508,7 @@ pub fn selection_map_wrapped(
                 );
             }
             WrappedSelectionMapSelection::InlineFragment(isograph_object_type_name) => {
-                maybe_add_typename_selection(&mut inner_selection_map);
+                maybe_add_typename_selection(&mut inner_selection_map, isograph_object_type_name);
                 map.insert(
                     NormalizationKey::InlineFragment(isograph_object_type_name),
                     MergedServerSelection::InlineFragment(MergedInlineFragmentSelection {
@@ -1517,12 +1524,16 @@ pub fn selection_map_wrapped(
     inner_selection_map
 }
 
-fn maybe_add_typename_selection(selections: &mut MergedSelectionMap) {
+fn maybe_add_typename_selection(
+    selections: &mut MergedSelectionMap,
+    parent_object_entity_name: ServerObjectEntityName,
+) {
     // If a discriminator exists, this is a no-op
     selections.insert(
         NormalizationKey::Discriminator,
         MergedServerSelection::ScalarField(MergedScalarFieldSelection {
-            name: (*TYPENAME_FIELD_NAME).into(),
+            parent_object_entity_name,
+            name: *TYPENAME_FIELD_NAME,
             arguments: vec![],
         }),
     );
