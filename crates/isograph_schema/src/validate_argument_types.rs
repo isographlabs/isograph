@@ -17,7 +17,7 @@ use isograph_lang_types::{
 use crate::{
     BOOLEAN_ENTITY_NAME, FLOAT_ENTITY_NAME, ID_ENTITY_NAME, INT_ENTITY_NAME, IsographDatabase,
     NetworkProtocol, STRING_ENTITY_NAME, ServerEntityName, ValidatedVariableDefinition,
-    server_selectables_map,
+    server_selectables_map_for_entity,
 };
 
 fn graphql_type_to_non_null_type<TValue>(
@@ -335,7 +335,7 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
     server_object_entity_name: ServerObjectEntityName,
 ) -> Result<Vec<ObjectLiteralFieldType>, WithLocation<ValidateArgumentTypesError<TNetworkProtocol>>>
 {
-    let server_selectables = server_selectables_map(db, server_object_entity_name)
+    let server_selectables = server_selectables_map_for_entity(db, server_object_entity_name)
         .as_ref()
         .map_err(|e| {
             WithLocation::new(
@@ -400,7 +400,7 @@ fn validate_no_extraneous_fields<TNetworkProtocol: NetworkProtocol>(
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     location: Location,
 ) -> ValidateArgumentTypesResult<(), TNetworkProtocol> {
-    let object_fields = server_selectables_map(db, parent_server_object_entity_name)
+    let object_fields = server_selectables_map_for_entity(db, parent_server_object_entity_name)
         .as_ref()
         .map_err(|e| {
             WithLocation::new(

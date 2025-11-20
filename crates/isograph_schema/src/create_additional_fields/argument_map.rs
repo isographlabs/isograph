@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use crate::{
     IsographDatabase, NetworkProtocol, ServerEntityName, ServerSelectableId,
-    ValidatedVariableDefinition, server_selectables_vec,
+    ValidatedVariableDefinition, server_selectables_vec_for_entity,
 };
 
 use super::create_additional_fields_error::{
@@ -186,7 +186,7 @@ impl ModifiedArgument {
         let object = unmodified.type_.clone().map(|input_type_name| {
             match input_type_name {
                 ServerEntityName::Object(object_entity_name) => {
-                    let field_map = server_selectables_vec(db, object_entity_name)
+                    let field_map = server_selectables_vec_for_entity(db, object_entity_name)
                         .as_ref()
                         .expect(
                             "Expected parsing to have worked. \

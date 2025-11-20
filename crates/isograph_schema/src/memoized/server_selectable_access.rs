@@ -17,8 +17,9 @@ type OwnedSelectableResult<TNetworkProtocol> =
     Result<OwnedServerSelectable<TNetworkProtocol>, FieldToInsertToServerSelectableError>;
 
 /// A vector of all server selectables that are defined in the type system schema
+/// for a given entity
 #[memo]
-pub fn server_selectables_vec<TNetworkProtocol: NetworkProtocol>(
+pub fn server_selectables_vec_for_entity<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
 ) -> Result<
@@ -55,7 +56,7 @@ pub fn server_selectables_vec<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
+pub fn server_selectables_map_for_entity<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
 ) -> Result<
@@ -63,7 +64,7 @@ pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
     let server_selectables =
-        server_selectables_vec(db, parent_server_object_entity_name).to_owned()?;
+        server_selectables_vec_for_entity(db, parent_server_object_entity_name).to_owned()?;
     let mut map: HashMap<_, Vec<_>> = HashMap::new();
 
     for (name, item) in server_selectables {
@@ -82,7 +83,7 @@ pub fn server_selectables_named<TNetworkProtocol: NetworkProtocol>(
     Vec<OwnedSelectableResult<TNetworkProtocol>>,
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
-    let map = server_selectables_map(db, parent_server_object_entity_name)
+    let map = server_selectables_map_for_entity(db, parent_server_object_entity_name)
         .as_ref()
         .map_err(|e| e.clone())?;
 

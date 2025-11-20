@@ -7,7 +7,7 @@ use isograph_lang_types::{SelectionType, TypeAnnotation, UnionVariant};
 use isograph_schema::{
     IsographDatabase, NetworkProtocol, OwnedServerSelectable, ServerEntityName,
     server_object_selectable_named, server_scalar_entity_javascript_name,
-    server_scalar_selectable_named, server_selectables_vec,
+    server_scalar_selectable_named, server_selectables_vec_for_entity,
 };
 
 pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
@@ -54,12 +54,13 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
             // consider how to do this is a not obviously broken manner.
             let mut s = "{\n".to_string();
 
-            for (name, server_selectable) in server_selectables_vec(db, parent_object_entity_name)
-                .as_ref()
-                .expect(
-                    "Expected type system document to be valid. \
+            for (name, server_selectable) in
+                server_selectables_vec_for_entity(db, parent_object_entity_name)
+                    .as_ref()
+                    .expect(
+                        "Expected type system document to be valid. \
                     This is indicative of a bug in Isograph.",
-                )
+                    )
             {
                 let server_selectable = server_selectable.as_ref().expect(
                     "Expected selectable to be valid. \
