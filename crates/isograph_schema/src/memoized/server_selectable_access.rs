@@ -16,6 +16,48 @@ use crate::{
 type OwnedSelectableResult<TNetworkProtocol> =
     Result<OwnedServerSelectable<TNetworkProtocol>, FieldToInsertToServerSelectableError>;
 
+#[memo]
+pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+) -> Result<
+    HashMap<
+        ServerObjectEntityName,
+        Vec<(
+            ServerSelectableName,
+            OwnedSelectableResult<TNetworkProtocol>,
+        )>,
+    >,
+    TNetworkProtocol::ParseTypeSystemDocumentsError,
+> {
+    let (items, _fetchable_types) = TNetworkProtocol::parse_type_system_documents(db)
+        .as_ref()
+        .map_err(|e| e.clone())?;
+
+    Ok(items
+        .into_iter()
+        .flat_map(|selection_type| selection_type.as_ref().as_object())
+        .map(|object_outcome| {
+            let fields = object_outcome
+                .fields_to_insert
+                .iter()
+                .map(|field_to_insert| {
+                    (
+                        field_to_insert.item.name.item,
+                        field_to_insert_to_server_selectable(
+                            db,
+                            object_outcome.server_object_entity.item.name.item,
+                            field_to_insert,
+                        )
+                        .map(|x| x.map_scalar(|(scalar, _)| scalar)),
+                    )
+                })
+                .collect();
+
+            (object_outcome.server_object_entity.item.name.item, fields)
+        })
+        .collect())
+}
+
 /// A vector of all server selectables that are defined in the type system schema
 /// for a given entity
 #[memo]
