@@ -22,7 +22,7 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
     let mut errors = vec![];
 
     if let Err(e) = validate_use_of_arguments(db) {
-        errors.extend(e.into_iter().map(|e| ValidationError::from(e.item.clone())))
+        errors.extend(e.iter().map(|e| ValidationError::from(e.item.clone())))
     }
 
     if errors.is_empty() {
