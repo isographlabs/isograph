@@ -1,5 +1,6 @@
 use std::{collections::HashMap, ops::Deref};
 
+use prelude::Postfix;
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{Error, parse_macro_input, spanned::Spanned};
@@ -192,9 +193,11 @@ fn handle_case(
     ctor: fn(syn::Type) -> ResolveFieldInfoType,
 ) -> Result<ResolveFieldInfoTypeWrapper, proc_macro2::TokenStream> {
     if let Some(inner_type) = extract_single_generic_type(last_segment) {
-        Ok(ResolveFieldInfoTypeWrapper::None(Box::new(ctor(
-            replace_generics_in_type(inner_type.clone(), generics_map),
+        ResolveFieldInfoTypeWrapper::None(Box::new(ctor(replace_generics_in_type(
+            inner_type.clone(),
+            generics_map,
         ))))
+        .ok()
     } else {
         Err(Error::new_spanned(
             last_segment,
@@ -280,17 +283,18 @@ fn get_resolve_field_info(
 
     if let syn::Type::Path(syn::TypePath { path, .. }) = &field.ty {
         match parse_resolve_field_type(path, generics_map) {
-            Ok(field_type) => Ok(Some(ResolveFieldInfo {
+            Ok(field_type) => ResolveFieldInfo {
                 field_name,
                 field_type,
-            })),
+            }
+            .some()
+            .ok(),
             Err(e) => Err(e),
         }
     } else {
-        Err(
-            Error::new_spanned(&field.ty, "#[resolve_field] fields must be path types")
-                .to_compile_error(),
-        )
+        Error::new_spanned(&field.ty, "#[resolve_field] fields must be path types")
+            .to_compile_error()
+            .err()
     }
 }
 

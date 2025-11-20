@@ -2670,6 +2670,7 @@ name = "resolve_position_macros"
 version = "0.4.3"
 dependencies = [
  "deluxe",
+ "prelude",
  "proc-macro2",
  "quote",
  "syn 2.0.98",
@@ -3449,6 +3450,7 @@ dependencies = [
  "isograph_config",
  "once_cell",
  "pathdiff",
+ "prelude",
  "regex",
  "serde",
  "serde_json",

@@ -16,6 +16,7 @@ use lsp_types::{
     request::{Formatting, Request},
 };
 use pico_macros::memo;
+use prelude::Postfix;
 
 use crate::{lsp_runtime_error::LSPRuntimeResult, uri_file_path_ext::UriFilePathExt};
 
@@ -42,10 +43,10 @@ pub fn on_format<TNetworkProtocol: NetworkProtocol>(
 
     let extracted_items = extract_iso_literals_from_file_content(db, relative_path_to_source_file);
 
-    let text_edits = extracted_items
+    extracted_items
         .iter()
         .flat_map(|extraction| {
-            Some(TextEdit {
+            TextEdit {
                 range: get_range_of_extraction(extraction, content),
                 new_text: format_extraction(
                     db,
@@ -54,11 +55,12 @@ pub fn on_format<TNetworkProtocol: NetworkProtocol>(
                     current_working_directory,
                 )
                 .to_owned()?,
-            })
+            }
+            .some()
         })
-        .collect::<Vec<_>>();
-
-    Ok(Some(text_edits))
+        .collect::<Vec<_>>()
+        .some()
+        .ok()
 }
 
 fn get_range_of_extraction(extraction: &IsoLiteralExtraction, content: &str) -> Range {

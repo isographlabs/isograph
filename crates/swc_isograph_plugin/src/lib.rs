@@ -1,6 +1,7 @@
 use anyhow::{Result, bail};
 use isograph_config::{ConfigFileJavascriptModule, ISOGRAPH_FOLDER, IsographProjectConfig};
 use once_cell::sync::Lazy;
+use prelude::Postfix;
 use regex::Regex;
 use serde::Deserialize;
 use std::{
@@ -355,20 +356,20 @@ impl IsoLiteralCompilerVisitor<'_> {
         debug!("iso_template_literal: {:#?}", iso_template_literal);
 
         match iso_template_literal.artifact_type {
-            ArtifactType::Entrypoint => {
-                Ok(self.handle_valid_isograph_entrypoint_literal(iso_template_literal))
-            }
+            ArtifactType::Entrypoint => self
+                .handle_valid_isograph_entrypoint_literal(iso_template_literal)
+                .ok(),
             ArtifactType::Field => {
                 match fn_args {
                     Some(fn_args) => {
                         if let Some((first, [])) = fn_args.split_first() {
-                            return Ok(first.expr.as_ref().clone());
+                            return first.expr.as_ref().clone().ok();
                         }
                         // iso(...)(>args empty<) or iso(...)(first_arg, second_arg)
-                        return Err(IsographTransformError::IsoFnCallRequiresOneArg);
+                        return IsographTransformError::IsoFnCallRequiresOneArg.err();
                     }
                     // iso(...)>empty<
-                    None => Ok(build_arrow_identity_expr()),
+                    None => build_arrow_identity_expr().ok(),
                 }
             }
         }

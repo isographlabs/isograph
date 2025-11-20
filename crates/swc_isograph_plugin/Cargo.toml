@@ -16,6 +16,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 isograph_config = { path = "../isograph_config" }
+prelude = { path = "../prelude" }
 anyhow = { workspace = true }
 once_cell = { workspace = true }
 pathdiff = { workspace = true }
