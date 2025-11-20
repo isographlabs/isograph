@@ -20,13 +20,13 @@ use isograph_schema::{
     FieldTraversalResult, ID_ENTITY_NAME, IsographDatabase, LINK_FIELD_NAME, NameAndArguments,
     NetworkProtocol, NormalizationKey, RefetchStrategy, ScalarSelectableId, SelectableTrait,
     ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo, ValidatedSelection,
-    ValidatedVariableDefinition, WrappedSelectionMapSelection, accessible_client_fields,
-    client_object_selectable_named, client_scalar_selectable_named, client_selectable_map,
-    client_selectable_named, description, fetchable_types, inline_fragment_reader_selection_set,
-    output_type_annotation, selectable_named, selection_map_wrapped, server_object_entity_named,
-    server_object_selectable_named, server_scalar_entity_javascript_name,
-    server_scalar_selectable_named, validated_entrypoints,
-    validated_refetch_strategy_for_client_scalar_selectable_named,
+    ValidatedVariableDefinition, ValidationError, WrappedSelectionMapSelection,
+    accessible_client_fields, client_object_selectable_named, client_scalar_selectable_named,
+    client_selectable_map, client_selectable_named, description, fetchable_types,
+    inline_fragment_reader_selection_set, output_type_annotation, selectable_named,
+    selection_map_wrapped, server_object_entity_named, server_object_selectable_named,
+    server_scalar_entity_javascript_name, server_scalar_selectable_named, validate_entire_schema,
+    validated_entrypoints, validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 use isograph_schema::{ContainsIsoStats, GetValidatedSchemaError, get_validated_schema};
 use lazy_static::lazy_static;
@@ -115,6 +115,11 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
     GetArtifactPathAndContentError<TNetworkProtocol>,
 > {
     let config = db.get_isograph_config();
+
+    validate_entire_schema(db)
+        .to_owned()
+        .map_err(|e| GetArtifactPathAndContentError::ValidationError { messages: e })?;
+
     let validated_schema = get_validated_schema(db);
     let stats = match validated_schema {
         Ok(stats) => stats,
@@ -1468,4 +1473,15 @@ pub fn get_provided_arguments<'a>(
 pub enum GetArtifactPathAndContentError<TNetworkProtocol: NetworkProtocol> {
     #[error("{0}")]
     GetValidatedSchemaError(#[from] GetValidatedSchemaError<TNetworkProtocol>),
+
+    #[error(
+        "{}",
+        messages.iter().fold(String::new(), |mut output, x| {
+            output.push_str(&format!("\n\n{}", x));
+            output
+        })
+    )]
+    ValidationError {
+        messages: Vec<ValidationError<TNetworkProtocol>>,
+    },
 }

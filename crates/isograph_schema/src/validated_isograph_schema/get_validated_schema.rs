@@ -1,7 +1,7 @@
 use crate::{
     ContainsIsoStats, CreateAdditionalFieldsError, IsographDatabase, NetworkProtocol,
     ProcessIsoLiteralsForSchemaError, ValidateUseOfArgumentsError, create_new_exposed_field,
-    process_iso_literals_for_schema, validate_use_of_arguments,
+    process_iso_literals_for_schema,
     validated_isograph_schema::create_type_system_schema::{
         CreateSchemaError, create_type_system_schema_with_server_selectables,
     },
@@ -33,7 +33,6 @@ pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol>(
     }
 
     let stats = process_iso_literals_for_schema(db, unprocessed_selection_sets)?;
-    validate_use_of_arguments(db)?;
     Ok(stats)
 }
 

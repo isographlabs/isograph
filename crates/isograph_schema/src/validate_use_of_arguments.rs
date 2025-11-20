@@ -11,6 +11,7 @@ use isograph_lang_types::{
     SelectionType,
 };
 use lazy_static::lazy_static;
+use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
@@ -38,6 +39,7 @@ lazy_static! {
 /// This should not be validated here, and can be fixed with better modeling (i.e.
 /// have different associated data for fields that points to server objects and
 /// fields that point to client objects.)
+#[memo]
 pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<(), Vec<WithLocation<ValidateUseOfArgumentsError<TNetworkProtocol>>>> {
