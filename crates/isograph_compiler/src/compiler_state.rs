@@ -35,7 +35,9 @@ impl<TNetworkProtocol: NetworkProtocol> CompilerState<TNetworkProtocol> {
 
     pub fn run_garbage_collection(&mut self) {
         if self.last_gc_run.elapsed() >= Duration::from_secs(GC_DURATION_SECONDS) {
+            eprintln!("Running gc");
             self.db.run_garbage_collection();
+            eprintln!("done Running gc");
             self.last_gc_run = Instant::now();
         }
     }

@@ -22,6 +22,7 @@ impl<Db: Database> InternalStorage<Db> {
         &mut self,
         retained_derived_node_ids: impl Iterator<Item = DerivedNodeId>,
     ) {
+        eprintln!("running gc!");
         let mut derived_node_id_queue = retained_derived_node_ids.collect::<Vec<_>>();
 
         // We need to keep track of nodes that we have already processed, since one top-level retained node
