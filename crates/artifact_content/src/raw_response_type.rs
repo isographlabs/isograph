@@ -1,8 +1,14 @@
 use intern::Lookup;
-use isograph_schema::{MergedSelectionMap, MergedServerSelection, NetworkProtocol, Schema};
+use isograph_lang_types::TypeAnnotation;
+use isograph_schema::{
+    IsographDatabase, MergedSelectionMap, MergedServerSelection, NetworkProtocol,
+    TYPENAME_FIELD_NAME, server_scalar_entity_javascript_name, server_scalar_selectable_named,
+};
+
+use crate::generate_artifacts::print_javascript_type_declaration;
 
 pub fn generate_raw_response_type<TNetworkProtocol: NetworkProtocol>(
-    schema: &Schema<TNetworkProtocol>,
+    db: &IsographDatabase<TNetworkProtocol>,
     selection_map: &MergedSelectionMap,
     indentation_level: u8,
 ) -> String {
@@ -11,8 +17,8 @@ pub fn generate_raw_response_type<TNetworkProtocol: NetworkProtocol>(
     let mut raw_response_type = String::new();
     raw_response_type.push_str(&format!("{}{{\n", indent));
     generate_raw_response_type_inner(
+        db,
         &mut raw_response_type,
-        schema,
         selection_map,
         indentation_level + 1,
     );
@@ -21,8 +27,8 @@ pub fn generate_raw_response_type<TNetworkProtocol: NetworkProtocol>(
 }
 
 pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
     raw_response_type: &mut String,
-    schema: &Schema<TNetworkProtocol>,
     selection_map: &MergedSelectionMap,
     indentation_level: u8,
 ) {
@@ -37,7 +43,58 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
                     .as_deref()
                     .unwrap_or(scalar_field.name.lookup());
 
-                raw_response_type.push_str(&format!("{name}: unknown,\n"));
+                if scalar_field.name == *TYPENAME_FIELD_NAME {
+                    raw_response_type.push_str(&format!(
+                        "{name}: \"{}\",\n",
+                        scalar_field.parent_object_entity_name
+                    ));
+                    continue;
+                }
+
+                let server_scalar_selectable = server_scalar_selectable_named(
+                    db,
+                    scalar_field.parent_object_entity_name,
+                    scalar_field.name.into(),
+                )
+                .as_ref()
+                .expect(
+                    "Expected validation to have succeeded. \
+                            This is indicative of a bug in Isograph.",
+                )
+                .as_ref()
+                .expect(
+                    "Expected selectable to exist. \
+                            This is indicative of a bug in Isograph.",
+                );
+
+                let raw_type = server_scalar_selectable.target_scalar_entity.as_ref().map(
+                    &mut |scalar_entity_name| match server_scalar_selectable
+                        .javascript_type_override
+                    {
+                        Some(javascript_name) => javascript_name,
+                        None => server_scalar_entity_javascript_name(db, *scalar_entity_name)
+                            .as_ref()
+                            .expect(
+                                "Expected parsing to not have failed. \
+                                        This is indicative of a bug in Isograph.",
+                            )
+                            .expect(
+                                "Expected entity to exist. \
+                                        This is indicative of a bug in Isograph.",
+                            ),
+                    },
+                );
+
+                let is_optional = matches!(
+                    server_scalar_selectable.target_scalar_entity,
+                    TypeAnnotation::Union(_)
+                );
+
+                raw_response_type.push_str(&format!(
+                    "{name}{}: {},\n",
+                    if is_optional { "?" } else { "" },
+                    print_javascript_type_declaration(&raw_type)
+                ));
             }
             MergedServerSelection::LinkedField(linked_field) => {
                 raw_response_type.push_str(indent);
@@ -48,21 +105,25 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
                 raw_response_type.push_str(&format!("{name}: {{\n"));
 
                 generate_raw_response_type_inner(
+                    db,
                     raw_response_type,
-                    schema,
                     &linked_field.selection_map,
                     indentation_level + 1,
                 );
                 raw_response_type.push_str(&format!("{indent}}},\n"));
             }
             MergedServerSelection::ClientPointer(_) => {}
-            MergedServerSelection::InlineFragment(inline_fragment) => {
-                generate_raw_response_type_inner(
-                    raw_response_type,
-                    schema,
-                    &inline_fragment.selection_map,
-                    indentation_level,
-                );
+            MergedServerSelection::InlineFragment(_) => {
+                // TODO: support fragments
+                // given `...on A {} ... on B {} ... on C {}`
+                // and `type A implements C` and `type B implements C`
+                // output should be (A & C) | (B & C)
+                // generate_raw_response_type_inner(
+                //     db,
+                //     raw_response_type,
+                //     &inline_fragment.selection_map,
+                //     indentation_level,
+                // );
             }
         }
     }

@@ -287,7 +287,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         &directive_set,
     );
 
-    let raw_response_type = generate_raw_response_type(schema, merged_selection_map, 0);
+    let raw_response_type = generate_raw_response_type(db, merged_selection_map, 0);
 
     let mut path_and_contents = Vec::with_capacity(refetch_paths_with_variables.len() + 3);
     path_and_contents.push(ArtifactPathAndContent {
