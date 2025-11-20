@@ -68,6 +68,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
                 "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
             )
+            .lookup(db)
             .item;
     let FieldTraversalResult {
         traversal_state,
@@ -170,6 +171,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
                 "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
             )
+            .lookup(db)
             .item;
 
     let reachable_variables =
@@ -259,6 +261,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
             "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
         )
+        .lookup(db)
         .item;
 
     let operation_text = generate_operation_text(

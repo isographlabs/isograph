@@ -321,6 +321,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 "Expected entity to exist. \
                                     This is indicative of a bug in Isograph.",
                             )
+                            .lookup(db)
                             .item;
 
                             let variable_definitions_iter = client_scalar_selectable

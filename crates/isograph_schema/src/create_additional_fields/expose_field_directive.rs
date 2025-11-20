@@ -139,6 +139,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
                 "Expected entity to exist. \
             This is indicative of a bug in Isograph.",
             )
+            .lookup(db)
             .item
             .concrete_type;
 
@@ -215,6 +216,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
                             "Expected entity to exist. \
                                 This is indicative of a bug in Isograph.",
                         )
+                        .lookup(db)
                         .item
                         .name
                         .item,
@@ -388,6 +390,7 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
             "Expected entity to exist. \
             This is indicative of a bug in Isograph.",
         )
+        .lookup(db)
         .item
         .concrete_type;
 

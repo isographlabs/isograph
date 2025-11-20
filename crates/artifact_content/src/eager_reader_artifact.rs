@@ -53,6 +53,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
                 "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
             )
+            .lookup(db)
             .item;
 
     let (reader_ast, reader_imports) = generate_reader_ast(
@@ -212,6 +213,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
                 "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
             )
+            .lookup(db)
             .item;
 
     let concrete_type =
@@ -226,6 +228,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
                 "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
             )
+            .lookup(db)
             .item
             .name
             .item;
@@ -299,6 +302,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
     )
+    .lookup(db)
     .item;
 
     let mut param_type_imports = BTreeSet::new();
@@ -426,6 +430,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
                 "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
             )
+            .lookup(db)
             .item;
 
     let function_import_statement =
@@ -484,6 +489,7 @@ pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtoc
                 "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
             )
+            .lookup(db)
             .item;
 
     let client_field_output_type = generate_output_type(db, client_field);

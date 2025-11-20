@@ -5,10 +5,11 @@ use common_lang_types::{
     WithEmbeddedLocation, WithLocation, WithSpan,
 };
 use isograph_lang_types::{DefinitionLocation, Description, SelectionType};
+use pico::MemoRef;
 
 use crate::{ClientSelectableId, NetworkProtocol, ServerSelectableId};
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ServerScalarEntity<TNetworkProtocol: NetworkProtocol> {
     // TODO make this a WithLocation or just an Option<Description>
     pub description: Option<WithSpan<Description>>,
@@ -21,7 +22,7 @@ pub type SelectableId = DefinitionLocation<ServerSelectableId, ClientSelectableI
 
 pub type ServerObjectEntityAvailableSelectables = BTreeMap<SelectableName, SelectableId>;
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ServerObjectEntity<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
     pub name: WithEmbeddedLocation<ServerObjectEntityName>,
@@ -39,6 +40,11 @@ pub type ServerEntity<'a, TNetworkProtocol> = SelectionType<
 pub type OwnedServerEntity<TNetworkProtocol> = SelectionType<
     WithLocation<ServerScalarEntity<TNetworkProtocol>>,
     WithLocation<ServerObjectEntity<TNetworkProtocol>>,
+>;
+
+pub type RefServerEntity<TNetworkProtocol> = SelectionType<
+    MemoRef<WithLocation<ServerScalarEntity<TNetworkProtocol>>>,
+    MemoRef<WithLocation<ServerObjectEntity<TNetworkProtocol>>>,
 >;
 
 pub type ServerEntityName = SelectionType<ServerScalarEntityName, ServerObjectEntityName>;

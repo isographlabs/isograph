@@ -5,11 +5,12 @@ use common_lang_types::{
     WithLocation,
 };
 use isograph_lang_types::SelectionType;
+use pico::MemoRef;
 use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
-    IsographDatabase, NetworkProtocol, OwnedServerEntity, ServerEntityName, ServerObjectEntity,
+    IsographDatabase, NetworkProtocol, RefServerEntity, ServerEntityName, ServerObjectEntity,
     ServerScalarEntity,
 };
 
@@ -20,13 +21,12 @@ use crate::{
 fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
-    HashMap<UnvalidatedTypeName, Vec<OwnedServerEntity<TNetworkProtocol>>>,
+    HashMap<UnvalidatedTypeName, Vec<RefServerEntity<TNetworkProtocol>>>,
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
-    let (outcome, _) = match TNetworkProtocol::parse_type_system_documents(db) {
-        Ok(outcome) => outcome,
-        Err(e) => return Err(e.clone()),
-    };
+    let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db)
+        .as_ref()
+        .map_err(|e| e.clone())?;
 
     let mut server_entities: HashMap<_, Vec<_>> = HashMap::new();
 
@@ -35,11 +35,13 @@ fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
             SelectionType::Scalar(s) => server_entities
                 .entry(s.item.name.item.into())
                 .or_default()
-                .push(SelectionType::Scalar(s.clone())),
+                .push(SelectionType::Scalar(db.intern_ref(s))),
             SelectionType::Object(outcome) => server_entities
                 .entry(outcome.server_object_entity.item.name.item.into())
                 .or_default()
-                .push(SelectionType::Object(outcome.server_object_entity.clone())),
+                .push(SelectionType::Object(
+                    db.intern_ref(&outcome.server_object_entity),
+                )),
         }
     }
 
@@ -52,7 +54,7 @@ fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
 pub fn server_entities_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: UnvalidatedTypeName,
-) -> Result<Vec<OwnedServerEntity<TNetworkProtocol>>, TNetworkProtocol::ParseTypeSystemDocumentsError>
+) -> Result<Vec<RefServerEntity<TNetworkProtocol>>, TNetworkProtocol::ParseTypeSystemDocumentsError>
 {
     let map = server_entity_map(db).as_ref().map_err(|e| e.clone())?;
 
@@ -98,12 +100,13 @@ pub enum EntityAccessError<TNetworkProtocol: NetworkProtocol> {
     },
 }
 
+#[expect(clippy::type_complexity)]
 #[memo]
 pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_object_entity_name: ServerObjectEntityName,
 ) -> Result<
-    Option<WithLocation<ServerObjectEntity<TNetworkProtocol>>>,
+    Option<MemoRef<WithLocation<ServerObjectEntity<TNetworkProtocol>>>>,
     EntityAccessError<TNetworkProtocol>,
 > {
     let entities = server_entities_named(db, server_object_entity_name.into())
@@ -114,7 +117,7 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
         Some((first, rest)) => {
             if rest.is_empty() {
                 match first {
-                    SelectionType::Object(o) => Ok(Some(o.clone())),
+                    SelectionType::Object(o) => Ok(Some(*o)),
                     SelectionType::Scalar(_) => {
                         Err(EntityAccessError::IncorrectEntitySelectionType {
                             server_entity_name: server_object_entity_name.into(),
@@ -133,12 +136,13 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
+#[expect(clippy::type_complexity)]
 #[memo]
 pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_scalar_entity_name: ServerScalarEntityName,
 ) -> Result<
-    Option<WithLocation<ServerScalarEntity<TNetworkProtocol>>>,
+    Option<MemoRef<WithLocation<ServerScalarEntity<TNetworkProtocol>>>>,
     EntityAccessError<TNetworkProtocol>,
 > {
     let entities = server_entities_named(db, server_scalar_entity_name.into())
@@ -149,7 +153,7 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
         Some((first, rest)) => {
             if rest.is_empty() {
                 match first {
-                    SelectionType::Scalar(s) => Ok(Some(s.clone())),
+                    SelectionType::Scalar(s) => Ok(Some(*s)),
                     SelectionType::Object(_) => {
                         Err(EntityAccessError::IncorrectEntitySelectionType {
                             server_entity_name: server_scalar_entity_name.into(),
@@ -184,14 +188,14 @@ pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol>(
         None => return Ok(None),
     };
 
-    Ok(Some(entity.item.javascript_name))
+    Ok(Some(entity.lookup(db).item.javascript_name))
 }
 
 #[memo]
 pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     name: ServerEntityName,
-) -> Result<Option<OwnedServerEntity<TNetworkProtocol>>, EntityAccessError<TNetworkProtocol>> {
+) -> Result<Option<RefServerEntity<TNetworkProtocol>>, EntityAccessError<TNetworkProtocol>> {
     match name {
         SelectionType::Object(server_object_entity_name) => {
             let server_object_entity =

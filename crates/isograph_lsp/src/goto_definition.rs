@@ -8,7 +8,7 @@ use common_lang_types::{Span, relative_path_from_absolute_and_working_directory}
 use isograph_compiler::CompilerState;
 use isograph_lang_types::{
     ClientObjectSelectableNameWrapperParent, ClientScalarSelectableNameWrapperParent,
-    DefinitionLocation, IsographResolvedNode,
+    DefinitionLocation, IsographResolvedNode, SelectionType,
 };
 use isograph_schema::{
     IsoLiteralsSource, IsographDatabase, NetworkProtocol, client_object_selectable_named,
@@ -23,7 +23,6 @@ use lsp_types::{
     GotoDefinitionResponse, Position, Uri,
     request::{GotoDefinition, Request},
 };
-use pico_macros::memo;
 use resolve_position::ResolvePosition;
 
 pub fn on_goto_definition<TNetworkProtocol: NetworkProtocol>(
@@ -39,7 +38,7 @@ pub fn on_goto_definition<TNetworkProtocol: NetworkProtocol>(
     .to_owned()
 }
 
-#[memo]
+// #[memo]
 pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     url: Uri,
@@ -82,7 +81,12 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                         .flat_map(|entity| {
                             isograph_location_to_lsp_location(
                                 db,
-                                entity.location().as_embedded_location()?,
+                                (match entity {
+                                    SelectionType::Scalar(s) => SelectionType::Scalar(s.lookup(db)),
+                                    SelectionType::Object(o) => SelectionType::Object(o.lookup(db)),
+                                })
+                                .location()
+                                .as_embedded_location()?,
                                 &db.get_schema_source().content,
                             )
                         })

@@ -22,7 +22,7 @@ pub type ParseTypeSystemOutcome<TNetworkProtocol> = Vec<
 pub trait NetworkProtocol:
     Debug + Clone + Copy + Eq + PartialEq + Ord + PartialOrd + Hash + Default + Sized + 'static
 {
-    type SchemaObjectAssociatedData: Debug + PartialEq + Eq + Clone;
+    type SchemaObjectAssociatedData: Debug + PartialEq + Eq + Clone + Hash;
     type ParseTypeSystemDocumentsError: Error + PartialEq + Eq + Clone + 'static;
 
     // TODO this should return a Vec<Result<...>>, not a Result<Vec<...>>, probably

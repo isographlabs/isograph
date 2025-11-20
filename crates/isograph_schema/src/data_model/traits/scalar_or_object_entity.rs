@@ -43,7 +43,31 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
 }
 
 impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
+    for &ServerScalarEntity<TNetworkProtocol>
+{
+    fn name(&self) -> SelectionType<ServerScalarEntityName, ServerObjectEntityName> {
+        SelectionType::Scalar(self.name.item)
+    }
+
+    fn description(&self) -> Option<Description> {
+        self.description.map(|x| x.item)
+    }
+}
+
+impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
     for ServerObjectEntity<TNetworkProtocol>
+{
+    fn name(&self) -> SelectionType<ServerScalarEntityName, ServerObjectEntityName> {
+        SelectionType::Object(self.name.item)
+    }
+
+    fn description(&self) -> Option<Description> {
+        self.description
+    }
+}
+
+impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
+    for &ServerObjectEntity<TNetworkProtocol>
 {
     fn name(&self) -> SelectionType<ServerScalarEntityName, ServerObjectEntityName> {
         SelectionType::Object(self.name.item)
@@ -160,15 +184,17 @@ pub fn parent_object_entity_and_selectable<TNetworkProtocol: NetworkProtocol>(
     ),
     GetParentAndSelectableError<TNetworkProtocol>,
 > {
-    let parent_entity = server_object_entity_named(db, parent_server_object_entity_name.0)
+    let parent_entity = &server_object_entity_named(db, parent_server_object_entity_name.0)
         .to_owned()?
         .ok_or(GetParentAndSelectableError::ParentTypeNotDefined {
             parent_type_name: parent_server_object_entity_name,
         })?
+        .lookup(db)
         .item;
 
     match selectable_named(db, parent_server_object_entity_name.0, selectable_name).to_owned()? {
-        Some(selectable) => Ok((parent_entity, selectable)),
+        // TODO don't clone
+        Some(selectable) => Ok((parent_entity.clone(), selectable)),
         None => Err(GetParentAndSelectableError::FieldMustExist {
             parent_type_name: parent_server_object_entity_name,
             field_name: selectable_name,

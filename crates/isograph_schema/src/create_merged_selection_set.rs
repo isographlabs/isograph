@@ -615,6 +615,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             "Expected entity to exist. \
                             This is indicative of a bug in Isograph.",
                         )
+                        .lookup(db)
                         .item;
 
                 match object_selection.associated_data {
@@ -763,6 +764,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                                 "Expected entity to exist. \
                             This is indicative of a bug in Isograph.",
                             )
+                            .lookup(db)
                             .item;
 
                     let reader_selection_set =
@@ -861,6 +863,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         "Expected entity to exist. \
                         This is indicative of a bug in Isograph.",
                     )
+                    .lookup(db)
                     .item
                     .concrete_type;
 
@@ -1171,6 +1174,7 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
                 "Expected entity to exist. \
             This is indicative of a bug in Isograph.",
             )
+            .lookup(db)
             .item;
 
     let parent_object_entity_name = ClientOrServerObjectSelectable::parent_object_entity_name(

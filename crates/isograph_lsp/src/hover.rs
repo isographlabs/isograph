@@ -75,7 +75,9 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                     .as_ref()
                     .ok_or(LSPRuntimeError::ExpectedError)?;
 
-                Some(format_hover_for_entity(&server_object_entity.item))
+                Some(format_hover_for_entity(
+                    &server_object_entity.lookup(db).item,
+                ))
             }
             IsographResolvedNode::Description(_) => None,
             IsographResolvedNode::ScalarSelection(scalar_path) => {

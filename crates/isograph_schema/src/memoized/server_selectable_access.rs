@@ -169,7 +169,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     let options = &db.get_isograph_config().options;
 
     // And must have the right inner type
-    if target_scalar_entity.item.name.item != *ID_ENTITY_NAME {
+    if target_scalar_entity.lookup(db).item.name.item != *ID_ENTITY_NAME {
         options.on_invalid_id_type.on_failure(|| {
             ServerSelectableNamedError::IdFieldMustBeNonNullIdType {
                 strong_field_name: "id",

@@ -248,6 +248,15 @@ impl<TScalar, TObject> SelectionType<WithLocation<TScalar>, WithLocation<TObject
     }
 }
 
+impl<TScalar, TObject> SelectionType<&WithLocation<TScalar>, &WithLocation<TObject>> {
+    pub fn location(&self) -> Location {
+        match self {
+            SelectionType::Scalar(s) => s.location,
+            SelectionType::Object(o) => o.location,
+        }
+    }
+}
+
 // A blanket impl for SelectionType for ResolvedNode. Note that this will not work
 // in all circumstances, but because it requires that the Parent associated type
 // for both TScalar and TObject are the same. That will probably usually be the case,
