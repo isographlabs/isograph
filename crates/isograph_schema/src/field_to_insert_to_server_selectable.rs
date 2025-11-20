@@ -1,5 +1,6 @@
 use common_lang_types::{
-    SelectableName, ServerObjectEntityName, UnvalidatedTypeName, VariableName, WithLocation,
+    SelectableName, ServerObjectEntityName, ServerSelectableName, UnvalidatedTypeName,
+    VariableName, WithLocation,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLInputValueDefinition, GraphQLNamedTypeAnnotation, NameValuePair,
@@ -43,7 +44,9 @@ pub fn field_to_insert_to_server_selectable<TNetworkProtocol: NetworkProtocol>(
         )
         .ok_or(
             FieldToInsertToServerSelectableError::FieldTypenameDoesNotExist {
+                parent_object_entity_name,
                 target_entity_type_name: *target_entity_type_name,
+                selectable_name: server_field_to_insert.item.name.item,
             },
         )?;
 
@@ -108,8 +111,12 @@ pub fn field_to_insert_to_server_selectable<TNetworkProtocol: NetworkProtocol>(
 
 #[derive(Clone, Error, PartialEq, Eq, Debug)]
 pub enum FieldToInsertToServerSelectableError {
-    #[error("This field has type `{target_entity_type_name}`, which does not exist")]
+    #[error(
+        "The field `{parent_object_entity_name}.{selectable_name}` has inner type `{target_entity_type_name}`, which does not exist"
+    )]
     FieldTypenameDoesNotExist {
+        parent_object_entity_name: ServerObjectEntityName,
+        selectable_name: ServerSelectableName,
         target_entity_type_name: UnvalidatedTypeName,
     },
 

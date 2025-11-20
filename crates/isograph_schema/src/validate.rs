@@ -2,7 +2,8 @@ use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
-    IsographDatabase, NetworkProtocol, ValidateUseOfArgumentsError, validate_use_of_arguments,
+    FieldToInsertToServerSelectableError, IsographDatabase, NetworkProtocol,
+    ValidateUseOfArgumentsError, server_selectables_map, validate_use_of_arguments,
 };
 
 /// In the world of pico, we minimally validate. For example, if the
@@ -25,6 +26,10 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
         errors.extend(e.iter().map(|e| ValidationError::from(e.item.clone())))
     }
 
+    if let Err(e) = validate_all_server_selectables_point_to_defined_types(db).to_owned() {
+        errors.extend(e);
+    }
+
     if errors.is_empty() {
         Ok(())
     } else {
@@ -36,4 +41,43 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
 pub enum ValidationError<TNetworkProtocol: NetworkProtocol> {
     #[error("{0}")]
     ValidateUseOfArgumentsError(#[from] ValidateUseOfArgumentsError<TNetworkProtocol>),
+
+    #[error("{0}")]
+    ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),
+
+    #[error("{0}")]
+    FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),
+}
+
+#[memo]
+fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+) -> Result<(), Vec<ValidationError<TNetworkProtocol>>> {
+    // Note: server_selectables_map is a HashMap<_, Vec<(_, Result)>
+    // That result encodes whether the field exists. So, basically, we are collecting
+    // each error from that result.
+    //
+    // This can and should be rethought! Namely, just because the referenced entity doesn't exist
+    // doesn't mean that the selectable can't be materialized. Instead, the result should be
+    // materialized when we actually need to look at the referenced entity.
+    let server_selectables = server_selectables_map(db)
+        .as_ref()
+        .map_err(|e| ValidationError::ParseTypeSystemDocumentsError(e.clone()))
+        .map_err(|e| vec![e])?;
+
+    let mut errors = vec![];
+
+    for (_, selectables) in server_selectables {
+        for (_, selectable_result) in selectables {
+            if let Err(e) = selectable_result {
+                errors.push(e.clone().into());
+            }
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
 }
