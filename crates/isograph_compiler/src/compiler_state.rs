@@ -10,7 +10,7 @@ use pico::Database;
 
 use crate::{batch_compile::BatchCompileError, source_files::initialize_sources};
 
-const GC_DURATION_SECONDS: u64 = 60;
+const GC_DURATION_SECONDS: u64 = 5;
 
 #[derive(Debug)]
 pub struct CompilerState<TNetworkProtocol: NetworkProtocol> {
@@ -35,6 +35,7 @@ impl<TNetworkProtocol: NetworkProtocol> CompilerState<TNetworkProtocol> {
 
     pub fn run_garbage_collection(&mut self) {
         if self.last_gc_run.elapsed() >= Duration::from_secs(GC_DURATION_SECONDS) {
+            eprintln!("running gc");
             self.db.run_garbage_collection();
             self.last_gc_run = Instant::now();
         }

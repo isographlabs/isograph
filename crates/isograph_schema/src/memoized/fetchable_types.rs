@@ -18,5 +18,6 @@ pub fn fetchable_types<TNetworkProtocol: NetworkProtocol>(
         .as_ref()
         .map_err(|e| e.clone())?;
 
+    eprintln!("fetchable types result {:?}", fetchable_types);
     Ok(db.intern_ref(fetchable_types))
 }

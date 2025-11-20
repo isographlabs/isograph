@@ -270,19 +270,23 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
                     )
                 })?;
 
-        let query_id = fetchable_types(db)
-            .as_ref()
-            .map_err(|e| {
-                WithSpan::new(
-                    ProcessClientFieldDeclarationError::ParseTypeSystemDocumentsError(e.clone()),
-                    Span::todo_generated(),
-                )
-            })?
-            .lookup(db)
-            .iter()
-            .find(|(_, root_operation_name)| root_operation_name.0 == "query")
-            .expect("Expected query to be found")
-            .0;
+        let query_id = dbg!(
+            fetchable_types(db)
+                .as_ref()
+                .map_err(|e| {
+                    WithSpan::new(
+                        ProcessClientFieldDeclarationError::ParseTypeSystemDocumentsError(
+                            e.clone(),
+                        ),
+                        Span::todo_generated(),
+                    )
+                })?
+                .lookup(db)
+        )
+        .iter()
+        .find(|(_, root_operation_name)| root_operation_name.0 == "query")
+        .expect("Expected query to be found")
+        .0;
 
         id_field.map(|_| {
             // Assume that if we have an id field, this implements Node
