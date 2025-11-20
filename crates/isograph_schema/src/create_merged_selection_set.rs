@@ -1227,7 +1227,6 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
                         "Expected parsing to have succeeded. \
                         This is indicative of a bug in Isograph.",
                     )
-                    .lookup(db)
                     .iter()
                     .find(|(_, root_operation_name)| root_operation_name.0 == "query")
                     .expect("Expected query to be found")

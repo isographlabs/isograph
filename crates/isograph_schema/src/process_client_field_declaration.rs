@@ -246,7 +246,6 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
             "Expected parsing to have succeeded. \
             This is indicative of a bug in Isograph.",
         )
-        .lookup(db)
         .contains_key(&parent_object_entity_name);
 
     let refetch_strategy = if is_fetchable {
@@ -278,7 +277,6 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
                     Span::todo_generated(),
                 )
             })?
-            .lookup(db)
             .iter()
             .find(|(_, root_operation_name)| root_operation_name.0 == "query")
             .expect("Expected query to be found")

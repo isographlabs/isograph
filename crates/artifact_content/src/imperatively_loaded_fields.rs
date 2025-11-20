@@ -99,7 +99,6 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
             "Expected parsing to have succeeded. \
             This is indicative of a bug in Isograph.",
         )
-        .lookup(db)
         .get(&root_object_entity_name)
         .cloned()
         .expect(

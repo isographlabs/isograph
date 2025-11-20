@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 
 use common_lang_types::ServerObjectEntityName;
-use pico::MemoRef;
 use pico_macros::memo;
 
 use crate::{IsographDatabase, NetworkProtocol, RootOperationName};
@@ -11,12 +10,10 @@ use crate::{IsographDatabase, NetworkProtocol, RootOperationName};
 pub fn fetchable_types<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
-    MemoRef<BTreeMap<ServerObjectEntityName, RootOperationName>>,
+    BTreeMap<ServerObjectEntityName, RootOperationName>,
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
-    let (_items, fetchable_types) = TNetworkProtocol::parse_type_system_documents(db)
-        .as_ref()
-        .map_err(|e| e.clone())?;
+    let (_items, fetchable_types) = TNetworkProtocol::parse_type_system_documents(db).to_owned()?;
 
-    Ok(db.intern_ref(fetchable_types))
+    Ok(fetchable_types)
 }

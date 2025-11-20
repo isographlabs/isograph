@@ -418,7 +418,6 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                     "Expected parsing to have succeeded. \
                                     This is indicative of a bug in Isograph.",
                                 )
-                                .lookup(db)
                                 .iter()
                                 .find(|(_, root_operation_name)| root_operation_name.0 == "query");
 
