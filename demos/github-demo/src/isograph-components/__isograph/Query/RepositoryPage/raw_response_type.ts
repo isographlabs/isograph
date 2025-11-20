@@ -7,7 +7,7 @@ export type Query__RepositoryPage__rawResponse = {
       name: string,
       nameWithOwner: string,
       owner: {
-        __typename: string,
+        __typename: "RepositoryOwner",
         id: string,
         login: string,
       },
@@ -17,11 +17,8 @@ export type Query__RepositoryPage__rawResponse = {
         node: {
           id: string,
           author: {
-            __typename: string,
+            __typename: "Actor",
             login: string,
-            __typename: 'User',
-            id: string,
-            twitterUsername: (string | null),
           },
           closed: boolean,
           createdAt: string,
@@ -30,13 +27,13 @@ export type Query__RepositoryPage__rawResponse = {
             id: string,
             name: string,
             owner: {
-              __typename: string,
+              __typename: "RepositoryOwner",
               id: string,
               login: string,
             },
           },
           title: string,
-          totalCommentsCount: (number | null),
+          totalCommentsCount?: (number | null),
         },
       },
     },

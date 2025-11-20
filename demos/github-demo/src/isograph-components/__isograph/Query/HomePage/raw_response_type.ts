@@ -3,17 +3,17 @@ export type Query__HomePage__rawResponse = {
     id: string,
     avatarUrl: string,
     login: string,
-    name: (string | null),
+    name?: (string | null),
     repositories____first___l_10____after___l_null: {
       edges: {
         node: {
           id: string,
-          description: (string | null),
+          description?: (string | null),
           forkCount: number,
           name: string,
           nameWithOwner: string,
           owner: {
-            __typename: string,
+            __typename: "RepositoryOwner",
             id: string,
             login: string,
           },
