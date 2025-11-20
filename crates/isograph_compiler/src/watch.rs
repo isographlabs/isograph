@@ -11,7 +11,7 @@ use notify_debouncer_full::{
 };
 use std::{path::PathBuf, time::Duration};
 use tokio::{runtime::Handle, sync::mpsc::Receiver};
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::{
     batch_compile::{BatchCompileError, compile, print_result},
@@ -251,7 +251,7 @@ pub fn create_debounced_file_watcher(
                 let sender = sender.clone();
                 current_runtime.spawn(async move {
                     if let Err(e) = sender.send(events).await {
-                        println!("Error sending event result: {e:?}");
+                        warn!("Error sending event result: {e:?}");
                     }
                 });
             }
