@@ -1,6 +1,7 @@
 use std::{fmt, ops::Deref};
 
 use common_lang_types::{Span, WithSpan};
+use prelude::Postfix;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum GraphQLTypeAnnotation<TValue> {
@@ -53,7 +54,7 @@ impl<TValue> GraphQLTypeAnnotation<TValue> {
     where
         F: FnOnce(TValue) -> Result<TNewValue, E>,
     {
-        Ok(match self {
+        match self {
             GraphQLTypeAnnotation::Named(named) => GraphQLTypeAnnotation::Named(
                 GraphQLNamedTypeAnnotation(WithSpan::new(f(named.0.item)?, named.0.span)),
             ),
@@ -63,7 +64,8 @@ impl<TValue> GraphQLTypeAnnotation<TValue> {
             GraphQLTypeAnnotation::NonNull(non_null) => {
                 GraphQLTypeAnnotation::NonNull(Box::new(non_null.and_then(f)?))
             }
-        })
+        }
+        .ok()
     }
 
     /// If a TypeAnnotation is of the form X!, i.e. it is a NonNull named type, then
@@ -146,14 +148,15 @@ impl<TValue> GraphQLNonNullTypeAnnotation<TValue> {
     where
         F: FnOnce(TValue) -> Result<TNewValue, E>,
     {
-        Ok(match self {
+        match self {
             GraphQLNonNullTypeAnnotation::Named(named) => GraphQLNonNullTypeAnnotation::Named(
                 GraphQLNamedTypeAnnotation(WithSpan::new(f(named.0.item)?, named.0.span)),
             ),
             GraphQLNonNullTypeAnnotation::List(list) => {
                 GraphQLNonNullTypeAnnotation::List(list.and_then(f)?)
             }
-        })
+        }
+        .ok()
     }
 }
 
@@ -198,7 +201,7 @@ impl<TValue> GraphQLListTypeAnnotation<TValue> {
     where
         F: FnOnce(TValue) -> Result<TNewValue, E>,
     {
-        Ok(GraphQLListTypeAnnotation(self.0.and_then(f)?))
+        GraphQLListTypeAnnotation(self.0.and_then(f)?).ok()
     }
 }
 

@@ -19,6 +19,7 @@ use lsp_types::{
     request::{Request, SemanticTokensFullRequest},
 };
 use pico_macros::memo;
+use prelude::Postfix;
 
 pub fn on_semantic_token_full_request<TNetworkProtocol: NetworkProtocol>(
     compiler_state: &CompilerState<TNetworkProtocol>,
@@ -87,10 +88,12 @@ fn get_semantic_tokens<TNetworkProtocol: NetworkProtocol>(
     );
     let lsp_tokens = convert_absolute_token_to_lsp_token(absolute_tokens, page_content);
 
-    return Ok(Some(LspSemanticTokensResult::Tokens(LspSemanticTokens {
+    return LspSemanticTokensResult::Tokens(LspSemanticTokens {
         result_id: None,
         data: lsp_tokens.collect(),
-    })));
+    })
+    .some()
+    .ok();
 }
 
 #[derive(Debug)]
@@ -140,7 +143,7 @@ fn absolutize_relative_token<'a>(
                 semantic_token: relative_token.item,
             };
             *iterated_so_far_within_token += line_text.len() as u32;
-            Some(token)
+            token.some()
         })
 }
 
@@ -164,7 +167,7 @@ fn convert_absolute_token_to_lsp_token<'a>(
         };
 
         *last_token_start = absolute_token.absolute_char_start;
-        Some(token)
+        token.some()
     })
 }
 

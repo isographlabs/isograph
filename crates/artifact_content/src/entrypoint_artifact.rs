@@ -29,6 +29,7 @@ use isograph_schema::{
     current_target_merged_selections, fetchable_types, get_reachable_variables,
     initial_variable_context, server_object_entity_named,
 };
+use prelude::Postfix;
 use std::collections::BTreeSet;
 
 pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
@@ -93,7 +94,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     generate_entrypoint_artifacts_with_client_field_traversal_result(
         db,
         entrypoint,
-        Some(info),
+        info.some(),
         &merged_selection_map,
         &traversal_state,
         encountered_client_type_map,
@@ -289,10 +290,11 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     path_and_contents.push(ArtifactPathAndContent {
         file_content: format!("export default '{query_text}';"),
         file_name: *QUERY_TEXT_FILE_NAME,
-        type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+        type_and_field: ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: type_name,
             selectable_name: field_name,
-        }),
+        }
+        .some(),
     });
     path_and_contents.push(ArtifactPathAndContent {
         file_content: format!(
@@ -305,18 +307,20 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
             "  ", "  "
         ),
         file_name: *NORMALIZATION_AST_FILE_NAME,
-        type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+        type_and_field: ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: type_name,
             selectable_name: field_name,
-        }),
+        }
+        .some(),
     });
     path_and_contents.push(ArtifactPathAndContent {
         file_content: entrypoint_file_content,
         file_name: *ENTRYPOINT_FILE_NAME,
-        type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+        type_and_field: ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: type_name,
             selectable_name: field_name,
-        }),
+        }
+        .some(),
     });
 
     path_and_contents.extend(

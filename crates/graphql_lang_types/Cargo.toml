@@ -7,6 +7,7 @@ license = { workspace = true }
 [dependencies]
 intern = { path = "../../relay-crates/intern" }
 common_lang_types = { path = "../common_lang_types" }
+prelude = { path = "../prelude" }
 strum = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

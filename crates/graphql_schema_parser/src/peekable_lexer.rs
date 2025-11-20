@@ -1,6 +1,7 @@
 use graphql_syntax::TokenKind;
 use intern::string_key::{Intern, StringKey};
 use logos::Logos;
+use prelude::Postfix;
 use thiserror::Error;
 
 use common_lang_types::{Span, WithSpan};
@@ -79,15 +80,16 @@ impl<'source> PeekableLexer<'source> {
     ) -> ParseResultWithSpan<WithSpan<TokenKind>> {
         let found = self.peek();
         if found.item == expected_kind {
-            Ok(self.parse_token())
+            self.parse_token().ok()
         } else {
-            Err(WithSpan::new(
+            WithSpan::new(
                 LowLevelParseError::ParseTokenKindError {
                     expected_kind,
                     found_kind: found.item,
                 },
                 found.span,
-            ))
+            )
+            .err()
         }
     }
 
@@ -99,7 +101,7 @@ impl<'source> PeekableLexer<'source> {
     ) -> ParseResultWithSpan<WithSpan<&'source str>> {
         let kind = self.parse_token_of_kind(expected_kind)?;
 
-        Ok(WithSpan::new(self.source(kind.span), kind.span))
+        WithSpan::new(self.source(kind.span), kind.span).ok()
     }
 
     pub fn parse_string_key_type<T: From<StringKey>>(
@@ -108,7 +110,7 @@ impl<'source> PeekableLexer<'source> {
     ) -> ParseResultWithSpan<WithSpan<T>> {
         let kind = self.parse_token_of_kind(expected_kind)?;
         let source = self.source(kind.span).intern();
-        Ok(WithSpan::new(source.into(), kind.span))
+        WithSpan::new(source.into(), kind.span).ok()
     }
 
     pub fn parse_matching_identifier(
@@ -119,12 +121,13 @@ impl<'source> PeekableLexer<'source> {
         if peeked.item == TokenKind::Identifier {
             let source = self.source(peeked.span);
             if source == identifier {
-                Ok(self.parse_token())
+                self.parse_token().ok()
             } else {
-                Err(LowLevelParseError::ParseMatchingIdentifierError {
+                LowLevelParseError::ParseMatchingIdentifierError {
                     expected_identifier: identifier,
                     found_text: source.to_string(),
-                })
+                }
+                .err()
             }
         } else {
             Err(LowLevelParseError::ParseTokenKindError {
@@ -141,7 +144,7 @@ impl<'source> PeekableLexer<'source> {
         let start = self.current.span.start;
         let result = do_stuff(self)?;
         let end = self.end_index_of_last_parsed_token;
-        Ok(WithSpan::new(result, Span::new(start, end)))
+        WithSpan::new(result, Span::new(start, end)).ok()
     }
 }
 

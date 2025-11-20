@@ -14,6 +14,7 @@ use common_lang_types::{
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{ClientFieldDeclaration, ClientPointerDeclaration, SelectionType};
 use pico_macros::memo;
+use prelude::Postfix;
 use thiserror::Error;
 
 use crate::parse_iso_literal_in_source;
@@ -106,12 +107,13 @@ pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
     {
         Some((first, rest)) => {
             if rest.is_empty() {
-                Ok(Some(first.clone()))
+                first.clone().some().ok()
             } else {
-                Err(MemoizedIsoLiteralError::MultipleDefinitionsFound {
+                MemoizedIsoLiteralError::MultipleDefinitionsFound {
                     duplicate_entity_name: parent_object_entity_name,
                     duplicate_client_selectable_name: client_selectable_name,
-                })
+                }
+                .err()
             }
         }
         None => {
@@ -173,14 +175,15 @@ pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     };
     match item {
         SelectionType::Scalar(client_field_declaration) => {
-            Ok(Some(client_field_declaration.clone()))
+            client_field_declaration.clone().some().ok()
         }
-        SelectionType::Object(_) => Err(MemoizedIsoLiteralError::SelectableIsWrongType {
+        SelectionType::Object(_) => MemoizedIsoLiteralError::SelectableIsWrongType {
             parent_object_entity_name,
             client_selectable_name: client_scalar_selectable_name.into(),
             intended_type: "a scalar",
             actual_type: "an object",
-        }),
+        }
+        .err(),
     }
 }
 
@@ -204,14 +207,15 @@ pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     };
     match item {
         SelectionType::Object(client_pointer_declaration) => {
-            Ok(Some(client_pointer_declaration.clone()))
+            client_pointer_declaration.clone().some().ok()
         }
-        SelectionType::Scalar(_) => Err(MemoizedIsoLiteralError::SelectableIsWrongType {
+        SelectionType::Scalar(_) => MemoizedIsoLiteralError::SelectableIsWrongType {
             parent_object_entity_name,
             client_selectable_name: client_object_selectable_name.into(),
             intended_type: "an object",
             actual_type: "a scalar",
-        }),
+        }
+        .err(),
     }
 }
 
@@ -249,16 +253,17 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
                 .get(&(parent_object_entity_name, client_scalar_selectable_name))
                 .cloned()
             {
-                return Ok(Some(link_field));
+                return link_field.some().ok();
             }
 
             // Awkward! We also need to check for expose fields. Ay ay ay
-            return Ok(expose_field_map(db)
+            return expose_field_map(db)
                 .as_ref()
                 .map_err(|e| e.clone())?
                 .get(&(parent_object_entity_name, client_scalar_selectable_name))
                 .cloned()
-                .map(|(selectable, _)| selectable));
+                .map(|(selectable, _)| selectable)
+                .ok();
         }
     };
 
@@ -266,7 +271,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
         .as_ref()
         .map_err(|e| MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(e.clone()))?;
 
-    Ok(Some(scalar_selectable.clone()))
+    scalar_selectable.clone().some().ok()
 }
 
 #[memo]
@@ -292,7 +297,7 @@ pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
         .as_ref()
         .map_err(|e| MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(e.clone()))?;
 
-    Ok(Some(object_selectable.clone()))
+    object_selectable.clone().some().ok()
 }
 
 #[memo]
@@ -345,13 +350,14 @@ pub fn client_selectable_named<TNetworkProtocol: NetworkProtocol>(
                 "Expected at least one case to be None. \
                 This is indicative of a bug in Isograph."
             );
-            Ok(object
+            object
                 .map(SelectionType::Object)
-                .or(scalar.map(SelectionType::Scalar)))
+                .or(scalar.map(SelectionType::Scalar))
+                .ok()
         }
-        (Ok(object_selectable), Err(_)) => Ok(object_selectable.map(SelectionType::Object)),
-        (Err(_), Ok(scalar_selectable)) => Ok(scalar_selectable.map(SelectionType::Scalar)),
-        (Err(e), Err(_)) => Err(e),
+        (Ok(object_selectable), Err(_)) => object_selectable.map(SelectionType::Object).ok(),
+        (Err(_), Ok(scalar_selectable)) => scalar_selectable.map(SelectionType::Scalar).ok(),
+        (Err(e), Err(_)) => e.err(),
     }
 }
 
@@ -414,7 +420,7 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
 > {
     let iso_literal_map = client_selectable_declaration_map_from_iso_literals(db);
 
-    Ok(iso_literal_map
+    iso_literal_map
         .iter()
         .map(|(key, value)| {
             let value = (|| match value.split_first() {
@@ -458,5 +464,6 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
                     ((key.0, key.1.into()), Ok(SelectionType::Scalar(selectable)))
                 }),
         )
-        .collect())
+        .collect::<HashMap<_, _>>()
+        .ok()
 }

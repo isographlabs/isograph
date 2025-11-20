@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 use common_lang_types::{VariableName, WithLocation};
 use graphql_lang_types::GraphQLTypeAnnotation;
+use prelude::Postfix;
 
 use crate::ConstantValue;
 
@@ -28,10 +29,11 @@ impl<TValue: Ord + Debug> VariableDefinition<TValue> {
         self,
         map: &mut impl FnMut(TValue) -> Result<TNewValue, E>,
     ) -> Result<VariableDefinition<TNewValue>, E> {
-        Ok(VariableDefinition {
+        VariableDefinition {
             name: self.name,
             type_: self.type_.and_then(map)?,
             default_value: self.default_value,
-        })
+        }
+        .ok()
     }
 }

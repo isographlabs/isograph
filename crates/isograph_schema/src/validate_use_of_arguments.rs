@@ -12,6 +12,7 @@ use isograph_lang_types::{
 };
 use lazy_static::lazy_static;
 use pico_macros::memo;
+use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
@@ -287,21 +288,22 @@ fn validate_all_variables_are_used<TNetworkProtocol: NetworkProtocol>(
             let is_used = used_variables.contains(&variable.item.name.item);
 
             if !is_used {
-                return Some(variable.clone());
+                return variable.clone().some();
             }
             None
         })
         .collect::<Vec<_>>();
 
     if !unused_variables.is_empty() {
-        return Err(WithLocation::new(
+        return WithLocation::new(
             ValidateUseOfArgumentsError::UnusedVariables {
                 unused_variables,
                 type_name: top_level_type_and_field_name.parent_object_entity_name,
                 field_name: top_level_type_and_field_name.selectable_name,
             },
             location,
-        ));
+        )
+        .err();
     }
     Ok(())
 }
@@ -311,10 +313,11 @@ fn assert_no_missing_arguments<TNetworkProtocol: NetworkProtocol>(
     location: Location,
 ) -> ValidateUseOfArgumentsResult<(), TNetworkProtocol> {
     if !missing_arguments.is_empty() {
-        return Err(WithLocation::new(
+        return WithLocation::new(
             ValidateUseOfArgumentsError::MissingArguments { missing_arguments },
             location,
-        ));
+        )
+        .err();
     }
     Ok(())
 }
@@ -339,16 +342,14 @@ fn get_missing_and_provided_arguments<'a>(
                 .find(|arg| field_argument_definition.name.item == arg.item.name.item);
 
             if let Some(selection_supplied_argument) = selection_supplied_argument {
-                Some(ArgumentType::Provided(
-                    field_argument_definition,
-                    selection_supplied_argument,
-                ))
+                ArgumentType::Provided(field_argument_definition, selection_supplied_argument)
+                    .some()
             } else if field_argument_definition.default_value.is_some()
                 || field_argument_definition.type_.is_nullable()
             {
                 None
             } else {
-                Some(ArgumentType::Missing(field_argument_definition))
+                ArgumentType::Missing(field_argument_definition).some()
             }
         })
 }
@@ -375,17 +376,18 @@ fn validate_no_extraneous_arguments<TNetworkProtocol: NetworkProtocol>(
                 .any(|definition| definition.name.item == arg.item.name.item);
 
             if !is_defined {
-                return Some(arg.clone());
+                return arg.clone().some();
             }
             None
         })
         .collect();
 
     if !extra_arguments.is_empty() {
-        return Err(WithLocation::new(
+        return WithLocation::new(
             ValidateUseOfArgumentsError::ExtraneousArgument { extra_arguments },
             location,
-        ));
+        )
+        .err();
     }
     Ok(())
 }

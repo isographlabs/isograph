@@ -7,6 +7,7 @@ use common_lang_types::CurrentWorkingDirectory;
 use isograph_config::create_config;
 use isograph_schema::{IsographDatabase, NetworkProtocol};
 use pico::Database;
+use prelude::Postfix;
 
 use crate::{batch_compile::BatchCompileError, source_files::initialize_sources};
 
@@ -27,10 +28,11 @@ impl<TNetworkProtocol: NetworkProtocol> CompilerState<TNetworkProtocol> {
         db.set(current_working_directory);
         db.set(create_config(config_location, current_working_directory));
         initialize_sources(&mut db)?;
-        Ok(Self {
+        Self {
             db,
             last_gc_run: Instant::now(),
-        })
+        }
+        .ok()
     }
 
     pub fn run_garbage_collection(&mut self) {

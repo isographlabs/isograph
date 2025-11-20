@@ -18,6 +18,7 @@ use isograph_schema::{
     STRING_JAVASCRIPT_TYPE, ServerObjectEntity, ServerScalarEntity, TYPENAME_FIELD_NAME,
 };
 use lazy_static::lazy_static;
+use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
@@ -216,12 +217,13 @@ pub fn process_graphql_type_system_document(
             }
             GraphQLTypeSystemDefinition::SchemaDefinition(schema_definition) => {
                 if graphql_root_types.is_some() {
-                    return Err(WithLocation::new(
+                    return WithLocation::new(
                         ProcessGraphqlTypeSystemDefinitionError::DuplicateSchemaDefinition,
                         location,
-                    ));
+                    )
+                    .err();
                 }
-                *graphql_root_types = Some(GraphQLRootTypes {
+                *graphql_root_types = GraphQLRootTypes {
                     query: schema_definition
                         .query
                         .map(|x| x.item.into())
@@ -234,7 +236,8 @@ pub fn process_graphql_type_system_document(
                         .subscription
                         .map(|x| x.item.into())
                         .unwrap_or_else(|| "Subscription".intern().into()),
-                })
+                }
+                .some()
             }
         }
     }
@@ -268,14 +271,15 @@ pub fn process_graphql_type_system_document(
         for subtype_name in subtypes.iter() {
             object_outcome.fields_to_insert.push(WithLocation::new(
                 FieldToInsert {
-                    description: Some(WithSpan::new(
+                    description: WithSpan::new(
                         Description(
                             format!("A client pointer for the {subtype_name} type.")
                                 .intern()
                                 .into(),
                         ),
                         Span::todo_generated(),
-                    )),
+                    )
+                    .some(),
                     name: WithLocation::new(
                         format!("as{subtype_name}").intern().into(),
                         Location::generated(),
@@ -292,7 +296,7 @@ pub fn process_graphql_type_system_document(
         }
     }
 
-    Ok((type_system_entities, directives, refetch_fields))
+    (type_system_entities, directives, refetch_fields).ok()
 }
 
 #[expect(clippy::type_complexity)]
@@ -333,7 +337,7 @@ pub fn process_graphql_type_extension_document(
         }
     }
 
-    Ok((outcome, directives, refetch_fields))
+    (outcome, directives, refetch_fields).ok()
 }
 
 pub(crate) type ProcessGraphqlTypeDefinitionResult<T> =
@@ -428,7 +432,7 @@ fn process_object_type_definition(
     if should_add_refetch_field {
         refetch_fields.push(ExposeFieldToInsert {
             expose_field_directive: ExposeFieldDirective {
-                expose_as: Some(*REFETCH_FIELD_NAME),
+                expose_as: (*REFETCH_FIELD_NAME).some(),
                 field_map: vec![FieldMapItem {
                     from: (*ID_FIELD_NAME).unchecked_conversion(),
                     to: (*ID_FIELD_NAME).unchecked_conversion(),
@@ -438,25 +442,27 @@ fn process_object_type_definition(
                     .into(),
             },
             parent_object_name: object_type_definition.name.item,
-            description: Some(Description(
+            description: Description(
                 format!(
                     "A refetch field for the {} type.",
                     object_type_definition.name.item
                 )
                 .intern()
                 .into(),
-            )),
+            )
+            .some(),
         });
     }
 
-    Ok((
+    (
         ProcessObjectTypeDefinitionOutcome {
             server_object_entity,
             fields_to_insert,
             expose_fields_to_insert: vec![],
         },
         object_type_definition.directives,
-    ))
+    )
+        .ok()
 }
 
 // TODO this should accept an IsographScalarTypeDefinition

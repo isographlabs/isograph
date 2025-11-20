@@ -7,6 +7,7 @@ use isograph_schema::{
     client_scalar_selectable_selection_set_for_parent_query, initial_variable_context,
     validated_refetch_strategy_for_client_scalar_selectable_named,
 };
+use prelude::Postfix;
 
 use crate::{
     generate_artifacts::{
@@ -88,10 +89,11 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
     ArtifactPathAndContent {
         file_name: *REFETCH_READER_FILE_NAME,
         file_content: reader_content,
-        type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+        type_and_field: ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: client_field.parent_object_entity_name,
             selectable_name: client_field.name.item.into(),
-        }),
+        }
+        .some(),
     }
 }
 
@@ -116,10 +118,11 @@ pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkPro
     ArtifactPathAndContent {
         file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
         file_content: output_type_text,
-        type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+        type_and_field: ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: client_field.parent_object_entity_name,
             selectable_name: client_field.name.item.into(),
-        }),
+        }
+        .some(),
     }
 }
 

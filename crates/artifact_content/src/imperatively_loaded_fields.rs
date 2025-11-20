@@ -12,6 +12,7 @@ use isograph_schema::{
     PathToRefetchFieldInfo, REFETCH_FIELD_NAME, RootRefetchedPath, ServerEntityName,
     WrappedSelectionMapSelection, client_selectable_named, fetchable_types, selection_map_wrapped,
 };
+use prelude::Postfix;
 
 use crate::{
     generate_artifacts::QUERY_TEXT, normalization_ast_text::generate_normalization_ast_text,
@@ -178,18 +179,20 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         ArtifactPathAndContent {
             file_content: format!("export default '{query_text}';"),
             file_name: query_text_file_name_with_extension,
-            type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+            type_and_field: ParentObjectEntityNameAndSelectableName {
                 parent_object_entity_name: root_parent_object,
                 selectable_name: root_fetchable_field.into(),
-            }),
+            }
+            .some(),
         },
         ArtifactPathAndContent {
             file_content: imperatively_loaded_field_file_contents,
             file_name: file_name_prefix,
-            type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+            type_and_field: ParentObjectEntityNameAndSelectableName {
                 parent_object_entity_name: root_parent_object,
                 selectable_name: root_fetchable_field.into(),
-            }),
+            }
+            .some(),
         },
     ]
 }
@@ -205,25 +208,24 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
             if *variable_name == "id" {
                 None
             } else {
-                Some(
-                    entrypoint
-                        .as_ref()
-                        .variable_definitions()
-                        .iter()
-                        .find(|definition| definition.item.name.item == *variable_name)
-                        .unwrap_or_else(|| {
-                            panic!(
-                                "Did not find matching variable definition. \
+                entrypoint
+                    .as_ref()
+                    .variable_definitions()
+                    .iter()
+                    .find(|definition| definition.item.name.item == *variable_name)
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "Did not find matching variable definition. \
                                 This might not be validated yet. For now, each client field \
                                 containing a __refetch field must re-defined all used variables. \
                                 Client field {} is missing variable definition {}",
-                                entrypoint.as_ref().name(),
-                                variable_name
-                            )
-                        })
-                        .item
-                        .clone(),
-                )
+                            entrypoint.as_ref().name(),
+                            variable_name
+                        )
+                    })
+                    .item
+                    .clone()
+                    .some()
             }
         })
         .collect::<Vec<_>>()

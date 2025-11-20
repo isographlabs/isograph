@@ -6,6 +6,7 @@ use common_lang_types::{
 };
 use isograph_lang_types::SelectionType;
 use pico_macros::memo;
+use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
@@ -40,11 +41,11 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
             match out.entry(*key) {
                 Entry::Occupied(mut occupied_entry) => {
                     // TODO check for length instead
-                    *occupied_entry.get_mut() =
-                        Err(RefetchStrategyAccessError::DuplicateDefinition {
-                            parent_object_entity_name: key.0,
-                            client_selectable_name: key.1,
-                        })
+                    *occupied_entry.get_mut() = RefetchStrategyAccessError::DuplicateDefinition {
+                        parent_object_entity_name: key.0,
+                        client_selectable_name: key.1,
+                    }
+                    .err()
                 }
                 Entry::Vacant(vacant_entry) => match item {
                     SelectionType::Scalar(_) => {
@@ -76,15 +77,15 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
     for (key, (_, selection_set)) in expose_field_map {
         match out.entry((key.0, key.1.into())) {
             Entry::Occupied(mut occupied_entry) => {
-                *occupied_entry.get_mut() = Err(RefetchStrategyAccessError::DuplicateDefinition {
+                *occupied_entry.get_mut() = RefetchStrategyAccessError::DuplicateDefinition {
                     parent_object_entity_name: key.0,
                     client_selectable_name: key.1.into(),
-                });
+                }
+                .err();
             }
             Entry::Vacant(vacant_entry) => {
-                vacant_entry.insert(Ok(SelectionType::Scalar(
-                    selection_set.refetch_strategy.clone(),
-                )));
+                vacant_entry
+                    .insert(SelectionType::Scalar(selection_set.refetch_strategy.clone()).ok());
             }
         }
     }
@@ -111,12 +112,12 @@ pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
 > {
     let map = unvalidated_refetch_strategy_map(db).clone()?;
 
-    Ok(map
+    map
         .into_iter()
         .map(|(key, value)| {
             let value: Result<_, RefetchStrategyAccessError<_>> = value.and_then(|opt| match opt {
                 SelectionType::Scalar(refetch_strategy) => {
-                    Ok(SelectionType::Scalar(refetch_strategy.map(|refetch_strategy| {
+                    SelectionType::Scalar(refetch_strategy.map(|refetch_strategy| {
                         get_validated_refetch_strategy(
                             db,
                             refetch_strategy,
@@ -126,9 +127,9 @@ pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                                 key.1.into(),
                             )),
                         )
-                    }).transpose()?))
+                    }).transpose()?).ok()
                 }
-                SelectionType::Object(refetch_strategy) => Ok(SelectionType::Object(get_validated_refetch_strategy(
+                SelectionType::Object(refetch_strategy) => SelectionType::Object(get_validated_refetch_strategy(
                     db,
                     refetch_strategy,
                     key.0,
@@ -141,12 +142,12 @@ pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                     RefetchStrategyAccessError::ValidateAddSelectionSetsResultWithMultipleErrors {
                         errors: e,
                     }
-                })?)),
+                })?).ok(),
             });
 
             (key, value)
         })
-        .collect())
+        .collect::<HashMap<_,_>>().ok()
 }
 
 #[memo]
@@ -170,20 +171,22 @@ pub fn validated_refetch_strategy_for_client_scalar_selectable_named<
     )) {
         Some(result) => match result {
             Ok(selection_type) => match selection_type {
-                SelectionType::Object(_) => Err(RefetchStrategyAccessError::IncorrectType {
+                SelectionType::Object(_) => RefetchStrategyAccessError::IncorrectType {
                     parent_object_entity_name: parent_server_object_entity_name,
                     selectable_name: client_scalar_selectable_name.into(),
                     expected_type: "a scalar",
                     actual_type: "an object",
-                }),
-                SelectionType::Scalar(s) => Ok(s.clone()),
+                }
+                .err(),
+                SelectionType::Scalar(s) => s.clone().ok(),
             },
-            Err(e) => Err(e.clone()),
+            Err(e) => e.clone().err(),
         },
-        None => Err(RefetchStrategyAccessError::NotFound {
+        None => RefetchStrategyAccessError::NotFound {
             parent_server_object_entity_name,
             selectable_name: client_scalar_selectable_name.into(),
-        }),
+        }
+        .err(),
     }
 }
 
@@ -208,20 +211,22 @@ pub fn validated_refetch_strategy_for_object_scalar_selectable_named<
     )) {
         Some(result) => match result {
             Ok(selection_type) => match selection_type {
-                SelectionType::Scalar(_) => Err(RefetchStrategyAccessError::IncorrectType {
+                SelectionType::Scalar(_) => RefetchStrategyAccessError::IncorrectType {
                     parent_object_entity_name: parent_server_object_entity_name,
                     selectable_name: client_object_selectable_name.into(),
                     expected_type: "an object",
                     actual_type: "a scalar",
-                }),
-                SelectionType::Object(s) => Ok(s.clone()),
+                }
+                .err(),
+                SelectionType::Object(s) => s.clone().ok(),
             },
-            Err(e) => Err(e.clone()),
+            Err(e) => e.clone().err(),
         },
-        None => Err(RefetchStrategyAccessError::NotFound {
+        None => RefetchStrategyAccessError::NotFound {
             parent_server_object_entity_name,
             selectable_name: client_object_selectable_name.into(),
-        }),
+        }
+        .err(),
     }
 }
 #[derive(Clone, Error, Eq, PartialEq, Debug)]

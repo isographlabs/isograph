@@ -6,6 +6,7 @@ use graphql_lang_types::{
     GraphQLConstantValue, GraphQLInputValueDefinition, GraphQLNamedTypeAnnotation, NameValuePair,
 };
 use isograph_lang_types::{ConstantValue, SelectionType, TypeAnnotation, VariableDefinition};
+use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
@@ -66,7 +67,7 @@ pub fn field_to_insert_to_server_selectable<TNetworkProtocol: NetworkProtocol>(
         })
         .collect::<Result<Vec<_>, _>>()?;
     let description = server_field_to_insert.item.description.map(|d| d.item);
-    let selectable = match selection_type {
+    match selection_type {
         SelectionType::Scalar(scalar_entity_name) => SelectionType::Scalar((
             ServerScalarSelectable {
                 description,
@@ -105,8 +106,8 @@ pub fn field_to_insert_to_server_selectable<TNetworkProtocol: NetworkProtocol>(
                     }
             })
         }
-    };
-    Ok(selectable)
+    }
+    .ok()
 }
 
 #[derive(Clone, Error, PartialEq, Eq, Debug)]
@@ -142,12 +143,13 @@ pub fn graphql_input_value_definition_to_variable_definition<TNetworkProtocol: N
         .item
         .default_value
         .map(|graphql_constant_value| {
-            Ok(WithLocation::new(
+            WithLocation::new(
                 convert_graphql_constant_value_to_isograph_constant_value(
                     graphql_constant_value.item,
                 ),
                 graphql_constant_value.location,
-            ))
+            )
+            .ok()
         })
         .transpose()?;
 
@@ -174,14 +176,15 @@ pub fn graphql_input_value_definition_to_variable_definition<TNetworkProtocol: N
                 )
         })?;
 
-    Ok(WithLocation::new(
+    WithLocation::new(
         VariableDefinition {
             name: input_value_definition.item.name.map(VariableName::from),
             type_,
             default_value,
         },
         input_value_definition.location,
-    ))
+    )
+    .ok()
 }
 
 fn convert_graphql_constant_value_to_isograph_constant_value(

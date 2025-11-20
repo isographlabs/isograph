@@ -147,6 +147,7 @@ dependencies = [
  "lazy_static",
  "md-5",
  "pathdiff",
+ "prelude",
  "serde",
  "serde_json",
  "sha2",
@@ -581,6 +582,7 @@ dependencies = [
  "intern",
  "pathdiff",
  "pico",
+ "prelude",
  "serde",
  "string_key_newtype",
 ]
@@ -1121,6 +1123,7 @@ version = "0.4.3"
 dependencies = [
  "common_lang_types",
  "intern",
+ "prelude",
  "serde",
  "strum",
  "thiserror 1.0.69",
@@ -1141,6 +1144,7 @@ dependencies = [
  "pathdiff",
  "pico",
  "pico_macros",
+ "prelude",
  "thiserror 1.0.69",
  "tracing",
 ]
@@ -1154,6 +1158,7 @@ dependencies = [
  "graphql_lang_types",
  "intern",
  "logos",
+ "prelude",
  "thiserror 1.0.69",
 ]
 
@@ -1637,6 +1642,7 @@ dependencies = [
  "pathdiff",
  "pico",
  "pico_macros",
+ "prelude",
  "pretty-duration",
  "regex",
  "thiserror 1.0.69",
@@ -1683,6 +1689,7 @@ dependencies = [
  "intern",
  "isograph_lang_types",
  "logos",
+ "prelude",
  "resolve_position",
  "resolve_position_macros",
  "thiserror 1.0.69",
@@ -1696,6 +1703,7 @@ dependencies = [
  "graphql_lang_types",
  "intern",
  "lsp-types 0.97.0",
+ "prelude",
  "resolve_position",
  "resolve_position_macros",
  "serde",
@@ -1720,6 +1728,7 @@ dependencies = [
  "lsp-types 0.97.0",
  "pico",
  "pico_macros",
+ "prelude",
  "resolve_position",
  "serde",
  "serde_json",
@@ -1743,6 +1752,7 @@ dependencies = [
  "lazy_static",
  "pico",
  "pico_macros",
+ "prelude",
  "regex",
  "serde",
  "thiserror 1.0.69",
@@ -2399,6 +2409,10 @@ checksum = "77957b295656769bb8ad2b6a6b09d897d94f05c41b069aede1fcdaa675eaea04"
 dependencies = [
  "zerocopy",
 ]
+
+[[package]]
+name = "prelude"
+version = "0.4.3"
 
 [[package]]
 name = "pretty-duration"

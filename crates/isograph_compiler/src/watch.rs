@@ -9,6 +9,7 @@ use notify::{
 use notify_debouncer_full::{
     DebounceEventResult, DebouncedEvent, Debouncer, RecommendedCache, new_debouncer,
 };
+use prelude::Postfix;
 use std::{path::PathBuf, time::Duration};
 use tokio::{runtime::Handle, sync::mpsc::Receiver};
 use tracing::{info, warn};
@@ -90,7 +91,7 @@ fn categorize_and_filter_events(
     if source_file_events.is_empty() {
         None
     } else {
-        Some(source_file_events)
+        source_file_events.some()
     }
 }
 
@@ -207,20 +208,20 @@ fn categorize_changed_file_and_filter_changes_in_artifact_directory(
     if !path.starts_with(&config.artifact_directory.absolute_path) {
         if path.starts_with(&config.project_root) {
             if path.is_file() {
-                return Some(ChangedFileKind::JavaScriptSourceFile);
+                return ChangedFileKind::JavaScriptSourceFile.some();
             } else {
-                return Some(ChangedFileKind::JavaScriptSourceFolder);
+                return ChangedFileKind::JavaScriptSourceFolder.some();
             }
         } else if path == &config.schema.absolute_path {
-            return Some(ChangedFileKind::Schema);
+            return ChangedFileKind::Schema.some();
         } else if config
             .schema_extensions
             .iter()
             .any(|x| x.absolute_path == *path)
         {
-            return Some(ChangedFileKind::SchemaExtension);
+            return ChangedFileKind::SchemaExtension.some();
         } else if path == &config.config_location {
-            return Some(ChangedFileKind::Config);
+            return ChangedFileKind::Config.some();
         }
     }
     None

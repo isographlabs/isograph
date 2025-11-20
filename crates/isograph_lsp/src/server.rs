@@ -33,6 +33,7 @@ use lsp_types::{
     notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument},
     request::{Formatting, GotoDefinition},
 };
+use prelude::Postfix;
 use std::{ops::ControlFlow, path::PathBuf};
 use thiserror::Error;
 use tracing::debug;
@@ -44,25 +45,25 @@ pub fn initialize<TNetworkProtocol: NetworkProtocol>(
 ) -> LSPProcessResult<InitializeParams, TNetworkProtocol> {
     let server_capabilities = ServerCapabilities {
         // Enable text document syncing so we can know when files are opened/changed/saved/closed
-        text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
-        semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
+        text_document_sync: TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL).some(),
+        semantic_tokens_provider: SemanticTokensServerCapabilities::SemanticTokensOptions(
             SemanticTokensOptions {
                 work_done_progress_options: WorkDoneProgressOptions::default(),
                 legend: semantic_token_legend(),
                 range: None,
-                full: Some(SemanticTokensFullOptions::Bool(true)),
+                full: SemanticTokensFullOptions::Bool(true).some(),
             },
-        )),
-        hover_provider: Some(HoverProviderCapability::Simple(true)),
-        document_formatting_provider: Some(OneOf::Left(true)),
-        definition_provider: Some(OneOf::Left(true)),
+        )
+        .some(),
+        hover_provider: HoverProviderCapability::Simple(true).some(),
+        document_formatting_provider: OneOf::Left(true).some(),
+        definition_provider: OneOf::Left(true).some(),
         ..Default::default()
     };
     let server_capabilities = serde_json::to_value(server_capabilities)?;
     let params = connection.initialize(server_capabilities)?;
 
-    let params: InitializeParams = serde_json::from_value(params)?;
-    Ok(params)
+    serde_json::from_value::<InitializeParams>(params)?.ok()
 }
 
 /// Run the main server loop

@@ -9,6 +9,7 @@ use isograph_lang_types::{
     SelectionTypeContainingSelections, VariableDefinition,
 };
 
+use prelude::Postfix;
 use serde::Deserialize;
 
 use crate::{
@@ -256,24 +257,24 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
         network_protocol: std::marker::PhantomData,
     };
 
-    Ok((
+    (
         UnprocessedClientScalarSelectableSelectionSet {
             client_scalar_selectable_name: mutation_field_client_field_name,
             parent_object_entity_name: maybe_abstract_parent_object_entity_name,
             reader_selection_set: vec![],
-            refetch_strategy: Some(RefetchStrategy::UseRefetchField(
-                generate_refetch_field_strategy(
-                    fields.to_vec(),
-                    // NOTE: this will probably panic if we're not exposing fields which are
-                    // originally on Mutation
-                    parent_object_entity_name,
-                    subfields_or_inline_fragments,
-                ),
-            )),
+            refetch_strategy: RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
+                fields.to_vec(),
+                // NOTE: this will probably panic if we're not exposing fields which are
+                // originally on Mutation
+                parent_object_entity_name,
+                subfields_or_inline_fragments,
+            ))
+            .some(),
         },
         mutation_client_scalar_selectable,
         payload_object_entity_name,
-    ))
+    )
+        .ok()
 }
 
 /// Here, we are turning "pet" (the field_arg) to the ServerFieldId
@@ -302,14 +303,16 @@ fn parse_mutation_subfield_id<TNetworkProtocol: NetworkProtocol>(
                     field_arg: field_arg.to_string(),
                 })?;
 
-            Ok((
+            (
                 server_object_selectable.parent_object_entity_name,
                 server_object_selectable.name.item,
-            ))
+            )
+                .ok()
         }
-        None => Err(CreateAdditionalFieldsError::InvalidField {
+        None => CreateAdditionalFieldsError::InvalidField {
             field_arg: field_arg.to_string(),
-        }),
+        }
+        .err(),
     }
 }
 
@@ -362,9 +365,10 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
                 match entity {
                     SelectionType::Scalar(_) => {
                         // TODO show a better error message
-                        return Err(CreateAdditionalFieldsError::InvalidField {
+                        return CreateAdditionalFieldsError::InvalidField {
                             field_arg: selection_name.lookup().to_string(),
-                        });
+                        }
+                        .err();
                     }
                     SelectionType::Object(object) => {
                         current_entity_name = *object.target_object_entity.inner();
@@ -372,10 +376,11 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
                 }
             }
             None => {
-                return Err(CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
+                return CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
                     primary_object_entity_name: current_entity_name,
                     field_name: selection_name.unchecked_conversion(),
-                });
+                }
+                .err();
             }
         };
     }
@@ -391,5 +396,5 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
         .item
         .concrete_type;
 
-    Ok((current_entity_name, current_entity_concrete_type))
+    (current_entity_name, current_entity_concrete_type).ok()
 }

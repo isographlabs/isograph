@@ -1,5 +1,7 @@
 use std::{fmt, ops::Range};
 
+use prelude::Postfix;
+
 use crate::{EmbeddedLocation, Location, TextSource, WithEmbeddedLocation, WithLocation};
 
 // Invariant: end >= start
@@ -93,7 +95,7 @@ impl<T> WithSpan<T> {
     }
 
     pub fn and_then<U, E>(self, map: impl FnOnce(T) -> Result<U, E>) -> Result<WithSpan<U>, E> {
-        Ok(WithSpan::new(map(self.item)?, self.span))
+        WithSpan::new(map(self.item)?, self.span).ok()
     }
 
     pub fn as_ref(&self) -> WithSpan<&T> {

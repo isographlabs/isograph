@@ -15,6 +15,7 @@ use isograph_lang_types::{
     SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, VariableDefinition,
 };
 use lazy_static::lazy_static;
+use prelude::Postfix;
 
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientOrServerObjectSelectable,
@@ -115,10 +116,7 @@ impl MergedScalarFieldSelection {
         if self.arguments.is_empty() {
             None
         } else {
-            Some(get_aliased_mutation_field_name(
-                self.name.into(),
-                &self.arguments,
-            ))
+            get_aliased_mutation_field_name(self.name.into(), &self.arguments).some()
         }
     }
 }
@@ -139,10 +137,7 @@ impl MergedLinkedFieldSelection {
         if self.arguments.is_empty() {
             None
         } else {
-            Some(get_aliased_mutation_field_name(
-                self.name.into(),
-                &self.arguments,
-            ))
+            get_aliased_mutation_field_name(self.name.into(), &self.arguments).some()
         }
     }
 }
@@ -1087,7 +1082,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
         wrap_refetch_field_with_inline_fragment: if parent_object_entity_name
             != newly_encountered_client_scalar_selectable.parent_object_entity_name()
         {
-            Some(parent_object_entity_name)
+            parent_object_entity_name.some()
         } else {
             None
         },
@@ -1205,11 +1200,10 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
 
     let info = PathToRefetchFieldInfo {
         wrap_refetch_field_with_inline_fragment: target_server_object_entity.concrete_type.map_or(
-            Some(
-                *newly_encountered_client_object_selectable
-                    .target_object_entity_name
-                    .inner(),
-            ),
+            (*newly_encountered_client_object_selectable
+                .target_object_entity_name
+                .inner())
+            .some(),
             |_| None,
         ),
         imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant {

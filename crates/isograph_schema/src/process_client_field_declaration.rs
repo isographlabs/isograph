@@ -10,6 +10,7 @@ use isograph_lang_types::{
     ClientScalarSelectionDirectiveSet, DeserializationError, NonConstantValue, SelectionType,
     ServerObjectEntityNameWrapper, TypeAnnotation, UnvalidatedSelection, VariableDefinition,
 };
+use prelude::Postfix;
 
 use pico_macros::memo;
 use thiserror::Error;
@@ -67,7 +68,7 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
                 Location::new(text_source, client_field_declaration.item.parent_type.span),
             ))?;
 
-    let unprocess_client_field_items = match parent_type_id {
+    match parent_type_id {
         ServerEntityName::Object(_) => add_client_field_to_object(db, client_field_declaration)
             .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?,
         ServerEntityName::Scalar(scalar_entity_name) => {
@@ -79,9 +80,8 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
                 Location::new(text_source, client_field_declaration.item.parent_type.span),
             ));
         }
-    };
-
-    Ok(unprocess_client_field_items)
+    }
+    .ok()
 }
 
 pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
@@ -130,7 +130,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
         ),
     ))?;
 
-    let unprocessed_client_object_selection_set = match parent_type_id {
+    match parent_type_id {
         ServerEntityName::Object(_) => match target_type_id {
             ServerEntityName::Object(_to_object_entity_name) => {
                 add_client_pointer_to_object(db, client_pointer_declaration)
@@ -160,8 +160,8 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
                 ),
             ));
         }
-    };
-    Ok(unprocessed_client_object_selection_set)
+    }
+    .ok()
 }
 
 fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol>(
@@ -225,7 +225,7 @@ pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>
     let parent_object_entity_name = client_field_declaration.parent_type.item.0;
     let refetch_strategy = get_unvalidated_refetch_stategy(db, parent_object_entity_name)?;
 
-    Ok((
+    (
         UnprocessedClientScalarSelectableSelectionSet {
             parent_object_entity_name: client_field_declaration.parent_type.item.0,
             client_scalar_selectable_name: *client_scalar_selectable_name,
@@ -233,7 +233,8 @@ pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>
             refetch_strategy,
         },
         selectable,
-    ))
+    )
+        .ok()
 }
 
 pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
@@ -248,7 +249,7 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
         )
         .contains_key(&parent_object_entity_name);
 
-    let refetch_strategy = if is_fetchable {
+    if is_fetchable {
         Some(RefetchStrategy::RefetchFromRoot)
     } else {
         let id_field =
@@ -297,8 +298,8 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
                 ],
             ))
         })
-    };
-    Ok(refetch_strategy)
+    }
+    .ok()
 }
 
 fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol>(
@@ -545,12 +546,13 @@ pub fn validate_variable_definition<TNetworkProtocol: NetworkProtocol>(
                 })
         })?;
 
-    Ok(WithSpan::new(
+    WithSpan::new(
         VariableDefinition {
             name: variable_definition.item.name.map(VariableName::from),
             type_,
             default_value: variable_definition.item.default_value,
         },
         variable_definition.span,
-    ))
+    )
+    .ok()
 }

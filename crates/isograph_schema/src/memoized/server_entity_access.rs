@@ -6,6 +6,7 @@ use common_lang_types::{
 };
 use isograph_lang_types::SelectionType;
 use pico_macros::memo;
+use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
@@ -25,7 +26,7 @@ fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
 > {
     let (outcome, _) = match TNetworkProtocol::parse_type_system_documents(db) {
         Ok(outcome) => outcome,
-        Err(e) => return Err(e.clone()),
+        Err(e) => return e.clone().err(),
     };
 
     let mut server_entities: HashMap<_, Vec<_>> = HashMap::new();
@@ -56,7 +57,7 @@ pub fn server_entities_named<TNetworkProtocol: NetworkProtocol>(
 {
     let map = server_entity_map(db).as_ref().map_err(|e| e.clone())?;
 
-    Ok(map.get(&entity_name).cloned().unwrap_or_default())
+    map.get(&entity_name).cloned().unwrap_or_default().ok()
 }
 
 #[memo]
@@ -68,14 +69,15 @@ pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
 > {
     let (outcome, _) = match TNetworkProtocol::parse_type_system_documents(db) {
         Ok(outcome) => outcome,
-        Err(e) => return Err(e.clone()),
+        Err(e) => return e.clone().err(),
     };
 
-    Ok(outcome
+    outcome
         .iter()
         .filter_map(|x| x.as_ref().as_object())
         .map(|x| x.server_object_entity.clone())
-        .collect())
+        .collect::<Vec<_>>()
+        .ok()
 }
 
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
@@ -114,7 +116,7 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
         Some((first, rest)) => {
             if rest.is_empty() {
                 match first {
-                    SelectionType::Object(o) => Ok(Some(o.clone())),
+                    SelectionType::Object(o) => o.clone().some().ok(),
                     SelectionType::Scalar(_) => {
                         Err(EntityAccessError::IncorrectEntitySelectionType {
                             server_entity_name: server_object_entity_name.into(),

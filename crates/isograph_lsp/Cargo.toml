@@ -14,6 +14,7 @@ isograph_lang_types = { path = "../isograph_lang_types" }
 isograph_schema = { path = "../isograph_schema" }
 pico = { path = "../pico" }
 pico_macros = { path = "../pico_macros" }
+prelude = { path = "../prelude" }
 resolve_position = { path = "../resolve_position" }
 colored = { workspace = true }
 crossbeam = { workspace = true }

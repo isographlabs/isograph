@@ -11,6 +11,7 @@ use isograph_lang_types::{
     SelectionTypeContainingSelections, VariableDefinition,
 };
 use lazy_static::lazy_static;
+use prelude::Postfix;
 
 use crate::{
     IsographDatabase, NetworkProtocol, NormalizationKey, ObjectSelectableId, ServerEntityName,
@@ -53,9 +54,10 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
                 match entity {
                     SelectionType::Scalar(_) => {
                         // TODO show a better error message
-                        return Err(CreateAdditionalFieldsError::InvalidField {
+                        return CreateAdditionalFieldsError::InvalidField {
                             field_arg: selection_name.lookup().to_string(),
-                        });
+                        }
+                        .err();
                     }
                     SelectionType::Object(object) => {
                         // TODO don't clone. When memoized functions return references with 'db lifetime,
@@ -66,15 +68,16 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
                 }
             }
             None => {
-                return Err(CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
+                return CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
                     primary_object_entity_name: current_entity_name,
                     field_name: selection_name.unchecked_conversion(),
-                });
+                }
+                .err();
             }
         };
     }
 
-    Ok(path)
+    path.ok()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]

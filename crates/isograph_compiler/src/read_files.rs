@@ -10,6 +10,7 @@ use common_lang_types::{
     relative_path_from_absolute_and_working_directory,
 };
 use isograph_config::ISOGRAPH_FOLDER;
+use prelude::Postfix;
 use thiserror::Error;
 
 pub fn read_files_in_folder(
@@ -52,7 +53,7 @@ pub fn read_file(
         .map_err(|e| ReadFileError::UnableToConvertToString { path, reason: e })?
         .to_owned();
 
-    Ok((relative_path, contents))
+    (relative_path, contents).ok()
 }
 
 #[expect(clippy::enum_variant_names)]

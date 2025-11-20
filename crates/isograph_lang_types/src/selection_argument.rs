@@ -4,6 +4,7 @@ use common_lang_types::{
 };
 use graphql_lang_types::{FloatValue, NameValuePair};
 use intern::string_key::Lookup;
+use prelude::Postfix;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct SelectionFieldArgument {
@@ -168,36 +169,35 @@ impl TryFrom<NonConstantValue> for ConstantValue {
 
     fn try_from(value: NonConstantValue) -> Result<Self, Self::Error> {
         match value {
-            NonConstantValue::Variable(variable_name) => Err(variable_name),
-            NonConstantValue::Integer(i) => Ok(ConstantValue::Integer(i)),
-            NonConstantValue::Boolean(b) => Ok(ConstantValue::Boolean(b)),
-            NonConstantValue::String(s) => Ok(ConstantValue::String(s)),
-            NonConstantValue::Float(f) => Ok(ConstantValue::Float(f)),
-            NonConstantValue::Null => Ok(ConstantValue::Null),
-            NonConstantValue::Enum(e) => Ok(ConstantValue::Enum(e)),
+            NonConstantValue::Variable(variable_name) => variable_name.err(),
+            NonConstantValue::Integer(i) => ConstantValue::Integer(i).ok(),
+            NonConstantValue::Boolean(b) => ConstantValue::Boolean(b).ok(),
+            NonConstantValue::String(s) => ConstantValue::String(s).ok(),
+            NonConstantValue::Float(f) => ConstantValue::Float(f).ok(),
+            NonConstantValue::Null => ConstantValue::Null.ok(),
+            NonConstantValue::Enum(e) => ConstantValue::Enum(e).ok(),
             NonConstantValue::List(l) => {
                 let converted_list = l
                     .into_iter()
-                    .map(|x| {
-                        Ok::<_, Self::Error>(WithLocation::new(x.item.try_into()?, x.location))
-                    })
+                    .map(|x| WithLocation::new(x.item.try_into()?, x.location).ok::<Self::Error>())
                     .collect::<Result<Vec<_>, _>>()?;
-                Ok(ConstantValue::List(converted_list))
+                ConstantValue::List(converted_list).ok()
             }
             NonConstantValue::Object(o) => {
                 let converted_object = o
                     .into_iter()
                     .map(|name_value_pair| {
-                        Ok::<_, Self::Error>(NameValuePair {
+                        NameValuePair {
                             name: name_value_pair.name,
                             value: WithLocation::new(
                                 name_value_pair.value.item.try_into()?,
                                 name_value_pair.value.location,
                             ),
-                        })
+                        }
+                        .ok::<Self::Error>()
                     })
                     .collect::<Result<Vec<_>, _>>()?;
-                Ok(ConstantValue::Object(converted_object))
+                ConstantValue::Object(converted_object).ok()
             }
         }
     }

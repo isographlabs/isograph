@@ -12,6 +12,7 @@ use intern::Lookup;
 use isograph_config::absolute_and_relative_paths;
 use isograph_schema::{IsographDatabase, NetworkProtocol, SchemaSource, StandardSources};
 use pico::{Database, SourceId};
+use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
@@ -212,12 +213,12 @@ fn read_schema<TNetworkProtocol: NetworkProtocol>(
         span: None,
         current_working_directory: db.get_current_working_directory(),
     };
-    let schema_id = db.set(SchemaSource {
+    db.set(SchemaSource {
         relative_path: schema_path.relative_path,
         content,
         text_source,
-    });
-    Ok(schema_id)
+    })
+    .ok()
 }
 
 fn read_schema_file(path: &PathBuf) -> Result<String, SourceError> {
@@ -232,9 +233,10 @@ fn read_schema_file(path: &PathBuf) -> Result<String, SourceError> {
             })?;
 
     if !canonicalized_existing_path.is_file() {
-        return Err(SourceError::SchemaNotAFile {
+        return SourceError::SchemaNotAFile {
             path: canonicalized_existing_path,
-        });
+        }
+        .err();
     }
 
     let contents = std::fs::read(canonicalized_existing_path.clone()).map_err(|e| {
@@ -244,14 +246,13 @@ fn read_schema_file(path: &PathBuf) -> Result<String, SourceError> {
         }
     })?;
 
-    let contents = std::str::from_utf8(&contents)
+    std::str::from_utf8(&contents)
         .map_err(|e| SourceError::UnableToConvertToString {
             path: canonicalized_existing_path.clone(),
             reason: e,
         })?
-        .to_owned();
-
-    Ok(contents)
+        .to_owned()
+        .ok()
 }
 
 fn read_schema_extensions<TNetworkProtocol: NetworkProtocol>(
@@ -263,7 +264,7 @@ fn read_schema_extensions<TNetworkProtocol: NetworkProtocol>(
         let schema_extension = read_schema(db, schema_extension_path)?;
         schema_extensions.insert(schema_extension_path.relative_path, schema_extension);
     }
-    Ok(schema_extensions)
+    schema_extensions.ok()
 }
 
 fn read_iso_literals_from_project_root<TNetworkProtocol: NetworkProtocol>(

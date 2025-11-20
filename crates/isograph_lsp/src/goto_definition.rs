@@ -24,6 +24,7 @@ use lsp_types::{
     request::{GotoDefinition, Request},
 };
 use pico_macros::memo;
+use prelude::Postfix;
 use resolve_position::ResolvePosition;
 
 pub fn on_goto_definition<TNetworkProtocol: NetworkProtocol>(
@@ -76,7 +77,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                     Err(_) => return Err(LSPRuntimeError::ExpectedError),
                 };
 
-                Some(GotoDefinitionResponse::Array(
+                GotoDefinitionResponse::Array(
                     server_entities
                         .iter()
                         .flat_map(|entity| {
@@ -87,7 +88,8 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                             )
                         })
                         .collect(),
-                ))
+                )
+                .some()
             }
             IsographResolvedNode::Description(_) => None,
             IsographResolvedNode::ScalarSelection(scalar_path) => {
@@ -259,7 +261,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
         None
     };
 
-    Ok(goto_response)
+    goto_response.ok()
 }
 
 fn lsp_location_to_scalar_response(location: lsp_types::Location) -> GotoDefinitionResponse {

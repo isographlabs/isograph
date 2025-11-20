@@ -14,6 +14,7 @@ isograph_lang_types = { path = "../isograph_lang_types" }
 intern = { path = "../../relay-crates/intern" }
 pico = { path = "../pico" }
 pico_macros = { path = "../pico_macros" }
+prelude = { path = "../prelude" }
 colored = { workspace = true }
 lazy_static = { workspace = true }
 notify = { workspace = true }

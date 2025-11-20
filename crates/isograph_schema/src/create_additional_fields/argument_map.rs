@@ -5,6 +5,7 @@ use common_lang_types::{
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
 use isograph_lang_types::{SelectionType, VariableDefinition};
+use prelude::Postfix;
 use std::collections::HashMap;
 
 use crate::{
@@ -66,17 +67,16 @@ pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol>(
     // TODO avoid matching twice?
     let location = argument.location;
 
-    let processed_field_map_item = match &mut argument.item {
+    match &mut argument.item {
         PotentiallyModifiedArgument::Unmodified(unmodified_argument) => {
             match split_to_arg.to_field_names.split_first() {
                 None => {
                     if unmodified_argument.type_.inner().as_object().is_some() {
-                        return Err(
-                            CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
-                                primary_object_entity_name,
-                                field_name: split_to_arg.to_argument_name.lookup().to_string(),
-                            },
-                        );
+                        return CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
+                            primary_object_entity_name,
+                            field_name: split_to_arg.to_argument_name.lookup().to_string(),
+                        }
+                        .err();
                     }
 
                     argument_map.arguments.swap_remove(index_of_argument);
@@ -107,12 +107,11 @@ pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol>(
                     // TODO encode this in the type system.
                     // A modified argument will always have an object type, and cannot be remapped
                     // at the object level.
-                    return Err(
-                        CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
-                            primary_object_entity_name,
-                            field_name: split_to_arg.to_argument_name.lookup().to_string(),
-                        },
-                    );
+                    return CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
+                        primary_object_entity_name,
+                        field_name: split_to_arg.to_argument_name.lookup().to_string(),
+                    }
+                    .err();
                 }
                 Some((first, rest)) => {
                     modified.remove_to_field::<TNetworkProtocol>(
@@ -125,9 +124,8 @@ pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol>(
                 }
             }
         }
-    };
-
-    Ok(processed_field_map_item)
+    }
+    .ok()
 }
 
 #[derive(Debug)]
@@ -195,7 +193,7 @@ impl ModifiedArgument {
                         .iter()
                         .flat_map(|(name, result)| {
                             if let Ok(v) = result {
-                                Some((
+                                (
                                     *name,
                                     PotentiallyModifiedField::Unmodified(match v {
                                         SelectionType::Scalar(s) => SelectionType::Scalar((
@@ -207,7 +205,8 @@ impl ModifiedArgument {
                                             o.name.item,
                                         )),
                                     }),
-                                ))
+                                )
+                                    .some()
                             } else {
                                 None
                             }
@@ -255,12 +254,10 @@ impl ModifiedArgument {
                         match field {
                             PotentiallyModifiedField::Unmodified(field_id) => {
                                 if field_id.as_object().is_some() {
-                                    return Err(
-                                        CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
-                                            primary_object_entity_name,
-                                            field_name: key.lookup().to_string(),
-                                        }
-                                    );
+                                    return CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
+                                        primary_object_entity_name,
+                                        field_name: key.lookup().to_string(),
+                                    }.err();
                                 }
 
                                 // Cool! We found a scalar, we can remove it.
@@ -271,22 +268,21 @@ impl ModifiedArgument {
                             }
                             PotentiallyModifiedField::Modified(_) => {
                                 // A field can only be modified if it has an object type
-                                return Err(
-                                    CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
-                                        primary_object_entity_name,
-                                        field_name: key.to_string(),
-                                    }
-                                );
+                                return CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
+                                    primary_object_entity_name,
+                                    field_name: key.to_string(),
+                                }.err();
                             }
                         }
                     }
                 }
             }
             None => {
-                return Err(CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
+                return CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
                     primary_object_entity_name,
                     field_name: first,
-                });
+                }
+                .err();
             }
         };
         Ok(())

@@ -12,6 +12,7 @@ use artifact_content::{
 use colored::Colorize;
 use common_lang_types::CurrentWorkingDirectory;
 use isograph_schema::{IsographDatabase, NetworkProtocol};
+use prelude::Postfix;
 use pretty_duration::pretty_duration;
 use thiserror::Error;
 use tracing::{error, info};
@@ -90,12 +91,13 @@ pub fn compile<TNetworkProtocol: NetworkProtocol>(
     let total_artifacts_written =
         write_artifacts_to_disk(artifacts, &config.artifact_directory.absolute_path)?;
 
-    Ok(CompilationStats {
+    CompilationStats {
         client_field_count: stats.client_field_count,
         client_pointer_count: stats.client_pointer_count,
         entrypoint_count: stats.entrypoint_count,
         total_artifacts_written,
-    })
+    }
+    .ok()
 }
 
 #[derive(Error, Debug)]

@@ -30,6 +30,7 @@ use isograph_schema::{
 };
 use isograph_schema::{ContainsIsoStats, GetValidatedSchemaError, get_validated_schema};
 use lazy_static::lazy_static;
+use prelude::*;
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
     fmt::{Debug, Display},
@@ -133,7 +134,7 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
                 format!("// {header}\n{}", artifact_path_and_content.file_content);
         }
     }
-    Ok((artifact_path_and_content, stats.clone()))
+    (artifact_path_and_content, stats.clone()).ok()
 }
 
 fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
@@ -484,7 +485,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 }
             };
 
-            Some((client_type_name, value))
+            (client_type_name, value).some()
         })
     {
         // For each user-written client types, generate a param type artifact
@@ -532,36 +533,36 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 );
 
         let artifact_path_and_content = match client_selectable {
-            SelectionType::Object(client_pointer) => {
-                Some(generate_eager_reader_output_type_artifact(
-                    db,
-                    &SelectionType::Object(client_pointer),
-                    config,
-                    UserWrittenClientTypeInfo {
-                        const_export_name: client_pointer.info.const_export_name,
-                        file_path: client_pointer.info.file_path,
-                        client_field_directive_set: ClientScalarSelectionDirectiveSet::None(
-                            EmptyDirectiveSet {},
-                        ),
-                    },
-                    config.options.include_file_extensions_in_import_statements,
-                ))
-            }
+            SelectionType::Object(client_pointer) => generate_eager_reader_output_type_artifact(
+                db,
+                &SelectionType::Object(client_pointer),
+                config,
+                UserWrittenClientTypeInfo {
+                    const_export_name: client_pointer.info.const_export_name,
+                    file_path: client_pointer.info.file_path,
+                    client_field_directive_set: ClientScalarSelectionDirectiveSet::None(
+                        EmptyDirectiveSet {},
+                    ),
+                },
+                config.options.include_file_extensions_in_import_statements,
+            )
+            .some(),
             SelectionType::Scalar(client_field) => match client_field.variant {
                 ClientFieldVariant::Link => {
-                    Some(generate_link_output_type_artifact(db, client_field))
+                    generate_link_output_type_artifact(db, client_field).some()
                 }
                 ClientFieldVariant::UserWritten(info) => {
-                    Some(generate_eager_reader_output_type_artifact(
+                    generate_eager_reader_output_type_artifact(
                         db,
                         &SelectionType::Scalar(client_field),
                         config,
                         info,
                         config.options.include_file_extensions_in_import_statements,
-                    ))
+                    )
+                    .some()
                 }
                 ClientFieldVariant::ImperativelyLoadedField(_) => {
-                    Some(generate_refetch_output_type_artifact(db, client_field))
+                    generate_refetch_output_type_artifact(db, client_field).some()
                 }
             },
         };
@@ -1461,7 +1462,7 @@ pub fn get_provided_arguments<'a>(
                 .iter()
                 .any(|arg| definition.name.item == arg.item.name.item);
             if user_has_supplied_argument {
-                Some(definition.clone())
+                definition.clone().some()
             } else {
                 None
             }

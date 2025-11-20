@@ -15,6 +15,7 @@ use isograph_schema::{
 use isograph_schema::{IsographDatabase, ServerScalarEntity};
 use lazy_static::lazy_static;
 use pico_macros::memo;
+use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
@@ -158,18 +159,16 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     }
                 }
                 None => {
-                    return Err(
-                        ProcessGraphqlTypeSystemDefinitionError::AttemptedToExtendUndefinedType {
-                            type_name: name,
-                        },
-                    )?;
+                    return ProcessGraphqlTypeSystemDefinitionError::AttemptedToExtendUndefinedType {
+                        type_name: name,
+                    }.err()?;
                 }
             }
         }
 
         extend_result_with_default_types(&mut result);
 
-        Ok((result, graphql_root_types.into()))
+        (result, graphql_root_types.into()).ok()
     }
 
     fn generate_link_type<'a>(

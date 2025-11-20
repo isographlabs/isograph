@@ -6,6 +6,7 @@ use graphql_schema_parser::{SchemaParseError, parse_schema, parse_schema_extensi
 use isograph_schema::{IsographDatabase, NetworkProtocol, SchemaSource};
 use pico::{MemoRef, SourceId};
 use pico_macros::memo;
+use prelude::Postfix;
 
 #[expect(clippy::type_complexity)]
 #[memo]
@@ -39,7 +40,7 @@ pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol>(
         schema_extensions.insert(*relative_path, extensions_document);
     }
 
-    Ok((db.intern(schema), schema_extensions))
+    (db.intern(schema), schema_extensions).ok()
 }
 
 #[memo]
@@ -55,5 +56,5 @@ pub fn parse_schema_extensions_file<TNetworkProtocol: NetworkProtocol>(
     let schema_extensions = parse_schema_extensions(content, *text_source)
         .map_err(|with_span| with_span.to_with_location(*text_source))?;
 
-    Ok(db.intern(schema_extensions))
+    db.intern(schema_extensions).ok()
 }

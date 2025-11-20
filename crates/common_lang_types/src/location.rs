@@ -1,4 +1,5 @@
 use intern::string_key::{Intern, Lookup};
+use prelude::Postfix;
 use std::{error::Error, fmt, path::PathBuf};
 
 use crate::{
@@ -105,14 +106,14 @@ impl Location {
 
     pub fn span(self) -> Option<Span> {
         match self {
-            Location::Embedded(embedded) => Some(embedded.span),
+            Location::Embedded(embedded) => embedded.span.some(),
             Location::Generated => None,
         }
     }
 
     pub fn as_embedded_location(self) -> Option<EmbeddedLocation> {
         match self {
-            Location::Embedded(embedded_location) => Some(embedded_location),
+            Location::Embedded(embedded_location) => embedded_location.some(),
             Location::Generated => None,
         }
     }
@@ -157,7 +158,7 @@ impl<T> WithLocation<T> {
     }
 
     pub fn and_then<U, E>(self, map: impl FnOnce(T) -> Result<U, E>) -> Result<WithLocation<U>, E> {
-        Ok(WithLocation::new(map(self.item)?, self.location))
+        WithLocation::new(map(self.item)?, self.location).ok()
     }
 
     /// This method should not be called. It exists because in some places,
@@ -231,7 +232,7 @@ impl<T> WithEmbeddedLocation<T> {
         self,
         map: impl FnOnce(T) -> Result<U, E>,
     ) -> Result<WithEmbeddedLocation<U>, E> {
-        Ok(WithEmbeddedLocation::new(map(self.item)?, self.location))
+        WithEmbeddedLocation::new(map(self.item)?, self.location).ok()
     }
 
     pub fn into_with_location(self) -> WithLocation<T> {

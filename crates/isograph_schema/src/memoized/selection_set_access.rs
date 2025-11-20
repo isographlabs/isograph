@@ -6,6 +6,7 @@ use common_lang_types::{
 };
 use isograph_lang_types::{SelectionType, UnvalidatedSelection};
 use pico_macros::memo;
+use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
@@ -41,19 +42,20 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
             if rest.is_empty() {
                 match first {
                     SelectionType::Scalar(s) => {
-                        (*key, Ok(SelectionType::Scalar(s.selection_set.clone())))
+                        (*key, SelectionType::Scalar(s.selection_set.clone()).ok())
                     }
                     SelectionType::Object(o) => {
-                        (*key, Ok(SelectionType::Object(o.selection_set.clone())))
+                        (*key, SelectionType::Object(o.selection_set.clone()).ok())
                     }
                 }
             } else {
                 (
                     *key,
-                    Err(MemoizedSelectionSetError::DuplicateDefinition {
+                    MemoizedSelectionSetError::DuplicateDefinition {
                         parent_object_entity_name: key.0,
                         client_selectable_name: key.1,
-                    }),
+                    }
+                    .err(),
                 )
             }
         })
@@ -66,7 +68,7 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
             for field in fields {
                 map.insert(
                     (field.parent_object_entity_name, field.name.item.into()),
-                    Ok(SelectionType::Scalar(vec![])),
+                    SelectionType::Scalar(vec![]).ok(),
                 );
             }
         }
@@ -82,9 +84,7 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
             for (key, (_, selection_set)) in expose_field_map {
                 map.insert(
                     (key.0, key.1.into()),
-                    Ok(SelectionType::Scalar(
-                        selection_set.reader_selection_set.clone(),
-                    )),
+                    SelectionType::Scalar(selection_set.reader_selection_set.clone()).ok(),
                 );
             }
         }
@@ -142,13 +142,14 @@ pub fn selectable_validated_reader_selection_set<TNetworkProtocol: NetworkProtoc
 
     match map.get(&(parent_server_object_entity_name, client_selectable_name)) {
         Some(result) => match result {
-            Ok(selections) => Ok(selections.clone()),
-            Err(e) => Err(e.clone()),
+            Ok(selections) => selections.clone().ok(),
+            Err(e) => e.clone().err(),
         },
-        None => Err(MemoizedSelectionSetError::NotFound {
+        None => MemoizedSelectionSetError::NotFound {
             parent_server_object_entity_name,
             selectable_name: client_selectable_name,
-        }),
+        }
+        .err(),
     }
 }
 

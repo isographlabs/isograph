@@ -1,5 +1,6 @@
 use common_lang_types::{IsographDirectiveName, WithLocation, WithSpan};
 use intern::Lookup;
+use prelude::Postfix;
 use serde::{
     Deserialize, Deserializer,
     de::{self, IntoDeserializer, MapAccess},
@@ -259,11 +260,12 @@ impl<'de> MapAccess<'de> for IsographFieldDirectiveVecDeserializer<'de> {
                     directive: &directive.item,
                 })
             }
-            _ => Err(DeserializationError::Custom(format!(
+            _ => DeserializationError::Custom(format!(
                 "Called deserialization of field value for a field with idx {} \
                 that doesn't exist. This is indicative of a bug in Isograph.",
                 self.field_idx
-            ))),
+            ))
+            .err(),
         }
     }
 }

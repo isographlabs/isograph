@@ -11,6 +11,7 @@ intern = { path = "../../relay-crates/intern" }
 graphql_lang_types = { path = "../graphql_lang_types" }
 resolve_position = { path = "../resolve_position" }
 resolve_position_macros = { path = "../resolve_position_macros" }
+prelude = { path = "../prelude" }
 logos = { workspace = true }
 thiserror = { workspace = true }
 

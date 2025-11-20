@@ -1,6 +1,7 @@
 use common_lang_types::{SelectableName, ServerObjectEntityName};
 use isograph_lang_types::{DefinitionLocation, SelectionType};
 use pico_macros::memo;
+use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
@@ -54,25 +55,30 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
     match (server_selectable, client_selectable) {
         (Err(e), Err(_)) => Err(e.clone().into()),
         (Ok(server), Err(_)) => match server.clone() {
-            Some(server_selectable) => Ok(Some(DefinitionLocation::Server(server_selectable?))),
+            Some(server_selectable) => DefinitionLocation::Server(server_selectable?).some().ok(),
             None => Ok(None),
         },
         (Err(_), Ok(client)) => match client.clone() {
-            Some(client_selectable) => Ok(Some(DefinitionLocation::Client(client_selectable))),
+            Some(client_selectable) => DefinitionLocation::Client(client_selectable).some().ok(),
             None => Ok(None),
         },
         (Ok(server), Ok(client)) => match (server, client) {
             (None, None) => Ok(None),
             (None, Some(client_selectable)) => {
-                Ok(Some(DefinitionLocation::Client(client_selectable.clone())))
+                DefinitionLocation::Client(client_selectable.clone())
+                    .some()
+                    .ok()
             }
             (Some(server_selectable), None) => {
-                Ok(Some(DefinitionLocation::Server(server_selectable.clone()?)))
+                DefinitionLocation::Server(server_selectable.clone()?)
+                    .some()
+                    .ok()
             }
-            (Some(_), Some(_)) => Err(SelectableNamedError::DuplicateDefinitions {
+            (Some(_), Some(_)) => SelectableNamedError::DuplicateDefinitions {
                 parent_object_entity_name: parent_server_object_entity_name,
                 selectable_name,
-            }),
+            }
+            .err(),
         },
     }
 }

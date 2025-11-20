@@ -7,6 +7,7 @@ use graphql_lang_types::{
     GraphQLTypeAnnotation, NameValuePair,
 };
 use intern::Lookup;
+use prelude::Postfix;
 use thiserror::Error;
 
 use isograph_lang_types::{
@@ -45,13 +46,14 @@ fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     location: Location,
 ) -> Result<(), WithLocation<ValidateArgumentTypesError<TNetworkProtocol>>> {
     match graphql_type_to_non_null_type(type_.clone()) {
-        GraphQLNonNullTypeAnnotation::List(_) => Err(WithLocation::new(
+        GraphQLNonNullTypeAnnotation::List(_) => WithLocation::new(
             ValidateArgumentTypesError::ExpectedTypeFoundScalar {
                 expected: id_annotation_to_typename_annotation(type_),
                 actual: scalar_literal_name,
             },
             location,
-        )),
+        )
+        .err(),
         GraphQLNonNullTypeAnnotation::Named(named_type) => match named_type.item {
             SelectionType::Scalar(expected_scalar_entity_name) => {
                 if expected_scalar_entity_name == scalar_literal_name {
@@ -60,24 +62,26 @@ fn scalar_literal_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 
                 let expected = id_annotation_to_typename_annotation(type_);
 
-                Err(WithLocation::new(
+                WithLocation::new(
                     ValidateArgumentTypesError::ExpectedTypeFoundScalar {
                         expected,
                         actual: scalar_literal_name,
                     },
                     location,
-                ))
+                )
+                .err()
             }
             SelectionType::Object(_) => {
                 let expected = id_annotation_to_typename_annotation(type_);
 
-                Err(WithLocation::new(
+                WithLocation::new(
                     ValidateArgumentTypesError::ExpectedTypeFoundScalar {
                         expected,
                         actual: scalar_literal_name,
                     },
                     location,
-                ))
+                )
+                .err()
             }
         },
     }
@@ -142,14 +146,15 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                 let expected = id_annotation_to_typename_annotation(field_argument_definition_type);
                 let actual = id_annotation_to_typename_annotation(variable_type);
 
-                Err(WithLocation::new(
+                WithLocation::new(
                     ValidateArgumentTypesError::ExpectedTypeFoundVariable {
                         expected_type: expected,
                         variable_type: actual,
                         variable_name: *variable_name,
                     },
                     selection_supplied_argument_value.location,
-                ))
+                )
+                .err()
             }
         }
         NonConstantValue::Integer(_) => scalar_literal_satisfies_type(
@@ -198,7 +203,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
         ),
         NonConstantValue::Enum(enum_literal_value) => {
             match graphql_type_to_non_null_type(field_argument_definition_type.clone()) {
-                GraphQLNonNullTypeAnnotation::List(_) => Err(WithLocation::new(
+                GraphQLNonNullTypeAnnotation::List(_) => WithLocation::new(
                     ValidateArgumentTypesError::ExpectedTypeFoundEnum {
                         expected: id_annotation_to_typename_annotation(
                             field_argument_definition_type,
@@ -206,7 +211,8 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                         actual: *enum_literal_value,
                     },
                     selection_supplied_argument_value.location,
-                )),
+                )
+                .err(),
                 GraphQLNonNullTypeAnnotation::Named(named_type) => enum_satisfies_type(
                     enum_literal_value,
                     &named_type,
@@ -218,14 +224,15 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             if field_argument_definition_type.is_nullable() {
                 Ok(())
             } else {
-                Err(WithLocation::new(
+                WithLocation::new(
                     ValidateArgumentTypesError::ExpectedNonNullTypeFoundNull {
                         expected: id_annotation_to_typename_annotation(
                             field_argument_definition_type,
                         ),
                     },
                     selection_supplied_argument_value.location,
-                ))
+                )
+                .err()
             }
         }
         NonConstantValue::List(list) => {
@@ -233,35 +240,38 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                 GraphQLNonNullTypeAnnotation::List(list_type) => {
                     list_satisfies_type(db, list, list_type, variable_definitions)
                 }
-                GraphQLNonNullTypeAnnotation::Named(_) => Err(WithLocation::new(
+                GraphQLNonNullTypeAnnotation::Named(_) => WithLocation::new(
                     ValidateArgumentTypesError::ExpectedTypeFoundList {
                         expected: id_annotation_to_typename_annotation(
                             field_argument_definition_type,
                         ),
                     },
                     selection_supplied_argument_value.location,
-                )),
+                )
+                .err(),
             }
         }
         NonConstantValue::Object(object_literal) => {
             match graphql_type_to_non_null_type(field_argument_definition_type.clone()) {
-                GraphQLNonNullTypeAnnotation::List(_) => Err(WithLocation::new(
+                GraphQLNonNullTypeAnnotation::List(_) => WithLocation::new(
                     ValidateArgumentTypesError::ExpectedTypeFoundObject {
                         expected: id_annotation_to_typename_annotation(
                             field_argument_definition_type,
                         ),
                     },
                     selection_supplied_argument_value.location,
-                )),
+                )
+                .err(),
                 GraphQLNonNullTypeAnnotation::Named(named_type) => match named_type.0.item {
-                    SelectionType::Scalar(_) => Err(WithLocation::new(
+                    SelectionType::Scalar(_) => WithLocation::new(
                         ValidateArgumentTypesError::ExpectedTypeFoundObject {
                             expected: id_annotation_to_typename_annotation(
                                 field_argument_definition_type,
                             ),
                         },
                         selection_supplied_argument_value.location,
-                    )),
+                    )
+                    .err(),
                     SelectionType::Object(object_entity_name) => object_satisfies_type(
                         db,
                         selection_supplied_argument_value,
@@ -303,21 +313,22 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                     variable_definitions,
                 ) {
                     Ok(_) => None,
-                    Err(e) => Some(Err(e)),
+                    Err(e) => e.err().some(),
                 },
-                ObjectLiteralFieldType::Missing(field_name) => Some(Ok(*field_name)),
+                ObjectLiteralFieldType::Missing(field_name) => (*field_name).ok().some(),
             })
             .collect::<Result<Vec<_>, _>>()?;
 
     if missing_fields.is_empty() {
         Ok(())
     } else {
-        Err(WithLocation::new(
+        WithLocation::new(
             ValidateArgumentTypesError::MissingFields {
                 missing_fields_names: missing_fields,
             },
             selection_supplied_argument_value.location,
-        ))
+        )
+        .err()
     }
 }
 
@@ -344,7 +355,7 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
             )
         })?;
 
-    let value = server_selectables
+    server_selectables
         .iter()
         .filter_map(|(field_name, selectables)| {
             let first_selectable = selectables
@@ -377,21 +388,21 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
                 .find(|field| field.name.item.lookup() == (*field_name).lookup());
 
             match object_literal_supplied_field {
-                Some(selection_supplied_argument_value) => Some(ObjectLiteralFieldType::Provided(
+                Some(selection_supplied_argument_value) => ObjectLiteralFieldType::Provided(
                     field_type_annotation,
                     selection_supplied_argument_value.clone(),
-                )),
+                )
+                .some(),
                 None => match field_type_annotation {
                     GraphQLTypeAnnotation::NonNull(_) => {
-                        Some(ObjectLiteralFieldType::Missing((*field_name).into()))
+                        ObjectLiteralFieldType::Missing((*field_name).into()).some()
                     }
                     GraphQLTypeAnnotation::List(_) | GraphQLTypeAnnotation::Named(_) => None,
                 },
             }
         })
-        .collect();
-
-    Ok(value)
+        .collect::<Vec<_>>()
+        .ok()
 }
 
 fn validate_no_extraneous_fields<TNetworkProtocol: NetworkProtocol>(
@@ -417,17 +428,18 @@ fn validate_no_extraneous_fields<TNetworkProtocol: NetworkProtocol>(
                 .is_some();
 
             if !is_defined {
-                return Some(field.clone());
+                return field.clone().some();
             }
             None
         })
         .collect();
 
     if !extra_fields.is_empty() {
-        return Err(WithLocation::new(
+        return WithLocation::new(
             ValidateArgumentTypesError::ExtraneousFields { extra_fields },
             location,
-        ));
+        )
+        .err();
     }
     Ok(())
 }
@@ -452,13 +464,14 @@ fn enum_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                 enum_type.clone().map(|_| object_entity_name.into()),
             ));
 
-            Err(WithLocation::new(
+            WithLocation::new(
                 ValidateArgumentTypesError::ExpectedTypeFoundEnum {
                     expected,
                     actual: *enum_literal_value,
                 },
                 location,
-            ))
+            )
+            .err()
         }
         SelectionType::Scalar(_scalar_entity_name) => {
             todo!("Validate enum literal. Parser doesn't support enum literals yet")
@@ -486,13 +499,14 @@ fn get_variable_type<'a, TNetworkProtocol: NetworkProtocol>(
         .iter()
         .find(|definition| definition.item.name.item == *variable_name)
     {
-        Some(variable) => Ok(&variable.item.type_),
-        None => Err(WithLocation::new(
+        Some(variable) => (&variable.item.type_).ok(),
+        None => WithLocation::new(
             ValidateArgumentTypesError::UsedUndefinedVariable {
                 undefined_variable: *variable_name,
             },
             location,
-        )),
+        )
+        .err(),
     }
 }
 

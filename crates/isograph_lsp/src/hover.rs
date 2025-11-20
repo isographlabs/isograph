@@ -17,6 +17,7 @@ use lsp_types::{
     request::{HoverRequest, Request},
 };
 use pico_macros::memo;
+use prelude::Postfix;
 use resolve_position::ResolvePosition;
 
 use crate::{
@@ -75,21 +76,22 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                     .as_ref()
                     .ok_or(LSPRuntimeError::ExpectedError)?;
 
-                Some(format_hover_for_entity(&server_object_entity.item))
+                format_hover_for_entity(&server_object_entity.item).some()
             }
             IsographResolvedNode::Description(_) => None,
             IsographResolvedNode::ScalarSelection(scalar_path) => {
                 if let Ok((parent_object, selectable)) =
                     get_parent_and_selectable_for_scalar_path(db, &scalar_path)
                 {
-                    Some(hover_text_for_selectable(
+                    hover_text_for_selectable(
                         selectable.variant_name(),
                         selectable.name().item,
                         selectable.description(),
                         selectable.arguments(),
                         parent_object.name.item,
                         parent_object.description,
-                    ))
+                    )
+                    .some()
                 } else {
                     None
                 }
@@ -98,14 +100,15 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                 if let Ok((parent_object, selectable)) =
                     get_parent_and_selectable_for_object_path(db, &object_path)
                 {
-                    Some(hover_text_for_selectable(
+                    hover_text_for_selectable(
                         selectable.variant_name(),
                         selectable.name().item,
                         selectable.description(),
                         selectable.arguments(),
                         parent_object.name.item,
                         parent_object.description,
-                    ))
+                    )
+                    .some()
                 } else {
                     None
                 }
@@ -117,13 +120,15 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
         None
     };
 
-    Ok(hover_markup.map(|markup| Hover {
-        contents: HoverContents::Markup(MarkupContent {
-            kind: MarkupKind::Markdown,
-            value: markup,
-        }),
-        range: None,
-    }))
+    hover_markup
+        .map(|markup| Hover {
+            contents: HoverContents::Markup(MarkupContent {
+                kind: MarkupKind::Markdown,
+                value: markup,
+            }),
+            range: None,
+        })
+        .ok()
 }
 
 #[memo]
@@ -205,7 +210,7 @@ fn find_iso_literal_extraction_under_cursor<'a>(
                     character: diff_char,
                 },
             );
-            return Some((extract_item.clone(), index_of_line_char));
+            return (extract_item.clone(), index_of_line_char).some();
         }
 
         last_iteration_end_line_count = end_line_count;

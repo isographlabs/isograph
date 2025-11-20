@@ -1,6 +1,7 @@
 use intern::Lookup;
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{ClientScalarSelectionDirectiveSet, EmptyDirectiveSet, SelectionType};
+use prelude::Postfix;
 use std::{cmp::Ordering, collections::BTreeSet};
 
 use common_lang_types::{ArtifactPathAndContent, SelectableName, ServerObjectEntityName};
@@ -290,7 +291,7 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
                 SelectionType::Object(_) => {}
             };
 
-            Some(value.clone())
+            value.clone().some()
         })
         .map(|selection_type| {
             let client_scalar_selection_directive_set = {
