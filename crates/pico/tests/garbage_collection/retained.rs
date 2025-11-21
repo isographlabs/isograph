@@ -19,6 +19,9 @@ impl TestDatabase {
     }
 }
 
+/// When a result is retained because of being most recently used
+/// and another is marked for permanent retention, both are retained.
+/// This is in spite of the capacity being 1.
 #[test]
 fn basic_retained() {
     // When we garbage collect, we will only keep the most recently called top-level field
@@ -30,8 +33,8 @@ fn basic_retained() {
     memoized_b(&db);
     assert_eq!(B_COUNTER.load(Ordering::SeqCst), 1);
 
-    let retain = retain(&db, memo_ref_a);
-    retain.never_garbage_collect();
+    let retain_a = retain(&db, memo_ref_a);
+    retain_a.never_garbage_collect();
 
     // Run GC. both are retained — b, because of the LRU cache, and a, because of
     // the permanent retain.

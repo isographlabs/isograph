@@ -19,6 +19,10 @@ impl TestDatabase {
     }
 }
 
+/// Test how reachability interacts with garbage collection.
+/// `inner` is reachable from `outer`
+/// and is most recently called
+/// so only it is retained. `outer` is not.
 #[test]
 fn inner_retained() {
     // When we garbage collect, we will only keep the most recently called top-level field

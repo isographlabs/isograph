@@ -19,6 +19,8 @@ impl TestDatabase {
     }
 }
 
+/// When doing garbage collection with a capacity of 1,
+/// only the correct one uses the memoization.
 #[test]
 fn basic_gc() {
     // When we garbage collect, we will only keep the most recently called top-level field

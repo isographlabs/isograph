@@ -5,6 +5,7 @@ mod garbage_collection {
     mod outer_retained;
     mod retained;
     mod retained_and_in_lru;
+    mod retained_clear;
 }
 
 mod params {
