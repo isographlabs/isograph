@@ -2,7 +2,7 @@ use intern::Lookup;
 use isograph_lang_types::TypeAnnotation;
 use isograph_schema::{
     IsographDatabase, MergedSelectionMap, MergedServerSelection, NetworkProtocol,
-    TYPENAME_FIELD_NAME, server_scalar_entity_javascript_name, server_scalar_selectable_named,
+    server_scalar_entity_javascript_name, server_scalar_selectable_named,
 };
 use std::collections::BTreeMap;
 
@@ -56,23 +56,11 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
                     "Expected validation to have succeeded. \
                             This is indicative of a bug in Isograph.",
                 )
-                .as_ref();
-
-                let server_scalar_selectable = match server_scalar_selectable {
-                    Some(server_scalar_selectable) => server_scalar_selectable,
-                    None => {
-                        if scalar_field.name == *TYPENAME_FIELD_NAME {
-                            // this might be __typename defined on an interface, this currently not supported,
-                            // we use a work around here
-                            raw_response_type_inner.push_str(&format!("{name}: string,\n",));
-                            continue;
-                        }
-                        panic!(
-                            "Expected selectable to exist. \
-                                    This is indicative of a bug in Isograph.",
-                        );
-                    }
-                };
+                .as_ref()
+                .expect(
+                    "Expected selectable to exist. \
+                            This is indicative of a bug in Isograph.",
+                );
 
                 let raw_type = server_scalar_selectable.target_scalar_entity.as_ref().map(
                     &mut |scalar_entity_name| match server_scalar_selectable

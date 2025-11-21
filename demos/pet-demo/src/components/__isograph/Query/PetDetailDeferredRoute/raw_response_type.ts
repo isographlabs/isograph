@@ -5,7 +5,7 @@ export type Query__PetDetailDeferredRoute__rawResponse = {
     lastName: string,
   },
   topLevelField____input___o_name__s_ThisIsJustHereToTestObjectLiterals_c: {
-    __typename: 'TopLevelField',
+    __typename: "TopLevelField",
   },
 }
 
