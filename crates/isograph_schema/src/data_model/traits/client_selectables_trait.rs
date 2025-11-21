@@ -129,58 +129,59 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
     parent_object_entity_name: ServerObjectEntityName,
     client_scalar_selectable_name: ClientScalarSelectableName,
 ) -> Result<Vec<WithSpan<ValidatedSelection>>, MemoizedIsoLiteralError<TNetworkProtocol>> {
-    let selectable = client_scalar_selectable_named(
+    // let selectable = client_scalar_selectable_named(
+    //     db,
+    //     parent_object_entity_name,
+    //     client_scalar_selectable_name,
+    // )
+    // .as_ref()
+    // .map_err(|e| e.clone())?
+    // .as_ref()
+    // .expect(
+    //     "Expected selectable to exist. \
+    //     This is indicative of a bug in Isograph.",
+    // );
+
+    // Ok(match selectable.variant {
+    //     ClientFieldVariant::ImperativelyLoadedField(_) => {
+    //         // let refetch_strategy = validated_refetch_strategy_for_client_scalar_selectable_named(
+    //         //     db,
+    //         //     parent_object_entity_name,
+    //         //     client_scalar_selectable_name,
+    //         // )
+    //         // .as_ref()
+    //         // .expect(
+    //         //     "Expected imperatively loaded field to have refetch selection set. \
+    //         //     This is indicative of a bug in Isograph.",
+    //         // )
+    //         // .as_ref()
+    //         // .expect(
+    //         //     "Expected imperatively loaded field to have refetch selection set. \
+    //         //     This is indicative of a bug in Isograph.",
+    //         // );
+
+    //         // refetch_strategy
+    //         //     .refetch_selection_set()
+    //         //     .expect(
+    //         //         "Expected imperatively loaded field to have refetch selection set. \
+    //         //     This is indicative of a bug in Isograph.",
+    //         //     )
+    //         //     // TODO don't clone
+    //         //     .clone()
+    //         vec![]
+    //     }
+    //     _ => {
+    // TODO don't clone
+    Ok(selectable_validated_reader_selection_set(
         db,
         parent_object_entity_name,
-        client_scalar_selectable_name,
+        client_scalar_selectable_name.into(),
     )
     .as_ref()
-    .map_err(|e| e.clone())?
-    .as_ref()
-    .expect(
-        "Expected selectable to exist. \
-        This is indicative of a bug in Isograph.",
-    );
-
-    Ok(match selectable.variant {
-        ClientFieldVariant::ImperativelyLoadedField(_) => {
-            let refetch_strategy = validated_refetch_strategy_for_client_scalar_selectable_named(
-                db,
-                parent_object_entity_name,
-                client_scalar_selectable_name,
-            )
-            .as_ref()
-            .expect(
-                "Expected imperatively loaded field to have refetch selection set. \
-                This is indicative of a bug in Isograph.",
-            )
-            .as_ref()
-            .expect(
-                "Expected imperatively loaded field to have refetch selection set. \
-                This is indicative of a bug in Isograph.",
-            );
-
-            refetch_strategy
-                .refetch_selection_set()
-                .expect(
-                    "Expected imperatively loaded field to have refetch selection set. \
-                This is indicative of a bug in Isograph.",
-                )
-                // TODO don't clone
-                .clone()
-        }
-        _ => {
-            // TODO don't clone
-            selectable_validated_reader_selection_set(
-                db,
-                parent_object_entity_name,
-                client_scalar_selectable_name.into(),
-            )
-            .as_ref()
-            .expect("Expected selection set to be valid.")
-            .clone()
-        }
-    })
+    .expect("Expected selection set to be valid.")
+    .clone())
+    // }
+    // })
 }
 
 pub fn client_object_selectable_selection_set_for_parent_query<

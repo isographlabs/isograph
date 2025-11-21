@@ -18,8 +18,8 @@ use crate::{
     ClientObjectSelectable, ClientScalarSelectable, FieldMapItem,
     FieldToInsertToServerSelectableError, ID_FIELD_NAME, IsographDatabase, NODE_FIELD_NAME,
     NetworkProtocol, ServerEntityName, ServerSelectableNamedError, ValidatedVariableDefinition,
-    WrappedSelectionMapSelection, defined_entity, fetchable_types,
-    refetch_strategy::{RefetchStrategy, generate_refetch_field_strategy, id_selection},
+    WrappedSelectionMapSelection, defined_entity, fetchable_types, fetchable_types_2,
+    refetch_strategy::{self, RefetchStrategy, generate_refetch_field_strategy, id_selection},
     server_selectable_named,
 };
 
@@ -240,16 +240,19 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
 ) -> ProcessClientFieldDeclarationResult<Option<RefetchStrategy<(), ()>>, TNetworkProtocol> {
-    let is_fetchable = fetchable_types(db)
+    let fetch_types = fetchable_types(db)
         .as_ref()
         .expect(
             "Expected parsing to have succeeded. \
             This is indicative of a bug in Isograph.",
         )
-        .lookup(db)
-        .contains_key(&parent_object_entity_name);
+        .lookup_tracked(db);
+    eprintln!(
+        "just read fetch types and it has size={}",
+        fetch_types.len()
+    );
 
-    let refetch_strategy = if is_fetchable {
+    let refetch_strategy = if fetch_types.contains_key(&parent_object_entity_name) {
         Some(RefetchStrategy::RefetchFromRoot)
     } else {
         let id_field =
@@ -270,23 +273,11 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
                     )
                 })?;
 
-        let query_id = dbg!(
-            fetchable_types(db)
-                .as_ref()
-                .map_err(|e| {
-                    WithSpan::new(
-                        ProcessClientFieldDeclarationError::ParseTypeSystemDocumentsError(
-                            e.clone(),
-                        ),
-                        Span::todo_generated(),
-                    )
-                })?
-                .lookup(db)
-        )
-        .iter()
-        .find(|(_, root_operation_name)| root_operation_name.0 == "query")
-        .expect("Expected query to be found")
-        .0;
+        let query_id = fetch_types
+            .iter()
+            .find(|(_, root_operation_name)| root_operation_name.0 == "query")
+            .expect("Expected query to be found")
+            .0;
 
         id_field.map(|_| {
             // Assume that if we have an id field, this implements Node
@@ -400,6 +391,9 @@ pub enum ProcessClientFieldDeclarationError<TNetworkProtocol: NetworkProtocol> {
     ParentTypeNotDefined {
         parent_object_entity_name: ServerObjectEntityNameWrapper,
     },
+
+    #[error("foo")]
+    Foo,
 
     #[error("Directive `@{directive_name}` is not supported on client pointers.")]
     DirectiveNotSupportedOnClientPointer {

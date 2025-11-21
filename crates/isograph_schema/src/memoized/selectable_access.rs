@@ -33,12 +33,12 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
     // we don't obviously have a better way to do this besides checking whether this
     // a server selectable and also checking whether it is a client selectable, and
     // error'ing if we have multiple definitions.
-    let server_selectable = server_selectable_named(
-        db,
-        parent_server_object_entity_name,
-        selectable_name.unchecked_conversion(),
-    )
-    .as_ref();
+    // let server_selectable = server_selectable_named(
+    //     db,
+    //     parent_server_object_entity_name,
+    //     selectable_name.unchecked_conversion(),
+    // )
+    // .as_ref();
 
     let client_selectable = client_selectable_named(
         db,
@@ -51,29 +51,29 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
     // case 2: one is error -> assume that is an unrelated error and return the other one
     // case 3: both are ok -> check that there aren't duplicate definitions, and return remaining one or None
 
-    match (server_selectable, client_selectable) {
-        (Err(e), Err(_)) => Err(e.clone().into()),
-        (Ok(server), Err(_)) => match server.clone() {
-            Some(server_selectable) => Ok(Some(DefinitionLocation::Server(server_selectable?))),
-            None => Ok(None),
-        },
-        (Err(_), Ok(client)) => match client.clone() {
+    match (client_selectable) {
+        (Err(e)) => Err(SelectableNamedError::Foo),
+        // (Ok(server)) => match server.clone() {
+        //     Some(server_selectable) => Ok(Some(DefinitionLocation::Server(server_selectable?))),
+        //     None => Ok(None),
+        // },
+        (Ok(client)) => match client.clone() {
             Some(client_selectable) => Ok(Some(DefinitionLocation::Client(client_selectable))),
             None => Ok(None),
         },
-        (Ok(server), Ok(client)) => match (server, client) {
-            (None, None) => Ok(None),
-            (None, Some(client_selectable)) => {
-                Ok(Some(DefinitionLocation::Client(client_selectable.clone())))
-            }
-            (Some(server_selectable), None) => {
-                Ok(Some(DefinitionLocation::Server(server_selectable.clone()?)))
-            }
-            (Some(_), Some(_)) => Err(SelectableNamedError::DuplicateDefinitions {
-                parent_object_entity_name: parent_server_object_entity_name,
-                selectable_name,
-            }),
-        },
+        // (Ok(server), Ok(client)) => match (server, client) {
+        //     (None, None) => Ok(None),
+        //     (None, Some(client_selectable)) => {
+        //         Ok(Some(DefinitionLocation::Client(client_selectable.clone())))
+        //     }
+        //     (Some(server_selectable), None) => {
+        //         Ok(Some(DefinitionLocation::Server(server_selectable.clone()?)))
+        //     }
+        //     (Some(_), Some(_)) => Err(SelectableNamedError::DuplicateDefinitions {
+        //         parent_object_entity_name: parent_server_object_entity_name,
+        //         selectable_name,
+        //     }),
+        // },
     }
 }
 
@@ -90,4 +90,7 @@ pub enum SelectableNamedError<TNetworkProtocol: NetworkProtocol> {
         parent_object_entity_name: ServerObjectEntityName,
         selectable_name: SelectableName,
     },
+
+    #[error("asdf")]
+    Foo,
 }

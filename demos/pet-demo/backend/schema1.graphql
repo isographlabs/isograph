@@ -1,0 +1,130 @@
+type Query {
+  pets: [Pet!]!
+  pet(id: ID!): Pet
+  petByName(name: String!): Pet
+  node(id: ID!): Node
+  viewer: Viewer!
+  topLevelField(input: TopLevelFieldInput): TopLevelField
+  foo: Pet
+}
+
+input TopLevelFieldInput {
+  name: String
+  nestedInput: NestedInput
+}
+
+input NestedInput {
+  nestedField: String
+}
+
+type TopLevelField {
+  name: String
+}
+
+type Viewer implements Node {
+  id: ID!
+  newsfeed(limit: Int!, skip: Int!): [NewsfeedItem!]!
+}
+
+type Mutation {
+  set_pet_best_friend(id: ID!, new_best_friend_id: ID!): SetBestFriendResponse!
+  set_pet_tagline(input: SetPetTaglineParams!): SetPetTaglineResponse!
+  make_checkin_super(checkin_id: ID!): MakeCheckinSuperResponse!
+}
+
+interface Node {
+  id: ID!
+}
+
+# TODO make this a union: Success | InvalidId instead of using an optional field
+type MakeCheckinSuperResponse {
+  icheckin: ICheckin
+}
+
+type SetBestFriendResponse {
+  pet: Pet!
+}
+
+input SetPetTaglineParams {
+  id: ID!
+  tagline: String!
+}
+
+type SetPetTaglineResponse {
+  pet: Pet!
+}
+
+"""
+A pet is the joy in life
+"""
+type Pet implements Node {
+  id: ID!
+  firstName: String!
+  lastName: String!
+  best_friend_relationship: BestFriendRelationship
+
+  picture: Url!
+  nickname: String
+  age: Int!
+  stats: PetStats
+  tagline: String!
+  alt_tagline: String!
+  potential_new_best_friends: [Pet!]!
+
+  checkins(limit: Int, skip: Int): [Checkin!]!
+  favorite_phrase: String
+}
+
+scalar Url
+
+type BestFriendRelationship {
+  best_friend: Pet!
+  picture_together: Url
+}
+
+type PetStats {
+  weight: Int
+  intelligence: Int
+  cuteness: Int
+  hunger: Int
+  sociability: Int
+  energy: Int
+}
+
+type Checkin implements ICheckin & Node {
+  id: ID!
+  location: String!
+  time: String!
+}
+
+"""
+This interface exists solely allow make_checkin_super to
+return an interface
+"""
+interface ICheckin implements Node {
+  id: ID!
+  location: String!
+  time: String!
+}
+
+union NewsfeedItem = BlogItem | AdItem
+
+type BlogItem implements Node {
+  id: ID!
+  author: String!
+  title: String!
+  content: String!
+  moreContent: String!
+  image: Image
+}
+
+type Image implements Node {
+  id: ID!
+  url: String!
+}
+
+type AdItem implements Node {
+  id: ID!
+  advertiser: String!
+  message: String!
+}

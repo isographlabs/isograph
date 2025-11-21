@@ -40,80 +40,82 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     file_extensions: GenerateFileExtensionsOption,
     persisted_documents: &mut Option<PersistedDocuments>,
 ) -> Vec<ArtifactPathAndContent> {
-    let entrypoint = client_scalar_selectable_named(
+    // let entrypoint = client_scalar_selectable_named(
+    //     db,
+    //     parent_object_entity_name,
+    //     entrypoint_scalar_selectable_name,
+    // )
+    // .as_ref()
+    // .expect(
+    //     "Expected parsing to have succeeded by this point. \
+    //         This is indicative of a bug in Isograph.",
+    // )
+    // .as_ref()
+    // .expect(
+    //     "Expected selectable to exist. \
+    //         This is indicative of a bug in Isograph.",
+    // );
+
+    // let parent_object_entity =
+    //     &server_object_entity_named(db, entrypoint.parent_object_entity_name())
+    //         .as_ref()
+    //         .expect(
+    //             "Expected validation to have worked. \
+    //             This is indicative of a bug in Isograph.",
+    //         )
+    //         .as_ref()
+    //         .expect(
+    //             "Expected entity to exist. \
+    //             This is indicative of a bug in Isograph.",
+    //         )
+    //         .item;
+    let validated_selections = &client_scalar_selectable_selection_set_for_parent_query(
         db,
         parent_object_entity_name,
         entrypoint_scalar_selectable_name,
     )
-    .as_ref()
-    .expect(
-        "Expected parsing to have succeeded by this point. \
-            This is indicative of a bug in Isograph.",
-    )
-    .as_ref()
-    .expect(
-        "Expected selectable to exist. \
-            This is indicative of a bug in Isograph.",
-    );
+    .expect("Expected selection set to be valid.");
+    // let FieldTraversalResult {
+    //     traversal_state,
+    //     merged_selection_map,
+    //     ..
+    // } = create_merged_selection_map_for_field_and_insert_into_global_map(
+    //     db,
+    //     parent_object_entity,
+    //     validated_selections,
+    //     encountered_client_type_map,
+    //     DefinitionLocation::Client(SelectionType::Scalar((
+    //         entrypoint.parent_object_entity_name,
+    //         entrypoint_scalar_selectable_name,
+    //     ))),
+    //     &initial_variable_context(&SelectionType::Scalar(entrypoint)),
+    // );
 
-    let parent_object_entity =
-        &server_object_entity_named(db, entrypoint.parent_object_entity_name())
-            .as_ref()
-            .expect(
-                "Expected validation to have worked. \
-                This is indicative of a bug in Isograph.",
-            )
-            .as_ref()
-            .expect(
-                "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-            )
-            .item;
-    let FieldTraversalResult {
-        traversal_state,
-        merged_selection_map,
-        ..
-    } = create_merged_selection_map_for_field_and_insert_into_global_map(
-        db,
-        parent_object_entity,
-        &client_scalar_selectable_selection_set_for_parent_query(
-            db,
-            entrypoint.parent_object_entity_name,
-            entrypoint.name.item,
-        )
-        .expect("Expected selection set to be valid."),
-        encountered_client_type_map,
-        DefinitionLocation::Client(SelectionType::Scalar((
-            entrypoint.parent_object_entity_name,
-            entrypoint_scalar_selectable_name,
-        ))),
-        &initial_variable_context(&SelectionType::Scalar(entrypoint)),
-    );
-
-    generate_entrypoint_artifacts_with_client_field_traversal_result(
-        db,
-        entrypoint,
-        Some(info),
-        &merged_selection_map,
-        &traversal_state,
-        encountered_client_type_map,
-        entrypoint
-            .variable_definitions
-            .iter()
-            .map(|variable_definition| &variable_definition.item)
-            .collect(),
-        &fetchable_types(db)
-            .as_ref()
-            .expect(
-                "Expected parsing to have succeeded. \
-                This is indicative of a bug in Isograph.",
-            )
-            .lookup(db)
-            .iter()
-            .find(|(_, root_operation_name)| root_operation_name.0 == "mutation"),
-        file_extensions,
-        persisted_documents,
-    )
+    // generate_entrypoint_artifacts_with_client_field_traversal_result(
+    //     db,
+    //     entrypoint,
+    //     Some(info),
+    //     &merged_selection_map,
+    //     &traversal_state,
+    //     encountered_client_type_map,
+    //     entrypoint
+    //         .variable_definitions
+    //         .iter()
+    //         .map(|variable_definition| &variable_definition.item)
+    //         .collect(),
+    //     &fetchable_types(db)
+    //         .as_ref()
+    //         .expect(
+    //             "Expected parsing to have succeeded. \
+    //             This is indicative of a bug in Isograph.",
+    //         )
+    //         .lookup(db)
+    //         .iter()
+    //         .find(|(_, root_operation_name)| root_operation_name.0 == "mutation"),
+    //     file_extensions,
+    //     persisted_documents,
+    // )
+    vec![]
 }
 
 #[expect(clippy::too_many_arguments)]

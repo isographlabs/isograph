@@ -177,6 +177,7 @@ impl<Db: Database> Storage<Db> {
         let top_level_function_calls =
             std::mem::replace(&mut self.top_level_calls, BoxcarVec::new());
 
+        eprintln!("gc 1 {:?}", top_level_function_calls);
         for derived_node_id in top_level_function_calls {
             self.top_level_call_lru_cache.put(derived_node_id, ());
         }

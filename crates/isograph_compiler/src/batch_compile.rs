@@ -11,7 +11,9 @@ use artifact_content::{
 };
 use colored::Colorize;
 use common_lang_types::CurrentWorkingDirectory;
-use isograph_schema::{IsographDatabase, NetworkProtocol};
+use isograph_schema::{
+    IsographDatabase, NetworkProtocol, fetchable_types, fetchable_types_2, server_entity_map,
+};
 use pretty_duration::pretty_duration;
 use thiserror::Error;
 use tracing::{error, info};
@@ -85,17 +87,41 @@ pub fn compile<TNetworkProtocol: NetworkProtocol>(
     // disk can be as fast as possible and we minimize the chance that changes to the file
     // system occur while we're writing and we get unpredictable results.
 
-    let config = db.get_isograph_config();
-    let (artifacts, stats) = get_artifact_path_and_content(db)?;
-    let total_artifacts_written =
-        write_artifacts_to_disk(artifacts, &config.artifact_directory.absolute_path)?;
+    // let fetch_types_2 = fetchable_types_2(db).as_ref().expect(
+    //     "Expected parsing to have succeeded. \
+    //         This is indicative of a bug in Isograph.",
+    // );
+
+    // eprintln!("owned fetch type len={}", fetch_types_2.len());
+
+    let fetch_types = fetchable_types(db)
+        .as_ref()
+        .expect(
+            "Expected parsing to have succeeded. \
+            This is indicative of a bug in Isograph.",
+        )
+        .lookup_tracked(db);
+    eprintln!("entrypoint fetch type len={}", fetch_types.len());
+
+    if fetch_types.len() == 0 {
+        panic!("should not be empty");
+    }
+    // let config = db.get_isograph_config();
+    // let (artifacts, stats) = get_artifact_path_and_content(db)?;
 
     Ok(CompilationStats {
-        client_field_count: stats.client_field_count,
-        client_pointer_count: stats.client_pointer_count,
-        entrypoint_count: stats.entrypoint_count,
-        total_artifacts_written,
+        client_field_count: 0,
+        client_pointer_count: 0,
+        entrypoint_count: 0,
+        total_artifacts_written: 100,
     })
+
+    // Ok(CompilationStats {
+    //     client_field_count: stats.client_field_count,
+    //     client_pointer_count: stats.client_pointer_count,
+    //     entrypoint_count: stats.entrypoint_count,
+    //     total_artifacts_written,
+    // })
 }
 
 #[derive(Error, Debug)]

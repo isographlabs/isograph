@@ -1,7 +1,7 @@
 use colored::Colorize;
 use common_lang_types::CurrentWorkingDirectory;
 use isograph_config::CompilerConfig;
-use isograph_schema::NetworkProtocol;
+use isograph_schema::{NetworkProtocol, StandardSources, fetchable_types};
 use notify::{
     Error, EventKind, RecommendedWatcher, RecursiveMode,
     event::{CreateKind, ModifyKind, RemoveKind, RenameMode},
@@ -16,6 +16,7 @@ use tracing::info;
 use crate::{
     batch_compile::{BatchCompileError, compile, print_result},
     compiler_state::CompilerState,
+    mutate_schema_source_in_db,
     source_files::update_sources,
     with_duration::WithDuration,
 };
@@ -26,38 +27,39 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
 ) -> Result<(), BatchCompileError<TNetworkProtocol>> {
     let mut state = CompilerState::new(config_location, current_working_directory)?;
 
-    let config = state.db.get_isograph_config().clone();
+    fetch_types_assert_non_zero_len(&state, "first");
 
-    info!("{}", "Starting to compile.".cyan());
-    let _ = print_result(WithDuration::new(|| compile::<TNetworkProtocol>(&state.db)));
+    let schema = state.db.get_isograph_config().schema.clone();
 
-    let (mut file_system_receiver, mut file_system_watcher) =
-        create_debounced_file_watcher(&config);
-    while let Some(res) = file_system_receiver.recv().await {
-        match res {
-            Ok(changes) => {
-                if has_config_changes(&changes) {
-                    info!(
-                        "{}",
-                        "Config change detected. Starting a full compilation.".cyan()
-                    );
-                    state = CompilerState::new(config_location, current_working_directory)?;
-                    file_system_watcher.stop();
-                    // TODO is this a bug? Will we continue to watch the old folders? I think so.
-                    (file_system_receiver, file_system_watcher) =
-                        create_debounced_file_watcher(&config);
-                } else {
-                    info!("{}", "File changes detected. Starting to compile.".cyan());
-                    update_sources(&mut state.db, &changes)?;
-                    state.run_garbage_collection();
-                };
-                let result = WithDuration::new(|| compile::<TNetworkProtocol>(&state.db));
-                let _ = print_result(result);
-            }
-            Err(errors) => return Err(errors.into()),
-        }
-    }
+    mutate_schema_source_in_db(&mut state.db, &schema)?;
+
+    fetch_types_assert_non_zero_len(&state, "second");
+
+    state.run_garbage_collection();
+
+    // THIS PANICS???
+    fetch_types_assert_non_zero_len(&state, "third");
+
     Ok(())
+}
+
+fn fetch_types_assert_non_zero_len<TNetworkProtocol: NetworkProtocol>(
+    state: &CompilerState<TNetworkProtocol>,
+    msg: &'static str,
+) {
+    let fetch_types = fetchable_types(&state.db)
+        .as_ref()
+        .expect(
+            "Expected parsing to have succeeded. \
+            This is indicative of a bug in Isograph.",
+        )
+        // tracked or untracked, doesn't matter?
+        .lookup_tracked(&state.db);
+    info!("fetch type {msg} len={}", fetch_types.len());
+    if fetch_types.len() == 0 {
+        // This will not panic
+        panic!("should not be empty");
+    }
 }
 
 pub fn has_config_changes(changes: &[SourceFileEvent]) -> bool {
@@ -284,6 +286,7 @@ pub enum SourceEventKind {
     Remove(PathBuf),
 }
 
+#[derive(Debug)]
 pub enum ChangedFileKind {
     Config,
     Schema,

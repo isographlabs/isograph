@@ -73,6 +73,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         ),
         ParseGraphQLTypeSystemDocumentsError,
     > {
+        eprintln!("parse type system documents");
         let mut graphql_root_types = None;
 
         let (type_system_document, type_system_extension_documents) =

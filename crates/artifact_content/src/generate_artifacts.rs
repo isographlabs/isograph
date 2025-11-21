@@ -115,27 +115,34 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
     GetArtifactPathAndContentError<TNetworkProtocol>,
 > {
     let config = db.get_isograph_config();
-    let validated_schema = get_validated_schema(db);
-    let stats = match validated_schema {
-        Ok(stats) => stats,
-        Err(e) => return Err(e.clone())?,
-    };
+    // let validated_schema = get_validated_schema(db);
+    // let stats = match validated_schema {
+    //     Ok(stats) => stats,
+    //     Err(e) => return Err(e.clone())?,
+    // };
 
     let mut artifact_path_and_content = get_artifact_path_and_content_impl(db, config);
-    if let Some(header) = config.options.generated_file_header {
-        for artifact_path_and_content in artifact_path_and_content.iter_mut() {
-            artifact_path_and_content.file_content =
-                format!("// {header}\n{}", artifact_path_and_content.file_content);
-        }
-    }
-    Ok((artifact_path_and_content, stats.clone()))
+    // if let Some(header) = config.options.generated_file_header {
+    //     for artifact_path_and_content in artifact_path_and_content.iter_mut() {
+    //         artifact_path_and_content.file_content =
+    //             format!("// {header}\n{}", artifact_path_and_content.file_content);
+    //     }
+    // }
+    Ok((
+        artifact_path_and_content,
+        ContainsIsoStats {
+            client_field_count: 0,
+            entrypoint_count: 0,
+            client_pointer_count: 0,
+        },
+    ))
 }
 
 fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     config: &CompilerConfig,
 ) -> Vec<ArtifactPathAndContent> {
-    let mut encountered_client_type_map = BTreeMap::new();
+    // let mut encountered_client_type_map = BTreeMap::new();
     let mut path_and_contents = vec![];
     let mut encountered_output_types = HashSet::<ClientSelectableId>::new();
     let mut persisted_documents =
@@ -148,435 +155,435 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 documents: BTreeMap::new(),
             });
 
-    // For each entrypoint, generate an entrypoint artifact and refetch artifacts
-    for ((parent_object_entity_name, entrypoint_selectable_name), entrypoint_info) in
-        validated_entrypoints(db)
-    {
-        let entrypoint_info = entrypoint_info
-            .as_ref()
-            .expect("Expected entrypoints to be validated");
+    // // For each entrypoint, generate an entrypoint artifact and refetch artifacts
+    // for ((parent_object_entity_name, entrypoint_selectable_name), entrypoint_info) in
+    //     validated_entrypoints(db)
+    // {
+    //     let entrypoint_info = entrypoint_info
+    //         .as_ref()
+    //         .expect("Expected entrypoints to be validated");
 
-        let entrypoint_path_and_content = generate_entrypoint_artifacts(
-            db,
-            *parent_object_entity_name,
-            *entrypoint_selectable_name,
-            entrypoint_info,
-            &mut encountered_client_type_map,
-            config.options.include_file_extensions_in_import_statements,
-            &mut persisted_documents,
-        );
-        path_and_contents.extend(entrypoint_path_and_content);
+    //     let entrypoint_path_and_content = generate_entrypoint_artifacts(
+    //         db,
+    //         *parent_object_entity_name,
+    //         *entrypoint_selectable_name,
+    //         entrypoint_info,
+    //         &mut encountered_client_type_map,
+    //         config.options.include_file_extensions_in_import_statements,
+    //         &mut persisted_documents,
+    //     );
+    //     path_and_contents.extend(entrypoint_path_and_content);
 
-        // We also need to generate output types for entrypoints
-        encountered_output_types.insert(SelectionType::Scalar((
-            *parent_object_entity_name,
-            *entrypoint_selectable_name,
-        )));
-    }
+    //     // We also need to generate output types for entrypoints
+    //     encountered_output_types.insert(SelectionType::Scalar((
+    //         *parent_object_entity_name,
+    //         *entrypoint_selectable_name,
+    //     )));
+    // }
 
-    for (
-        encountered_field_id,
-        FieldTraversalResult {
-            traversal_state,
-            merged_selection_map,
-            was_ever_selected_loadably,
-            ..
-        },
-    ) in &encountered_client_type_map
-    {
-        match encountered_field_id {
-            DefinitionLocation::Server((
-                parent_object_entity_name,
-                server_object_selectable_name,
-            )) => {
-                let server_object_selectable = server_object_selectable_named(
-                    db,
-                    *parent_object_entity_name,
-                    (*server_object_selectable_name).into(),
-                )
-                .as_ref()
-                .expect(
-                    "Expected validation to have succeeded. \
-                    This is indicative of a bug in Isograph.",
-                )
-                .as_ref()
-                .expect(
-                    "Expected selectable to exist. \
-                        This is indicative of a bug in Isograph.",
-                );
+    // for (
+    //     encountered_field_id,
+    //     FieldTraversalResult {
+    //         traversal_state,
+    //         merged_selection_map,
+    //         was_ever_selected_loadably,
+    //         ..
+    //     },
+    // ) in &encountered_client_type_map
+    // {
+    //     match encountered_field_id {
+    //         DefinitionLocation::Server((
+    //             parent_object_entity_name,
+    //             server_object_selectable_name,
+    //         )) => {
+    //             let server_object_selectable = server_object_selectable_named(
+    //                 db,
+    //                 *parent_object_entity_name,
+    //                 (*server_object_selectable_name).into(),
+    //             )
+    //             .as_ref()
+    //             .expect(
+    //                 "Expected validation to have succeeded. \
+    //                 This is indicative of a bug in Isograph.",
+    //             )
+    //             .as_ref()
+    //             .expect(
+    //                 "Expected selectable to exist. \
+    //                     This is indicative of a bug in Isograph.",
+    //             );
 
-                match &server_object_selectable.object_selectable_variant {
-                    ServerObjectSelectableVariant::LinkedField => {}
-                    ServerObjectSelectableVariant::InlineFragment => {
-                        path_and_contents.push(generate_eager_reader_condition_artifact(
-                            db,
-                            server_object_selectable,
-                            &inline_fragment_reader_selection_set(server_object_selectable),
-                            &traversal_state.refetch_paths,
-                            config.options.include_file_extensions_in_import_statements,
-                        ));
-                    }
-                }
-            }
+    //             match &server_object_selectable.object_selectable_variant {
+    //                 ServerObjectSelectableVariant::LinkedField => {}
+    //                 ServerObjectSelectableVariant::InlineFragment => {
+    //                     path_and_contents.push(generate_eager_reader_condition_artifact(
+    //                         db,
+    //                         server_object_selectable,
+    //                         &inline_fragment_reader_selection_set(server_object_selectable),
+    //                         &traversal_state.refetch_paths,
+    //                         config.options.include_file_extensions_in_import_statements,
+    //                     ));
+    //                 }
+    //             }
+    //         }
 
-            DefinitionLocation::Client(SelectionType::Object((
-                parent_object_entity_name,
-                client_object_selectable_name,
-            ))) => {
-                let client_object_selectable = client_object_selectable_named(
-                    db,
-                    *parent_object_entity_name,
-                    *client_object_selectable_name,
-                )
-                .as_ref()
-                .expect(
-                    "Expected selectable to be valid. \
-                    This is indicative of a bug in Isograph.",
-                )
-                .as_ref()
-                .expect(
-                    "Expected selectable to exist. \
-                    This is indicative of a bug in Isograph.",
-                );
+    //         DefinitionLocation::Client(SelectionType::Object((
+    //             parent_object_entity_name,
+    //             client_object_selectable_name,
+    //         ))) => {
+    //             let client_object_selectable = client_object_selectable_named(
+    //                 db,
+    //                 *parent_object_entity_name,
+    //                 *client_object_selectable_name,
+    //             )
+    //             .as_ref()
+    //             .expect(
+    //                 "Expected selectable to be valid. \
+    //                 This is indicative of a bug in Isograph.",
+    //             )
+    //             .as_ref()
+    //             .expect(
+    //                 "Expected selectable to exist. \
+    //                 This is indicative of a bug in Isograph.",
+    //             );
 
-                path_and_contents.extend(generate_eager_reader_artifacts(
-                    db,
-                    &SelectionType::Object(client_object_selectable),
-                    config,
-                    UserWrittenClientTypeInfo {
-                        const_export_name: client_object_selectable.info.const_export_name,
-                        file_path: client_object_selectable.info.file_path,
-                        client_field_directive_set: ClientScalarSelectionDirectiveSet::None(
-                            EmptyDirectiveSet {},
-                        ),
-                    },
-                    &traversal_state.refetch_paths,
-                    config.options.include_file_extensions_in_import_statements,
-                    traversal_state.has_updatable,
-                ));
-            }
-            DefinitionLocation::Client(SelectionType::Scalar((
-                parent_object_entity_name,
-                client_scalar_selectable_name,
-            ))) => {
-                let client_scalar_selectable = client_scalar_selectable_named(
-                    db,
-                    *parent_object_entity_name,
-                    *client_scalar_selectable_name,
-                )
-                .as_ref()
-                .expect(
-                    "Expected parsing to have succeeded by this point. \
-                        This is indicative of a bug in Isograph.",
-                )
-                .as_ref()
-                .expect(
-                    "Expected selectable to exist. \
-                        This is indicative of a bug in Isograph.",
-                );
+    //             path_and_contents.extend(generate_eager_reader_artifacts(
+    //                 db,
+    //                 &SelectionType::Object(client_object_selectable),
+    //                 config,
+    //                 UserWrittenClientTypeInfo {
+    //                     const_export_name: client_object_selectable.info.const_export_name,
+    //                     file_path: client_object_selectable.info.file_path,
+    //                     client_field_directive_set: ClientScalarSelectionDirectiveSet::None(
+    //                         EmptyDirectiveSet {},
+    //                     ),
+    //                 },
+    //                 &traversal_state.refetch_paths,
+    //                 config.options.include_file_extensions_in_import_statements,
+    //                 traversal_state.has_updatable,
+    //             ));
+    //         }
+    //         DefinitionLocation::Client(SelectionType::Scalar((
+    //             parent_object_entity_name,
+    //             client_scalar_selectable_name,
+    //         ))) => {
+    //             let client_scalar_selectable = client_scalar_selectable_named(
+    //                 db,
+    //                 *parent_object_entity_name,
+    //                 *client_scalar_selectable_name,
+    //             )
+    //             .as_ref()
+    //             .expect(
+    //                 "Expected parsing to have succeeded by this point. \
+    //                     This is indicative of a bug in Isograph.",
+    //             )
+    //             .as_ref()
+    //             .expect(
+    //                 "Expected selectable to exist. \
+    //                     This is indicative of a bug in Isograph.",
+    //             );
 
-                match &client_scalar_selectable.variant {
-                    ClientFieldVariant::Link => (),
-                    ClientFieldVariant::UserWritten(info) => {
-                        path_and_contents.extend(generate_eager_reader_artifacts(
-                            db,
-                            &SelectionType::Scalar(client_scalar_selectable),
-                            config,
-                            *info,
-                            &traversal_state.refetch_paths,
-                            config.options.include_file_extensions_in_import_statements,
-                            traversal_state.has_updatable,
-                        ));
+    //             match &client_scalar_selectable.variant {
+    //                 ClientFieldVariant::Link => (),
+    //                 ClientFieldVariant::UserWritten(info) => {
+    //                     path_and_contents.extend(generate_eager_reader_artifacts(
+    //                         db,
+    //                         &SelectionType::Scalar(client_scalar_selectable),
+    //                         config,
+    //                         *info,
+    //                         &traversal_state.refetch_paths,
+    //                         config.options.include_file_extensions_in_import_statements,
+    //                         traversal_state.has_updatable,
+    //                     ));
 
-                        if *was_ever_selected_loadably {
-                            path_and_contents.push(generate_refetch_reader_artifact(
-                                db,
-                                client_scalar_selectable,
-                                &traversal_state.refetch_paths,
-                                true,
-                                config.options.include_file_extensions_in_import_statements,
-                                &[FieldMapItem {
-                                    from: "id".intern().into(),
-                                    to: "id".intern().into(),
-                                }],
-                            ));
+    //                     if *was_ever_selected_loadably {
+    //                         path_and_contents.push(generate_refetch_reader_artifact(
+    //                             db,
+    //                             client_scalar_selectable,
+    //                             &traversal_state.refetch_paths,
+    //                             true,
+    //                             config.options.include_file_extensions_in_import_statements,
+    //                             &[FieldMapItem {
+    //                                 from: "id".intern().into(),
+    //                                 to: "id".intern().into(),
+    //                             }],
+    //                         ));
 
-                            // Everything about this is quite sus
-                            let id_arg = ArgumentKeyAndValue {
-                                key: "id".intern().into(),
-                                value: NonConstantValue::Variable("id".intern().into()),
-                            };
+    //                         // Everything about this is quite sus
+    //                         let id_arg = ArgumentKeyAndValue {
+    //                             key: "id".intern().into(),
+    //                             value: NonConstantValue::Variable("id".intern().into()),
+    //                         };
 
-                            let type_to_refine_to = &server_object_entity_named(
-                                db,
-                                client_scalar_selectable.parent_object_entity_name(),
-                            )
-                            .as_ref()
-                            .expect(
-                                "Expected validation to have worked. \
-                                    This is indicative of a bug in Isograph.",
-                            )
-                            .as_ref()
-                            .expect(
-                                "Expected entity to exist. \
-                                    This is indicative of a bug in Isograph.",
-                            )
-                            .item;
+    //                         let type_to_refine_to = &server_object_entity_named(
+    //                             db,
+    //                             client_scalar_selectable.parent_object_entity_name(),
+    //                         )
+    //                         .as_ref()
+    //                         .expect(
+    //                             "Expected validation to have worked. \
+    //                                 This is indicative of a bug in Isograph.",
+    //                         )
+    //                         .as_ref()
+    //                         .expect(
+    //                             "Expected entity to exist. \
+    //                                 This is indicative of a bug in Isograph.",
+    //                         )
+    //                         .item;
 
-                            let variable_definitions_iter = client_scalar_selectable
-                                .variable_definitions
-                                .iter()
-                                .map(|variable_definition| &variable_definition.item);
+    //                         let variable_definitions_iter = client_scalar_selectable
+    //                             .variable_definitions
+    //                             .iter()
+    //                             .map(|variable_definition| &variable_definition.item);
 
-                            let id_var = ValidatedVariableDefinition {
-                                name: WithLocation::new("id".intern().into(), Location::Generated),
-                                type_: GraphQLTypeAnnotation::NonNull(Box::new(
-                                    GraphQLNonNullTypeAnnotation::Named(
-                                        GraphQLNamedTypeAnnotation(WithSpan::new(
-                                            ServerEntityName::Scalar(*ID_ENTITY_NAME),
-                                            Span::todo_generated(),
-                                        )),
-                                    ),
-                                )),
-                                default_value: None,
-                            };
+    //                         let id_var = ValidatedVariableDefinition {
+    //                             name: WithLocation::new("id".intern().into(), Location::Generated),
+    //                             type_: GraphQLTypeAnnotation::NonNull(Box::new(
+    //                                 GraphQLNonNullTypeAnnotation::Named(
+    //                                     GraphQLNamedTypeAnnotation(WithSpan::new(
+    //                                         ServerEntityName::Scalar(*ID_ENTITY_NAME),
+    //                                         Span::todo_generated(),
+    //                                     )),
+    //                                 ),
+    //                             )),
+    //                             default_value: None,
+    //                         };
 
-                            let validated_refetch_strategy =
-                                validated_refetch_strategy_for_client_scalar_selectable_named(
-                                    db,
-                                    client_scalar_selectable.parent_object_entity_name,
-                                    client_scalar_selectable.name.item,
-                                )
-                                .as_ref()
-                                .expect(
-                                    "Expected refetch strategy to be valid. \
-                                    This is indicative of a bug in Isograph.",
-                                )
-                                .as_ref()
-                                .expect(
-                                    "Expected refetch strategy. \
-                                    This is indicative of a bug in Isograph.",
-                                );
+    //                         let validated_refetch_strategy =
+    //                             validated_refetch_strategy_for_client_scalar_selectable_named(
+    //                                 db,
+    //                                 client_scalar_selectable.parent_object_entity_name,
+    //                                 client_scalar_selectable.name.item,
+    //                             )
+    //                             .as_ref()
+    //                             .expect(
+    //                                 "Expected refetch strategy to be valid. \
+    //                                 This is indicative of a bug in Isograph.",
+    //                             )
+    //                             .as_ref()
+    //                             .expect(
+    //                                 "Expected refetch strategy. \
+    //                                 This is indicative of a bug in Isograph.",
+    //                             );
 
-                            let (wrapped_map, variable_definitions_iter) =
-                                match validated_refetch_strategy {
-                                    RefetchStrategy::RefetchFromRoot => (
-                                        selection_map_wrapped(merged_selection_map.clone(), vec![]),
-                                        variable_definitions_iter.collect::<Vec<_>>(),
-                                    ),
-                                    RefetchStrategy::UseRefetchField(_) => {
-                                        let wrapped_map = selection_map_wrapped(
-                                            merged_selection_map.clone(),
-                                            vec![
-                                                WrappedSelectionMapSelection::InlineFragment(
-                                                    type_to_refine_to.name.item,
-                                                ),
-                                                WrappedSelectionMapSelection::LinkedField {
-                                                    server_object_selectable_name: "node"
-                                                        .intern()
-                                                        .into(),
-                                                    arguments: vec![id_arg.clone()],
-                                                    concrete_type: None,
-                                                },
-                                            ],
-                                        );
+    //                         let (wrapped_map, variable_definitions_iter) =
+    //                             match validated_refetch_strategy {
+    //                                 RefetchStrategy::RefetchFromRoot => (
+    //                                     selection_map_wrapped(merged_selection_map.clone(), vec![]),
+    //                                     variable_definitions_iter.collect::<Vec<_>>(),
+    //                                 ),
+    //                                 RefetchStrategy::UseRefetchField(_) => {
+    //                                     let wrapped_map = selection_map_wrapped(
+    //                                         merged_selection_map.clone(),
+    //                                         vec![
+    //                                             WrappedSelectionMapSelection::InlineFragment(
+    //                                                 type_to_refine_to.name.item,
+    //                                             ),
+    //                                             WrappedSelectionMapSelection::LinkedField {
+    //                                                 server_object_selectable_name: "node"
+    //                                                     .intern()
+    //                                                     .into(),
+    //                                                 arguments: vec![id_arg.clone()],
+    //                                                 concrete_type: None,
+    //                                             },
+    //                                         ],
+    //                                     );
 
-                                        (
-                                            wrapped_map,
-                                            variable_definitions_iter
-                                                .chain(std::iter::once(&id_var))
-                                                .collect(),
-                                        )
-                                    }
-                                };
+    //                                     (
+    //                                         wrapped_map,
+    //                                         variable_definitions_iter
+    //                                             .chain(std::iter::once(&id_var))
+    //                                             .collect(),
+    //                                     )
+    //                                 }
+    //                             };
 
-                            let mut traversal_state = traversal_state.clone();
-                            traversal_state.refetch_paths = traversal_state
-                                .refetch_paths
-                                .into_iter()
-                                .map(|(mut key, value)| {
-                                    key.0.linked_fields.insert(
-                                        0,
-                                        NormalizationKey::InlineFragment(
-                                            type_to_refine_to.name.item,
-                                        ),
-                                    );
-                                    key.0.linked_fields.insert(
-                                        0,
-                                        NormalizationKey::ServerField(NameAndArguments {
-                                            name: "node".intern().into(),
-                                            arguments: vec![id_arg.clone()],
-                                        }),
-                                    );
-                                    (key, value)
-                                })
-                                .collect();
+    //                         let mut traversal_state = traversal_state.clone();
+    //                         traversal_state.refetch_paths = traversal_state
+    //                             .refetch_paths
+    //                             .into_iter()
+    //                             .map(|(mut key, value)| {
+    //                                 key.0.linked_fields.insert(
+    //                                     0,
+    //                                     NormalizationKey::InlineFragment(
+    //                                         type_to_refine_to.name.item,
+    //                                     ),
+    //                                 );
+    //                                 key.0.linked_fields.insert(
+    //                                     0,
+    //                                     NormalizationKey::ServerField(NameAndArguments {
+    //                                         name: "node".intern().into(),
+    //                                         arguments: vec![id_arg.clone()],
+    //                                     }),
+    //                                 );
+    //                                 (key, value)
+    //                             })
+    //                             .collect();
 
-                            let query_type = fetchable_types(db)
-                                .as_ref()
-                                .expect(
-                                    "Expected parsing to have succeeded. \
-                                    This is indicative of a bug in Isograph.",
-                                )
-                                .lookup(db)
-                                .iter()
-                                .find(|(_, root_operation_name)| root_operation_name.0 == "query");
+    //                         let query_type = fetchable_types(db)
+    //                             .as_ref()
+    //                             .expect(
+    //                                 "Expected parsing to have succeeded. \
+    //                                 This is indicative of a bug in Isograph.",
+    //                             )
+    //                             .lookup(db)
+    //                             .iter()
+    //                             .find(|(_, root_operation_name)| root_operation_name.0 == "query");
 
-                            path_and_contents.extend(
-                                generate_entrypoint_artifacts_with_client_field_traversal_result(
-                                    db,
-                                    client_scalar_selectable,
-                                    None,
-                                    &wrapped_map,
-                                    &traversal_state,
-                                    &encountered_client_type_map,
-                                    variable_definitions_iter,
-                                    &query_type,
-                                    config.options.include_file_extensions_in_import_statements,
-                                    &mut persisted_documents,
-                                ),
-                            );
-                        }
-                    }
-                    ClientFieldVariant::ImperativelyLoadedField(s) => {
-                        path_and_contents.push(generate_refetch_reader_artifact(
-                            db,
-                            client_scalar_selectable,
-                            &traversal_state.refetch_paths,
-                            false,
-                            config.options.include_file_extensions_in_import_statements,
-                            &s.field_map,
-                        ));
-                    }
-                };
-            }
-        }
-    }
+    //                         path_and_contents.extend(
+    //                             generate_entrypoint_artifacts_with_client_field_traversal_result(
+    //                                 db,
+    //                                 client_scalar_selectable,
+    //                                 None,
+    //                                 &wrapped_map,
+    //                                 &traversal_state,
+    //                                 &encountered_client_type_map,
+    //                                 variable_definitions_iter,
+    //                                 &query_type,
+    //                                 config.options.include_file_extensions_in_import_statements,
+    //                                 &mut persisted_documents,
+    //                             ),
+    //                         );
+    //                     }
+    //                 }
+    //                 ClientFieldVariant::ImperativelyLoadedField(s) => {
+    //                     path_and_contents.push(generate_refetch_reader_artifact(
+    //                         db,
+    //                         client_scalar_selectable,
+    //                         &traversal_state.refetch_paths,
+    //                         false,
+    //                         config.options.include_file_extensions_in_import_statements,
+    //                         &s.field_map,
+    //                     ));
+    //                 }
+    //             };
+    //         }
+    //     }
+    // }
 
-    for (client_type_name, user_written_client_type) in client_selectable_map(db)
-        .as_ref()
-        .expect("Expected client selectable map to be valid.")
-        .iter()
-        .flat_map(|(key, value)| {
-            let value = value
-                .as_ref()
-                .expect("Expected client selectable to be valid");
+    // for (client_type_name, user_written_client_type) in client_selectable_map(db)
+    //     .as_ref()
+    //     .expect("Expected client selectable map to be valid.")
+    //     .iter()
+    //     .flat_map(|(key, value)| {
+    //         let value = value
+    //             .as_ref()
+    //             .expect("Expected client selectable to be valid");
 
-            match &value {
-                SelectionType::Scalar(s) => match &s.variant {
-                    isograph_schema::ClientFieldVariant::UserWritten(_) => {}
-                    isograph_schema::ClientFieldVariant::ImperativelyLoadedField(_) => return None,
-                    isograph_schema::ClientFieldVariant::Link => return None,
-                },
-                SelectionType::Object(_) => {}
-            };
+    //         match &value {
+    //             SelectionType::Scalar(s) => match &s.variant {
+    //                 isograph_schema::ClientFieldVariant::UserWritten(_) => {}
+    //                 isograph_schema::ClientFieldVariant::ImperativelyLoadedField(_) => return None,
+    //                 isograph_schema::ClientFieldVariant::Link => return None,
+    //             },
+    //             SelectionType::Object(_) => {}
+    //         };
 
-            let client_type_name = match value {
-                SelectionType::Scalar(_) => {
-                    SelectionType::Scalar((key.0, key.1.unchecked_conversion()))
-                }
-                SelectionType::Object(_) => {
-                    SelectionType::Object((key.0, key.1.unchecked_conversion()))
-                }
-            };
+    //         let client_type_name = match value {
+    //             SelectionType::Scalar(_) => {
+    //                 SelectionType::Scalar((key.0, key.1.unchecked_conversion()))
+    //             }
+    //             SelectionType::Object(_) => {
+    //                 SelectionType::Object((key.0, key.1.unchecked_conversion()))
+    //             }
+    //         };
 
-            Some((client_type_name, value))
-        })
-    {
-        // For each user-written client types, generate a param type artifact
-        path_and_contents.push(generate_eager_reader_param_type_artifact(
-            db,
-            user_written_client_type,
-            config.options.include_file_extensions_in_import_statements,
-        ));
+    //         Some((client_type_name, value))
+    //     })
+    // {
+    //     // For each user-written client types, generate a param type artifact
+    //     path_and_contents.push(generate_eager_reader_param_type_artifact(
+    //         db,
+    //         user_written_client_type,
+    //         config.options.include_file_extensions_in_import_statements,
+    //     ));
 
-        match encountered_client_type_map.get(&DefinitionLocation::Client(client_type_name)) {
-            Some(FieldTraversalResult {
-                traversal_state, ..
-            }) => {
-                // If this user-written client field is reachable from an entrypoint,
-                // we've already noted the accessible client fields
-                encountered_output_types.extend(traversal_state.accessible_client_fields.iter())
-            }
-            None => {
-                // If this field is not reachable from an entrypoint, we need to
-                // encounter all the client fields
-                for nested_client_field_id in accessible_client_fields(db, user_written_client_type)
-                {
-                    encountered_output_types.insert(nested_client_field_id);
-                }
-            }
-        }
-    }
+    //     match encountered_client_type_map.get(&DefinitionLocation::Client(client_type_name)) {
+    //         Some(FieldTraversalResult {
+    //             traversal_state, ..
+    //         }) => {
+    //             // If this user-written client field is reachable from an entrypoint,
+    //             // we've already noted the accessible client fields
+    //             encountered_output_types.extend(traversal_state.accessible_client_fields.iter())
+    //         }
+    //         None => {
+    //             // If this field is not reachable from an entrypoint, we need to
+    //             // encounter all the client fields
+    //             for nested_client_field_id in accessible_client_fields(db, user_written_client_type)
+    //             {
+    //                 encountered_output_types.insert(nested_client_field_id);
+    //             }
+    //         }
+    //     }
+    // }
 
-    for output_type_id in encountered_output_types {
-        let (parent_object_entity_name, client_selectable_name) = match output_type_id {
-            SelectionType::Scalar(s) => (s.0, s.1.into()),
-            SelectionType::Object(o) => (o.0, o.1.into()),
-        };
-        let client_selectable =
-            client_selectable_named(db, parent_object_entity_name, client_selectable_name)
-                .as_ref()
-                .expect(
-                    "Expected selectable to be valid. \
-                    This is indicative of a bug in Isograph.",
-                )
-                .as_ref()
-                .expect(
-                    "Expected selectable to exist. \
-                    This is indicative of a bug in Isograph.",
-                );
+    // for output_type_id in encountered_output_types {
+    //     let (parent_object_entity_name, client_selectable_name) = match output_type_id {
+    //         SelectionType::Scalar(s) => (s.0, s.1.into()),
+    //         SelectionType::Object(o) => (o.0, o.1.into()),
+    //     };
+    //     let client_selectable =
+    //         client_selectable_named(db, parent_object_entity_name, client_selectable_name)
+    //             .as_ref()
+    //             .expect(
+    //                 "Expected selectable to be valid. \
+    //                 This is indicative of a bug in Isograph.",
+    //             )
+    //             .as_ref()
+    //             .expect(
+    //                 "Expected selectable to exist. \
+    //                 This is indicative of a bug in Isograph.",
+    //             );
 
-        let artifact_path_and_content = match client_selectable {
-            SelectionType::Object(client_pointer) => {
-                Some(generate_eager_reader_output_type_artifact(
-                    db,
-                    &SelectionType::Object(client_pointer),
-                    config,
-                    UserWrittenClientTypeInfo {
-                        const_export_name: client_pointer.info.const_export_name,
-                        file_path: client_pointer.info.file_path,
-                        client_field_directive_set: ClientScalarSelectionDirectiveSet::None(
-                            EmptyDirectiveSet {},
-                        ),
-                    },
-                    config.options.include_file_extensions_in_import_statements,
-                ))
-            }
-            SelectionType::Scalar(client_field) => match client_field.variant {
-                ClientFieldVariant::Link => {
-                    Some(generate_link_output_type_artifact(db, client_field))
-                }
-                ClientFieldVariant::UserWritten(info) => {
-                    Some(generate_eager_reader_output_type_artifact(
-                        db,
-                        &SelectionType::Scalar(client_field),
-                        config,
-                        info,
-                        config.options.include_file_extensions_in_import_statements,
-                    ))
-                }
-                ClientFieldVariant::ImperativelyLoadedField(_) => {
-                    Some(generate_refetch_output_type_artifact(db, client_field))
-                }
-            },
-        };
+    //     let artifact_path_and_content = match client_selectable {
+    //         SelectionType::Object(client_pointer) => {
+    //             Some(generate_eager_reader_output_type_artifact(
+    //                 db,
+    //                 &SelectionType::Object(client_pointer),
+    //                 config,
+    //                 UserWrittenClientTypeInfo {
+    //                     const_export_name: client_pointer.info.const_export_name,
+    //                     file_path: client_pointer.info.file_path,
+    //                     client_field_directive_set: ClientScalarSelectionDirectiveSet::None(
+    //                         EmptyDirectiveSet {},
+    //                     ),
+    //                 },
+    //                 config.options.include_file_extensions_in_import_statements,
+    //             ))
+    //         }
+    //         SelectionType::Scalar(client_field) => match client_field.variant {
+    //             ClientFieldVariant::Link => {
+    //                 Some(generate_link_output_type_artifact(db, client_field))
+    //             }
+    //             ClientFieldVariant::UserWritten(info) => {
+    //                 Some(generate_eager_reader_output_type_artifact(
+    //                     db,
+    //                     &SelectionType::Scalar(client_field),
+    //                     config,
+    //                     info,
+    //                     config.options.include_file_extensions_in_import_statements,
+    //                 ))
+    //             }
+    //             ClientFieldVariant::ImperativelyLoadedField(_) => {
+    //                 Some(generate_refetch_output_type_artifact(db, client_field))
+    //             }
+    //         },
+    //     };
 
-        if let Some(path_and_content) = artifact_path_and_content {
-            path_and_contents.push(path_and_content);
-        }
-    }
+    //     if let Some(path_and_content) = artifact_path_and_content {
+    //         path_and_contents.push(path_and_content);
+    //     }
+    // }
 
-    path_and_contents.push(build_iso_overload_artifact(
-        db,
-        config.options.include_file_extensions_in_import_statements,
-        config.options.no_babel_transform,
-    ));
-    path_and_contents.push(generate_ts_config());
+    // path_and_contents.push(build_iso_overload_artifact(
+    //     db,
+    //     config.options.include_file_extensions_in_import_statements,
+    //     config.options.no_babel_transform,
+    // ));
+    // path_and_contents.push(generate_ts_config());
 
-    if let Some(persisted_documents) = persisted_documents {
-        path_and_contents.push(persisted_documents.path_and_content());
-    }
+    // if let Some(persisted_documents) = persisted_documents {
+    //     path_and_contents.push(persisted_documents.path_and_content());
+    // }
 
     path_and_contents
 }

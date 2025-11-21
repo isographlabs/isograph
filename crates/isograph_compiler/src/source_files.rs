@@ -36,6 +36,7 @@ pub fn update_sources<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     changes: &[SourceFileEvent],
 ) -> Result<(), SourceError> {
+    eprintln!("{:?}", changes);
     let errors = changes
         .iter()
         .filter_map(|(event, change_kind)| match change_kind {
@@ -62,6 +63,7 @@ fn handle_update_schema<TNetworkProtocol: NetworkProtocol>(
     let schema = db.get_isograph_config().schema.clone();
     match event_kind {
         SourceEventKind::CreateOrModify(_) => {
+            println!("modifying schema");
             db.get_standard_sources_mut().tracked().schema_source_id = read_schema(db, &schema)?;
         }
         SourceEventKind::Rename((_, target_path)) => {
@@ -202,7 +204,7 @@ fn remove_iso_literals_from_folder<TNetworkProtocol: NetworkProtocol>(
     db.remove_iso_literals_from_path(&relative_path);
 }
 
-fn read_schema<TNetworkProtocol: NetworkProtocol>(
+pub fn read_schema<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     schema_path: &AbsolutePathAndRelativePath,
 ) -> Result<SourceId<SchemaSource>, SourceError> {
@@ -218,6 +220,32 @@ fn read_schema<TNetworkProtocol: NetworkProtocol>(
         text_source,
     });
     Ok(schema_id)
+}
+
+pub fn mutate_schema_source_in_db<TNetworkProtocol: NetworkProtocol>(
+    db: &mut IsographDatabase<TNetworkProtocol>,
+    schema_path: &AbsolutePathAndRelativePath,
+) -> Result<(), SourceError> {
+    eprintln!("read schema 2");
+
+    let content = format!(
+        "\n\n# asdfasdf\n{}\n\n# nooo why",
+        read_schema_file(&schema_path.absolute_path)?
+    );
+    let text_source = TextSource {
+        relative_path_to_source_file: schema_path.relative_path,
+        span: None,
+        current_working_directory: db.get_current_working_directory(),
+    };
+
+    // and we must set a changed source
+    let schema_id = db.set(SchemaSource {
+        relative_path: schema_path.relative_path,
+        content,
+        text_source,
+    });
+    // Ok(schema_id)
+    Ok(())
 }
 
 fn read_schema_file(path: &PathBuf) -> Result<String, SourceError> {

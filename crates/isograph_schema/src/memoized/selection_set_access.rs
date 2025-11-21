@@ -140,16 +140,17 @@ pub fn selectable_validated_reader_selection_set<TNetworkProtocol: NetworkProtoc
 ) -> Result<ValidatedSelectionSet, MemoizedSelectionSetError<TNetworkProtocol>> {
     let map = memoized_validated_reader_selection_set_map(db);
 
-    match map.get(&(parent_server_object_entity_name, client_selectable_name)) {
-        Some(result) => match result {
-            Ok(selections) => Ok(selections.clone()),
-            Err(e) => Err(e.clone()),
-        },
-        None => Err(MemoizedSelectionSetError::NotFound {
-            parent_server_object_entity_name,
-            selectable_name: client_selectable_name,
-        }),
-    }
+    // match map.get(&(parent_server_object_entity_name, client_selectable_name)) {
+    //     Some(result) => match result {
+    //         Ok(selections) => Ok(selections.clone()),
+    //         Err(e) => Err(e.clone()),
+    //     },
+    //     None => Err(MemoizedSelectionSetError::NotFound {
+    //         parent_server_object_entity_name,
+    //         selectable_name: client_selectable_name,
+    //     }),
+    // }
+    Ok(vec![])
 }
 
 #[derive(Clone, Error, Eq, PartialEq, Debug)]

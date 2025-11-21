@@ -123,6 +123,9 @@ pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
 
 #[derive(Clone, Error, Debug, Eq, PartialEq)]
 pub enum MemoizedIsoLiteralError<TNetworkProtocol: NetworkProtocol> {
+    #[error("foo")]
+    Foo,
+
     #[error(
         "Multiple definitions of `{duplicate_entity_name}.{duplicate_client_selectable_name}` were found"
     )]
@@ -232,33 +235,34 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     let declaration = match declaration {
         Some(declaration) => declaration.clone(),
         None => {
-            // This is an awkward situation! We didn't find any client scalar selectable defined
-            // by an iso literal. But, we still need to check for linked fields.
-            //
-            // What's nice, though, is that we don't actually need the schema to successfully
-            // compile if we've already found the field we need! That's neat.
-            //
-            // We could theoretically skip this if the name is not *LINK_FIELD_NAME /shrug
-            //
-            // This is also problematic, because we really actually want a "all client fields map" fn,
-            // but we don't really have one, since we're adding this here. Oh well. See the awkwardness in
-            // selection_set_access.
-            let link_fields = get_link_fields_map(db).as_ref().map_err(|e| e.clone())?;
+            // // This is an awkward situation! We didn't find any client scalar selectable defined
+            // // by an iso literal. But, we still need to check for linked fields.
+            // //
+            // // What's nice, though, is that we don't actually need the schema to successfully
+            // // compile if we've already found the field we need! That's neat.
+            // //
+            // // We could theoretically skip this if the name is not *LINK_FIELD_NAME /shrug
+            // //
+            // // This is also problematic, because we really actually want a "all client fields map" fn,
+            // // but we don't really have one, since we're adding this here. Oh well. See the awkwardness in
+            // // selection_set_access.
+            // let link_fields = get_link_fields_map(db).as_ref().map_err(|e| e.clone())?;
 
-            if let Some(link_field) = link_fields
-                .get(&(parent_object_entity_name, client_scalar_selectable_name))
-                .cloned()
-            {
-                return Ok(Some(link_field));
-            }
+            // if let Some(link_field) = link_fields
+            //     .get(&(parent_object_entity_name, client_scalar_selectable_name))
+            //     .cloned()
+            // {
+            //     return Ok(Some(link_field));
+            // }
 
-            // Awkward! We also need to check for expose fields. Ay ay ay
-            return Ok(expose_field_map(db)
-                .as_ref()
-                .map_err(|e| e.clone())?
-                .get(&(parent_object_entity_name, client_scalar_selectable_name))
-                .cloned()
-                .map(|(selectable, _)| selectable));
+            // // Awkward! We also need to check for expose fields. Ay ay ay
+            // return Ok(expose_field_map(db)
+            //     .as_ref()
+            //     .map_err(|e| e.clone())?
+            //     .get(&(parent_object_entity_name, client_scalar_selectable_name))
+            //     .cloned()
+            //     .map(|(selectable, _)| selectable));
+            return Ok(None);
         }
     };
 
@@ -314,14 +318,16 @@ pub fn client_selectable_named<TNetworkProtocol: NetworkProtocol>(
     // just in general, we can do better! This is awkward!
     // TODO don't call to_owned, since that clones an error unnecessarily
 
-    let object_selectable = client_object_selectable_named(
+    let client_selectable = client_scalar_selectable_named(
         db,
         parent_object_entity_name,
         client_selectable_name.unchecked_conversion(),
     )
     .to_owned();
 
-    let client_selectable = client_scalar_selectable_named(
+    return Err(MemoizedIsoLiteralError::Foo);
+
+    let object_selectable = client_object_selectable_named(
         db,
         parent_object_entity_name,
         client_selectable_name.unchecked_conversion(),

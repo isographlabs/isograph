@@ -17,7 +17,7 @@ use crate::{
 /// already fully parses the schema, so until that's refactored, there isn't much upside in
 /// not materializing a map here.
 #[memo]
-fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
+pub fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
     HashMap<UnvalidatedTypeName, Vec<OwnedServerEntity<TNetworkProtocol>>>,
