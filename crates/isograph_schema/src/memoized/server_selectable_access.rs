@@ -16,6 +16,7 @@ use crate::{
 type OwnedSelectableResult<TNetworkProtocol> =
     Result<OwnedServerSelectable<TNetworkProtocol>, FieldToInsertToServerSelectableError>;
 
+#[expect(clippy::type_complexity)]
 #[memo]
 pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
@@ -34,7 +35,7 @@ pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
         .map_err(|e| e.clone())?;
 
     Ok(items
-        .into_iter()
+        .iter()
         .flat_map(|selection_type| selection_type.as_ref().as_object())
         .map(|object_outcome| {
             let fields = object_outcome
