@@ -1,3 +1,5 @@
+#![allow(clippy::print_stderr)]
+
 use crate::{
     format::on_format,
     goto_definition::on_goto_definition,
@@ -36,7 +38,6 @@ use lsp_types::{
 use prelude::Postfix;
 use std::{ops::ControlFlow, path::PathBuf};
 use thiserror::Error;
-use tracing::debug;
 
 /// Initializes an LSP connection, handling the `initialize` message and `initialized` notification
 /// handshake.
@@ -76,7 +77,7 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
     let mut compiler_state: CompilerState<TNetworkProtocol> =
         CompilerState::new(config_location, current_working_directory)?;
 
-    debug!("Running server loop");
+    eprintln!("Running server loop");
 
     let (tokio_sender, mut lsp_message_receiver) = tokio::sync::mpsc::channel(100);
     bridge_crossbeam_to_tokio(connection.receiver, tokio_sender);
@@ -93,21 +94,21 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
                     let duration = WithDuration::new(|| {
                         match lsp_message {
                             lsp_server::Message::Request(request) => {
-                                debug!("\nReceived request: {}", request.method);
+                                eprintln!("\nReceived request: {}", request.method);
                                 let response = dispatch_request(request, &compiler_state);
-                                debug!("Sending response: {response:?}");
+                                eprintln!("Sending response: {response:?}");
                                 connection.sender.send(response.into()).unwrap();
                             }
                             lsp_server::Message::Notification(notification) => {
-                                debug!("\nReceived notification: {}", notification.method);
+                                eprintln!("\nReceived notification: {}", notification.method);
                                 let _ = dispatch_notification(notification, &mut compiler_state);
                             }
                             lsp_server::Message::Response(response) => {
-                                debug!("\nReceived response: {response:?}");
+                                eprintln!("\nReceived response: {response:?}");
                             }
                         }
                     });
-                    debug!("Processing took {}ms.", duration.elapsed_time.as_millis());
+                    eprintln!("Processing took {}ms.", duration.elapsed_time.as_millis());
                 } else {
                     // If any connection breaks, we can just end
                     break 'all_messages;
