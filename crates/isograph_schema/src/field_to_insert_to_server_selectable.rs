@@ -1,6 +1,6 @@
 use common_lang_types::{
     SelectableName, ServerObjectEntityName, ServerSelectableName, UnvalidatedTypeName,
-    VariableName, WithLocation,
+    VariableName, WithLocation, WithLocationPostfix,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLInputValueDefinition, GraphQLNamedTypeAnnotation, NameValuePair,
@@ -147,13 +147,9 @@ pub fn graphql_input_value_definition_to_variable_definition<TNetworkProtocol: N
         .item
         .default_value
         .map(|graphql_constant_value| {
-            WithLocation::new(
-                convert_graphql_constant_value_to_isograph_constant_value(
-                    graphql_constant_value.item,
-                ),
-                graphql_constant_value.location,
-            )
-            .ok()
+            convert_graphql_constant_value_to_isograph_constant_value(graphql_constant_value.item)
+                .with_location(graphql_constant_value.location)
+                .ok()
         })
         .transpose()?;
 
@@ -180,14 +176,12 @@ pub fn graphql_input_value_definition_to_variable_definition<TNetworkProtocol: N
                 )
         })?;
 
-    WithLocation::new(
-        VariableDefinition {
-            name: input_value_definition.item.name.map(VariableName::from),
-            type_,
-            default_value,
-        },
-        input_value_definition.location,
-    )
+    VariableDefinition {
+        name: input_value_definition.item.name.map(VariableName::from),
+        type_,
+        default_value,
+    }
+    .with_location(input_value_definition.location)
     .ok()
 }
 
@@ -205,10 +199,8 @@ fn convert_graphql_constant_value_to_isograph_constant_value(
             let converted_list = l
                 .into_iter()
                 .map(|x| {
-                    WithLocation::new(
-                        convert_graphql_constant_value_to_isograph_constant_value(x.item),
-                        x.location,
-                    )
+                    convert_graphql_constant_value_to_isograph_constant_value(x.item)
+                        .with_location(x.location)
                 })
                 .collect::<Vec<_>>();
             ConstantValue::List(converted_list)
@@ -218,12 +210,10 @@ fn convert_graphql_constant_value_to_isograph_constant_value(
                 .into_iter()
                 .map(|name_value_pair| NameValuePair {
                     name: name_value_pair.name,
-                    value: WithLocation::new(
-                        convert_graphql_constant_value_to_isograph_constant_value(
-                            name_value_pair.value.item,
-                        ),
-                        name_value_pair.value.location,
-                    ),
+                    value: convert_graphql_constant_value_to_isograph_constant_value(
+                        name_value_pair.value.item,
+                    )
+                    .with_location(name_value_pair.value.location),
                 })
                 .collect::<Vec<_>>();
             ConstantValue::Object(converted_object)

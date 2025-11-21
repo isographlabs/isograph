@@ -97,9 +97,6 @@ pub enum Location {
 }
 
 impl Location {
-    pub fn generated() -> Self {
-        Location::Generated
-    }
     pub fn new(text_source: TextSource, span: Span) -> Self {
         Location::Embedded(EmbeddedLocation::new(text_source, span))
     }
@@ -140,6 +137,21 @@ pub struct WithLocation<T> {
     pub location: Location,
     pub item: T,
 }
+
+pub trait WithLocationPostfix
+where
+    Self: Sized,
+{
+    fn with_location(self, location: Location) -> WithLocation<Self> {
+        WithLocation::new(self, location)
+    }
+
+    fn with_generated_location(self) -> WithLocation<Self> {
+        WithLocation::new(self, Location::Generated)
+    }
+}
+
+impl<T> WithLocationPostfix for T {}
 
 impl<T: Error> Error for WithLocationForDisplay<'_, T> {
     fn description(&self) -> &str {
@@ -237,6 +249,18 @@ impl<T> WithEmbeddedLocation<T> {
 
     pub fn into_with_location(self) -> WithLocation<T> {
         self.into()
+    }
+}
+
+pub trait WithEmbeddedLocationPostfix
+where
+    Self: Sized,
+{
+    fn with_embedded_location(
+        self,
+        embedded_location: EmbeddedLocation,
+    ) -> WithEmbeddedLocation<Self> {
+        WithEmbeddedLocation::new(self, embedded_location)
     }
 }
 

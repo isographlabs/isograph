@@ -119,3 +119,18 @@ impl<T: fmt::Display> fmt::Display for WithSpan<T> {
         self.item.fmt(f)
     }
 }
+
+pub trait WithSpanPostfix
+where
+    Self: Sized,
+{
+    fn with_span(self, span: Span) -> WithSpan<Self> {
+        WithSpan::new(self, span)
+    }
+
+    fn with_generated_span(self) -> WithSpan<Self> {
+        WithSpan::new(self, Span::todo_generated())
+    }
+}
+
+impl<T> WithSpanPostfix for T {}

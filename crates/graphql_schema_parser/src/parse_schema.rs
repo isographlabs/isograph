@@ -1,8 +1,8 @@
 use std::{ops::ControlFlow, str::FromStr};
 
 use common_lang_types::{
-    DescriptionValue, EnumLiteralValue, GraphQLInterfaceTypeName, GraphQLObjectTypeName, Span,
-    StringLiteralValue, TextSource, WithLocation, WithSpan,
+    DescriptionValue, EnumLiteralValue, GraphQLInterfaceTypeName, GraphQLObjectTypeName,
+    StringLiteralValue, TextSource, WithLocation, WithSpan, WithSpanPostfix,
 };
 use graphql_syntax::TokenKind;
 use intern::{
@@ -81,13 +81,13 @@ fn parse_type_system_extension_document(
                         .ok()
                 }
             },
-            Err(unexpected_token) => WithSpan::new(
+            Err(unexpected_token) => {
                 SchemaParseError::TopLevelSchemaDeclarationOrExtensionExpected {
                     found_text: unexpected_token.item.to_string(),
-                },
-                unexpected_token.span,
-            )
-            .err(),
+                }
+                .with_span(unexpected_token.span)
+                .err()
+            }
         }?;
         definitions_or_extensions.push(definition_or_extension);
     }
@@ -113,12 +113,10 @@ fn parse_type_system_extension(
         match identifier.item {
             "type" => parse_object_type_extension(tokens, text_source)
                 .map(GraphQLTypeSystemExtension::from),
-            _ => WithSpan::new(
-                SchemaParseError::TopLevelSchemaDeclarationExpected {
-                    found_text: identifier.to_string(),
-                },
-                identifier.span,
-            )
+            _ => SchemaParseError::TopLevelSchemaDeclarationExpected {
+                found_text: identifier.to_string(),
+            }
+            .with_span(identifier.span)
             .err(),
         }
     })?;
@@ -152,12 +150,10 @@ fn parse_type_system_definition(
                 .map(GraphQLTypeSystemDefinition::from),
             "schema" => parse_schema_definition(tokens, description, text_source)
                 .map(GraphQLTypeSystemDefinition::from),
-            _ => WithSpan::new(
-                SchemaParseError::TopLevelSchemaDeclarationExpected {
-                    found_text: identifier.item.to_string(),
-                },
-                identifier.span,
-            )
+            _ => SchemaParseError::TopLevelSchemaDeclarationExpected {
+                found_text: identifier.item.to_string(),
+            }
+            .with_span(identifier.span)
             .err(),
         }
     })?;
@@ -292,7 +288,7 @@ fn parse_directive_definition(
         .map(|x| x.map(|_| ()));
     let _on = tokens
         .parse_matching_identifier("on")
-        .map_err(|x| WithSpan::new(SchemaParseError::from(x), Span::todo_generated()))?;
+        .map_err(|x| SchemaParseError::from(x).with_generated_span())?;
 
     let locations = parse_directive_locations(tokens)?;
 
@@ -328,12 +324,10 @@ fn parse_directive_location(
     match tokens.parse_source_of_kind(TokenKind::Identifier) {
         Ok(text) => DirectiveLocation::from_str(text.item)
             .map_err(|_| {
-                WithSpan::new(
-                    SchemaParseError::ExpectedDirectiveLocation {
-                        text: text.item.to_string(),
-                    },
-                    text.span,
-                )
+                SchemaParseError::ExpectedDirectiveLocation {
+                    text: text.item.to_string(),
+                }
+                .with_span(text.span)
             })
             .map(|location| text.map(|_| location)),
         Err(with_span) => {
@@ -524,11 +518,9 @@ fn reassign_or_error(
     ),
 ) -> ParseResult<()> {
     if root_type.is_some() {
-        return WithSpan::new(
-            SchemaParseError::RootOperationTypeRedefined,
-            operation_type.0.span,
-        )
-        .err();
+        return SchemaParseError::RootOperationTypeRedefined
+            .with_span(operation_type.0.span)
+            .err();
     }
     *root_type = operation_type.1.some();
     Ok(())
@@ -546,11 +538,13 @@ fn parse_root_operation_type(
         .map_err(|with_span| with_span.map(SchemaParseError::from))?;
 
     let root_operation_type = match name.item {
-        "query" => WithSpan::new(RootOperationKind::Query, name.span),
-        "subscription" => WithSpan::new(RootOperationKind::Subscription, name.span),
-        "mutation" => WithSpan::new(RootOperationKind::Mutation, name.span),
+        "query" => RootOperationKind::Query.with_span(name.span),
+        "subscription" => RootOperationKind::Subscription.with_span(name.span),
+        "mutation" => RootOperationKind::Mutation.with_span(name.span),
         _ => {
-            return WithSpan::new(SchemaParseError::ExpectedRootOperationType, name.span).err();
+            return SchemaParseError::ExpectedRootOperationType
+                .with_span(name.span)
+                .err();
         }
     };
 
@@ -711,12 +705,10 @@ fn parse_constant_value(
                     int_literal_string.and_then(|raw_int_value| {
                         match raw_int_value.parse::<i64>() {
                             Ok(value) => GraphQLConstantValue::Int(value).ok(),
-                            Err(_) => WithSpan::new(
-                                SchemaParseError::InvalidIntValue {
-                                    text: raw_int_value.to_string(),
-                                },
-                                int_literal_string.span,
-                            )
+                            Err(_) => SchemaParseError::InvalidIntValue {
+                                text: raw_int_value.to_string(),
+                            }
+                            .with_span(int_literal_string.span)
                             .err(),
                         }
                     })
@@ -732,12 +724,10 @@ fn parse_constant_value(
                     float_literal_string.and_then(|raw_float_value| {
                         match raw_float_value.parse::<f64>() {
                             Ok(value) => GraphQLConstantValue::Float(value.into()).ok(),
-                            Err(_) => WithSpan::new(
-                                SchemaParseError::InvalidFloatValue {
-                                    text: raw_float_value.to_string(),
-                                },
-                                float_literal_string.span,
-                            )
+                            Err(_) => SchemaParseError::InvalidFloatValue {
+                                text: raw_float_value.to_string(),
+                            }
+                            .with_span(float_literal_string.span)
                             .err(),
                         }
                     })
@@ -831,10 +821,9 @@ fn parse_constant_value(
             x
         })?;
 
-        ControlFlow::Continue(WithSpan::new(
-            SchemaParseError::UnableToParseConstantValue,
-            tokens.peek().span,
-        ))
+        ControlFlow::Continue(
+            SchemaParseError::UnableToParseConstantValue.with_span(tokens.peek().span),
+        )
     })
 }
 
@@ -966,10 +955,9 @@ fn parse_type_annotation<T: From<StringKey>>(
         //
         // We don't get a great error message with this current approach.
 
-        ControlFlow::Continue(WithSpan::new(
-            SchemaParseError::ExpectedTypeAnnotation,
-            tokens.peek().span,
-        ))
+        ControlFlow::Continue(
+            SchemaParseError::ExpectedTypeAnnotation.with_span(tokens.peek().span),
+        )
     })
 }
 

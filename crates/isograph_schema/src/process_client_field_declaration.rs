@@ -1,8 +1,9 @@
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, ConstExportName,
     IsographDirectiveName, Location, ParentObjectEntityNameAndSelectableName,
-    RelativePathToSourceFile, SelectableName, ServerObjectEntityName, Span, TextSource,
-    UnvalidatedTypeName, VariableName, WithLocation, WithSpan,
+    RelativePathToSourceFile, SelectableName, ServerObjectEntityName, TextSource,
+    UnvalidatedTypeName, VariableName, WithLocation, WithLocationPostfix, WithSpan,
+    WithSpanPostfix,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -61,24 +62,29 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
                 "Expected parsing to have succeeded. \
                 This is indicative of a bug in Isograph.",
             )
-            .ok_or(WithLocation::new(
+            .ok_or(
                 ProcessClientFieldDeclarationError::ParentTypeNotDefined {
                     parent_object_entity_name: client_field_declaration.item.parent_type.item,
-                },
-                Location::new(text_source, client_field_declaration.item.parent_type.span),
-            ))?;
+                }
+                .with_location(Location::new(
+                    text_source,
+                    client_field_declaration.item.parent_type.span,
+                )),
+            )?;
 
     match parent_type_id {
         ServerEntityName::Object(_) => add_client_field_to_object(db, client_field_declaration)
-            .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?,
+            .map_err(|e| e.item.with_location(Location::new(text_source, e.span)))?,
         ServerEntityName::Scalar(scalar_entity_name) => {
-            return Err(WithLocation::new(
-                ProcessClientFieldDeclarationError::InvalidParentType {
-                    literal_type: "field",
-                    parent_object_entity_name: scalar_entity_name.into(),
-                },
-                Location::new(text_source, client_field_declaration.item.parent_type.span),
-            ));
+            return ProcessClientFieldDeclarationError::InvalidParentType {
+                literal_type: "field",
+                parent_object_entity_name: scalar_entity_name.into(),
+            }
+            .with_location(Location::new(
+                text_source,
+                client_field_declaration.item.parent_type.span,
+            ))
+            .err();
         }
     }
     .ok()
@@ -101,15 +107,15 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
         "Expected parsing to have succeeded. \
         This is indicative of a bug in Isograph.",
     )
-    .ok_or(WithLocation::new(
+    .ok_or(
         ProcessClientFieldDeclarationError::ParentTypeNotDefined {
             parent_object_entity_name: client_pointer_declaration.item.parent_type.item,
-        },
-        Location::new(
+        }
+        .with_location(Location::new(
             text_source,
             client_pointer_declaration.item.parent_type.span,
-        ),
-    ))?;
+        )),
+    )?;
 
     let target_type_id = defined_entity(
         db,
@@ -120,45 +126,43 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
         "Expected parsing to have succeeded. \
             This is indicative of a bug in Isograph.",
     )
-    .ok_or(WithLocation::new(
+    .ok_or(
         ProcessClientFieldDeclarationError::ParentTypeNotDefined {
             parent_object_entity_name: *client_pointer_declaration.item.target_type.inner(),
-        },
-        Location::new(
+        }
+        .with_location(Location::new(
             text_source,
             client_pointer_declaration.item.target_type.span(),
-        ),
-    ))?;
+        )),
+    )?;
 
     match parent_type_id {
         ServerEntityName::Object(_) => match target_type_id {
             ServerEntityName::Object(_to_object_entity_name) => {
                 add_client_pointer_to_object(db, client_pointer_declaration)
-                    .map_err(|e| WithLocation::new(e.item, Location::new(text_source, e.span)))?
+                    .map_err(|e| e.item.with_location(Location::new(text_source, e.span)))?
             }
             ServerEntityName::Scalar(scalar_entity_name) => {
-                return Err(WithLocation::new(
-                    ProcessClientFieldDeclarationError::ClientPointerInvalidTargetType {
-                        target_object_entity_name: scalar_entity_name.into(),
-                    },
-                    Location::new(
-                        text_source,
-                        client_pointer_declaration.item.target_type.span(),
-                    ),
-                ));
+                return ProcessClientFieldDeclarationError::ClientPointerInvalidTargetType {
+                    target_object_entity_name: scalar_entity_name.into(),
+                }
+                .with_location(Location::new(
+                    text_source,
+                    client_pointer_declaration.item.target_type.span(),
+                ))
+                .err();
             }
         },
         ServerEntityName::Scalar(scalar_entity_name) => {
-            return Err(WithLocation::new(
-                ProcessClientFieldDeclarationError::InvalidParentType {
-                    literal_type: "pointer",
-                    parent_object_entity_name: scalar_entity_name.into(),
-                },
-                Location::new(
-                    text_source,
-                    client_pointer_declaration.item.parent_type.span,
-                ),
-            ));
+            return ProcessClientFieldDeclarationError::InvalidParentType {
+                literal_type: "pointer",
+                parent_object_entity_name: scalar_entity_name.into(),
+            }
+            .with_location(Location::new(
+                text_source,
+                client_pointer_declaration.item.parent_type.span,
+            ))
+            .err();
         }
     }
     .ok()
@@ -256,17 +260,13 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
                 // TODO don't call to_owned
                 .to_owned()
                 .map_err(|e| {
-                    WithSpan::new(
-                        ProcessClientFieldDeclarationError::ServerSelectableNamedError(e),
-                        Span::todo_generated(),
-                    )
+                    ProcessClientFieldDeclarationError::ServerSelectableNamedError(e)
+                        .with_generated_span()
                 })?
                 .transpose()
                 .map_err(|e| {
-                    WithSpan::new(
-                        ProcessClientFieldDeclarationError::FieldToInsertToServerSelectableError(e),
-                        Span::todo_generated(),
-                    )
+                    ProcessClientFieldDeclarationError::FieldToInsertToServerSelectableError(e)
+                        .with_generated_span()
                 })?;
 
         let query_id = fetchable_types_map
@@ -526,25 +526,21 @@ pub fn validate_variable_definition<TNetworkProtocol: NetworkProtocol>(
                     This is indicative of a bug in Isograph.",
                 )
                 .ok_or_else(|| {
-                    WithSpan::new(
-                        ProcessClientFieldDeclarationError::FieldArgumentTypeDoesNotExist {
-                            argument_type: input_type_name,
-                            argument_name: variable_definition.item.name.item,
-                            parent_object_entity_name,
-                            selectable_name,
-                        },
-                        variable_definition.span,
-                    )
+                    ProcessClientFieldDeclarationError::FieldArgumentTypeDoesNotExist {
+                        argument_type: input_type_name,
+                        argument_name: variable_definition.item.name.item,
+                        parent_object_entity_name,
+                        selectable_name,
+                    }
+                    .with_span(variable_definition.span)
                 })
         })?;
 
-    WithSpan::new(
-        VariableDefinition {
-            name: variable_definition.item.name.map(VariableName::from),
-            type_,
-            default_value: variable_definition.item.default_value,
-        },
-        variable_definition.span,
-    )
+    VariableDefinition {
+        name: variable_definition.item.name.map(VariableName::from),
+        type_,
+        default_value: variable_definition.item.default_value,
+    }
+    .with_span(variable_definition.span)
     .ok()
 }

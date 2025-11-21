@@ -1,7 +1,7 @@
 use std::{collections::BTreeSet, fmt::Debug};
 
 use common_lang_types::{
-    Location, ServerObjectEntityName, Span, VariableName, WithLocation, WithSpan,
+    ServerObjectEntityName, VariableName, WithLocation, WithSpan, WithSpanPostfix,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -131,14 +131,12 @@ impl GenerateRefetchQueryImpl {
 }
 
 pub fn id_selection() -> UnprocessedSelection {
-    WithSpan::new(
-        SelectionTypeContainingSelections::Scalar(ScalarSelection {
-            name: WithLocation::new("id".intern().into(), Location::generated()),
-            reader_alias: None,
-            scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
-            associated_data: (),
-            arguments: vec![],
-        }),
-        Span::todo_generated(),
-    )
+    SelectionTypeContainingSelections::Scalar(ScalarSelection {
+        name: WithLocation::new_generated("id".intern().into()),
+        reader_alias: None,
+        scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
+        associated_data: (),
+        arguments: vec![],
+    })
+    .with_generated_span()
 }

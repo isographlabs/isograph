@@ -4,7 +4,7 @@ use logos::Logos;
 use prelude::Postfix;
 use thiserror::Error;
 
-use common_lang_types::{Span, WithSpan};
+use common_lang_types::{Span, WithSpan, WithSpanPostfix};
 
 pub(crate) struct PeekableLexer<'source> {
     current: WithSpan<TokenKind>,
@@ -26,7 +26,7 @@ impl<'source> PeekableLexer<'source> {
         // value to construct the Parser, then immediately advance()s to move to the
         // first real token.
         let lexer = TokenKind::lexer(source);
-        let dummy = WithSpan::new(TokenKind::EndOfFile, Span::todo_generated());
+        let dummy = TokenKind::EndOfFile.with_generated_span();
 
         let mut parser = PeekableLexer {
             current: dummy,
@@ -47,7 +47,7 @@ impl<'source> PeekableLexer<'source> {
         self.end_index_of_last_parsed_token = self.current.span.end;
         let span = self.lexer_span();
         // TODO why does self.current = ... not work here?
-        std::mem::replace(&mut self.current, WithSpan::new(kind, span))
+        std::mem::replace(&mut self.current, kind.with_span(span))
     }
 
     pub fn peek(&self) -> WithSpan<TokenKind> {
@@ -82,13 +82,11 @@ impl<'source> PeekableLexer<'source> {
         if found.item == expected_kind {
             self.parse_token().ok()
         } else {
-            WithSpan::new(
-                LowLevelParseError::ParseTokenKindError {
-                    expected_kind,
-                    found_kind: found.item,
-                },
-                found.span,
-            )
+            LowLevelParseError::ParseTokenKindError {
+                expected_kind,
+                found_kind: found.item,
+            }
+            .with_span(found.span)
             .err()
         }
     }
@@ -101,7 +99,7 @@ impl<'source> PeekableLexer<'source> {
     ) -> ParseResultWithSpan<WithSpan<&'source str>> {
         let kind = self.parse_token_of_kind(expected_kind)?;
 
-        WithSpan::new(self.source(kind.span), kind.span).ok()
+        self.source(kind.span).with_span(kind.span).ok()
     }
 
     pub fn parse_string_key_type<T: From<StringKey>>(
@@ -144,7 +142,7 @@ impl<'source> PeekableLexer<'source> {
         let start = self.current.span.start;
         let result = do_stuff(self)?;
         let end = self.end_index_of_last_parsed_token;
-        WithSpan::new(result, Span::new(start, end)).ok()
+        result.with_span(Span::new(start, end)).ok()
     }
 }
 

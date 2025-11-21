@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use common_lang_types::{
     DirectiveName, QueryExtraInfo, QueryOperationName, QueryText, ServerObjectEntityName,
-    UnvalidatedTypeName, WithLocation,
+    UnvalidatedTypeName, WithLocation, WithLocationPostfix,
 };
 use graphql_lang_types::{DeserializationError, from_graphql_directive};
 use graphql_schema_parser::SchemaParseError;
@@ -299,48 +299,53 @@ impl From<WithLocation<ProcessGraphqlTypeSystemDefinitionError>>
 
 fn extend_result_with_default_types(result: &mut ParseTypeSystemOutcome<GraphQLNetworkProtocol>) {
     result.push(
-        WithLocation::new_generated(ServerScalarEntity {
+        ServerScalarEntity {
             description: None,
             name: WithLocation::new_generated("ID".intern().into()),
             javascript_name: "string".intern().into(),
             network_protocol: std::marker::PhantomData,
-        })
+        }
+        .with_generated_location()
         .scalar_selected(),
     );
     result.push(
-        WithLocation::new_generated(ServerScalarEntity {
+        ServerScalarEntity {
             description: None,
             name: WithLocation::new_generated("String".intern().into()),
             javascript_name: "string".intern().into(),
             network_protocol: std::marker::PhantomData,
-        })
+        }
+        .with_generated_location()
         .scalar_selected(),
     );
     result.push(
-        WithLocation::new_generated(ServerScalarEntity {
+        ServerScalarEntity {
             description: None,
             name: WithLocation::new_generated("Boolean".intern().into()),
             javascript_name: "boolean".intern().into(),
             network_protocol: std::marker::PhantomData,
-        })
+        }
+        .with_generated_location()
         .scalar_selected(),
     );
     result.push(
-        WithLocation::new_generated(ServerScalarEntity {
+        ServerScalarEntity {
             description: None,
             name: WithLocation::new_generated("Float".intern().into()),
             javascript_name: "number".intern().into(),
             network_protocol: std::marker::PhantomData,
-        })
+        }
+        .with_generated_location()
         .scalar_selected(),
     );
     result.push(
-        WithLocation::new_generated(ServerScalarEntity {
+        ServerScalarEntity {
             description: None,
             name: WithLocation::new_generated("Int".intern().into()),
             javascript_name: "number".intern().into(),
             network_protocol: std::marker::PhantomData,
-        })
+        }
+        .with_generated_location()
         .scalar_selected(),
     );
 }

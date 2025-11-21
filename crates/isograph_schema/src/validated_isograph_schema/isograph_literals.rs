@@ -4,8 +4,8 @@ use crate::{
     process_client_pointer_declaration,
 };
 use common_lang_types::{
-    CurrentWorkingDirectory, Location, RelativePathToSourceFile, Span, TextSource, WithLocation,
-    WithSpan,
+    CurrentWorkingDirectory, RelativePathToSourceFile, Span, TextSource, WithLocation,
+    WithLocationPostfix, WithSpan,
 };
 use isograph_lang_parser::{
     IsoLiteralExtractionResult, IsographLiteralParseError, parse_iso_literal,
@@ -14,6 +14,7 @@ use isograph_lang_types::{EntrypointDeclaration, SelectionTypePostfix};
 use lazy_static::lazy_static;
 use pico::SourceId;
 use pico_macros::memo;
+use prelude::Postfix;
 use regex::Regex;
 
 // TODO this should return a Vec of Results, since a file can contain
@@ -191,10 +192,9 @@ pub fn process_iso_literal_extraction<TNetworkProtocol: NetworkProtocol>(
     };
 
     if !has_paren {
-        return Err(WithLocation::new(
-            IsographLiteralParseError::ExpectedParenthesesAroundIsoLiteral,
-            Location::new(text_source, Span::todo_generated()),
-        ));
+        return IsographLiteralParseError::ExpectedParenthesesAroundIsoLiteral
+            .with_generated_location()
+            .err();
     }
 
     let iso_literal_extraction_result = memoized_parse_iso_literal(
@@ -211,10 +211,9 @@ pub fn process_iso_literal_extraction<TNetworkProtocol: NetworkProtocol>(
         IsoLiteralExtractionResult::ClientFieldDeclaration(_)
     );
     if is_client_field_declaration && !has_associated_js_function {
-        return Err(WithLocation::new(
-            IsographLiteralParseError::ExpectedAssociatedJsFunction,
-            Location::new(text_source, Span::todo_generated()),
-        ));
+        return IsographLiteralParseError::ExpectedAssociatedJsFunction
+            .with_generated_location()
+            .err();
     }
 
     Ok((iso_literal_extraction_result, text_source))

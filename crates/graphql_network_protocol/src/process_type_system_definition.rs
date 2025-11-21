@@ -2,7 +2,8 @@ use std::collections::{BTreeMap, HashMap};
 
 use common_lang_types::{
     GraphQLInterfaceTypeName, Location, SelectableName, ServerObjectEntityName,
-    ServerScalarSelectableName, Span, UnvalidatedTypeName, WithLocation, WithSpan,
+    ServerScalarSelectableName, Span, UnvalidatedTypeName, WithLocation, WithLocationPostfix,
+    WithSpan, WithSpanPostfix,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLNamedTypeAnnotation,
@@ -100,11 +101,9 @@ pub fn process_graphql_type_system_document(
             GraphQLTypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
                 let name_location = scalar_type_definition.name.location;
                 type_system_entities.push(
-                    WithLocation::new(
-                        process_scalar_definition(scalar_type_definition),
-                        name_location,
-                    )
-                    .scalar_selected(),
+                    process_scalar_definition(scalar_type_definition)
+                        .with_location(name_location)
+                        .scalar_selected(),
                 );
                 // N.B. we assume that Mutation will be an object, not a scalar
             }
@@ -167,14 +166,12 @@ pub fn process_graphql_type_system_document(
             GraphQLTypeSystemDefinition::EnumDefinition(enum_definition) => {
                 // TODO Do not do this
                 type_system_entities.push(
-                    WithLocation::new(
-                        process_scalar_definition(GraphQLScalarTypeDefinition {
-                            description: enum_definition.description,
-                            name: enum_definition.name.map(|x| x.unchecked_conversion()),
-                            directives: enum_definition.directives,
-                        }),
-                        enum_definition.name.location,
-                    )
+                    process_scalar_definition(GraphQLScalarTypeDefinition {
+                        description: enum_definition.description,
+                        name: enum_definition.name.map(|x| x.unchecked_conversion()),
+                        directives: enum_definition.directives,
+                    })
+                    .with_location(enum_definition.name.location)
                     .scalar_selected(),
                 )
             }
@@ -217,11 +214,9 @@ pub fn process_graphql_type_system_document(
             }
             GraphQLTypeSystemDefinition::SchemaDefinition(schema_definition) => {
                 if graphql_root_types.is_some() {
-                    return WithLocation::new(
-                        ProcessGraphqlTypeSystemDefinitionError::DuplicateSchemaDefinition,
-                        location,
-                    )
-                    .err();
+                    return ProcessGraphqlTypeSystemDefinitionError::DuplicateSchemaDefinition
+                        .with_location(location)
+                        .err();
                 }
                 *graphql_root_types = GraphQLRootTypes {
                     query: schema_definition
@@ -269,30 +264,26 @@ pub fn process_graphql_type_system_document(
             .extend(subtypes);
 
         for subtype_name in subtypes.iter() {
-            object_outcome.fields_to_insert.push(WithLocation::new(
+            object_outcome.fields_to_insert.push(
                 FieldToInsert {
-                    description: WithSpan::new(
-                        Description(
-                            format!("A client pointer for the {subtype_name} type.")
-                                .intern()
-                                .into(),
-                        ),
-                        Span::todo_generated(),
+                    description: Description(
+                        format!("A client pointer for the {subtype_name} type.")
+                            .intern()
+                            .into(),
                     )
+                    .with_generated_span()
                     .some(),
-                    name: WithLocation::new(
-                        format!("as{subtype_name}").intern().into(),
-                        Location::generated(),
-                    ),
+                    name: WithLocation::new_generated(format!("as{subtype_name}").intern().into()),
+
                     graphql_type: GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                        WithSpan::new(*subtype_name, Span::todo_generated()),
+                        (*subtype_name).with_generated_span(),
                     )),
                     javascript_type_override: None,
                     arguments: vec![],
                     is_inline_fragment: true,
-                },
-                Location::generated(),
-            ));
+                }
+                .with_generated_location(),
+            );
         }
     }
 
@@ -315,10 +306,10 @@ pub fn process_graphql_type_extension_document(
         let WithLocation { location, item } = extension_or_definition;
         match item {
             GraphQLTypeSystemExtensionOrDefinition::Definition(definition) => {
-                definitions.push(WithLocation::new(definition, location));
+                definitions.push(definition.with_location(location));
             }
             GraphQLTypeSystemExtensionOrDefinition::Extension(extension) => {
-                extensions.push(WithLocation::new(extension, location))
+                extensions.push(extension.with_location(location))
             }
         }
     }
@@ -373,44 +364,40 @@ fn process_object_type_definition(
     let should_add_refetch_field = type_definition_type.is_concrete()
         && type_definition_type.is_output_type()
         && type_implements_node(&object_type_definition);
-    let server_object_entity = WithLocation::new(
-        ServerObjectEntity {
-            description: object_type_definition.description.map(|d| d.item),
-            name: object_type_definition.name,
-            concrete_type,
-            network_protocol_associated_data: associated_data,
-        },
-        object_type_definition.name.location.into(),
-    );
+    let server_object_entity = ServerObjectEntity {
+        description: object_type_definition.description.map(|d| d.item),
+        name: object_type_definition.name,
+        concrete_type,
+        network_protocol_associated_data: associated_data,
+    }
+    .with_location(object_type_definition.name.location.into());
 
     let mut fields_to_insert: Vec<_> = object_type_definition
         .fields
         .into_iter()
         .map(|field_definition| {
-            WithLocation::new(
-                FieldToInsert {
-                    description: field_definition
-                        .item
-                        .description
-                        .map(|with_span| with_span.map(|dv| dv.into())),
-                    name: field_definition.item.name,
-                    graphql_type: field_definition.item.type_,
-                    javascript_type_override: None,
+            FieldToInsert {
+                description: field_definition
+                    .item
+                    .description
+                    .map(|with_span| with_span.map(|dv| dv.into())),
+                name: field_definition.item.name,
+                graphql_type: field_definition.item.type_,
+                javascript_type_override: None,
 
-                    arguments: field_definition.item.arguments,
-                    is_inline_fragment: field_definition.item.is_inline_fragment,
-                },
-                field_definition.location,
-            )
+                arguments: field_definition.item.arguments,
+                is_inline_fragment: field_definition.item.is_inline_fragment,
+            }
+            .with_location(field_definition.location)
         })
         .collect();
 
     // We need to define a typename field for objects and interfaces, but not unions or input objects
     if type_definition_type.has_typename_field() {
-        fields_to_insert.push(WithLocation::new(
+        fields_to_insert.push(
             FieldToInsert {
                 description: None,
-                name: WithLocation::new((*TYPENAME_FIELD_NAME).into(), Location::generated()),
+                name: WithLocation::new((*TYPENAME_FIELD_NAME).into(), Location::Generated),
                 graphql_type: GraphQLTypeAnnotation::NonNull(
                     GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(WithSpan::new(
                         *STRING_TYPE_NAME,
@@ -425,9 +412,9 @@ fn process_object_type_definition(
 
                 arguments: vec![],
                 is_inline_fragment: false,
-            },
-            Location::generated(),
-        ));
+            }
+            .with_generated_location(),
+        );
     }
 
     if should_add_refetch_field {

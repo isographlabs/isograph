@@ -6,8 +6,8 @@ use crate::{
     validated_isograph_schema::create_type_system_schema::CreateSchemaError,
 };
 use common_lang_types::{
-    ClientScalarSelectableName, Location, ParentObjectEntityNameAndSelectableName,
-    ServerObjectEntityName, WithLocation,
+    ClientScalarSelectableName, ParentObjectEntityNameAndSelectableName, ServerObjectEntityName,
+    WithLocationPostfix,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::Description;
@@ -31,7 +31,7 @@ pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
                         .intern()
                         .into(),
                 )),
-                name: WithLocation::new(field_name, Location::generated()),
+                name: field_name.with_generated_location(),
                 parent_object_entity_name: parent_object_entity_name.item,
                 variable_definitions: vec![],
                 variant: ClientFieldVariant::Link,

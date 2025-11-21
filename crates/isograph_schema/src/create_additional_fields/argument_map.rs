@@ -1,6 +1,6 @@
 use common_lang_types::{
     SelectableName, ServerObjectEntityName, ServerSelectableName, StringLiteralValue, VariableName,
-    WithLocation,
+    WithLocation, WithLocationPostfix,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
@@ -92,8 +92,7 @@ pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol>(
                         primary_object_entity_name,
                     )?;
 
-                    *argument =
-                        WithLocation::new(PotentiallyModifiedArgument::Modified(arg), location);
+                    *argument = PotentiallyModifiedArgument::Modified(arg).with_location(location);
                     // processed_field_map_item
                     // TODO wat
                     ProcessedFieldMapItem(field_map_item.clone())

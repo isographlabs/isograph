@@ -1,7 +1,7 @@
 use common_lang_types::{
-    Location, ParentObjectEntityNameAndSelectableName, SelectableName, ServerObjectEntityName,
-    ServerObjectSelectableName, ServerSelectableName, Span, StringLiteralValue, WithLocation,
-    WithSpan,
+    ParentObjectEntityNameAndSelectableName, SelectableName, ServerObjectEntityName,
+    ServerObjectSelectableName, ServerSelectableName, StringLiteralValue, WithLocation,
+    WithSpanPostfix,
 };
 use intern::{Lookup, string_key::Intern};
 use isograph_lang_types::{
@@ -154,11 +154,10 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
         .iter()
         .map(|field_map_item| {
             let scalar_field_selection = ScalarSelection {
-                name: WithLocation::new(
+                name: WithLocation::new_generated(
                     // TODO make this no-op
                     // TODO split on . here; we should be able to have from: "best_friend.id" or whatnot.
                     field_map_item.0.from.unchecked_conversion(),
-                    Location::generated(),
                 ),
                 reader_alias: None,
                 associated_data: (),
@@ -169,10 +168,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
                 arguments: vec![],
             };
 
-            WithSpan::new(
-                SelectionTypeContainingSelections::Scalar(scalar_field_selection),
-                Span::todo_generated(),
-            )
+            SelectionTypeContainingSelections::Scalar(scalar_field_selection).with_generated_span()
         })
         .collect::<Vec<_>>();
 
@@ -234,11 +230,9 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
 
     let mutation_client_scalar_selectable = ClientScalarSelectable {
         description,
-        name: WithLocation::new(
+        name: WithLocation::new_generated(
             client_field_scalar_selection_name.unchecked_conversion(),
-            Location::generated(),
         ),
-
         variant: ClientFieldVariant::ImperativelyLoadedField(ImperativelyLoadedFieldVariant {
             top_level_schema_field_arguments,
             client_selection_name: client_field_scalar_selection_name.unchecked_conversion(),

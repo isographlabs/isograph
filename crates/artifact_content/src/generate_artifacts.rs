@@ -1,7 +1,7 @@
 use common_lang_types::{
     ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent, ClientScalarSelectableName,
-    Location, ParentObjectEntityNameAndSelectableName, SelectableNameOrAlias,
-    ServerObjectEntityName, Span, WithLocation, WithSpan, derive_display,
+    ParentObjectEntityNameAndSelectableName, SelectableNameOrAlias, ServerObjectEntityName,
+    WithLocation, WithSpan, WithSpanPostfix, derive_display,
 };
 use core::panic;
 use graphql_lang_types::{
@@ -334,13 +334,13 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 .map(|variable_definition| &variable_definition.item);
 
                             let id_var = ValidatedVariableDefinition {
-                                name: WithLocation::new("id".intern().into(), Location::Generated),
+                                name: WithLocation::new_generated("id".intern().into()),
                                 type_: GraphQLTypeAnnotation::NonNull(
                                     GraphQLNonNullTypeAnnotation::Named(
-                                        GraphQLNamedTypeAnnotation(WithSpan::new(
-                                            ServerEntityName::Scalar(*ID_ENTITY_NAME),
-                                            Span::todo_generated(),
-                                        )),
+                                        GraphQLNamedTypeAnnotation(
+                                            ServerEntityName::Scalar(*ID_ENTITY_NAME)
+                                                .with_generated_span(),
+                                        ),
                                     )
                                     .boxed(),
                                 ),

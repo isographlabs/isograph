@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use common_lang_types::{
     FieldArgumentName, Location, ParentObjectEntityNameAndSelectableName, SelectableName,
-    ServerObjectEntityName, VariableName, WithLocation, WithSpan,
+    ServerObjectEntityName, VariableName, WithLocation, WithLocationPostfix, WithSpan,
 };
 
 use intern::string_key::Intern;
@@ -48,7 +48,7 @@ pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
 
     for client_selectable in client_selectable_map(db)
         .as_ref()
-        .map_err(|e| vec![WithLocation::new(e.clone().into(), Location::generated())])?
+        .map_err(|e| vec![WithLocation::new_generated(e.clone().into())])?
         .iter()
         .flat_map(|(_, value)| value.as_ref().ok())
     {
@@ -217,7 +217,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
             reachable_variables,
             client_type.type_and_field(),
             // TODO client_type name needs a location
-            Location::generated(),
+            Location::Generated,
         ),
     );
 }
@@ -295,14 +295,12 @@ fn validate_all_variables_are_used<TNetworkProtocol: NetworkProtocol>(
         .collect::<Vec<_>>();
 
     if !unused_variables.is_empty() {
-        return WithLocation::new(
-            ValidateUseOfArgumentsError::UnusedVariables {
-                unused_variables,
-                type_name: top_level_type_and_field_name.parent_object_entity_name,
-                field_name: top_level_type_and_field_name.selectable_name,
-            },
-            location,
-        )
+        return ValidateUseOfArgumentsError::UnusedVariables {
+            unused_variables,
+            type_name: top_level_type_and_field_name.parent_object_entity_name,
+            field_name: top_level_type_and_field_name.selectable_name,
+        }
+        .with_location(location)
         .err();
     }
     Ok(())
@@ -313,11 +311,9 @@ fn assert_no_missing_arguments<TNetworkProtocol: NetworkProtocol>(
     location: Location,
 ) -> ValidateUseOfArgumentsResult<(), TNetworkProtocol> {
     if !missing_arguments.is_empty() {
-        return WithLocation::new(
-            ValidateUseOfArgumentsError::MissingArguments { missing_arguments },
-            location,
-        )
-        .err();
+        return ValidateUseOfArgumentsError::MissingArguments { missing_arguments }
+            .with_location(location)
+            .err();
     }
     Ok(())
 }
@@ -383,11 +379,9 @@ fn validate_no_extraneous_arguments<TNetworkProtocol: NetworkProtocol>(
         .collect();
 
     if !extra_arguments.is_empty() {
-        return WithLocation::new(
-            ValidateUseOfArgumentsError::ExtraneousArgument { extra_arguments },
-            location,
-        )
-        .err();
+        return ValidateUseOfArgumentsError::ExtraneousArgument { extra_arguments }
+            .with_location(location)
+            .err();
     }
     Ok(())
 }

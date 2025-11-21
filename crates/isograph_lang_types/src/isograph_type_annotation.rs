@@ -5,7 +5,7 @@ use std::{
     fmt::Debug,
 };
 
-use common_lang_types::{Span, WithSpan};
+use common_lang_types::{Span, WithSpan, WithSpanPostfix};
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
     GraphQLTypeAnnotation,
@@ -191,12 +191,9 @@ fn graphql_type_annotation_from_union_variant<TValue: Ord + Copy + Debug>(
 ) -> GraphQLTypeAnnotation<TValue> {
     if union_type_annotation.nullable {
         return match union_type_annotation.variants.iter().next().unwrap() {
-            UnionVariant::Scalar(scalar_entity_name) => {
-                GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(WithSpan::new(
-                    *scalar_entity_name,
-                    Span::todo_generated(),
-                )))
-            }
+            UnionVariant::Scalar(scalar_entity_name) => GraphQLTypeAnnotation::Named(
+                GraphQLNamedTypeAnnotation((*scalar_entity_name).with_generated_span()),
+            ),
             UnionVariant::Plural(type_annotation) => GraphQLTypeAnnotation::List(
                 GraphQLListTypeAnnotation(graphql_type_annotation_from_type_annotation(
                     type_annotation,
@@ -208,13 +205,10 @@ fn graphql_type_annotation_from_union_variant<TValue: Ord + Copy + Debug>(
 
     GraphQLTypeAnnotation::NonNull(
         match union_type_annotation.variants.iter().next().unwrap() {
-            UnionVariant::Scalar(scalar_entity_name) => {
-                GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(WithSpan::new(
-                    *scalar_entity_name,
-                    Span::todo_generated(),
-                )))
-                .boxed()
-            }
+            UnionVariant::Scalar(scalar_entity_name) => GraphQLNonNullTypeAnnotation::Named(
+                GraphQLNamedTypeAnnotation((*scalar_entity_name).with_generated_span()),
+            )
+            .boxed(),
             UnionVariant::Plural(type_annotation) => {
                 GraphQLNonNullTypeAnnotation::List(GraphQLListTypeAnnotation(
                     graphql_type_annotation_from_type_annotation(type_annotation),
@@ -230,7 +224,7 @@ pub fn graphql_type_annotation_from_type_annotation<TValue: Ord + Copy + Debug>(
 ) -> GraphQLTypeAnnotation<TValue> {
     match other {
         TypeAnnotation::Scalar(scalar_entity_name) => GraphQLTypeAnnotation::Named(
-            GraphQLNamedTypeAnnotation(WithSpan::new(*scalar_entity_name, Span::todo_generated())),
+            GraphQLNamedTypeAnnotation((*scalar_entity_name).with_generated_span()),
         ),
         TypeAnnotation::Plural(type_annotation) => GraphQLTypeAnnotation::List(
             GraphQLListTypeAnnotation(graphql_type_annotation_from_type_annotation(

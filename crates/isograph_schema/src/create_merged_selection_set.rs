@@ -1,9 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet, btree_map::Entry};
 
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, Location,
+    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName,
     ScalarSelectableName, SelectableName, ServerObjectEntityName, ServerObjectSelectableName,
-    ServerScalarSelectableName, Span, VariableName, WithLocation, WithSpan,
+    ServerScalarSelectableName, VariableName, WithLocation, WithLocationPostfix, WithSpan,
+    WithSpanPostfix,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
@@ -1547,12 +1548,11 @@ fn get_aliased_mutation_field_name(
 
 pub fn id_arguments() -> Vec<VariableDefinition<ServerEntityName>> {
     vec![VariableDefinition {
-        name: WithLocation::new(ID_FIELD_NAME.unchecked_conversion(), Location::generated()),
+        name: WithLocation::new_generated((*ID_FIELD_NAME).unchecked_conversion()),
         type_: GraphQLTypeAnnotation::NonNull(
-            GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(WithSpan::new(
-                (*ID_ENTITY_NAME).scalar_selected(),
-                Span::todo_generated(),
-            )))
+            GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
+                (*ID_ENTITY_NAME).scalar_selected().with_generated_span(),
+            ))
             .boxed(),
         ),
         default_value: None,
@@ -1562,39 +1562,32 @@ pub fn id_arguments() -> Vec<VariableDefinition<ServerEntityName>> {
 pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
     server_object_selectable: &ServerObjectSelectable<TNetworkProtocol>,
 ) -> Vec<WithSpan<ValidatedSelection>> {
-    let typename_selection = WithSpan::new(
-        SelectionTypeContainingSelections::Scalar(ScalarSelection {
-            arguments: vec![],
-            scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
-            // What is this for???
-            associated_data: (
-                server_object_selectable.parent_object_entity_name,
-                *TYPENAME_FIELD_NAME,
-            )
-                .server_defined(),
-            name: WithLocation::new(
-                ScalarSelectableName::from(*TYPENAME_FIELD_NAME),
-                Location::generated(),
-            ),
-            reader_alias: None,
-        }),
-        Span::todo_generated(),
-    );
+    let typename_selection = SelectionTypeContainingSelections::Scalar(ScalarSelection {
+        arguments: vec![],
+        scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
+        // What is this for???
+        associated_data: (
+            server_object_selectable.parent_object_entity_name,
+            *TYPENAME_FIELD_NAME,
+        )
+            .server_defined(),
+        name: ScalarSelectableName::from(*TYPENAME_FIELD_NAME).with_generated_location(),
+        reader_alias: None,
+    })
+    .with_generated_span();
 
-    let link_selection = WithSpan::new(
-        SelectionTypeContainingSelections::Scalar(ScalarSelection {
-            arguments: vec![],
-            associated_data: (
-                server_object_selectable.parent_object_entity_name,
-                *LINK_FIELD_NAME,
-            )
-                .client_defined(),
-            scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
-            name: WithLocation::new((*LINK_FIELD_NAME).into(), Location::generated()),
-            reader_alias: None,
-        }),
-        Span::todo_generated(),
-    );
+    let link_selection = SelectionTypeContainingSelections::Scalar(ScalarSelection {
+        arguments: vec![],
+        associated_data: (
+            server_object_selectable.parent_object_entity_name,
+            *LINK_FIELD_NAME,
+        )
+            .client_defined(),
+        scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
+        name: WithLocation::new_generated((*LINK_FIELD_NAME).into()),
+        reader_alias: None,
+    })
+    .with_generated_span();
 
     vec![typename_selection, link_selection]
 }
