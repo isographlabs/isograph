@@ -5,7 +5,9 @@ use common_lang_types::{
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLInputValueDefinition, GraphQLNamedTypeAnnotation, NameValuePair,
 };
-use isograph_lang_types::{ConstantValue, SelectionType, TypeAnnotation, VariableDefinition};
+use isograph_lang_types::{
+    ConstantValue, SelectionType, SelectionTypePostFix, TypeAnnotation, VariableDefinition,
+};
 use prelude::Postfix;
 use thiserror::Error;
 
@@ -68,7 +70,7 @@ pub fn field_to_insert_to_server_selectable<TNetworkProtocol: NetworkProtocol>(
         .collect::<Result<Vec<_>, _>>()?;
     let description = server_field_to_insert.item.description.map(|d| d.item);
     match selection_type {
-        SelectionType::Scalar(scalar_entity_name) => SelectionType::Scalar((
+        SelectionType::Scalar(scalar_entity_name) => (
             ServerScalarSelectable {
                 description,
                 name: server_field_to_insert
@@ -85,9 +87,10 @@ pub fn field_to_insert_to_server_selectable<TNetworkProtocol: NetworkProtocol>(
                 phantom_data: std::marker::PhantomData,
             },
             target_entity_type_name_non_null,
-        )),
+        )
+            .scalar_selected(),
         SelectionType::Object(object_entity_name) => {
-            SelectionType::Object(ServerObjectSelectable {
+            ServerObjectSelectable {
                 description,
                 name: server_field_to_insert.item.name.map(|x| x.unchecked_conversion()),
                 target_object_entity: TypeAnnotation::from_graphql_type_annotation(
@@ -104,7 +107,8 @@ pub fn field_to_insert_to_server_selectable<TNetworkProtocol: NetworkProtocol>(
                     } else {
                         ServerObjectSelectableVariant::LinkedField
                     }
-            })
+            }
+            .object_selected()
         }
     }
     .ok()

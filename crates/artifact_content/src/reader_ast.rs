@@ -6,7 +6,7 @@ use common_lang_types::{
 use isograph_lang_types::{
     DefinitionLocation, EmptyDirectiveSet, LoadableDirectiveParameters,
     ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionType,
-    SelectionTypeContainingSelections,
+    SelectionTypeContainingSelections, SelectionTypePostFix,
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, IsographDatabase, Loadability, NameAndArguments,
@@ -809,9 +809,10 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                             Some(Loadability::ImperativelyLoadedField(_)) => {
                                 paths.insert(PathToRefetchField {
                                     linked_fields: path.clone(),
-                                    field_name: SelectionType::Scalar(
-                                        client_scalar_selectable.name.item,
-                                    ),
+                                    field_name: client_scalar_selectable
+                                        .name
+                                        .item
+                                        .scalar_selected(),
                                 });
                             }
                             Some(Loadability::LoadablySelectedField(_)) => {
@@ -896,7 +897,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
 
                         paths.insert(PathToRefetchField {
                             linked_fields: path.clone(),
-                            field_name: SelectionType::Object(name_and_arguments.clone()),
+                            field_name: name_and_arguments.clone().object_selected(),
                         });
 
                         let normalization_key = NormalizationKey::ClientPointer(name_and_arguments);

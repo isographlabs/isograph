@@ -4,7 +4,7 @@ use common_lang_types::{
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
-use isograph_lang_types::{SelectionType, VariableDefinition};
+use isograph_lang_types::{SelectionType, SelectionTypePostFix, VariableDefinition};
 use prelude::Postfix;
 use std::collections::HashMap;
 
@@ -196,14 +196,14 @@ impl ModifiedArgument {
                                 (
                                     *name,
                                     PotentiallyModifiedField::Unmodified(match v {
-                                        SelectionType::Scalar(s) => SelectionType::Scalar((
-                                            s.parent_object_entity_name,
-                                            s.name.item,
-                                        )),
-                                        SelectionType::Object(o) => SelectionType::Object((
-                                            o.parent_object_entity_name,
-                                            o.name.item,
-                                        )),
+                                        SelectionType::Scalar(s) => {
+                                            (s.parent_object_entity_name, s.name.item)
+                                                .scalar_selected()
+                                        }
+                                        SelectionType::Object(o) => {
+                                            (o.parent_object_entity_name, o.name.item)
+                                                .object_selected()
+                                        }
                                     }),
                                 )
                                     .some()

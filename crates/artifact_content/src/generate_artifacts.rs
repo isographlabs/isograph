@@ -10,10 +10,11 @@ use graphql_lang_types::{
 use intern::{Lookup, string_key::Intern};
 use isograph_config::CompilerConfig;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientScalarSelectionDirectiveSet, DefinitionLocation, Description,
-    EmptyDirectiveSet, NonConstantValue, ObjectSelectionDirectiveSet, ScalarSelection,
-    ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionType,
-    SelectionTypeContainingSelections, TypeAnnotation, UnionVariant, VariableDefinition,
+    ArgumentKeyAndValue, ClientScalarSelectionDirectiveSet, DefinitionLocation,
+    DefinitionLocationPostFix, Description, EmptyDirectiveSet, NonConstantValue,
+    ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
+    SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, SelectionTypePostFix,
+    TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, ClientSelectableId, FieldMapItem,
@@ -174,10 +175,8 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
         path_and_contents.extend(entrypoint_path_and_content);
 
         // We also need to generate output types for entrypoints
-        encountered_output_types.insert(SelectionType::Scalar((
-            *parent_object_entity_name,
-            *entrypoint_selectable_name,
-        )));
+        encountered_output_types
+            .insert((*parent_object_entity_name, *entrypoint_selectable_name).scalar_selected());
     }
 
     for (
@@ -247,7 +246,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
 
                 path_and_contents.extend(generate_eager_reader_artifacts(
                     db,
-                    &SelectionType::Object(client_object_selectable),
+                    &client_object_selectable.object_selected(),
                     config,
                     UserWrittenClientTypeInfo {
                         const_export_name: client_object_selectable.info.const_export_name,
@@ -286,7 +285,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     ClientFieldVariant::UserWritten(info) => {
                         path_and_contents.extend(generate_eager_reader_artifacts(
                             db,
-                            &SelectionType::Scalar(client_scalar_selectable),
+                            &client_scalar_selectable.scalar_selected(),
                             config,
                             *info,
                             &traversal_state.refetch_paths,
@@ -477,12 +476,8 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
             };
 
             let client_type_name = match value {
-                SelectionType::Scalar(_) => {
-                    SelectionType::Scalar((key.0, key.1.unchecked_conversion()))
-                }
-                SelectionType::Object(_) => {
-                    SelectionType::Object((key.0, key.1.unchecked_conversion()))
-                }
+                SelectionType::Scalar(_) => (key.0, key.1.unchecked_conversion()).scalar_selected(),
+                SelectionType::Object(_) => (key.0, key.1.unchecked_conversion()).object_selected(),
             };
 
             (client_type_name, value).some()
@@ -495,7 +490,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
             config.options.include_file_extensions_in_import_statements,
         ));
 
-        match encountered_client_type_map.get(&DefinitionLocation::Client(client_type_name)) {
+        match encountered_client_type_map.get(&client_type_name.client_defined()) {
             Some(FieldTraversalResult {
                 traversal_state, ..
             }) => {
@@ -535,7 +530,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
         let artifact_path_and_content = match client_selectable {
             SelectionType::Object(client_pointer) => generate_eager_reader_output_type_artifact(
                 db,
-                &SelectionType::Object(client_pointer),
+                &client_pointer.object_selected(),
                 config,
                 UserWrittenClientTypeInfo {
                     const_export_name: client_pointer.info.const_export_name,
@@ -554,7 +549,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 ClientFieldVariant::UserWritten(info) => {
                     generate_eager_reader_output_type_artifact(
                         db,
-                        &SelectionType::Scalar(client_field),
+                        &client_field.scalar_selected(),
                         config,
                         info,
                         config.options.include_file_extensions_in_import_statements,

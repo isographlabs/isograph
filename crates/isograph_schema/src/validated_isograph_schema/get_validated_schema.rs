@@ -7,7 +7,7 @@ use crate::{
     },
 };
 use common_lang_types::WithLocation;
-use isograph_lang_types::SelectionType;
+use isograph_lang_types::{SelectionType, SelectionTypePostFix};
 use pico_macros::memo;
 use thiserror::Error;
 
@@ -26,9 +26,8 @@ pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol>(
             let (unprocessed_client_scalar_selection_set, _, _) =
                 create_new_exposed_field(db, expose_as_field, *parent_object_entity_name)?;
 
-            unprocessed_selection_sets.push(SelectionType::Scalar(
-                unprocessed_client_scalar_selection_set,
-            ));
+            unprocessed_selection_sets
+                .push(unprocessed_client_scalar_selection_set.scalar_selected());
         }
     }
 

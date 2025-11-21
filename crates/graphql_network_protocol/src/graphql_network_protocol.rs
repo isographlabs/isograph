@@ -7,7 +7,7 @@ use common_lang_types::{
 use graphql_lang_types::{DeserializationError, from_graphql_directive};
 use graphql_schema_parser::SchemaParseError;
 use intern::string_key::Intern;
-use isograph_lang_types::SelectionType;
+use isograph_lang_types::{SelectionType, SelectionTypePostFix};
 use isograph_schema::{
     ExposeFieldToInsert, Format, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome,
     RootOperationName, ValidatedVariableDefinition, server_object_entity_named,
@@ -298,44 +298,49 @@ impl From<WithLocation<ProcessGraphqlTypeSystemDefinitionError>>
 }
 
 fn extend_result_with_default_types(result: &mut ParseTypeSystemOutcome<GraphQLNetworkProtocol>) {
-    result.push(SelectionType::Scalar(WithLocation::new_generated(
-        ServerScalarEntity {
+    result.push(
+        WithLocation::new_generated(ServerScalarEntity {
             description: None,
             name: WithLocation::new_generated("ID".intern().into()),
             javascript_name: "string".intern().into(),
             network_protocol: std::marker::PhantomData,
-        },
-    )));
-    result.push(SelectionType::Scalar(WithLocation::new_generated(
-        ServerScalarEntity {
+        })
+        .scalar_selected(),
+    );
+    result.push(
+        WithLocation::new_generated(ServerScalarEntity {
             description: None,
             name: WithLocation::new_generated("String".intern().into()),
             javascript_name: "string".intern().into(),
             network_protocol: std::marker::PhantomData,
-        },
-    )));
-    result.push(SelectionType::Scalar(WithLocation::new_generated(
-        ServerScalarEntity {
+        })
+        .scalar_selected(),
+    );
+    result.push(
+        WithLocation::new_generated(ServerScalarEntity {
             description: None,
             name: WithLocation::new_generated("Boolean".intern().into()),
             javascript_name: "boolean".intern().into(),
             network_protocol: std::marker::PhantomData,
-        },
-    )));
-    result.push(SelectionType::Scalar(WithLocation::new_generated(
-        ServerScalarEntity {
+        })
+        .scalar_selected(),
+    );
+    result.push(
+        WithLocation::new_generated(ServerScalarEntity {
             description: None,
             name: WithLocation::new_generated("Float".intern().into()),
             javascript_name: "number".intern().into(),
             network_protocol: std::marker::PhantomData,
-        },
-    )));
-    result.push(SelectionType::Scalar(WithLocation::new_generated(
-        ServerScalarEntity {
+        })
+        .scalar_selected(),
+    );
+    result.push(
+        WithLocation::new_generated(ServerScalarEntity {
             description: None,
             name: WithLocation::new_generated("Int".intern().into()),
             javascript_name: "number".intern().into(),
             network_protocol: std::marker::PhantomData,
-        },
-    )));
+        })
+        .scalar_selected(),
+    );
 }

@@ -15,8 +15,8 @@ use common_lang_types::{
 };
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
-    DefinitionLocation, EmptyDirectiveSet, EntrypointDirectiveSet, ScalarSelectionDirectiveSet,
-    SelectionType,
+    DefinitionLocation, DefinitionLocationPostFix, EmptyDirectiveSet, EntrypointDirectiveSet,
+    ScalarSelectionDirectiveSet, SelectionType, SelectionTypePostFix,
 };
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, EntrypointDeclarationInfo,
@@ -84,11 +84,13 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
         )
         .expect("Expected selection set to be valid."),
         encountered_client_type_map,
-        DefinitionLocation::Client(SelectionType::Scalar((
+        (
             entrypoint.parent_object_entity_name,
             entrypoint_scalar_selectable_name,
-        ))),
-        &initial_variable_context(&SelectionType::Scalar(entrypoint)),
+        )
+            .scalar_selected()
+            .client_defined(),
+        &initial_variable_context(&entrypoint.scalar_selected()),
     );
 
     generate_entrypoint_artifacts_with_client_field_traversal_result(
@@ -202,11 +204,12 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
                             // Note: it would be cleaner to include a reference to the merged selection set here via
                             // the selection_variant variable, instead of by looking it up like this.
                             &encountered_client_type_map
-                                .get(&DefinitionLocation::Client(
-                                    root_refetch_path
+                                .get(
+                                    &root_refetch_path
                                         .path_to_refetch_field_info
-                                        .client_selectable_id,
-                                ))
+                                        .client_selectable_id
+                                        .client_defined(),
+                                )
                                 .expect(
                                     "Expected field to have been encountered, \
                                     since it is being used as a refetch field.",

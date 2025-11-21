@@ -57,6 +57,21 @@ impl<TServer, TClient> DefinitionLocation<TServer, TClient> {
     }
 }
 
+pub trait DefinitionLocationPostFix
+where
+    Self: Sized,
+{
+    fn server_defined<TClient>(self) -> DefinitionLocation<Self, TClient> {
+        DefinitionLocation::Server(self)
+    }
+
+    fn client_defined<TServer>(self) -> DefinitionLocation<TServer, Self> {
+        DefinitionLocation::Client(self)
+    }
+}
+
+impl<T> DefinitionLocationPostFix for T {}
+
 impl<TServerScalar, TServerObject, TClientScalar, TClientObject>
     DefinitionLocation<
         SelectionType<TServerScalar, TServerObject>,
@@ -247,6 +262,21 @@ impl<TScalar, TObject> SelectionType<WithLocation<TScalar>, WithLocation<TObject
         }
     }
 }
+
+pub trait SelectionTypePostFix
+where
+    Self: Sized,
+{
+    fn scalar_selected<TObject>(self) -> SelectionType<Self, TObject> {
+        SelectionType::Scalar(self)
+    }
+
+    fn object_selected<TScalar>(self) -> SelectionType<TScalar, Self> {
+        SelectionType::Object(self)
+    }
+}
+
+impl<T> SelectionTypePostFix for T {}
 
 // A blanket impl for SelectionType for ResolvedNode. Note that this will not work
 // in all circumstances, but because it requires that the Parent associated type

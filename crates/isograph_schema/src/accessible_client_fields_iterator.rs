@@ -1,5 +1,8 @@
 use common_lang_types::WithSpan;
-use isograph_lang_types::{DefinitionLocation, SelectionTypeContainingSelections};
+use isograph_lang_types::{
+    DefinitionLocation, SelectionTypeContainingSelections, SelectionTypePostFix,
+};
+use prelude::Postfix;
 
 use crate::{
     ClientSelectableId, IsographDatabase, NetworkProtocol, OwnedClientSelectable,
@@ -73,10 +76,9 @@ impl Iterator for AccessibleClientFieldIterator {
                                 client_field_name,
                             )) => {
                                 self.index += 1;
-                                return Some(SelectionType::Scalar((
-                                    parent_object_entity_name,
-                                    client_field_name,
-                                )));
+                                return (parent_object_entity_name, client_field_name)
+                                    .scalar_selected()
+                                    .some();
                             }
                         }
                     }
@@ -93,7 +95,7 @@ impl Iterator for AccessibleClientFieldIterator {
                                 // https://github.com/isographlabs/isograph/issues/719
                                 self.sub_iterator = Some(Box::new(iterator));
                                 self.index += 1;
-                                return Some(SelectionType::Object(client_pointer_id));
+                                return client_pointer_id.object_selected().some();
                             }
                             DefinitionLocation::Server(_) => {}
                         };

@@ -9,9 +9,11 @@ use common_lang_types::{
     UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use isograph_lang_types::{
-    DefinitionLocation, ObjectSelection, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionType, UnvalidatedScalarFieldSelection, UnvalidatedSelection,
+    DefinitionLocation, DefinitionLocationPostFix, ObjectSelection, ScalarSelection,
+    ScalarSelectionDirectiveSet, SelectionType, SelectionTypePostFix,
+    UnvalidatedScalarFieldSelection, UnvalidatedSelection,
 };
+use prelude::Postfix;
 use thiserror::Error;
 
 pub type ValidateAddSelectionSetsResultWithMultipleErrors<T, TNetworkProtocol> =
@@ -56,23 +58,23 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<WithSpan<ValidatedSelection>, TNetworkProtocol>
 {
     with_span.and_then(|selection| match selection {
-        SelectionType::Scalar(scalar_selection) => Ok(SelectionType::Scalar(
-            get_validated_scalar_selection(
-                db,
-                parent_object_entity_name,
-                top_level_field_or_pointer,
-                scalar_selection,
-            )
-            .map_err(|e| vec![e])?,
-        )),
-        SelectionType::Object(object_selection) => {
-            Ok(SelectionType::Object(get_validated_object_selection(
-                db,
-                parent_object_entity_name,
-                top_level_field_or_pointer,
-                object_selection,
-            )?))
-        }
+        SelectionType::Scalar(scalar_selection) => get_validated_scalar_selection(
+            db,
+            parent_object_entity_name,
+            top_level_field_or_pointer,
+            scalar_selection,
+        )
+        .map_err(|e| vec![e])?
+        .scalar_selected()
+        .ok(),
+        SelectionType::Object(object_selection) => get_validated_object_selection(
+            db,
+            parent_object_entity_name,
+            top_level_field_or_pointer,
+            object_selection,
+        )?
+        .object_selected()
+        .ok(),
     })
 }
 
@@ -146,10 +148,11 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
                     )
                 })?;
 
-            DefinitionLocation::Server((
+            (
                 server_scalar_selectable.parent_object_entity_name,
                 server_scalar_selectable.name.item,
-            ))
+            )
+                .server_defined()
         }
         DefinitionLocation::Client(client_type) => {
             let client_scalar_selectable =
@@ -165,10 +168,11 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
                     scalar_selection.name.location,
                 )
                 })?;
-            DefinitionLocation::Client((
+            (
                 client_scalar_selectable.parent_object_entity_name,
                 client_scalar_selectable.name.item,
-            ))
+            )
+                .client_defined()
         }
     };
 
@@ -258,10 +262,11 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                 })?;
 
             (
-                DefinitionLocation::Server((
+                (
                     server_object_selectable.parent_object_entity_name,
                     server_object_selectable.name.item,
-                )),
+                )
+                    .server_defined(),
                 *server_object_selectable.target_object_entity.inner(),
             )
         }
@@ -281,10 +286,11 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                 })?;
 
             (
-                DefinitionLocation::Client((
+                (
                     client_object_selectable.parent_object_entity_name,
                     client_object_selectable.name.item,
-                )),
+                )
+                    .client_defined(),
                 *client_object_selectable.target_object_entity_name.inner(),
             )
         }

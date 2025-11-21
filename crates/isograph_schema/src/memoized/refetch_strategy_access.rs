@@ -4,7 +4,7 @@ use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName,
     ParentObjectEntityNameAndSelectableName, ServerObjectEntityName, WithLocation, WithSpan,
 };
-use isograph_lang_types::SelectionType;
+use isograph_lang_types::{SelectionType, SelectionTypePostFix};
 use pico_macros::memo;
 use prelude::Postfix;
 use thiserror::Error;
@@ -62,10 +62,11 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                             get_unvalidated_refetch_stategy(db, o.target_type.inner().0)
                                 .map_err(|e| e.into())
                                 .map(|item| {
-                                    SelectionType::Object(item.expect(
+                                    item.expect(
                                 "Expected client object selectable to have a refetch strategy. \
                                 This is indicative of a bug in Isograph.",
-                            ))
+                            )
+                            .object_selected()
                                 });
                         vacant_entry.insert(refetch_strategy);
                     }
@@ -84,8 +85,13 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                 .err();
             }
             Entry::Vacant(vacant_entry) => {
-                vacant_entry
-                    .insert(SelectionType::Scalar(selection_set.refetch_strategy.clone()).ok());
+                vacant_entry.insert(
+                    selection_set
+                        .refetch_strategy
+                        .clone()
+                        .scalar_selected()
+                        .ok(),
+                );
             }
         }
     }
@@ -112,42 +118,42 @@ pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
 > {
     let map = unvalidated_refetch_strategy_map(db).clone()?;
 
-    map
-        .into_iter()
+    map.into_iter()
         .map(|(key, value)| {
             let value: Result<_, RefetchStrategyAccessError<_>> = value.and_then(|opt| match opt {
-                SelectionType::Scalar(refetch_strategy) => {
-                    SelectionType::Scalar(refetch_strategy.map(|refetch_strategy| {
+                SelectionType::Scalar(refetch_strategy) => refetch_strategy
+                    .map(|refetch_strategy| {
                         get_validated_refetch_strategy(
                             db,
                             refetch_strategy,
                             key.0,
-                            SelectionType::Scalar(ParentObjectEntityNameAndSelectableName::new(
-                                key.0,
-                                key.1.into(),
-                            )),
+                            ParentObjectEntityNameAndSelectableName::new(key.0, key.1.into())
+                                .scalar_selected(),
                         )
-                    }).transpose()?).ok()
-                }
-                SelectionType::Object(refetch_strategy) => SelectionType::Object(get_validated_refetch_strategy(
+                    })
+                    .transpose()?
+                    .scalar_selected()
+                    .ok(),
+                SelectionType::Object(refetch_strategy) => get_validated_refetch_strategy(
                     db,
                     refetch_strategy,
                     key.0,
-                    SelectionType::Object(ParentObjectEntityNameAndSelectableName::new(
-                        key.0,
-                        key.1.into(),
-                    )),
+                    ParentObjectEntityNameAndSelectableName::new(key.0, key.1.into())
+                        .object_selected(),
                 )
                 .map_err(|e| {
                     RefetchStrategyAccessError::ValidateAddSelectionSetsResultWithMultipleErrors {
                         errors: e,
                     }
-                })?).ok(),
+                })?
+                .object_selected()
+                .ok(),
             });
 
             (key, value)
         })
-        .collect::<HashMap<_,_>>().ok()
+        .collect::<HashMap<_, _>>()
+        .ok()
 }
 
 #[memo]

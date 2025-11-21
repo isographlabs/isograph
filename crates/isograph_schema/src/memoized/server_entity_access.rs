@@ -4,7 +4,7 @@ use common_lang_types::{
     JavascriptName, ServerObjectEntityName, ServerScalarEntityName, UnvalidatedTypeName,
     WithLocation,
 };
-use isograph_lang_types::SelectionType;
+use isograph_lang_types::{SelectionType, SelectionTypePostFix};
 use pico_macros::memo;
 use prelude::Postfix;
 use thiserror::Error;
@@ -36,11 +36,11 @@ fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
             SelectionType::Scalar(s) => server_entities
                 .entry(s.item.name.item.into())
                 .or_default()
-                .push(SelectionType::Scalar(s.clone())),
+                .push(s.clone().scalar_selected()),
             SelectionType::Object(outcome) => server_entities
                 .entry(outcome.server_object_entity.item.name.item.into())
                 .or_default()
-                .push(SelectionType::Object(outcome.server_object_entity.clone())),
+                .push(outcome.server_object_entity.clone().object_selected()),
         }
     }
 
@@ -199,7 +199,7 @@ pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
             let server_object_entity =
                 server_object_entity_named(db, server_object_entity_name).to_owned()?;
             if let Some(server_object_entity) = server_object_entity {
-                Ok(Some(SelectionType::Object(server_object_entity)))
+                server_object_entity.object_selected().some().ok()
             } else {
                 Ok(None)
             }
@@ -208,7 +208,7 @@ pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
             let server_scalar_entity =
                 server_scalar_entity_named(db, server_scalar_entity_name).to_owned()?;
             if let Some(server_scalar_entity) = server_scalar_entity {
-                Ok(Some(SelectionType::Scalar(server_scalar_entity)))
+                server_scalar_entity.scalar_selected().some().ok()
             } else {
                 Ok(None)
             }
@@ -236,13 +236,18 @@ pub fn defined_entities<TNetworkProtocol: NetworkProtocol>(
             SelectionType::Object(outcome) => defined_entities
                 .entry(outcome.server_object_entity.item.name.item.into())
                 .or_default()
-                .push(SelectionType::Object(
-                    outcome.server_object_entity.item.name.item,
-                )),
+                .push(
+                    outcome
+                        .server_object_entity
+                        .item
+                        .name
+                        .item
+                        .object_selected(),
+                ),
             SelectionType::Scalar(server_scalar_entity) => defined_entities
                 .entry(server_scalar_entity.item.name.item.into())
                 .or_default()
-                .push(SelectionType::Scalar(server_scalar_entity.item.name.item)),
+                .push(server_scalar_entity.item.name.item.scalar_selected()),
         }
     }
 

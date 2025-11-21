@@ -11,7 +11,7 @@ use graphql_lang_types::{
     GraphQLTypeSystemExtensionDocument, GraphQLTypeSystemExtensionOrDefinition,
 };
 use intern::string_key::Intern;
-use isograph_lang_types::{Description, SelectionType};
+use isograph_lang_types::{Description, SelectionType, SelectionTypePostFix};
 use isograph_schema::{
     ExposeFieldDirective, ExposeFieldToInsert, FieldMapItem, FieldToInsert,
     IsographObjectTypeDefinition, ParseTypeSystemOutcome, ProcessObjectTypeDefinitionOutcome,
@@ -95,14 +95,17 @@ pub fn process_graphql_type_system_document(
                     .or_default()
                     .extend(new_directives);
 
-                type_system_entities.push(SelectionType::Object(object_definition_outcome));
+                type_system_entities.push(object_definition_outcome.object_selected());
             }
             GraphQLTypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
                 let name_location = scalar_type_definition.name.location;
-                type_system_entities.push(SelectionType::Scalar(WithLocation::new(
-                    process_scalar_definition(scalar_type_definition),
-                    name_location,
-                )));
+                type_system_entities.push(
+                    WithLocation::new(
+                        process_scalar_definition(scalar_type_definition),
+                        name_location,
+                    )
+                    .scalar_selected(),
+                );
                 // N.B. we assume that Mutation will be an object, not a scalar
             }
             GraphQLTypeSystemDefinition::InterfaceTypeDefinition(interface_type_definition) => {
@@ -120,9 +123,7 @@ pub fn process_graphql_type_system_document(
                         &mut refetch_fields,
                     )?;
 
-                type_system_entities.push(SelectionType::Object(
-                    process_object_type_definition_outcome,
-                ));
+                type_system_entities.push(process_object_type_definition_outcome.object_selected());
 
                 directives
                     .entry(interface_name)
@@ -152,9 +153,7 @@ pub fn process_graphql_type_system_document(
                         &mut refetch_fields,
                     )?;
 
-                type_system_entities.push(SelectionType::Object(
-                    process_object_type_definition_outcome,
-                ));
+                type_system_entities.push(process_object_type_definition_outcome.object_selected());
 
                 directives
                     .entry(input_object_name)
@@ -167,14 +166,17 @@ pub fn process_graphql_type_system_document(
             }
             GraphQLTypeSystemDefinition::EnumDefinition(enum_definition) => {
                 // TODO Do not do this
-                type_system_entities.push(SelectionType::Scalar(WithLocation::new(
-                    process_scalar_definition(GraphQLScalarTypeDefinition {
-                        description: enum_definition.description,
-                        name: enum_definition.name.map(|x| x.unchecked_conversion()),
-                        directives: enum_definition.directives,
-                    }),
-                    enum_definition.name.location,
-                )))
+                type_system_entities.push(
+                    WithLocation::new(
+                        process_scalar_definition(GraphQLScalarTypeDefinition {
+                            description: enum_definition.description,
+                            name: enum_definition.name.map(|x| x.unchecked_conversion()),
+                            directives: enum_definition.directives,
+                        }),
+                        enum_definition.name.location,
+                    )
+                    .scalar_selected(),
+                )
             }
             GraphQLTypeSystemDefinition::UnionTypeDefinition(union_definition) => {
                 // TODO do something reasonable here, once we add support for type refinements.
@@ -198,9 +200,7 @@ pub fn process_graphql_type_system_document(
                         &mut refetch_fields,
                     )?;
 
-                type_system_entities.push(SelectionType::Object(
-                    process_object_type_definition_outcome,
-                ));
+                type_system_entities.push(process_object_type_definition_outcome.object_selected());
 
                 directives
                     .entry(union_definition.name.item.unchecked_conversion())

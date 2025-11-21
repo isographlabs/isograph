@@ -4,7 +4,7 @@ use common_lang_types::{
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
     Description, ObjectSelectionPath, ScalarSelectionPath, SelectionParentType, SelectionType,
-    ServerObjectEntityNameWrapper,
+    SelectionTypePostFix, ServerObjectEntityNameWrapper,
 };
 use thiserror::Error;
 
@@ -34,7 +34,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
     for ServerScalarEntity<TNetworkProtocol>
 {
     fn name(&self) -> SelectionType<ServerScalarEntityName, ServerObjectEntityName> {
-        SelectionType::Scalar(self.name.item)
+        self.name.item.scalar_selected()
     }
 
     fn description(&self) -> Option<Description> {
@@ -46,7 +46,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
     for ServerObjectEntity<TNetworkProtocol>
 {
     fn name(&self) -> SelectionType<ServerScalarEntityName, ServerObjectEntityName> {
-        SelectionType::Object(self.name.item)
+        self.name.item.object_selected()
     }
 
     fn description(&self) -> Option<Description> {

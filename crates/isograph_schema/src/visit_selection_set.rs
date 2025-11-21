@@ -1,6 +1,7 @@
 use common_lang_types::WithSpan;
 use isograph_lang_types::{
     ObjectSelection, ScalarSelection, SelectionType, SelectionTypeContainingSelections,
+    SelectionTypePostFix,
 };
 
 pub(crate) fn visit_selection_set<
@@ -25,9 +26,9 @@ pub(crate) fn visit_selection_set<
 ) {
     for selection in selection_set.iter() {
         match &selection.item {
-            SelectionType::Scalar(scalar) => visit_selection(SelectionType::Scalar(scalar)),
+            SelectionType::Scalar(scalar) => visit_selection(scalar.scalar_selected()),
             SelectionType::Object(object) => {
-                visit_selection(SelectionType::Object(object));
+                visit_selection(object.object_selected());
                 visit_selection_set(&object.selection_set, visit_selection);
             }
         }

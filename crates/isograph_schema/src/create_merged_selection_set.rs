@@ -10,9 +10,10 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, DefinitionLocation, EmptyDirectiveSet, NonConstantValue,
-    ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, VariableDefinition,
+    ArgumentKeyAndValue, DefinitionLocation, DefinitionLocationPostFix, EmptyDirectiveSet,
+    NonConstantValue, ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
+    SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, SelectionTypePostFix,
+    VariableDefinition,
 };
 use lazy_static::lazy_static;
 use prelude::Postfix;
@@ -742,7 +743,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                 | MergedServerSelection::LinkedField(_) => {
                     panic!(
                         "Expected inline fragment. \
-                                            This is indicative of a bug in Isograph."
+                        This is indicative of a bug in Isograph."
                     )
                 }
                 MergedServerSelection::InlineFragment(existing_inline_fragment) => {
@@ -751,12 +752,12 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                             .as_ref()
                             .expect(
                                 "Expected validation to have worked. \
-                            This is indicative of a bug in Isograph.",
+                                This is indicative of a bug in Isograph.",
                             )
                             .as_ref()
                             .expect(
                                 "Expected entity to exist. \
-                            This is indicative of a bug in Isograph.",
+                                This is indicative of a bug in Isograph.",
                             )
                             .item;
 
@@ -786,10 +787,11 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         parent_object_entity,
                         &object_selection.selection_set,
                         encountered_client_type_map,
-                        DefinitionLocation::Server((
+                        (
                             field_parent_object_entity_name,
                             field_server_object_selectable_name,
-                        )),
+                        )
+                            .server_defined(),
                         &server_object_selectable.initial_variable_context(),
                     );
                 }
@@ -930,33 +932,36 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
         parent_object_entity,
         parent_map,
         merge_traversal_state,
-        SelectionType::Object((
+        (
             parent_object_entity_name,
             newly_encountered_client_object_selectable_name,
-        )),
-        SelectionType::Object(newly_encountered_client_object_selectable),
+        )
+            .object_selected(),
+        newly_encountered_client_object_selectable.object_selected(),
         encountered_client_type_map,
         variable_context,
         &object_selection.arguments,
     );
 
-    merge_traversal_state
-        .accessible_client_fields
-        .insert(SelectionType::Object((
+    merge_traversal_state.accessible_client_fields.insert(
+        (
             parent_object_entity_name,
             newly_encountered_client_object_selectable_name,
-        )));
+        )
+            .object_selected(),
+    );
 
     // this is theoretically wrong, we should be adding this to the client pointer
     // traversal state instead of it's parent, but it works out the same
-    merge_traversal_state
-        .accessible_client_fields
-        .insert(SelectionType::Scalar((
+    merge_traversal_state.accessible_client_fields.insert(
+        (
             *newly_encountered_client_object_selectable
                 .target_object_entity_name
                 .inner(),
             *LINK_FIELD_NAME,
-        )));
+        )
+            .scalar_selected(),
+    );
 }
 
 #[expect(clippy::too_many_arguments)]
@@ -1001,20 +1006,26 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
                 )
                 .expect("Expected selection set to be valid."),
                 encountered_client_type_map,
-                DefinitionLocation::Client(SelectionType::Scalar((
+                (
                     *parent_object_entity_name,
                     *newly_encountered_scalar_client_selectable_name,
-                ))),
-                &initial_variable_context(&SelectionType::Scalar(
-                    newly_encountered_scalar_client_selectable,
-                )),
+                )
+                    .scalar_selected()
+                    .client_defined(),
+                &initial_variable_context(
+                    &newly_encountered_scalar_client_selectable.scalar_selected(),
+                ),
             );
 
             let state = encountered_client_type_map
-                .get_mut(&DefinitionLocation::Client(SelectionType::Scalar((
-                    *parent_object_entity_name,
-                    *newly_encountered_scalar_client_selectable_name,
-                ))))
+                .get_mut(
+                    &(
+                        *parent_object_entity_name,
+                        *newly_encountered_scalar_client_selectable_name,
+                    )
+                        .scalar_selected()
+                        .client_defined(),
+                )
                 .expect(
                     "Expected field to exist when \
                                                 it is encountered loadably",
@@ -1041,11 +1052,12 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
                     parent_object_entity,
                     parent_map,
                     merge_traversal_state,
-                    SelectionType::Scalar((
+                    (
                         *parent_object_entity_name,
                         *newly_encountered_scalar_client_selectable_name,
-                    )),
-                    SelectionType::Scalar(newly_encountered_scalar_client_selectable),
+                    )
+                        .scalar_selected(),
+                    newly_encountered_scalar_client_selectable.scalar_selected(),
                     encountered_client_type_map,
                     variable_context,
                     &scalar_field_selection.arguments,
@@ -1054,12 +1066,13 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
         },
     }
 
-    merge_traversal_state
-        .accessible_client_fields
-        .insert(SelectionType::Scalar((
+    merge_traversal_state.accessible_client_fields.insert(
+        (
             *parent_object_entity_name,
             *newly_encountered_scalar_client_selectable_name,
-        )));
+        )
+            .scalar_selected(),
+    );
 }
 
 #[expect(clippy::too_many_arguments)]
@@ -1075,7 +1088,10 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
 ) {
     let path = PathToRefetchField {
         linked_fields: merge_traversal_state.traversal_path.clone(),
-        field_name: SelectionType::Scalar(newly_encountered_client_scalar_selectable.name.item),
+        field_name: newly_encountered_client_scalar_selectable
+            .name
+            .item
+            .scalar_selected(),
     };
 
     let info = PathToRefetchFieldInfo {
@@ -1087,10 +1103,11 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
             None
         },
         imperatively_loaded_field_variant: variant.clone(),
-        client_selectable_id: SelectionType::Scalar((
+        client_selectable_id: (
             newly_encountered_client_scalar_selectable.parent_object_entity_name,
             newly_encountered_scalar_client_selectable_name,
-        )),
+        )
+            .scalar_selected(),
     };
 
     merge_traversal_state.refetch_paths.insert(
@@ -1130,13 +1147,13 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
             .refetch_selection_set()
             .unwrap_or(&empty_selection_set),
         encountered_client_type_map,
-        DefinitionLocation::Client(SelectionType::Scalar((
+        (
             parent_object_entity_name,
             newly_encountered_scalar_client_selectable_name,
-        ))),
-        &initial_variable_context(&SelectionType::Scalar(
-            newly_encountered_client_scalar_selectable,
-        )),
+        )
+            .scalar_selected()
+            .client_defined(),
+        &initial_variable_context(&newly_encountered_client_scalar_selectable.scalar_selected()),
     );
 }
 
@@ -1180,7 +1197,7 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
 
     let path = PathToRefetchField {
         linked_fields: merge_traversal_state.traversal_path.clone(),
-        field_name: SelectionType::Object(name_and_arguments.clone()),
+        field_name: name_and_arguments.clone().object_selected(),
     };
 
     let mut subfields_or_inline_fragments = vec![];
@@ -1227,10 +1244,11 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
                     .0
             },
         },
-        client_selectable_id: SelectionType::Object((
+        client_selectable_id: (
             parent_object_entity_name,
             newly_encountered_client_object_selectable_name,
-        )),
+        )
+            .object_selected(),
     };
 
     merge_traversal_state.refetch_paths.insert(
@@ -1318,7 +1336,7 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
         parent_object_entity,
         &validated_selections,
         encountered_client_type_map,
-        DefinitionLocation::Client(newly_encountered_client_type_id),
+        newly_encountered_client_type_id.client_defined(),
         &initial_variable_context(&newly_encountered_client_type),
     );
 
@@ -1532,7 +1550,7 @@ pub fn id_arguments() -> Vec<VariableDefinition<ServerEntityName>> {
         name: WithLocation::new(ID_FIELD_NAME.unchecked_conversion(), Location::generated()),
         type_: GraphQLTypeAnnotation::NonNull(Box::new(GraphQLNonNullTypeAnnotation::Named(
             GraphQLNamedTypeAnnotation(WithSpan::new(
-                SelectionType::Scalar(*ID_ENTITY_NAME),
+                (*ID_ENTITY_NAME).scalar_selected(),
                 Span::todo_generated(),
             )),
         ))),
@@ -1548,10 +1566,11 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
             arguments: vec![],
             scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
             // What is this for???
-            associated_data: DefinitionLocation::Server((
+            associated_data: (
                 server_object_selectable.parent_object_entity_name,
                 *TYPENAME_FIELD_NAME,
-            )),
+            )
+                .server_defined(),
             name: WithLocation::new(
                 ScalarSelectableName::from(*TYPENAME_FIELD_NAME),
                 Location::generated(),
@@ -1564,10 +1583,11 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
     let link_selection = WithSpan::new(
         SelectionTypeContainingSelections::Scalar(ScalarSelection {
             arguments: vec![],
-            associated_data: DefinitionLocation::Client((
+            associated_data: (
                 server_object_selectable.parent_object_entity_name,
                 *LINK_FIELD_NAME,
-            )),
+            )
+                .client_defined(),
             scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
             name: WithLocation::new((*LINK_FIELD_NAME).into(), Location::generated()),
             reader_alias: None,

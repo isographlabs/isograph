@@ -4,7 +4,7 @@ use common_lang_types::{
     ClientSelectableName, ParentObjectEntityNameAndSelectableName, ServerObjectEntityName,
     WithLocation, WithSpan,
 };
-use isograph_lang_types::{SelectionType, UnvalidatedSelection};
+use isograph_lang_types::{SelectionType, SelectionTypePostFix, UnvalidatedSelection};
 use pico_macros::memo;
 use prelude::Postfix;
 use thiserror::Error;
@@ -42,10 +42,10 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
             if rest.is_empty() {
                 match first {
                     SelectionType::Scalar(s) => {
-                        (*key, SelectionType::Scalar(s.selection_set.clone()).ok())
+                        (*key, s.selection_set.clone().scalar_selected().ok())
                     }
                     SelectionType::Object(o) => {
-                        (*key, SelectionType::Object(o.selection_set.clone()).ok())
+                        (*key, o.selection_set.clone().object_selected().ok())
                     }
                 }
             } else {
@@ -68,7 +68,7 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
             for field in fields {
                 map.insert(
                     (field.parent_object_entity_name, field.name.item.into()),
-                    SelectionType::Scalar(vec![]).ok(),
+                    vec![].scalar_selected().ok(),
                 );
             }
         }
@@ -84,7 +84,11 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
             for (key, (_, selection_set)) in expose_field_map {
                 map.insert(
                     (key.0, key.1.into()),
-                    SelectionType::Scalar(selection_set.reader_selection_set.clone()).ok(),
+                    selection_set
+                        .reader_selection_set
+                        .clone()
+                        .scalar_selected()
+                        .ok(),
                 );
             }
         }
@@ -112,12 +116,14 @@ pub fn memoized_validated_reader_selection_set_map<TNetworkProtocol: NetworkProt
                 key,
                 value.and_then(|unvalidated_selection_set| {
                     let top_level_field_or_pointer = match unvalidated_selection_set {
-                        SelectionType::Scalar(_) => SelectionType::Scalar(
-                            ParentObjectEntityNameAndSelectableName::new(key.0, key.1.into()),
-                        ),
-                        SelectionType::Object(_) => SelectionType::Object(
-                            ParentObjectEntityNameAndSelectableName::new(key.0, key.1.into()),
-                        ),
+                        SelectionType::Scalar(_) => {
+                            ParentObjectEntityNameAndSelectableName::new(key.0, key.1.into())
+                                .scalar_selected()
+                        }
+                        SelectionType::Object(_) => {
+                            ParentObjectEntityNameAndSelectableName::new(key.0, key.1.into())
+                                .object_selected()
+                        }
                     };
 
                     get_validated_selection_set(

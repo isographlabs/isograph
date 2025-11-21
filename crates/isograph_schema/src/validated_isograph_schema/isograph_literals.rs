@@ -10,7 +10,7 @@ use common_lang_types::{
 use isograph_lang_parser::{
     IsoLiteralExtractionResult, IsographLiteralParseError, parse_iso_literal,
 };
-use isograph_lang_types::{EntrypointDeclaration, SelectionType};
+use isograph_lang_types::{EntrypointDeclaration, SelectionType, SelectionTypePostFix};
 use lazy_static::lazy_static;
 use pico::SourceId;
 use pico_macros::memo;
@@ -133,7 +133,7 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
                         text_source,
                     ) {
                         Ok(unprocessed_client_field_items) => unprocess_client_field_items
-                            .push(SelectionType::Scalar(unprocessed_client_field_items)),
+                            .push(unprocessed_client_field_items.scalar_selected()),
                         Err(e) => {
                             errors.push(e);
                         }
@@ -148,7 +148,7 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
                         text_source,
                     ) {
                         Ok(unprocessed_client_pointer_item) => unprocess_client_field_items
-                            .push(SelectionType::Object(unprocessed_client_pointer_item)),
+                            .push(unprocessed_client_pointer_item.object_selected()),
                         Err(e) => {
                             errors.push(e);
                         }

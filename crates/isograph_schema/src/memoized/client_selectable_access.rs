@@ -12,7 +12,9 @@ use common_lang_types::{
     ServerObjectEntityName, WithSpan,
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
-use isograph_lang_types::{ClientFieldDeclaration, ClientPointerDeclaration, SelectionType};
+use isograph_lang_types::{
+    ClientFieldDeclaration, ClientPointerDeclaration, SelectionType, SelectionTypePostFix,
+};
 use pico_macros::memo;
 use prelude::Postfix;
 use thiserror::Error;
@@ -47,7 +49,7 @@ pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: Net
                                 .into(),
                         ))
                         .or_default()
-                        .push(SelectionType::Object(client_pointer_declaration.item));
+                        .push(client_pointer_declaration.item.object_selected());
                     }
                     IsoLiteralExtractionResult::ClientFieldDeclaration(
                         client_field_declaration,
@@ -62,7 +64,7 @@ pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: Net
                                 .into(),
                         ))
                         .or_default()
-                        .push(SelectionType::Scalar(client_field_declaration.item));
+                        .push(client_field_declaration.item.scalar_selected());
                     }
                     IsoLiteralExtractionResult::EntrypointDeclaration(_) => {
                         // Intentionally ignored. TODO reconsider
@@ -427,16 +429,18 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
                 Some((first, rest)) => {
                     if rest.is_empty() {
                         Ok(match first.clone() {
-                            SelectionType::Scalar(scalar_declaration) => SelectionType::Scalar(
+                            SelectionType::Scalar(scalar_declaration) => {
                                 process_client_field_declaration_inner(db, scalar_declaration)
                                     .clone()
-                                    .map(|(_, selectable)| selectable)?,
-                            ),
-                            SelectionType::Object(object_declaration) => SelectionType::Object(
+                                    .map(|(_, selectable)| selectable)?
+                                    .scalar_selected()
+                            }
+                            SelectionType::Object(object_declaration) => {
                                 process_client_pointer_declaration_inner(db, object_declaration)
                                     .clone()
-                                    .map(|(_, selectable)| selectable)?,
-                            ),
+                                    .map(|(_, selectable)| selectable)?
+                                    .object_selected()
+                            }
                         })
                     } else {
                         Err(MemoizedIsoLiteralError::MultipleDefinitionsFound {
@@ -454,14 +458,14 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
             get_link_fields_map(db)
                 .clone()?
                 .into_iter()
-                .map(|(key, value)| ((key.0, key.1.into()), Ok(SelectionType::Scalar(value)))),
+                .map(|(key, value)| ((key.0, key.1.into()), Ok(value.scalar_selected()))),
         )
         .chain(
             expose_field_map(db)
                 .clone()?
                 .into_iter()
                 .map(|(key, (selectable, _))| {
-                    ((key.0, key.1.into()), Ok(SelectionType::Scalar(selectable)))
+                    ((key.0, key.1.into()), Ok(selectable.scalar_selected()))
                 }),
         )
         .collect::<HashMap<_, _>>()
