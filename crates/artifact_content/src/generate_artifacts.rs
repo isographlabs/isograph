@@ -64,8 +64,7 @@ lazy_static! {
     pub static ref ISO_TS: ArtifactFilePrefix = "iso".intern().into();
     pub static ref NORMALIZATION_AST_FILE_NAME: ArtifactFileName =
         "normalization_ast.ts".intern().into();
-    pub static ref RAW_RESPONSE_TYPE: ArtifactFileName =
-        "raw_response_type.ts".intern().into();
+    pub static ref RAW_RESPONSE_TYPE: ArtifactFileName = "raw_response_type.ts".intern().into();
     pub static ref NORMALIZATION_AST: ArtifactFilePrefix = "normalization_ast".intern().into();
     pub static ref QUERY_TEXT_FILE_NAME: ArtifactFileName = "query_text.ts".intern().into();
     pub static ref QUERY_TEXT: ArtifactFilePrefix = "query_text".intern().into();
