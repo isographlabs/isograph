@@ -495,6 +495,16 @@ fn create_field_traversal_result<TNetworkProtocol: NetworkProtocol>(
         variable_context,
     );
 
+    if merged_selection_map.is_empty() {
+        merged_selection_map.insert(
+            NormalizationKey::Discriminator,
+            MergedServerSelection::ScalarField(MergedScalarFieldSelection {
+                name: *TYPENAME_FIELD_NAME,
+                arguments: vec![],
+            }),
+        );
+    }
+
     FieldTraversalResult {
         traversal_state,
         merged_selection_map,

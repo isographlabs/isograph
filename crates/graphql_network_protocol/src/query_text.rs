@@ -91,56 +91,48 @@ fn write_selections_for_query_text(
         Format::Compact => (" ", &"".to_string()),
     };
 
-    if items.is_empty() {
-        query_text.push_str(indent);
-        query_text.push_str("__typename,");
-        query_text.push_str(new_line);
-    } else {
-        for item in items.values() {
-            match &item {
-                MergedServerSelection::ScalarField(scalar_field) => {
-                    query_text.push_str(indent);
-                    if let Some(alias) = scalar_field.normalization_alias() {
-                        query_text.push_str(&format!("{alias}: "));
-                    }
-                    let name = scalar_field.name;
-                    let arguments =
-                        get_serialized_arguments_for_query_text(&scalar_field.arguments);
-                    query_text.push_str(&format!("{name}{arguments},{new_line}"));
+    for item in items.values() {
+        match &item {
+            MergedServerSelection::ScalarField(scalar_field) => {
+                query_text.push_str(indent);
+                if let Some(alias) = scalar_field.normalization_alias() {
+                    query_text.push_str(&format!("{alias}: "));
                 }
-                MergedServerSelection::LinkedField(linked_field) => {
-                    query_text.push_str(indent);
-                    if let Some(alias) = linked_field.normalization_alias() {
-                        // This is bad, alias is WithLocation
-                        query_text.push_str(&format!("{alias}: "));
-                    }
-                    let name = linked_field.name;
-                    let arguments =
-                        get_serialized_arguments_for_query_text(&linked_field.arguments);
-                    query_text.push_str(&format!("{name}{arguments} {{{new_line}"));
-                    write_selections_for_query_text(
-                        query_text,
-                        &linked_field.selection_map,
-                        indentation_level + 1,
-                        format,
-                    );
-                    query_text.push_str(&format!("{indent}}},{new_line}"));
+                let name = scalar_field.name;
+                let arguments = get_serialized_arguments_for_query_text(&scalar_field.arguments);
+                query_text.push_str(&format!("{name}{arguments},{new_line}"));
+            }
+            MergedServerSelection::LinkedField(linked_field) => {
+                query_text.push_str(indent);
+                if let Some(alias) = linked_field.normalization_alias() {
+                    // This is bad, alias is WithLocation
+                    query_text.push_str(&format!("{alias}: "));
                 }
-                MergedServerSelection::ClientPointer(_) => {}
-                MergedServerSelection::InlineFragment(inline_fragment) => {
-                    query_text.push_str(indent);
-                    query_text.push_str(&format!(
-                        "... on {} {{{}",
-                        inline_fragment.type_to_refine_to, new_line,
-                    ));
-                    write_selections_for_query_text(
-                        query_text,
-                        &inline_fragment.selection_map,
-                        indentation_level + 1,
-                        format,
-                    );
-                    query_text.push_str(&format!("{indent}}},{new_line}"));
-                }
+                let name = linked_field.name;
+                let arguments = get_serialized_arguments_for_query_text(&linked_field.arguments);
+                query_text.push_str(&format!("{name}{arguments} {{{new_line}"));
+                write_selections_for_query_text(
+                    query_text,
+                    &linked_field.selection_map,
+                    indentation_level + 1,
+                    format,
+                );
+                query_text.push_str(&format!("{indent}}},{new_line}"));
+            }
+            MergedServerSelection::ClientPointer(_) => {}
+            MergedServerSelection::InlineFragment(inline_fragment) => {
+                query_text.push_str(indent);
+                query_text.push_str(&format!(
+                    "... on {} {{{}",
+                    inline_fragment.type_to_refine_to, new_line,
+                ));
+                write_selections_for_query_text(
+                    query_text,
+                    &inline_fragment.selection_map,
+                    indentation_level + 1,
+                    format,
+                );
+                query_text.push_str(&format!("{indent}}},{new_line}"));
             }
         }
     }
