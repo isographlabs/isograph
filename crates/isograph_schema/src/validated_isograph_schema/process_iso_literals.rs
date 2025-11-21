@@ -3,95 +3,12 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::{
-    AddSelectionSetsError, IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError,
-    ValidatedEntrypointError,
-};
-use common_lang_types::{
-    RelativePathToSourceFile, SelectableName, ServerObjectEntityName, TextSource, WithLocation,
-};
+use crate::{IsographDatabase, NetworkProtocol};
+use common_lang_types::{RelativePathToSourceFile, TextSource, WithLocation};
 use isograph_lang_parser::{IsoLiteralExtractionResult, IsographLiteralParseError};
 use pico_macros::memo;
-use thiserror::Error;
 
 use crate::parse_iso_literal_in_source;
-
-#[derive(Debug, Error, PartialEq, Eq, Clone)]
-pub enum ProcessIsoLiteralsForSchemaError<TNetworkProtocol: NetworkProtocol> {
-    #[error(
-        "{}{}",
-        if messages.len() == 1 { "Unable to process Isograph literal:" } else { "Unable to process Isograph literals:" },
-        messages.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{}", x.for_display()));
-            output
-        })
-    )]
-    ProcessIsoLiterals {
-        messages: Vec<WithLocation<ProcessClientFieldDeclarationError<TNetworkProtocol>>>,
-    },
-
-    #[error(
-        "The Isograph compiler attempted to create a field named \
-        `{selectable_name}` on type `{parent_object_entity_name}`, but a field with that name already exists."
-    )]
-    CompilerCreatedFieldExistsOnType {
-        selectable_name: SelectableName,
-        parent_object_entity_name: ServerObjectEntityName,
-    },
-
-    #[error(
-        "{}",
-        messages.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{}", x.for_display()));
-            output
-        })
-    )]
-    AddSelectionSets {
-        messages: Vec<WithLocation<AddSelectionSetsError<TNetworkProtocol>>>,
-    },
-
-    #[error(
-        "{}",
-        messages.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{}", x.for_display()));
-            output
-        })
-    )]
-    ParseIsoLiteral {
-        messages: Vec<WithLocation<IsographLiteralParseError>>,
-    },
-
-    #[error("{0}")]
-    ValidatedEntrypointError(#[from] ValidatedEntrypointError<TNetworkProtocol>),
-}
-
-impl<TNetworkProtocol: NetworkProtocol>
-    From<Vec<WithLocation<ProcessClientFieldDeclarationError<TNetworkProtocol>>>>
-    for ProcessIsoLiteralsForSchemaError<TNetworkProtocol>
-{
-    fn from(
-        messages: Vec<WithLocation<ProcessClientFieldDeclarationError<TNetworkProtocol>>>,
-    ) -> Self {
-        ProcessIsoLiteralsForSchemaError::ProcessIsoLiterals { messages }
-    }
-}
-
-impl<TNetworkProtocol: NetworkProtocol> From<Vec<WithLocation<IsographLiteralParseError>>>
-    for ProcessIsoLiteralsForSchemaError<TNetworkProtocol>
-{
-    fn from(messages: Vec<WithLocation<IsographLiteralParseError>>) -> Self {
-        ProcessIsoLiteralsForSchemaError::ParseIsoLiteral { messages }
-    }
-}
-
-impl<TNetworkProtocol: NetworkProtocol>
-    From<Vec<WithLocation<AddSelectionSetsError<TNetworkProtocol>>>>
-    for ProcessIsoLiteralsForSchemaError<TNetworkProtocol>
-{
-    fn from(messages: Vec<WithLocation<AddSelectionSetsError<TNetworkProtocol>>>) -> Self {
-        ProcessIsoLiteralsForSchemaError::AddSelectionSets { messages }
-    }
-}
 
 // This should not be used. It returns an Err variant if there is a single parse error.
 #[memo]
