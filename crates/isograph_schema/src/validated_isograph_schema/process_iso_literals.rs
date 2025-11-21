@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     AddSelectionSetsError, IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError,
-    UnprocessedSelectionSet, ValidatedEntrypointError, validated_entrypoints,
+    UnprocessedSelectionSet, ValidatedEntrypointError,
 };
 use common_lang_types::{
     RelativePathToSourceFile, SelectableName, ServerObjectEntityName, TextSource, WithLocation,
@@ -25,11 +25,6 @@ pub(crate) fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol>
 
     let (unprocessed_client_selection_sets, _) = process_iso_literals(db, contains_iso)?;
     unprocessed_selection_sets.extend(unprocessed_client_selection_sets);
-
-    // TODO return these as an array
-    for entrypoint in validated_entrypoints(db).values() {
-        entrypoint.as_ref().map_err(|e| e.clone())?;
-    }
 
     Ok(contains_iso_stats)
 }

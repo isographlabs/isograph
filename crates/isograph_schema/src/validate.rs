@@ -1,9 +1,11 @@
 use pico_macros::memo;
+use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
     FieldToInsertToServerSelectableError, IsographDatabase, NetworkProtocol,
-    ValidateUseOfArgumentsError, server_selectables_map, validate_use_of_arguments,
+    ValidateUseOfArgumentsError, ValidatedEntrypointError, server_selectables_map,
+    validate_use_of_arguments, validated_entrypoints,
 };
 
 /// In the world of pico, we minimally validate. For example, if the
@@ -30,6 +32,10 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
         errors.extend(e);
     }
 
+    errors.extend(validated_entrypoints(db).values().flat_map(|result| {
+        ValidationError::ValidatedEntrypointError(result.as_ref().err()?.clone()).some()
+    }));
+
     if errors.is_empty() {
         Ok(())
     } else {
@@ -47,6 +53,9 @@ pub enum ValidationError<TNetworkProtocol: NetworkProtocol> {
 
     #[error("{0}")]
     FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),
+
+    #[error("{0}")]
+    ValidatedEntrypointError(#[from] ValidatedEntrypointError<TNetworkProtocol>),
 }
 
 #[memo]
