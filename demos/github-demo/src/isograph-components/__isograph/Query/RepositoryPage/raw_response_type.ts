@@ -17,7 +17,7 @@ export type Query__RepositoryPage__rawResponse = {
         node: {
           id: string,
           author: {
-            __typename: 'User',
+            __typename: "User",
             id: string,
             login: string,
             twitterUsername?: (string | null),

@@ -1,6 +1,6 @@
 export type User__RepositoryConnection__rawResponse = {
   node____id___v_id: {
-    __typename: 'User',
+    __typename: "User",
     id: string,
     repositories____first___v_first____after___v_after: {
       edges: {
