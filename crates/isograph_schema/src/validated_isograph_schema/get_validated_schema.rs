@@ -1,9 +1,10 @@
 use crate::{
     ContainsIsoStats, CreateAdditionalFieldsError, IsographDatabase, NetworkProtocol,
-    ProcessIsoLiteralsForSchemaError, ValidateUseOfArgumentsError, process_iso_literals_for_schema,
+    ProcessIsoLiteralsForSchemaError, ValidateUseOfArgumentsError, parse_iso_literals,
     validated_isograph_schema::create_type_system_schema::CreateSchemaError,
 };
 use common_lang_types::WithLocation;
+use isograph_lang_parser::IsographLiteralParseError;
 use pico_macros::memo;
 use thiserror::Error;
 
@@ -11,8 +12,10 @@ use thiserror::Error;
 pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<ContainsIsoStats, GetValidatedSchemaError<TNetworkProtocol>> {
-    let stats = process_iso_literals_for_schema(db)?;
-    Ok(stats)
+    let contains_iso = parse_iso_literals(db)
+        .to_owned()
+        .map_err(|errors| GetValidatedSchemaError::IsographLiteralParseError { errors })?;
+    Ok(contains_iso.stats())
 }
 
 #[derive(Error, Debug, PartialEq, Eq, Clone)]
@@ -42,6 +45,17 @@ pub enum GetValidatedSchemaError<TNetworkProtocol: NetworkProtocol> {
 
     #[error("{0}")]
     CreateAdditionalFieldsError(#[from] CreateAdditionalFieldsError<TNetworkProtocol>),
+
+    #[error(
+        "{}",
+        errors.iter().fold(String::new(), |mut output, x| {
+            output.push_str(&format!("\n\n{}", x.for_display()));
+            output
+        })
+    )]
+    IsographLiteralParseError {
+        errors: Vec<WithLocation<IsographLiteralParseError>>,
+    },
 }
 
 impl<TNetworkProtocol: NetworkProtocol>

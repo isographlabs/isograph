@@ -14,18 +14,7 @@ use isograph_lang_parser::{IsoLiteralExtractionResult, IsographLiteralParseError
 use pico_macros::memo;
 use thiserror::Error;
 
-use crate::{parse_iso_literal_in_source, process_iso_literals};
-
-pub(crate) fn process_iso_literals_for_schema<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<ContainsIsoStats, ProcessIsoLiteralsForSchemaError<TNetworkProtocol>> {
-    let contains_iso = parse_iso_literals(db).to_owned()?;
-    let contains_iso_stats = contains_iso.stats();
-
-    let (_, _) = process_iso_literals(db, contains_iso)?;
-
-    Ok(contains_iso_stats)
-}
+use crate::parse_iso_literal_in_source;
 
 #[derive(Debug, Error, PartialEq, Eq, Clone)]
 pub enum ProcessIsoLiteralsForSchemaError<TNetworkProtocol: NetworkProtocol> {
@@ -106,7 +95,7 @@ impl<TNetworkProtocol: NetworkProtocol>
 
 // This should not be used. It returns an Err variant if there is a single parse error.
 #[memo]
-fn parse_iso_literals<TNetworkProtocol: NetworkProtocol>(
+pub fn parse_iso_literals<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<ParsedIsoLiteralsMap, Vec<WithLocation<IsographLiteralParseError>>> {
     // TODO we are not checking the open file map here. This will probably be fixed when we

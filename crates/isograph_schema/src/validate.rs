@@ -1,11 +1,14 @@
+use common_lang_types::WithLocation;
+use isograph_lang_parser::IsographLiteralParseError;
 use pico_macros::memo;
 use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
     CreateAdditionalFieldsError, CreateSchemaError, FieldToInsertToServerSelectableError,
-    IsographDatabase, NetworkProtocol, ValidateUseOfArgumentsError, ValidatedEntrypointError,
-    create_new_exposed_field, create_type_system_schema_with_server_selectables,
+    IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError,
+    ValidateUseOfArgumentsError, ValidatedEntrypointError, create_new_exposed_field,
+    create_type_system_schema_with_server_selectables, parse_iso_literals, process_iso_literals,
     server_selectables_map, validate_use_of_arguments, validated_entrypoints,
 };
 
@@ -19,6 +22,9 @@ use crate::{
 /// This is opt-in, but it makes sense to call this before we generate
 /// artifacts. However, whether we do these strictly-unnecessary
 /// validations should be controllable by the user.
+///
+/// TODO we return early in a few places, and throw away already-accumulated
+/// errors, which we should not do.
 #[memo]
 pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
@@ -52,6 +58,21 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
         }
     }
 
+    // Process all iso literals
+    let contains_iso = parse_iso_literals(db).to_owned().map_err(|errors| {
+        errors
+            .into_iter()
+            .map(|e| ValidationError::IsographLiteralParseError { message: e })
+            .collect::<Vec<_>>()
+    })?;
+
+    if let Err(e) = process_iso_literals(db, contains_iso) {
+        errors.extend(
+            e.into_iter()
+                .map(|e| ValidationError::ProcessClientFieldDeclarationError { error: e }),
+        )
+    }
+
     if errors.is_empty() {
         Ok(())
     } else {
@@ -78,6 +99,16 @@ pub enum ValidationError<TNetworkProtocol: NetworkProtocol> {
 
     #[error("{0}")]
     CreateSchemaError(#[from] CreateSchemaError<TNetworkProtocol>),
+
+    #[error("{}", message.for_display())]
+    IsographLiteralParseError {
+        message: WithLocation<IsographLiteralParseError>,
+    },
+
+    #[error("{}", error.for_display())]
+    ProcessClientFieldDeclarationError {
+        error: WithLocation<ProcessClientFieldDeclarationError<TNetworkProtocol>>,
+    },
 }
 
 #[memo]
