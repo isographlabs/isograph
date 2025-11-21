@@ -4,7 +4,7 @@ use crate::{
     process_client_pointer_declaration,
 };
 use common_lang_types::{
-    CurrentWorkingDirectory, RelativePathToSourceFile, Span, TextSource, WithLocation,
+    CurrentWorkingDirectory, Location, RelativePathToSourceFile, Span, TextSource, WithLocation,
     WithLocationPostfix, WithSpan,
 };
 use isograph_lang_parser::{
@@ -212,7 +212,7 @@ pub fn process_iso_literal_extraction<TNetworkProtocol: NetworkProtocol>(
     );
     if is_client_field_declaration && !has_associated_js_function {
         return IsographLiteralParseError::ExpectedAssociatedJsFunction
-            .with_generated_location()
+            .with_location(Location::new(text_source, Span::todo_generated()))
             .err();
     }
 
