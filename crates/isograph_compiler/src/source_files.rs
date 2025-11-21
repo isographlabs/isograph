@@ -224,12 +224,12 @@ pub fn read_schema<TNetworkProtocol: NetworkProtocol>(
 
 pub fn mutate_schema_source_in_db<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
-    schema_path: &AbsolutePathAndRelativePath,
 ) -> Result<(), SourceError> {
+    let schema_path = db.get_isograph_config().schema.clone();
     eprintln!("read schema 2");
 
     let content = format!(
-        "\n\n# asdfasdf\n{}\n\n# nooo why",
+        "\n\n# FOOBARBAZ\n{}\n\n# nooo why",
         read_schema_file(&schema_path.absolute_path)?
     );
     let text_source = TextSource {

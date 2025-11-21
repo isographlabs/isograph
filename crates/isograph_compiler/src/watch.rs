@@ -29,9 +29,7 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
 
     fetch_types_assert_non_zero_len(&state, "first");
 
-    let schema = state.db.get_isograph_config().schema.clone();
-
-    mutate_schema_source_in_db(&mut state.db, &schema)?;
+    mutate_schema_source_in_db(&mut state.db)?;
 
     fetch_types_assert_non_zero_len(&state, "second");
 

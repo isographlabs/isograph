@@ -73,104 +73,17 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         ),
         ParseGraphQLTypeSystemDocumentsError,
     > {
-        eprintln!("parse type system documents");
-        let mut graphql_root_types = None;
+        eprintln!("parse type system documents...");
+        // let mut graphql_root_types = None;
 
-        let (type_system_document, type_system_extension_documents) =
-            parse_graphql_schema(db).to_owned()?;
+        // let (type_system_document, type_system_extension_documents) =
+        parse_graphql_schema(db);
 
-        let (mut result, mut directives, mut refetch_fields) =
-            process_graphql_type_system_document(
-                type_system_document.to_owned(db),
-                &mut graphql_root_types,
-            )?;
-
-        for type_system_extension_document in type_system_extension_documents.values() {
-            let (outcome, objects_and_directives, new_refetch_fields) =
-                process_graphql_type_extension_document(
-                    type_system_extension_document.to_owned(db),
-                    &mut graphql_root_types,
-                )?;
-
-            for (name, new_directives) in objects_and_directives {
-                directives.entry(name).or_default().extend(new_directives);
-            }
-
-            // Note: we process all newly-defined types in schema extensions.
-            // However, we ignore a bunch of things, like newly-defined fields on existing types, etc.
-            // We should probably fix that!
-            result.extend(outcome);
-            refetch_fields.extend(new_refetch_fields);
-        }
-
-        let graphql_root_types = graphql_root_types.unwrap_or_default();
-
-        let query = result
-            .iter_mut()
-            .find_map(|item| match item.as_ref_mut().as_object() {
-                Some(outcome) => {
-                    if outcome.server_object_entity.item.name.item == graphql_root_types.query {
-                        Some(outcome)
-                    } else {
-                        None
-                    }
-                }
-                None => None,
-            })
-            .expect("Expected query type to be found.");
-        query.expose_fields_to_insert.extend(refetch_fields);
-
-        // - in the extension document, you may have added directives to objects, e.g. @expose
-        // - we need to transfer those to the original objects.
-        //
-        // The way we are doing this is in dire need of cleanup.
-        for (name, directives) in directives {
-            // TODO don't do O(n^2) here
-            match result
-                .iter_mut()
-                .find_map(|item| match item.as_ref_mut().as_object() {
-                    Some(x) => {
-                        if x.server_object_entity.item.name.item == name {
-                            Some(x)
-                        } else {
-                            None
-                        }
-                    }
-                    None => None,
-                }) {
-                Some(outcome) => {
-                    for directive in directives {
-                        if directive.name.item == *EXPOSE_FIELD_DIRECTIVE {
-                            let expose_field_directive = from_graphql_directive(&directive)
-                                .map_err(|err| match err {
-                                    DeserializationError::Custom(err) => {
-                                        ParseGraphQLTypeSystemDocumentsError::FailedToDeserialize(
-                                            err,
-                                        )
-                                    }
-                                })?;
-
-                            outcome.expose_fields_to_insert.push(ExposeFieldToInsert {
-                                expose_field_directive,
-                                parent_object_name: outcome.server_object_entity.item.name.item,
-                                description: None,
-                            });
-                        }
-                    }
-                }
-                None => {
-                    return Err(
-                        ProcessGraphqlTypeSystemDefinitionError::AttemptedToExtendUndefinedType {
-                            type_name: name,
-                        },
-                    )?;
-                }
-            }
-        }
-
-        extend_result_with_default_types(&mut result);
-
-        Ok((result, graphql_root_types.into()))
+        Ok((vec![], {
+            let mut map = BTreeMap::new();
+            map.insert("foo".intern().into(), RootOperationName("query"));
+            map
+        }))
     }
 
     fn generate_link_type<'a>(
