@@ -15,7 +15,7 @@ use thiserror::Error;
 pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<ContainsIsoStats, GetValidatedSchemaError<TNetworkProtocol>> {
-    let (expose_as_field_queue, _) = create_type_system_schema_with_server_selectables(db)
+    let expose_as_field_queue = create_type_system_schema_with_server_selectables(db)
         .as_ref()
         .map_err(|e| e.clone())?;
 

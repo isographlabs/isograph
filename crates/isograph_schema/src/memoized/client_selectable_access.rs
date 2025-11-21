@@ -377,10 +377,9 @@ pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
     >,
     MemoizedIsoLiteralError<TNetworkProtocol>,
 > {
-    let (expose_as_field_queue, _field_queue) =
-        create_type_system_schema_with_server_selectables(db)
-            .as_ref()
-            .map_err(|e| e.clone())?;
+    let expose_as_field_queue = create_type_system_schema_with_server_selectables(db)
+        .as_ref()
+        .map_err(|e| e.clone())?;
 
     let mut map = HashMap::new();
     for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
