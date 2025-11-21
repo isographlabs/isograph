@@ -32,23 +32,50 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
 ) -> Result<ContainsIsoStats, Vec<ValidationError<TNetworkProtocol>>> {
     let mut errors = vec![];
 
-    if let Err(e) = validate_use_of_arguments(db) {
-        errors.extend(e.iter().map(|e| ValidationError::from(e.item.clone())))
-    }
+    maybe_extend(
+        &mut errors,
+        validate_use_of_arguments(db).to_owned().map_err(|e| {
+            e.into_iter()
+                .map(|e| ValidationError::ValidateUseOfArgumentsError { error: e })
+                .collect()
+        }),
+    );
 
-    if let Err(e) = validate_all_server_selectables_point_to_defined_types(db).to_owned() {
-        errors.extend(e);
-    }
+    maybe_extend(
+        &mut errors,
+        validate_all_server_selectables_point_to_defined_types(db).to_owned(),
+    );
 
     errors.extend(validated_entrypoints(db).values().flat_map(|result| {
         ValidationError::ValidatedEntrypointError(result.as_ref().err()?.clone()).some()
     }));
 
-    // validate that each expose field is defined correctly
+    maybe_extend(&mut errors, validate_all_expose_as_fields(db));
+
+    let contains_iso_stats = match validate_all_iso_literals(db) {
+        Ok(stats) => stats,
+        Err(e) => {
+            errors.extend(e);
+            return Err(errors);
+        }
+    };
+
+    if errors.is_empty() {
+        Ok(contains_iso_stats)
+    } else {
+        Err(errors)
+    }
+}
+
+fn validate_all_expose_as_fields<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+) -> Result<(), Vec<ValidationError<TNetworkProtocol>>> {
     let expose_as_field_queue = create_type_system_schema_with_server_selectables(db)
         .as_ref()
         .map_err(|e| vec![e.clone().into()])?;
 
+    // TODO restructure as a .map or whatnot
+    let mut errors = vec![];
     for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
         for expose_as_field in expose_as_fields_to_insert {
             if let Err(e) =
@@ -59,7 +86,12 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
         }
     }
 
-    // Process all iso literals
+    is_empty_or_ok(errors)
+}
+
+fn validate_all_iso_literals<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+) -> Result<ContainsIsoStats, Vec<ValidationError<TNetworkProtocol>>> {
     let contains_iso = parse_iso_literals(db).to_owned().map_err(|errors| {
         errors
             .into_iter()
@@ -69,23 +101,36 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
     let contains_iso_stats = contains_iso.stats();
 
     if let Err(e) = process_iso_literals(db, contains_iso) {
-        errors.extend(
-            e.into_iter()
-                .map(|e| ValidationError::ProcessClientFieldDeclarationError { error: e }),
-        )
+        return e
+            .into_iter()
+            .map(|e| ValidationError::ProcessClientFieldDeclarationError { error: e })
+            .collect::<Vec<_>>()
+            .err();
     }
 
+    Ok(contains_iso_stats)
+}
+
+fn is_empty_or_ok<E>(errors: Vec<E>) -> Result<(), Vec<E>> {
     if errors.is_empty() {
-        Ok(contains_iso_stats)
-    } else {
         Err(errors)
+    } else {
+        Ok(())
+    }
+}
+
+fn maybe_extend<T, E>(errors_acc: &mut Vec<E>, result: Result<T, Vec<E>>) {
+    if let Err(e) = result {
+        errors_acc.extend(e);
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Error)]
 pub enum ValidationError<TNetworkProtocol: NetworkProtocol> {
-    #[error("{0}")]
-    ValidateUseOfArgumentsError(#[from] ValidateUseOfArgumentsError<TNetworkProtocol>),
+    #[error("{}", error.for_display())]
+    ValidateUseOfArgumentsError {
+        error: WithLocation<ValidateUseOfArgumentsError<TNetworkProtocol>>,
+    },
 
     #[error("{0}")]
     ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),
