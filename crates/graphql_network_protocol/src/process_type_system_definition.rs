@@ -496,7 +496,7 @@ impl GraphQLObjectDefinitionType {
     pub fn has_typename_field(&self) -> bool {
         match self {
             GraphQLObjectDefinitionType::InputObject => false,
-            GraphQLObjectDefinitionType::Union => false,
+            GraphQLObjectDefinitionType::Union => true,
             GraphQLObjectDefinitionType::Object => true,
             GraphQLObjectDefinitionType::Interface => true,
         }
