@@ -7,7 +7,7 @@ use common_lang_types::{
 use graphql_lang_types::{DeserializationError, from_graphql_directive};
 use graphql_schema_parser::SchemaParseError;
 use intern::string_key::Intern;
-use isograph_lang_types::{SelectionType, SelectionTypePostFix};
+use isograph_lang_types::SelectionTypePostFix;
 use isograph_schema::{
     ExposeFieldToInsert, Format, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome,
     RootOperationName, ValidatedVariableDefinition, server_object_entity_named,

@@ -43,9 +43,9 @@ impl<TValue> GraphQLTypeAnnotation<TValue> {
             GraphQLTypeAnnotation::Named(named) => GraphQLTypeAnnotation::Named(
                 GraphQLNamedTypeAnnotation(WithSpan::new(f(named.0.item), named.0.span)),
             ),
-            GraphQLTypeAnnotation::List(list) => GraphQLTypeAnnotation::List(Box::new(list.map(f))),
+            GraphQLTypeAnnotation::List(list) => GraphQLTypeAnnotation::List(list.map(f).boxed()),
             GraphQLTypeAnnotation::NonNull(non_null) => {
-                GraphQLTypeAnnotation::NonNull(Box::new(non_null.map(f)))
+                GraphQLTypeAnnotation::NonNull(non_null.map(f).boxed())
             }
         }
     }
@@ -59,10 +59,10 @@ impl<TValue> GraphQLTypeAnnotation<TValue> {
                 GraphQLNamedTypeAnnotation(WithSpan::new(f(named.0.item)?, named.0.span)),
             ),
             GraphQLTypeAnnotation::List(list) => {
-                GraphQLTypeAnnotation::List(Box::new(list.and_then(f)?))
+                GraphQLTypeAnnotation::List(list.and_then(f)?.boxed())
             }
             GraphQLTypeAnnotation::NonNull(non_null) => {
-                GraphQLTypeAnnotation::NonNull(Box::new(non_null.and_then(f)?))
+                GraphQLTypeAnnotation::NonNull(non_null.and_then(f)?.boxed())
             }
         }
         .ok()

@@ -5,8 +5,8 @@ use common_lang_types::{
 };
 use isograph_lang_types::{
     DefinitionLocation, EmptyDirectiveSet, LoadableDirectiveParameters,
-    ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionType,
-    SelectionTypeContainingSelections, SelectionTypePostFix,
+    ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionTypeContainingSelections,
+    SelectionTypePostFix,
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, IsographDatabase, Loadability, NameAndArguments,

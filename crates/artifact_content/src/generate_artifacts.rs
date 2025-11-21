@@ -335,14 +335,15 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
 
                             let id_var = ValidatedVariableDefinition {
                                 name: WithLocation::new("id".intern().into(), Location::Generated),
-                                type_: GraphQLTypeAnnotation::NonNull(Box::new(
+                                type_: GraphQLTypeAnnotation::NonNull(
                                     GraphQLNonNullTypeAnnotation::Named(
                                         GraphQLNamedTypeAnnotation(WithSpan::new(
                                             ServerEntityName::Scalar(*ID_ENTITY_NAME),
                                             Span::todo_generated(),
                                         )),
-                                    ),
-                                )),
+                                    )
+                                    .boxed(),
+                                ),
                                 default_value: None,
                             };
 

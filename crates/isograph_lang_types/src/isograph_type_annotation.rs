@@ -10,6 +10,7 @@ use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
     GraphQLTypeAnnotation,
 };
+use prelude::Postfix;
 
 /// This is annoying! We should find a better way to model lists.
 /// This gets us closer to a good solution, so it's fine.
@@ -47,7 +48,7 @@ impl<TInner: Ord> TypeAnnotation<TInner> {
             }
             GraphQLNonNullTypeAnnotation::List(list_type_annotation) => {
                 let inner = TypeAnnotation::from_graphql_type_annotation(list_type_annotation.0);
-                TypeAnnotation::Plural(Box::new(inner))
+                TypeAnnotation::Plural(inner.boxed())
             }
         }
     }
@@ -59,7 +60,7 @@ impl<TInner: Ord> TypeAnnotation<TInner> {
                 TypeAnnotation::Union(union_type_annotation.as_ref())
             }
             TypeAnnotation::Plural(type_annotation) => {
-                TypeAnnotation::Plural(Box::new(TypeAnnotation::as_ref(type_annotation)))
+                TypeAnnotation::Plural(TypeAnnotation::as_ref(type_annotation).boxed())
             }
         }
     }
@@ -114,7 +115,7 @@ impl<TInner: Ord> TypeAnnotation<TInner> {
                 })
             }
             TypeAnnotation::Plural(type_annotation) => {
-                TypeAnnotation::Plural(Box::new(type_annotation.map(map)))
+                TypeAnnotation::Plural(type_annotation.map(map).boxed())
             }
         }
     }
@@ -196,27 +197,30 @@ fn graphql_type_annotation_from_union_variant<TValue: Ord + Copy + Debug>(
                     Span::todo_generated(),
                 )))
             }
-            UnionVariant::Plural(type_annotation) => {
-                GraphQLTypeAnnotation::List(Box::new(GraphQLListTypeAnnotation(
-                    graphql_type_annotation_from_type_annotation(type_annotation),
-                )))
-            }
+            UnionVariant::Plural(type_annotation) => GraphQLTypeAnnotation::List(
+                GraphQLListTypeAnnotation(graphql_type_annotation_from_type_annotation(
+                    type_annotation,
+                ))
+                .boxed(),
+            ),
         };
     }
 
     GraphQLTypeAnnotation::NonNull(
         match union_type_annotation.variants.iter().next().unwrap() {
-            UnionVariant::Scalar(scalar_entity_name) => Box::new(
+            UnionVariant::Scalar(scalar_entity_name) => {
                 GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(WithSpan::new(
                     *scalar_entity_name,
                     Span::todo_generated(),
-                ))),
-            ),
-            UnionVariant::Plural(type_annotation) => Box::new(GraphQLNonNullTypeAnnotation::List(
-                GraphQLListTypeAnnotation(graphql_type_annotation_from_type_annotation(
-                    type_annotation,
-                )),
-            )),
+                )))
+                .boxed()
+            }
+            UnionVariant::Plural(type_annotation) => {
+                GraphQLNonNullTypeAnnotation::List(GraphQLListTypeAnnotation(
+                    graphql_type_annotation_from_type_annotation(type_annotation),
+                ))
+                .boxed()
+            }
         },
     )
 }
@@ -228,11 +232,12 @@ pub fn graphql_type_annotation_from_type_annotation<TValue: Ord + Copy + Debug>(
         TypeAnnotation::Scalar(scalar_entity_name) => GraphQLTypeAnnotation::Named(
             GraphQLNamedTypeAnnotation(WithSpan::new(*scalar_entity_name, Span::todo_generated())),
         ),
-        TypeAnnotation::Plural(type_annotation) => {
-            GraphQLTypeAnnotation::List(Box::new(GraphQLListTypeAnnotation(
-                graphql_type_annotation_from_type_annotation(type_annotation),
-            )))
-        }
+        TypeAnnotation::Plural(type_annotation) => GraphQLTypeAnnotation::List(
+            GraphQLListTypeAnnotation(graphql_type_annotation_from_type_annotation(
+                type_annotation,
+            ))
+            .boxed(),
+        ),
         TypeAnnotation::Union(union_type_annotation) => {
             graphql_type_annotation_from_union_variant(union_type_annotation)
         }

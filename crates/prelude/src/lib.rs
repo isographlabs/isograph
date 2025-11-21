@@ -13,6 +13,10 @@ where
     fn some(self) -> Option<Self> {
         Some(self)
     }
+
+    fn boxed(self) -> Box<Self> {
+        Box::new(self)
+    }
 }
 
 impl<T> Postfix for T {}

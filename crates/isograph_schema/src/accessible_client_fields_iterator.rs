@@ -93,7 +93,7 @@ impl Iterator for AccessibleClientFieldIterator {
                             DefinitionLocation::Client(client_pointer_id) => {
                                 // TODO: include pointer target link type
                                 // https://github.com/isographlabs/isograph/issues/719
-                                self.sub_iterator = Some(Box::new(iterator));
+                                self.sub_iterator = Some(iterator.boxed());
                                 self.index += 1;
                                 return client_pointer_id.object_selected().some();
                             }
@@ -101,7 +101,7 @@ impl Iterator for AccessibleClientFieldIterator {
                         };
                         let next = iterator.next();
                         if next.is_some() {
-                            self.sub_iterator = Some(Box::new(iterator));
+                            self.sub_iterator = Some(iterator.boxed());
                             // When we exhaust the iterator, we don't want to re-create and
                             // re-iterate sub_iterator, so we also advance the index.
                             self.index += 1;

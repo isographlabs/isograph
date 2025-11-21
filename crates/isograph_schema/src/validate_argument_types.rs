@@ -36,7 +36,7 @@ fn graphql_type_to_nullable_type<TValue>(
 ) -> GraphQLTypeAnnotation<TValue> {
     match value {
         GraphQLNonNullTypeAnnotation::Named(named) => GraphQLTypeAnnotation::Named(named),
-        GraphQLNonNullTypeAnnotation::List(list) => GraphQLTypeAnnotation::List(Box::new(list)),
+        GraphQLNonNullTypeAnnotation::List(list) => GraphQLTypeAnnotation::List(list.boxed()),
     }
 }
 

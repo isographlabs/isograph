@@ -11,7 +11,7 @@ use graphql_lang_types::{
     GraphQLTypeSystemExtensionDocument, GraphQLTypeSystemExtensionOrDefinition,
 };
 use intern::string_key::Intern;
-use isograph_lang_types::{Description, SelectionType, SelectionTypePostFix};
+use isograph_lang_types::{Description, SelectionTypePostFix};
 use isograph_schema::{
     ExposeFieldDirective, ExposeFieldToInsert, FieldMapItem, FieldToInsert,
     IsographObjectTypeDefinition, ParseTypeSystemOutcome, ProcessObjectTypeDefinitionOutcome,
@@ -411,12 +411,13 @@ fn process_object_type_definition(
             FieldToInsert {
                 description: None,
                 name: WithLocation::new((*TYPENAME_FIELD_NAME).into(), Location::generated()),
-                graphql_type: GraphQLTypeAnnotation::NonNull(Box::new(
+                graphql_type: GraphQLTypeAnnotation::NonNull(
                     GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(WithSpan::new(
                         *STRING_TYPE_NAME,
                         Span::todo_generated(),
-                    ))),
-                )),
+                    )))
+                    .boxed(),
+                ),
                 // This is bad data modeling, and we should do better.
                 javascript_type_override: concrete_type.map(|parent_concrete_type| {
                     format!("'{parent_concrete_type}'").intern().into()

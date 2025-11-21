@@ -922,9 +922,9 @@ fn parse_type_annotation<T: From<StringKey>>(
 
             let is_non_null = tokens.parse_token_of_kind(TokenKind::Exclamation).is_ok();
             if is_non_null {
-                GraphQLTypeAnnotation::NonNull(Box::new(GraphQLNonNullTypeAnnotation::Named(
-                    GraphQLNamedTypeAnnotation(type_),
-                )))
+                GraphQLTypeAnnotation::NonNull(
+                    GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(type_)).boxed(),
+                )
                 .ok()
             } else {
                 GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(type_)).ok()
@@ -944,14 +944,17 @@ fn parse_type_annotation<T: From<StringKey>>(
             let is_non_null = tokens.parse_token_of_kind(TokenKind::Exclamation).is_ok();
 
             if is_non_null {
-                GraphQLTypeAnnotation::NonNull(Box::new(GraphQLNonNullTypeAnnotation::List(
-                    GraphQLListTypeAnnotation(inner_type_annotation),
-                )))
+                GraphQLTypeAnnotation::NonNull(
+                    GraphQLNonNullTypeAnnotation::List(GraphQLListTypeAnnotation(
+                        inner_type_annotation,
+                    ))
+                    .boxed(),
+                )
                 .ok()
             } else {
-                GraphQLTypeAnnotation::List(Box::new(GraphQLListTypeAnnotation(
-                    inner_type_annotation,
-                )))
+                GraphQLTypeAnnotation::List(
+                    GraphQLListTypeAnnotation(inner_type_annotation).boxed(),
+                )
                 .ok()
             }
         })?;

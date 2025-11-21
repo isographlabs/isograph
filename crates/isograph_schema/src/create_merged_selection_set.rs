@@ -1548,12 +1548,13 @@ fn get_aliased_mutation_field_name(
 pub fn id_arguments() -> Vec<VariableDefinition<ServerEntityName>> {
     vec![VariableDefinition {
         name: WithLocation::new(ID_FIELD_NAME.unchecked_conversion(), Location::generated()),
-        type_: GraphQLTypeAnnotation::NonNull(Box::new(GraphQLNonNullTypeAnnotation::Named(
-            GraphQLNamedTypeAnnotation(WithSpan::new(
+        type_: GraphQLTypeAnnotation::NonNull(
+            GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(WithSpan::new(
                 (*ID_ENTITY_NAME).scalar_selected(),
                 Span::todo_generated(),
-            )),
-        ))),
+            )))
+            .boxed(),
+        ),
         default_value: None,
     }]
 }
