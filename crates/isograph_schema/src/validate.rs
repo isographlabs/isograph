@@ -5,11 +5,12 @@ use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
-    CreateAdditionalFieldsError, CreateSchemaError, FieldToInsertToServerSelectableError,
-    IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError,
-    ValidateUseOfArgumentsError, ValidatedEntrypointError, create_new_exposed_field,
-    create_type_system_schema_with_server_selectables, parse_iso_literals, process_iso_literals,
-    server_selectables_map, validate_use_of_arguments, validated_entrypoints,
+    ContainsIsoStats, CreateAdditionalFieldsError, CreateSchemaError,
+    FieldToInsertToServerSelectableError, IsographDatabase, NetworkProtocol,
+    ProcessClientFieldDeclarationError, ValidateUseOfArgumentsError, ValidatedEntrypointError,
+    create_new_exposed_field, create_type_system_schema_with_server_selectables,
+    parse_iso_literals, process_iso_literals, server_selectables_map, validate_use_of_arguments,
+    validated_entrypoints,
 };
 
 /// In the world of pico, we minimally validate. For example, if the
@@ -28,7 +29,7 @@ use crate::{
 #[memo]
 pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<(), Vec<ValidationError<TNetworkProtocol>>> {
+) -> Result<ContainsIsoStats, Vec<ValidationError<TNetworkProtocol>>> {
     let mut errors = vec![];
 
     if let Err(e) = validate_use_of_arguments(db) {
@@ -65,6 +66,7 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
             .map(|e| ValidationError::IsographLiteralParseError { message: e })
             .collect::<Vec<_>>()
     })?;
+    let contains_iso_stats = contains_iso.stats();
 
     if let Err(e) = process_iso_literals(db, contains_iso) {
         errors.extend(
@@ -74,7 +76,7 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
     }
 
     if errors.is_empty() {
-        Ok(())
+        Ok(contains_iso_stats)
     } else {
         Err(errors)
     }

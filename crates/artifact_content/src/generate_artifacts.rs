@@ -16,6 +16,7 @@ use isograph_lang_types::{
     SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, SelectionTypePostfix,
     TypeAnnotation, UnionVariant, VariableDefinition,
 };
+use isograph_schema::ContainsIsoStats;
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, ClientSelectableId, FieldMapItem,
     FieldTraversalResult, ID_ENTITY_NAME, IsographDatabase, LINK_FIELD_NAME, NameAndArguments,
@@ -29,7 +30,6 @@ use isograph_schema::{
     server_scalar_entity_javascript_name, server_scalar_selectable_named, validate_entire_schema,
     validated_entrypoints, validated_refetch_strategy_for_client_scalar_selectable_named,
 };
-use isograph_schema::{ContainsIsoStats, GetValidatedSchemaError, get_validated_schema};
 use lazy_static::lazy_static;
 use prelude::*;
 use std::{
@@ -118,15 +118,9 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
 > {
     let config = db.get_isograph_config();
 
-    validate_entire_schema(db)
+    let stats = validate_entire_schema(db)
         .to_owned()
         .map_err(|e| GetArtifactPathAndContentError::ValidationError { messages: e })?;
-
-    let validated_schema = get_validated_schema(db);
-    let stats = match validated_schema {
-        Ok(stats) => stats,
-        Err(e) => return Err(e.clone())?,
-    };
 
     let mut artifact_path_and_content = get_artifact_path_and_content_impl(db, config);
     if let Some(header) = config.options.generated_file_header {
@@ -1468,9 +1462,6 @@ pub fn get_provided_arguments<'a>(
 
 #[derive(Error, Debug, Clone)]
 pub enum GetArtifactPathAndContentError<TNetworkProtocol: NetworkProtocol> {
-    #[error("{0}")]
-    GetValidatedSchemaError(#[from] GetValidatedSchemaError<TNetworkProtocol>),
-
     #[error(
         "{}",
         messages.iter().fold(String::new(), |mut output, x| {
