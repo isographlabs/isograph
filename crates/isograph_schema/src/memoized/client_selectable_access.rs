@@ -384,11 +384,8 @@ pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
     let mut map = HashMap::new();
     for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
         for expose_as_field in expose_as_fields_to_insert {
-            let (
-                unprocessed_client_scalar_selection_set,
-                exposed_field_client_scalar_selectable,
-                _payload_object_entity_name,
-            ) = create_new_exposed_field(db, expose_as_field, *parent_object_entity_name)?;
+            let (unprocessed_client_scalar_selection_set, exposed_field_client_scalar_selectable) =
+                create_new_exposed_field(db, expose_as_field, *parent_object_entity_name)?;
 
             map.insert(
                 (

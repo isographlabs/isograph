@@ -65,7 +65,6 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
     (
         UnprocessedClientScalarSelectableSelectionSet,
         ClientScalarSelectable<TNetworkProtocol>,
-        ServerObjectEntityName,
     ),
     CreateAdditionalFieldsError<TNetworkProtocol>,
 > {
@@ -266,7 +265,6 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
             .some(),
         },
         mutation_client_scalar_selectable,
-        payload_object_entity_name,
     )
         .ok()
 }

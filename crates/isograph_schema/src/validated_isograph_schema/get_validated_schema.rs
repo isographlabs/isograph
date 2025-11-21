@@ -23,7 +23,7 @@ pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol>(
 
     for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
         for expose_as_field in expose_as_fields_to_insert {
-            let (unprocessed_client_scalar_selection_set, _, _) =
+            let (unprocessed_client_scalar_selection_set, _) =
                 create_new_exposed_field(db, expose_as_field, *parent_object_entity_name)?;
 
             unprocessed_selection_sets
