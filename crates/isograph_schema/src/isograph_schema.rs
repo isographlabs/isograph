@@ -15,8 +15,8 @@ use prelude::Postfix;
 
 use crate::{
     IsographDatabase, NetworkProtocol, NormalizationKey, ObjectSelectableId, ServerEntityName,
-    ServerObjectSelectable, UseRefetchFieldRefetchStrategy,
-    create_additional_fields::CreateAdditionalFieldsError, server_selectable_named,
+    ServerObjectSelectable, create_additional_fields::CreateAdditionalFieldsError,
+    server_selectable_named,
 };
 
 lazy_static! {
@@ -117,9 +117,6 @@ pub type ValidatedObjectSelection = ObjectSelection<ScalarSelectableId, ObjectSe
 pub type ValidatedScalarSelection = ScalarSelection<ScalarSelectableId>;
 
 pub type ValidatedVariableDefinition = VariableDefinition<ServerEntityName>;
-
-pub type ValidatedUseRefetchFieldStrategy =
-    UseRefetchFieldRefetchStrategy<ScalarSelectableId, ObjectSelectableId>;
 
 pub type ScalarSelectableId = DefinitionLocation<
     (ServerObjectEntityName, ServerScalarSelectableName),
