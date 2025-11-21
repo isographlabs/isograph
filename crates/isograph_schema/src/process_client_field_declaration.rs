@@ -241,13 +241,12 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
 ) -> ProcessClientFieldDeclarationResult<Option<RefetchStrategy<(), ()>>, TNetworkProtocol> {
-    let is_fetchable = fetchable_types(db)
-        .as_ref()
-        .expect(
-            "Expected parsing to have succeeded. \
-            This is indicative of a bug in Isograph.",
-        )
-        .contains_key(&parent_object_entity_name);
+    let fetchable_types_map = fetchable_types(db).as_ref().expect(
+        "Expected parsing to have succeeded. \
+        This is indicative of a bug in Isograph.",
+    );
+
+    let is_fetchable = fetchable_types_map.contains_key(&parent_object_entity_name);
 
     if is_fetchable {
         Some(RefetchStrategy::RefetchFromRoot)
@@ -270,14 +269,7 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
                     )
                 })?;
 
-        let query_id = fetchable_types(db)
-            .as_ref()
-            .map_err(|e| {
-                WithSpan::new(
-                    ProcessClientFieldDeclarationError::ParseTypeSystemDocumentsError(e.clone()),
-                    Span::todo_generated(),
-                )
-            })?
+        let query_id = fetchable_types_map
             .iter()
             .find(|(_, root_operation_name)| root_operation_name.0 == "query")
             .expect("Expected query to be found")
