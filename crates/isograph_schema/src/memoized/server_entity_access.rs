@@ -4,7 +4,7 @@ use common_lang_types::{
     JavascriptName, ServerObjectEntityName, ServerScalarEntityName, UnvalidatedTypeName,
     WithLocation,
 };
-use isograph_lang_types::{SelectionType, SelectionTypePostFix};
+use isograph_lang_types::{SelectionType, SelectionTypePostfix};
 use pico_macros::memo;
 use prelude::Postfix;
 use thiserror::Error;

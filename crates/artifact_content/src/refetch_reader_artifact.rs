@@ -1,7 +1,7 @@
 use common_lang_types::{ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName};
 
 use isograph_config::GenerateFileExtensionsOption;
-use isograph_lang_types::SelectionTypePostFix;
+use isograph_lang_types::SelectionTypePostfix;
 use isograph_schema::{
     ClientScalarSelectable, FieldMapItem, IsographDatabase, NetworkProtocol, RefetchedPathsMap,
     client_scalar_selectable_selection_set_for_parent_query, initial_variable_context,

@@ -1,7 +1,7 @@
 use common_lang_types::WithSpan;
 use isograph_lang_types::{
     ObjectSelection, ScalarSelection, SelectionType, SelectionTypeContainingSelections,
-    SelectionTypePostFix,
+    SelectionTypePostfix,
 };
 
 pub(crate) fn visit_selection_set<

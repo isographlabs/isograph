@@ -4,7 +4,7 @@ use common_lang_types::{
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
-use isograph_lang_types::{SelectionType, SelectionTypePostFix, VariableDefinition};
+use isograph_lang_types::{SelectionType, SelectionTypePostfix, VariableDefinition};
 use prelude::Postfix;
 use std::collections::HashMap;
 

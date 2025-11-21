@@ -11,9 +11,9 @@ use intern::{Lookup, string_key::Intern};
 use isograph_config::CompilerConfig;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientScalarSelectionDirectiveSet, DefinitionLocation,
-    DefinitionLocationPostFix, Description, EmptyDirectiveSet, NonConstantValue,
+    DefinitionLocationPostfix, Description, EmptyDirectiveSet, NonConstantValue,
     ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, SelectionTypePostFix,
+    SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, SelectionTypePostfix,
     TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{

@@ -1,5 +1,5 @@
 use common_lang_types::{SelectableName, ServerObjectEntityName};
-use isograph_lang_types::{DefinitionLocation, DefinitionLocationPostFix, SelectionType};
+use isograph_lang_types::{DefinitionLocation, DefinitionLocationPostfix, SelectionType};
 use pico_macros::memo;
 use prelude::Postfix;
 use thiserror::Error;

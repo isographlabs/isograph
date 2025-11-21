@@ -15,8 +15,8 @@ use common_lang_types::{
 };
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
-    DefinitionLocationPostFix, EmptyDirectiveSet, EntrypointDirectiveSet,
-    ScalarSelectionDirectiveSet, SelectionType, SelectionTypePostFix,
+    DefinitionLocationPostfix, EmptyDirectiveSet, EntrypointDirectiveSet,
+    ScalarSelectionDirectiveSet, SelectionType, SelectionTypePostfix,
 };
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, EntrypointDeclarationInfo,

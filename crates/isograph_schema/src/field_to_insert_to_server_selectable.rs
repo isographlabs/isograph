@@ -6,7 +6,7 @@ use graphql_lang_types::{
     GraphQLConstantValue, GraphQLInputValueDefinition, GraphQLNamedTypeAnnotation, NameValuePair,
 };
 use isograph_lang_types::{
-    ConstantValue, SelectionType, SelectionTypePostFix, TypeAnnotation, VariableDefinition,
+    ConstantValue, SelectionType, SelectionTypePostfix, TypeAnnotation, VariableDefinition,
 };
 use prelude::Postfix;
 use thiserror::Error;

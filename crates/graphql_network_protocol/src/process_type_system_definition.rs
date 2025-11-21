@@ -11,7 +11,7 @@ use graphql_lang_types::{
     GraphQLTypeSystemExtensionDocument, GraphQLTypeSystemExtensionOrDefinition,
 };
 use intern::string_key::Intern;
-use isograph_lang_types::{Description, SelectionTypePostFix};
+use isograph_lang_types::{Description, SelectionTypePostfix};
 use isograph_schema::{
     ExposeFieldDirective, ExposeFieldToInsert, FieldMapItem, FieldToInsert,
     IsographObjectTypeDefinition, ParseTypeSystemOutcome, ProcessObjectTypeDefinitionOutcome,

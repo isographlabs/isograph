@@ -13,7 +13,7 @@ use common_lang_types::{
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{
-    ClientFieldDeclaration, ClientPointerDeclaration, SelectionType, SelectionTypePostFix,
+    ClientFieldDeclaration, ClientPointerDeclaration, SelectionType, SelectionTypePostfix,
 };
 use pico_macros::memo;
 use prelude::Postfix;

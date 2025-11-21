@@ -9,8 +9,8 @@ use common_lang_types::{
     UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use isograph_lang_types::{
-    DefinitionLocation, DefinitionLocationPostFix, ObjectSelection, ScalarSelection,
-    ScalarSelectionDirectiveSet, SelectionType, SelectionTypePostFix,
+    DefinitionLocation, DefinitionLocationPostfix, ObjectSelection, ScalarSelection,
+    ScalarSelectionDirectiveSet, SelectionType, SelectionTypePostfix,
     UnvalidatedScalarFieldSelection, UnvalidatedSelection,
 };
 use prelude::Postfix;

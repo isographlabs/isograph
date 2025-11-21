@@ -57,7 +57,7 @@ impl<TServer, TClient> DefinitionLocation<TServer, TClient> {
     }
 }
 
-pub trait DefinitionLocationPostFix
+pub trait DefinitionLocationPostfix
 where
     Self: Sized,
 {
@@ -70,7 +70,7 @@ where
     }
 }
 
-impl<T> DefinitionLocationPostFix for T {}
+impl<T> DefinitionLocationPostfix for T {}
 
 impl<TServerScalar, TServerObject, TClientScalar, TClientObject>
     DefinitionLocation<
@@ -263,7 +263,7 @@ impl<TScalar, TObject> SelectionType<WithLocation<TScalar>, WithLocation<TObject
     }
 }
 
-pub trait SelectionTypePostFix
+pub trait SelectionTypePostfix
 where
     Self: Sized,
 {
@@ -276,7 +276,7 @@ where
     }
 }
 
-impl<T> SelectionTypePostFix for T {}
+impl<T> SelectionTypePostfix for T {}
 
 // A blanket impl for SelectionType for ResolvedNode. Note that this will not work
 // in all circumstances, but because it requires that the Parent associated type

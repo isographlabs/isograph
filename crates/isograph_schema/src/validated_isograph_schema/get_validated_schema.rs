@@ -7,7 +7,7 @@ use crate::{
     },
 };
 use common_lang_types::WithLocation;
-use isograph_lang_types::SelectionTypePostFix;
+use isograph_lang_types::SelectionTypePostfix;
 use pico_macros::memo;
 use thiserror::Error;
 

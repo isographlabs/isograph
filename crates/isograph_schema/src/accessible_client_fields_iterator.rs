@@ -1,6 +1,6 @@
 use common_lang_types::WithSpan;
 use isograph_lang_types::{
-    DefinitionLocation, SelectionTypeContainingSelections, SelectionTypePostFix,
+    DefinitionLocation, SelectionTypeContainingSelections, SelectionTypePostfix,
 };
 use prelude::Postfix;
 

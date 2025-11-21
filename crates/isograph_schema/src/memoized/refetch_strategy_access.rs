@@ -4,7 +4,7 @@ use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName,
     ParentObjectEntityNameAndSelectableName, ServerObjectEntityName, WithLocation, WithSpan,
 };
-use isograph_lang_types::{SelectionType, SelectionTypePostFix};
+use isograph_lang_types::{SelectionType, SelectionTypePostfix};
 use pico_macros::memo;
 use prelude::Postfix;
 use thiserror::Error;

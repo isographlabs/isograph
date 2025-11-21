@@ -4,7 +4,7 @@ use common_lang_types::{
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
     Description, ObjectSelectionPath, ScalarSelectionPath, SelectionParentType, SelectionType,
-    SelectionTypePostFix, ServerObjectEntityNameWrapper,
+    SelectionTypePostfix, ServerObjectEntityNameWrapper,
 };
 use thiserror::Error;
 
