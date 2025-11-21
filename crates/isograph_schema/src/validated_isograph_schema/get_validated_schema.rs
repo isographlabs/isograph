@@ -1,10 +1,7 @@
 use crate::{
     ContainsIsoStats, CreateAdditionalFieldsError, IsographDatabase, NetworkProtocol,
-    ProcessIsoLiteralsForSchemaError, ValidateUseOfArgumentsError, create_new_exposed_field,
-    process_iso_literals_for_schema,
-    validated_isograph_schema::create_type_system_schema::{
-        CreateSchemaError, create_type_system_schema_with_server_selectables,
-    },
+    ProcessIsoLiteralsForSchemaError, ValidateUseOfArgumentsError, process_iso_literals_for_schema,
+    validated_isograph_schema::create_type_system_schema::CreateSchemaError,
 };
 use common_lang_types::WithLocation;
 use pico_macros::memo;
@@ -14,16 +11,6 @@ use thiserror::Error;
 pub fn get_validated_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<ContainsIsoStats, GetValidatedSchemaError<TNetworkProtocol>> {
-    let expose_as_field_queue = create_type_system_schema_with_server_selectables(db)
-        .as_ref()
-        .map_err(|e| e.clone())?;
-
-    for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
-        for expose_as_field in expose_as_fields_to_insert {
-            create_new_exposed_field(db, expose_as_field, *parent_object_entity_name)?;
-        }
-    }
-
     let stats = process_iso_literals_for_schema(db)?;
     Ok(stats)
 }

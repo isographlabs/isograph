@@ -3,9 +3,10 @@ use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
-    FieldToInsertToServerSelectableError, IsographDatabase, NetworkProtocol,
-    ValidateUseOfArgumentsError, ValidatedEntrypointError, server_selectables_map,
-    validate_use_of_arguments, validated_entrypoints,
+    CreateAdditionalFieldsError, CreateSchemaError, FieldToInsertToServerSelectableError,
+    IsographDatabase, NetworkProtocol, ValidateUseOfArgumentsError, ValidatedEntrypointError,
+    create_new_exposed_field, create_type_system_schema_with_server_selectables,
+    server_selectables_map, validate_use_of_arguments, validated_entrypoints,
 };
 
 /// In the world of pico, we minimally validate. For example, if the
@@ -36,6 +37,21 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
         ValidationError::ValidatedEntrypointError(result.as_ref().err()?.clone()).some()
     }));
 
+    // validate that each expose field is defined correctly
+    let expose_as_field_queue = create_type_system_schema_with_server_selectables(db)
+        .as_ref()
+        .map_err(|e| vec![e.clone().into()])?;
+
+    for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
+        for expose_as_field in expose_as_fields_to_insert {
+            if let Err(e) =
+                create_new_exposed_field(db, expose_as_field, *parent_object_entity_name)
+            {
+                errors.push(e.into());
+            }
+        }
+    }
+
     if errors.is_empty() {
         Ok(())
     } else {
@@ -56,6 +72,12 @@ pub enum ValidationError<TNetworkProtocol: NetworkProtocol> {
 
     #[error("{0}")]
     ValidatedEntrypointError(#[from] ValidatedEntrypointError<TNetworkProtocol>),
+
+    #[error("{0}")]
+    CreateAdditionalFieldsError(#[from] CreateAdditionalFieldsError<TNetworkProtocol>),
+
+    #[error("{0}")]
+    CreateSchemaError(#[from] CreateSchemaError<TNetworkProtocol>),
 }
 
 #[memo]
