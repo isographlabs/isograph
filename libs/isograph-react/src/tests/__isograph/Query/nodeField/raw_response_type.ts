@@ -1,6 +1,6 @@
 export type Query__nodeField__rawResponse = {
   node____id___v_id: {
-    __typename: "Node",
+    __typename: string,
     id: string,
   },
 }
