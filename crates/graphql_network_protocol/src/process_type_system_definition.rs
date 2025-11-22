@@ -461,7 +461,7 @@ fn process_scalar_definition(
         description: scalar_type_definition
             .description
             .map(|with_span| with_span.map(|dv| dv.into())),
-        name: scalar_type_definition.name,
+        name: scalar_type_definition.name.item,
         // TODO we should allow customization here
         javascript_name: *STRING_JAVASCRIPT_TYPE,
         network_protocol: std::marker::PhantomData,

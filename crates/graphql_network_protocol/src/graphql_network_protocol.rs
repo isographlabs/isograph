@@ -301,7 +301,7 @@ fn extend_result_with_default_types(result: &mut ParseTypeSystemOutcome<GraphQLN
     result.push(
         ServerScalarEntity {
             description: None,
-            name: WithLocation::new_generated("ID".intern().into()),
+            name: "ID".intern().into(),
             javascript_name: "string".intern().into(),
             network_protocol: std::marker::PhantomData,
         }
@@ -311,7 +311,7 @@ fn extend_result_with_default_types(result: &mut ParseTypeSystemOutcome<GraphQLN
     result.push(
         ServerScalarEntity {
             description: None,
-            name: WithLocation::new_generated("String".intern().into()),
+            name: "String".intern().into(),
             javascript_name: "string".intern().into(),
             network_protocol: std::marker::PhantomData,
         }
@@ -321,7 +321,7 @@ fn extend_result_with_default_types(result: &mut ParseTypeSystemOutcome<GraphQLN
     result.push(
         ServerScalarEntity {
             description: None,
-            name: WithLocation::new_generated("Boolean".intern().into()),
+            name: "Boolean".intern().into(),
             javascript_name: "boolean".intern().into(),
             network_protocol: std::marker::PhantomData,
         }
@@ -331,7 +331,7 @@ fn extend_result_with_default_types(result: &mut ParseTypeSystemOutcome<GraphQLN
     result.push(
         ServerScalarEntity {
             description: None,
-            name: WithLocation::new_generated("Float".intern().into()),
+            name: "Float".intern().into(),
             javascript_name: "number".intern().into(),
             network_protocol: std::marker::PhantomData,
         }
@@ -341,7 +341,7 @@ fn extend_result_with_default_types(result: &mut ParseTypeSystemOutcome<GraphQLN
     result.push(
         ServerScalarEntity {
             description: None,
-            name: WithLocation::new_generated("Int".intern().into()),
+            name: "Int".intern().into(),
             javascript_name: "number".intern().into(),
             network_protocol: std::marker::PhantomData,
         }

@@ -34,7 +34,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
     for ServerScalarEntity<TNetworkProtocol>
 {
     fn name(&self) -> SelectionType<ServerScalarEntityName, ServerObjectEntityName> {
-        self.name.item.scalar_selected()
+        self.name.scalar_selected()
     }
 
     fn description(&self) -> Option<Description> {

@@ -34,7 +34,7 @@ fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
     for item in outcome.iter() {
         match item {
             SelectionType::Scalar(s) => server_entities
-                .entry(s.item.name.item.into())
+                .entry(s.item.name.into())
                 .or_default()
                 .push(s.clone().scalar_selected()),
             SelectionType::Object(outcome) => server_entities
@@ -238,9 +238,9 @@ pub fn defined_entities<TNetworkProtocol: NetworkProtocol>(
                 .or_default()
                 .push(outcome.server_object_entity.item.name.object_selected()),
             SelectionType::Scalar(server_scalar_entity) => defined_entities
-                .entry(server_scalar_entity.item.name.item.into())
+                .entry(server_scalar_entity.item.name.into())
                 .or_default()
-                .push(server_scalar_entity.item.name.item.scalar_selected()),
+                .push(server_scalar_entity.item.name.scalar_selected()),
         }
     }
 
