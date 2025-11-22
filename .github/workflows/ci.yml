@@ -332,14 +332,7 @@ jobs:
   main-release:
     name: Main NPM release
     runs-on: ubuntu-latest
-    if: >-
-      github.event_name == 'push' &&
-      github.repository == 'isographlabs/isograph' &&
-      (
-        (github.ref == 'refs/heads/main' &&
-        github.ref_type != 'tag') ||
-        startsWith(github.ref, 'refs/heads/deploy/')
-      )
+    if: github.repository == 'isographlabs/isograph'
     needs: [all-checks-passed]
     steps:
       - uses: actions/checkout@v2
@@ -419,6 +412,13 @@ jobs:
         run: pnpm build-swc
 
       - name: Publish to NPM
+        if: >-
+          github.event_name == 'push' &&
+            (
+              (github.ref == 'refs/heads/main' &&
+              github.ref_type != 'tag') ||
+              startsWith(github.ref, 'refs/heads/deploy/')
+            )
         run: |
           for pkg in libs/*; do
             echo PUBLISHING $pkg
@@ -428,6 +428,10 @@ jobs:
           done
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+
+      - name: Publish to pkg.pr.new
+        if: github.event_name == 'pull_request'
+        run: pnpx pkg-pr-new publish './libs/*'
 
   versioned-release:
     name: Versioned NPM release
