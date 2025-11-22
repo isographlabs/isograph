@@ -30,9 +30,7 @@ pub fn compile_and_print<TNetworkProtocol: NetworkProtocol>(
 ) -> Result<(), BatchCompileError<TNetworkProtocol>> {
     info!("{}", "Starting to compile.".cyan());
     let state = CompilerState::new(config_location, current_working_directory)?;
-    print_result(WithDuration::new(|| {
-        generate_and_write_artifacts::<TNetworkProtocol>(&state.db)
-    }))
+    print_result(WithDuration::new(|| compile::<TNetworkProtocol>(&state.db)))
 }
 
 pub fn print_result<TNetworkProtocol: NetworkProtocol>(
@@ -79,8 +77,9 @@ fn print_stats(elapsed_time: Duration, stats: CompilationStats) {
     );
 }
 
+/// This the "workhorse" command of batch compilation.
 #[tracing::instrument(skip(db))]
-pub fn generate_and_write_artifacts<TNetworkProtocol: NetworkProtocol>(
+pub fn compile<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<CompilationStats, BatchCompileError<TNetworkProtocol>> {
     // Note: we calculate all of the artifact paths and contents first, so that writing to
