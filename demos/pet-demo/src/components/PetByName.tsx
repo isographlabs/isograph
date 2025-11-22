@@ -6,7 +6,11 @@ import { PetByNameRoute } from './routes';
 export const PetByNameRouteComponent = iso(`
   field Query.PetByName(
     $name: String !
-  ) @component {
+  ) @component
+  """
+  Show some pet details by name.
+  """
+  {
     pet: petByName(
       name: $name
     ) {

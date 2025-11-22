@@ -6,7 +6,11 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { FullPageLoading } from './routes';
 
 export const HomeRoute = iso(`
-  field Query.HomeRoute @component {
+  field Query.HomeRoute @component
+  """
+  Show a list of pets
+  """
+  {
     pets {
       id
       PetSummaryCard

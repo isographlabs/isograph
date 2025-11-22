@@ -1,9 +1,27 @@
 type Query {
+  """
+  All the pets! What more could you ask for?
+  """
   pets: [Pet!]!
+  """
+  Fetch a pet by id
+  """
   pet(id: ID!): Pet
+  """
+  Fetch a pet by name
+  """
   petByName(name: String!): Pet
+  """
+  Fetch a field by ID
+  """
   node(id: ID!): Node
+  """
+  Who are you? Find out here!
+  """
   viewer: Viewer!
+  """
+  Don't use this field. It's for testing.
+  """
   topLevelField(input: TopLevelFieldInput): TopLevelField
 }
 
