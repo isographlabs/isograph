@@ -6,8 +6,9 @@ use thiserror::Error;
 
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, FieldToInsertToServerSelectableError,
-    IsographDatabase, NetworkProtocol, ServerObjectSelectable, ServerScalarSelectable,
-    ServerSelectableNamedError, client_selectable_named, server_selectable_named,
+    IsographDatabase, MemoizedIsoLiteralError, NetworkProtocol, ServerObjectSelectable,
+    ServerScalarSelectable, ServerSelectableNamedError, client_selectable_map,
+    client_selectable_named, server_selectable_named, server_selectables_vec_for_entity,
 };
 
 #[expect(clippy::type_complexity)]
@@ -79,6 +80,52 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
+#[expect(clippy::type_complexity)]
+#[memo]
+pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    parent_server_object_entity_name: ServerObjectEntityName,
+) -> Result<
+    Vec<
+        Result<
+            DefinitionLocation<
+                SelectionType<
+                    ServerScalarSelectable<TNetworkProtocol>,
+                    ServerObjectSelectable<TNetworkProtocol>,
+                >,
+                SelectionType<
+                    ClientScalarSelectable<TNetworkProtocol>,
+                    ClientObjectSelectable<TNetworkProtocol>,
+                >,
+            >,
+            SelectableNamedError<TNetworkProtocol>,
+        >,
+    >,
+    SelectableNamedError<TNetworkProtocol>,
+> {
+    let mut selectables = server_selectables_vec_for_entity(db, parent_server_object_entity_name)
+        .to_owned()
+        .map_err(|e| SelectableNamedError::ParseTypeSystemDocumentsError(e))?
+        .into_iter()
+        .map(|(_key, value)| {
+            let value = value?;
+            value.server_defined().ok()
+        })
+        .collect::<Vec<_>>();
+
+    selectables.extend(
+        client_selectable_map(db)
+            .to_owned()?
+            .into_iter()
+            .map(|(_key, value)| {
+                let value = value?;
+                value.client_defined().ok()
+            }),
+    );
+
+    selectables.ok()
+}
+
 #[derive(Error, Debug, PartialEq, Eq, Clone)]
 pub enum SelectableNamedError<TNetworkProtocol: NetworkProtocol> {
     #[error("{0}")]
@@ -92,4 +139,10 @@ pub enum SelectableNamedError<TNetworkProtocol: NetworkProtocol> {
         parent_object_entity_name: ServerObjectEntityName,
         selectable_name: SelectableName,
     },
+
+    #[error("{0}")]
+    MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError<TNetworkProtocol>),
+
+    #[error("{0}")]
+    ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),
 }
