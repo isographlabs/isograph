@@ -42,7 +42,7 @@ importers:
   demos/disposable-state-ajax-demo:
     dependencies:
       '@isograph/react-disposable-state':
-        specifier: '*'
+        specifier: workspace:*
         version: link:../../libs/isograph-react-disposable-state
       '@types/node':
         specifier: 18.16.3
@@ -91,10 +91,10 @@ importers:
         specifier: ^5.0.3
         version: 5.2.6
       '@isograph/react':
-        specifier: '*'
+        specifier: workspace:*
         version: link:../../libs/isograph-react
       '@isograph/react-disposable-state':
-        specifier: '*'
+        specifier: workspace:*
         version: link:../../libs/isograph-react-disposable-state
       '@mui/icons-material':
         specifier: ^5.11.16
@@ -151,10 +151,10 @@ importers:
         specifier: ^11.11.0
         version: 11.14.1(@emotion/react@11.14.0(@types/react@18.3.1)(react@18.3.1))(@types/react@18.3.1)(react@18.3.1)
       '@isograph/react':
-        specifier: '*'
+        specifier: workspace:*
         version: link:../../libs/isograph-react
       '@isograph/react-disposable-state':
-        specifier: '*'
+        specifier: workspace:*
         version: link:../../libs/isograph-react-disposable-state
       '@mui/material':
         specifier: ^5.14.8
@@ -199,7 +199,7 @@ importers:
   demos/vite-demo:
     dependencies:
       '@isograph/react':
-        specifier: '*'
+        specifier: workspace:*
         version: link:../../libs/isograph-react
       react:
         specifier: 18.3.1
@@ -215,7 +215,7 @@ importers:
         specifier: ^9.11.1
         version: 9.34.0
       '@isograph/compiler':
-        specifier: '*'
+        specifier: workspace:*
         version: link:../../libs/isograph-compiler
       '@types/node':
         specifier: ^22.7.5
@@ -261,10 +261,10 @@ importers:
         version: 3.0.1(@docusaurus/types@3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(@swc/core@1.7.42(@swc/helpers@0.5.13))(acorn@8.15.0)(eslint@9.34.0(jiti@1.21.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.6.3)
       '@docusaurus/preset-classic':
         specifier: 3.0.1
-        version: 3.0.1(@algolia/client-search@5.35.0)(@swc/core@1.7.42(@swc/helpers@0.5.13))(@types/react@18.3.1)(acorn@8.15.0)(eslint@9.34.0(jiti@1.21.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(search-insights@2.17.3)(typescript@5.6.3)
+        version: 3.0.1(@algolia/client-search@5.35.0)(@swc/core@1.7.42(@swc/helpers@0.5.13))(@types/react@19.2.6)(acorn@8.15.0)(eslint@9.34.0(jiti@1.21.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(search-insights@2.17.3)(typescript@5.6.3)
       '@mdx-js/react':
         specifier: ^3.0.0
-        version: 3.1.0(@types/react@18.3.1)(react@18.3.1)
+        version: 3.1.0(@types/react@19.2.6)(react@18.3.1)
       clsx:
         specifier: ^2.0.0
         version: 2.1.1
@@ -342,13 +342,13 @@ importers:
   libs/isograph-react:
     dependencies:
       '@isograph/disposable-types':
-        specifier: '*'
+        specifier: workspace:*
         version: link:../isograph-disposable-types
       '@isograph/react-disposable-state':
-        specifier: '*'
+        specifier: workspace:*
         version: link:../isograph-react-disposable-state
       '@isograph/reference-counted-pointer':
-        specifier: '*'
+        specifier: workspace:*
         version: link:../isograph-reference-counted-pointer
       react:
         specifier: ^18.0.0 || ^19.0.0
@@ -376,7 +376,7 @@ importers:
   libs/isograph-react-disposable-state:
     dependencies:
       '@isograph/disposable-types':
-        specifier: '*'
+        specifier: workspace:*
         version: link:../isograph-disposable-types
       react:
         specifier: ^18.0.0 || ^19.0.0
@@ -395,7 +395,7 @@ importers:
   libs/isograph-reference-counted-pointer:
     dependencies:
       '@isograph/disposable-types':
-        specifier: '*'
+        specifier: workspace:*
         version: link:../isograph-disposable-types
     devDependencies:
       typescript:
@@ -425,7 +425,7 @@ importers:
         version: 0.25.0
       tree-sitter-cli:
         specifier: ^0.25.8
-        version: 0.25.8
+        version: 0.25.10
 
 packages:
 
@@ -2634,6 +2634,9 @@ packages:
   '@types/react@18.3.1':
     resolution: {integrity: sha512-V0kuGBX3+prX+DQ/7r2qsv1NsdfnCLnTgnRJ1pYnxykBhGMz+qj+box5lq7XsO5mtZsBqpjwwTu/7wszPfMBcw==}
 
+  '@types/react@19.2.6':
+    resolution: {integrity: sha512-p/jUvulfgU7oKtj6Xpk8cA2Y1xKTtICGpJYeJXz2YVO2UcvjQgeRMLDGfDeqeRW2Ta+0QNFwcc8X3GH8SxZz6w==}
+
   '@types/retry@0.12.0':
     resolution: {integrity: sha512-wWKOClTTiizcZhXnPY4wikVAwmdYHp8q6DmC+EJUzAMsycb7HB32Kh9RN4+0gExjmPmZSAQjgURXIGATPegAvA==}
 
@@ -3880,6 +3883,9 @@ packages:
 
   csstype@3.1.3:
     resolution: {integrity: sha512-M1uQkMl8rQK/szD0LNhtqxIPLpimGm8sOBwU7lLnCpSbTyY3yeU1Vc7l4KT5zT4s/yOxHH5O7tIuuLOCnLADRw==}
+
+  csstype@3.2.3:
+    resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
 
   d@1.0.2:
     resolution: {integrity: sha512-MOqHvMWF9/9MX6nza0KgvFH4HpMU0EF5uUDXqX/BtxtU8NfB0QzRtJ8Oe/6SuS4kbhyzVJwjd97EA4PKrzJ8bw==}
@@ -6167,8 +6173,8 @@ packages:
   no-case@3.0.4:
     resolution: {integrity: sha512-fgAN3jGAh+RoxUGZHTSOLJIqUc2wmoBwGR4tbpNAKmmovFoWq0OdRkb0VkldReO2a2iBT/OEulG9XSUc10r3zg==}
 
-  node-abi@3.75.0:
-    resolution: {integrity: sha512-OhYaY5sDsIka7H7AtijtI9jwGYLyl29eQn/W623DiN/MIv5sUqc4g7BIDThX+gb7di9f6xK02nkp8sdfFWZLTg==}
+  node-abi@3.85.0:
+    resolution: {integrity: sha512-zsFhmbkAzwhTft6nd3VxcG0cvJsT70rL+BIGHWVq5fi6MwGrHwzqKaxXE+Hl2GmnGItnDKPPkO5/LQqjVkIdFg==}
     engines: {node: '>=10'}
 
   node-addon-api@8.5.0:
@@ -7751,8 +7757,8 @@ packages:
     resolution: {integrity: sha512-ZL6DDuAlRlLGghwcfmSn9sK3Hr6ArtyudlSAiCqQ6IfE+b+HHbydbYDIG15IfS5do+7XQQBdBiubF/cV2dnDzg==}
     engines: {node: '>=6'}
 
-  tar-fs@2.1.3:
-    resolution: {integrity: sha512-090nwYJDmlhwFwEW3QQl+vaNnxsO2yVsd45eTKRBzSzu+hlb1w2K9inVq5b0ngXuLVqQ4ApvsUHHnu/zQNkWAg==}
+  tar-fs@2.1.4:
+    resolution: {integrity: sha512-mDAjwmZdh7LTT6pNleZ05Yt65HC3E+NiQzl672vQG38jIrehtJk/J3mNwIg+vShQPcLF/LV7CMnDW6vjj6sfYQ==}
 
   tar-stream@2.2.0:
     resolution: {integrity: sha512-ujeqbceABgwMZxEJnk2HDY2DlnUZ+9oEcb1KzTVfYHio0UE6dG71n60d8D2I4qNvleWrrXpmjpt7vZeF1LnMZQ==}
@@ -7859,8 +7865,8 @@ packages:
     resolution: {integrity: sha512-sf4i37nQ2LBx4m3wB74y+ubopq6W/dIzXg0FDGjsYnZHVa1Da8FH853wlL2gtUhg+xJXjfk3kUZS3BRoQeoQBQ==}
     engines: {node: '>=6'}
 
-  tree-sitter-cli@0.25.8:
-    resolution: {integrity: sha512-avR7qo4qT+dNv2jj4M2e79vfc2etbWK6/umWcRsnEX1LTRhUL6p5AgGe6dP7+cV/RYFFk/VBz1rJuVCk+w5H2A==}
+  tree-sitter-cli@0.25.10:
+    resolution: {integrity: sha512-KoebQguKMCIghisEOdA372TIbrUl0kdnfZ9YQIBRAeOvNSKe85XbU4LuFW7hduRUwJj0rAG7pX5wo9sZhbBF1g==}
     engines: {node: '>=12.0.0'}
     hasBin: true
 
@@ -9415,14 +9421,14 @@ snapshots:
 
   '@docsearch/css@3.9.0': {}
 
-  '@docsearch/react@3.9.0(@algolia/client-search@5.35.0)(@types/react@18.3.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(search-insights@2.17.3)':
+  '@docsearch/react@3.9.0(@algolia/client-search@5.35.0)(@types/react@19.2.6)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(search-insights@2.17.3)':
     dependencies:
       '@algolia/autocomplete-core': 1.17.9(@algolia/client-search@5.35.0)(algoliasearch@5.35.0)(search-insights@2.17.3)
       '@algolia/autocomplete-preset-algolia': 1.17.9(@algolia/client-search@5.35.0)(algoliasearch@5.35.0)
       '@docsearch/css': 3.9.0
       algoliasearch: 5.35.0
     optionalDependencies:
-      '@types/react': 18.3.1
+      '@types/react': 19.2.6
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
       search-insights: 2.17.3
@@ -9843,7 +9849,7 @@ snapshots:
       - vue-template-compiler
       - webpack-cli
 
-  '@docusaurus/preset-classic@3.0.1(@algolia/client-search@5.35.0)(@swc/core@1.7.42(@swc/helpers@0.5.13))(@types/react@18.3.1)(acorn@8.15.0)(eslint@9.34.0(jiti@1.21.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(search-insights@2.17.3)(typescript@5.6.3)':
+  '@docusaurus/preset-classic@3.0.1(@algolia/client-search@5.35.0)(@swc/core@1.7.42(@swc/helpers@0.5.13))(@types/react@19.2.6)(acorn@8.15.0)(eslint@9.34.0(jiti@1.21.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(search-insights@2.17.3)(typescript@5.6.3)':
     dependencies:
       '@docusaurus/core': 3.0.1(@docusaurus/types@3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(@swc/core@1.7.42(@swc/helpers@0.5.13))(acorn@8.15.0)(eslint@9.34.0(jiti@1.21.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.6.3)
       '@docusaurus/plugin-content-blog': 3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(acorn@8.15.0)(eslint@9.34.0(jiti@1.21.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.6.3)
@@ -9854,9 +9860,9 @@ snapshots:
       '@docusaurus/plugin-google-gtag': 3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(acorn@8.15.0)(eslint@9.34.0(jiti@1.21.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.6.3)
       '@docusaurus/plugin-google-tag-manager': 3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(acorn@8.15.0)(eslint@9.34.0(jiti@1.21.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.6.3)
       '@docusaurus/plugin-sitemap': 3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(acorn@8.15.0)(eslint@9.34.0(jiti@1.21.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.6.3)
-      '@docusaurus/theme-classic': 3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(@types/react@18.3.1)(acorn@8.15.0)(eslint@9.34.0(jiti@1.21.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.6.3)
+      '@docusaurus/theme-classic': 3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(@types/react@19.2.6)(acorn@8.15.0)(eslint@9.34.0(jiti@1.21.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.6.3)
       '@docusaurus/theme-common': 3.0.1(@docusaurus/types@3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(@swc/core@1.7.42(@swc/helpers@0.5.13))(acorn@8.15.0)(eslint@9.34.0(jiti@1.21.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.6.3)
-      '@docusaurus/theme-search-algolia': 3.0.1(@algolia/client-search@5.35.0)(@docusaurus/types@3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(@swc/core@1.7.42(@swc/helpers@0.5.13))(@types/react@18.3.1)(acorn@8.15.0)(eslint@9.34.0(jiti@1.21.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(search-insights@2.17.3)(typescript@5.6.3)
+      '@docusaurus/theme-search-algolia': 3.0.1(@algolia/client-search@5.35.0)(@docusaurus/types@3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(@swc/core@1.7.42(@swc/helpers@0.5.13))(@types/react@19.2.6)(acorn@8.15.0)(eslint@9.34.0(jiti@1.21.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(search-insights@2.17.3)(typescript@5.6.3)
       '@docusaurus/types': 3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
@@ -9888,7 +9894,7 @@ snapshots:
       prop-types: 15.8.1
       react: 18.3.1
 
-  '@docusaurus/theme-classic@3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(@types/react@18.3.1)(acorn@8.15.0)(eslint@9.34.0(jiti@1.21.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.6.3)':
+  '@docusaurus/theme-classic@3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(@types/react@19.2.6)(acorn@8.15.0)(eslint@9.34.0(jiti@1.21.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.6.3)':
     dependencies:
       '@docusaurus/core': 3.0.1(@docusaurus/types@3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(@swc/core@1.7.42(@swc/helpers@0.5.13))(acorn@8.15.0)(eslint@9.34.0(jiti@1.21.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.6.3)
       '@docusaurus/mdx-loader': 3.0.1(@docusaurus/types@3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(@swc/core@1.7.42(@swc/helpers@0.5.13))(acorn@8.15.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -9902,7 +9908,7 @@ snapshots:
       '@docusaurus/utils': 3.0.1(@docusaurus/types@3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(@swc/core@1.7.42(@swc/helpers@0.5.13))
       '@docusaurus/utils-common': 3.0.1(@docusaurus/types@3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
       '@docusaurus/utils-validation': 3.0.1(@docusaurus/types@3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(@swc/core@1.7.42(@swc/helpers@0.5.13))
-      '@mdx-js/react': 3.1.0(@types/react@18.3.1)(react@18.3.1)
+      '@mdx-js/react': 3.1.0(@types/react@19.2.6)(react@18.3.1)
       clsx: 2.1.1
       copy-text-to-clipboard: 3.2.0
       infima: 0.2.0-alpha.43
@@ -9976,9 +9982,9 @@ snapshots:
       - vue-template-compiler
       - webpack-cli
 
-  '@docusaurus/theme-search-algolia@3.0.1(@algolia/client-search@5.35.0)(@docusaurus/types@3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(@swc/core@1.7.42(@swc/helpers@0.5.13))(@types/react@18.3.1)(acorn@8.15.0)(eslint@9.34.0(jiti@1.21.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(search-insights@2.17.3)(typescript@5.6.3)':
+  '@docusaurus/theme-search-algolia@3.0.1(@algolia/client-search@5.35.0)(@docusaurus/types@3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(@swc/core@1.7.42(@swc/helpers@0.5.13))(@types/react@19.2.6)(acorn@8.15.0)(eslint@9.34.0(jiti@1.21.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(search-insights@2.17.3)(typescript@5.6.3)':
     dependencies:
-      '@docsearch/react': 3.9.0(@algolia/client-search@5.35.0)(@types/react@18.3.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(search-insights@2.17.3)
+      '@docsearch/react': 3.9.0(@algolia/client-search@5.35.0)(@types/react@19.2.6)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(search-insights@2.17.3)
       '@docusaurus/core': 3.0.1(@docusaurus/types@3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(@swc/core@1.7.42(@swc/helpers@0.5.13))(acorn@8.15.0)(eslint@9.34.0(jiti@1.21.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.6.3)
       '@docusaurus/logger': 3.0.1
       '@docusaurus/plugin-content-docs': 3.0.1(@swc/core@1.7.42(@swc/helpers@0.5.13))(acorn@8.15.0)(eslint@9.34.0(jiti@1.21.7))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.6.3)
@@ -10596,10 +10602,10 @@ snapshots:
       - acorn
       - supports-color
 
-  '@mdx-js/react@3.1.0(@types/react@18.3.1)(react@18.3.1)':
+  '@mdx-js/react@3.1.0(@types/react@19.2.6)(react@18.3.1)':
     dependencies:
       '@types/mdx': 2.0.13
-      '@types/react': 18.3.1
+      '@types/react': 19.2.6
       react: 18.3.1
 
   '@mui/core-downloads-tracker@5.18.0': {}
@@ -11282,6 +11288,10 @@ snapshots:
     dependencies:
       '@types/prop-types': 15.7.15
       csstype: 3.1.3
+
+  '@types/react@19.2.6':
+    dependencies:
+      csstype: 3.2.3
 
   '@types/retry@0.12.0': {}
 
@@ -12756,6 +12766,8 @@ snapshots:
 
   csstype@3.1.3: {}
 
+  csstype@3.2.3: {}
+
   d@1.0.2:
     dependencies:
       es5-ext: 0.10.64
@@ -13218,7 +13230,7 @@ snapshots:
       eslint: 8.39.0
       eslint-import-resolver-node: 0.3.9
       eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(eslint@8.39.0))(eslint@8.39.0)
-      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@5.62.0(eslint@8.39.0)(typescript@5.6.3))(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@8.39.0))(eslint@8.39.0))(eslint@8.39.0)
+      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@5.62.0(eslint@8.39.0)(typescript@5.6.3))(eslint-import-resolver-typescript@3.10.1)(eslint@8.39.0)
       eslint-plugin-jsx-a11y: 6.10.2(eslint@8.39.0)
       eslint-plugin-react: 7.37.5(eslint@8.39.0)
       eslint-plugin-react-hooks: 4.6.2(eslint@8.39.0)
@@ -13237,7 +13249,7 @@ snapshots:
       eslint: 8.49.0
       eslint-import-resolver-node: 0.3.9
       eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(eslint@8.49.0))(eslint@8.49.0)
-      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@6.21.0(eslint@8.49.0)(typescript@5.6.3))(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@8.49.0))(eslint@8.49.0))(eslint@8.49.0)
+      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@6.21.0(eslint@8.49.0)(typescript@5.6.3))(eslint-import-resolver-typescript@3.10.1)(eslint@8.49.0)
       eslint-plugin-jsx-a11y: 6.10.2(eslint@8.49.0)
       eslint-plugin-react: 7.37.5(eslint@8.49.0)
       eslint-plugin-react-hooks: 5.0.0-canary-7118f5dd7-20230705(eslint@8.49.0)
@@ -13267,7 +13279,7 @@ snapshots:
       tinyglobby: 0.2.14
       unrs-resolver: 1.11.1
     optionalDependencies:
-      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@5.62.0(eslint@8.39.0)(typescript@5.6.3))(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@8.39.0))(eslint@8.39.0))(eslint@8.39.0)
+      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@5.62.0(eslint@8.39.0)(typescript@5.6.3))(eslint-import-resolver-typescript@3.10.1)(eslint@8.39.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -13282,7 +13294,7 @@ snapshots:
       tinyglobby: 0.2.14
       unrs-resolver: 1.11.1
     optionalDependencies:
-      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@6.21.0(eslint@8.49.0)(typescript@5.6.3))(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@8.49.0))(eslint@8.49.0))(eslint@8.49.0)
+      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@6.21.0(eslint@8.49.0)(typescript@5.6.3))(eslint-import-resolver-typescript@3.10.1)(eslint@8.49.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -13308,7 +13320,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-plugin-import@2.32.0(@typescript-eslint/parser@5.62.0(eslint@8.39.0)(typescript@5.6.3))(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@8.39.0))(eslint@8.39.0))(eslint@8.39.0):
+  eslint-plugin-import@2.32.0(@typescript-eslint/parser@5.62.0(eslint@8.39.0)(typescript@5.6.3))(eslint-import-resolver-typescript@3.10.1)(eslint@8.39.0):
     dependencies:
       '@rtsao/scc': 1.1.0
       array-includes: 3.1.9
@@ -13337,7 +13349,7 @@ snapshots:
       - eslint-import-resolver-webpack
       - supports-color
 
-  eslint-plugin-import@2.32.0(@typescript-eslint/parser@6.21.0(eslint@8.49.0)(typescript@5.6.3))(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@8.49.0))(eslint@8.49.0))(eslint@8.49.0):
+  eslint-plugin-import@2.32.0(@typescript-eslint/parser@6.21.0(eslint@8.49.0)(typescript@5.6.3))(eslint-import-resolver-typescript@3.10.1)(eslint@8.49.0):
     dependencies:
       '@rtsao/scc': 1.1.0
       array-includes: 3.1.9
@@ -15886,7 +15898,7 @@ snapshots:
       lower-case: 2.0.2
       tslib: 2.8.1
 
-  node-abi@3.75.0:
+  node-abi@3.85.0:
     dependencies:
       semver: 7.7.2
 
@@ -16514,10 +16526,10 @@ snapshots:
     dependencies:
       minimist: 1.2.8
       mkdirp-classic: 0.5.3
-      node-abi: 3.75.0
+      node-abi: 3.85.0
       npm-run-path: 3.1.0
       pump: 3.0.3
-      tar-fs: 2.1.3
+      tar-fs: 2.1.4
 
   prelude-ls@1.2.1: {}
 
@@ -17707,7 +17719,7 @@ snapshots:
 
   tapable@2.2.3: {}
 
-  tar-fs@2.1.3:
+  tar-fs@2.1.4:
     dependencies:
       chownr: 1.1.4
       mkdirp-classic: 0.5.3
@@ -17810,7 +17822,7 @@ snapshots:
 
   totalist@3.0.1: {}
 
-  tree-sitter-cli@0.25.8: {}
+  tree-sitter-cli@0.25.10: {}
 
   tree-sitter@0.25.0:
     dependencies:

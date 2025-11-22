@@ -19,9 +19,9 @@
     "iso": "cross-env ISO_PRINT_ABSOLUTE_FILEPATH=1 ../../target/debug/isograph_cli --config ./isograph.config.json"
   },
   "dependencies": {
-    "@isograph/disposable-types": "*",
-    "@isograph/react-disposable-state": "*",
-    "@isograph/reference-counted-pointer": "*"
+    "@isograph/disposable-types": "workspace:*",
+    "@isograph/react-disposable-state": "workspace:*",
+    "@isograph/reference-counted-pointer": "workspace:*"
   },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0"

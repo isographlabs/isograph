@@ -17,7 +17,7 @@
     "tsc-force": "tsc --build --clean && tsc --build --force"
   },
   "dependencies": {
-    "@isograph/disposable-types": "*"
+    "@isograph/disposable-types": "workspace:*"
   },
   "devDependencies": {
     "typescript": "5.6.3"

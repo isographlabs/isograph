@@ -16,8 +16,8 @@
   "dependencies": {
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
-    "@isograph/react": "*",
-    "@isograph/react-disposable-state": "*",
+    "@isograph/react": "workspace:*",
+    "@isograph/react-disposable-state": "workspace:*",
     "@mui/material": "^5.14.8",
     "@types/node": "20.6.0",
     "@types/react": "18.3.1",

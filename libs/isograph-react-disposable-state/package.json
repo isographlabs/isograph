@@ -19,7 +19,7 @@
     "tsc-force": "tsc --build --clean && tsc --build --force"
   },
   "dependencies": {
-    "@isograph/disposable-types": "*"
+    "@isograph/disposable-types": "workspace:*"
   },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0"

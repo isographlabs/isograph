@@ -423,7 +423,7 @@ jobs:
           for pkg in libs/*; do
             echo PUBLISHING $pkg
             cd $pkg
-            npm publish --tag ${{ startsWith(github.ref, 'refs/heads/deploy/') && 'deploy' || 'main' }}
+            pnpm publish --tag ${{ startsWith(github.ref, 'refs/heads/deploy/') && 'deploy' || 'main' }}
             cd ../..
           done
         env:
@@ -510,7 +510,7 @@ jobs:
           for pkg in libs/*; do
             echo PUBLISHING $pkg
             cd $pkg
-            npm publish --tag latest
+            pnpm publish --tag latest
             cd ../..
           done
         env:
