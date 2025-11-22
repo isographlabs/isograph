@@ -26,6 +26,8 @@ pub struct ServerObjectEntity<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
     pub name: WithEmbeddedLocation<ServerObjectEntityName>,
     /// Some if the object is concrete; None otherwise.
+    ///
+    /// This is a GraphQL-ism! We should get rid of it.
     pub concrete_type: Option<ServerObjectEntityName>,
 
     pub network_protocol_associated_data: TNetworkProtocol::SchemaObjectAssociatedData,
