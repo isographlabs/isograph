@@ -115,10 +115,14 @@ pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
 
     selectables.extend(
         client_selectable_map(db)
-            .to_owned()?
-            .into_iter()
+            .as_ref()
+            .map_err(|e| e.clone())?
+            .iter()
+            .filter(|((entity_name, _selectable_name), _value)| {
+                *entity_name == parent_server_object_entity_name
+            })
             .map(|(_key, value)| {
-                let value = value?;
+                let value = value.as_ref().map_err(|e| e.clone())?.clone();
                 value.client_defined().ok()
             }),
     );

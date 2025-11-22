@@ -1,0 +1,81 @@
+use crate::{
+    hover::get_iso_literal_extraction_from_text_position_params,
+    lsp_runtime_error::LSPRuntimeResult, uri_file_path_ext::UriFilePathExt,
+};
+use common_lang_types::Span;
+use common_lang_types::relative_path_from_absolute_and_working_directory;
+use isograph_compiler::CompilerState;
+use isograph_lang_types::IsographResolvedNode;
+use isograph_schema::SelectableTrait;
+use isograph_schema::selectables_for_entity;
+use isograph_schema::{
+    NetworkProtocol, get_parent_and_selectable_for_object_path, process_iso_literal_extraction,
+};
+use lsp_types::{
+    CompletionItem, CompletionResponse,
+    request::{Completion, Request},
+};
+use prelude::Postfix;
+use resolve_position::ResolvePosition;
+
+pub fn on_completion<TNetworkProtocol: NetworkProtocol>(
+    compiler_state: &CompilerState<TNetworkProtocol>,
+    params: <Completion as Request>::Params,
+) -> LSPRuntimeResult<Option<CompletionResponse>> {
+    let url = params.text_document_position.text_document.uri;
+    let position = params.text_document_position.position;
+
+    let db = &compiler_state.db;
+
+    let current_working_directory = db.get_current_working_directory();
+
+    let relative_path_to_source_file = relative_path_from_absolute_and_working_directory(
+        current_working_directory,
+        &url.to_file_path().expect("Expected file path to be valid."),
+    );
+
+    let extraction_option =
+        get_iso_literal_extraction_from_text_position_params(db, url.clone(), position.into())
+            .to_owned();
+    let (extraction, offset) = match extraction_option {
+        Some(e) => e,
+        None => return Ok(None),
+    };
+
+    let completion_response = if let Ok((result, _text_source)) = process_iso_literal_extraction(
+        db,
+        &extraction,
+        relative_path_to_source_file,
+        current_working_directory,
+    ) {
+        match result.resolve((), Span::new(offset, offset)) {
+            IsographResolvedNode::ObjectSelection(object_path) => {
+                if let Ok((parent_object, _)) =
+                    get_parent_and_selectable_for_object_path(db, &object_path)
+                {
+                    if let Ok(map) = selectables_for_entity(db, parent_object.name.item).as_ref() {
+                        map.iter()
+                            .flat_map(|x| x.as_ref().ok())
+                            .map(|field| CompletionItem {
+                                label: field.name().item.to_string(),
+                                ..Default::default()
+                            })
+                            .collect::<Vec<_>>()
+                            .some()
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    } else {
+        None
+    };
+
+    Ok(Some(CompletionResponse::Array(
+        completion_response.unwrap_or_default(),
+    )))
+}

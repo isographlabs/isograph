@@ -1,6 +1,7 @@
 #![allow(clippy::print_stderr)]
 
 use crate::{
+    completion::on_completion,
     format::on_format,
     goto_definition::on_goto_definition,
     hover::on_hover,
@@ -26,7 +27,7 @@ use log::{info, warn};
 use lsp_server::{Connection, ErrorCode, ProtocolError, Response, ResponseError};
 use lsp_types::{
     HoverProviderCapability,
-    request::{HoverRequest, SemanticTokensFullRequest},
+    request::{Completion, HoverRequest, SemanticTokensFullRequest},
 };
 use lsp_types::{
     InitializeParams, OneOf, SemanticTokensFullOptions, SemanticTokensOptions,
@@ -59,6 +60,7 @@ pub fn initialize<TNetworkProtocol: NetworkProtocol>(
         hover_provider: HoverProviderCapability::Simple(true).some(),
         document_formatting_provider: OneOf::Left(true).some(),
         definition_provider: OneOf::Left(true).some(),
+        completion_provider: Some(Default::default()),
         ..Default::default()
     };
     let server_capabilities = serde_json::to_value(server_capabilities)?;
@@ -177,6 +179,7 @@ fn dispatch_request<TNetworkProtocol: NetworkProtocol>(
             .on_request_sync::<HoverRequest>(on_hover)?
             .on_request_sync::<Formatting>(on_format)?
             .on_request_sync::<GotoDefinition>(on_goto_definition)?
+            .on_request_sync::<Completion>(on_completion)?
             .request();
 
         // If we have gotten here, we have not handled the request

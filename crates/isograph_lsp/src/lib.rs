@@ -6,6 +6,7 @@ use lsp_server::Connection;
 
 use crate::server::LSPProcessResult;
 
+mod completion;
 mod format;
 mod goto_definition;
 mod hover;
