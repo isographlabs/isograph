@@ -367,7 +367,7 @@ pub fn intern_ref<Db: Database, T: Clone + Hash + DynEq + 'static>(
     db: &Db,
     value: &T,
 ) -> MemoRef<T> {
-    let param_id = hash(value).into();
+    let param_id = (value as *const T as usize as u64).into();
     if let Entry::Vacant(v) = db.get_storage().internal.param_id_to_index.entry(param_id) {
         let idx = db
             .get_storage()
