@@ -4,6 +4,7 @@ use common_lang_types::ServerObjectEntityName;
 use intern::string_key::Intern;
 use pico::MemoRef;
 use pico_macros::memo;
+use tracing::info;
 
 use crate::{IsographDatabase, NetworkProtocol, RootOperationName};
 
@@ -19,7 +20,7 @@ pub fn fetchable_types<TNetworkProtocol: NetworkProtocol>(
         .as_ref()
         .map_err(|e| e.clone())?;
 
-    eprintln!(
+    info!(
         "fetchable types called, always has len 3 (proof: {})",
         fetchable_types.len()
     );

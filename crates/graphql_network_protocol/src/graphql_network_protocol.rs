@@ -10,7 +10,7 @@ use intern::string_key::Intern;
 use isograph_lang_types::SelectionType;
 use isograph_schema::{
     ExposeFieldToInsert, Format, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome,
-    RootOperationName, ValidatedVariableDefinition, server_object_entity_named,
+    RootOperationName, SchemaSource, ValidatedVariableDefinition, server_object_entity_named,
 };
 use isograph_schema::{IsographDatabase, ServerScalarEntity};
 use lazy_static::lazy_static;
@@ -73,13 +73,32 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         ),
         ParseGraphQLTypeSystemDocumentsError,
     > {
-        eprintln!("parse type system documents...");
+        eprintln!("parse type system documents called...");
         // let mut graphql_root_types = None;
 
         // let (type_system_document, type_system_extension_documents) =
         parse_graphql_schema(db);
 
-        Ok((vec![], {
+        let SchemaSource {
+            content,
+            text_source,
+            ..
+        } = db.get_schema_source();
+
+        let v = if content.contains("FOOBARBAZ") {
+            vec![]
+        } else {
+            vec![SelectionType::Scalar(WithLocation::new_generated(
+                ServerScalarEntity {
+                    description: None,
+                    name: WithLocation::new_generated("foo".intern().into()),
+                    javascript_name: "jsname".intern().into(),
+                    network_protocol: std::marker::PhantomData,
+                },
+            ))]
+        };
+
+        Ok((v, {
             let mut map = BTreeMap::new();
             map.insert("foo".intern().into(), RootOperationName("query"));
             map

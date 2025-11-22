@@ -1,7 +1,7 @@
 use colored::Colorize;
 use common_lang_types::CurrentWorkingDirectory;
 use isograph_config::CompilerConfig;
-use isograph_schema::{NetworkProtocol, StandardSources, fetchable_types};
+use isograph_schema::{IsographDatabase, NetworkProtocol, StandardSources, fetchable_types};
 use notify::{
     Error, EventKind, RecommendedWatcher, RecursiveMode,
     event::{CreateKind, ModifyKind, RemoveKind, RenameMode},
@@ -9,6 +9,7 @@ use notify::{
 use notify_debouncer_full::{
     DebounceEventResult, DebouncedEvent, Debouncer, RecommendedCache, new_debouncer,
 };
+use pico_macros::memo;
 use std::{path::PathBuf, time::Duration};
 use tokio::{runtime::Handle, sync::mpsc::Receiver};
 use tracing::info;
@@ -27,35 +28,35 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
 ) -> Result<(), BatchCompileError<TNetworkProtocol>> {
     let mut state = CompilerState::new(config_location, current_working_directory)?;
 
-    fetch_types_assert_non_zero_len(&state, "first");
+    fetch_types_assert_non_zero_len(&state.db, "first".to_string());
 
     mutate_schema_source_in_db(&mut state.db)?;
 
-    fetch_types_assert_non_zero_len(&state, "second");
+    fetch_types_assert_non_zero_len(&state.db, "second".to_string());
 
     state.run_garbage_collection();
 
     // THIS PANICS???
-    fetch_types_assert_non_zero_len(&state, "third");
+    fetch_types_assert_non_zero_len(&state.db, "third".to_string());
 
     Ok(())
 }
 
+#[memo]
 fn fetch_types_assert_non_zero_len<TNetworkProtocol: NetworkProtocol>(
-    state: &CompilerState<TNetworkProtocol>,
-    msg: &'static str,
+    db: &IsographDatabase<TNetworkProtocol>,
+    msg: String,
 ) {
-    let fetch_types = fetchable_types(&state.db)
+    let fetch_types = fetchable_types(db)
         .as_ref()
         .expect(
             "Expected parsing to have succeeded. \
             This is indicative of a bug in Isograph.",
         )
         // tracked or untracked, doesn't matter?
-        .lookup_tracked(&state.db);
+        .lookup_tracked(db);
     info!("fetch type {msg} len={}", fetch_types.len());
     if fetch_types.len() == 0 {
-        // This will not panic
         panic!("should not be empty");
     }
 }

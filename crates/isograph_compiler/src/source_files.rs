@@ -13,6 +13,7 @@ use isograph_config::absolute_and_relative_paths;
 use isograph_schema::{IsographDatabase, NetworkProtocol, SchemaSource, StandardSources};
 use pico::{Database, SourceId};
 use thiserror::Error;
+use tracing::info;
 
 use crate::{
     read_files::{ReadFileError, read_file, read_files_in_folder},
@@ -226,7 +227,7 @@ pub fn mutate_schema_source_in_db<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
 ) -> Result<(), SourceError> {
     let schema_path = db.get_isograph_config().schema.clone();
-    eprintln!("read schema 2");
+    info!("mutate schema");
 
     let content = format!(
         "\n\n# FOOBARBAZ\n{}\n\n# nooo why",

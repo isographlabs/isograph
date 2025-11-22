@@ -35,7 +35,6 @@ impl<Db: Database> InternalStorage<Db> {
         let new_derived_node_id_to_revision = DashMap::new();
 
         'derived_node_id_queue: while let Some(derived_node_id) = derived_node_id_queue.pop() {
-            eprintln!("derived node id {:?}", derived_node_id);
             if processed_nodes.contains(&derived_node_id) {
                 continue 'derived_node_id_queue;
             }
