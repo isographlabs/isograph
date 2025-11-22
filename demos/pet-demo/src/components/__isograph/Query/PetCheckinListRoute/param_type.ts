@@ -7,6 +7,9 @@ import type { Query__PetCheckinListRoute__parameters } from './parameters_type';
 
 export type Query__PetCheckinListRoute__param = {
   readonly data: {
+    /**
+Fetch a pet by id
+    */
     readonly pet: ({
       readonly FirstCheckinMakeSuperButton: Pet__FirstCheckinMakeSuperButton__output_type,
       readonly fullName: Pet__fullName__output_type,

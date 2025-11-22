@@ -2,6 +2,9 @@ import { type Checkin____link__output_type } from '../../Checkin/__link/output_t
 
 export type Pet__checkinsPointer__param = {
   readonly data: {
+    /**
+Even pets use social media, mmkay.
+    */
     readonly checkins: ReadonlyArray<{
       /**
 A store Link for the Checkin type.

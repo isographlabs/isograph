@@ -3,6 +3,9 @@ import type { Pet__PetCheckinsCardList__parameters } from './parameters_type';
 
 export type Pet__PetCheckinsCardList__param = {
   readonly data: {
+    /**
+Even pets use social media, mmkay.
+    */
     readonly checkins: ReadonlyArray<{
       readonly CheckinDisplay: Checkin__CheckinDisplay__output_type,
       readonly id: string,

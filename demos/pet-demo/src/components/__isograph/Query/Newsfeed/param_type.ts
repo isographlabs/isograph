@@ -4,6 +4,9 @@ import { type Viewer__NewsfeedPaginationComponent__param } from '../../Viewer/Ne
 
 export type Query__Newsfeed__param = {
   readonly data: {
+    /**
+Who are you? Find out here!
+    */
     readonly viewer: {
       readonly initial: Viewer__NewsfeedPaginationComponent__output_type,
       readonly NewsfeedPaginationComponent: LoadableField<

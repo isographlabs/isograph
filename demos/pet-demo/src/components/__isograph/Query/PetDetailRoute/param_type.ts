@@ -10,7 +10,13 @@ import type { Query__PetDetailRoute__parameters } from './parameters_type';
 
 export type Query__PetDetailRoute__param = {
   readonly data: {
+    /**
+Fetch a pet by id
+    */
     readonly pet: ({
+      /**
+Fetch a field by ID
+      */
       readonly custom_pet_refetch: Pet__custom_pet_refetch__output_type,
       readonly fullName: Pet__fullName__output_type,
       readonly PetCheckinsCard: Pet__PetCheckinsCard__output_type,

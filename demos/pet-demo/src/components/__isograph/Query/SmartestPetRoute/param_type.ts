@@ -7,9 +7,18 @@ import { type Query__smartestPet__param } from '../../Query/smartestPet/param_ty
 export type Query__SmartestPetRoute__param = {
   readonly data: {
     readonly smartestPet: (LoadableField<Query__smartestPet__param, {
+      /**
+The pet's ID
+      */
       readonly id: string,
       readonly fullName: Pet__fullName__output_type,
+      /**
+A picture of a pet, framed.
+      */
       readonly Avatar: Pet__Avatar__output_type,
+      /**
+Charisma? 100%
+      */
       readonly stats: ({
         readonly intelligence: (number | null),
       } | null),

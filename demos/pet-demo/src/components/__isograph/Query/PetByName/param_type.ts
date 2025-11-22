@@ -3,6 +3,9 @@ import type { Query__PetByName__parameters } from './parameters_type';
 
 export type Query__PetByName__param = {
   readonly data: {
+    /**
+Fetch a pet by name
+    */
     readonly pet: ({
       readonly PetDetailDeferredRouteInnerComponent: Pet__PetDetailDeferredRouteInnerComponent__output_type,
     } | null),

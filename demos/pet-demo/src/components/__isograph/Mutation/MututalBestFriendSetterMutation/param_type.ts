@@ -9,12 +9,24 @@ export type Mutation__MututalBestFriendSetterMutation__param = {
   readonly data: {
     readonly set_pet_best_friend: {
       readonly pet: {
+        /**
+The pet's ID
+        */
         readonly id: string,
+        /**
+Pets have a very complex social life. Find out more!
+        */
         readonly best_friend_relationship: ({
           readonly picture_together: (string | null),
           readonly best_friend: {
+            /**
+The pet's ID
+            */
             readonly id: string,
             readonly fullName: Pet__fullName__output_type,
+            /**
+A picture of a pet, framed.
+            */
             readonly Avatar: Pet__Avatar__output_type,
           },
         } | null),

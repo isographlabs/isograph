@@ -3,9 +3,15 @@ import type { Query__PetDetailDeferredRoute__parameters } from './parameters_typ
 
 export type Query__PetDetailDeferredRoute__param = {
   readonly data: {
+    /**
+Fetch a pet by id
+    */
     readonly pet: ({
       readonly PetDetailDeferredRouteInnerComponent: Pet__PetDetailDeferredRouteInnerComponent__output_type,
     } | null),
+    /**
+Don't use this field. It's for testing.
+    */
     readonly topLevelField: ({
       readonly __typename: 'TopLevelField',
     } | null),
