@@ -171,7 +171,7 @@ impl<'source> PeekableLexer<'source> {
         }
     }
 
-    pub fn with_span<T, E>(
+    pub fn with_span_result<T, E>(
         &mut self,
         do_stuff: impl FnOnce(&mut Self) -> Result<T, E>,
     ) -> Result<WithSpan<T>, E> {

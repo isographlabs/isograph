@@ -121,7 +121,7 @@ fn parse_iso_entrypoint_declaration(
     iso_literal_text: IsoLiteralText,
 ) -> ParseResultWithLocation<WithSpan<EntrypointDeclaration>> {
     let entrypoint_declaration = tokens
-        .with_span(|tokens| {
+        .with_span_result(|tokens| {
             let parent_type = tokens
                 .parse_string_key_type(
                     IsographLangTokenKind::Identifier,
@@ -202,7 +202,7 @@ fn parse_client_field_declaration_inner(
     const_export_name: Option<&str>,
     text_source: TextSource,
 ) -> ParseResultWithSpan<WithSpan<ClientFieldDeclaration>> {
-    tokens.with_span(|tokens| {
+    tokens.with_span_result(|tokens| {
         let parent_type = tokens
             .parse_string_key_type(
                 IsographLangTokenKind::Identifier,
@@ -314,7 +314,7 @@ fn parse_client_pointer_declaration_inner(
     const_export_name: Option<&str>,
     text_source: TextSource,
 ) -> ParseResultWithSpan<WithSpan<ClientPointerDeclaration>> {
-    tokens.with_span(|tokens| {
+    tokens.with_span_result(|tokens| {
         let parent_type = tokens
             .parse_string_key_type(
                 IsographLangTokenKind::Identifier,
@@ -484,7 +484,7 @@ fn parse_selection(
     tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
 ) -> ParseResultWithSpan<WithSpan<UnvalidatedSelection>> {
-    tokens.with_span(|tokens| {
+    tokens.with_span_result(|tokens| {
         let (field_name, alias) = parse_optional_alias_and_field_name(tokens)?;
         let field_name = field_name.to_with_location(text_source);
         let alias = alias.map(|alias| alias.to_with_location(text_source));
@@ -629,7 +629,7 @@ fn parse_argument(
     tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
 ) -> ParseResultWithSpan<WithLocation<SelectionFieldArgument>> {
-    let argument = tokens.with_span(|tokens| {
+    let argument = tokens.with_span_result(|tokens| {
         let name = tokens
             .parse_string_key_type(
                 IsographLangTokenKind::Identifier,
@@ -808,7 +808,7 @@ fn parse_variable_definition(
     text_source: TextSource,
 ) -> ParseResultWithSpan<WithSpan<VariableDefinition<UnvalidatedTypeName>>> {
     tokens
-        .with_span(|tokens| {
+        .with_span_result(|tokens| {
             let _dollar = tokens
                 .parse_token_of_kind(
                     IsographLangTokenKind::Dollar,

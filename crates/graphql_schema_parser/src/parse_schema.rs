@@ -98,7 +98,7 @@ fn parse_type_system_extension(
     tokens: &mut PeekableLexer,
     text_source: TextSource,
 ) -> ParseResult<WithLocation<GraphQLTypeSystemExtension>> {
-    let extension = tokens.with_span(|tokens| {
+    let extension = tokens.with_span_result(|tokens| {
         let identifier = tokens
             .parse_source_of_kind(TokenKind::Identifier)
             .expect("Expected identifier extend. This is indicative of a bug in Isograph.");
@@ -128,7 +128,7 @@ fn parse_type_system_definition(
     tokens: &mut PeekableLexer,
     text_source: TextSource,
 ) -> ParseResult<WithLocation<GraphQLTypeSystemDefinition>> {
-    let definition = tokens.with_span(|tokens| {
+    let definition = tokens.with_span_result(|tokens| {
         let description = parse_optional_description(tokens);
         let identifier = tokens
             .parse_source_of_kind(TokenKind::Identifier)
@@ -381,7 +381,7 @@ fn parse_enum_value_definition(
     tokens: &mut PeekableLexer,
     text_source: TextSource,
 ) -> ParseResult<WithSpan<GraphQLEnumValueDefinition>> {
-    tokens.with_span(|tokens| {
+    tokens.with_span_result(|tokens| {
         let description = parse_optional_description(tokens);
         let enum_literal_value_str = tokens
             .parse_source_of_kind(TokenKind::Identifier)
@@ -782,7 +782,7 @@ fn parse_constant_value(
 
         to_control_flow(|| {
             let x: ParseResult<_> = tokens
-                .with_span(|tokens| {
+                .with_span_result(|tokens| {
                     tokens
                         .parse_token_of_kind(TokenKind::OpenBracket)
                         .map_err(|with_span| with_span.map(SchemaParseError::from))?;
@@ -798,7 +798,7 @@ fn parse_constant_value(
 
         to_control_flow(|| {
             let x: ParseResult<_> = tokens
-                .with_span(|tokens| {
+                .with_span_result(|tokens| {
                     tokens
                         .parse_token_of_kind(TokenKind::OpenBrace)
                         .map_err(|with_span| with_span.map(SchemaParseError::from))?;
@@ -864,7 +864,7 @@ fn parse_field(
     text_source: TextSource,
 ) -> ParseResult<WithLocation<GraphQLFieldDefinition>> {
     tokens
-        .with_span(|tokens| {
+        .with_span_result(|tokens| {
             let description = parse_optional_description(tokens);
             let name = tokens
                 .parse_string_key_type(TokenKind::Identifier)
@@ -987,7 +987,7 @@ fn parse_argument_definition(
     tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
 ) -> ParseResult<WithSpan<GraphQLInputValueDefinition>> {
-    tokens.with_span(|tokens| {
+    tokens.with_span_result(|tokens| {
         let description = parse_optional_description(tokens);
         let name = tokens
             .parse_string_key_type(TokenKind::Identifier)
