@@ -55,6 +55,20 @@ impl<TServer, TClient> DefinitionLocation<TServer, TClient> {
             DefinitionLocation::Client(_) => "Client",
         }
     }
+
+    pub fn as_ref(&self) -> DefinitionLocation<&TServer, &TClient> {
+        match self {
+            DefinitionLocation::Server(s) => DefinitionLocation::Server(s),
+            DefinitionLocation::Client(o) => DefinitionLocation::Client(o),
+        }
+    }
+
+    pub fn as_ref_mut(&mut self) -> DefinitionLocation<&mut TServer, &mut TClient> {
+        match self {
+            DefinitionLocation::Server(s) => DefinitionLocation::Server(s),
+            DefinitionLocation::Client(o) => DefinitionLocation::Client(o),
+        }
+    }
 }
 
 pub trait DefinitionLocationPostfix
