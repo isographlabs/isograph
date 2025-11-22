@@ -43,7 +43,15 @@ Ok(
                         ),
                     },
                     description: None,
-                    selection_set: [],
+                    selection_set: WithSpan {
+                        item: SelectionSet {
+                            selections: [],
+                        },
+                        span: Span {
+                            start: 19,
+                            end: 21,
+                        },
+                    },
                     client_field_directive_set: None(
                         EmptyDirectiveSet,
                     ),

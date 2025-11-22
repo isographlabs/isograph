@@ -55,7 +55,15 @@ Ok(
                             },
                         },
                     ),
-                    selection_set: [],
+                    selection_set: WithSpan {
+                        item: SelectionSet {
+                            selections: [],
+                        },
+                        span: Span {
+                            start: 81,
+                            end: 83,
+                        },
+                    },
                     client_field_directive_set: None(
                         EmptyDirectiveSet,
                     ),

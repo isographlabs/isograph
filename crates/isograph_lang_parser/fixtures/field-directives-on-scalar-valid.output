@@ -43,54 +43,62 @@ Ok(
                         ),
                     },
                     description: None,
-                    selection_set: [
-                        WithSpan {
-                            item: Scalar(
-                                ScalarSelection {
-                                    name: WithLocation {
-                                        location: Embedded(
-                                            EmbeddedLocation {
-                                                text_source: TextSource {
-                                                    current_working_directory: CurrentWorkingDirectory,
-                                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                                    ),
-                                                    span: Some(
-                                                        Span {
-                                                            start: 31,
-                                                            end: 77,
+                    selection_set: WithSpan {
+                        item: SelectionSet {
+                            selections: [
+                                WithSpan {
+                                    item: Scalar(
+                                        ScalarSelection {
+                                            name: WithLocation {
+                                                location: Embedded(
+                                                    EmbeddedLocation {
+                                                        text_source: TextSource {
+                                                            current_working_directory: CurrentWorkingDirectory,
+                                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                                            ),
+                                                            span: Some(
+                                                                Span {
+                                                                    start: 31,
+                                                                    end: 77,
+                                                                },
+                                                            ),
                                                         },
-                                                    ),
-                                                },
-                                                span: Span {
-                                                    start: 25,
-                                                    end: 31,
-                                                },
+                                                        span: Span {
+                                                            start: 25,
+                                                            end: 31,
+                                                        },
+                                                    },
+                                                ),
+                                                item: ScalarSelectableName(
+                                                    "scalar",
+                                                ),
                                             },
-                                        ),
-                                        item: ScalarSelectableName(
-                                            "scalar",
-                                        ),
-                                    },
-                                    reader_alias: None,
-                                    associated_data: (),
-                                    arguments: [],
-                                    scalar_selection_directive_set: Loadable(
-                                        LoadableDirectiveSet {
-                                            loadable: LoadableDirectiveParameters {
-                                                complete_selection_set: false,
-                                                lazy_load_artifact: false,
-                                            },
+                                            reader_alias: None,
+                                            associated_data: (),
+                                            arguments: [],
+                                            scalar_selection_directive_set: Loadable(
+                                                LoadableDirectiveSet {
+                                                    loadable: LoadableDirectiveParameters {
+                                                        complete_selection_set: false,
+                                                        lazy_load_artifact: false,
+                                                    },
+                                                },
+                                            ),
                                         },
                                     ),
+                                    span: Span {
+                                        start: 25,
+                                        end: 41,
+                                    },
                                 },
-                            ),
-                            span: Span {
-                                start: 25,
-                                end: 41,
-                            },
+                            ],
                         },
-                    ],
+                        span: Span {
+                            start: 19,
+                            end: 45,
+                        },
+                    },
                     client_field_directive_set: None(
                         EmptyDirectiveSet,
                     ),
@@ -345,54 +353,62 @@ Ok(
                         ),
                     },
                     description: None,
-                    selection_set: [
-                        WithSpan {
-                            item: Scalar(
-                                ScalarSelection {
-                                    name: WithLocation {
-                                        location: Embedded(
-                                            EmbeddedLocation {
-                                                text_source: TextSource {
-                                                    current_working_directory: CurrentWorkingDirectory,
-                                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                                    ),
-                                                    span: Some(
-                                                        Span {
-                                                            start: 116,
-                                                            end: 187,
+                    selection_set: WithSpan {
+                        item: SelectionSet {
+                            selections: [
+                                WithSpan {
+                                    item: Scalar(
+                                        ScalarSelection {
+                                            name: WithLocation {
+                                                location: Embedded(
+                                                    EmbeddedLocation {
+                                                        text_source: TextSource {
+                                                            current_working_directory: CurrentWorkingDirectory,
+                                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                                            ),
+                                                            span: Some(
+                                                                Span {
+                                                                    start: 116,
+                                                                    end: 187,
+                                                                },
+                                                            ),
                                                         },
-                                                    ),
-                                                },
-                                                span: Span {
-                                                    start: 25,
-                                                    end: 31,
-                                                },
+                                                        span: Span {
+                                                            start: 25,
+                                                            end: 31,
+                                                        },
+                                                    },
+                                                ),
+                                                item: ScalarSelectableName(
+                                                    "scalar",
+                                                ),
                                             },
-                                        ),
-                                        item: ScalarSelectableName(
-                                            "scalar",
-                                        ),
-                                    },
-                                    reader_alias: None,
-                                    associated_data: (),
-                                    arguments: [],
-                                    scalar_selection_directive_set: Loadable(
-                                        LoadableDirectiveSet {
-                                            loadable: LoadableDirectiveParameters {
-                                                complete_selection_set: false,
-                                                lazy_load_artifact: false,
-                                            },
+                                            reader_alias: None,
+                                            associated_data: (),
+                                            arguments: [],
+                                            scalar_selection_directive_set: Loadable(
+                                                LoadableDirectiveSet {
+                                                    loadable: LoadableDirectiveParameters {
+                                                        complete_selection_set: false,
+                                                        lazy_load_artifact: false,
+                                                    },
+                                                },
+                                            ),
                                         },
                                     ),
+                                    span: Span {
+                                        start: 25,
+                                        end: 66,
+                                    },
                                 },
-                            ),
-                            span: Span {
-                                start: 25,
-                                end: 66,
-                            },
+                            ],
                         },
-                    ],
+                        span: Span {
+                            start: 19,
+                            end: 70,
+                        },
+                    },
                     client_field_directive_set: None(
                         EmptyDirectiveSet,
                     ),
@@ -748,54 +764,62 @@ Ok(
                         ),
                     },
                     description: None,
-                    selection_set: [
-                        WithSpan {
-                            item: Scalar(
-                                ScalarSelection {
-                                    name: WithLocation {
-                                        location: Embedded(
-                                            EmbeddedLocation {
-                                                text_source: TextSource {
-                                                    current_working_directory: CurrentWorkingDirectory,
-                                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                                    ),
-                                                    span: Some(
-                                                        Span {
-                                                            start: 226,
-                                                            end: 296,
+                    selection_set: WithSpan {
+                        item: SelectionSet {
+                            selections: [
+                                WithSpan {
+                                    item: Scalar(
+                                        ScalarSelection {
+                                            name: WithLocation {
+                                                location: Embedded(
+                                                    EmbeddedLocation {
+                                                        text_source: TextSource {
+                                                            current_working_directory: CurrentWorkingDirectory,
+                                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                                            ),
+                                                            span: Some(
+                                                                Span {
+                                                                    start: 226,
+                                                                    end: 296,
+                                                                },
+                                                            ),
                                                         },
-                                                    ),
-                                                },
-                                                span: Span {
-                                                    start: 25,
-                                                    end: 31,
-                                                },
+                                                        span: Span {
+                                                            start: 25,
+                                                            end: 31,
+                                                        },
+                                                    },
+                                                ),
+                                                item: ScalarSelectableName(
+                                                    "scalar",
+                                                ),
                                             },
-                                        ),
-                                        item: ScalarSelectableName(
-                                            "scalar",
-                                        ),
-                                    },
-                                    reader_alias: None,
-                                    associated_data: (),
-                                    arguments: [],
-                                    scalar_selection_directive_set: Loadable(
-                                        LoadableDirectiveSet {
-                                            loadable: LoadableDirectiveParameters {
-                                                complete_selection_set: false,
-                                                lazy_load_artifact: true,
-                                            },
+                                            reader_alias: None,
+                                            associated_data: (),
+                                            arguments: [],
+                                            scalar_selection_directive_set: Loadable(
+                                                LoadableDirectiveSet {
+                                                    loadable: LoadableDirectiveParameters {
+                                                        complete_selection_set: false,
+                                                        lazy_load_artifact: true,
+                                                    },
+                                                },
+                                            ),
                                         },
                                     ),
+                                    span: Span {
+                                        start: 25,
+                                        end: 65,
+                                    },
                                 },
-                            ),
-                            span: Span {
-                                start: 25,
-                                end: 65,
-                            },
+                            ],
                         },
-                    ],
+                        span: Span {
+                            start: 19,
+                            end: 69,
+                        },
+                    },
                     client_field_directive_set: None(
                         EmptyDirectiveSet,
                     ),
@@ -1151,51 +1175,59 @@ Ok(
                         ),
                     },
                     description: None,
-                    selection_set: [
-                        WithSpan {
-                            item: Scalar(
-                                ScalarSelection {
-                                    name: WithLocation {
-                                        location: Embedded(
-                                            EmbeddedLocation {
-                                                text_source: TextSource {
-                                                    current_working_directory: CurrentWorkingDirectory,
-                                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                                    ),
-                                                    span: Some(
-                                                        Span {
-                                                            start: 333,
-                                                            end: 380,
+                    selection_set: WithSpan {
+                        item: SelectionSet {
+                            selections: [
+                                WithSpan {
+                                    item: Scalar(
+                                        ScalarSelection {
+                                            name: WithLocation {
+                                                location: Embedded(
+                                                    EmbeddedLocation {
+                                                        text_source: TextSource {
+                                                            current_working_directory: CurrentWorkingDirectory,
+                                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                                            ),
+                                                            span: Some(
+                                                                Span {
+                                                                    start: 333,
+                                                                    end: 380,
+                                                                },
+                                                            ),
                                                         },
-                                                    ),
-                                                },
-                                                span: Span {
-                                                    start: 25,
-                                                    end: 31,
-                                                },
+                                                        span: Span {
+                                                            start: 25,
+                                                            end: 31,
+                                                        },
+                                                    },
+                                                ),
+                                                item: ScalarSelectableName(
+                                                    "scalar",
+                                                ),
                                             },
-                                        ),
-                                        item: ScalarSelectableName(
-                                            "scalar",
-                                        ),
-                                    },
-                                    reader_alias: None,
-                                    associated_data: (),
-                                    arguments: [],
-                                    scalar_selection_directive_set: Updatable(
-                                        UpdatableDirectiveSet {
-                                            updatable: UpdatableDirectiveParameters,
+                                            reader_alias: None,
+                                            associated_data: (),
+                                            arguments: [],
+                                            scalar_selection_directive_set: Updatable(
+                                                UpdatableDirectiveSet {
+                                                    updatable: UpdatableDirectiveParameters,
+                                                },
+                                            ),
                                         },
                                     ),
+                                    span: Span {
+                                        start: 25,
+                                        end: 42,
+                                    },
                                 },
-                            ),
-                            span: Span {
-                                start: 25,
-                                end: 42,
-                            },
+                            ],
                         },
-                    ],
+                        span: Span {
+                            start: 19,
+                            end: 46,
+                        },
+                    },
                     client_field_directive_set: None(
                         EmptyDirectiveSet,
                     ),

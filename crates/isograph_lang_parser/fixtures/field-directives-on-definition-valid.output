@@ -43,7 +43,15 @@ Ok(
                         ),
                     },
                     description: None,
-                    selection_set: [],
+                    selection_set: WithSpan {
+                        item: SelectionSet {
+                            selections: [],
+                        },
+                        span: Span {
+                            start: 30,
+                            end: 35,
+                        },
+                    },
                     client_field_directive_set: Component(
                         ComponentDirectiveSet {
                             component: ComponentDirectiveParameters,
