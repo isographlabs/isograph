@@ -24,13 +24,15 @@ pub struct CompilationStats {
     pub total_artifacts_written: usize,
 }
 
-pub fn create_state_and_compile_once<TNetworkProtocol: NetworkProtocol>(
+pub fn compile_and_print<TNetworkProtocol: NetworkProtocol>(
     config_location: &PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(), BatchCompileError<TNetworkProtocol>> {
     info!("{}", "Starting to compile.".cyan());
     let state = CompilerState::new(config_location, current_working_directory)?;
-    generate_and_write_artifacts::<TNetworkProtocol>(&state.db)
+    print_result(WithDuration::new(|| {
+        generate_and_write_artifacts::<TNetworkProtocol>(&state.db)
+    }))
 }
 
 pub fn print_result<TNetworkProtocol: NetworkProtocol>(
@@ -80,25 +82,23 @@ fn print_stats(elapsed_time: Duration, stats: CompilationStats) {
 #[tracing::instrument(skip(db))]
 pub fn generate_and_write_artifacts<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<(), BatchCompileError<TNetworkProtocol>> {
-    print_result(WithDuration::new(|| {
-        // Note: we calculate all of the artifact paths and contents first, so that writing to
-        // disk can be as fast as possible and we minimize the chance that changes to the file
-        // system occur while we're writing and we get unpredictable results.
+) -> Result<CompilationStats, BatchCompileError<TNetworkProtocol>> {
+    // Note: we calculate all of the artifact paths and contents first, so that writing to
+    // disk can be as fast as possible and we minimize the chance that changes to the file
+    // system occur while we're writing and we get unpredictable results.
 
-        let config = db.get_isograph_config();
-        let (artifacts, stats) = get_artifact_path_and_content(db)?;
-        let total_artifacts_written =
-            write_artifacts_to_disk(artifacts, &config.artifact_directory.absolute_path)?;
+    let config = db.get_isograph_config();
+    let (artifacts, stats) = get_artifact_path_and_content(db)?;
+    let total_artifacts_written =
+        write_artifacts_to_disk(artifacts, &config.artifact_directory.absolute_path)?;
 
-        CompilationStats {
-            client_field_count: stats.client_field_count,
-            client_pointer_count: stats.client_pointer_count,
-            entrypoint_count: stats.entrypoint_count,
-            total_artifacts_written,
-        }
-        .ok()
-    }))
+    CompilationStats {
+        client_field_count: stats.client_field_count,
+        client_pointer_count: stats.client_pointer_count,
+        entrypoint_count: stats.entrypoint_count,
+        total_artifacts_written,
+    }
+    .ok()
 }
 
 #[derive(Error, Debug)]

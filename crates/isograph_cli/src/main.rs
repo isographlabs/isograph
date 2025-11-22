@@ -5,7 +5,7 @@ use colored::Colorize;
 use common_lang_types::CurrentWorkingDirectory;
 use graphql_network_protocol::GraphQLNetworkProtocol;
 use intern::string_key::Intern;
-use isograph_compiler::{create_state_and_compile_once, handle_watch_command};
+use isograph_compiler::{compile_and_print, handle_watch_command};
 use isograph_config::create_config;
 use opentelemetry::{KeyValue, sdk::Resource};
 use opentelemetry_otlp::WithExportConfig;
@@ -56,7 +56,7 @@ async fn start_compiler(
                 std::process::exit(1);
             }
         };
-    } else if create_state_and_compile_once::<GraphQLNetworkProtocol>(
+    } else if compile_and_print::<GraphQLNetworkProtocol>(
         &config_location,
         current_working_directory,
     )

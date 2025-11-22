@@ -15,9 +15,10 @@ use tokio::{runtime::Handle, sync::mpsc::Receiver};
 use tracing::{info, warn};
 
 use crate::{
-    batch_compile::{BatchCompileError, generate_and_write_artifacts},
+    batch_compile::{BatchCompileError, generate_and_write_artifacts, print_result},
     compiler_state::CompilerState,
     source_files::update_sources,
+    with_duration::WithDuration,
 };
 
 pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
@@ -29,7 +30,9 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
     let config = state.db.get_isograph_config().clone();
 
     info!("{}", "Starting to compile.".cyan());
-    let _ = generate_and_write_artifacts::<TNetworkProtocol>(&state.db);
+    let _ = print_result(WithDuration::new(|| {
+        generate_and_write_artifacts::<TNetworkProtocol>(&state.db)
+    }));
 
     let (mut file_system_receiver, mut file_system_watcher) =
         create_debounced_file_watcher(&config);
@@ -51,7 +54,10 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
                     update_sources(&mut state.db, &changes)?;
                     state.run_garbage_collection();
                 };
-                let _ = generate_and_write_artifacts::<TNetworkProtocol>(&state.db);
+                let result = WithDuration::new(|| {
+                    generate_and_write_artifacts::<TNetworkProtocol>(&state.db)
+                });
+                let _ = print_result(result);
             }
             Err(errors) => return Err(errors.into()),
         }
