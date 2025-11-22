@@ -11,6 +11,7 @@ use isograph_schema::selectables_for_entity;
 use isograph_schema::{
     NetworkProtocol, get_parent_and_selectable_for_object_path, process_iso_literal_extraction,
 };
+use lsp_types::CompletionItemLabelDetails;
 use lsp_types::{
     CompletionItem, CompletionResponse,
     request::{Completion, Request},
@@ -58,6 +59,10 @@ pub fn on_completion<TNetworkProtocol: NetworkProtocol>(
                             .flat_map(|x| x.as_ref().ok())
                             .map(|field| CompletionItem {
                                 label: field.name().item.to_string(),
+                                label_details: Some(CompletionItemLabelDetails {
+                                    detail: None,
+                                    description: field.description().map(|x| x.to_string()),
+                                }),
                                 ..Default::default()
                             })
                             .collect::<Vec<_>>()
