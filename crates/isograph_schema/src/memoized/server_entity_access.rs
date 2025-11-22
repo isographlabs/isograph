@@ -65,10 +65,9 @@ pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
     Vec<ServerObjectEntity<TNetworkProtocol>>,
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
-    let (outcome, _) = match TNetworkProtocol::parse_type_system_documents(db) {
-        Ok(outcome) => outcome,
-        Err(e) => return e.clone().err(),
-    };
+    let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db)
+        .as_ref()
+        .map_err(|e| e.clone())?;
 
     outcome
         .iter()
@@ -216,10 +215,9 @@ pub fn defined_entities<TNetworkProtocol: NetworkProtocol>(
     HashMap<UnvalidatedTypeName, Vec<ServerEntityName>>,
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
-    let (outcome, _) = match TNetworkProtocol::parse_type_system_documents(db) {
-        Ok(outcome) => outcome,
-        Err(e) => return Err(e.clone()),
-    };
+    let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db)
+        .as_ref()
+        .map_err(|e| e.clone())?;
 
     let mut defined_entities: HashMap<UnvalidatedTypeName, Vec<_>> = HashMap::new();
 
