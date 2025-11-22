@@ -195,9 +195,9 @@ impl<'source> PeekableLexer<'source> {
         let result = do_stuff(self)?;
         let end = self.end_index_of_last_parsed_token;
 
-        // Here, if do_stuff parses nothing, then it had better return None!
+        // Here, if do_stuff parses nothing, then it had better not advanced the cursor.
         debug_assert!(
-            (result.is_some() && (end >= start)) || (result.is_none() && (end < start)),
+            result.is_some() || (start == self.current.span.start),
             "We should either parse something and advance the cursor, or parse nothing and \
             not advance it."
         );
