@@ -3,7 +3,11 @@ import { Avatar } from '@mui/material';
 import React from 'react';
 
 export const PetAvatar = iso(`
-  field Pet.Avatar @component {
+  field Pet.Avatar @component
+  """
+  A picture of a pet, framed.
+  """
+  {
     picture
   }
 `)(function PetAvatar({ data }, { onClick }: { onClick: () => void }) {

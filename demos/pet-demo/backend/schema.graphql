@@ -75,20 +75,59 @@ type SetPetTaglineResponse {
 A pet is the joy in life
 """
 type Pet implements Node {
+  """
+  The pet's ID
+  """
   id: ID!
+  """
+  What do you call the pet when you're happy?
+  """
   firstName: String!
+  """
+  What do you call the pet when you're angry?
+  """
   lastName: String!
+  """
+  Pets have a very complex social life. Find out more!
+  """
   best_friend_relationship: BestFriendRelationship
 
   picture: Url!
+  """
+  What you call the pet when you're very happy.
+  """
   nickname: String
+
+  """
+  It's just a number.
+  """
   age: Int!
+  """
+  Charisma? 100%
+  """
   stats: PetStats
+
+  """
+  If your pet was a superhero.
+  """
   tagline: String!
+  """
+  And if they had an alter ego.
+  """
   alt_tagline: String!
+
+  """
+  Hold your enemies close...
+  """
   potential_new_best_friends: [Pet!]!
 
+  """
+  Even pets use social media, mmkay.
+  """
   checkins(limit: Int, skip: Int): [Checkin!]!
+  """
+  It's probably something from David Foster Wallace or Dostoevsky, keep up.
+  """
   favorite_phrase: String
 }
 
