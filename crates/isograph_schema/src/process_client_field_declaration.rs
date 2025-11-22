@@ -246,10 +246,13 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
 ) -> ProcessClientFieldDeclarationResult<Option<RefetchStrategy<(), ()>>, TNetworkProtocol> {
-    let fetchable_types_map = fetchable_types(db).as_ref().expect(
-        "Expected parsing to have succeeded. \
+    let fetchable_types_map = fetchable_types(db)
+        .as_ref()
+        .expect(
+            "Expected parsing to have succeeded. \
         This is indicative of a bug in Isograph.",
-    );
+        )
+        .lookup(db);
 
     let is_fetchable = fetchable_types_map.contains_key(&parent_object_entity_name);
 

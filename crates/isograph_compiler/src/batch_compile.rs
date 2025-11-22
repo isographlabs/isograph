@@ -78,7 +78,7 @@ fn print_stats(elapsed_time: Duration, stats: CompilationStats) {
 }
 
 /// This the "workhorse" command of batch compilation.
-#[tracing::instrument(skip(db))]
+#[tracing::instrument(skip_all)]
 pub fn compile<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<CompilationStats, BatchCompileError<TNetworkProtocol>> {

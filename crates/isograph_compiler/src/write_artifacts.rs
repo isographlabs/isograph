@@ -8,7 +8,7 @@ use common_lang_types::ArtifactPathAndContent;
 use intern::string_key::Lookup;
 use thiserror::Error;
 
-#[tracing::instrument(skip(paths_and_contents, artifact_directory))]
+#[tracing::instrument(skip_all)]
 pub(crate) fn write_artifacts_to_disk(
     paths_and_contents: impl IntoIterator<Item = ArtifactPathAndContent>,
     artifact_directory: &PathBuf,
