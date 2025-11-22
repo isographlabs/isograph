@@ -419,13 +419,7 @@ jobs:
         run: pnpm build-swc
 
       - name: Publish to NPM
-        run: |
-          for pkg in libs/*; do
-            echo PUBLISHING $pkg
-            cd $pkg
-            npm publish --tag ${{ startsWith(github.ref, 'refs/heads/deploy/') && 'deploy' || 'main' }}
-            cd ../..
-          done
+        run: pnpm --filter='./libs/*' publish --no-git-checks --tag ${{ startsWith(github.ref, 'refs/heads/deploy/') && 'deploy' || 'main' }}
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
 
@@ -506,12 +500,6 @@ jobs:
         run: pnpm build-swc
 
       - name: Publish latest version to NPM
-        run: |
-          for pkg in libs/*; do
-            echo PUBLISHING $pkg
-            cd $pkg
-            npm publish --tag latest
-            cd ../..
-          done
+        run: pnpm --filter './libs/*' publish --no-git-checks --tag latest
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
