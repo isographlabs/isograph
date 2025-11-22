@@ -50,7 +50,7 @@ pub fn update_sources<TNetworkProtocol: NetworkProtocol>(
         })
         .collect::<Vec<_>>();
     if !errors.is_empty() {
-        Err(SourceError::MultipleErrors { messages: errors })
+        Err(SourceError::MultipleErrors { errors })
     } else {
         Ok(())
     }
@@ -308,12 +308,12 @@ pub enum SourceError {
 
     #[error(
         "{}",
-        messages.iter().fold(String::new(), |mut output, x| {
+        errors.iter().fold(String::new(), |mut output, x| {
             output.push_str(&format!("\n\n{x}"));
             output
         })
     )]
-    MultipleErrors { messages: Vec<SourceError> },
+    MultipleErrors { errors: Vec<SourceError> },
 
     #[error("{error}")]
     ReadFileError {

@@ -116,12 +116,12 @@ pub enum BatchCompileError<TNetworkProtocol: NetworkProtocol> {
 
     #[error(
         "{}",
-        messages.iter().fold(String::new(), |mut output, x| {
+        errors.iter().fold(String::new(), |mut output, x| {
             output.push_str(&format!("\n\n{x}"));
             output
         })
     )]
-    NotifyErrors { messages: Vec<notify::Error> },
+    NotifyErrors { errors: Vec<notify::Error> },
 
     #[error("{error}")]
     GenerateArtifactsError {
@@ -133,7 +133,7 @@ pub enum BatchCompileError<TNetworkProtocol: NetworkProtocol> {
 impl<TNetworkProtocol: NetworkProtocol> From<Vec<notify::Error>>
     for BatchCompileError<TNetworkProtocol>
 {
-    fn from(messages: Vec<notify::Error>) -> Self {
-        BatchCompileError::NotifyErrors { messages }
+    fn from(errors: Vec<notify::Error>) -> Self {
+        BatchCompileError::NotifyErrors { errors }
     }
 }

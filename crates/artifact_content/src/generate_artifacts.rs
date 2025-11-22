@@ -119,7 +119,7 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
 
     let stats = validate_entire_schema(db)
         .to_owned()
-        .map_err(|e| GetArtifactPathAndContentError::ValidationError { messages: e })?;
+        .map_err(|errors| GetArtifactPathAndContentError::ValidationError { errors })?;
 
     let mut artifact_path_and_content = get_artifact_path_and_content_impl(db);
     if let Some(header) = config.options.generated_file_header {
@@ -1460,12 +1460,12 @@ pub fn get_provided_arguments<'a>(
 pub enum GetArtifactPathAndContentError<TNetworkProtocol: NetworkProtocol> {
     #[error(
         "{}",
-        messages.iter().fold(String::new(), |mut output, x| {
+        errors.iter().fold(String::new(), |mut output, x| {
             output.push_str(&format!("\n\n{}", x));
             output
         })
     )]
     ValidationError {
-        messages: Vec<ValidationError<TNetworkProtocol>>,
+        errors: Vec<ValidationError<TNetworkProtocol>>,
     },
 }
