@@ -8,9 +8,8 @@ use common_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration,
-    ClientScalarSelectionDirectiveSet, DeserializationError, NonConstantValue, SelectionSet,
-    SelectionType, ServerObjectEntityNameWrapper, TypeAnnotation, UnvalidatedSelection,
-    VariableDefinition,
+    ClientScalarSelectionDirectiveSet, NonConstantValue, SelectionSet, SelectionType,
+    ServerObjectEntityNameWrapper, TypeAnnotation, UnvalidatedSelection, VariableDefinition,
 };
 use prelude::Postfix;
 
@@ -420,26 +419,6 @@ pub enum ProcessClientFieldDeclarationError<TNetworkProtocol: NetworkProtocol> {
     },
 
     #[error(
-        "Invalid client pointer target type. `{target_object_entity_name}` has no id field. \
-        You are attempting to define a pointer to it. \
-        In order to do so, the target must be an object implementing the `Node` interface."
-    )]
-    ClientPointerTargetTypeHasNoId {
-        target_object_entity_name: ServerObjectEntityNameWrapper,
-    },
-
-    #[error(
-        "The Isograph object type `{parent_object_entity_name}` already has a field named `{client_selectable_name}`."
-    )]
-    ParentAlreadyHasField {
-        parent_object_entity_name: ServerObjectEntityName,
-        client_selectable_name: ClientSelectableName,
-    },
-
-    #[error("Error when deserializing directives. Message: {message}")]
-    UnableToDeserializeDirectives { message: DeserializationError },
-
-    #[error(
         "The argument `{argument_name}` on field `{parent_object_entity_name}.{selectable_name}` \
         has inner type `{argument_type}`, which does not exist."
     )]
@@ -451,13 +430,10 @@ pub enum ProcessClientFieldDeclarationError<TNetworkProtocol: NetworkProtocol> {
     },
 
     #[error("{0}")]
-    ServerSelectableNamedError(ServerSelectableNamedError<TNetworkProtocol>),
+    ServerSelectableNamedError(#[from] ServerSelectableNamedError<TNetworkProtocol>),
 
     #[error("{0}")]
-    FieldToInsertToServerSelectableError(FieldToInsertToServerSelectableError),
-
-    #[error("{0}")]
-    ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),
+    FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

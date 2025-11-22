@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 
 use crate::{
-    CreateAdditionalFieldsError, ExposeFieldToInsert, FieldToInsertToServerSelectableError,
-    IsographDatabase, NetworkProtocol,
+    ExposeFieldToInsert, FieldToInsertToServerSelectableError, IsographDatabase, NetworkProtocol,
 };
-use common_lang_types::{SelectableName, ServerObjectEntityName};
+use common_lang_types::ServerObjectEntityName;
 use pico_macros::memo;
 use thiserror::Error;
 
@@ -38,28 +37,6 @@ pub enum CreateSchemaError<TNetworkProtocol: NetworkProtocol> {
         message: TNetworkProtocol::ParseTypeSystemDocumentsError,
     },
 
-    #[error("{}", message)]
-    CreateAdditionalFields {
-        message: CreateAdditionalFieldsError<TNetworkProtocol>,
-    },
-
-    #[error(
-        "The Isograph compiler attempted to create a field named \
-        `{selectable_name}` on type `{parent_object_entity_name}`, but a field with that name already exists."
-    )]
-    CompilerCreatedFieldExistsOnType {
-        selectable_name: SelectableName,
-        parent_object_entity_name: ServerObjectEntityName,
-    },
-
     #[error("{0}")]
     FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),
-}
-
-impl<TNetworkProtocol: NetworkProtocol> From<CreateAdditionalFieldsError<TNetworkProtocol>>
-    for CreateSchemaError<TNetworkProtocol>
-{
-    fn from(value: CreateAdditionalFieldsError<TNetworkProtocol>) -> Self {
-        CreateSchemaError::CreateAdditionalFields { message: value }
-    }
 }

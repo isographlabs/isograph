@@ -9,7 +9,10 @@ pub(crate) type ParseResult<T> = Result<T, WithSpan<SchemaParseError>>;
 #[derive(Error, Clone, Eq, PartialEq, Debug)]
 pub enum SchemaParseError {
     #[error("{error}")]
-    ParseError { error: LowLevelParseError },
+    ParseError {
+        #[from]
+        error: LowLevelParseError,
+    },
 
     #[error(
         "Expected scalar, type, interface, union, enum, input object, schema or directive, found \"{found_text}\""
@@ -46,10 +49,4 @@ pub enum SchemaParseError {
         "Root operation types (query, subscription and mutation) cannot be defined twice in a schema definition"
     )]
     RootOperationTypeRedefined,
-}
-
-impl From<LowLevelParseError> for SchemaParseError {
-    fn from(error: LowLevelParseError) -> Self {
-        SchemaParseError::ParseError { error }
-    }
 }

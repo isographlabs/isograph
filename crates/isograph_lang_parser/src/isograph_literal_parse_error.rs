@@ -13,7 +13,10 @@ pub(crate) type ParseResultWithSpan<T> = Result<T, WithSpan<IsographLiteralParse
 #[derive(Error, Clone, Eq, PartialEq, Debug)]
 pub enum IsographLiteralParseError {
     #[error("{error}")]
-    ParseError { error: LowLevelParseError },
+    ParseError {
+        #[from]
+        error: LowLevelParseError,
+    },
 
     #[error("Expected a type (e.g. String, [String], or String!)")]
     ExpectedTypeAnnotation,
@@ -44,9 +47,6 @@ pub enum IsographLiteralParseError {
 
     #[error("Found a variable, like $foo, in a context where variables are not allowed")]
     UnexpectedVariable,
-
-    #[error("Descriptions are currently disallowed")]
-    DescriptionsAreDisallowed,
 
     #[error("Expected a linebreak")]
     ExpectedLineBreak,
@@ -82,10 +82,4 @@ pub enum IsographLiteralParseError {
 
     #[error("Unable to process directives. Message: {message}")]
     UnableToDeserializeDirectives { message: DeserializationError },
-}
-
-impl From<LowLevelParseError> for IsographLiteralParseError {
-    fn from(error: LowLevelParseError) -> Self {
-        IsographLiteralParseError::ParseError { error }
-    }
 }

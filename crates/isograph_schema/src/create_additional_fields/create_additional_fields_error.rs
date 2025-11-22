@@ -2,10 +2,7 @@ use crate::{
     EntityAccessError, FieldToInsertToServerSelectableError, NetworkProtocol,
     ServerSelectableNamedError,
 };
-use common_lang_types::{
-    ClientScalarSelectableName, SelectableName, ServerObjectEntityName, StringLiteralValue,
-    UnvalidatedTypeName, VariableName,
-};
+use common_lang_types::{SelectableName, ServerObjectEntityName, StringLiteralValue};
 use intern::{Lookup, string_key::Intern};
 
 use serde::Deserialize;
@@ -52,23 +49,6 @@ pub type ProcessTypeDefinitionResult<T, TNetworkProtocol> =
 /// in some cases!
 #[derive(Error, Clone, Eq, PartialEq, Debug)]
 pub enum CreateAdditionalFieldsError<TNetworkProtocol: NetworkProtocol> {
-    #[error(
-        "The Isograph compiler attempted to create a field named \
-        `{client_scalar_selectable_name}` on entity `{parent_object_entity_name}`, \
-        but a field with that name already exists."
-    )]
-    CompilerCreatedFieldExistsOnType {
-        client_scalar_selectable_name: ClientScalarSelectableName,
-        parent_object_entity_name: ServerObjectEntityName,
-    },
-
-    // TODO include info about where the field was previously defined
-    #[error("Duplicate field named `{selectable_name}` on type `{parent_object_entity_name}`")]
-    DuplicateField {
-        selectable_name: SelectableName,
-        parent_object_entity_name: ServerObjectEntityName,
-    },
-
     #[error("Invalid field `{field_arg}` in @exposeField directive")]
     InvalidField { field_arg: String },
 
@@ -100,39 +80,6 @@ pub enum CreateAdditionalFieldsError<TNetworkProtocol: NetworkProtocol> {
     PrimaryDirectiveFieldNotFound {
         primary_object_entity_name: ServerObjectEntityName,
         field_name: StringLiteralValue,
-    },
-
-    #[error("Failed to deserialize {0}")]
-    FailedToDeserialize(String),
-
-    #[error(
-        "The `{strong_field_name}` field on `{parent_object_entity_name}` must have type `ID!`.\n\
-        This error can be suppressed using the \"on_invalid_id_type\" config parameter."
-    )]
-    IdFieldMustBeNonNullIdType {
-        parent_object_entity_name: ServerObjectEntityName,
-        strong_field_name: &'static str,
-    },
-
-    #[error(
-        "The argument `{argument_name}` on field `{parent_object_entity_name}.{field_name}` has inner type `{argument_type}`, which does not exist."
-    )]
-    FieldArgumentTypeDoesNotExist {
-        argument_name: VariableName,
-        parent_object_entity_name: ServerObjectEntityName,
-        field_name: SelectableName,
-        argument_type: UnvalidatedTypeName,
-    },
-
-    #[error("This field has type `{target_entity_name}`, which does not exist")]
-    FieldTypenameDoesNotExist {
-        target_entity_name: UnvalidatedTypeName,
-    },
-
-    #[error("Duplicate type definition (`{type_definition_type}`) named `{duplicate_entity_name}`")]
-    DuplicateTypeDefinition {
-        type_definition_type: &'static str,
-        duplicate_entity_name: UnvalidatedTypeName,
     },
 
     #[error("{0}")]
