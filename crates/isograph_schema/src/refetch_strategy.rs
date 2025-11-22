@@ -5,7 +5,7 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    EmptyDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
+    EmptyDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet, SelectionSet,
     SelectionTypeContainingSelections,
 };
 
@@ -40,12 +40,10 @@ impl<
     pub fn refetch_selection_set(
         &self,
     ) -> Option<
-        &Vec<
-            WithSpan<
-                SelectionTypeContainingSelections<
-                    TSelectionTypeSelectionScalarFieldAssociatedData,
-                    TSelectionTypeSelectionLinkedFieldAssociatedData,
-                >,
+        &WithSpan<
+            SelectionSet<
+                TSelectionTypeSelectionScalarFieldAssociatedData,
+                TSelectionTypeSelectionLinkedFieldAssociatedData,
             >,
         >,
     > {
@@ -61,12 +59,10 @@ pub fn generate_refetch_field_strategy<
     TSelectionTypeSelectionScalarFieldAssociatedData,
     TSelectionTypeSelectionLinkedFieldAssociatedData,
 >(
-    refetch_selection_set: Vec<
-        WithSpan<
-            SelectionTypeContainingSelections<
-                TSelectionTypeSelectionScalarFieldAssociatedData,
-                TSelectionTypeSelectionLinkedFieldAssociatedData,
-            >,
+    refetch_selection_set: WithSpan<
+        SelectionSet<
+            TSelectionTypeSelectionScalarFieldAssociatedData,
+            TSelectionTypeSelectionLinkedFieldAssociatedData,
         >,
     >,
     root_fetchable_type_name: ServerObjectEntityName,
@@ -89,12 +85,10 @@ pub struct UseRefetchFieldRefetchStrategy<
 > {
     /// If this field is fetched imperatively, what fields do we need to
     /// select in the parent query?
-    pub refetch_selection_set: Vec<
-        WithSpan<
-            SelectionTypeContainingSelections<
-                TSelectionTypeSelectionScalarFieldAssociatedData,
-                TSelectionTypeSelectionLinkedFieldAssociatedData,
-            >,
+    pub refetch_selection_set: WithSpan<
+        SelectionSet<
+            TSelectionTypeSelectionScalarFieldAssociatedData,
+            TSelectionTypeSelectionLinkedFieldAssociatedData,
         >,
     >,
     /// Query, Mutation, etc.

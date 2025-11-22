@@ -5,7 +5,7 @@ use common_lang_types::{
 };
 use intern::{Lookup, string_key::Intern};
 use isograph_lang_types::{
-    EmptyDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet, SelectionType,
+    EmptyDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet, SelectionSet, SelectionType,
     SelectionTypeContainingSelections, VariableDefinition,
 };
 
@@ -251,9 +251,12 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
         UnprocessedClientScalarSelectableSelectionSet {
             client_scalar_selectable_name: mutation_field_client_field_name,
             parent_object_entity_name: maybe_abstract_parent_object_entity_name,
-            reader_selection_set: vec![],
+            reader_selection_set: SelectionSet { selections: vec![] }.with_generated_span(),
             refetch_strategy: RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
-                fields.to_vec(),
+                SelectionSet {
+                    selections: fields.to_vec(),
+                }
+                .with_generated_span(),
                 // NOTE: this will probably panic if we're not exposing fields which are
                 // originally on Mutation
                 parent_object_entity_name,

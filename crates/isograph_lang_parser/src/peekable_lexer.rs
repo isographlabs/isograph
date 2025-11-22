@@ -178,7 +178,33 @@ impl<'source> PeekableLexer<'source> {
         let start = self.current.span.start;
         let result = do_stuff(self)?;
         let end = self.end_index_of_last_parsed_token;
+
+        // If `do_stuff` parses nothing, e.g. we call `with_span_result(parse_something_optional)`
+        // and nothing is parsed, then end < start, and we will panic.
+        //
+        // In situations like that, call with_span_optional_result!
+
         result.with_span(Span::new(start, end)).ok()
+    }
+
+    pub fn with_span_optional_result<T, E>(
+        &mut self,
+        do_stuff: impl FnOnce(&mut Self) -> Result<Option<T>, E>,
+    ) -> Result<Option<WithSpan<T>>, E> {
+        let start = self.current.span.start;
+        let result = do_stuff(self)?;
+        let end = self.end_index_of_last_parsed_token;
+
+        // Here, if do_stuff parses nothing, then it had better return None!
+        debug_assert!(
+            (result.is_some() && (end >= start)) || (result.is_none() && (end < start)),
+            "We should either parse something and advance the cursor, or parse nothing and \
+            not advance it."
+        );
+
+        result
+            .map(|value| value.with_span(Span::new(start, end)))
+            .ok()
     }
 
     pub fn white_space_span(&self) -> Span {

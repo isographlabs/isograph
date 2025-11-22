@@ -8,7 +8,6 @@ use common_lang_types::relative_path_from_absolute_and_working_directory;
 use isograph_compiler::CompilerState;
 use isograph_lang_types::DefinitionLocation;
 use isograph_lang_types::IsographResolvedNode;
-use isograph_schema::ClientOrServerObjectSelectable;
 use isograph_schema::SelectableTrait;
 use isograph_schema::selectables_for_entity;
 use isograph_schema::{
@@ -53,15 +52,17 @@ pub fn on_completion<TNetworkProtocol: NetworkProtocol>(
         current_working_directory,
     ) {
         match result.resolve((), Span::new(offset, offset)) {
+<<<<<<< HEAD
             IsographResolvedNode::ObjectSelection(object_path) => {
                 if let Ok((_, resolved_selectable)) =
                     get_parent_and_selectable_for_object_path(db, &object_path)
+=======
+            IsographResolvedNode::SelectionSet(selection_set_path) => {
+                if let Ok(parent_object_entity) =
+                    get_parent_for_selection_set_path(db, &selection_set_path)
+>>>>>>> 8c6aca73 (fix bugz)
                 {
-                    if let Ok(map) = selectables_for_entity(
-                        db,
-                        *resolved_selectable.target_object_entity_name().inner(),
-                    )
-                    .as_ref()
+                    if let Ok(map) = selectables_for_entity(db, parent_object_entity.name).as_ref()
                     {
                         map.iter()
                             .flat_map(|result| result.as_ref().ok())

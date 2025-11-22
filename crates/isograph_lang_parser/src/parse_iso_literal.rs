@@ -12,9 +12,9 @@ use isograph_lang_types::{
     ClientFieldDeclaration, ClientPointerDeclaration, ClientScalarSelectableNameWrapper,
     ConstantValue, EntrypointDeclaration, IsographFieldDirective, IsographResolvedNode,
     IsographSemanticToken, NonConstantValue, ObjectSelection, ScalarSelection,
-    SelectionFieldArgument, SelectionTypeContainingSelections, ServerObjectEntityNameWrapper,
-    UnvalidatedSelection, VariableDefinition, from_isograph_field_directives,
-    semantic_token_legend,
+    SelectionFieldArgument, SelectionSet, SelectionTypeContainingSelections,
+    ServerObjectEntityNameWrapper, UnvalidatedSelection, VariableDefinition,
+    from_isograph_field_directives, semantic_token_legend,
 };
 use prelude::Postfix;
 use resolve_position_macros::ResolvePosition;
@@ -239,7 +239,10 @@ fn parse_client_field_declaration_inner(
 
         let description = parse_optional_description(tokens);
 
-        let selection_set = parse_selection_set(tokens, text_source)?;
+        let selection_set =
+            parse_optional_selection_set(tokens, text_source)?.ok_or_else(|| {
+                IsographLiteralParseError::ExpectedSelectionSet.with_span(Span::new(0, 0))
+            })?;
 
         let const_export_name = const_export_name.ok_or_else(|| {
             IsographLiteralParseError::ExpectedLiteralToBeExported {
@@ -343,7 +346,10 @@ fn parse_client_pointer_declaration_inner(
 
         let description = parse_optional_description(tokens);
 
-        let selection_set = parse_selection_set(tokens, text_source)?;
+        let selection_set =
+            parse_optional_selection_set(tokens, text_source)?.ok_or_else(|| {
+                IsographLiteralParseError::ExpectedSelectionSet.with_span(Span::new(0, 0))
+            })?;
 
         let const_export_name = const_export_name.ok_or_else(|| {
             IsographLiteralParseError::ExpectedLiteralToBeExported {
@@ -371,17 +377,20 @@ fn parse_client_pointer_declaration_inner(
 }
 
 // Note: for now, top-level selection sets are required
-fn parse_selection_set(
+fn parse_optional_selection_set(
     tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
-) -> ParseResultWithSpan<Vec<WithSpan<UnvalidatedSelection>>> {
-    let selection_set = parse_optional_selection_set(tokens, text_source)?;
-    selection_set
-        .ok_or_else(|| IsographLiteralParseError::ExpectedSelectionSet.with_span(Span::new(0, 0)))
+) -> ParseResultWithSpan<Option<WithSpan<SelectionSet<(), ()>>>> {
+    tokens.with_span_optional_result(|tokens| {
+        let selections = parse_optional_selection_set_inner(tokens, text_source)?;
+        selections
+            .map(|selections| SelectionSet { selections })
+            .ok()
+    })
 }
 
 // TODO this should not parse an optional selection set, but a required one
-fn parse_optional_selection_set(
+fn parse_optional_selection_set_inner(
     tokens: &mut PeekableLexer<'_>,
     text_source: TextSource,
 ) -> ParseResultWithSpan<Option<Vec<WithSpan<UnvalidatedSelection>>>> {

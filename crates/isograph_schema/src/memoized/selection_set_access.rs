@@ -2,21 +2,20 @@ use std::collections::HashMap;
 
 use common_lang_types::{
     ClientSelectableName, ParentObjectEntityNameAndSelectableName, ServerObjectEntityName,
-    WithLocation, WithSpan,
+    WithLocation, WithSpan, WithSpanPostfix,
 };
-use isograph_lang_types::{SelectionType, SelectionTypePostfix, UnvalidatedSelection};
+use isograph_lang_types::{SelectionSet, SelectionType, SelectionTypePostfix};
 use pico_macros::memo;
 use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
     AddSelectionSetsError, EntityAccessError, IsographDatabase, NetworkProtocol,
-    ValidatedSelection, client_selectable_declaration_map_from_iso_literals, expose_field_map,
-    get_link_fields, get_validated_selection_set,
+    ObjectSelectableId, ScalarSelectableId, client_selectable_declaration_map_from_iso_literals,
+    expose_field_map, get_link_fields, get_validated_selection_set,
 };
 
-type UnvalidatedSelectionSet = Vec<WithSpan<UnvalidatedSelection>>;
-type ValidatedSelectionSet = Vec<WithSpan<ValidatedSelection>>;
+type ValidatedSelectionSet = WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>;
 
 #[expect(clippy::type_complexity)]
 #[memo]
@@ -25,7 +24,7 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
 ) -> HashMap<
     (ServerObjectEntityName, ClientSelectableName),
     Result<
-        SelectionType<UnvalidatedSelectionSet, UnvalidatedSelectionSet>,
+        SelectionType<WithSpan<SelectionSet<(), ()>>, WithSpan<SelectionSet<(), ()>>>,
         MemoizedSelectionSetError<TNetworkProtocol>,
     >,
 > {
@@ -68,7 +67,10 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
             for field in fields {
                 map.insert(
                     (field.parent_object_entity_name, field.name.item.into()),
-                    vec![].scalar_selected().ok(),
+                    SelectionSet { selections: vec![] }
+                        .with_generated_span()
+                        .scalar_selected()
+                        .ok(),
                 );
             }
         }
@@ -100,12 +102,16 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
     map
 }
 
+#[expect(clippy::type_complexity)]
 #[memo]
 pub fn memoized_validated_reader_selection_set_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> HashMap<
     (ServerObjectEntityName, ClientSelectableName),
-    Result<ValidatedSelectionSet, MemoizedSelectionSetError<TNetworkProtocol>>,
+    Result<
+        WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
+        MemoizedSelectionSetError<TNetworkProtocol>,
+    >,
 > {
     let unvalidated_map = memoized_unvalidated_reader_selection_set_map(db).to_owned();
 

@@ -12,10 +12,9 @@ use isograph_lang_types::{
     ArgumentKeyAndValue, ClientScalarSelectionDirectiveSet, DefinitionLocation,
     DefinitionLocationPostfix, Description, EmptyDirectiveSet, NonConstantValue,
     ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, SelectionTypePostfix,
-    TypeAnnotation, UnionVariant, VariableDefinition,
+    SelectionFieldArgument, SelectionSet, SelectionType, SelectionTypeContainingSelections,
+    SelectionTypePostfix, TypeAnnotation, UnionVariant, VariableDefinition,
 };
-use isograph_schema::ContainsIsoStats;
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, ClientSelectableId, FieldMapItem,
     FieldTraversalResult, ID_ENTITY_NAME, IsographDatabase, LINK_FIELD_NAME, NameAndArguments,
@@ -29,6 +28,7 @@ use isograph_schema::{
     server_scalar_entity_javascript_name, server_scalar_selectable_named, validate_entire_schema,
     validated_entrypoints, validated_refetch_strategy_for_client_scalar_selectable_named,
 };
+use isograph_schema::{ContainsIsoStats, ObjectSelectableId};
 use lazy_static::lazy_static;
 use prelude::*;
 use std::{
@@ -725,7 +725,7 @@ pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
 
 pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    selection_map: &[WithSpan<ValidatedSelection>],
+    selection_map: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
@@ -733,7 +733,7 @@ pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProt
     // TODO use unwraps
     let mut client_field_parameter_type = "{\n".to_string();
 
-    for selection in selection_map.iter() {
+    for selection in selection_map.item.selections.iter() {
         write_param_type_from_selection(
             db,
             &mut client_field_parameter_type,
@@ -750,7 +750,7 @@ pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProt
 
 pub(crate) fn generate_client_field_updatable_data_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    selection_map: &[WithSpan<ValidatedSelection>],
+    selection_map: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
     nested_client_field_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
@@ -760,7 +760,7 @@ pub(crate) fn generate_client_field_updatable_data_type<TNetworkProtocol: Networ
 
     let mut client_field_updatable_data_type = "{\n".to_string();
 
-    for selection in selection_map.iter() {
+    for selection in selection_map.item.selections.iter() {
         write_updatable_data_type_from_selection(
             db,
             &mut client_field_updatable_data_type,

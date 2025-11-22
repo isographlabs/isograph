@@ -13,8 +13,8 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, DefinitionLocation, DefinitionLocationPostfix, EmptyDirectiveSet,
     NonConstantValue, ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionFieldArgument, SelectionType, SelectionTypeContainingSelections, SelectionTypePostfix,
-    VariableDefinition,
+    SelectionFieldArgument, SelectionSet, SelectionType, SelectionTypeContainingSelections,
+    SelectionTypePostfix, VariableDefinition,
 };
 use lazy_static::lazy_static;
 use prelude::Postfix;
@@ -23,11 +23,12 @@ use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientOrServerObjectSelectable,
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, ClientSelectableId,
     ID_ENTITY_NAME, ID_FIELD_NAME, ImperativelyLoadedFieldVariant, IsographDatabase,
-    NameAndArguments, NetworkProtocol, PathToRefetchField, ServerEntityName, ServerObjectEntity,
-    ServerObjectSelectable, ServerObjectSelectableVariant, ValidatedObjectSelection,
-    ValidatedScalarSelection, ValidatedSelection, VariableContext, client_object_selectable_named,
-    client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
-    create_transformed_name_and_arguments, fetchable_types,
+    NameAndArguments, NetworkProtocol, ObjectSelectableId, PathToRefetchField, ScalarSelectableId,
+    ServerEntityName, ServerObjectEntity, ServerObjectSelectable, ServerObjectSelectableVariant,
+    ValidatedObjectSelection, ValidatedScalarSelection, VariableContext,
+    client_object_selectable_named, client_scalar_selectable_named,
+    client_scalar_selectable_selection_set_for_parent_query, create_transformed_name_and_arguments,
+    fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
     initial_variable_context, selectable_named, selectable_validated_reader_selection_set,
     server_id_selectable, server_object_entity_named, server_object_selectable_named,
@@ -443,7 +444,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
 >(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
-    validated_selections: &[WithSpan<ValidatedSelection>],
+    validated_selections: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     root_field_id: DefinitionLocation<
         (ServerObjectEntityName, ServerObjectSelectableName),
@@ -477,7 +478,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
 fn create_field_traversal_result<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
-    validated_selections: &[WithSpan<ValidatedSelection>],
+    validated_selections: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
 ) -> FieldTraversalResult {
@@ -533,12 +534,12 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
     db: &IsographDatabase<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
-    validated_selections: &[WithSpan<ValidatedSelection>],
+    validated_selections: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
 ) {
-    for validated_selection in validated_selections.iter() {
+    for validated_selection in validated_selections.item.selections.iter() {
         match &validated_selection.item {
             SelectionType::Scalar(scalar_field_selection) => {
                 match &scalar_field_selection.associated_data {
@@ -1119,7 +1120,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
         },
     );
 
-    let empty_selection_set = vec![];
+    let empty_selection_set = SelectionSet { selections: vec![] }.with_generated_span();
 
     let validated_refetch_strategy = validated_refetch_strategy_for_client_scalar_selectable_named(
         db,
@@ -1557,7 +1558,7 @@ pub fn id_arguments() -> Vec<VariableDefinition<ServerEntityName>> {
 
 pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
     server_object_selectable: &ServerObjectSelectable<TNetworkProtocol>,
-) -> Vec<WithSpan<ValidatedSelection>> {
+) -> WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>> {
     let typename_selection = SelectionTypeContainingSelections::Scalar(ScalarSelection {
         arguments: vec![],
         scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
@@ -1585,5 +1586,8 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
     })
     .with_generated_span();
 
-    vec![typename_selection, link_selection]
+    SelectionSet {
+        selections: vec![typename_selection, link_selection],
+    }
+    .with_generated_span()
 }

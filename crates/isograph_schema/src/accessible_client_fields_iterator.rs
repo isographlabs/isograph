@@ -1,12 +1,13 @@
 use common_lang_types::WithSpan;
 use isograph_lang_types::{
-    DefinitionLocation, SelectionTypeContainingSelections, SelectionTypePostfix,
+    DefinitionLocation, SelectionSet, SelectionTypeContainingSelections, SelectionTypePostfix,
 };
 use prelude::Postfix;
 
 use crate::{
-    ClientSelectableId, IsographDatabase, NetworkProtocol, OwnedClientSelectable,
-    ValidatedSelection, client_object_selectable_selection_set_for_parent_query,
+    ClientSelectableId, IsographDatabase, NetworkProtocol, ObjectSelectableId,
+    OwnedClientSelectable, ScalarSelectableId,
+    client_object_selectable_selection_set_for_parent_query,
     client_scalar_selectable_selection_set_for_parent_query,
 };
 
@@ -42,7 +43,7 @@ pub fn accessible_client_fields<TNetworkProtocol: NetworkProtocol>(
 
 struct AccessibleClientFieldIterator {
     // TODO have a reference
-    selection_set: Vec<WithSpan<ValidatedSelection>>,
+    selection_set: WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
     index: usize,
     sub_iterator: Option<Box<AccessibleClientFieldIterator>>,
 }
@@ -61,7 +62,7 @@ impl Iterator for AccessibleClientFieldIterator {
         }
 
         'main_loop: loop {
-            let item = self.selection_set.get(self.index);
+            let item = self.selection_set.item.selections.get(self.index);
 
             if let Some(selection) = item {
                 match &selection.item {

@@ -263,6 +263,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
 
                 lsp_location_opt.map(lsp_location_to_scalar_response)
             }
+            IsographResolvedNode::SelectionSet(_) => None,
         }
     } else {
         None

@@ -1,18 +1,18 @@
 use std::collections::{BTreeSet, HashSet};
 
 use common_lang_types::{
-    ClientScalarSelectableName, ParentObjectEntityNameAndSelectableName, WithSpan,
+    ClientScalarSelectableName, ParentObjectEntityNameAndSelectableName, WithSpan, WithSpanPostfix,
 };
 use isograph_lang_types::{
     DefinitionLocation, EmptyDirectiveSet, LoadableDirectiveParameters,
-    ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionTypeContainingSelections,
-    SelectionTypePostfix,
+    ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionSet,
+    SelectionTypeContainingSelections, SelectionTypePostfix,
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, IsographDatabase, Loadability, NameAndArguments,
-    NetworkProtocol, NormalizationKey, PathToRefetchField, RefetchedPathsMap,
-    ServerObjectSelectableVariant, ValidatedObjectSelection, ValidatedScalarSelection,
-    ValidatedSelection, VariableContext, categorize_field_loadability,
+    NetworkProtocol, NormalizationKey, ObjectSelectableId, PathToRefetchField, RefetchedPathsMap,
+    ScalarSelectableId, ServerObjectSelectableVariant, ValidatedObjectSelection,
+    ValidatedScalarSelection, ValidatedSelection, VariableContext, categorize_field_loadability,
     client_object_selectable_named, client_object_selectable_selection_set_for_parent_query,
     client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
     server_object_selectable_named, transform_arguments_with_child_context,
@@ -566,7 +566,7 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         This is indicative of a bug in Isograph.",
     );
 
-    let empty_selection_set = vec![];
+    let empty_selection_set = SelectionSet { selections: vec![] }.with_generated_span();
     let (reader_ast, additional_reader_imports) = generate_reader_ast(
         db,
         validated_refetch_strategy
@@ -636,7 +636,7 @@ fn server_defined_scalar_field_ast_node(
 
 fn generate_reader_ast_with_path<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    selection_set: &[WithSpan<ValidatedSelection>],
+    selection_set: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
     indentation_level: u8,
     nested_client_field_imports: &mut ReaderImports,
     // N.B. this is not root_refetched_paths when we're generating a non-fetchable client field :(
@@ -645,7 +645,7 @@ fn generate_reader_ast_with_path<TNetworkProtocol: NetworkProtocol>(
     initial_variable_context: &VariableContext,
 ) -> ReaderAst {
     let mut reader_ast = "[\n".to_string();
-    for item in selection_set {
+    for item in &selection_set.item.selections {
         let s = generate_reader_ast_node(
             db,
             item,
@@ -718,7 +718,7 @@ fn find_imperatively_fetchable_query_index(
 
 pub(crate) fn generate_reader_ast<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    selection_set: &[WithSpan<ValidatedSelection>],
+    selection_set: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
     indentation_level: u8,
     // N.B. this is not root_refetched_paths when we're generating an entrypoint :(
     // ????
@@ -769,13 +769,13 @@ fn refetched_paths_for_client_field<TNetworkProtocol: NetworkProtocol>(
 
 fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    selection_set: &[WithSpan<ValidatedSelection>],
+    selection_set: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
     path: &mut Vec<NormalizationKey>,
     initial_variable_context: &VariableContext,
 ) -> HashSet<PathToRefetchField> {
     let mut paths = HashSet::default();
 
-    for selection in selection_set {
+    for selection in &selection_set.item.selections {
         match &selection.item {
             SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
                 match scalar_field_selection.associated_data {

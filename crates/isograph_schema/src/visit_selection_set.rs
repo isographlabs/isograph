@@ -29,7 +29,7 @@ pub(crate) fn visit_selection_set<
             SelectionType::Scalar(scalar) => visit_selection(scalar.scalar_selected()),
             SelectionType::Object(object) => {
                 visit_selection(object.object_selected());
-                visit_selection_set(&object.selection_set, visit_selection);
+                visit_selection_set(&object.selection_set.item.selections, visit_selection);
             }
         }
     }

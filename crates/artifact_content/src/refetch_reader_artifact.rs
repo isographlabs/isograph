@@ -1,7 +1,9 @@
-use common_lang_types::{ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName};
+use common_lang_types::{
+    ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName, WithSpanPostfix,
+};
 
 use isograph_config::GenerateFileExtensionsOption;
-use isograph_lang_types::SelectionTypePostfix;
+use isograph_lang_types::{SelectionSet, SelectionTypePostfix};
 use isograph_schema::{
     ClientScalarSelectable, FieldMapItem, IsographDatabase, NetworkProtocol, RefetchedPathsMap,
     client_scalar_selectable_selection_set_for_parent_query, initial_variable_context,
@@ -29,7 +31,7 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
     let read_out_data = get_read_out_data(field_map);
     let function_import_statement = generate_function_import_statement(read_out_data);
 
-    let empty_selection_set = vec![];
+    let empty_selection_set = SelectionSet { selections: vec![] }.with_generated_span();
 
     let validated_refetch_strategy = validated_refetch_strategy_for_client_scalar_selectable_named(
         db,

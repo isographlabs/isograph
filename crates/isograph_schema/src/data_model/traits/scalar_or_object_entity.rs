@@ -3,8 +3,8 @@ use common_lang_types::{
 };
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
-    Description, ObjectSelectionPath, ScalarSelectionPath, SelectionParentType, SelectionType,
-    SelectionTypePostfix, ServerObjectEntityNameWrapper,
+    Description, ObjectSelectionPath, ScalarSelectionPath, SelectionParentType,
+    SelectionSetParentType, SelectionType, SelectionTypePostfix, ServerObjectEntityNameWrapper,
 };
 use thiserror::Error;
 
@@ -54,6 +54,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
     }
 }
 
+// TODO return only selectable. The caller can look up the entity.
 pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     scalar_path: &ScalarSelectionPath<'a>,
@@ -83,6 +84,7 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkPr
     Ok((parent, selectable))
 }
 
+// TODO return only selectable. The caller can look up the entity.
 pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     object_path: &ObjectSelectionPath<'a>,
@@ -112,6 +114,39 @@ pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkPr
     Ok((parent, selectable))
 }
 
+// For a selection set, you are not hovering on an individual selection, so it doesn't make sense to
+// get a selectable! Just the enclosing object entity.
+pub fn get_parent_for_selection_set_path<'a, 'db, TNetworkProtocol: NetworkProtocol>(
+    db: &'db IsographDatabase<TNetworkProtocol>,
+    selection_set_path: &SelectionSetPath<'a>,
+) -> Result<&'db ServerObjectEntity<TNetworkProtocol>, GetParentAndSelectableError<TNetworkProtocol>>
+{
+    let parent_object_entity_name = match &selection_set_path.parent {
+        SelectionSetParentType::ObjectSelection(object_selection_path) => {
+            let (_parent, selectable) =
+                get_parent_and_selectable_for_object_path(db, object_selection_path)?;
+            // in pet(id: 123) { /* we are hovering here */ }
+            // _parent is Query, selectable is pet. So, we need to get the target of the selectable.
+
+            *selectable.target_object_entity_name().inner()
+        }
+        SelectionSetParentType::ClientFieldDeclaration(client_field_declaration_path) => {
+            client_field_declaration_path.inner.parent_type.item.0
+        }
+        SelectionSetParentType::ClientPointerDeclaration(client_pointer_declaration_path) => {
+            client_pointer_declaration_path.inner.parent_type.item.0
+        }
+    };
+
+    server_object_entity_named(db, parent_object_entity_name)
+        .as_ref()
+        .map_err(|e| e.clone())?
+        .as_ref()
+        .ok_or_else(|| GetParentAndSelectableError::ParentTypeNotDefined {
+            parent_type_name: parent_object_entity_name.into(),
+        })
+}
+
 pub fn get_parent_and_selectable_for_selection_parent<'a, TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_parent: &SelectionParentType<'a>,
@@ -124,27 +159,34 @@ pub fn get_parent_and_selectable_for_selection_parent<'a, TNetworkProtocol: Netw
     GetParentAndSelectableError<TNetworkProtocol>,
 > {
     match selection_parent {
-        SelectionParentType::ObjectSelection(object_selection_path) => {
-            let (_, object_selectable) =
-                get_parent_and_selectable_for_object_path(db, object_selection_path)?;
+        SelectionParentType::SelectionSet(position_resolution_path) => {
+            match &position_resolution_path.parent {
+                SelectionSetParentType::ObjectSelection(object_selection_path) => {
+                    let (_, object_selectable) =
+                        get_parent_and_selectable_for_object_path(db, object_selection_path)?;
 
-            let object_parent_entity_name = *object_selectable.target_object_entity_name().inner();
+                    let object_parent_entity_name =
+                        *object_selectable.target_object_entity_name().inner();
 
-            parent_object_entity_and_selectable(
-                db,
-                object_parent_entity_name.into(),
-                selectable_name,
-            )
-        }
-        SelectionParentType::ClientFieldDeclaration(client_field_declaration_path) => {
-            let parent_type_name = client_field_declaration_path.inner.parent_type.item;
+                    parent_object_entity_and_selectable(
+                        db,
+                        object_parent_entity_name.into(),
+                        selectable_name,
+                    )
+                }
+                SelectionSetParentType::ClientFieldDeclaration(client_field_declaration_path) => {
+                    let parent_type_name = client_field_declaration_path.inner.parent_type.item;
 
-            parent_object_entity_and_selectable(db, parent_type_name, selectable_name)
-        }
-        SelectionParentType::ClientPointerDeclaration(client_pointer_declaration_path) => {
-            let parent_type_name = client_pointer_declaration_path.inner.parent_type.item;
+                    parent_object_entity_and_selectable(db, parent_type_name, selectable_name)
+                }
+                SelectionSetParentType::ClientPointerDeclaration(
+                    client_pointer_declaration_path,
+                ) => {
+                    let parent_type_name = client_pointer_declaration_path.inner.parent_type.item;
 
-            parent_object_entity_and_selectable(db, parent_type_name, selectable_name)
+                    parent_object_entity_and_selectable(db, parent_type_name, selectable_name)
+                }
+            }
         }
     }
 }

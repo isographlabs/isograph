@@ -4,12 +4,12 @@ use common_lang_types::{
     WithSpan,
 };
 use impl_base_types_macro::impl_for_selection_type;
-use isograph_lang_types::{Description, VariableDefinition};
+use isograph_lang_types::{Description, SelectionSet, VariableDefinition};
 
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, IsographDatabase,
-    MemoizedIsoLiteralError, MemoizedSelectionSetError, NetworkProtocol, SelectableTrait,
-    ServerEntityName, ValidatedSelection, client_scalar_selectable_named,
+    MemoizedIsoLiteralError, MemoizedSelectionSetError, NetworkProtocol, ObjectSelectableId,
+    ScalarSelectableId, SelectableTrait, ServerEntityName, client_scalar_selectable_named,
     selectable_validated_reader_selection_set,
     validated_refetch_strategy_for_client_scalar_selectable_named,
 };
@@ -128,7 +128,10 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_scalar_selectable_name: ClientScalarSelectableName,
-) -> Result<Vec<WithSpan<ValidatedSelection>>, MemoizedIsoLiteralError<TNetworkProtocol>> {
+) -> Result<
+    WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
+    MemoizedIsoLiteralError<TNetworkProtocol>,
+> {
     let selectable = client_scalar_selectable_named(
         db,
         parent_object_entity_name,
@@ -189,7 +192,10 @@ pub fn client_object_selectable_selection_set_for_parent_query<
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_object_selectable_name: ClientObjectSelectableName,
-) -> Result<Vec<WithSpan<ValidatedSelection>>, MemoizedSelectionSetError<TNetworkProtocol>> {
+) -> Result<
+    WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
+    MemoizedSelectionSetError<TNetworkProtocol>,
+> {
     let selection_set = selectable_validated_reader_selection_set(
         db,
         parent_object_entity_name,

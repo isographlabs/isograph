@@ -8,8 +8,9 @@ use common_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration,
-    ClientScalarSelectionDirectiveSet, DeserializationError, NonConstantValue, SelectionType,
-    ServerObjectEntityNameWrapper, TypeAnnotation, UnvalidatedSelection, VariableDefinition,
+    ClientScalarSelectionDirectiveSet, DeserializationError, NonConstantValue, SelectionSet,
+    SelectionType, ServerObjectEntityNameWrapper, TypeAnnotation, UnvalidatedSelection,
+    VariableDefinition,
 };
 use prelude::Postfix;
 
@@ -31,7 +32,7 @@ pub type UnprocessedSelection = WithSpan<UnvalidatedSelection>;
 pub struct UnprocessedClientScalarSelectableSelectionSet {
     pub parent_object_entity_name: ServerObjectEntityName,
     pub client_scalar_selectable_name: ClientScalarSelectableName,
-    pub reader_selection_set: Vec<UnprocessedSelection>,
+    pub reader_selection_set: WithSpan<SelectionSet<(), ()>>,
     pub refetch_strategy: Option<RefetchStrategy<(), ()>>,
 }
 
@@ -39,8 +40,8 @@ pub struct UnprocessedClientScalarSelectableSelectionSet {
 pub struct UnprocessedClientObjectSelectableSelectionSet {
     pub parent_object_entity_name: ServerObjectEntityName,
     pub client_object_selectable_name: ClientObjectSelectableName,
-    pub reader_selection_set: Vec<UnprocessedSelection>,
-    pub refetch_selection_set: Vec<UnprocessedSelection>,
+    pub reader_selection_set: WithSpan<SelectionSet<(), ()>>,
+    pub refetch_selection_set: WithSpan<SelectionSet<(), ()>>,
 }
 pub type UnprocessedSelectionSet = SelectionType<
     UnprocessedClientScalarSelectableSelectionSet,
@@ -278,7 +279,10 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
         id_field.map(|_| {
             // Assume that if we have an id field, this implements Node
             RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
-                vec![id_selection()],
+                SelectionSet {
+                    selections: vec![id_selection()],
+                }
+                .with_generated_span(),
                 *query_id,
                 vec![
                     WrappedSelectionMapSelection::InlineFragment(parent_object_entity_name),
@@ -372,7 +376,10 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
             client_object_selectable_name: client_pointer_name,
             parent_object_entity_name,
             reader_selection_set: unprocessed_fields,
-            refetch_selection_set: vec![id_selection()],
+            refetch_selection_set: SelectionSet {
+                selections: vec![id_selection()],
+            }
+            .with_generated_span(),
         },
         client_object_selectable,
     ))

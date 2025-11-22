@@ -9,8 +9,9 @@ use std::fmt::Debug;
 use crate::{
     ClientObjectSelectableNameWrapper, ClientScalarSelectableNameWrapper,
     ClientScalarSelectionDirectiveSet, IsographFieldDirective, IsographSemanticToken,
-    ServerObjectEntityNameWrapper, UnvalidatedSelection, VariableDefinition,
-    isograph_resolved_node::IsographResolvedNode, string_key_wrappers::Description,
+    ObjectSelectionPath, SelectionTypeContainingSelections, ServerObjectEntityNameWrapper,
+    VariableDefinition, isograph_resolved_node::IsographResolvedNode,
+    string_key_wrappers::Description,
 };
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
@@ -24,7 +25,7 @@ pub struct ClientFieldDeclaration {
     #[resolve_field]
     pub description: Option<WithSpan<Description>>,
     #[resolve_field]
-    pub selection_set: Vec<WithSpan<UnvalidatedSelection>>,
+    pub selection_set: WithSpan<SelectionSet<(), ()>>,
     pub client_field_directive_set: ClientScalarSelectionDirectiveSet,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: RelativePathToSourceFile,
@@ -48,7 +49,7 @@ pub struct ClientPointerDeclaration {
     #[resolve_field]
     pub description: Option<WithSpan<Description>>,
     #[resolve_field]
-    pub selection_set: Vec<WithSpan<UnvalidatedSelection>>,
+    pub selection_set: WithSpan<SelectionSet<(), ()>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: RelativePathToSourceFile,
 
@@ -57,3 +58,20 @@ pub struct ClientPointerDeclaration {
 
 pub type ClientPointerDeclarationPath<'a> =
     PositionResolutionPath<&'a ClientPointerDeclaration, ()>;
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
+#[resolve_position(parent_type=SelectionSetParentType<'a>, resolved_node=IsographResolvedNode<'a>, self_type_generics=<(), ()>)]
+pub struct SelectionSet<TScalar, TLinked> {
+    #[resolve_field]
+    pub selections: Vec<WithSpan<SelectionTypeContainingSelections<TScalar, TLinked>>>,
+}
+
+#[derive(Debug)]
+pub enum SelectionSetParentType<'a> {
+    ObjectSelection(Box<ObjectSelectionPath<'a>>),
+    ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
+    ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
+}
+
+pub type SelectionSetPath<'a> =
+    PositionResolutionPath<&'a SelectionSet<(), ()>, SelectionSetParentType<'a>>;

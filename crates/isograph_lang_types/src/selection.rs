@@ -6,9 +6,9 @@ use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
 
 use crate::{
-    ClientFieldDeclarationPath, ClientPointerDeclarationPath, IsographResolvedNode,
-    NonConstantValue, ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet,
-    SelectionFieldArgument, SelectionType,
+    IsographResolvedNode, NonConstantValue, ObjectSelectionDirectiveSet,
+    ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionSet, SelectionSetPath,
+    SelectionType,
 };
 
 pub type UnvalidatedSelection = SelectionTypeContainingSelections<(), ()>;
@@ -77,7 +77,7 @@ pub struct ObjectSelection<TScalar, TLinked> {
     pub reader_alias: Option<WithLocation<SelectableAlias>>,
     pub associated_data: TLinked,
     #[resolve_field]
-    pub selection_set: Vec<WithSpan<SelectionTypeContainingSelections<TScalar, TLinked>>>,
+    pub selection_set: WithSpan<SelectionSet<TScalar, TLinked>>,
     // TODO make this WithSpan instead of WithLocation
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
     pub object_selection_directive_set: ObjectSelectionDirectiveSet,
@@ -86,11 +86,10 @@ pub struct ObjectSelection<TScalar, TLinked> {
 pub type ObjectSelectionPath<'a> =
     PositionResolutionPath<&'a ObjectSelection<(), ()>, SelectionParentType<'a>>;
 
+// TODO can we replace this directly with SelectionSetPath?
 #[derive(Debug)]
 pub enum SelectionParentType<'a> {
-    ObjectSelection(Box<ObjectSelectionPath<'a>>),
-    ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
-    ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
+    SelectionSet(SelectionSetPath<'a>),
 }
 
 impl<TScalarField, TLinkedField> ObjectSelection<TScalarField, TLinkedField> {

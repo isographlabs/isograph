@@ -6,11 +6,11 @@ use crate::{
 };
 use common_lang_types::{
     Location, ParentObjectEntityNameAndSelectableName, SelectableName, ServerObjectEntityName,
-    UnvalidatedTypeName, WithLocation, WithLocationPostfix, WithSpan,
+    UnvalidatedTypeName, WithLocation, WithLocationPostfix, WithSpan, WithSpanPostfix,
 };
 use isograph_lang_types::{
     DefinitionLocation, DefinitionLocationPostfix, ObjectSelection, ScalarSelection,
-    ScalarSelectionDirectiveSet, SelectionType, SelectionTypePostfix,
+    ScalarSelectionDirectiveSet, SelectionSet, SelectionType, SelectionTypePostfix,
     UnvalidatedScalarFieldSelection, UnvalidatedSelection,
 };
 use prelude::Postfix;
@@ -27,24 +27,27 @@ pub type ValidateAddSelectionSetsResultWithMultipleErrors<T, TNetworkProtocol> =
 /// - include the selectable id in the associated data
 pub fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    selection_set: Vec<WithSpan<UnvalidatedSelection>>,
+    selection_set: WithSpan<SelectionSet<(), ()>>,
     parent_object_entity_name: ServerObjectEntityName,
     top_level_field_or_pointer: SelectionType<
         ParentObjectEntityNameAndSelectableName,
         ParentObjectEntityNameAndSelectableName,
     >,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<
-    Vec<WithSpan<ValidatedSelection>>,
+    WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
     TNetworkProtocol,
 > {
-    get_all_errors_or_all_ok(selection_set.into_iter().map(|selection| {
-        get_validated_selection(
-            db,
-            selection,
-            parent_object_entity_name,
-            top_level_field_or_pointer,
-        )
-    }))
+    let selections =
+        get_all_errors_or_all_ok(selection_set.item.selections.into_iter().map(|selection| {
+            get_validated_selection(
+                db,
+                selection,
+                parent_object_entity_name,
+                top_level_field_or_pointer,
+            )
+        }))?;
+
+    SelectionSet { selections }.with_generated_span().ok()
 }
 
 fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(

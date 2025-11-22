@@ -115,6 +115,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
             }
             IsographResolvedNode::ClientScalarSelectableNameWrapper(_) => None,
             IsographResolvedNode::ClientObjectSelectableNameWrapper(_) => None,
+            IsographResolvedNode::SelectionSet(_) => None,
         }
     } else {
         None
