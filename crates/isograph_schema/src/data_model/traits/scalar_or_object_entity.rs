@@ -38,7 +38,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
     }
 
     fn description(&self) -> Option<Description> {
-        self.description.map(|x| x.item)
+        self.description
     }
 }
 

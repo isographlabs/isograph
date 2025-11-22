@@ -2,7 +2,6 @@ use std::{collections::BTreeMap, marker::PhantomData};
 
 use common_lang_types::{
     JavascriptName, SelectableName, ServerObjectEntityName, ServerScalarEntityName, WithLocation,
-    WithSpan,
 };
 use isograph_lang_types::{DefinitionLocation, Description, SelectionType};
 
@@ -11,7 +10,7 @@ use crate::{ClientSelectableId, NetworkProtocol, ServerSelectableId};
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ServerScalarEntity<TNetworkProtocol: NetworkProtocol> {
     // TODO make this a WithLocation or just an Option<Description>
-    pub description: Option<WithSpan<Description>>,
+    pub description: Option<Description>,
     pub name: ServerScalarEntityName,
     pub javascript_name: JavascriptName,
     pub network_protocol: PhantomData<TNetworkProtocol>,
