@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, marker::PhantomData};
 
 use common_lang_types::{
-    JavascriptName, SelectableName, ServerObjectEntityName, ServerScalarEntityName, WithLocation,
+    JavascriptName, SelectableName, ServerObjectEntityName, ServerScalarEntityName,
 };
 use isograph_lang_types::{DefinitionLocation, Description, SelectionType};
 
@@ -37,9 +37,7 @@ pub type ServerEntity<'a, TNetworkProtocol> = SelectionType<
     &'a ServerObjectEntity<TNetworkProtocol>,
 >;
 
-pub type OwnedServerEntity<TNetworkProtocol> = SelectionType<
-    WithLocation<ServerScalarEntity<TNetworkProtocol>>,
-    WithLocation<ServerObjectEntity<TNetworkProtocol>>,
->;
+pub type OwnedServerEntity<TNetworkProtocol> =
+    SelectionType<ServerScalarEntity<TNetworkProtocol>, ServerObjectEntity<TNetworkProtocol>>;
 
 pub type ServerEntityName = SelectionType<ServerScalarEntityName, ServerObjectEntityName>;

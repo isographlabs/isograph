@@ -22,7 +22,6 @@ pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
         .map_err(|e| CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e.clone() })?
         .iter()
         .map(|object| {
-            let object = &object.item;
             let field_name = *LINK_FIELD_NAME;
             let parent_object_entity_name = object.name;
             ClientScalarSelectable {

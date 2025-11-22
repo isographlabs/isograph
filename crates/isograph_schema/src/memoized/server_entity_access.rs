@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    JavascriptName, ServerObjectEntityName, ServerScalarEntityName, UnvalidatedTypeName,
-    WithLocation,
+    JavascriptName, Location, ServerObjectEntityName, ServerScalarEntityName, UnvalidatedTypeName,
 };
 use isograph_lang_types::{SelectionType, SelectionTypePostfix};
 use pico_macros::memo;
@@ -24,10 +23,9 @@ fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
     HashMap<UnvalidatedTypeName, Vec<OwnedServerEntity<TNetworkProtocol>>>,
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
-    let (outcome, _) = match TNetworkProtocol::parse_type_system_documents(db) {
-        Ok(outcome) => outcome,
-        Err(e) => return e.clone().err(),
-    };
+    let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db)
+        .as_ref()
+        .map_err(|e| e.clone())?;
 
     let mut server_entities: HashMap<_, Vec<_>> = HashMap::new();
 
@@ -36,11 +34,11 @@ fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
             SelectionType::Scalar(s) => server_entities
                 .entry(s.item.name.into())
                 .or_default()
-                .push(s.clone().scalar_selected()),
+                .push(s.item.clone().scalar_selected()),
             SelectionType::Object(outcome) => server_entities
                 .entry(outcome.server_object_entity.item.name.into())
                 .or_default()
-                .push(outcome.server_object_entity.clone().object_selected()),
+                .push(outcome.server_object_entity.item.clone().object_selected()),
         }
     }
 
@@ -64,7 +62,7 @@ pub fn server_entities_named<TNetworkProtocol: NetworkProtocol>(
 pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<
-    Vec<WithLocation<ServerObjectEntity<TNetworkProtocol>>>,
+    Vec<ServerObjectEntity<TNetworkProtocol>>,
     TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
     let (outcome, _) = match TNetworkProtocol::parse_type_system_documents(db) {
@@ -75,7 +73,7 @@ pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
     outcome
         .iter()
         .filter_map(|x| x.as_ref().as_object())
-        .map(|x| x.server_object_entity.clone())
+        .map(|x| x.server_object_entity.item.clone())
         .collect::<Vec<_>>()
         .ok()
 }
@@ -104,10 +102,7 @@ pub enum EntityAccessError<TNetworkProtocol: NetworkProtocol> {
 pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_object_entity_name: ServerObjectEntityName,
-) -> Result<
-    Option<WithLocation<ServerObjectEntity<TNetworkProtocol>>>,
-    EntityAccessError<TNetworkProtocol>,
-> {
+) -> Result<Option<ServerObjectEntity<TNetworkProtocol>>, EntityAccessError<TNetworkProtocol>> {
     let entities = server_entities_named(db, server_object_entity_name.into())
         .as_ref()
         .map_err(|e| EntityAccessError::ParseTypeSystemDocumentsError(e.clone()))?;
@@ -139,10 +134,7 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
 pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_scalar_entity_name: ServerScalarEntityName,
-) -> Result<
-    Option<WithLocation<ServerScalarEntity<TNetworkProtocol>>>,
-    EntityAccessError<TNetworkProtocol>,
-> {
+) -> Result<Option<ServerScalarEntity<TNetworkProtocol>>, EntityAccessError<TNetworkProtocol>> {
     let entities = server_entities_named(db, server_scalar_entity_name.into())
         .as_ref()
         .map_err(|e| EntityAccessError::ParseTypeSystemDocumentsError(e.clone()))?;
@@ -186,7 +178,7 @@ pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol>(
         None => return Ok(None),
     };
 
-    Ok(Some(entity.item.javascript_name))
+    Ok(Some(entity.javascript_name))
 }
 
 #[memo]
@@ -288,4 +280,35 @@ pub enum DefinedEntityError<TNetworkProtocol: NetworkProtocol> {
     MultipleDefinitionsFound {
         duplicate_entity_name: UnvalidatedTypeName,
     },
+}
+
+#[memo]
+pub fn entity_definition_location<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    entity_name: UnvalidatedTypeName,
+) -> Result<Option<Location>, TNetworkProtocol::ParseTypeSystemDocumentsError> {
+    let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db)
+        .as_ref()
+        .map_err(|e| e.clone())?;
+
+    outcome
+        .iter()
+        .find_map(|item| {
+            match item {
+                SelectionType::Scalar(s) => {
+                    let name: UnvalidatedTypeName = s.item.name.into();
+                    if name == entity_name {
+                        return Some(s.location);
+                    }
+                }
+                SelectionType::Object(o) => {
+                    let name: UnvalidatedTypeName = o.server_object_entity.item.name.into();
+                    if name == entity_name {
+                        return Some(o.server_object_entity.location);
+                    }
+                }
+            }
+            None
+        })
+        .ok()
 }

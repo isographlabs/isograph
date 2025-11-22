@@ -8,12 +8,12 @@ use common_lang_types::{Span, relative_path_from_absolute_and_working_directory}
 use isograph_compiler::CompilerState;
 use isograph_lang_types::{
     ClientObjectSelectableNameWrapperParent, ClientScalarSelectableNameWrapperParent,
-    DefinitionLocation, IsographResolvedNode,
+    DefinitionLocation, IsographResolvedNode, SelectionType,
 };
 use isograph_schema::{
     IsoLiteralsSource, IsographDatabase, NetworkProtocol, client_object_selectable_named,
-    get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
-    server_entities_named,
+    entity_definition_location, get_parent_and_selectable_for_object_path,
+    get_parent_and_selectable_for_scalar_path, server_entities_named,
 };
 use isograph_schema::{
     client_scalar_selectable_named, process_iso_literal_extraction,
@@ -81,9 +81,16 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                     server_entities
                         .iter()
                         .flat_map(|entity| {
+                            let name = match entity {
+                                SelectionType::Scalar(s) => s.name.into(),
+                                SelectionType::Object(o) => o.name.into(),
+                            };
+                            let location =
+                                entity_definition_location(db, name).to_owned().ok()??;
+
                             isograph_location_to_lsp_location(
                                 db,
-                                entity.location().as_embedded_location()?,
+                                location.as_embedded_location()?,
                                 &db.get_schema_source().content,
                             )
                         })

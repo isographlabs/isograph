@@ -611,8 +611,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                         .expect(
                             "Expected entity to exist. \
                             This is indicative of a bug in Isograph.",
-                        )
-                        .item;
+                        );
 
                 match object_selection.associated_data {
                     DefinitionLocation::Client((
@@ -759,8 +758,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                             .expect(
                                 "Expected entity to exist. \
                                 This is indicative of a bug in Isograph.",
-                            )
-                            .item;
+                            );
 
                     let reader_selection_set =
                         inline_fragment_reader_selection_set(server_object_selectable);
@@ -859,7 +857,6 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         "Expected entity to exist. \
                         This is indicative of a bug in Isograph.",
                     )
-                    .item
                     .concrete_type;
 
                 MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
@@ -1183,8 +1180,7 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
             .expect(
                 "Expected entity to exist. \
             This is indicative of a bug in Isograph.",
-            )
-            .item;
+            );
 
     let parent_object_entity_name = ClientOrServerObjectSelectable::parent_object_entity_name(
         &newly_encountered_client_object_selectable,

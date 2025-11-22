@@ -164,8 +164,7 @@ pub fn parent_object_entity_and_selectable<TNetworkProtocol: NetworkProtocol>(
         .to_owned()?
         .ok_or(GetParentAndSelectableError::ParentTypeNotDefined {
             parent_type_name: parent_server_object_entity_name,
-        })?
-        .item;
+        })?;
 
     match selectable_named(db, parent_server_object_entity_name.0, selectable_name).to_owned()? {
         Some(selectable) => Ok((parent_entity, selectable)),
