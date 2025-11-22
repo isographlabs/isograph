@@ -109,7 +109,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             .iter_mut()
             .find_map(|item| match item.as_ref_mut().as_object() {
                 Some(outcome) => {
-                    if outcome.server_object_entity.item.name.item == graphql_root_types.query {
+                    if outcome.server_object_entity.item.name == graphql_root_types.query {
                         Some(outcome)
                     } else {
                         None
@@ -130,7 +130,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 .iter_mut()
                 .find_map(|item| match item.as_ref_mut().as_object() {
                     Some(x) => {
-                        if x.server_object_entity.item.name.item == name {
+                        if x.server_object_entity.item.name == name {
                             Some(x)
                         } else {
                             None
@@ -152,7 +152,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 
                             outcome.expose_fields_to_insert.push(ExposeFieldToInsert {
                                 expose_field_directive,
-                                parent_object_name: outcome.server_object_entity.item.name.item,
+                                parent_object_name: outcome.server_object_entity.item.name,
                                 description: None,
                             });
                         }

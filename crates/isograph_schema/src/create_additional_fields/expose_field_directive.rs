@@ -212,8 +212,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
                                 This is indicative of a bug in Isograph.",
                         )
                         .item
-                        .name
-                        .item,
+                        .name,
                     )
                 }
             };

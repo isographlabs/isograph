@@ -27,17 +27,17 @@ pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
             let parent_object_entity_name = object.name;
             ClientScalarSelectable {
                 description: Some(Description(
-                    format!("A store Link for the {} type.", object.name.item)
+                    format!("A store Link for the {} type.", object.name)
                         .intern()
                         .into(),
                 )),
                 name: field_name.with_generated_location(),
-                parent_object_entity_name: parent_object_entity_name.item,
+                parent_object_entity_name,
                 variable_definitions: vec![],
                 variant: ClientFieldVariant::Link,
                 type_and_field: ParentObjectEntityNameAndSelectableName {
                     selectable_name: field_name.into(),
-                    parent_object_entity_name: object.name.item,
+                    parent_object_entity_name: object.name,
                 },
                 network_protocol: std::marker::PhantomData,
             }

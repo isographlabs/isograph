@@ -246,7 +246,7 @@ pub fn process_graphql_type_system_document(
                     // Why do we have to do this?
                     let supertype_name: ServerObjectEntityName =
                         supertype_name.unchecked_conversion();
-                    if x.server_object_entity.item.name.item == supertype_name {
+                    if x.server_object_entity.item.name == supertype_name {
                         Some(x)
                     } else {
                         None
@@ -366,7 +366,7 @@ fn process_object_type_definition(
         && type_implements_node(&object_type_definition);
     let server_object_entity = ServerObjectEntity {
         description: object_type_definition.description.map(|d| d.item),
-        name: object_type_definition.name,
+        name: object_type_definition.name.item,
         concrete_type,
         network_protocol_associated_data: associated_data,
     }

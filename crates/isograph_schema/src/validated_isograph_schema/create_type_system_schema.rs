@@ -23,7 +23,7 @@ pub fn create_type_system_schema_with_server_selectables<TNetworkProtocol: Netwo
 
     for item in items.iter().flat_map(|x| x.as_ref().as_object()) {
         expose_as_field_queue.insert(
-            item.server_object_entity.item.name.item,
+            item.server_object_entity.item.name,
             item.expose_fields_to_insert.clone(),
         );
     }

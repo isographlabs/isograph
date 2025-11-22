@@ -1,8 +1,8 @@
 use std::{collections::BTreeMap, marker::PhantomData};
 
 use common_lang_types::{
-    JavascriptName, SelectableName, ServerObjectEntityName, ServerScalarEntityName,
-    WithEmbeddedLocation, WithLocation, WithSpan,
+    JavascriptName, SelectableName, ServerObjectEntityName, ServerScalarEntityName, WithLocation,
+    WithSpan,
 };
 use isograph_lang_types::{DefinitionLocation, Description, SelectionType};
 
@@ -24,7 +24,7 @@ pub type ServerObjectEntityAvailableSelectables = BTreeMap<SelectableName, Selec
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ServerObjectEntity<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
-    pub name: WithEmbeddedLocation<ServerObjectEntityName>,
+    pub name: ServerObjectEntityName,
     /// Some if the object is concrete; None otherwise.
     ///
     /// This is a GraphQL-ism! We should get rid of it.

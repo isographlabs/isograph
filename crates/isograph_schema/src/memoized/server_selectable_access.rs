@@ -46,7 +46,7 @@ pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
                         field_to_insert.item.name.item,
                         field_to_insert_to_server_selectable(
                             db,
-                            object_outcome.server_object_entity.item.name.item,
+                            object_outcome.server_object_entity.item.name,
                             field_to_insert,
                         )
                         .map(|x| x.map_scalar(|(scalar, _)| scalar)),
@@ -54,7 +54,7 @@ pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
                 })
                 .collect();
 
-            (object_outcome.server_object_entity.item.name.item, fields)
+            (object_outcome.server_object_entity.item.name, fields)
         })
         .collect())
 }
@@ -81,7 +81,7 @@ pub fn server_selectables_vec_for_entity<TNetworkProtocol: NetworkProtocol>(
     Ok(items
         .iter()
         .flat_map(|selection_type| selection_type.as_ref().as_object())
-        .filter(|o| o.server_object_entity.item.name.item == parent_server_object_entity_name)
+        .filter(|o| o.server_object_entity.item.name == parent_server_object_entity_name)
         .flat_map(|o| {
             o.fields_to_insert.iter().map(|field_to_insert| {
                 (

@@ -368,7 +368,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                             merged_selection_map.clone(),
                                             vec![
                                                 WrappedSelectionMapSelection::InlineFragment(
-                                                    type_to_refine_to.name.item,
+                                                    type_to_refine_to.name,
                                                 ),
                                                 WrappedSelectionMapSelection::LinkedField {
                                                     server_object_selectable_name: "node"
@@ -396,9 +396,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 .map(|(mut key, value)| {
                                     key.0.linked_fields.insert(
                                         0,
-                                        NormalizationKey::InlineFragment(
-                                            type_to_refine_to.name.item,
-                                        ),
+                                        NormalizationKey::InlineFragment(type_to_refine_to.name),
                                     );
                                     key.0.linked_fields.insert(
                                         0,

@@ -724,7 +724,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
 
     match &server_object_selectable.object_selectable_variant {
         ServerObjectSelectableVariant::InlineFragment => {
-            let type_to_refine_to = object_selection_parent_object.name.item;
+            let type_to_refine_to = object_selection_parent_object.name;
 
             let normalization_key = NormalizationKey::InlineFragment(type_to_refine_to);
             merge_traversal_state
@@ -1204,7 +1204,7 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
     let mut subfields_or_inline_fragments = vec![];
     if target_server_object_entity.concrete_type.is_some() {
         subfields_or_inline_fragments.push(WrappedSelectionMapSelection::InlineFragment(
-            target_server_object_entity.name.item,
+            target_server_object_entity.name,
         ));
     }
     subfields_or_inline_fragments.push(WrappedSelectionMapSelection::LinkedField {
@@ -1427,7 +1427,7 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
         maybe_add_typename_selection(merged_selection_map)
     };
 
-    let id_field = server_id_selectable(db, parent_object_entity.name.item)
+    let id_field = server_id_selectable(db, parent_object_entity.name)
         .as_ref()
         .expect("Expected this to be valid.");
 

@@ -88,7 +88,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                         selectable.name().item,
                         selectable.description(),
                         selectable.arguments(),
-                        parent_object.name.item,
+                        parent_object.name,
                         parent_object.description,
                     )
                     .some()
@@ -105,7 +105,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                         selectable.name().item,
                         selectable.description(),
                         selectable.arguments(),
-                        parent_object.name.item,
+                        parent_object.name,
                         parent_object.description,
                     )
                     .some()
@@ -310,7 +310,7 @@ fn hover_text_for_selectable(
 fn format_hover_for_entity<TNetworkProtocol: NetworkProtocol>(
     entity: &ServerObjectEntity<TNetworkProtocol>,
 ) -> String {
-    let object_entity_name = entity.name.item;
+    let object_entity_name = entity.name;
     let description = match entity.description {
         Some(description) => format!("\n\n{description}"),
         None => "".to_string(),

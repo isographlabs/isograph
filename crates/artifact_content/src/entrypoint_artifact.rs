@@ -267,7 +267,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         merged_selection_map,
         reachable_variables.iter().copied(),
         root_operation_name,
-        concrete_object_entity.name.item,
+        concrete_object_entity.name,
         persisted_documents,
         1,
     );
@@ -277,7 +277,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         .unwrap_or(EntrypointDirectiveSet::None(EmptyDirectiveSet {}));
 
     let field_name = query_name.into();
-    let type_name = parent_object_entity.name.item;
+    let type_name = parent_object_entity.name;
 
     let entrypoint_file_content = entrypoint_file_content(
         file_extensions,
@@ -285,7 +285,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         &operation_text,
         parent_object_entity,
         &refetch_query_artifact_import,
-        concrete_object_entity.name.item,
+        concrete_object_entity.name,
         &directive_set,
     );
 
@@ -424,9 +424,8 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
     directive_set: &EntrypointDirectiveSet,
 ) -> String {
     let ts_file_extension = file_extensions.ts();
-    let entrypoint_params_typename = format!("{}__{}__param", parent_type.name.item, query_name);
-    let entrypoint_output_type_name =
-        format!("{}__{}__output_type", parent_type.name.item, query_name);
+    let entrypoint_params_typename = format!("{}__{}__param", parent_type.name, query_name);
+    let entrypoint_output_type_name = format!("{}__{}__output_type", parent_type.name, query_name);
     let resolver_reader_file_name = *RESOLVER_READER;
     let param_type_file_name = *RESOLVER_PARAM_TYPE;
     let output_type_file_name = *RESOLVER_OUTPUT_TYPE;

@@ -46,7 +46,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
     for ServerObjectEntity<TNetworkProtocol>
 {
     fn name(&self) -> SelectionType<ServerScalarEntityName, ServerObjectEntityName> {
-        self.name.item.object_selected()
+        self.name.object_selected()
     }
 
     fn description(&self) -> Option<Description> {
@@ -74,7 +74,7 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkPr
         selectable
             .as_scalar()
             .ok_or_else(|| GetParentAndSelectableError::FieldWrongType {
-                parent_type_name: parent.name.item.into(),
+                parent_type_name: parent.name.into(),
                 field_name: scalar_selectable_name.into(),
                 must_be: "a scalar",
                 is: "an object",
@@ -103,7 +103,7 @@ pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkPr
         selectable
             .as_object()
             .ok_or_else(|| GetParentAndSelectableError::FieldWrongType {
-                parent_type_name: parent.name.item.into(),
+                parent_type_name: parent.name.into(),
                 field_name: object_selectable_name.into(),
                 must_be: "an object",
                 is: "a scalar",
