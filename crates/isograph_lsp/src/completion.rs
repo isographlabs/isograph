@@ -9,10 +9,9 @@ use isograph_compiler::CompilerState;
 use isograph_lang_types::DefinitionLocation;
 use isograph_lang_types::IsographResolvedNode;
 use isograph_schema::SelectableTrait;
+use isograph_schema::get_parent_for_selection_set_path;
 use isograph_schema::selectables_for_entity;
-use isograph_schema::{
-    NetworkProtocol, get_parent_and_selectable_for_object_path, process_iso_literal_extraction,
-};
+use isograph_schema::{NetworkProtocol, process_iso_literal_extraction};
 use lsp_types::CompletionItemLabelDetails;
 use lsp_types::{
     CompletionItem, CompletionResponse,
@@ -52,15 +51,9 @@ pub fn on_completion<TNetworkProtocol: NetworkProtocol>(
         current_working_directory,
     ) {
         match result.resolve((), Span::new(offset, offset)) {
-<<<<<<< HEAD
-            IsographResolvedNode::ObjectSelection(object_path) => {
-                if let Ok((_, resolved_selectable)) =
-                    get_parent_and_selectable_for_object_path(db, &object_path)
-=======
             IsographResolvedNode::SelectionSet(selection_set_path) => {
                 if let Ok(parent_object_entity) =
                     get_parent_for_selection_set_path(db, &selection_set_path)
->>>>>>> 8c6aca73 (fix bugz)
                 {
                     if let Ok(map) = selectables_for_entity(db, parent_object_entity.name).as_ref()
                     {
