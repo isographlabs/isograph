@@ -47,18 +47,6 @@ const setMainVersion = async () => {
     const pkgJsonPath = path.join('.', 'libs', build.folder, 'package.json');
     const packageJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
     packageJson.version = VERSION;
-    for (const depKind of [
-      'dependencies',
-      'devDependencies',
-      'peerDependencies',
-    ]) {
-      const deps = packageJson[depKind];
-      for (const dep in deps) {
-        if (packages.includes(dep)) {
-          deps[dep] = VERSION;
-        }
-      }
-    }
     fs.writeFileSync(
       pkgJsonPath,
       JSON.stringify(packageJson, null, 2) + '\n',

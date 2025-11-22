@@ -12,8 +12,8 @@
     "iso": "cross-env ISO_PRINT_ABSOLUTE_FILEPATH=1 ../../target/debug/isograph_cli --config ./isograph.config.json"
   },
   "dependencies": {
-    "@isograph/react": "*",
-    "@isograph/react-disposable-state": "*",
+    "@isograph/react": "workspace:*",
+    "@isograph/react-disposable-state": "workspace:*",
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
     "@fontsource/roboto": "^5.0.3",
