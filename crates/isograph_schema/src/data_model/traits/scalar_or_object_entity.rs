@@ -4,7 +4,8 @@ use common_lang_types::{
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
     Description, ObjectSelectionPath, ScalarSelectionPath, SelectionParentType,
-    SelectionSetParentType, SelectionType, SelectionTypePostfix, ServerObjectEntityNameWrapper,
+    SelectionSetParentType, SelectionSetPath, SelectionType, SelectionTypePostfix,
+    ServerObjectEntityNameWrapper,
 };
 use thiserror::Error;
 
@@ -68,8 +69,13 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkPr
     let ScalarSelectionPath { parent, inner } = scalar_path;
     let scalar_selectable_name = inner.name.item;
 
-    let (parent, selectable) =
-        get_parent_and_selectable_for_selection_parent(db, parent, scalar_selectable_name.into())?;
+    let (parent, selectable) = get_parent_and_selectable_for_selection_parent(
+        db,
+        match &parent {
+            SelectionParentType::SelectionSet(position_resolution_path) => position_resolution_path,
+        },
+        scalar_selectable_name.into(),
+    )?;
 
     let selectable =
         selectable
@@ -98,8 +104,13 @@ pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkPr
     let ObjectSelectionPath { parent, inner } = object_path;
     let object_selectable_name = inner.name.item;
 
-    let (parent, selectable) =
-        get_parent_and_selectable_for_selection_parent(db, parent, object_selectable_name.into())?;
+    let (parent, selectable) = get_parent_and_selectable_for_selection_parent(
+        db,
+        match &parent {
+            SelectionParentType::SelectionSet(position_resolution_path) => position_resolution_path,
+        },
+        object_selectable_name.into(),
+    )?;
 
     let selectable =
         selectable
@@ -149,7 +160,7 @@ pub fn get_parent_for_selection_set_path<'a, 'db, TNetworkProtocol: NetworkProto
 
 pub fn get_parent_and_selectable_for_selection_parent<'a, TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    selection_parent: &SelectionParentType<'a>,
+    selection_set_path: &SelectionSetPath<'a>,
     selectable_name: SelectableName,
 ) -> Result<
     (
@@ -158,35 +169,28 @@ pub fn get_parent_and_selectable_for_selection_parent<'a, TNetworkProtocol: Netw
     ),
     GetParentAndSelectableError<TNetworkProtocol>,
 > {
-    match selection_parent {
-        SelectionParentType::SelectionSet(position_resolution_path) => {
-            match &position_resolution_path.parent {
-                SelectionSetParentType::ObjectSelection(object_selection_path) => {
-                    let (_, object_selectable) =
-                        get_parent_and_selectable_for_object_path(db, object_selection_path)?;
+    match &selection_set_path.parent {
+        SelectionSetParentType::ObjectSelection(object_selection_path) => {
+            let (_, object_selectable) =
+                get_parent_and_selectable_for_object_path(db, object_selection_path)?;
 
-                    let object_parent_entity_name =
-                        *object_selectable.target_object_entity_name().inner();
+            let object_parent_entity_name = *object_selectable.target_object_entity_name().inner();
 
-                    parent_object_entity_and_selectable(
-                        db,
-                        object_parent_entity_name.into(),
-                        selectable_name,
-                    )
-                }
-                SelectionSetParentType::ClientFieldDeclaration(client_field_declaration_path) => {
-                    let parent_type_name = client_field_declaration_path.inner.parent_type.item;
+            parent_object_entity_and_selectable(
+                db,
+                object_parent_entity_name.into(),
+                selectable_name,
+            )
+        }
+        SelectionSetParentType::ClientFieldDeclaration(client_field_declaration_path) => {
+            let parent_type_name = client_field_declaration_path.inner.parent_type.item;
 
-                    parent_object_entity_and_selectable(db, parent_type_name, selectable_name)
-                }
-                SelectionSetParentType::ClientPointerDeclaration(
-                    client_pointer_declaration_path,
-                ) => {
-                    let parent_type_name = client_pointer_declaration_path.inner.parent_type.item;
+            parent_object_entity_and_selectable(db, parent_type_name, selectable_name)
+        }
+        SelectionSetParentType::ClientPointerDeclaration(client_pointer_declaration_path) => {
+            let parent_type_name = client_pointer_declaration_path.inner.parent_type.item;
 
-                    parent_object_entity_and_selectable(db, parent_type_name, selectable_name)
-                }
-            }
+            parent_object_entity_and_selectable(db, parent_type_name, selectable_name)
         }
     }
 }
