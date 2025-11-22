@@ -8,7 +8,6 @@ use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
 };
 use intern::{Lookup, string_key::Intern};
-use isograph_config::CompilerConfig;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientScalarSelectionDirectiveSet, DefinitionLocation,
     DefinitionLocationPostfix, Description, EmptyDirectiveSet, NonConstantValue,
@@ -122,7 +121,7 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
         .to_owned()
         .map_err(|e| GetArtifactPathAndContentError::ValidationError { messages: e })?;
 
-    let mut artifact_path_and_content = get_artifact_path_and_content_impl(db, config);
+    let mut artifact_path_and_content = get_artifact_path_and_content_impl(db);
     if let Some(header) = config.options.generated_file_header {
         for artifact_path_and_content in artifact_path_and_content.iter_mut() {
             artifact_path_and_content.file_content =
@@ -134,8 +133,8 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
 
 fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    config: &CompilerConfig,
 ) -> Vec<ArtifactPathAndContent> {
+    let config = db.get_isograph_config();
     let mut encountered_client_type_map = BTreeMap::new();
     let mut path_and_contents = vec![];
     let mut encountered_output_types = HashSet::<ClientSelectableId>::new();
