@@ -8,6 +8,7 @@ mod iso_overload_file;
 mod normalization_ast_text;
 mod operation_text;
 mod persisted_documents;
+mod raw_response_type;
 mod reader_ast;
 mod refetch_reader_artifact;
 mod ts_config;
