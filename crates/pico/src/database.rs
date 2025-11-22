@@ -8,7 +8,7 @@ use crate::{
     execute_memoized_function,
     index::Index,
     intern::{Key, ParamId},
-    macro_fns::{get_param, hash, init_param_vec, intern_owned_param},
+    macro_fns::{get_param, init_param_vec, intern_owned_param},
     source::{Source, SourceId, SourceNode},
 };
 use boxcar::Vec as BoxcarVec;
@@ -366,7 +366,7 @@ pub fn intern_ref<Db: Database, T: Clone + Hash + DynEq + 'static>(
     db: &Db,
     value: &T,
 ) -> MemoRef<T> {
-    let param_id = hash(value).into();
+    let param_id = (value as *const T as usize as u64).into();
     if let Entry::Vacant(v) = db.get_storage().internal.param_id_to_index.entry(param_id) {
         let idx = db
             .get_storage()
