@@ -7,7 +7,7 @@ export type Query__RepositoryPage__rawResponse = {
       name: string,
       nameWithOwner: string,
       owner: {
-        __typename: "RepositoryOwner",
+        __typename: string,
         id: string,
         login: string,
       },
@@ -17,8 +17,10 @@ export type Query__RepositoryPage__rawResponse = {
         node: {
           id: string,
           author: {
-            __typename: "Actor",
+            __typename: 'User',
+            id: string,
             login: string,
+            twitterUsername?: (string | null),
           },
           closed: boolean,
           createdAt: string,
@@ -27,7 +29,7 @@ export type Query__RepositoryPage__rawResponse = {
             id: string,
             name: string,
             owner: {
-              __typename: "RepositoryOwner",
+              __typename: string,
               id: string,
               login: string,
             },

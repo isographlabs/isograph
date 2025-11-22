@@ -502,6 +502,7 @@ fn create_field_traversal_result<TNetworkProtocol: NetworkProtocol>(
         merged_selection_map.insert(
             NormalizationKey::Discriminator,
             MergedServerSelection::ScalarField(MergedScalarFieldSelection {
+                parent_object_entity_name: parent_object_entity.name.item,
                 name: *TYPENAME_FIELD_NAME,
                 arguments: vec![],
             }),

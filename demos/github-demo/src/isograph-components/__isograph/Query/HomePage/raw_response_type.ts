@@ -13,7 +13,7 @@ export type Query__HomePage__rawResponse = {
           name: string,
           nameWithOwner: string,
           owner: {
-            __typename: "RepositoryOwner",
+            __typename: string,
             id: string,
             login: string,
           },

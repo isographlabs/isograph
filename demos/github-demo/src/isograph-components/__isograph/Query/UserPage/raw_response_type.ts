@@ -11,7 +11,7 @@ export type Query__UserPage__rawResponse = {
           name: string,
           nameWithOwner: string,
           owner: {
-            __typename: "RepositoryOwner",
+            __typename: string,
             id: string,
             login: string,
           },
