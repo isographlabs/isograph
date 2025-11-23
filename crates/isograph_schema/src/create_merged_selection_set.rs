@@ -552,7 +552,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             parent_map,
                             variable_context,
                             merge_traversal_state,
-                            parent_object_entity.name.item,
+                            parent_object_entity.name,
                         );
                     }
                     DefinitionLocation::Client((
@@ -1427,7 +1427,7 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
 ) {
     if parent_object_entity.concrete_type.is_none() {
-        maybe_add_typename_selection(merged_selection_map, parent_object_entity.name.item)
+        maybe_add_typename_selection(merged_selection_map, parent_object_entity.name)
     };
 
     let id_field = server_id_selectable(db, parent_object_entity.name)
@@ -1457,7 +1457,7 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
             Entry::Vacant(vacant_entry) => {
                 vacant_entry.insert(MergedServerSelection::ScalarField(
                     MergedScalarFieldSelection {
-                        parent_object_entity_name: parent_object_entity.name.item,
+                        parent_object_entity_name: parent_object_entity.name,
                         name: id_field.lookup(db).name.item,
                         arguments: vec![],
                     },
