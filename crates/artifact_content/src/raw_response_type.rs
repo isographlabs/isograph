@@ -1,5 +1,4 @@
 use intern::Lookup;
-use isograph_lang_types::TypeAnnotation;
 use isograph_schema::{
     IsographDatabase, MergedSelectionMap, MergedServerSelection, NetworkProtocol,
     server_object_selectable_named, server_scalar_entity_javascript_name,
@@ -80,14 +79,13 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
                     },
                 );
 
-                let is_optional = matches!(
-                    server_scalar_selectable.target_scalar_entity,
-                    TypeAnnotation::Union(_)
-                );
-
                 raw_response_type_inner.push_str(&format!(
                     "{indent}{name}{}: {},\n",
-                    if is_optional { "?" } else { "" },
+                    if server_scalar_selectable.target_scalar_entity.is_nullable() {
+                        "?"
+                    } else {
+                        ""
+                    },
                     print_javascript_type_declaration(&raw_type)
                 ));
             }
@@ -130,14 +128,13 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
                             raw_response_type_declaration
                         });
 
-                let is_optional = matches!(
-                    server_object_selectable.target_object_entity,
-                    TypeAnnotation::Union(_)
-                );
-
                 raw_response_type_inner.push_str(&format!(
                     "{indent}{name}{}: {},\n",
-                    if is_optional { "?" } else { "" },
+                    if server_object_selectable.target_object_entity.is_nullable() {
+                        "?"
+                    } else {
+                        ""
+                    },
                     print_javascript_type_declaration(&raw_type)
                 ));
             }

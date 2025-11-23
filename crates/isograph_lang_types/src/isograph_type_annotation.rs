@@ -121,6 +121,12 @@ impl<TInner: Ord> TypeAnnotation<TInner> {
     }
 
     // TODO implement as_ref
+
+    pub fn is_nullable(&self) -> bool {
+        // TODO this will have to change at some point, but for now, a Union is only used
+        // to represent nullability.
+        matches!(self, TypeAnnotation::Union(_))
+    }
 }
 
 #[derive(Default, Ord, PartialEq, PartialOrd, Eq, Clone, Debug, Hash)]
