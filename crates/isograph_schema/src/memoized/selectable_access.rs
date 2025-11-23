@@ -6,9 +6,8 @@ use thiserror::Error;
 
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, IsographDatabase, MemoizedIsoLiteralError,
-    NetworkProtocol, ServerObjectSelectable, ServerScalarSelectable, ServerSelectableNamedError,
-    client_selectable_map, client_selectable_named, server_selectable_named,
-    server_selectables_vec_for_entity,
+    NetworkProtocol, ServerObjectSelectable, ServerScalarSelectable, client_selectable_map,
+    client_selectable_named, server_selectable_named, server_selectables_vec_for_entity,
 };
 
 #[expect(clippy::type_complexity)]
@@ -54,7 +53,9 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
     // case 3: both are ok -> check that there aren't duplicate definitions, and return remaining one or None
 
     match (server_selectable, client_selectable) {
-        (Err(e), Err(_)) => Err(e.clone().into()),
+        (Err(e), Err(_)) => Err(SelectableNamedError::ParseTypeSystemDocumentsError(
+            e.clone(),
+        )),
         (Ok(server), Err(_)) => match server.clone() {
             Some(server_selectable) => server_selectable
                 .map_err(
@@ -147,7 +148,7 @@ pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
 #[derive(Error, Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub enum SelectableNamedError {
     #[error("{0}")]
-    ServerSelectableNamedError(#[from] ServerSelectableNamedError),
+    ServerSelectableNamedError(Diagnostic),
 
     #[error("{error}")]
     FieldToInsertToServerSelectableError { error: Diagnostic },

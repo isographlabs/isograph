@@ -18,8 +18,8 @@ use thiserror::Error;
 
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, FieldMapItem, ID_FIELD_NAME, IsographDatabase,
-    NODE_FIELD_NAME, NetworkProtocol, ServerEntityName, ServerSelectableNamedError,
-    ValidatedVariableDefinition, WrappedSelectionMapSelection, defined_entity, fetchable_types,
+    NODE_FIELD_NAME, NetworkProtocol, ServerEntityName, ValidatedVariableDefinition,
+    WrappedSelectionMapSelection, defined_entity, fetchable_types,
     refetch_strategy::{RefetchStrategy, generate_refetch_field_strategy, id_selection},
     server_selectable_named,
 };
@@ -416,7 +416,7 @@ pub enum ProcessClientFieldDeclarationError {
     },
 
     #[error("{0}")]
-    ServerSelectableNamedError(#[from] ServerSelectableNamedError),
+    ServerSelectableNamedError(Diagnostic),
 
     #[error("{}", error)]
     FieldToInsertToServerSelectableError { error: Diagnostic },

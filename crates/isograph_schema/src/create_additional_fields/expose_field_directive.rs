@@ -92,7 +92,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
     let mutation_field =
         server_selectable_named(db, parent_object_entity_name, mutation_subfield_name.into())
             .as_ref()
-            .map_err(|e| e.clone())?
+            .map_err(|e| CreateAdditionalFieldsError::EntityAccessError(e.clone()))?
             .as_ref()
             // TODO propagate this errors instead of panicking
             .expect(
@@ -283,7 +283,7 @@ fn parse_mutation_subfield_id<TNetworkProtocol: NetworkProtocol>(
     let opt_field =
         server_selectable_named(db, mutation_object_entity_name, field_arg.intern().into())
             .as_ref()
-            .map_err(|e| e.clone())?;
+            .map_err(|e| CreateAdditionalFieldsError::EntityAccessError(e.clone()))?;
 
     match opt_field {
         Some(s) => {
@@ -351,7 +351,7 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
     for selection_name in selections {
         let current_selectable = server_selectable_named(db, current_entity_name, *selection_name)
             .as_ref()
-            .map_err(|e| e.clone())?;
+            .map_err(|e| CreateAdditionalFieldsError::EntityAccessError(e.clone()))?;
 
         match current_selectable {
             Some(entity) => {

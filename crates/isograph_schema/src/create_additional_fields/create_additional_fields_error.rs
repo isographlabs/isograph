@@ -1,4 +1,3 @@
-use crate::ServerSelectableNamedError;
 use common_lang_types::{Diagnostic, SelectableName, ServerObjectEntityName, StringLiteralValue};
 use intern::{Lookup, string_key::Intern};
 
@@ -82,7 +81,7 @@ pub enum CreateAdditionalFieldsError {
     EntityAccessError(Diagnostic),
 
     #[error("{0}")]
-    ServerSelectableNamedError(#[from] ServerSelectableNamedError),
+    ServerSelectableNamedError(Diagnostic),
 
     #[error("{error}")]
     FieldToInsertToServerSelectableError { error: Diagnostic },

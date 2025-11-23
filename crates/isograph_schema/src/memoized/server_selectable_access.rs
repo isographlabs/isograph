@@ -3,16 +3,15 @@ use std::collections::HashMap;
 use common_lang_types::{
     Diagnostic, DiagnosticResult, ServerObjectEntityName, ServerSelectableName,
 };
-use intern::Lookup;
 use isograph_lang_types::SelectionType;
 use pico::MemoRef;
 use pico_macros::memo;
-use thiserror::Error;
+use prelude::Postfix;
 
 use crate::{
     ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, NetworkProtocol, OwnedServerSelectable,
-    ServerObjectSelectable, ServerScalarSelectable, field_to_insert_to_server_selectable,
-    server_scalar_entity_named,
+    ServerObjectSelectable, ServerScalarSelectable, entity_definition_location,
+    field_to_insert_to_server_selectable, server_scalar_entity_named,
 };
 
 type OwnedSelectableResult<TNetworkProtocol> =
@@ -135,21 +134,30 @@ pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
     server_selectable_name: ServerSelectableName,
-) -> Result<Option<OwnedSelectableResult<TNetworkProtocol>>, ServerSelectableNamedError> {
+) -> DiagnosticResult<Option<OwnedSelectableResult<TNetworkProtocol>>> {
     let vec =
         server_selectables_named(db, parent_server_object_entity_name, server_selectable_name)
             .as_ref()
-            .map_err(|e| ServerSelectableNamedError::ParseTypeSystemDocumentsError(e.clone()))?;
+            .map_err(|e| e.clone())?;
 
     match vec.split_first() {
         Some((first, rest)) => {
             if rest.is_empty() {
                 Ok(Some(first.clone()))
             } else {
-                Err(ServerSelectableNamedError::MultipleDefinitionsFound {
-                    parent_object_entity_name: parent_server_object_entity_name,
-                    duplicate_selectable_name: server_selectable_name,
-                })
+                Diagnostic::new(
+                    format!(
+                        "Multiple definitions of \
+                        `{parent_server_object_entity_name}.{server_selectable_name}` were found"
+                    ),
+                    Result::ok(
+                        entity_definition_location(db, parent_server_object_entity_name.into())
+                            .as_ref(),
+                    )
+                    .cloned()
+                    .flatten(),
+                )
+                .err()
             }
         }
         None => Ok(None),
@@ -160,7 +168,7 @@ pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol>(
 pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
-) -> Result<Option<MemoRef<ServerScalarSelectable<TNetworkProtocol>>>, ServerSelectableNamedError> {
+) -> DiagnosticResult<Option<MemoRef<ServerScalarSelectable<TNetworkProtocol>>>> {
     let selectable = server_selectable_named(
         db,
         parent_server_object_entity_name,
@@ -170,9 +178,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     .map_err(|e| e.clone())?;
 
     let selectable = match selectable {
-        Some(s) => s.as_ref().map_err(|e| {
-            ServerSelectableNamedError::FieldToInsertToServerSelectableError { error: e.clone() }
-        })?,
+        Some(s) => s.as_ref().map_err(|e| e.clone())?,
         None => return Ok(None),
     };
 
@@ -180,24 +186,45 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     let selectable = match selectable {
         SelectionType::Scalar(s) => s,
         SelectionType::Object(_) => {
-            return Err(ServerSelectableNamedError::IncorrectType {
-                parent_object_entity_name: parent_server_object_entity_name,
-                selectable_name: (*ID_FIELD_NAME).into(),
-                expected_type: "a scalar",
-                actual_type: "an object",
-            });
+            let selectable_name = *ID_FIELD_NAME;
+            return Diagnostic::new(
+                format!(
+                    "Expected `{parent_server_object_entity_name}.{selectable_name}` \
+                    to be a scalar, but it was an object."
+                ),
+                Result::ok(
+                    entity_definition_location(db, parent_server_object_entity_name.into())
+                        .as_ref(),
+                )
+                .cloned()
+                .flatten(),
+            )
+            .err();
         }
     };
 
-    let target_scalar_entity = selectable.target_scalar_entity.inner();
-    let target_scalar_entity = server_scalar_entity_named(db, *target_scalar_entity)
+    let target_scalar_entity_name = selectable.target_scalar_entity.inner();
+    let target_scalar_entity = server_scalar_entity_named(db, *target_scalar_entity_name)
         .as_ref()
-        .map_err(|e| ServerSelectableNamedError::EntityAccessError(e.clone()))?
+        .map_err(|e| e.clone())?
         .as_ref()
         // It must exist
-        .ok_or_else(|| ServerSelectableNamedError::IdFieldMustBeNonNullIdType {
-            strong_field_name: selectable.name.item.lookup(),
-            parent_object_entity_name: parent_server_object_entity_name,
+        .ok_or_else(|| {
+            let id_field_name = *ID_FIELD_NAME;
+            Diagnostic::new(
+                // TODO: it doesn't seem like this error is actually suppresable (here).
+                format!(
+                    "The `{id_field_name}` field on \
+                    `{target_scalar_entity_name}` must have type `ID!`.\n\
+                    This error can be suppressed using the \
+                    \"on_invalid_id_type\" config parameter."
+                ),
+                Result::ok(
+                    entity_definition_location(db, (*target_scalar_entity_name).into()).as_ref(),
+                )
+                .cloned()
+                .flatten(),
+            )
         })?;
 
     let options = &db.get_isograph_config().options;
@@ -205,10 +232,21 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     // And must have the right inner type
     if target_scalar_entity.name != *ID_ENTITY_NAME {
         options.on_invalid_id_type.on_failure(|| {
-            ServerSelectableNamedError::IdFieldMustBeNonNullIdType {
-                strong_field_name: "id",
-                parent_object_entity_name: parent_server_object_entity_name,
-            }
+            let strong_field_name = *ID_FIELD_NAME;
+            Diagnostic::new(
+                format!(
+                    "The `{strong_field_name}` field on \
+                    `{parent_server_object_entity_name}` must have type `ID!`.\n\
+                    This error can be suppressed using the \
+                    \"on_invalid_id_type\" config parameter."
+                ),
+                Result::ok(
+                    entity_definition_location(db, parent_server_object_entity_name.into())
+                        .as_ref(),
+                )
+                .cloned()
+                .flatten(),
+            )
         })?;
     }
 
@@ -217,53 +255,12 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     Ok(Some(db.intern_ref(selectable)))
 }
 
-#[derive(Clone, Debug, Error, PartialEq, Eq, PartialOrd, Ord)]
-pub enum ServerSelectableNamedError {
-    #[error("{0}")]
-    ParseTypeSystemDocumentsError(Diagnostic),
-
-    // TODO include additional locations
-    #[error(
-        "Multiple definitions of `{parent_object_entity_name}.{duplicate_selectable_name}` were found"
-    )]
-    MultipleDefinitionsFound {
-        parent_object_entity_name: ServerObjectEntityName,
-        duplicate_selectable_name: ServerSelectableName,
-    },
-
-    #[error(
-        "Expected `{parent_object_entity_name}.{selectable_name}` to be {expected_type}, \
-        but it was {actual_type}."
-    )]
-    IncorrectType {
-        parent_object_entity_name: ServerObjectEntityName,
-        selectable_name: ServerSelectableName,
-        expected_type: &'static str,
-        actual_type: &'static str,
-    },
-
-    #[error("{}", error)]
-    FieldToInsertToServerSelectableError { error: Diagnostic },
-
-    #[error(
-        "The `{strong_field_name}` field on `{parent_object_entity_name}` must have type `ID!`.\n\
-        This error can be suppressed using the \"on_invalid_id_type\" config parameter."
-    )]
-    IdFieldMustBeNonNullIdType {
-        parent_object_entity_name: ServerObjectEntityName,
-        strong_field_name: &'static str,
-    },
-
-    #[error("{0}")]
-    EntityAccessError(Diagnostic),
-}
-
 #[memo]
 pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
     server_selectable_name: ServerSelectableName,
-) -> Result<Option<ServerObjectSelectable<TNetworkProtocol>>, ServerSelectableNamedError> {
+) -> DiagnosticResult<Option<ServerObjectSelectable<TNetworkProtocol>>> {
     let item =
         server_selectable_named(db, parent_server_object_entity_name, server_selectable_name)
             .as_ref()
@@ -271,19 +268,22 @@ pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
 
     match item {
         Some(item) => {
-            let item = item.as_ref().map_err(|e| {
-                ServerSelectableNamedError::FieldToInsertToServerSelectableError {
-                    error: e.clone(),
-                }
-            })?;
+            let item = item.as_ref().map_err(|e| e.clone())?;
             match item.as_ref().as_object() {
                 Some(obj) => Ok(Some(obj.clone())),
-                None => Err(ServerSelectableNamedError::IncorrectType {
-                    parent_object_entity_name: parent_server_object_entity_name,
-                    selectable_name: server_selectable_name,
-                    expected_type: "an object",
-                    actual_type: "a scalar",
-                }),
+                None => Diagnostic::new(
+                    format!(
+                        "Expected `{parent_server_object_entity_name}.{server_selectable_name}`\
+                        to be an object, but it was a scalar."
+                    ),
+                    Result::ok(
+                        entity_definition_location(db, parent_server_object_entity_name.into())
+                            .as_ref(),
+                    )
+                    .cloned()
+                    .flatten(),
+                )
+                .err(),
             }
         }
         None => Ok(None),
@@ -295,7 +295,7 @@ pub fn server_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
     server_selectable_name: ServerSelectableName,
-) -> Result<Option<ServerScalarSelectable<TNetworkProtocol>>, ServerSelectableNamedError> {
+) -> DiagnosticResult<Option<ServerScalarSelectable<TNetworkProtocol>>> {
     let item =
         server_selectable_named(db, parent_server_object_entity_name, server_selectable_name)
             .as_ref()
@@ -303,19 +303,22 @@ pub fn server_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
 
     match item {
         Some(item) => {
-            let item = item.as_ref().map_err(|e| {
-                ServerSelectableNamedError::FieldToInsertToServerSelectableError {
-                    error: e.clone(),
-                }
-            })?;
+            let item = item.as_ref().map_err(|e| e.clone())?;
             match item.as_ref().as_scalar() {
                 Some(scalar) => Ok(Some(scalar.clone())),
-                None => Err(ServerSelectableNamedError::IncorrectType {
-                    parent_object_entity_name: parent_server_object_entity_name,
-                    selectable_name: server_selectable_name,
-                    expected_type: "a scalar",
-                    actual_type: "an object",
-                }),
+                None => Diagnostic::new(
+                    format!(
+                        "Expected `{parent_server_object_entity_name}.{server_selectable_name}` \
+                        to be a scalar, but it was an object."
+                    ),
+                    Result::ok(
+                        entity_definition_location(db, parent_server_object_entity_name.into())
+                            .as_ref(),
+                    )
+                    .cloned()
+                    .flatten(),
+                )
+                .err(),
             }
         }
         None => Ok(None),

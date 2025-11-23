@@ -43,7 +43,7 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
     for selection_name in selections {
         let current_selectable = server_selectable_named(db, current_entity_name, selection_name)
             .as_ref()
-            .map_err(|e| e.clone())?;
+            .map_err(|e| CreateAdditionalFieldsError::EntityAccessError(e.clone()))?;
 
         match current_selectable {
             Some(entity) => {
