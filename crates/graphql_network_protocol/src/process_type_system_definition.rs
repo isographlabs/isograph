@@ -388,7 +388,7 @@ fn process_object_type_definition(
                 ),
                 // This is bad data modeling, and we should do better.
                 javascript_type_override: concrete_type.map(|parent_concrete_type| {
-                    format!("'{parent_concrete_type}'").intern().into()
+                    format!("\"{parent_concrete_type}\"").intern().into()
                 }),
 
                 arguments: vec![],
