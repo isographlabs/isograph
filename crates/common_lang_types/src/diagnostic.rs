@@ -1,0 +1,37 @@
+use std::fmt::Display;
+
+use prelude::Postfix;
+
+use crate::Location;
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Diagnostic(Box<DiagnosticData>);
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+struct DiagnosticData {
+    /// A human-readable message.
+    message: String,
+
+    /// The primary location where the message originated.
+    location: Option<Location>,
+}
+
+impl Diagnostic {
+    pub fn new(message: String, location: Option<Location>) -> Diagnostic {
+        Diagnostic(DiagnosticData { message, location }.boxed())
+    }
+}
+
+impl Display for Diagnostic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.message)?;
+        if let Some(location) = self.0.location {
+            write!(f, "\n{}", location)?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for Diagnostic {}
+
+pub type DiagnosticResult<T> = Result<T, Diagnostic>;

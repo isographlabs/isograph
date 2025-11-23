@@ -1,4 +1,5 @@
 mod absolute_and_relative_path;
+mod diagnostic;
 mod entity_and_selectable_name;
 mod location;
 mod path_and_content;
@@ -9,6 +10,7 @@ mod string_types;
 mod text_with_carats;
 
 pub use absolute_and_relative_path::*;
+pub use diagnostic::*;
 pub use entity_and_selectable_name::*;
 pub use location::*;
 pub use path_and_content::*;
