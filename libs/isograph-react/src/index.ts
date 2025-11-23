@@ -21,6 +21,7 @@ export {
   callSubscriptions,
   subscribe,
   normalizeData,
+  writeData,
   type NetworkResponseObject,
   type NetworkResponseValue,
   type NetworkResponseScalarValue,

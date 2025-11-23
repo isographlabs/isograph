@@ -1,8 +1,8 @@
 use crate::{
     generate_artifacts::{
         ENTRYPOINT_FILE_NAME, NORMALIZATION_AST, NORMALIZATION_AST_FILE_NAME, QUERY_TEXT,
-        QUERY_TEXT_FILE_NAME, RAW_RESPONSE_TYPE, RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE,
-        RESOLVER_READER, RefetchQueryArtifactImport,
+        QUERY_TEXT_FILE_NAME, RAW_RESPONSE_TYPE, RAW_RESPONSE_TYPE_FILE_NAME, RESOLVER_OUTPUT_TYPE,
+        RESOLVER_PARAM_TYPE, RESOLVER_READER, RefetchQueryArtifactImport,
     },
     imperatively_loaded_fields::get_paths_and_contents_for_imperatively_loaded_field,
     normalization_ast_text::generate_normalization_ast_text,
@@ -14,6 +14,7 @@ use common_lang_types::{
     ArtifactPathAndContent, ClientScalarSelectableName, ParentObjectEntityNameAndSelectableName,
     QueryOperationName, ServerObjectEntityName, VariableName,
 };
+use intern::Lookup;
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
     DefinitionLocationPostfix, EmptyDirectiveSet, EntrypointDirectiveSet,
@@ -318,10 +319,12 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     });
     path_and_contents.push(ArtifactPathAndContent {
         file_content: format!(
-            "export type {}__{}__raw_response_type = {raw_response_type}\n",
-            type_name, field_name,
+            "export type {}__{}__{} = {raw_response_type}\n",
+            type_name,
+            field_name,
+            RAW_RESPONSE_TYPE.lookup()
         ),
-        file_name: *RAW_RESPONSE_TYPE,
+        file_name: *RAW_RESPONSE_TYPE_FILE_NAME,
         type_and_field: Some(ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: type_name,
             selectable_name: field_name,
@@ -437,9 +440,16 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
     let ts_file_extension = file_extensions.ts();
     let entrypoint_params_typename = format!("{}__{}__param", parent_type.name, query_name);
     let entrypoint_output_type_name = format!("{}__{}__output_type", parent_type.name, query_name);
+    let raw_response_type_name = format!(
+        "{}__{}__{}",
+        parent_type.name,
+        query_name,
+        RAW_RESPONSE_TYPE.lookup()
+    );
     let resolver_reader_file_name = *RESOLVER_READER;
     let param_type_file_name = *RESOLVER_PARAM_TYPE;
     let output_type_file_name = *RESOLVER_OUTPUT_TYPE;
+    let raw_response_type_file_name = *RAW_RESPONSE_TYPE;
     let query_text_file_name = *QUERY_TEXT;
     let normalization_text_file_name = *NORMALIZATION_AST;
     let indent = "  ";
@@ -505,6 +515,7 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
         {normalization_ast_type_name}, RefetchQueryNormalizationArtifactWrapper}} from '@isograph/react';\n\
         import {{{entrypoint_params_typename}}} from './{param_type_file_name}{ts_file_extension}';\n\
         import {{{entrypoint_output_type_name}}} from './{output_type_file_name}{ts_file_extension}';\n\
+        import {{{raw_response_type_name}}} from './{raw_response_type_file_name}{ts_file_extension}';\n\
         {reader_import}\
         import queryText from './{query_text_file_name}{ts_file_extension}';\n\
         {normalization_ast_import}\
@@ -512,7 +523,8 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
         const artifact: IsographEntrypoint<\n\
         {indent}{entrypoint_params_typename},\n\
         {indent}{entrypoint_output_type_name},\n\
-        {indent}{normalization_ast_type_name}\n\
+        {indent}{normalization_ast_type_name},\n\
+        {indent}{raw_response_type_name}\n\
         > = {{\n\
         {indent}kind: \"Entrypoint\",\n\
         {indent}networkRequestInfo: {{\n\

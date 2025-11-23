@@ -22,7 +22,8 @@ export function useLazyReference<
   entrypoint: IsographEntrypoint<
     TReadFromStore,
     TClientFieldValue,
-    TNormalizationAst
+    TNormalizationAst,
+    {}
   >,
   variables: ExtractParameters<TReadFromStore>,
   ...[fetchOptions]: TNormalizationAst extends NormalizationAstLoader
@@ -57,12 +58,18 @@ export function useLazyReference<
 
 // @ts-ignore
 function tsTests() {
-  let withAst!: IsographEntrypoint<any, unknown, NormalizationAst>;
-  let withAstLoader!: IsographEntrypoint<any, unknown, NormalizationAstLoader>;
+  let withAst!: IsographEntrypoint<any, unknown, NormalizationAst, any>;
+  let withAstLoader!: IsographEntrypoint<
+    any,
+    unknown,
+    NormalizationAstLoader,
+    {}
+  >;
   let withAstOrLoader!: IsographEntrypoint<
     any,
     unknown,
-    NormalizationAst | NormalizationAstLoader
+    NormalizationAst | NormalizationAstLoader,
+    {}
   >;
 
   useLazyReference(withAst, {}) satisfies {};
