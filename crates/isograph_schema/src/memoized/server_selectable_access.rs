@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, ServerObjectEntityName, ServerSelectableName,
+    Diagnostic, DiagnosticResult, ServerObjectEntityName, ServerSelectableName, WithLocation,
 };
 use intern::Lookup;
 use isograph_lang_types::SelectionType;
@@ -15,8 +15,10 @@ use crate::{
     ServerScalarSelectable, field_to_insert_to_server_selectable, server_scalar_entity_named,
 };
 
-type OwnedSelectableResult<TNetworkProtocol> =
-    Result<OwnedServerSelectable<TNetworkProtocol>, FieldToInsertToServerSelectableError>;
+type OwnedSelectableResult<TNetworkProtocol> = Result<
+    OwnedServerSelectable<TNetworkProtocol>,
+    WithLocation<FieldToInsertToServerSelectableError>,
+>;
 
 #[expect(clippy::type_complexity)]
 #[memo]
@@ -170,7 +172,9 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     .map_err(|e| e.clone())?;
 
     let selectable = match selectable {
-        Some(s) => s.as_ref().map_err(|e| e.clone())?,
+        Some(s) => s.as_ref().map_err(|e| {
+            ServerSelectableNamedError::FieldToInsertToServerSelectableError { error: e.clone() }
+        })?,
         None => return Ok(None),
     };
 
@@ -241,8 +245,10 @@ pub enum ServerSelectableNamedError {
     },
 
     // TODO this is probably indicative of bad modeling
-    #[error("{0}")]
-    FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),
+    #[error("{}", error.for_display())]
+    FieldToInsertToServerSelectableError {
+        error: WithLocation<FieldToInsertToServerSelectableError>,
+    },
 
     #[error(
         "The `{strong_field_name}` field on `{parent_object_entity_name}` must have type `ID!`.\n\
@@ -270,7 +276,11 @@ pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
 
     match item {
         Some(item) => {
-            let item = item.as_ref().map_err(|e| e.clone())?;
+            let item = item.as_ref().map_err(|e| {
+                ServerSelectableNamedError::FieldToInsertToServerSelectableError {
+                    error: e.clone(),
+                }
+            })?;
             match item.as_ref().as_object() {
                 Some(obj) => Ok(Some(obj.clone())),
                 None => Err(ServerSelectableNamedError::IncorrectType {
@@ -298,7 +308,11 @@ pub fn server_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
 
     match item {
         Some(item) => {
-            let item = item.as_ref().map_err(|e| e.clone())?;
+            let item = item.as_ref().map_err(|e| {
+                ServerSelectableNamedError::FieldToInsertToServerSelectableError {
+                    error: e.clone(),
+                }
+            })?;
             match item.as_ref().as_scalar() {
                 Some(scalar) => Ok(Some(scalar.clone())),
                 None => Err(ServerSelectableNamedError::IncorrectType {

@@ -47,7 +47,11 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
 
         match current_selectable {
             Some(entity) => {
-                let entity = entity.as_ref().map_err(|e| e.clone())?;
+                let entity = entity.as_ref().map_err(|e| {
+                    CreateAdditionalFieldsError::FieldToInsertToServerSelectableError {
+                        error: e.clone(),
+                    }
+                })?;
                 match entity {
                     SelectionType::Scalar(_) => {
                         // TODO show a better error message

@@ -100,7 +100,11 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
                 This is indicative of a bug in Isograph.",
             )
             .as_ref()
-            .map_err(|e| e.clone())?
+            .map_err(
+                |e| CreateAdditionalFieldsError::FieldToInsertToServerSelectableError {
+                    error: e.clone(),
+                },
+            )?
             .as_ref()
             .as_object()
             // TODO propagate this errors instead of panicking
@@ -285,7 +289,11 @@ fn parse_mutation_subfield_id<TNetworkProtocol: NetworkProtocol>(
         Some(s) => {
             let server_object_selectable = s
                 .as_ref()
-                .map_err(|e| e.clone())?
+                .map_err(
+                    |e| CreateAdditionalFieldsError::FieldToInsertToServerSelectableError {
+                        error: e.clone(),
+                    },
+                )?
                 .as_ref()
                 .as_object()
                 .ok_or_else(|| CreateAdditionalFieldsError::InvalidField {
@@ -347,7 +355,11 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
 
         match current_selectable {
             Some(entity) => {
-                let entity = entity.as_ref().map_err(|e| e.clone())?;
+                let entity = entity.as_ref().map_err(|e| {
+                    CreateAdditionalFieldsError::FieldToInsertToServerSelectableError {
+                        error: e.clone(),
+                    }
+                })?;
                 match entity {
                     SelectionType::Scalar(_) => {
                         // TODO show a better error message

@@ -30,7 +30,7 @@ pub fn field_to_insert_to_server_selectable<TNetworkProtocol: NetworkProtocol>(
         ScalarSelectionAndNonNullType<TNetworkProtocol>,
         ServerObjectSelectable<TNetworkProtocol>,
     >,
-    FieldToInsertToServerSelectableError,
+    WithLocation<FieldToInsertToServerSelectableError>,
 > {
     let target_entity_type_name = server_field_to_insert.item.graphql_type.inner();
     let target_entity_type_name_non_null = server_field_to_insert
@@ -45,13 +45,14 @@ pub fn field_to_insert_to_server_selectable<TNetworkProtocol: NetworkProtocol>(
             "Expected parsing to have succeeded. \
             This is indicative of a bug in Isograph.",
         )
-        .ok_or(
+        .ok_or_else(|| {
             FieldToInsertToServerSelectableError::FieldTypenameDoesNotExist {
                 parent_object_entity_name,
                 target_entity_type_name: *target_entity_type_name,
                 selectable_name: server_field_to_insert.item.name.item,
-            },
-        )?;
+            }
+            .with_location(server_field_to_insert.location)
+        })?;
 
     let arguments = server_field_to_insert
         .item
@@ -141,15 +142,17 @@ pub fn graphql_input_value_definition_to_variable_definition<TNetworkProtocol: N
     input_value_definition: WithLocation<GraphQLInputValueDefinition>,
     parent_type_name: ServerObjectEntityName,
     field_name: SelectableName,
-) -> Result<WithLocation<VariableDefinition<ServerEntityName>>, FieldToInsertToServerSelectableError>
-{
+) -> Result<
+    WithLocation<VariableDefinition<ServerEntityName>>,
+    WithLocation<FieldToInsertToServerSelectableError>,
+> {
     let default_value = input_value_definition
         .item
         .default_value
         .map(|graphql_constant_value| {
             convert_graphql_constant_value_to_isograph_constant_value(graphql_constant_value.item)
                 .with_location(graphql_constant_value.location)
-                .ok()
+                .ok::<WithLocation<FieldToInsertToServerSelectableError>>()
         })
         .transpose()?;
 
@@ -172,7 +175,8 @@ pub fn graphql_input_value_definition_to_variable_definition<TNetworkProtocol: N
                         argument_name: input_value_definition.item.name.item.into(),
                         parent_type_name,
                         field_name,
-                    },
+                    }
+                    .with_location(input_value_definition.location),
                 )
         })?;
 

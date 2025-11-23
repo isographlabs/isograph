@@ -134,8 +134,10 @@ pub enum ValidationError {
     #[error("{0}")]
     ParseTypeSystemDocumentsError(Diagnostic),
 
-    #[error("{0}")]
-    FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),
+    #[error("{}", error.for_display())]
+    FieldToInsertToServerSelectableError {
+        error: WithLocation<FieldToInsertToServerSelectableError>,
+    },
 
     #[error("{0}")]
     ValidatedEntrypointError(#[from] ValidatedEntrypointError),
@@ -178,7 +180,9 @@ fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: Netw
     for selectables in server_selectables.values() {
         for (_, selectable_result) in selectables {
             if let Err(e) = selectable_result {
-                errors.push(e.clone().into());
+                errors.push(ValidationError::FieldToInsertToServerSelectableError {
+                    error: e.clone(),
+                });
             }
         }
     }

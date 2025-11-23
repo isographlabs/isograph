@@ -256,8 +256,10 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
                 })?
                 .transpose()
                 .map_err(|e| {
-                    ProcessClientFieldDeclarationError::FieldToInsertToServerSelectableError(e)
-                        .with_generated_span()
+                    ProcessClientFieldDeclarationError::FieldToInsertToServerSelectableError {
+                        error: e,
+                    }
+                    .with_generated_span()
                 })?;
 
         let query_id = fetchable_types_map
@@ -417,8 +419,10 @@ pub enum ProcessClientFieldDeclarationError {
     #[error("{0}")]
     ServerSelectableNamedError(#[from] ServerSelectableNamedError),
 
-    #[error("{0}")]
-    FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),
+    #[error("{}", error.for_display())]
+    FieldToInsertToServerSelectableError {
+        error: WithLocation<FieldToInsertToServerSelectableError>,
+    },
 
     #[error("{0}")]
     DefinedEntityError(#[from] DefinedEntityError),

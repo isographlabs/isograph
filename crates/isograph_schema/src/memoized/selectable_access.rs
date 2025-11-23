@@ -1,4 +1,4 @@
-use common_lang_types::{Diagnostic, SelectableName, ServerObjectEntityName};
+use common_lang_types::{Diagnostic, SelectableName, ServerObjectEntityName, WithLocation};
 use isograph_lang_types::{DefinitionLocation, DefinitionLocationPostfix, SelectionType};
 use pico_macros::memo;
 use prelude::Postfix;
@@ -56,7 +56,13 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
     match (server_selectable, client_selectable) {
         (Err(e), Err(_)) => Err(e.clone().into()),
         (Ok(server), Err(_)) => match server.clone() {
-            Some(server_selectable) => server_selectable?.server_defined().some().ok(),
+            Some(server_selectable) => server_selectable
+                .map_err(
+                    |e| SelectableNamedError::FieldToInsertToServerSelectableError { error: e },
+                )?
+                .server_defined()
+                .some()
+                .ok(),
             None => Ok(None),
         },
         (Err(_), Ok(client)) => match client.clone() {
@@ -68,9 +74,14 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
             (None, Some(client_selectable)) => {
                 client_selectable.clone().client_defined().some().ok()
             }
-            (Some(server_selectable), None) => {
-                server_selectable.clone()?.server_defined().some().ok()
-            }
+            (Some(server_selectable), None) => server_selectable
+                .clone()
+                .map_err(
+                    |e| SelectableNamedError::FieldToInsertToServerSelectableError { error: e },
+                )?
+                .server_defined()
+                .some()
+                .ok(),
             (Some(_), Some(_)) => SelectableNamedError::DuplicateDefinitions {
                 parent_object_entity_name: parent_server_object_entity_name,
                 selectable_name,
@@ -108,7 +119,10 @@ pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
         .map_err(SelectableNamedError::ParseTypeSystemDocumentsError)?
         .into_iter()
         .map(|(_key, value)| {
-            let value = value?;
+            let value =
+                value.map_err(
+                    |e| SelectableNamedError::FieldToInsertToServerSelectableError { error: e },
+                )?;
             value.server_defined().ok()
         })
         .collect::<Vec<_>>();
@@ -135,8 +149,10 @@ pub enum SelectableNamedError {
     #[error("{0}")]
     ServerSelectableNamedError(#[from] ServerSelectableNamedError),
 
-    #[error("{0}")]
-    FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),
+    #[error("{}", error.for_display())]
+    FieldToInsertToServerSelectableError {
+        error: WithLocation<FieldToInsertToServerSelectableError>,
+    },
 
     #[error("`{parent_object_entity_name}.{selectable_name}` has been defined multiple times.")]
     DuplicateDefinitions {
