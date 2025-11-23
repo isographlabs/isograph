@@ -1,14 +1,14 @@
 use std::collections::HashMap;
 
 use crate::{
-    ClientObjectSelectable, ClientScalarSelectable, CreateAdditionalFieldsError, CreateSchemaError,
-    IsographDatabase, NetworkProtocol, OwnedClientSelectable, ProcessClientFieldDeclarationError,
+    ClientObjectSelectable, ClientScalarSelectable, CreateAdditionalFieldsError, IsographDatabase,
+    NetworkProtocol, OwnedClientSelectable, ProcessClientFieldDeclarationError,
     UnprocessedClientScalarSelectableSelectionSet, create_new_exposed_field,
     create_type_system_schema_with_server_selectables, get_link_fields_map,
     process_client_field_declaration_inner, process_client_pointer_declaration_inner,
 };
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName,
+    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, Diagnostic,
     ServerObjectEntityName, WithSpan,
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
@@ -149,7 +149,7 @@ pub enum MemoizedIsoLiteralError {
     ProcessClientFieldDeclarationError(WithSpan<ProcessClientFieldDeclarationError>),
 
     #[error("{0}")]
-    CreateSchemaError(#[from] CreateSchemaError),
+    CreateSchemaError(Diagnostic),
 
     #[error("{0}")]
     CreateAdditionalFieldsError(#[from] CreateAdditionalFieldsError),
@@ -244,7 +244,9 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
             // This is also problematic, because we really actually want a "all client fields map" fn,
             // but we don't really have one, since we're adding this here. Oh well. See the awkwardness in
             // selection_set_access.
-            let link_fields = get_link_fields_map(db).as_ref().map_err(|e| e.clone())?;
+            let link_fields = get_link_fields_map(db)
+                .as_ref()
+                .map_err(|e| MemoizedIsoLiteralError::CreateSchemaError(e.clone()))?;
 
             if let Some(link_field) = link_fields
                 .get(&(parent_object_entity_name, client_scalar_selectable_name))
@@ -371,7 +373,7 @@ pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
 > {
     let expose_as_field_queue = create_type_system_schema_with_server_selectables(db)
         .as_ref()
-        .map_err(|e| e.clone())?;
+        .map_err(|e| MemoizedIsoLiteralError::CreateSchemaError(e.clone()))?;
 
     let mut map = HashMap::new();
     for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
@@ -454,7 +456,8 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
         })
         .chain(
             get_link_fields_map(db)
-                .clone()?
+                .clone()
+                .map_err(|e| MemoizedIsoLiteralError::CreateSchemaError(e))?
                 .into_iter()
                 .map(|(key, value)| ((key.0, key.1.into()), Ok(value.scalar_selected()))),
         )

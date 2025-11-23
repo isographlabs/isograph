@@ -7,12 +7,11 @@ use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
-    ContainsIsoStats, CreateAdditionalFieldsError, CreateSchemaError,
-    FieldToInsertToServerSelectableError, IsographDatabase, NetworkProtocol,
-    ProcessClientFieldDeclarationError, ValidateUseOfArgumentsError, ValidatedEntrypointError,
-    create_new_exposed_field, create_type_system_schema_with_server_selectables,
-    parse_iso_literals, process_iso_literals, server_selectables_map, validate_use_of_arguments,
-    validated_entrypoints,
+    ContainsIsoStats, CreateAdditionalFieldsError, FieldToInsertToServerSelectableError,
+    IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError,
+    ValidateUseOfArgumentsError, ValidatedEntrypointError, create_new_exposed_field,
+    create_type_system_schema_with_server_selectables, parse_iso_literals, process_iso_literals,
+    server_selectables_map, validate_use_of_arguments, validated_entrypoints,
 };
 
 /// In the world of pico, we minimally validate. For example, if the
@@ -71,7 +70,7 @@ fn validate_all_expose_as_fields<TNetworkProtocol: NetworkProtocol>(
 ) -> Result<(), Vec<ValidationError>> {
     let expose_as_field_queue = create_type_system_schema_with_server_selectables(db)
         .as_ref()
-        .map_err(|e| vec![e.clone().into()])?;
+        .map_err(|e| vec![ValidationError::CreateSchemaError(e.clone())])?;
 
     // TODO restructure as a .map or whatnot
     let mut errors = vec![];
@@ -146,7 +145,7 @@ pub enum ValidationError {
     CreateAdditionalFieldsError(#[from] CreateAdditionalFieldsError),
 
     #[error("{0}")]
-    CreateSchemaError(#[from] CreateSchemaError),
+    CreateSchemaError(Diagnostic),
 
     #[error("{}", message.for_display())]
     IsographLiteralParseError {

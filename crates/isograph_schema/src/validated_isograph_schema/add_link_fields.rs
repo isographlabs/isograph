@@ -3,11 +3,10 @@ use std::collections::HashMap;
 use crate::{
     ClientFieldVariant, ClientScalarSelectable, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol,
     server_object_entities,
-    validated_isograph_schema::create_type_system_schema::CreateSchemaError,
 };
 use common_lang_types::{
-    ClientScalarSelectableName, ParentObjectEntityNameAndSelectableName, ServerObjectEntityName,
-    WithLocationPostfix,
+    ClientScalarSelectableName, DiagnosticResult, ParentObjectEntityNameAndSelectableName,
+    ServerObjectEntityName, WithLocationPostfix,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::Description;
@@ -17,10 +16,10 @@ use prelude::Postfix;
 #[memo]
 pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<Vec<ClientScalarSelectable<TNetworkProtocol>>, CreateSchemaError> {
+) -> DiagnosticResult<Vec<ClientScalarSelectable<TNetworkProtocol>>> {
     server_object_entities(db)
         .as_ref()
-        .map_err(|e| CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e.clone() })?
+        .map_err(|e| e.clone())?
         .iter()
         .map(|object| {
             let field_name = *LINK_FIELD_NAME;
@@ -49,12 +48,11 @@ pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn get_link_fields_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<
+) -> DiagnosticResult<
     HashMap<
         (ServerObjectEntityName, ClientScalarSelectableName),
         ClientScalarSelectable<TNetworkProtocol>,
     >,
-    CreateSchemaError,
 > {
     get_link_fields(db)
         .to_owned()?
