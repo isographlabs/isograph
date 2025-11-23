@@ -12,12 +12,13 @@ use common_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::Description;
 use pico_macros::memo;
+use prelude::Postfix;
 
 #[memo]
 pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<Vec<ClientScalarSelectable<TNetworkProtocol>>, CreateSchemaError<TNetworkProtocol>> {
-    Ok(server_object_entities(db)
+    server_object_entities(db)
         .as_ref()
         .map_err(|e| CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e.clone() })?
         .iter()
@@ -41,7 +42,8 @@ pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
                 network_protocol: std::marker::PhantomData,
             }
         })
-        .collect())
+        .collect::<Vec<_>>()
+        .ok()
 }
 
 #[expect(clippy::type_complexity)]
@@ -55,7 +57,7 @@ pub fn get_link_fields_map<TNetworkProtocol: NetworkProtocol>(
     >,
     CreateSchemaError<TNetworkProtocol>,
 > {
-    Ok(get_link_fields(db)
+    get_link_fields(db)
         .to_owned()?
         .into_iter()
         .map(|link_selectable| {
@@ -64,5 +66,6 @@ pub fn get_link_fields_map<TNetworkProtocol: NetworkProtocol>(
                 link_selectable,
             )
         })
-        .collect())
+        .collect::<HashMap<_, _>>()
+        .ok()
 }
