@@ -4,8 +4,12 @@ use std::{
     path::PathBuf,
 };
 
+use artifact_content::{
+    ArtifactLookupCache, generate_artifacts::ARTIFACT_LOOKUP_CACHE_FILE_NAME, operation_text::hash,
+};
 use common_lang_types::ArtifactPathAndContent;
 use intern::string_key::Lookup;
+use isograph_config::PersistedDocumentsHashAlgorithm;
 use thiserror::Error;
 
 #[tracing::instrument(skip(paths_and_contents, artifact_directory))]
@@ -29,6 +33,7 @@ pub(crate) fn write_artifacts_to_disk(
     })?;
 
     let mut count = 0;
+    let mut artifact_lookup_cache = ArtifactLookupCache::new();
     for path_and_content in paths_and_contents {
         // Is this better than materializing paths_and_contents sooner?
         count += 1;
@@ -59,7 +64,34 @@ pub(crate) fn write_artifacts_to_disk(
                 path: absolute_file_path.clone(),
                 message: e.to_string(),
             })?;
+
+        let artifact_hash = hash(
+            &path_and_content.file_content,
+            PersistedDocumentsHashAlgorithm::Sha256,
+        );
+        let relative_file_path = absolute_file_path
+            .strip_prefix(artifact_directory)
+            .expect("absolute paths should contain artifact_directory")
+            .to_string_lossy()
+            .to_string();
+        artifact_lookup_cache.insert(relative_file_path, artifact_hash);
     }
+
+    let absolute_file_path = artifact_directory.join(ARTIFACT_LOOKUP_CACHE_FILE_NAME.lookup());
+    let file = File::create(&absolute_file_path).map_err(|e| {
+        GenerateArtifactsError::UnableToWriteToArtifactFile {
+            path: absolute_file_path.clone(),
+            message: e.to_string(),
+        }
+    })?;
+
+    artifact_lookup_cache.write_to(file).map_err(|e| {
+        GenerateArtifactsError::UnableToWriteToArtifactFile {
+            path: absolute_file_path.clone(),
+            message: e.to_string(),
+        }
+    })?;
+
     Ok(count)
 }
 
