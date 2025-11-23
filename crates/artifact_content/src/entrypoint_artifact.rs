@@ -14,7 +14,6 @@ use common_lang_types::{
     ArtifactPathAndContent, ClientScalarSelectableName, ParentObjectEntityNameAndSelectableName,
     QueryOperationName, ServerObjectEntityName, VariableName,
 };
-use intern::Lookup;
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
     DefinitionLocationPostfix, EmptyDirectiveSet, EntrypointDirectiveSet,
@@ -320,9 +319,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     path_and_contents.push(ArtifactPathAndContent {
         file_content: format!(
             "export type {}__{}__{} = {raw_response_type}\n",
-            type_name,
-            field_name,
-            RAW_RESPONSE_TYPE.lookup()
+            type_name, field_name, *RAW_RESPONSE_TYPE
         ),
         file_name: *RAW_RESPONSE_TYPE_FILE_NAME,
         type_and_field: Some(ParentObjectEntityNameAndSelectableName {
@@ -442,9 +439,7 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
     let entrypoint_output_type_name = format!("{}__{}__output_type", parent_type.name, query_name);
     let raw_response_type_name = format!(
         "{}__{}__{}",
-        parent_type.name,
-        query_name,
-        RAW_RESPONSE_TYPE.lookup()
+        parent_type.name, query_name, *RAW_RESPONSE_TYPE
     );
     let resolver_reader_file_name = *RESOLVER_READER;
     let param_type_file_name = *RESOLVER_PARAM_TYPE;
