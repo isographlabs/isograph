@@ -1,8 +1,8 @@
 export type Viewer__NewsfeedPaginationComponent__rawResponse = {
-  node____id___v_id: {
+  node____id___v_id?: ({
     __typename: "Viewer",
     id: string,
-    newsfeed____skip___v_skip____limit___v_limit: {
+    newsfeed____skip___v_skip____limit___v_limit: ReadonlyArray<{
       __typename: "AdItem",
       id: string,
     } | {
@@ -10,11 +10,11 @@ export type Viewer__NewsfeedPaginationComponent__rawResponse = {
       id: string,
       author: string,
       content: string,
-      image: {
+      image?: ({
         id: string,
-      },
+      } | null),
       title: string,
-    },
-  },
+    }>,
+  } | null),
 }
 

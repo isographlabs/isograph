@@ -1,10 +1,10 @@
 export type User__RepositoryConnection__rawResponse = {
-  node____id___v_id: {
+  node____id___v_id?: ({
     __typename: "User",
     id: string,
     repositories____first___v_first____after___v_after: {
-      edges: {
-        node: {
+      edges?: (ReadonlyArray<({
+        node?: ({
           id: string,
           description?: (string | null),
           forkCount: number,
@@ -22,13 +22,13 @@ export type User__RepositoryConnection__rawResponse = {
           watchers: {
             totalCount: number,
           },
-        },
-      },
+        } | null),
+      } | null)> | null),
       pageInfo: {
         endCursor?: (string | null),
         hasNextPage: boolean,
       },
     },
-  },
+  } | null),
 }
 

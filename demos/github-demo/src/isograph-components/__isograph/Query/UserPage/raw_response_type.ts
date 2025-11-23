@@ -1,10 +1,10 @@
 export type Query__UserPage__rawResponse = {
-  user____login___v_userLogin: {
+  user____login___v_userLogin?: ({
     id: string,
     name?: (string | null),
     repositories____first___l_10____after___l_null: {
-      edges: {
-        node: {
+      edges?: (ReadonlyArray<({
+        node?: ({
           id: string,
           description?: (string | null),
           forkCount: number,
@@ -22,14 +22,14 @@ export type Query__UserPage__rawResponse = {
           watchers: {
             totalCount: number,
           },
-        },
-      },
+        } | null),
+      } | null)> | null),
       pageInfo: {
         endCursor?: (string | null),
         hasNextPage: boolean,
       },
     },
-  },
+  } | null),
   viewer: {
     id: string,
     avatarUrl: string,

@@ -10,7 +10,7 @@ export type Mutation__MututalBestFriendSetterMutation__rawResponse = {
           picture: string,
         },
         picture_together?: (string | null),
-      },
+      } | null),
     },
   },
 }

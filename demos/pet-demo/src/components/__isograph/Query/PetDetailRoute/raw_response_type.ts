@@ -10,30 +10,30 @@ export type Query__PetDetailRoute__rawResponse = {
         picture: string,
       },
       picture_together?: (string | null),
-    },
-    checkins____skip___l_null____limit___l_null: {
+    } | null),
+    checkins____skip___l_null____limit___l_null: ReadonlyArray<{
       id: string,
       location: string,
       time: string,
-    },
+    }>,
     favorite_phrase?: (string | null),
     firstName: string,
     lastName: string,
     nickname?: (string | null),
-    potential_new_best_friends: {
+    potential_new_best_friends: ReadonlyArray<{
       id: string,
       firstName: string,
       lastName: string,
-    },
-    stats: {
+    }>,
+    stats?: ({
       cuteness?: (number | null),
       energy?: (number | null),
       hunger?: (number | null),
       intelligence?: (number | null),
       sociability?: (number | null),
       weight?: (number | null),
-    },
+    } | null),
     tagline: string,
-  },
+  } | null),
 }
 

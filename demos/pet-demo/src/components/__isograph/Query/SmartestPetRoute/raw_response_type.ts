@@ -1,9 +1,9 @@
 export type Query__SmartestPetRoute__rawResponse = {
-  pets: {
+  pets: ReadonlyArray<{
     id: string,
-    stats: {
+    stats?: ({
       intelligence?: (number | null),
-    },
-  },
+    } | null),
+  }>,
 }
 

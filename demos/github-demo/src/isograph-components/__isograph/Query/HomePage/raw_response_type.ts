@@ -5,8 +5,8 @@ export type Query__HomePage__rawResponse = {
     login: string,
     name?: (string | null),
     repositories____first___l_10____after___l_null: {
-      edges: {
-        node: {
+      edges?: (ReadonlyArray<({
+        node?: ({
           id: string,
           description?: (string | null),
           forkCount: number,
@@ -24,8 +24,8 @@ export type Query__HomePage__rawResponse = {
           watchers: {
             totalCount: number,
           },
-        },
-      },
+        } | null),
+      } | null)> | null),
       pageInfo: {
         endCursor?: (string | null),
         hasNextPage: boolean,

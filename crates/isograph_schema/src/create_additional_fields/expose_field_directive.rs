@@ -119,6 +119,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
     let client_field_scalar_selection_name = expose_as.unwrap_or(mutation_field.name.item.into());
     // TODO what is going on here. Should mutation_field have a checked way of converting to LinkedField?
     let top_level_schema_field_name = mutation_field.name.item.unchecked_conversion();
+    let top_level_schema_field_parent_object_entity_name = mutation_field.parent_object_entity_name;
     let mutation_field_arguments = mutation_field.arguments.clone();
     let description = expose_field_to_insert
         .description
@@ -196,6 +197,8 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
             let x = match server_object_selectable.object_selectable_variant {
                 ServerObjectSelectableVariant::LinkedField => {
                     WrappedSelectionMapSelection::LinkedField {
+                        parent_object_entity_name: server_object_selectable
+                            .parent_object_entity_name,
                         server_object_selectable_name: server_object_selectable.name.item,
                         arguments: vec![],
                         concrete_type: primary_field_concrete_type,
@@ -226,6 +229,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
         top_level_schema_field_name,
         &top_level_schema_field_arguments,
         top_level_schema_field_concrete_type,
+        top_level_schema_field_parent_object_entity_name,
     ));
 
     let mutation_client_scalar_selectable = ClientScalarSelectable {

@@ -2,7 +2,8 @@ use intern::Lookup;
 use isograph_lang_types::TypeAnnotation;
 use isograph_schema::{
     IsographDatabase, MergedSelectionMap, MergedServerSelection, NetworkProtocol,
-    server_scalar_entity_javascript_name, server_scalar_selectable_named,
+    server_object_selectable_named, server_scalar_entity_javascript_name,
+    server_scalar_selectable_named,
 };
 use std::collections::BTreeMap;
 
@@ -86,26 +87,60 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
                 );
 
                 raw_response_type_inner.push_str(&format!(
-                    "{name}{}: {},\n",
+                    "{indent}{name}{}: {},\n",
                     if is_optional { "?" } else { "" },
                     print_javascript_type_declaration(&raw_type)
                 ));
             }
             MergedServerSelection::LinkedField(linked_field) => {
-                raw_response_type_inner.push_str(indent);
                 let normalization_alias = linked_field.normalization_alias();
                 let name = normalization_alias
                     .as_deref()
                     .unwrap_or(linked_field.name.lookup());
-                raw_response_type_inner.push_str(&format!("{name}: {{\n"));
 
-                generate_raw_response_type_inner(
+                let server_object_selectable = server_object_selectable_named(
                     db,
-                    &mut raw_response_type_inner,
-                    &linked_field.selection_map,
-                    indentation_level + 1,
+                    linked_field.parent_object_entity_name,
+                    linked_field.name.into(),
+                )
+                .as_ref()
+                .expect(
+                    "Expected validation to have succeeded. \
+                    This is indicative of a bug in Isograph.",
+                )
+                .as_ref()
+                .expect(
+                    "Expected selectable to exist. \
+                    This is indicative of a bug in Isograph.",
                 );
-                raw_response_type_inner.push_str(&format!("{indent}}},\n"));
+
+                let raw_type =
+                    server_object_selectable
+                        .target_object_entity
+                        .as_ref()
+                        .map(&mut |_| {
+                            let mut raw_response_type_declaration = String::new();
+                            raw_response_type_declaration.push_str("{\n");
+                            generate_raw_response_type_inner(
+                                db,
+                                &mut raw_response_type_declaration,
+                                &linked_field.selection_map,
+                                indentation_level + 1,
+                            );
+                            raw_response_type_declaration.push_str(&format!("{indent}}}"));
+                            raw_response_type_declaration
+                        });
+
+                let is_optional = matches!(
+                    server_object_selectable.target_object_entity,
+                    TypeAnnotation::Union(_)
+                );
+
+                raw_response_type_inner.push_str(&format!(
+                    "{indent}{name}{}: {},\n",
+                    if is_optional { "?" } else { "" },
+                    print_javascript_type_declaration(&raw_type)
+                ));
             }
             MergedServerSelection::ClientPointer(_) => {}
             MergedServerSelection::InlineFragment(inline_fragment) => {
