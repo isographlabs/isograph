@@ -457,7 +457,7 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
         .chain(
             get_link_fields_map(db)
                 .clone()
-                .map_err(|e| MemoizedIsoLiteralError::CreateSchemaError(e))?
+                .map_err(MemoizedIsoLiteralError::CreateSchemaError)?
                 .into_iter()
                 .map(|(key, value)| ((key.0, key.1.into()), Ok(value.scalar_selected()))),
         )

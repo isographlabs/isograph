@@ -7,11 +7,11 @@ use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
-    ContainsIsoStats, CreateAdditionalFieldsError, FieldToInsertToServerSelectableError,
-    IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError,
-    ValidateUseOfArgumentsError, ValidatedEntrypointError, create_new_exposed_field,
-    create_type_system_schema_with_server_selectables, parse_iso_literals, process_iso_literals,
-    server_selectables_map, validate_use_of_arguments, validated_entrypoints,
+    ContainsIsoStats, CreateAdditionalFieldsError, IsographDatabase, NetworkProtocol,
+    ProcessClientFieldDeclarationError, ValidateUseOfArgumentsError, ValidatedEntrypointError,
+    create_new_exposed_field, create_type_system_schema_with_server_selectables,
+    parse_iso_literals, process_iso_literals, server_selectables_map, validate_use_of_arguments,
+    validated_entrypoints,
 };
 
 /// In the world of pico, we minimally validate. For example, if the
@@ -133,10 +133,8 @@ pub enum ValidationError {
     #[error("{0}")]
     ParseTypeSystemDocumentsError(Diagnostic),
 
-    #[error("{}", error.for_display())]
-    FieldToInsertToServerSelectableError {
-        error: WithLocation<FieldToInsertToServerSelectableError>,
-    },
+    #[error("{}", error)]
+    FieldToInsertToServerSelectableError { error: Diagnostic },
 
     #[error("{0}")]
     ValidatedEntrypointError(#[from] ValidatedEntrypointError),

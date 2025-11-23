@@ -1,14 +1,14 @@
-use common_lang_types::{Diagnostic, SelectableName, ServerObjectEntityName, WithLocation};
+use common_lang_types::{Diagnostic, SelectableName, ServerObjectEntityName};
 use isograph_lang_types::{DefinitionLocation, DefinitionLocationPostfix, SelectionType};
 use pico_macros::memo;
 use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
-    ClientObjectSelectable, ClientScalarSelectable, FieldToInsertToServerSelectableError,
-    IsographDatabase, MemoizedIsoLiteralError, NetworkProtocol, ServerObjectSelectable,
-    ServerScalarSelectable, ServerSelectableNamedError, client_selectable_map,
-    client_selectable_named, server_selectable_named, server_selectables_vec_for_entity,
+    ClientObjectSelectable, ClientScalarSelectable, IsographDatabase, MemoizedIsoLiteralError,
+    NetworkProtocol, ServerObjectSelectable, ServerScalarSelectable, ServerSelectableNamedError,
+    client_selectable_map, client_selectable_named, server_selectable_named,
+    server_selectables_vec_for_entity,
 };
 
 #[expect(clippy::type_complexity)]
@@ -149,10 +149,8 @@ pub enum SelectableNamedError {
     #[error("{0}")]
     ServerSelectableNamedError(#[from] ServerSelectableNamedError),
 
-    #[error("{}", error.for_display())]
-    FieldToInsertToServerSelectableError {
-        error: WithLocation<FieldToInsertToServerSelectableError>,
-    },
+    #[error("{error}")]
+    FieldToInsertToServerSelectableError { error: Diagnostic },
 
     #[error("`{parent_object_entity_name}.{selectable_name}` has been defined multiple times.")]
     DuplicateDefinitions {

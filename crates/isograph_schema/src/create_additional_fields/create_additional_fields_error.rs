@@ -1,5 +1,5 @@
-use crate::{EntityAccessError, FieldToInsertToServerSelectableError, ServerSelectableNamedError};
-use common_lang_types::{SelectableName, ServerObjectEntityName, StringLiteralValue, WithLocation};
+use crate::{EntityAccessError, ServerSelectableNamedError};
+use common_lang_types::{Diagnostic, SelectableName, ServerObjectEntityName, StringLiteralValue};
 use intern::{Lookup, string_key::Intern};
 
 use serde::Deserialize;
@@ -84,10 +84,8 @@ pub enum CreateAdditionalFieldsError {
     #[error("{0}")]
     ServerSelectableNamedError(#[from] ServerSelectableNamedError),
 
-    #[error("{}", error.for_display())]
-    FieldToInsertToServerSelectableError {
-        error: WithLocation<FieldToInsertToServerSelectableError>,
-    },
+    #[error("{error}")]
+    FieldToInsertToServerSelectableError { error: Diagnostic },
 }
 
 pub type CreateAdditionalFieldsResult<T> = Result<T, CreateAdditionalFieldsError>;

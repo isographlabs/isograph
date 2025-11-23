@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, ServerObjectEntityName, ServerSelectableName, WithLocation,
+    Diagnostic, DiagnosticResult, ServerObjectEntityName, ServerSelectableName,
 };
 use intern::Lookup;
 use isograph_lang_types::SelectionType;
@@ -10,15 +10,13 @@ use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
-    EntityAccessError, FieldToInsertToServerSelectableError, ID_ENTITY_NAME, ID_FIELD_NAME,
-    IsographDatabase, NetworkProtocol, OwnedServerSelectable, ServerObjectSelectable,
-    ServerScalarSelectable, field_to_insert_to_server_selectable, server_scalar_entity_named,
+    EntityAccessError, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, NetworkProtocol,
+    OwnedServerSelectable, ServerObjectSelectable, ServerScalarSelectable,
+    field_to_insert_to_server_selectable, server_scalar_entity_named,
 };
 
-type OwnedSelectableResult<TNetworkProtocol> = Result<
-    OwnedServerSelectable<TNetworkProtocol>,
-    WithLocation<FieldToInsertToServerSelectableError>,
->;
+type OwnedSelectableResult<TNetworkProtocol> =
+    DiagnosticResult<OwnedServerSelectable<TNetworkProtocol>>;
 
 #[expect(clippy::type_complexity)]
 #[memo]
@@ -244,11 +242,8 @@ pub enum ServerSelectableNamedError {
         actual_type: &'static str,
     },
 
-    // TODO this is probably indicative of bad modeling
-    #[error("{}", error.for_display())]
-    FieldToInsertToServerSelectableError {
-        error: WithLocation<FieldToInsertToServerSelectableError>,
-    },
+    #[error("{}", error)]
+    FieldToInsertToServerSelectableError { error: Diagnostic },
 
     #[error(
         "The `{strong_field_name}` field on `{parent_object_entity_name}` must have type `ID!`.\n\

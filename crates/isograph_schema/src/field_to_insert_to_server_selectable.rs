@@ -1,5 +1,5 @@
 use common_lang_types::{
-    SelectableName, ServerObjectEntityName, ServerSelectableName, UnvalidatedTypeName,
+    Diagnostic, DiagnosticResult, SelectableName, ServerObjectEntityName, UnvalidatedTypeName,
     VariableName, WithLocation, WithLocationPostfix,
 };
 use graphql_lang_types::{
@@ -9,7 +9,6 @@ use isograph_lang_types::{
     ConstantValue, SelectionType, SelectionTypePostfix, TypeAnnotation, VariableDefinition,
 };
 use prelude::Postfix;
-use thiserror::Error;
 
 use crate::{
     FieldToInsert, IsographDatabase, NetworkProtocol, ServerEntityName, ServerObjectSelectable,
@@ -25,12 +24,11 @@ pub fn field_to_insert_to_server_selectable<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     server_field_to_insert: &WithLocation<FieldToInsert>,
-) -> Result<
+) -> DiagnosticResult<
     SelectionType<
         ScalarSelectionAndNonNullType<TNetworkProtocol>,
         ServerObjectSelectable<TNetworkProtocol>,
     >,
-    WithLocation<FieldToInsertToServerSelectableError>,
 > {
     let target_entity_type_name = server_field_to_insert.item.graphql_type.inner();
     let target_entity_type_name_non_null = server_field_to_insert
@@ -46,12 +44,14 @@ pub fn field_to_insert_to_server_selectable<TNetworkProtocol: NetworkProtocol>(
             This is indicative of a bug in Isograph.",
         )
         .ok_or_else(|| {
-            FieldToInsertToServerSelectableError::FieldTypenameDoesNotExist {
-                parent_object_entity_name,
-                target_entity_type_name: *target_entity_type_name,
-                selectable_name: server_field_to_insert.item.name.item,
-            }
-            .with_location(server_field_to_insert.location)
+            let selectable_name = server_field_to_insert.item.name.item;
+            Diagnostic::new(
+                format!(
+                    "The field `{parent_object_entity_name}.{selectable_name}` \
+                    has inner type `{target_entity_type_name}`, which does not exist"
+                ),
+                server_field_to_insert.location.some(),
+            )
         })?;
 
     let arguments = server_field_to_insert
@@ -115,44 +115,19 @@ pub fn field_to_insert_to_server_selectable<TNetworkProtocol: NetworkProtocol>(
     .ok()
 }
 
-#[derive(Clone, Error, PartialEq, Eq, Debug, PartialOrd, Ord)]
-pub enum FieldToInsertToServerSelectableError {
-    #[error(
-        "The field `{parent_object_entity_name}.{selectable_name}` has inner type `{target_entity_type_name}`, which does not exist"
-    )]
-    FieldTypenameDoesNotExist {
-        parent_object_entity_name: ServerObjectEntityName,
-        selectable_name: ServerSelectableName,
-        target_entity_type_name: UnvalidatedTypeName,
-    },
-
-    #[error(
-        "The argument `{argument_name}` on field `{parent_type_name}.{field_name}` has inner type `{argument_type}`, which does not exist."
-    )]
-    FieldArgumentTypeDoesNotExist {
-        argument_name: VariableName,
-        parent_type_name: ServerObjectEntityName,
-        field_name: SelectableName,
-        argument_type: UnvalidatedTypeName,
-    },
-}
-
 pub fn graphql_input_value_definition_to_variable_definition<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     input_value_definition: WithLocation<GraphQLInputValueDefinition>,
     parent_type_name: ServerObjectEntityName,
     field_name: SelectableName,
-) -> Result<
-    WithLocation<VariableDefinition<ServerEntityName>>,
-    WithLocation<FieldToInsertToServerSelectableError>,
-> {
+) -> DiagnosticResult<WithLocation<VariableDefinition<ServerEntityName>>> {
     let default_value = input_value_definition
         .item
         .default_value
         .map(|graphql_constant_value| {
             convert_graphql_constant_value_to_isograph_constant_value(graphql_constant_value.item)
                 .with_location(graphql_constant_value.location)
-                .ok::<WithLocation<FieldToInsertToServerSelectableError>>()
+                .ok()
         })
         .transpose()?;
 
@@ -169,15 +144,17 @@ pub fn graphql_input_value_definition_to_variable_definition<TNetworkProtocol: N
                     "Expected parsing to have succeeded. \
                     This is indicative of a bug in Isograph.",
                 )
-                .ok_or(
-                    FieldToInsertToServerSelectableError::FieldArgumentTypeDoesNotExist {
-                        argument_type: input_type_name.into(),
-                        argument_name: input_value_definition.item.name.item.into(),
-                        parent_type_name,
-                        field_name,
-                    }
-                    .with_location(input_value_definition.location),
-                )
+                .ok_or_else(|| {
+                    let argument_name = input_value_definition.item.name.item;
+                    Diagnostic::new(
+                        format!(
+                            "The argument `{argument_name}` on field \
+                            `{parent_type_name}.{field_name}` \
+                            has inner type `{input_type_name}`, which does not exist"
+                        ),
+                        input_value_definition.location.some(),
+                    )
+                })
         })?;
 
     VariableDefinition {
