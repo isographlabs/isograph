@@ -23,9 +23,6 @@ use crate::{
 /// This is opt-in, but it makes sense to call this before we generate
 /// artifacts. However, whether we do these strictly-unnecessary
 /// validations should be controllable by the user.
-///
-/// TODO we return early in a few places, and throw away already-accumulated
-/// errors, which we should not do.
 #[memo]
 pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
