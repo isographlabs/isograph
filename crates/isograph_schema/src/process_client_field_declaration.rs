@@ -17,7 +17,7 @@ use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
-    ClientObjectSelectable, ClientScalarSelectable, FieldMapItem,
+    ClientObjectSelectable, ClientScalarSelectable, DefinedEntityError, FieldMapItem,
     FieldToInsertToServerSelectableError, ID_FIELD_NAME, IsographDatabase, NODE_FIELD_NAME,
     NetworkProtocol, ServerEntityName, ServerSelectableNamedError, ValidatedVariableDefinition,
     WrappedSelectionMapSelection, defined_entity, fetchable_types,
@@ -245,10 +245,10 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
 ) -> ProcessClientFieldDeclarationResult<Option<RefetchStrategy<(), ()>>, TNetworkProtocol> {
-    let fetchable_types_map = fetchable_types(db).as_ref().expect(
-        "Expected parsing to have succeeded. \
-        This is indicative of a bug in Isograph.",
-    );
+    let fetchable_types_map = fetchable_types(db).as_ref().map_err(|e| {
+        ProcessClientFieldDeclarationError::ParseTypeSystemDocumentsError(e.clone())
+            .with_generated_span()
+    })?;
 
     let is_fetchable = fetchable_types_map.contains_key(&parent_object_entity_name);
 
@@ -434,6 +434,12 @@ pub enum ProcessClientFieldDeclarationError<TNetworkProtocol: NetworkProtocol> {
 
     #[error("{0}")]
     FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),
+
+    #[error("{0}")]
+    DefinedEntityError(#[from] DefinedEntityError<TNetworkProtocol>),
+
+    #[error("{0}")]
+    ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -504,10 +510,9 @@ pub fn validate_variable_definition<TNetworkProtocol: NetworkProtocol>(
         .and_then(|input_type_name| {
             defined_entity(db, *variable_definition.item.type_.inner())
                 .to_owned()
-                .expect(
-                    "Expected parsing to have succeeded. \
-                    This is indicative of a bug in Isograph.",
-                )
+                .map_err(|e| {
+                    ProcessClientFieldDeclarationError::DefinedEntityError(e).with_generated_span()
+                })?
                 .ok_or_else(|| {
                     ProcessClientFieldDeclarationError::FieldArgumentTypeDoesNotExist {
                         argument_type: input_type_name,
