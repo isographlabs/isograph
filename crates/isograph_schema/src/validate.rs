@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use common_lang_types::WithLocation;
 use isograph_lang_parser::IsographLiteralParseError;
 use pico_macros::memo;
@@ -27,7 +29,7 @@ use crate::{
 pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<ContainsIsoStats, Vec<ValidationError<TNetworkProtocol>>> {
-    let mut errors = vec![];
+    let mut errors = BTreeSet::new();
 
     maybe_extend(
         &mut errors,
@@ -53,14 +55,14 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
         Ok(stats) => stats,
         Err(e) => {
             errors.extend(e);
-            return Err(errors);
+            return errors.into_iter().collect::<Vec<_>>().err();
         }
     };
 
     if errors.is_empty() {
         Ok(contains_iso_stats)
     } else {
-        Err(errors)
+        errors.into_iter().collect::<Vec<_>>().err()
     }
 }
 
@@ -116,13 +118,13 @@ fn is_empty_or_ok<E>(errors: Vec<E>) -> Result<(), Vec<E>> {
     }
 }
 
-fn maybe_extend<T, E>(errors_acc: &mut Vec<E>, result: Result<T, Vec<E>>) {
+fn maybe_extend<T, E>(errors_acc: &mut impl Extend<E>, result: Result<T, Vec<E>>) {
     if let Err(e) = result {
         errors_acc.extend(e);
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Error)]
+#[derive(Debug, Eq, PartialEq, Clone, Error, PartialOrd, Ord)]
 pub enum ValidationError<TNetworkProtocol: NetworkProtocol> {
     #[error("{}", error.for_display())]
     ValidateUseOfArgumentsError {

@@ -26,7 +26,7 @@ struct IsographFieldDirectiveDeserializer<'a> {
     directive: &'a IsographFieldDirective,
 }
 
-#[derive(Debug, Error, Eq, PartialEq, Clone)]
+#[derive(Debug, Error, Eq, PartialEq, Clone, PartialOrd, Ord)]
 pub enum DeserializationError {
     #[error("Error when deserializing.\n\n{0}")]
     Custom(String),

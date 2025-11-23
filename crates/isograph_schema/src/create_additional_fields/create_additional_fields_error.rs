@@ -47,7 +47,7 @@ pub type ProcessTypeDefinitionResult<T, TNetworkProtocol> =
 /// TODO some variants here should contain locations, since we used to have
 /// WithLocation<CreateAdditionalFieldsError> everywhere, but we removed that. But it makes sense
 /// in some cases!
-#[derive(Error, Clone, Eq, PartialEq, Debug)]
+#[derive(Error, Clone, Eq, PartialEq, Debug, PartialOrd, Ord)]
 pub enum CreateAdditionalFieldsError<TNetworkProtocol: NetworkProtocol> {
     #[error("Invalid field `{field_arg}` in @exposeField directive")]
     InvalidField { field_arg: String },

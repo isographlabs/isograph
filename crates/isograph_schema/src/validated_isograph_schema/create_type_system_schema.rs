@@ -30,7 +30,7 @@ pub fn create_type_system_schema_with_server_selectables<TNetworkProtocol: Netwo
     Ok(expose_as_field_queue)
 }
 
-#[derive(Error, Debug, PartialEq, Eq, Clone)]
+#[derive(Error, Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub enum CreateSchemaError<TNetworkProtocol: NetworkProtocol> {
     #[error("{message}")]
     ParseAndProcessTypeSystemDocument {

@@ -165,7 +165,7 @@ pub fn selectable_validated_reader_selection_set<TNetworkProtocol: NetworkProtoc
     }
 }
 
-#[derive(Clone, Error, Eq, PartialEq, Debug)]
+#[derive(Clone, Error, Eq, PartialEq, Debug, PartialOrd, Ord)]
 pub enum MemoizedSelectionSetError<TNetworkProtocol: NetworkProtocol> {
     #[error("`{parent_object_entity_name}.{client_selectable_name}` has been defined twice.")]
     DuplicateDefinition {

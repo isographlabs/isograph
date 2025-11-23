@@ -125,7 +125,7 @@ pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-#[derive(Clone, Error, Debug, Eq, PartialEq)]
+#[derive(Clone, Error, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum MemoizedIsoLiteralError<TNetworkProtocol: NetworkProtocol> {
     #[error(
         "Multiple definitions of `{duplicate_entity_name}.{duplicate_client_selectable_name}` were found"

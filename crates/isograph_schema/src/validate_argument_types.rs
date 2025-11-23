@@ -491,7 +491,7 @@ fn get_variable_type<'a, TNetworkProtocol: NetworkProtocol>(
 type ValidateArgumentTypesResult<T, TNetworkProtocol> =
     Result<T, WithLocation<ValidateArgumentTypesError<TNetworkProtocol>>>;
 
-#[derive(Debug, Error, PartialEq, Eq, Clone)]
+#[derive(Debug, Error, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub enum ValidateArgumentTypesError<TNetworkProtocol: NetworkProtocol> {
     #[error(
         "Expected input of type {expected_type}, found variable {variable_name} of type {variable_type}"

@@ -123,7 +123,7 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
     out
 }
 
-#[derive(Error, Clone, Debug, Eq, PartialEq)]
+#[derive(Error, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum ValidatedEntrypointError<TNetworkProtocol: NetworkProtocol> {
     #[error("{0}")]
     MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError<TNetworkProtocol>),

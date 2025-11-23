@@ -10,7 +10,7 @@ pub(crate) type ParseResultWithLocation<T> = Result<T, WithLocation<IsographLite
 pub(crate) type ParseResultWithSpan<T> = Result<T, WithSpan<IsographLiteralParseError>>;
 
 /// Errors tha make semantic sense when referring to parsing a Isograph literal
-#[derive(Error, Clone, Eq, PartialEq, Debug)]
+#[derive(Error, Clone, Eq, PartialEq, Debug, PartialOrd, Ord)]
 pub enum IsographLiteralParseError {
     #[error("{error}")]
     ParseError {

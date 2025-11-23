@@ -148,7 +148,7 @@ impl<'source> PeekableLexer<'source> {
 
 /// Low-level errors. If peekable_lexer could be made generic (it can't because it needs to know
 /// about EOF), these would belong in a different crate than the parser itself.
-#[derive(Error, Clone, Eq, PartialEq, Debug)]
+#[derive(Error, Clone, Eq, PartialEq, Debug, PartialOrd, Ord)]
 pub enum LowLevelParseError {
     #[error("Expected {expected_kind}, found {found_kind}")]
     ParseTokenKindError {

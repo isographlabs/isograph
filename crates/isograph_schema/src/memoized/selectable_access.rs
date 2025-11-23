@@ -130,7 +130,7 @@ pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
     selectables.ok()
 }
 
-#[derive(Error, Debug, PartialEq, Eq, Clone)]
+#[derive(Error, Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub enum SelectableNamedError<TNetworkProtocol: NetworkProtocol> {
     #[error("{0}")]
     ServerSelectableNamedError(#[from] ServerSelectableNamedError<TNetworkProtocol>),

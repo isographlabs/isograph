@@ -436,7 +436,7 @@ type MissingArguments = Vec<ValidatedVariableDefinition>;
 type ValidateUseOfArgumentsResult<T, TNetworkProtocol> =
     Result<T, WithLocation<ValidateUseOfArgumentsError<TNetworkProtocol>>>;
 
-#[derive(Debug, Error, PartialEq, Eq, Clone)]
+#[derive(Debug, Error, PartialEq, Eq, Clone, Ord, PartialOrd)]
 pub enum ValidateUseOfArgumentsError<TNetworkProtocol: NetworkProtocol> {
     #[error(
         "This field has missing arguments: {0}",

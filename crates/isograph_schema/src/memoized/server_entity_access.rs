@@ -77,7 +77,7 @@ pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
         .ok()
 }
 
-#[derive(Debug, Error, PartialEq, Eq, Clone)]
+#[derive(Debug, Error, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub enum EntityAccessError<TNetworkProtocol: NetworkProtocol> {
     #[error("{0}")]
     ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),
@@ -268,7 +268,7 @@ pub fn defined_entity<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-#[derive(Clone, Debug, Error, Eq, PartialEq)]
+#[derive(Clone, Debug, Error, Eq, PartialEq, PartialOrd, Ord)]
 pub enum DefinedEntityError<TNetworkProtocol: NetworkProtocol> {
     #[error("{0}")]
     ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),

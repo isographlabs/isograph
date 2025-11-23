@@ -384,7 +384,7 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
 type ProcessClientFieldDeclarationResult<T, TNetworkProtocol> =
     Result<T, WithSpan<ProcessClientFieldDeclarationError<TNetworkProtocol>>>;
 
-#[derive(Error, Eq, PartialEq, Debug, Clone)]
+#[derive(Error, Eq, PartialEq, Debug, Clone, PartialOrd, Ord)]
 pub enum ProcessClientFieldDeclarationError<TNetworkProtocol: NetworkProtocol> {
     #[error("`{parent_object_entity_name}` is not a type that has been defined.")]
     ParentTypeNotDefined {

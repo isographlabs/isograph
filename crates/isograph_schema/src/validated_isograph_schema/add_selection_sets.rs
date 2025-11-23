@@ -357,7 +357,7 @@ pub fn get_all_errors_or_all_ok<T, E>(
 type AddSelectionSetsResult<T, TNetworkProtocol> =
     Result<T, WithLocation<AddSelectionSetsError<TNetworkProtocol>>>;
 
-#[derive(Debug, Error, PartialEq, Eq, Clone)]
+#[derive(Debug, Error, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub enum AddSelectionSetsError<TNetworkProtocol: NetworkProtocol> {
     #[error(
         "In the client {client_type} `{client_field_parent_type_name}.{client_field_name}`, \

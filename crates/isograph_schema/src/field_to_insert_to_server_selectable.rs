@@ -114,7 +114,7 @@ pub fn field_to_insert_to_server_selectable<TNetworkProtocol: NetworkProtocol>(
     .ok()
 }
 
-#[derive(Clone, Error, PartialEq, Eq, Debug)]
+#[derive(Clone, Error, PartialEq, Eq, Debug, PartialOrd, Ord)]
 pub enum FieldToInsertToServerSelectableError {
     #[error(
         "The field `{parent_object_entity_name}.{selectable_name}` has inner type `{target_entity_type_name}`, which does not exist"

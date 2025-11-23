@@ -260,7 +260,7 @@ impl GraphQLSchemaOriginalDefinitionType {
     }
 }
 
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[derive(Error, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ParseGraphQLTypeSystemDocumentsError {
     #[error("{}", message.for_display())]
     SchemaParse {

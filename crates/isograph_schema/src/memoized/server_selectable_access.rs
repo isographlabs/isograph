@@ -227,7 +227,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     Ok(Some(db.intern_ref(selectable)))
 }
 
-#[derive(Clone, Debug, Error, PartialEq, Eq)]
+#[derive(Clone, Debug, Error, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ServerSelectableNamedError<TNetworkProtocol: NetworkProtocol> {
     #[error("{0}")]
     ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),
