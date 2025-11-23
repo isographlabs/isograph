@@ -68,7 +68,7 @@ pub(crate) fn generate_operation_text<'a, TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn hash(data: &str, algorithm: PersistedDocumentsHashAlgorithm) -> String {
+pub fn hash(data: &str, algorithm: PersistedDocumentsHashAlgorithm) -> String {
     match algorithm {
         PersistedDocumentsHashAlgorithm::Md5 => {
             let mut md5 = Md5::new();
