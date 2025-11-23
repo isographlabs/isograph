@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { getOrCreateCacheForArtifact, normalizeData } from '../core/cache';
 import {
   createIsographEnvironment,
@@ -13,6 +13,84 @@ import {
 import { iso } from './__isograph/iso';
 import type { Query__subquery__param } from './__isograph/Query/subquery/param_type';
 
+let store: ReturnType<typeof createIsographStore>;
+let environment: ReturnType<typeof createIsographEnvironment>;
+
+beforeEach(() => {
+  store = createIsographStore();
+  const networkFunction = vi.fn().mockRejectedValue(new Error('Fetch failed'));
+  environment = createIsographEnvironment(store, networkFunction);
+});
+
+export const normalizeUndefinedField = iso(`
+  field Query.normalizeUndefinedField {
+    me {
+      name
+    }
+  }
+`)(() => {});
+// prettier-ignore
+const normalizeUndefinedFieldEntrypoint = iso(`entrypoint Query.normalizeUndefinedField`);
+
+describe('normalize undefined field', () => {
+  test('should normalize scalar field to null', () => {
+    normalizeData(
+      environment,
+      environment.store,
+      normalizeUndefinedFieldEntrypoint.networkRequestInfo.normalizationAst
+        .selections,
+      {
+        me: { __typename: 'Economist', id: '1' },
+      },
+      {},
+      {
+        __link: ROOT_ID,
+        __typename: normalizeUndefinedFieldEntrypoint.concreteType,
+      },
+      new Map(),
+    );
+    expect(store).toStrictEqual({
+      Economist: {
+        '1': {
+          id: '1',
+          name: null,
+        },
+      },
+      Query: {
+        [ROOT_ID]: {
+          me: {
+            __typename: 'Economist',
+            __link: '1',
+          },
+        },
+      },
+    });
+  });
+
+  test('should normalize linked field to null', () => {
+    normalizeData(
+      environment,
+      environment.store,
+      normalizeUndefinedFieldEntrypoint.networkRequestInfo.normalizationAst
+        .selections,
+      {},
+      {},
+      {
+        __link: ROOT_ID,
+        __typename: normalizeUndefinedFieldEntrypoint.concreteType,
+      },
+      new Map(),
+    );
+    expect(store).toStrictEqual({
+      Query: {
+        [ROOT_ID]: {
+          me: null,
+        },
+      },
+    });
+  });
+});
+
 export const subquery = iso(`
   field Query.subquery($id: ID!) {
     query {
@@ -25,14 +103,8 @@ export const subquery = iso(`
 
 const entrypoint = iso(`entrypoint Query.subquery`);
 
-describe('normalizeData', () => {
-  test('nested Query should be normalized', () => {
-    const store = createIsographStore();
-    const networkFunction = vi
-      .fn()
-      .mockRejectedValue(new Error('Fetch failed'));
-    const environment = createIsographEnvironment(store, networkFunction);
-
+describe('nested Query', () => {
+  test('should be normalized', () => {
     normalizeData(
       environment,
       environment.store,
@@ -66,10 +138,8 @@ describe('normalizeData', () => {
       },
     } satisfies BaseStoreLayerData);
   });
-});
 
-describe('readData', () => {
-  test('nested Query should be read', () => {
+  test('should be read', () => {
     const store: BaseStoreLayerData = {
       Economist: {
         '1': {

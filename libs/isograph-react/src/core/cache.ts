@@ -508,12 +508,14 @@ function normalizeScalarField(
   const networkResponseKey = getNetworkResponseKey(astNode);
   const networkResponseData = networkResponseParentRecord[networkResponseKey];
   const parentRecordKey = getParentRecordKey(astNode, variables);
+  const existingValue = targetStoreRecord[parentRecordKey];
 
-  if (
-    networkResponseData == null ||
-    isScalarOrEmptyArray(networkResponseData)
-  ) {
-    const existingValue = targetStoreRecord[parentRecordKey];
+  if (networkResponseData == null) {
+    targetStoreRecord[parentRecordKey] = null;
+    return existingValue !== null;
+  }
+
+  if (isScalarOrEmptyArray(networkResponseData)) {
     targetStoreRecord[parentRecordKey] = networkResponseData;
     return existingValue !== networkResponseData;
   } else {
