@@ -232,10 +232,10 @@ pub fn defined_entities<TNetworkProtocol: NetworkProtocol>(
 pub fn defined_entity<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: UnvalidatedTypeName,
-) -> Result<Option<ServerEntityName>, DefinedEntityError> {
+) -> DiagnosticResult<Option<ServerEntityName>> {
     match defined_entities(db)
         .as_ref()
-        .map_err(|e| DefinedEntityError::ParseTypeSystemDocumentsError(e.clone()))?
+        .map_err(|e| e.clone())?
         .get(&entity_name)
     {
         Some(items) => {
@@ -244,9 +244,13 @@ pub fn defined_entity<TNetworkProtocol: NetworkProtocol>(
                     if rest.is_empty() {
                         Ok(Some(*first))
                     } else {
-                        Err(DefinedEntityError::MultipleDefinitionsFound {
-                            duplicate_entity_name: entity_name,
-                        })
+                        Diagnostic::new(
+                            format!("Multiple definitions of {entity_name} were found"),
+                            Result::ok(entity_definition_location(db, entity_name).as_ref())
+                                .cloned()
+                                .flatten(),
+                        )
+                        .err()
                     }
                 }
                 None => {
@@ -259,18 +263,7 @@ pub fn defined_entity<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-#[derive(Clone, Debug, Error, Eq, PartialEq, PartialOrd, Ord)]
-pub enum DefinedEntityError {
-    #[error("{0}")]
-    ParseTypeSystemDocumentsError(Diagnostic),
-
-    // TODO include additional locations
-    #[error("Multiple definitions of `{duplicate_entity_name}` were found")]
-    MultipleDefinitionsFound {
-        duplicate_entity_name: UnvalidatedTypeName,
-    },
-}
-
+/// Finds the entity of the first entity with the target name.
 #[memo]
 pub fn entity_definition_location<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,

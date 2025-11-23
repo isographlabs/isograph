@@ -17,10 +17,9 @@ use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
-    ClientObjectSelectable, ClientScalarSelectable, DefinedEntityError, FieldMapItem,
-    ID_FIELD_NAME, IsographDatabase, NODE_FIELD_NAME, NetworkProtocol, ServerEntityName,
-    ServerSelectableNamedError, ValidatedVariableDefinition, WrappedSelectionMapSelection,
-    defined_entity, fetchable_types,
+    ClientObjectSelectable, ClientScalarSelectable, FieldMapItem, ID_FIELD_NAME, IsographDatabase,
+    NODE_FIELD_NAME, NetworkProtocol, ServerEntityName, ServerSelectableNamedError,
+    ValidatedVariableDefinition, WrappedSelectionMapSelection, defined_entity, fetchable_types,
     refetch_strategy::{RefetchStrategy, generate_refetch_field_strategy, id_selection},
     server_selectable_named,
 };
@@ -423,7 +422,7 @@ pub enum ProcessClientFieldDeclarationError {
     FieldToInsertToServerSelectableError { error: Diagnostic },
 
     #[error("{0}")]
-    DefinedEntityError(#[from] DefinedEntityError),
+    DefinedEntityError(Diagnostic),
 
     #[error("{0}")]
     ParseTypeSystemDocumentsError(Diagnostic),
