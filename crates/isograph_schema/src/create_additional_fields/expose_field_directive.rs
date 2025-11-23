@@ -66,7 +66,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
         UnprocessedClientScalarSelectableSelectionSet,
         ClientScalarSelectable<TNetworkProtocol>,
     ),
-    CreateAdditionalFieldsError<TNetworkProtocol>,
+    CreateAdditionalFieldsError,
 > {
     let ExposeFieldDirective {
         expose_as,
@@ -214,7 +214,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
                     )
                 }
             };
-            Ok::<_, CreateAdditionalFieldsError<TNetworkProtocol>>(x)
+            Ok::<_, CreateAdditionalFieldsError>(x)
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -275,10 +275,7 @@ fn parse_mutation_subfield_id<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     field_arg: &str,
     mutation_object_entity_name: ServerObjectEntityName,
-) -> ProcessTypeDefinitionResult<
-    (ServerObjectEntityName, ServerObjectSelectableName),
-    TNetworkProtocol,
-> {
+) -> ProcessTypeDefinitionResult<(ServerObjectEntityName, ServerObjectSelectableName)> {
     let opt_field =
         server_selectable_named(db, mutation_object_entity_name, field_arg.intern().into())
             .as_ref()
@@ -315,7 +312,7 @@ fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol>(
     mutation_object_name: ServerObjectEntityName,
     mutation_field_name: SelectableName,
     field_map_items: Vec<FieldMapItem>,
-) -> ProcessTypeDefinitionResult<Vec<ProcessedFieldMapItem>, TNetworkProtocol> {
+) -> ProcessTypeDefinitionResult<Vec<ProcessedFieldMapItem>> {
     let mut processed_field_map_items = Vec::with_capacity(field_map_items.len());
     // TODO
     // We need to create entirely new arguments, which are the existing arguments minus
@@ -340,10 +337,7 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     root_object_name: ServerObjectEntityName,
     selections: &[ServerSelectableName],
-) -> Result<
-    (ServerObjectEntityName, Option<ServerObjectEntityName>),
-    CreateAdditionalFieldsError<TNetworkProtocol>,
-> {
+) -> Result<(ServerObjectEntityName, Option<ServerObjectEntityName>), CreateAdditionalFieldsError> {
     let mut current_entity_name = root_object_name;
 
     for selection_name in selections {

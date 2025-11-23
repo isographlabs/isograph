@@ -44,7 +44,7 @@ lazy_static! {
 #[memo]
 pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<(), Vec<WithLocation<ValidateUseOfArgumentsError<TNetworkProtocol>>>> {
+) -> Result<(), Vec<WithLocation<ValidateUseOfArgumentsError>>> {
     let mut errors = vec![];
 
     for client_selectable in client_selectable_map(db)
@@ -66,7 +66,7 @@ pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
 fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_type: impl ClientScalarOrObjectSelectable,
-    errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError<TNetworkProtocol>>>,
+    errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError>>,
 ) {
     let mut reachable_variables = BTreeSet::new();
 
@@ -232,7 +232,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
 #[expect(clippy::too_many_arguments)]
 fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError<TNetworkProtocol>>>,
+    errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError>>,
     reachable_variables: &mut BTreeSet<VariableName>,
     field_argument_definitions: Vec<ValidatedVariableDefinition>,
     client_type_variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
@@ -283,12 +283,12 @@ fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn validate_all_variables_are_used<TNetworkProtocol: NetworkProtocol>(
+fn validate_all_variables_are_used(
     variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
     used_variables: UsedVariables,
     top_level_type_and_field_name: ParentObjectEntityNameAndSelectableName,
     location: Location,
-) -> ValidateUseOfArgumentsResult<(), TNetworkProtocol> {
+) -> ValidateUseOfArgumentsResult<()> {
     let unused_variables = variable_definitions
         .iter()
         .filter_map(|variable| {
@@ -313,10 +313,10 @@ fn validate_all_variables_are_used<TNetworkProtocol: NetworkProtocol>(
     Ok(())
 }
 
-fn assert_no_missing_arguments<TNetworkProtocol: NetworkProtocol>(
+fn assert_no_missing_arguments(
     missing_arguments: Vec<ValidatedVariableDefinition>,
     location: Location,
-) -> ValidateUseOfArgumentsResult<(), TNetworkProtocol> {
+) -> ValidateUseOfArgumentsResult<()> {
     if !missing_arguments.is_empty() {
         return ValidateUseOfArgumentsError::MissingArguments { missing_arguments }
             .with_location(location)
@@ -357,11 +357,11 @@ fn get_missing_and_provided_arguments<'a>(
         })
 }
 
-fn validate_no_extraneous_arguments<TNetworkProtocol: NetworkProtocol>(
+fn validate_no_extraneous_arguments(
     field_argument_definitions: &[ValidatedVariableDefinition],
     selection_supplied_arguments: &[WithLocation<SelectionFieldArgument>],
     location: Location,
-) -> ValidateUseOfArgumentsResult<(), TNetworkProtocol> {
+) -> ValidateUseOfArgumentsResult<()> {
     let extra_arguments: Vec<_> = selection_supplied_arguments
         .iter()
         .filter_map(|arg| {
@@ -433,11 +433,10 @@ fn maybe_push_errors<E>(errors: &mut Vec<E>, result: Result<(), E>) {
 
 type MissingArguments = Vec<ValidatedVariableDefinition>;
 
-type ValidateUseOfArgumentsResult<T, TNetworkProtocol> =
-    Result<T, WithLocation<ValidateUseOfArgumentsError<TNetworkProtocol>>>;
+type ValidateUseOfArgumentsResult<T> = Result<T, WithLocation<ValidateUseOfArgumentsError>>;
 
 #[derive(Debug, Error, PartialEq, Eq, Clone, Ord, PartialOrd)]
-pub enum ValidateUseOfArgumentsError<TNetworkProtocol: NetworkProtocol> {
+pub enum ValidateUseOfArgumentsError {
     #[error(
         "This field has missing arguments: {0}",
         missing_arguments.iter().map(|arg| format!("${}", arg.name.item)).collect::<Vec<_>>().join(", ")
@@ -465,12 +464,12 @@ pub enum ValidateUseOfArgumentsError<TNetworkProtocol: NetworkProtocol> {
     #[error("{message}")]
     ValidateArgumentType {
         #[from]
-        message: ValidateArgumentTypesError<TNetworkProtocol>,
+        message: ValidateArgumentTypesError,
     },
 
     #[error("{0}")]
-    MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError<TNetworkProtocol>),
+    MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError),
 
     #[error("{0}")]
-    MemoizedSelectionSetError(#[from] MemoizedSelectionSetError<TNetworkProtocol>),
+    MemoizedSelectionSetError(#[from] MemoizedSelectionSetError),
 }

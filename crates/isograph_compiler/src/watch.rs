@@ -24,7 +24,7 @@ use crate::{
 pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
     config_location: &PathBuf,
     current_working_directory: CurrentWorkingDirectory,
-) -> Result<(), BatchCompileError<TNetworkProtocol>> {
+) -> Result<(), BatchCompileError> {
     let mut state = CompilerState::new(config_location, current_working_directory)?;
 
     let config = state.db.get_isograph_config().clone();

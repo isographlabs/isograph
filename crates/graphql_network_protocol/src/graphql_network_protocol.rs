@@ -1,11 +1,10 @@
 use std::collections::BTreeMap;
 
 use common_lang_types::{
-    Diagnostic, DirectiveName, QueryExtraInfo, QueryOperationName, QueryText,
-    ServerObjectEntityName, UnvalidatedTypeName, WithLocation, WithLocationPostfix,
+    Diagnostic, DiagnosticResult, DirectiveName, Location, QueryExtraInfo, QueryOperationName,
+    QueryText, ServerObjectEntityName, UnvalidatedTypeName, WithLocationPostfix,
 };
-use graphql_lang_types::{DeserializationError, from_graphql_directive};
-use graphql_schema_parser::SchemaParseError;
+use graphql_lang_types::from_graphql_directive;
 use intern::string_key::Intern;
 use isograph_lang_types::SelectionTypePostfix;
 use isograph_schema::{
@@ -16,7 +15,6 @@ use isograph_schema::{IsographDatabase, ServerScalarEntity};
 use lazy_static::lazy_static;
 use pico_macros::memo;
 use prelude::Postfix;
-use thiserror::Error;
 
 use crate::{
     parse_graphql_schema,
@@ -61,18 +59,14 @@ pub struct GraphQLNetworkProtocol {}
 
 impl NetworkProtocol for GraphQLNetworkProtocol {
     type SchemaObjectAssociatedData = GraphQLSchemaObjectAssociatedData;
-    type ParseTypeSystemDocumentsError = ParseGraphQLTypeSystemDocumentsError;
 
     #[memo]
     fn parse_type_system_documents(
         db: &IsographDatabase<Self>,
-    ) -> Result<
-        (
-            ParseTypeSystemOutcome<Self>,
-            BTreeMap<ServerObjectEntityName, RootOperationName>,
-        ),
-        ParseGraphQLTypeSystemDocumentsError,
-    > {
+    ) -> DiagnosticResult<(
+        ParseTypeSystemOutcome<Self>,
+        BTreeMap<ServerObjectEntityName, RootOperationName>,
+    )> {
         let mut graphql_root_types = None;
 
         let (type_system_document, type_system_extension_documents) =
@@ -141,12 +135,11 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     for directive in directives {
                         if directive.name.item == *EXPOSE_FIELD_DIRECTIVE {
                             let expose_field_directive = from_graphql_directive(&directive)
-                                .map_err(|err| match err {
-                                    DeserializationError::Custom(err) => {
-                                        ParseGraphQLTypeSystemDocumentsError::FailedToDeserialize(
-                                            err,
-                                        )
-                                    }
+                                .map_err(|err| {
+                                    Diagnostic::new(
+                                        format!("Failed to deserialize: {}", err),
+                                        Location::Generated.some(),
+                                    )
                                 })?;
 
                             outcome.expose_fields_to_insert.push(ExposeFieldToInsert {
@@ -259,29 +252,6 @@ impl GraphQLSchemaOriginalDefinitionType {
             GraphQLSchemaOriginalDefinitionType::Interface => "interface",
             GraphQLSchemaOriginalDefinitionType::Union => "union",
         }
-    }
-}
-
-#[derive(Error, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum ParseGraphQLTypeSystemDocumentsError {
-    #[error("{}", message.for_display())]
-    SchemaParse {
-        message: WithLocation<SchemaParseError>,
-    },
-
-    #[error("{message}")]
-    ProcessGraphQLTypeSystemDefinition {
-        #[from]
-        message: Diagnostic,
-    },
-
-    #[error("Failed to deserialize {0}")]
-    FailedToDeserialize(String),
-}
-
-impl From<WithLocation<SchemaParseError>> for ParseGraphQLTypeSystemDocumentsError {
-    fn from(value: WithLocation<SchemaParseError>) -> Self {
-        Self::SchemaParse { message: value }
     }
 }
 

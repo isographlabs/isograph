@@ -111,10 +111,7 @@ lazy_static! {
 #[tracing::instrument]
 pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<
-    (Vec<ArtifactPathAndContent>, ContainsIsoStats),
-    GetArtifactPathAndContentError<TNetworkProtocol>,
-> {
+) -> Result<(Vec<ArtifactPathAndContent>, ContainsIsoStats), GetArtifactPathAndContentError> {
     let config = db.get_isograph_config();
 
     let stats = validate_entire_schema(db)
@@ -1457,7 +1454,7 @@ pub fn get_provided_arguments<'a>(
 }
 
 #[derive(Error, Debug, Clone)]
-pub enum GetArtifactPathAndContentError<TNetworkProtocol: NetworkProtocol> {
+pub enum GetArtifactPathAndContentError {
     #[error(
         "{}",
         errors.iter().fold(String::new(), |mut output, x| {
@@ -1465,7 +1462,5 @@ pub enum GetArtifactPathAndContentError<TNetworkProtocol: NetworkProtocol> {
             output
         })
     )]
-    ValidationError {
-        errors: Vec<ValidationError<TNetworkProtocol>>,
-    },
+    ValidationError { errors: Vec<ValidationError> },
 }

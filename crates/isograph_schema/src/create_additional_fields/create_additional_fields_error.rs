@@ -1,7 +1,4 @@
-use crate::{
-    EntityAccessError, FieldToInsertToServerSelectableError, NetworkProtocol,
-    ServerSelectableNamedError,
-};
+use crate::{EntityAccessError, FieldToInsertToServerSelectableError, ServerSelectableNamedError};
 use common_lang_types::{SelectableName, ServerObjectEntityName, StringLiteralValue};
 use intern::{Lookup, string_key::Intern};
 
@@ -39,8 +36,7 @@ impl FieldMapItem {
 // TODO this should be a different type.
 pub(crate) struct ProcessedFieldMapItem(pub FieldMapItem);
 
-pub type ProcessTypeDefinitionResult<T, TNetworkProtocol> =
-    Result<T, CreateAdditionalFieldsError<TNetworkProtocol>>;
+pub type ProcessTypeDefinitionResult<T> = Result<T, CreateAdditionalFieldsError>;
 
 /// Errors that make semantic sense when referring to creating a GraphQL schema in-memory representation
 ///
@@ -48,7 +44,7 @@ pub type ProcessTypeDefinitionResult<T, TNetworkProtocol> =
 /// WithLocation<CreateAdditionalFieldsError> everywhere, but we removed that. But it makes sense
 /// in some cases!
 #[derive(Error, Clone, Eq, PartialEq, Debug, PartialOrd, Ord)]
-pub enum CreateAdditionalFieldsError<TNetworkProtocol: NetworkProtocol> {
+pub enum CreateAdditionalFieldsError {
     #[error("Invalid field `{field_arg}` in @exposeField directive")]
     InvalidField { field_arg: String },
 
@@ -83,14 +79,13 @@ pub enum CreateAdditionalFieldsError<TNetworkProtocol: NetworkProtocol> {
     },
 
     #[error("{0}")]
-    EntityAccessError(#[from] EntityAccessError<TNetworkProtocol>),
+    EntityAccessError(#[from] EntityAccessError),
 
     #[error("{0}")]
-    ServerSelectableNamedError(#[from] ServerSelectableNamedError<TNetworkProtocol>),
+    ServerSelectableNamedError(#[from] ServerSelectableNamedError),
 
     #[error("{0}")]
     FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),
 }
 
-pub type CreateAdditionalFieldsResult<T, TNetworkProtocol> =
-    Result<T, CreateAdditionalFieldsError<TNetworkProtocol>>;
+pub type CreateAdditionalFieldsResult<T> = Result<T, CreateAdditionalFieldsError>;

@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
-use common_lang_types::{RelativePathToSourceFile, WithLocation};
+use common_lang_types::{DiagnosticResult, RelativePathToSourceFile};
 use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDocument};
-use graphql_schema_parser::{SchemaParseError, parse_schema, parse_schema_extensions};
+use graphql_schema_parser::{parse_schema, parse_schema_extensions};
 use isograph_schema::{IsographDatabase, NetworkProtocol, SchemaSource};
 use pico::{MemoRef, SourceId};
 use pico_macros::memo;
@@ -12,21 +12,17 @@ use prelude::Postfix;
 #[memo]
 pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<
-    (
-        MemoRef<GraphQLTypeSystemDocument>,
-        BTreeMap<RelativePathToSourceFile, MemoRef<GraphQLTypeSystemExtensionDocument>>,
-    ),
-    WithLocation<SchemaParseError>,
-> {
+) -> DiagnosticResult<(
+    MemoRef<GraphQLTypeSystemDocument>,
+    BTreeMap<RelativePathToSourceFile, MemoRef<GraphQLTypeSystemExtensionDocument>>,
+)> {
     let SchemaSource {
         content,
         text_source,
         ..
     } = db.get_schema_source();
 
-    let schema = parse_schema(content, *text_source)
-        .map_err(|with_span| with_span.to_with_location(*text_source))?;
+    let schema = parse_schema(content, *text_source)?;
 
     let mut schema_extensions = BTreeMap::new();
     for (relative_path, schema_extension_source_id) in db
@@ -47,14 +43,13 @@ pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol>(
 pub fn parse_schema_extensions_file<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     schema_extension_source_id: SourceId<SchemaSource>,
-) -> Result<MemoRef<GraphQLTypeSystemExtensionDocument>, WithLocation<SchemaParseError>> {
+) -> DiagnosticResult<MemoRef<GraphQLTypeSystemExtensionDocument>> {
     let SchemaSource {
         content,
         text_source,
         ..
     } = db.get(schema_extension_source_id);
-    let schema_extensions = parse_schema_extensions(content, *text_source)
-        .map_err(|with_span| with_span.to_with_location(*text_source))?;
+    let schema_extensions = parse_schema_extensions(content, *text_source)?;
 
     db.intern(schema_extensions).ok()
 }

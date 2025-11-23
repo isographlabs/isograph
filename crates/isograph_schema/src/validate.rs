@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use common_lang_types::WithLocation;
+use common_lang_types::{Diagnostic, WithLocation};
 use isograph_lang_parser::IsographLiteralParseError;
 use pico_macros::memo;
 use prelude::Postfix;
@@ -28,7 +28,7 @@ use crate::{
 #[memo]
 pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<ContainsIsoStats, Vec<ValidationError<TNetworkProtocol>>> {
+) -> Result<ContainsIsoStats, Vec<ValidationError>> {
     let mut errors = BTreeSet::new();
 
     maybe_extend(
@@ -68,7 +68,7 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
 
 fn validate_all_expose_as_fields<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<(), Vec<ValidationError<TNetworkProtocol>>> {
+) -> Result<(), Vec<ValidationError>> {
     let expose_as_field_queue = create_type_system_schema_with_server_selectables(db)
         .as_ref()
         .map_err(|e| vec![e.clone().into()])?;
@@ -90,7 +90,7 @@ fn validate_all_expose_as_fields<TNetworkProtocol: NetworkProtocol>(
 
 fn validate_all_iso_literals<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<ContainsIsoStats, Vec<ValidationError<TNetworkProtocol>>> {
+) -> Result<ContainsIsoStats, Vec<ValidationError>> {
     let contains_iso = parse_iso_literals(db).to_owned().map_err(|errors| {
         errors
             .into_iter()
@@ -125,26 +125,26 @@ fn maybe_extend<T, E>(errors_acc: &mut impl Extend<E>, result: Result<T, Vec<E>>
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Error, PartialOrd, Ord)]
-pub enum ValidationError<TNetworkProtocol: NetworkProtocol> {
+pub enum ValidationError {
     #[error("{}", error.for_display())]
     ValidateUseOfArgumentsError {
-        error: WithLocation<ValidateUseOfArgumentsError<TNetworkProtocol>>,
+        error: WithLocation<ValidateUseOfArgumentsError>,
     },
 
     #[error("{0}")]
-    ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),
+    ParseTypeSystemDocumentsError(Diagnostic),
 
     #[error("{0}")]
     FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),
 
     #[error("{0}")]
-    ValidatedEntrypointError(#[from] ValidatedEntrypointError<TNetworkProtocol>),
+    ValidatedEntrypointError(#[from] ValidatedEntrypointError),
 
     #[error("{0}")]
-    CreateAdditionalFieldsError(#[from] CreateAdditionalFieldsError<TNetworkProtocol>),
+    CreateAdditionalFieldsError(#[from] CreateAdditionalFieldsError),
 
     #[error("{0}")]
-    CreateSchemaError(#[from] CreateSchemaError<TNetworkProtocol>),
+    CreateSchemaError(#[from] CreateSchemaError),
 
     #[error("{}", message.for_display())]
     IsographLiteralParseError {
@@ -153,14 +153,14 @@ pub enum ValidationError<TNetworkProtocol: NetworkProtocol> {
 
     #[error("{}", error.for_display())]
     ProcessClientFieldDeclarationError {
-        error: WithLocation<ProcessClientFieldDeclarationError<TNetworkProtocol>>,
+        error: WithLocation<ProcessClientFieldDeclarationError>,
     },
 }
 
 #[memo]
 fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<(), Vec<ValidationError<TNetworkProtocol>>> {
+) -> Result<(), Vec<ValidationError>> {
     // Note: server_selectables_map is a HashMap<_, Vec<(_, Result)>
     // That result encodes whether the field exists. So, basically, we are collecting
     // each error from that result.

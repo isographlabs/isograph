@@ -25,7 +25,7 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
     (ServerObjectEntityName, ClientSelectableName),
     Result<
         SelectionType<WithSpan<SelectionSet<(), ()>>, WithSpan<SelectionSet<(), ()>>>,
-        MemoizedSelectionSetError<TNetworkProtocol>,
+        MemoizedSelectionSetError,
     >,
 > {
     // TODO use client_selectable_map
@@ -110,7 +110,7 @@ pub fn memoized_validated_reader_selection_set_map<TNetworkProtocol: NetworkProt
     (ServerObjectEntityName, ClientSelectableName),
     Result<
         WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
-        MemoizedSelectionSetError<TNetworkProtocol>,
+        MemoizedSelectionSetError,
     >,
 > {
     let unvalidated_map = memoized_unvalidated_reader_selection_set_map(db).to_owned();
@@ -138,7 +138,7 @@ pub fn memoized_validated_reader_selection_set_map<TNetworkProtocol: NetworkProt
                         key.0,
                         top_level_field_or_pointer,
                     )
-                    .map_err(|e| e.into())
+                    .map_err(|e| MemoizedSelectionSetError::ValidateAddSelectionSetsResultWithMultipleErrors { errors: e })
                 }),
             )
         })
@@ -149,7 +149,7 @@ pub fn selectable_validated_reader_selection_set<TNetworkProtocol: NetworkProtoc
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
     client_selectable_name: ClientSelectableName,
-) -> Result<ValidatedSelectionSet, MemoizedSelectionSetError<TNetworkProtocol>> {
+) -> Result<ValidatedSelectionSet, MemoizedSelectionSetError> {
     let map = memoized_validated_reader_selection_set_map(db);
 
     match map.get(&(parent_server_object_entity_name, client_selectable_name)) {
@@ -166,7 +166,7 @@ pub fn selectable_validated_reader_selection_set<TNetworkProtocol: NetworkProtoc
 }
 
 #[derive(Clone, Error, Eq, PartialEq, Debug, PartialOrd, Ord)]
-pub enum MemoizedSelectionSetError<TNetworkProtocol: NetworkProtocol> {
+pub enum MemoizedSelectionSetError {
     #[error("`{parent_object_entity_name}.{client_selectable_name}` has been defined twice.")]
     DuplicateDefinition {
         parent_object_entity_name: ServerObjectEntityName,
@@ -177,12 +177,11 @@ pub enum MemoizedSelectionSetError<TNetworkProtocol: NetworkProtocol> {
         errors.iter().map(|error| format!("{}", error.for_display())).collect::<Vec<_>>().join("\n")
     )]
     ValidateAddSelectionSetsResultWithMultipleErrors {
-        #[from]
-        errors: Vec<WithLocation<AddSelectionSetsError<TNetworkProtocol>>>,
+        errors: Vec<WithLocation<AddSelectionSetsError>>,
     },
 
     #[error("{0}")]
-    EntityAccessError(#[from] EntityAccessError<TNetworkProtocol>),
+    EntityAccessError(#[from] EntityAccessError),
 
     // TODO this should be an option in the return value, not an error variant, but
     // realistically, that's super annoying.

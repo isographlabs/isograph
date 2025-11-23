@@ -1,6 +1,6 @@
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, ConstExportName,
-    IsographDirectiveName, Location, ParentObjectEntityNameAndSelectableName,
+    Diagnostic, IsographDirectiveName, Location, ParentObjectEntityNameAndSelectableName,
     RelativePathToSourceFile, SelectableName, ServerObjectEntityName, TextSource,
     UnvalidatedTypeName, VariableName, WithLocation, WithLocationPostfix, WithSpan,
     WithSpanPostfix,
@@ -53,7 +53,7 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     text_source: TextSource,
 ) -> Result<
     UnprocessedClientScalarSelectableSelectionSet,
-    WithLocation<ProcessClientFieldDeclarationError<TNetworkProtocol>>,
+    WithLocation<ProcessClientFieldDeclarationError>,
 > {
     let parent_type_id =
         defined_entity(db, client_field_declaration.item.parent_type.item.0.into())
@@ -95,7 +95,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     text_source: TextSource,
 ) -> Result<
     UnprocessedClientObjectSelectableSelectionSet,
-    WithLocation<ProcessClientFieldDeclarationError<TNetworkProtocol>>,
+    WithLocation<ProcessClientFieldDeclarationError>,
 > {
     let parent_type_id = defined_entity(
         db,
@@ -168,10 +168,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
 fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_field_declaration: WithSpan<ClientFieldDeclaration>,
-) -> ProcessClientFieldDeclarationResult<
-    UnprocessedClientScalarSelectableSelectionSet,
-    TNetworkProtocol,
-> {
+) -> ProcessClientFieldDeclarationResult<UnprocessedClientScalarSelectableSelectionSet> {
     let (result, _) =
         process_client_field_declaration_inner(db, client_field_declaration.item).to_owned()?;
 
@@ -182,13 +179,10 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol>(
 pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_field_declaration: ClientFieldDeclaration,
-) -> ProcessClientFieldDeclarationResult<
-    (
-        UnprocessedClientScalarSelectableSelectionSet,
-        ClientScalarSelectable<TNetworkProtocol>,
-    ),
-    TNetworkProtocol,
-> {
+) -> ProcessClientFieldDeclarationResult<(
+    UnprocessedClientScalarSelectableSelectionSet,
+    ClientScalarSelectable<TNetworkProtocol>,
+)> {
     let client_scalar_selectable_name = client_field_declaration.client_field_name.item;
 
     let variant = get_client_variant(&client_field_declaration);
@@ -241,7 +235,7 @@ pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>
 pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
-) -> ProcessClientFieldDeclarationResult<Option<RefetchStrategy<(), ()>>, TNetworkProtocol> {
+) -> ProcessClientFieldDeclarationResult<Option<RefetchStrategy<(), ()>>> {
     let fetchable_types_map = fetchable_types(db).as_ref().map_err(|e| {
         ProcessClientFieldDeclarationError::ParseTypeSystemDocumentsError(e.clone())
             .with_generated_span()
@@ -297,10 +291,7 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
 fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
-) -> ProcessClientFieldDeclarationResult<
-    UnprocessedClientObjectSelectableSelectionSet,
-    TNetworkProtocol,
-> {
+) -> ProcessClientFieldDeclarationResult<UnprocessedClientObjectSelectableSelectionSet> {
     let (unprocessed_fields, _) =
         process_client_pointer_declaration_inner(db, client_pointer_declaration.item).to_owned()?;
 
@@ -311,13 +302,10 @@ fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol>(
 pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_pointer_declaration: ClientPointerDeclaration,
-) -> ProcessClientFieldDeclarationResult<
-    (
-        UnprocessedClientObjectSelectableSelectionSet,
-        ClientObjectSelectable<TNetworkProtocol>,
-    ),
-    TNetworkProtocol,
-> {
+) -> ProcessClientFieldDeclarationResult<(
+    UnprocessedClientObjectSelectableSelectionSet,
+    ClientObjectSelectable<TNetworkProtocol>,
+)> {
     let parent_object_entity_name = client_pointer_declaration.parent_type.item.0;
     let client_pointer_name = client_pointer_declaration.client_pointer_name.item.0;
 
@@ -381,11 +369,11 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
     ))
 }
 
-type ProcessClientFieldDeclarationResult<T, TNetworkProtocol> =
-    Result<T, WithSpan<ProcessClientFieldDeclarationError<TNetworkProtocol>>>;
+type ProcessClientFieldDeclarationResult<T> =
+    Result<T, WithSpan<ProcessClientFieldDeclarationError>>;
 
 #[derive(Error, Eq, PartialEq, Debug, Clone, PartialOrd, Ord)]
-pub enum ProcessClientFieldDeclarationError<TNetworkProtocol: NetworkProtocol> {
+pub enum ProcessClientFieldDeclarationError {
     #[error("`{parent_object_entity_name}` is not a type that has been defined.")]
     ParentTypeNotDefined {
         parent_object_entity_name: ServerObjectEntityNameWrapper,
@@ -427,16 +415,16 @@ pub enum ProcessClientFieldDeclarationError<TNetworkProtocol: NetworkProtocol> {
     },
 
     #[error("{0}")]
-    ServerSelectableNamedError(#[from] ServerSelectableNamedError<TNetworkProtocol>),
+    ServerSelectableNamedError(#[from] ServerSelectableNamedError),
 
     #[error("{0}")]
     FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),
 
     #[error("{0}")]
-    DefinedEntityError(#[from] DefinedEntityError<TNetworkProtocol>),
+    DefinedEntityError(#[from] DefinedEntityError),
 
     #[error("{0}")]
-    ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),
+    ParseTypeSystemDocumentsError(Diagnostic),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -496,10 +484,7 @@ pub fn validate_variable_definition<TNetworkProtocol: NetworkProtocol>(
     variable_definition: WithSpan<VariableDefinition<UnvalidatedTypeName>>,
     parent_object_entity_name: ServerObjectEntityName,
     selectable_name: SelectableName,
-) -> ProcessClientFieldDeclarationResult<
-    WithSpan<VariableDefinition<ServerEntityName>>,
-    TNetworkProtocol,
-> {
+) -> ProcessClientFieldDeclarationResult<WithSpan<VariableDefinition<ServerEntityName>>> {
     let type_ = variable_definition
         .item
         .type_

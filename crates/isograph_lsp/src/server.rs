@@ -42,9 +42,7 @@ use thiserror::Error;
 
 /// Initializes an LSP connection, handling the `initialize` message and `initialized` notification
 /// handshake.
-pub fn initialize<TNetworkProtocol: NetworkProtocol>(
-    connection: &Connection,
-) -> LSPProcessResult<InitializeParams, TNetworkProtocol> {
+pub fn initialize(connection: &Connection) -> LSPProcessResult<InitializeParams> {
     let server_capabilities = ServerCapabilities {
         // Enable text document syncing so we can know when files are opened/changed/saved/closed
         text_document_sync: TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL).some(),
@@ -75,7 +73,7 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
     config_location: &PathBuf,
     _params: InitializeParams,
     current_working_directory: CurrentWorkingDirectory,
-) -> LSPProcessResult<(), TNetworkProtocol> {
+) -> LSPProcessResult<()> {
     let mut compiler_state: CompilerState<TNetworkProtocol> =
         CompilerState::new(config_location, current_working_directory)?;
 
@@ -200,11 +198,10 @@ fn dispatch_request<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-pub(crate) type LSPProcessResult<T, TNetworkProtocol> =
-    Result<T, LSPProcessError<TNetworkProtocol>>;
+pub(crate) type LSPProcessResult<T> = Result<T, LSPProcessError>;
 
 #[derive(Debug, Error)]
-pub enum LSPProcessError<TNetworkProtocol: NetworkProtocol> {
+pub enum LSPProcessError {
     #[error("{error}")]
     Serde {
         #[from]
@@ -226,7 +223,7 @@ pub enum LSPProcessError<TNetworkProtocol: NetworkProtocol> {
     #[error("{error}")]
     BatchCompileError {
         #[from]
-        error: BatchCompileError<TNetworkProtocol>,
+        error: BatchCompileError,
     },
 
     #[error("{error}")]

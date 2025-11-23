@@ -1,8 +1,8 @@
-use std::{collections::BTreeMap, error::Error, fmt::Debug, hash::Hash};
+use std::{collections::BTreeMap, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
-    JavascriptName, QueryExtraInfo, QueryOperationName, QueryText, ServerObjectEntityName,
-    ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
+    Diagnostic, JavascriptName, QueryExtraInfo, QueryOperationName, QueryText,
+    ServerObjectEntityName, ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation};
 use isograph_lang_types::{Description, SelectionType};
@@ -23,10 +23,8 @@ pub trait NetworkProtocol:
     Debug + Clone + Copy + Eq + PartialEq + Ord + PartialOrd + Hash + Default + Sized + 'static
 {
     type SchemaObjectAssociatedData: Debug + PartialEq + Eq + Clone;
-    type ParseTypeSystemDocumentsError: Error + PartialEq + Eq + Clone + PartialOrd + Ord + 'static;
 
     // TODO this should return a Vec<Result<...>>, not a Result<Vec<...>>, probably
-    #[expect(clippy::type_complexity)]
     fn parse_type_system_documents(
         db: &IsographDatabase<Self>,
     ) -> &Result<
@@ -35,7 +33,7 @@ pub trait NetworkProtocol:
             // TODO just seems awkward that we return fetchable types
             BTreeMap<ServerObjectEntityName, RootOperationName>,
         ),
-        Self::ParseTypeSystemDocumentsError,
+        Diagnostic,
     >;
 
     fn generate_query_text<'a>(

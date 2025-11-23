@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    JavascriptName, Location, ServerObjectEntityName, ServerScalarEntityName, UnvalidatedTypeName,
+    Diagnostic, DiagnosticResult, JavascriptName, Location, ServerObjectEntityName,
+    ServerScalarEntityName, UnvalidatedTypeName,
 };
 use isograph_lang_types::{SelectionType, SelectionTypePostfix};
 use pico_macros::memo;
@@ -19,10 +20,7 @@ use crate::{
 #[memo]
 fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<
-    HashMap<UnvalidatedTypeName, Vec<OwnedServerEntity<TNetworkProtocol>>>,
-    TNetworkProtocol::ParseTypeSystemDocumentsError,
-> {
+) -> Result<HashMap<UnvalidatedTypeName, Vec<OwnedServerEntity<TNetworkProtocol>>>, Diagnostic> {
     let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db)
         .as_ref()
         .map_err(|e| e.clone())?;
@@ -51,8 +49,7 @@ fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
 pub fn server_entities_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: UnvalidatedTypeName,
-) -> Result<Vec<OwnedServerEntity<TNetworkProtocol>>, TNetworkProtocol::ParseTypeSystemDocumentsError>
-{
+) -> DiagnosticResult<Vec<OwnedServerEntity<TNetworkProtocol>>> {
     let map = server_entity_map(db).as_ref().map_err(|e| e.clone())?;
 
     map.get(&entity_name).cloned().unwrap_or_default().ok()
@@ -61,10 +58,7 @@ pub fn server_entities_named<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<
-    Vec<ServerObjectEntity<TNetworkProtocol>>,
-    TNetworkProtocol::ParseTypeSystemDocumentsError,
-> {
+) -> DiagnosticResult<Vec<ServerObjectEntity<TNetworkProtocol>>> {
     let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db)
         .as_ref()
         .map_err(|e| e.clone())?;
@@ -78,9 +72,9 @@ pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[derive(Debug, Error, PartialEq, Eq, Clone, PartialOrd, Ord)]
-pub enum EntityAccessError<TNetworkProtocol: NetworkProtocol> {
+pub enum EntityAccessError {
     #[error("{0}")]
-    ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),
+    ParseTypeSystemDocumentsError(Diagnostic),
 
     #[error("Multiple definitions of `{duplicate_entity_name}` were found")]
     MultipleDefinitionsFound {
@@ -101,7 +95,7 @@ pub enum EntityAccessError<TNetworkProtocol: NetworkProtocol> {
 pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_object_entity_name: ServerObjectEntityName,
-) -> Result<Option<ServerObjectEntity<TNetworkProtocol>>, EntityAccessError<TNetworkProtocol>> {
+) -> Result<Option<ServerObjectEntity<TNetworkProtocol>>, EntityAccessError> {
     let entities = server_entities_named(db, server_object_entity_name.into())
         .as_ref()
         .map_err(|e| EntityAccessError::ParseTypeSystemDocumentsError(e.clone()))?;
@@ -133,7 +127,7 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
 pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_scalar_entity_name: ServerScalarEntityName,
-) -> Result<Option<ServerScalarEntity<TNetworkProtocol>>, EntityAccessError<TNetworkProtocol>> {
+) -> Result<Option<ServerScalarEntity<TNetworkProtocol>>, EntityAccessError> {
     let entities = server_entities_named(db, server_scalar_entity_name.into())
         .as_ref()
         .map_err(|e| EntityAccessError::ParseTypeSystemDocumentsError(e.clone()))?;
@@ -166,7 +160,7 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
 pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_scalar_entity_name: ServerScalarEntityName,
-) -> Result<Option<JavascriptName>, EntityAccessError<TNetworkProtocol>> {
+) -> Result<Option<JavascriptName>, EntityAccessError> {
     let value = server_scalar_entity_named(db, server_scalar_entity_name)
         .as_ref()
         .map_err(|e| e.clone())?
@@ -184,7 +178,7 @@ pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol>(
 pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     name: ServerEntityName,
-) -> Result<Option<OwnedServerEntity<TNetworkProtocol>>, EntityAccessError<TNetworkProtocol>> {
+) -> Result<Option<OwnedServerEntity<TNetworkProtocol>>, EntityAccessError> {
     match name {
         SelectionType::Object(server_object_entity_name) => {
             let server_object_entity =
@@ -211,10 +205,7 @@ pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn defined_entities<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<
-    HashMap<UnvalidatedTypeName, Vec<ServerEntityName>>,
-    TNetworkProtocol::ParseTypeSystemDocumentsError,
-> {
+) -> DiagnosticResult<HashMap<UnvalidatedTypeName, Vec<ServerEntityName>>> {
     let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db)
         .as_ref()
         .map_err(|e| e.clone())?;
@@ -241,7 +232,7 @@ pub fn defined_entities<TNetworkProtocol: NetworkProtocol>(
 pub fn defined_entity<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: UnvalidatedTypeName,
-) -> Result<Option<ServerEntityName>, DefinedEntityError<TNetworkProtocol>> {
+) -> Result<Option<ServerEntityName>, DefinedEntityError> {
     match defined_entities(db)
         .as_ref()
         .map_err(|e| DefinedEntityError::ParseTypeSystemDocumentsError(e.clone()))?
@@ -269,9 +260,9 @@ pub fn defined_entity<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[derive(Clone, Debug, Error, Eq, PartialEq, PartialOrd, Ord)]
-pub enum DefinedEntityError<TNetworkProtocol: NetworkProtocol> {
+pub enum DefinedEntityError {
     #[error("{0}")]
-    ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),
+    ParseTypeSystemDocumentsError(Diagnostic),
 
     // TODO include additional locations
     #[error("Multiple definitions of `{duplicate_entity_name}` were found")]
@@ -284,7 +275,7 @@ pub enum DefinedEntityError<TNetworkProtocol: NetworkProtocol> {
 pub fn entity_definition_location<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: UnvalidatedTypeName,
-) -> Result<Option<Location>, TNetworkProtocol::ParseTypeSystemDocumentsError> {
+) -> DiagnosticResult<Option<Location>> {
     let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db)
         .as_ref()
         .map_err(|e| e.clone())?;

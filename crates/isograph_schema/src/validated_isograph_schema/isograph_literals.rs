@@ -119,7 +119,7 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
         Vec<UnprocessedSelectionSet>,
         Vec<(TextSource, WithSpan<EntrypointDeclaration>)>,
     ),
-    Vec<WithLocation<ProcessClientFieldDeclarationError<TNetworkProtocol>>>,
+    Vec<WithLocation<ProcessClientFieldDeclarationError>>,
 > {
     let mut errors = vec![];
     let mut unprocess_client_field_items = vec![];

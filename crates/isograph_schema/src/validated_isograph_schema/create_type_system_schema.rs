@@ -3,17 +3,14 @@ use std::collections::HashMap;
 use crate::{
     ExposeFieldToInsert, FieldToInsertToServerSelectableError, IsographDatabase, NetworkProtocol,
 };
-use common_lang_types::ServerObjectEntityName;
+use common_lang_types::{Diagnostic, ServerObjectEntityName};
 use pico_macros::memo;
 use thiserror::Error;
 
 #[memo]
 pub fn create_type_system_schema_with_server_selectables<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<
-    HashMap<ServerObjectEntityName, Vec<ExposeFieldToInsert>>,
-    CreateSchemaError<TNetworkProtocol>,
-> {
+) -> Result<HashMap<ServerObjectEntityName, Vec<ExposeFieldToInsert>>, CreateSchemaError> {
     let (items, _fetchable_types) = TNetworkProtocol::parse_type_system_documents(db)
         .as_ref()
         .map_err(|e| CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e.clone() })?;
@@ -31,11 +28,9 @@ pub fn create_type_system_schema_with_server_selectables<TNetworkProtocol: Netwo
 }
 
 #[derive(Error, Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
-pub enum CreateSchemaError<TNetworkProtocol: NetworkProtocol> {
+pub enum CreateSchemaError {
     #[error("{message}")]
-    ParseAndProcessTypeSystemDocument {
-        message: TNetworkProtocol::ParseTypeSystemDocumentsError,
-    },
+    ParseAndProcessTypeSystemDocument { message: Diagnostic },
 
     #[error("{0}")]
     FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),

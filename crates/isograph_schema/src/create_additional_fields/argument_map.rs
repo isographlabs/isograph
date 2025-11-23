@@ -40,7 +40,7 @@ pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol>(
     primary_object_entity_name: ServerObjectEntityName,
     mutation_object_entity_name: ServerObjectEntityName,
     mutation_selectable_name: SelectableName,
-) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem, TNetworkProtocol> {
+) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem> {
     let split_to_arg = field_map_item.split_to_arg();
     let (index_of_argument, argument) = argument_map
         .arguments
@@ -55,7 +55,7 @@ pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol>(
             };
             name == split_to_arg.to_argument_name
         })
-        .ok_or_else(|| {
+        .ok_or({
             CreateAdditionalFieldsError::PrimaryDirectiveArgumentDoesNotExistOnField {
                 primary_object_entity_name,
                 mutation_object_entity_name,
@@ -86,11 +86,7 @@ pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol>(
                 Some((first, rest)) => {
                     let mut arg = ModifiedArgument::from_unmodified(db, unmodified_argument);
 
-                    arg.remove_to_field::<TNetworkProtocol>(
-                        *first,
-                        rest,
-                        primary_object_entity_name,
-                    )?;
+                    arg.remove_to_field(*first, rest, primary_object_entity_name)?;
 
                     *argument = PotentiallyModifiedArgument::Modified(arg).with_location(location);
                     // processed_field_map_item
@@ -113,11 +109,7 @@ pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol>(
                     .err();
                 }
                 Some((first, rest)) => {
-                    modified.remove_to_field::<TNetworkProtocol>(
-                        *first,
-                        rest,
-                        primary_object_entity_name,
-                    )?;
+                    modified.remove_to_field(*first, rest, primary_object_entity_name)?;
                     // TODO WAT
                     ProcessedFieldMapItem(field_map_item.clone())
                 }
@@ -227,12 +219,12 @@ impl ModifiedArgument {
         }
     }
 
-    fn remove_to_field<TNetworkProtocol: NetworkProtocol>(
+    fn remove_to_field(
         &mut self,
         first: StringLiteralValue,
         rest: &[StringLiteralValue],
         primary_object_entity_name: ServerObjectEntityName,
-    ) -> ProcessTypeDefinitionResult<(), TNetworkProtocol> {
+    ) -> ProcessTypeDefinitionResult<()> {
         let argument_object = self.object.inner_mut();
 
         let key = first.unchecked_conversion();

@@ -27,15 +27,15 @@ pub struct CompilationStats {
 pub fn compile_and_print<TNetworkProtocol: NetworkProtocol>(
     config_location: &PathBuf,
     current_working_directory: CurrentWorkingDirectory,
-) -> Result<(), BatchCompileError<TNetworkProtocol>> {
+) -> Result<(), BatchCompileError> {
     info!("{}", "Starting to compile.".cyan());
     let state = CompilerState::new(config_location, current_working_directory)?;
     print_result(WithDuration::new(|| compile::<TNetworkProtocol>(&state.db)))
 }
 
-pub fn print_result<TNetworkProtocol: NetworkProtocol>(
-    result: WithDuration<Result<CompilationStats, BatchCompileError<TNetworkProtocol>>>,
-) -> Result<(), BatchCompileError<TNetworkProtocol>> {
+pub fn print_result(
+    result: WithDuration<Result<CompilationStats, BatchCompileError>>,
+) -> Result<(), BatchCompileError> {
     match result.item {
         Ok(stats) => {
             print_stats(result.elapsed_time, stats);
@@ -81,7 +81,7 @@ fn print_stats(elapsed_time: Duration, stats: CompilationStats) {
 #[tracing::instrument(skip(db))]
 pub fn compile<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<CompilationStats, BatchCompileError<TNetworkProtocol>> {
+) -> Result<CompilationStats, BatchCompileError> {
     // Note: we calculate all of the artifact paths and contents first, so that writing to
     // disk can be as fast as possible and we minimize the chance that changes to the file
     // system occur while we're writing and we get unpredictable results.
@@ -101,7 +101,7 @@ pub fn compile<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[derive(Error, Debug)]
-pub enum BatchCompileError<TNetworkProtocol: NetworkProtocol> {
+pub enum BatchCompileError {
     #[error("{error}")]
     SourceError {
         #[from]
@@ -126,13 +126,11 @@ pub enum BatchCompileError<TNetworkProtocol: NetworkProtocol> {
     #[error("{error}")]
     GenerateArtifactsError {
         #[from]
-        error: GetArtifactPathAndContentError<TNetworkProtocol>,
+        error: GetArtifactPathAndContentError,
     },
 }
 
-impl<TNetworkProtocol: NetworkProtocol> From<Vec<notify::Error>>
-    for BatchCompileError<TNetworkProtocol>
-{
+impl From<Vec<notify::Error>> for BatchCompileError {
     fn from(errors: Vec<notify::Error>) -> Self {
         BatchCompileError::NotifyErrors { errors }
     }

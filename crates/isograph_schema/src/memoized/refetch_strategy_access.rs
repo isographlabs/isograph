@@ -25,10 +25,10 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
         (ServerObjectEntityName, ClientSelectableName),
         Result<
             SelectionType<Option<RefetchStrategy<(), ()>>, RefetchStrategy<(), ()>>,
-            RefetchStrategyAccessError<TNetworkProtocol>,
+            RefetchStrategyAccessError,
         >,
     >,
-    RefetchStrategyAccessError<TNetworkProtocol>,
+    RefetchStrategyAccessError,
 > {
     // TODO use a "list of iso declarations" fn
     let declaration_map = client_selectable_declaration_map_from_iso_literals(db);
@@ -50,7 +50,9 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                 Entry::Vacant(vacant_entry) => match item {
                     SelectionType::Scalar(_) => {
                         let refetch_strategy = get_unvalidated_refetch_stategy(db, key.0)
-                            .map_err(|e| e.into())
+                            .map_err(|e| {
+                                RefetchStrategyAccessError::ProcessClientFieldDeclarationError(e)
+                            })
                             .map(SelectionType::Scalar);
                         vacant_entry.insert(refetch_strategy);
                     }
@@ -60,7 +62,11 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                         // This is extremely weird, and we should fix this!
                         let refetch_strategy =
                             get_unvalidated_refetch_stategy(db, o.target_type.inner().0)
-                                .map_err(|e| e.into())
+                                .map_err(|e| {
+                                    RefetchStrategyAccessError::ProcessClientFieldDeclarationError(
+                                        e,
+                                    )
+                                })
                                 .map(|item| {
                                     item.expect(
                                 "Expected client object selectable to have a refetch strategy. \
@@ -111,16 +117,16 @@ pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                 Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>,
                 RefetchStrategy<ScalarSelectableId, ObjectSelectableId>,
             >,
-            RefetchStrategyAccessError<TNetworkProtocol>,
+            RefetchStrategyAccessError,
         >,
     >,
-    RefetchStrategyAccessError<TNetworkProtocol>,
+    RefetchStrategyAccessError,
 > {
     let map = unvalidated_refetch_strategy_map(db).clone()?;
 
     map.into_iter()
         .map(|(key, value)| {
-            let value: Result<_, RefetchStrategyAccessError<_>> = value.and_then(|opt| match opt {
+            let value: Result<_, RefetchStrategyAccessError> = value.and_then(|opt| match opt {
                 SelectionType::Scalar(refetch_strategy) => refetch_strategy
                     .map(|refetch_strategy| {
                         get_validated_refetch_strategy(
@@ -131,7 +137,8 @@ pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                                 .scalar_selected(),
                         )
                     })
-                    .transpose()?
+                    .transpose()
+                    .map_err(|e| RefetchStrategyAccessError::AddSelectionSetErrors { errors: e })?
                     .scalar_selected()
                     .ok(),
                 SelectionType::Object(refetch_strategy) => get_validated_refetch_strategy(
@@ -141,11 +148,7 @@ pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                     ParentObjectEntityNameAndSelectableName::new(key.0, key.1.into())
                         .object_selected(),
                 )
-                .map_err(|e| {
-                    RefetchStrategyAccessError::ValidateAddSelectionSetsResultWithMultipleErrors {
-                        errors: e,
-                    }
-                })?
+                .map_err(|e| RefetchStrategyAccessError::AddSelectionSetErrors { errors: e })?
                 .object_selected()
                 .ok(),
             });
@@ -165,7 +168,7 @@ pub fn validated_refetch_strategy_for_client_scalar_selectable_named<
     client_scalar_selectable_name: ClientScalarSelectableName,
 ) -> Result<
     Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>,
-    RefetchStrategyAccessError<TNetworkProtocol>,
+    RefetchStrategyAccessError,
 > {
     let map = validated_refetch_strategy_map(db)
         .as_ref()
@@ -203,10 +206,7 @@ pub fn validated_refetch_strategy_for_object_scalar_selectable_named<
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
     client_object_selectable_name: ClientObjectSelectableName,
-) -> Result<
-    RefetchStrategy<ScalarSelectableId, ObjectSelectableId>,
-    RefetchStrategyAccessError<TNetworkProtocol>,
-> {
+) -> Result<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>, RefetchStrategyAccessError> {
     let map = validated_refetch_strategy_map(db)
         .as_ref()
         .map_err(|e| e.clone())?;
@@ -236,14 +236,12 @@ pub fn validated_refetch_strategy_for_object_scalar_selectable_named<
     }
 }
 #[derive(Clone, Error, Eq, PartialEq, Debug)]
-pub enum RefetchStrategyAccessError<TNetworkProtocol: NetworkProtocol> {
+pub enum RefetchStrategyAccessError {
     #[error("{0}")]
-    ProcessClientFieldDeclarationError(
-        #[from] WithSpan<ProcessClientFieldDeclarationError<TNetworkProtocol>>,
-    ),
+    ProcessClientFieldDeclarationError(WithSpan<ProcessClientFieldDeclarationError>),
 
     #[error("{0}")]
-    MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError<TNetworkProtocol>),
+    MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError),
 
     #[error("`{parent_object_entity_name}.{client_selectable_name}` has been defined twice.")]
     DuplicateDefinition {
@@ -254,9 +252,8 @@ pub enum RefetchStrategyAccessError<TNetworkProtocol: NetworkProtocol> {
     #[error("{0}", 
         errors.iter().map(|error| format!("{}", error.for_display())).collect::<Vec<_>>().join("\n")
     )]
-    ValidateAddSelectionSetsResultWithMultipleErrors {
-        #[from]
-        errors: Vec<WithLocation<AddSelectionSetsError<TNetworkProtocol>>>,
+    AddSelectionSetErrors {
+        errors: Vec<WithLocation<AddSelectionSetsError>>,
     },
 
     #[error(

@@ -33,7 +33,7 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> HashMap<
     (ServerObjectEntityName, ClientScalarSelectableName),
-    Result<EntrypointDeclarationInfo, ValidatedEntrypointError<TNetworkProtocol>>,
+    Result<EntrypointDeclarationInfo, ValidatedEntrypointError>,
 > {
     let entrypoints = entrypoints(db);
 
@@ -124,9 +124,9 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[derive(Error, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-pub enum ValidatedEntrypointError<TNetworkProtocol: NetworkProtocol> {
+pub enum ValidatedEntrypointError {
     #[error("{0}")]
-    MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError<TNetworkProtocol>),
+    MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError),
 
     #[error("`{parent_object_entity_name}.{client_scalar_selectable_name}` was not defined")]
     NotDefined {

@@ -102,7 +102,7 @@ pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
     client_selectable_name: ClientSelectableName,
 ) -> Result<
     Option<SelectionType<ClientFieldDeclaration, ClientPointerDeclaration>>,
-    MemoizedIsoLiteralError<TNetworkProtocol>,
+    MemoizedIsoLiteralError,
 > {
     match client_selectable_declarations(db, parent_object_entity_name, client_selectable_name)
         .split_first()
@@ -126,7 +126,7 @@ pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[derive(Clone, Error, Debug, Eq, PartialEq, PartialOrd, Ord)]
-pub enum MemoizedIsoLiteralError<TNetworkProtocol: NetworkProtocol> {
+pub enum MemoizedIsoLiteralError {
     #[error(
         "Multiple definitions of `{duplicate_entity_name}.{duplicate_client_selectable_name}` were found"
     )]
@@ -146,15 +146,13 @@ pub enum MemoizedIsoLiteralError<TNetworkProtocol: NetworkProtocol> {
     },
 
     #[error("{0}")]
-    ProcessClientFieldDeclarationError(
-        #[from] WithSpan<ProcessClientFieldDeclarationError<TNetworkProtocol>>,
-    ),
+    ProcessClientFieldDeclarationError(WithSpan<ProcessClientFieldDeclarationError>),
 
     #[error("{0}")]
-    CreateSchemaError(#[from] CreateSchemaError<TNetworkProtocol>),
+    CreateSchemaError(#[from] CreateSchemaError),
 
     #[error("{0}")]
-    CreateAdditionalFieldsError(#[from] CreateAdditionalFieldsError<TNetworkProtocol>),
+    CreateAdditionalFieldsError(#[from] CreateAdditionalFieldsError),
 }
 
 #[memo]
@@ -162,7 +160,7 @@ pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_scalar_selectable_name: ClientScalarSelectableName,
-) -> Result<Option<ClientFieldDeclaration>, MemoizedIsoLiteralError<TNetworkProtocol>> {
+) -> Result<Option<ClientFieldDeclaration>, MemoizedIsoLiteralError> {
     let x = client_selectable_declaration(
         db,
         parent_object_entity_name,
@@ -194,7 +192,7 @@ pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_object_selectable_name: ClientObjectSelectableName,
-) -> Result<Option<ClientPointerDeclaration>, MemoizedIsoLiteralError<TNetworkProtocol>> {
+) -> Result<Option<ClientPointerDeclaration>, MemoizedIsoLiteralError> {
     let x = client_selectable_declaration(
         db,
         parent_object_entity_name,
@@ -226,10 +224,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_scalar_selectable_name: ClientScalarSelectableName,
-) -> Result<
-    Option<ClientScalarSelectable<TNetworkProtocol>>,
-    MemoizedIsoLiteralError<TNetworkProtocol>,
-> {
+) -> Result<Option<ClientScalarSelectable<TNetworkProtocol>>, MemoizedIsoLiteralError> {
     let declaration =
         client_field_declaration(db, parent_object_entity_name, client_scalar_selectable_name)
             .as_ref()
@@ -281,10 +276,7 @@ pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_object_selectable_name: ClientObjectSelectableName,
-) -> Result<
-    Option<ClientObjectSelectable<TNetworkProtocol>>,
-    MemoizedIsoLiteralError<TNetworkProtocol>,
-> {
+) -> Result<Option<ClientObjectSelectable<TNetworkProtocol>>, MemoizedIsoLiteralError> {
     let declaration =
         client_pointer_declaration(db, parent_object_entity_name, client_object_selectable_name)
             .as_ref()
@@ -315,7 +307,7 @@ pub fn client_selectable_named<TNetworkProtocol: NetworkProtocol>(
             ClientObjectSelectable<TNetworkProtocol>,
         >,
     >,
-    MemoizedIsoLiteralError<TNetworkProtocol>,
+    MemoizedIsoLiteralError,
 > {
     // we can do this better by reordering functions in this file
     // just in general, we can do better! This is awkward!
@@ -375,7 +367,7 @@ pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
             UnprocessedClientScalarSelectableSelectionSet,
         ),
     >,
-    MemoizedIsoLiteralError<TNetworkProtocol>,
+    MemoizedIsoLiteralError,
 > {
     let expose_as_field_queue = create_type_system_schema_with_server_selectables(db)
         .as_ref()
@@ -412,9 +404,9 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
 ) -> Result<
     HashMap<
         (ServerObjectEntityName, ClientSelectableName),
-        Result<OwnedClientSelectable<TNetworkProtocol>, MemoizedIsoLiteralError<TNetworkProtocol>>,
+        Result<OwnedClientSelectable<TNetworkProtocol>, MemoizedIsoLiteralError>,
     >,
-    MemoizedIsoLiteralError<TNetworkProtocol>,
+    MemoizedIsoLiteralError,
 > {
     let iso_literal_map = client_selectable_declaration_map_from_iso_literals(db);
 
@@ -428,13 +420,23 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
                             SelectionType::Scalar(scalar_declaration) => {
                                 process_client_field_declaration_inner(db, scalar_declaration)
                                     .clone()
-                                    .map(|(_, selectable)| selectable)?
+                                    .map(|(_, selectable)| selectable)
+                                    .map_err(|e| {
+                                        MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(
+                                            e,
+                                        )
+                                    })?
                                     .scalar_selected()
                             }
                             SelectionType::Object(object_declaration) => {
                                 process_client_pointer_declaration_inner(db, object_declaration)
                                     .clone()
-                                    .map(|(_, selectable)| selectable)?
+                                    .map(|(_, selectable)| selectable)
+                                    .map_err(|e| {
+                                        MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(
+                                            e,
+                                        )
+                                    })?
                                     .object_selected()
                             }
                         })

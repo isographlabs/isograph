@@ -17,7 +17,7 @@ use prelude::Postfix;
 #[memo]
 pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<Vec<ClientScalarSelectable<TNetworkProtocol>>, CreateSchemaError<TNetworkProtocol>> {
+) -> Result<Vec<ClientScalarSelectable<TNetworkProtocol>>, CreateSchemaError> {
     server_object_entities(db)
         .as_ref()
         .map_err(|e| CreateSchemaError::ParseAndProcessTypeSystemDocument { message: e.clone() })?
@@ -46,7 +46,6 @@ pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
         .ok()
 }
 
-#[expect(clippy::type_complexity)]
 #[memo]
 pub fn get_link_fields_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
@@ -55,7 +54,7 @@ pub fn get_link_fields_map<TNetworkProtocol: NetworkProtocol>(
         (ServerObjectEntityName, ClientScalarSelectableName),
         ClientScalarSelectable<TNetworkProtocol>,
     >,
-    CreateSchemaError<TNetworkProtocol>,
+    CreateSchemaError,
 > {
     get_link_fields(db)
         .to_owned()?

@@ -1,4 +1,4 @@
-use common_lang_types::{SelectableName, ServerObjectEntityName};
+use common_lang_types::{Diagnostic, SelectableName, ServerObjectEntityName};
 use isograph_lang_types::{DefinitionLocation, DefinitionLocationPostfix, SelectionType};
 use pico_macros::memo;
 use prelude::Postfix;
@@ -30,7 +30,7 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
             >,
         >,
     >,
-    SelectableNamedError<TNetworkProtocol>,
+    SelectableNamedError,
 > {
     // we don't obviously have a better way to do this besides checking whether this
     // a server selectable and also checking whether it is a client selectable, and
@@ -98,14 +98,14 @@ pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
                     ClientObjectSelectable<TNetworkProtocol>,
                 >,
             >,
-            SelectableNamedError<TNetworkProtocol>,
+            SelectableNamedError,
         >,
     >,
-    SelectableNamedError<TNetworkProtocol>,
+    SelectableNamedError,
 > {
     let mut selectables = server_selectables_vec_for_entity(db, parent_server_object_entity_name)
         .to_owned()
-        .map_err(|e| SelectableNamedError::ParseTypeSystemDocumentsError(e))?
+        .map_err(SelectableNamedError::ParseTypeSystemDocumentsError)?
         .into_iter()
         .map(|(_key, value)| {
             let value = value?;
@@ -131,9 +131,9 @@ pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[derive(Error, Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
-pub enum SelectableNamedError<TNetworkProtocol: NetworkProtocol> {
+pub enum SelectableNamedError {
     #[error("{0}")]
-    ServerSelectableNamedError(#[from] ServerSelectableNamedError<TNetworkProtocol>),
+    ServerSelectableNamedError(#[from] ServerSelectableNamedError),
 
     #[error("{0}")]
     FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),
@@ -145,8 +145,8 @@ pub enum SelectableNamedError<TNetworkProtocol: NetworkProtocol> {
     },
 
     #[error("{0}")]
-    MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError<TNetworkProtocol>),
+    MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError),
 
     #[error("{0}")]
-    ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),
+    ParseTypeSystemDocumentsError(Diagnostic),
 }

@@ -22,10 +22,10 @@ mod uri_file_path_ext;
 pub async fn start_language_server<TNetworkProtocol: NetworkProtocol>(
     config_location: &PathBuf,
     current_working_directory: CurrentWorkingDirectory,
-) -> LSPProcessResult<(), TNetworkProtocol> {
+) -> LSPProcessResult<()> {
     let (connection, io_handles) = Connection::stdio();
     let params = server::initialize(&connection)?;
-    server::run(
+    server::run::<TNetworkProtocol>(
         connection,
         config_location,
         params,

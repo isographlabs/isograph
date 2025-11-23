@@ -23,7 +23,7 @@ impl<TNetworkProtocol: NetworkProtocol> CompilerState<TNetworkProtocol> {
     pub fn new(
         config_location: &PathBuf,
         current_working_directory: CurrentWorkingDirectory,
-    ) -> Result<Self, BatchCompileError<TNetworkProtocol>> {
+    ) -> Result<Self, BatchCompileError> {
         let mut db = IsographDatabase::default();
         db.set(current_working_directory);
         db.set(create_config(config_location, current_working_directory));

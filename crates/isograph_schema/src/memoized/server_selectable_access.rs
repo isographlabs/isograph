@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use common_lang_types::{ServerObjectEntityName, ServerSelectableName};
+use common_lang_types::{
+    Diagnostic, DiagnosticResult, ServerObjectEntityName, ServerSelectableName,
+};
 use intern::Lookup;
 use isograph_lang_types::SelectionType;
 use pico::MemoRef;
@@ -20,7 +22,7 @@ type OwnedSelectableResult<TNetworkProtocol> =
 #[memo]
 pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<
+) -> DiagnosticResult<
     HashMap<
         ServerObjectEntityName,
         Vec<(
@@ -28,7 +30,6 @@ pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
             OwnedSelectableResult<TNetworkProtocol>,
         )>,
     >,
-    TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
     let (items, _fetchable_types) = TNetworkProtocol::parse_type_system_documents(db)
         .as_ref()
@@ -65,14 +66,13 @@ pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
 pub fn server_selectables_vec_for_entity<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
-) -> Result<
+) -> DiagnosticResult<
     // TODO return the SelectableId with each Result, i.e. we should know
     // the parent type and selectable name infallibly
     Vec<(
         ServerSelectableName,
         OwnedSelectableResult<TNetworkProtocol>,
     )>,
-    TNetworkProtocol::ParseTypeSystemDocumentsError,
 > {
     let (items, _fetchable_types) = TNetworkProtocol::parse_type_system_documents(db)
         .as_ref()
@@ -102,10 +102,7 @@ pub fn server_selectables_vec_for_entity<TNetworkProtocol: NetworkProtocol>(
 pub fn server_selectables_map_for_entity<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
-) -> Result<
-    HashMap<ServerSelectableName, Vec<OwnedSelectableResult<TNetworkProtocol>>>,
-    TNetworkProtocol::ParseTypeSystemDocumentsError,
-> {
+) -> DiagnosticResult<HashMap<ServerSelectableName, Vec<OwnedSelectableResult<TNetworkProtocol>>>> {
     let server_selectables =
         server_selectables_vec_for_entity(db, parent_server_object_entity_name).to_owned()?;
     let mut map: HashMap<_, Vec<_>> = HashMap::new();
@@ -122,10 +119,7 @@ pub fn server_selectables_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
     server_selectable_name: ServerSelectableName,
-) -> Result<
-    Vec<OwnedSelectableResult<TNetworkProtocol>>,
-    TNetworkProtocol::ParseTypeSystemDocumentsError,
-> {
+) -> DiagnosticResult<Vec<OwnedSelectableResult<TNetworkProtocol>>> {
     let map = server_selectables_map_for_entity(db, parent_server_object_entity_name)
         .as_ref()
         .map_err(|e| e.clone())?;
@@ -141,10 +135,7 @@ pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
     server_selectable_name: ServerSelectableName,
-) -> Result<
-    Option<OwnedSelectableResult<TNetworkProtocol>>,
-    ServerSelectableNamedError<TNetworkProtocol>,
-> {
+) -> Result<Option<OwnedSelectableResult<TNetworkProtocol>>, ServerSelectableNamedError> {
     let vec =
         server_selectables_named(db, parent_server_object_entity_name, server_selectable_name)
             .as_ref()
@@ -169,10 +160,7 @@ pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol>(
 pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
-) -> Result<
-    Option<MemoRef<ServerScalarSelectable<TNetworkProtocol>>>,
-    ServerSelectableNamedError<TNetworkProtocol>,
-> {
+) -> Result<Option<MemoRef<ServerScalarSelectable<TNetworkProtocol>>>, ServerSelectableNamedError> {
     let selectable = server_selectable_named(
         db,
         parent_server_object_entity_name,
@@ -228,9 +216,9 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[derive(Clone, Debug, Error, PartialEq, Eq, PartialOrd, Ord)]
-pub enum ServerSelectableNamedError<TNetworkProtocol: NetworkProtocol> {
+pub enum ServerSelectableNamedError {
     #[error("{0}")]
-    ParseTypeSystemDocumentsError(TNetworkProtocol::ParseTypeSystemDocumentsError),
+    ParseTypeSystemDocumentsError(Diagnostic),
 
     // TODO include additional locations
     #[error(
@@ -266,7 +254,7 @@ pub enum ServerSelectableNamedError<TNetworkProtocol: NetworkProtocol> {
     },
 
     #[error("{0}")]
-    EntityAccessError(#[from] EntityAccessError<TNetworkProtocol>),
+    EntityAccessError(#[from] EntityAccessError),
 }
 
 #[memo]
@@ -274,10 +262,7 @@ pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
     server_selectable_name: ServerSelectableName,
-) -> Result<
-    Option<ServerObjectSelectable<TNetworkProtocol>>,
-    ServerSelectableNamedError<TNetworkProtocol>,
-> {
+) -> Result<Option<ServerObjectSelectable<TNetworkProtocol>>, ServerSelectableNamedError> {
     let item =
         server_selectable_named(db, parent_server_object_entity_name, server_selectable_name)
             .as_ref()
@@ -305,10 +290,7 @@ pub fn server_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
     server_selectable_name: ServerSelectableName,
-) -> Result<
-    Option<ServerScalarSelectable<TNetworkProtocol>>,
-    ServerSelectableNamedError<TNetworkProtocol>,
-> {
+) -> Result<Option<ServerScalarSelectable<TNetworkProtocol>>, ServerSelectableNamedError> {
     let item =
         server_selectable_named(db, parent_server_object_entity_name, server_selectable_name)
             .as_ref()

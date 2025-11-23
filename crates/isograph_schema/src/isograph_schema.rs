@@ -36,10 +36,7 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     root_object_name: ServerObjectEntityName,
     selections: impl Iterator<Item = ServerSelectableName>,
-) -> Result<
-    Vec<ServerObjectSelectable<TNetworkProtocol>>,
-    CreateAdditionalFieldsError<TNetworkProtocol>,
-> {
+) -> Result<Vec<ServerObjectSelectable<TNetworkProtocol>>, CreateAdditionalFieldsError> {
     let mut path = vec![];
     let mut current_entity_name = root_object_name;
 

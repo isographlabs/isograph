@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use common_lang_types::ServerObjectEntityName;
+use common_lang_types::{DiagnosticResult, ServerObjectEntityName};
 use pico_macros::memo;
 
 use crate::{IsographDatabase, NetworkProtocol, RootOperationName};
@@ -9,10 +9,7 @@ use crate::{IsographDatabase, NetworkProtocol, RootOperationName};
 #[memo]
 pub fn fetchable_types<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<
-    BTreeMap<ServerObjectEntityName, RootOperationName>,
-    TNetworkProtocol::ParseTypeSystemDocumentsError,
-> {
+) -> DiagnosticResult<BTreeMap<ServerObjectEntityName, RootOperationName>> {
     let (_items, fetchable_types) = TNetworkProtocol::parse_type_system_documents(db).to_owned()?;
 
     Ok(fetchable_types)

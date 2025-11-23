@@ -64,7 +64,7 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkPr
         ServerObjectEntity<TNetworkProtocol>,
         ScalarSelectable<TNetworkProtocol>,
     ),
-    GetParentAndSelectableError<TNetworkProtocol>,
+    GetParentAndSelectableError,
 > {
     let ScalarSelectionPath { parent, inner } = scalar_path;
     let scalar_selectable_name = inner.name.item;
@@ -99,7 +99,7 @@ pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkPr
         ServerObjectEntity<TNetworkProtocol>,
         OwnedObjectSelectable<TNetworkProtocol>,
     ),
-    GetParentAndSelectableError<TNetworkProtocol>,
+    GetParentAndSelectableError,
 > {
     let ObjectSelectionPath { parent, inner } = object_path;
     let object_selectable_name = inner.name.item;
@@ -130,8 +130,7 @@ pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkPr
 pub fn get_parent_for_selection_set_path<'a, 'db, TNetworkProtocol: NetworkProtocol>(
     db: &'db IsographDatabase<TNetworkProtocol>,
     selection_set_path: &SelectionSetPath<'a>,
-) -> Result<&'db ServerObjectEntity<TNetworkProtocol>, GetParentAndSelectableError<TNetworkProtocol>>
-{
+) -> Result<&'db ServerObjectEntity<TNetworkProtocol>, GetParentAndSelectableError> {
     let parent_object_entity_name = match &selection_set_path.parent {
         SelectionSetParentType::ObjectSelection(object_selection_path) => {
             let (_parent, selectable) =
@@ -167,7 +166,7 @@ pub fn get_parent_and_selectable_for_selection_parent<'a, TNetworkProtocol: Netw
         ServerObjectEntity<TNetworkProtocol>,
         Selectable<TNetworkProtocol>,
     ),
-    GetParentAndSelectableError<TNetworkProtocol>,
+    GetParentAndSelectableError,
 > {
     match &selection_set_path.parent {
         SelectionSetParentType::ObjectSelection(object_selection_path) => {
@@ -204,7 +203,7 @@ pub fn parent_object_entity_and_selectable<TNetworkProtocol: NetworkProtocol>(
         ServerObjectEntity<TNetworkProtocol>,
         Selectable<TNetworkProtocol>,
     ),
-    GetParentAndSelectableError<TNetworkProtocol>,
+    GetParentAndSelectableError,
 > {
     let parent_entity = server_object_entity_named(db, parent_server_object_entity_name.0)
         .to_owned()?
@@ -222,7 +221,7 @@ pub fn parent_object_entity_and_selectable<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[derive(Error, Debug)]
-pub enum GetParentAndSelectableError<TNetworkProtocol: NetworkProtocol> {
+pub enum GetParentAndSelectableError {
     #[error("`{parent_type_name}` is not a type that has been defined.")]
     ParentTypeNotDefined {
         parent_type_name: ServerObjectEntityNameWrapper,
@@ -243,8 +242,8 @@ pub enum GetParentAndSelectableError<TNetworkProtocol: NetworkProtocol> {
     },
 
     #[error("{0}")]
-    EntityAccessError(#[from] EntityAccessError<TNetworkProtocol>),
+    EntityAccessError(#[from] EntityAccessError),
 
     #[error("{0}")]
-    SelectableNamedError(#[from] SelectableNamedError<TNetworkProtocol>),
+    SelectableNamedError(#[from] SelectableNamedError),
 }

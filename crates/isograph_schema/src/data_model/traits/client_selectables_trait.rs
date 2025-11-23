@@ -128,10 +128,8 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_scalar_selectable_name: ClientScalarSelectableName,
-) -> Result<
-    WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
-    MemoizedIsoLiteralError<TNetworkProtocol>,
-> {
+) -> Result<WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>, MemoizedIsoLiteralError>
+{
     let selectable = client_scalar_selectable_named(
         db,
         parent_object_entity_name,
@@ -192,10 +190,8 @@ pub fn client_object_selectable_selection_set_for_parent_query<
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_object_selectable_name: ClientObjectSelectableName,
-) -> Result<
-    WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
-    MemoizedSelectionSetError<TNetworkProtocol>,
-> {
+) -> Result<WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>, MemoizedSelectionSetError>
+{
     let selection_set = selectable_validated_reader_selection_set(
         db,
         parent_object_entity_name,

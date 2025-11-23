@@ -16,8 +16,8 @@ use isograph_lang_types::{
 use prelude::Postfix;
 use thiserror::Error;
 
-pub type ValidateAddSelectionSetsResultWithMultipleErrors<T, TNetworkProtocol> =
-    Result<T, Vec<WithLocation<AddSelectionSetsError<TNetworkProtocol>>>>;
+pub type ValidateAddSelectionSetsResultWithMultipleErrors<T> =
+    Result<T, Vec<WithLocation<AddSelectionSetsError>>>;
 
 /// At this point, all selectables have been defined. So, we can validate the parsed
 /// selection set by confirming:
@@ -35,7 +35,6 @@ pub fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol>(
     >,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<
     WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
-    TNetworkProtocol,
 > {
     let selections =
         get_all_errors_or_all_ok(selection_set.item.selections.into_iter().map(|selection| {
@@ -58,8 +57,7 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
         ParentObjectEntityNameAndSelectableName,
         ParentObjectEntityNameAndSelectableName,
     >,
-) -> ValidateAddSelectionSetsResultWithMultipleErrors<WithSpan<ValidatedSelection>, TNetworkProtocol>
-{
+) -> ValidateAddSelectionSetsResultWithMultipleErrors<WithSpan<ValidatedSelection>> {
     with_span.and_then(|selection| match selection {
         SelectionType::Scalar(scalar_selection) => get_validated_scalar_selection(
             db,
@@ -89,7 +87,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
         ParentObjectEntityNameAndSelectableName,
     >,
     scalar_selection: UnvalidatedScalarFieldSelection,
-) -> AddSelectionSetsResult<ValidatedScalarSelection, TNetworkProtocol> {
+) -> AddSelectionSetsResult<ValidatedScalarSelection> {
     let type_and_field = match top_level_field_or_pointer {
         SelectionType::Scalar(s) => s,
         SelectionType::Object(o) => o,
@@ -188,7 +186,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
         ParentObjectEntityNameAndSelectableName,
     >,
     object_selection: ObjectSelection<(), ()>,
-) -> ValidateAddSelectionSetsResultWithMultipleErrors<ValidatedObjectSelection, TNetworkProtocol> {
+) -> ValidateAddSelectionSetsResultWithMultipleErrors<ValidatedObjectSelection> {
     let type_and_field = match top_level_field_or_pointer {
         SelectionType::Scalar(s) => s,
         SelectionType::Object(o) => o,
@@ -315,7 +313,6 @@ pub fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol>(
     >,
 ) -> ValidateAddSelectionSetsResultWithMultipleErrors<
     RefetchStrategy<ScalarSelectableId, ObjectSelectableId>,
-    TNetworkProtocol,
 > {
     match unvalidated_refetch_strategy {
         RefetchStrategy::UseRefetchField(use_refetch_field_strategy) => Ok(
@@ -354,11 +351,10 @@ pub fn get_all_errors_or_all_ok<T, E>(
     }
 }
 
-type AddSelectionSetsResult<T, TNetworkProtocol> =
-    Result<T, WithLocation<AddSelectionSetsError<TNetworkProtocol>>>;
+type AddSelectionSetsResult<T> = Result<T, WithLocation<AddSelectionSetsError>>;
 
 #[derive(Debug, Error, PartialEq, Eq, Clone, PartialOrd, Ord)]
-pub enum AddSelectionSetsError<TNetworkProtocol: NetworkProtocol> {
+pub enum AddSelectionSetsError {
     #[error(
         "In the client {client_type} `{client_field_parent_type_name}.{client_field_name}`, \
         the field `{field_parent_type_name}.{field_name}` is selected, but that \
@@ -418,8 +414,8 @@ pub enum AddSelectionSetsError<TNetworkProtocol: NetworkProtocol> {
     ServerFieldCannotBeSelectedLoadably { server_field_name: SelectableName },
 
     #[error("{0}")]
-    MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError<TNetworkProtocol>),
+    MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError),
 
     #[error("{0}")]
-    SelectableNamedError(#[from] SelectableNamedError<TNetworkProtocol>),
+    SelectableNamedError(#[from] SelectableNamedError),
 }
