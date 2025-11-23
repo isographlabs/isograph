@@ -1,7 +1,7 @@
 import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
 import {Mutation__MutualBestFriendSetterOtherSide__param} from './param_type';
 import {Mutation__MutualBestFriendSetterOtherSide__output_type} from './output_type';
-import {Mutation__MutualBestFriendSetterOtherSide__raw_response_type} from './raw_response_type';
+import type {Mutation__MutualBestFriendSetterOtherSide__raw_response_type} from './raw_response_type';
 import readerResolver from './resolver_reader';
 import queryText from './query_text';
 import normalizationAst from './normalization_ast';

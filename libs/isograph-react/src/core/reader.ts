@@ -153,8 +153,8 @@ export type LoadablySelectedField = {
 
   // TODO we should not type these as any
   readonly entrypoint:
-    | IsographEntrypoint<any, any, any, {}>
-    | IsographEntrypointLoader<any, any, {}>;
+    | IsographEntrypoint<any, any, any, any>
+    | IsographEntrypointLoader<any, any, any>;
 };
 
 export type StableId = string;

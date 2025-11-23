@@ -515,7 +515,7 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
         {normalization_ast_type_name}, RefetchQueryNormalizationArtifactWrapper}} from '@isograph/react';\n\
         import {{{entrypoint_params_typename}}} from './{param_type_file_name}{ts_file_extension}';\n\
         import {{{entrypoint_output_type_name}}} from './{output_type_file_name}{ts_file_extension}';\n\
-        import {{{raw_response_type_name}}} from './{raw_response_type_file_name}{ts_file_extension}';\n\
+        import type {{{raw_response_type_name}}} from './{raw_response_type_file_name}{ts_file_extension}';\n\
         {reader_import}\
         import queryText from './{query_text_file_name}{ts_file_extension}';\n\
         {normalization_ast_import}\

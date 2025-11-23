@@ -1,7 +1,7 @@
 import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
 import {Pet__PetCheckinsCardList__param} from './param_type';
 import {Pet__PetCheckinsCardList__output_type} from './output_type';
-import {Pet__PetCheckinsCardList__raw_response_type} from './raw_response_type';
+import type {Pet__PetCheckinsCardList__raw_response_type} from './raw_response_type';
 import readerResolver from './resolver_reader';
 import queryText from './query_text';
 import normalizationAst from './normalization_ast';

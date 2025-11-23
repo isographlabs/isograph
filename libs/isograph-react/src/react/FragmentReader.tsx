@@ -1,3 +1,4 @@
+import type { NetworkResponseObject } from '../core/cache';
 import {
   type ExtractReadFromStore,
   type IsographEntrypoint,
@@ -8,7 +9,8 @@ import { useResult } from './useResult';
 
 export function FragmentReader<
   TResult,
-  TEntrypoint extends IsographEntrypoint<any, TResult, any, {}>,
+  TRawResponseType extends NetworkResponseObject,
+  TEntrypoint extends IsographEntrypoint<any, TResult, any, TRawResponseType>,
   TChildrenResult,
 >({
   fragmentReference,

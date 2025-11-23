@@ -1,5 +1,8 @@
 import { useLazyDisposableState } from '@isograph/react-disposable-state';
-import { getOrCreateCacheForArtifact } from '../core/cache';
+import {
+  getOrCreateCacheForArtifact,
+  type NetworkResponseObject,
+} from '../core/cache';
 import { FetchOptions, type RequiredFetchOptions } from '../core/check';
 import {
   IsographEntrypoint,
@@ -18,12 +21,13 @@ export function useLazyReference<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
+  TRawResponseType extends NetworkResponseObject,
 >(
   entrypoint: IsographEntrypoint<
     TReadFromStore,
     TClientFieldValue,
     TNormalizationAst,
-    {}
+    TRawResponseType
   >,
   variables: ExtractParameters<TReadFromStore>,
   ...[fetchOptions]: TNormalizationAst extends NormalizationAstLoader

@@ -87,13 +87,14 @@ export function getOrCreateCacheForArtifact<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
+  TRawResponseType extends NetworkResponseObject,
 >(
   environment: IsographEnvironment,
   entrypoint: IsographEntrypoint<
     TReadFromStore,
     TClientFieldValue,
     TNormalizationAst,
-    {}
+    TRawResponseType
   >,
   variables: ExtractParameters<TReadFromStore>,
   fetchOptions?: FetchOptions<TClientFieldValue>,
@@ -147,15 +148,15 @@ export type NetworkResponseValue =
   | NetworkResponseScalarValue
   | null
   | NetworkResponseObject
-  | (NetworkResponseObject | null)[]
-  | (NetworkResponseScalarValue | null)[];
+  | readonly (NetworkResponseObject | null)[]
+  | readonly (NetworkResponseScalarValue | null)[];
 
 export type NetworkResponseObject = {
   // N.B. undefined is here to support optional id's, but
   // undefined should not *actually* be present in the network response.
-  [index: string]: undefined | NetworkResponseValue;
-  id?: DataId;
-  __typename?: TypeName;
+  readonly [index: string]: undefined | NetworkResponseValue;
+  readonly id?: DataId;
+  readonly __typename?: TypeName;
 };
 
 export function normalizeData(
@@ -518,11 +519,17 @@ function normalizeScalarField(
   }
 
   if (isScalarOrEmptyArray(networkResponseData)) {
-    targetStoreRecord[parentRecordKey] = networkResponseData;
+    targetStoreRecord[parentRecordKey] = networkResponseData as
+      | NetworkResponseScalarValue
+      | (NetworkResponseScalarValue | null)[]; // have to cast array to mutable
     return existingValue !== networkResponseData;
   } else {
     throw new Error('Unexpected object array when normalizing scalar');
   }
+}
+
+function isArray(value: unknown): value is readonly unknown[] {
+  return Array.isArray(value);
 }
 
 /**
@@ -557,7 +564,7 @@ function normalizeLinkedField(
     );
   }
 
-  if (Array.isArray(networkResponseData)) {
+  if (isArray(networkResponseData)) {
     // TODO check astNode.plural or the like
     const dataIds: (StoreLink | null)[] = [];
     for (let i = 0; i < networkResponseData.length; i++) {
@@ -723,7 +730,9 @@ function normalizeNetworkResponseObject(
 
 function isScalarOrEmptyArray(
   data: NonNullable<NetworkResponseValue>,
-): data is NetworkResponseScalarValue | (NetworkResponseScalarValue | null)[] {
+): data is
+  | NetworkResponseScalarValue
+  | readonly (NetworkResponseScalarValue | null)[] {
   // N.B. empty arrays count as empty arrays of scalar fields.
   if (Array.isArray(data)) {
     // This is maybe fixed in a new version of Typescript??
@@ -737,7 +746,9 @@ function isScalarOrEmptyArray(
   return isScalarValue;
 }
 
-function isNullOrEmptyArray(data: unknown): data is never[] | null[] | null {
+function isNullOrEmptyArray(
+  data: unknown,
+): data is readonly never[] | null[] | null {
   if (Array.isArray(data)) {
     if (data.length === 0) {
       return true;
