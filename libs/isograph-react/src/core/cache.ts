@@ -948,12 +948,12 @@ export function writeData<
     data,
     variables,
     { __link: ROOT_ID, __typename: entrypoint.concreteType },
-    new Map(),
+    encounteredIds,
   );
   logMessage(environment, () => ({
     kind: 'AfterNormalization',
     store: environment.store,
-    encounteredIds: encounteredIds,
+    encounteredIds,
   }));
 
   callSubscriptions(environment, encounteredIds);
