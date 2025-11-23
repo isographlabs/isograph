@@ -9,7 +9,7 @@ export type Query__Newsfeed__rawResponse = {
       id: string,
       author: string,
       content: string,
-      image?: ({
+      image: ({
         id: string,
       } | null),
       title: string,
