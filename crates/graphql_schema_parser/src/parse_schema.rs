@@ -37,16 +37,15 @@ pub fn parse_schema(
 ) -> ParseResult<GraphQLTypeSystemDocument> {
     let mut tokens = PeekableLexer::new(source, text_source);
 
-    parse_type_system_document(&mut tokens, text_source)
+    parse_type_system_document(&mut tokens)
 }
 
 fn parse_type_system_document(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
 ) -> ParseResult<GraphQLTypeSystemDocument> {
     let mut type_system_definitions = vec![];
     while !tokens.reached_eof() {
-        let type_system_definition = parse_type_system_definition(tokens, text_source)?;
+        let type_system_definition = parse_type_system_definition(tokens)?;
         type_system_definitions.push(type_system_definition);
     }
     GraphQLTypeSystemDocument(type_system_definitions).ok()
@@ -58,25 +57,24 @@ pub fn parse_schema_extensions(
 ) -> ParseResult<GraphQLTypeSystemExtensionDocument> {
     let mut tokens = PeekableLexer::new(source, text_source);
 
-    parse_type_system_extension_document(&mut tokens, text_source)
+    parse_type_system_extension_document(&mut tokens)
 }
 
 fn parse_type_system_extension_document(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
 ) -> ParseResult<GraphQLTypeSystemExtensionDocument> {
     let mut definitions_or_extensions = vec![];
     while !tokens.reached_eof() {
         let definition_or_extension = match peek_type_system_doc_type(tokens) {
             Ok(type_system_document_kind) => match type_system_document_kind {
                 TypeSystemDocType::Definition => {
-                    let with_loc = parse_type_system_definition(tokens, text_source)?;
+                    let with_loc = parse_type_system_definition(tokens)?;
                     with_loc
                         .map(GraphQLTypeSystemExtensionOrDefinition::Definition)
                         .ok()
                 }
                 TypeSystemDocType::Extension => {
-                    let with_loc = parse_type_system_extension(tokens, text_source)?;
+                    let with_loc = parse_type_system_extension(tokens)?;
                     with_loc
                         .map(GraphQLTypeSystemExtensionOrDefinition::Extension)
                         .ok()
@@ -97,7 +95,6 @@ fn parse_type_system_extension_document(
 
 fn parse_type_system_extension(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
 ) -> ParseResult<WithLocation<GraphQLTypeSystemExtension>> {
     let extension = tokens.with_span_result(|tokens| {
         let identifier = tokens
@@ -112,8 +109,7 @@ fn parse_type_system_extension(
             .parse_source_of_kind(TokenKind::Identifier)
             .map_err(|diagnostic| SchemaParseError::ParseError(diagnostic).with_generated_span())?;
         match identifier.item {
-            "type" => parse_object_type_extension(tokens, text_source)
-                .map(GraphQLTypeSystemExtension::from),
+            "type" => parse_object_type_extension(tokens).map(GraphQLTypeSystemExtension::from),
             _ => SchemaParseError::TopLevelSchemaDeclarationExpected {
                 found_text: identifier.to_string(),
             }
@@ -122,12 +118,11 @@ fn parse_type_system_extension(
         }
     })?;
 
-    extension.to_with_location(text_source).ok()
+    extension.to_with_location(tokens.text_source).ok()
 }
 
 fn parse_type_system_definition(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
 ) -> ParseResult<WithLocation<GraphQLTypeSystemDefinition>> {
     let definition = tokens.with_span_result(|tokens| {
         let description = parse_optional_description(tokens);
@@ -135,22 +130,25 @@ fn parse_type_system_definition(
             .parse_source_of_kind(TokenKind::Identifier)
             .map_err(|diagnostic| SchemaParseError::ParseError(diagnostic).with_generated_span())?;
         match identifier.item {
-            "type" => parse_object_type_definition(tokens, description, text_source)
+            "type" => parse_object_type_definition(tokens, description)
                 .map(GraphQLTypeSystemDefinition::from),
-            "scalar" => parse_scalar_type_definition(tokens, description, text_source)
+            "scalar" => parse_scalar_type_definition(tokens, description)
                 .map(GraphQLTypeSystemDefinition::from),
-            "interface" => parse_interface_type_definition(tokens, description, text_source)
+            "interface" => parse_interface_type_definition(tokens, description)
                 .map(GraphQLTypeSystemDefinition::from),
-            "input" => parse_input_object_type_definition(tokens, description, text_source)
+            "input" => parse_input_object_type_definition(tokens, description)
                 .map(GraphQLTypeSystemDefinition::from),
-            "directive" => parse_directive_definition(tokens, description, text_source)
+            "directive" => parse_directive_definition(tokens, description)
                 .map(GraphQLTypeSystemDefinition::from),
-            "enum" => parse_enum_definition(tokens, description, text_source)
-                .map(GraphQLTypeSystemDefinition::from),
-            "union" => parse_union_definition(tokens, description, text_source)
-                .map(GraphQLTypeSystemDefinition::from),
-            "schema" => parse_schema_definition(tokens, description, text_source)
-                .map(GraphQLTypeSystemDefinition::from),
+            "enum" => {
+                parse_enum_definition(tokens, description).map(GraphQLTypeSystemDefinition::from)
+            }
+            "union" => {
+                parse_union_definition(tokens, description).map(GraphQLTypeSystemDefinition::from)
+            }
+            "schema" => {
+                parse_schema_definition(tokens, description).map(GraphQLTypeSystemDefinition::from)
+            }
             _ => SchemaParseError::TopLevelSchemaDeclarationExpected {
                 found_text: identifier.item.to_string(),
             }
@@ -159,23 +157,22 @@ fn parse_type_system_definition(
         }
     })?;
 
-    definition.to_with_location(text_source).ok()
+    definition.to_with_location(tokens.text_source).ok()
 }
 
 /// The state of the PeekableLexer is that it has processed the "type" keyword
 fn parse_object_type_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
-    text_source: TextSource,
 ) -> ParseResult<GraphQLObjectTypeDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
         .map_err(|diagnostic| SchemaParseError::ParseError(diagnostic).with_generated_span())?
-        .to_with_embedded_location(text_source);
+        .to_with_embedded_location(tokens.text_source);
 
-    let interfaces = parse_implements_interfaces_if_present(tokens, text_source)?;
-    let directives = parse_constant_directives(tokens, text_source)?;
-    let fields = parse_optional_fields(tokens, text_source)?;
+    let interfaces = parse_implements_interfaces_if_present(tokens)?;
+    let directives = parse_constant_directives(tokens)?;
+    let fields = parse_optional_fields(tokens)?;
 
     GraphQLObjectTypeDefinition {
         description,
@@ -190,16 +187,15 @@ fn parse_object_type_definition(
 /// The state of the PeekableLexer is that it has processed the "type" keyword
 fn parse_object_type_extension(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
 ) -> ParseResult<GraphQLObjectTypeExtension> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
-        .map(|with_span| with_span.to_with_location(text_source))
+        .map(|with_span| with_span.to_with_location(tokens.text_source))
         .map_err(|diagnostic| SchemaParseError::ParseError(diagnostic).with_generated_span())?;
 
-    let interfaces = parse_implements_interfaces_if_present(tokens, text_source)?;
-    let directives = parse_constant_directives(tokens, text_source)?;
-    let fields = parse_optional_fields(tokens, text_source)?;
+    let interfaces = parse_implements_interfaces_if_present(tokens)?;
+    let directives = parse_constant_directives(tokens)?;
+    let fields = parse_optional_fields(tokens)?;
 
     GraphQLObjectTypeExtension {
         name,
@@ -214,16 +210,15 @@ fn parse_object_type_extension(
 fn parse_interface_type_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
-    text_source: TextSource,
 ) -> ParseResult<GraphQLInterfaceTypeDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
         .map_err(|diagnostic| SchemaParseError::ParseError(diagnostic).with_generated_span())?
-        .to_with_embedded_location(text_source);
+        .to_with_embedded_location(tokens.text_source);
 
-    let interfaces = parse_implements_interfaces_if_present(tokens, text_source)?;
-    let directives = parse_constant_directives(tokens, text_source)?;
-    let fields = parse_optional_fields(tokens, text_source)?;
+    let interfaces = parse_implements_interfaces_if_present(tokens)?;
+    let directives = parse_constant_directives(tokens)?;
+    let fields = parse_optional_fields(tokens)?;
 
     GraphQLInterfaceTypeDefinition {
         description,
@@ -238,17 +233,15 @@ fn parse_interface_type_definition(
 fn parse_input_object_type_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
-    text_source: TextSource,
 ) -> ParseResult<GraphQLInputObjectTypeDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
         .map_err(|diagnostic| SchemaParseError::ParseError(diagnostic).with_generated_span())?
-        .to_with_embedded_location(text_source);
+        .to_with_embedded_location(tokens.text_source);
 
-    let directives = parse_constant_directives(tokens, text_source)?;
+    let directives = parse_constant_directives(tokens)?;
     let fields = parse_optional_enclosed_items(
         tokens,
-        text_source,
         TokenKind::OpenBrace,
         TokenKind::CloseBrace,
         parse_argument_definition,
@@ -267,17 +260,15 @@ fn parse_input_object_type_definition(
 fn parse_directive_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
-    text_source: TextSource,
 ) -> ParseResult<GraphQLDirectiveDefinition> {
     let _at = tokens.parse_token_of_kind(TokenKind::At);
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
         .map_err(|diagnostic| SchemaParseError::ParseError(diagnostic).with_generated_span())?
-        .to_with_location(text_source);
+        .to_with_location(tokens.text_source);
 
     let arguments = parse_optional_enclosed_items(
         tokens,
-        text_source,
         TokenKind::OpenParen,
         TokenKind::CloseParen,
         parse_argument_definition,
@@ -348,16 +339,15 @@ fn parse_directive_location(
 fn parse_enum_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
-    text_source: TextSource,
 ) -> ParseResult<GraphQLEnumDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
         .map_err(|e| SchemaParseError::ParseError(e).with_generated_span())?
-        .to_with_location(text_source);
+        .to_with_location(tokens.text_source);
 
-    let directives = parse_constant_directives(tokens, text_source)?;
+    let directives = parse_constant_directives(tokens)?;
 
-    let enum_value_definitions = parse_enum_value_definitions(tokens, text_source)?;
+    let enum_value_definitions = parse_enum_value_definitions(tokens)?;
 
     GraphQLEnumDefinition {
         description,
@@ -370,11 +360,9 @@ fn parse_enum_definition(
 
 fn parse_enum_value_definitions(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
 ) -> ParseResult<Vec<WithLocation<GraphQLEnumValueDefinition>>> {
     parse_optional_enclosed_items(
         tokens,
-        text_source,
         TokenKind::OpenBrace,
         TokenKind::CloseBrace,
         parse_enum_value_definition,
@@ -383,7 +371,6 @@ fn parse_enum_value_definitions(
 
 fn parse_enum_value_definition(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
 ) -> ParseResult<WithSpan<GraphQLEnumValueDefinition>> {
     tokens.with_span_result(|tokens| {
         let description = parse_optional_description(tokens);
@@ -401,12 +388,12 @@ fn parse_enum_value_definition(
             } else {
                 enum_literal_value_str
                     .map(|enum_literal_value| EnumLiteralValue::from(enum_literal_value.intern()))
-                    .to_with_location(text_source)
+                    .to_with_location(tokens.text_source)
                     .ok()
             }
         }?;
 
-        let directives = parse_constant_directives(tokens, text_source)?;
+        let directives = parse_constant_directives(tokens)?;
 
         GraphQLEnumValueDefinition {
             description,
@@ -420,20 +407,19 @@ fn parse_enum_value_definition(
 fn parse_union_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
-    text_source: TextSource,
 ) -> ParseResult<GraphQLUnionTypeDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
         .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?
-        .to_with_embedded_location(text_source);
+        .to_with_embedded_location(tokens.text_source);
 
-    let directives = parse_constant_directives(tokens, text_source)?;
+    let directives = parse_constant_directives(tokens)?;
 
     let _equal = tokens
         .parse_token_of_kind(TokenKind::Equals)
         .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?;
 
-    let union_member_types = parse_union_member_types(tokens, text_source)?;
+    let union_member_types = parse_union_member_types(tokens)?;
 
     GraphQLUnionTypeDefinition {
         description,
@@ -446,7 +432,6 @@ fn parse_union_definition(
 
 fn parse_union_member_types(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
 ) -> ParseResult<Vec<WithLocation<GraphQLObjectTypeName>>> {
     // This is a no-op if the token kind doesn't match, so effectively
     // this is an optional pipe
@@ -454,7 +439,7 @@ fn parse_union_member_types(
     let required_first_value = tokens
         .parse_string_key_type(TokenKind::Identifier)
         .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?
-        .to_with_location(text_source);
+        .to_with_location(tokens.text_source);
 
     let mut values = vec![required_first_value];
 
@@ -463,7 +448,7 @@ fn parse_union_member_types(
             tokens
                 .parse_string_key_type(TokenKind::Identifier)
                 .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?
-                .to_with_location(text_source),
+                .to_with_location(tokens.text_source),
         );
     }
 
@@ -473,9 +458,8 @@ fn parse_union_member_types(
 fn parse_schema_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
-    text_source: TextSource,
 ) -> ParseResult<GraphQLSchemaDefinition> {
-    let directives = parse_constant_directives(tokens, text_source)?;
+    let directives = parse_constant_directives(tokens)?;
 
     let _open_curly = tokens
         .parse_token_of_kind(TokenKind::OpenBrace)
@@ -485,7 +469,7 @@ fn parse_schema_definition(
     let mut mutation_type = None;
     let mut subscription_type = None;
 
-    let first_root_operation_type = parse_root_operation_type(tokens, text_source)?;
+    let first_root_operation_type = parse_root_operation_type(tokens)?;
     match first_root_operation_type.0.item {
         RootOperationKind::Query => query_type = first_root_operation_type.1.some(),
         RootOperationKind::Subscription => subscription_type = first_root_operation_type.1.some(),
@@ -493,7 +477,7 @@ fn parse_schema_definition(
     };
 
     while tokens.parse_token_of_kind(TokenKind::CloseBrace).is_err() {
-        let operation_type = parse_root_operation_type(tokens, text_source)?;
+        let operation_type = parse_root_operation_type(tokens)?;
 
         match operation_type.0.item {
             RootOperationKind::Query => reassign_or_error(&mut query_type, &operation_type)?,
@@ -532,7 +516,6 @@ fn reassign_or_error(
 
 fn parse_root_operation_type(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
 ) -> ParseResult<(
     WithSpan<RootOperationKind>,
     WithLocation<GraphQLObjectTypeName>,
@@ -562,7 +545,7 @@ fn parse_root_operation_type(
 
     (
         root_operation_type,
-        object_name.to_with_location(text_source),
+        object_name.to_with_location(tokens.text_source),
     )
         .ok()
 }
@@ -571,14 +554,13 @@ fn parse_root_operation_type(
 fn parse_scalar_type_definition(
     tokens: &mut PeekableLexer,
     description: Option<WithSpan<DescriptionValue>>,
-    text_source: TextSource,
 ) -> ParseResult<GraphQLScalarTypeDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
         .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?
-        .to_with_location(text_source);
+        .to_with_location(tokens.text_source);
 
-    let directives = parse_constant_directives(tokens, text_source)?;
+    let directives = parse_constant_directives(tokens)?;
 
     GraphQLScalarTypeDefinition {
         description,
@@ -591,10 +573,9 @@ fn parse_scalar_type_definition(
 /// The state of the PeekableLexer is that we have not parsed the "implements" keyword.
 fn parse_implements_interfaces_if_present(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
 ) -> ParseResult<Vec<WithLocation<GraphQLInterfaceTypeName>>> {
     if tokens.parse_matching_identifier("implements").is_ok() {
-        parse_interfaces(tokens, text_source)?.ok()
+        parse_interfaces(tokens)?.ok()
     } else {
         Ok(vec![])
     }
@@ -611,7 +592,6 @@ fn parse_implements_interfaces_if_present(
 /// with only "Foo", no directives and no fields was successfully parsed.
 fn parse_interfaces(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
 ) -> ParseResult<Vec<WithLocation<GraphQLInterfaceTypeName>>> {
     let _optional_ampersand = tokens.parse_token_of_kind(TokenKind::Ampersand);
 
@@ -619,14 +599,14 @@ fn parse_interfaces(
         .parse_string_key_type(TokenKind::Identifier)
         .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?;
 
-    let mut interfaces = vec![first_interface.to_with_location(text_source)];
+    let mut interfaces = vec![first_interface.to_with_location(tokens.text_source)];
 
     while tokens.parse_token_of_kind(TokenKind::Ampersand).is_ok() {
         interfaces.push(
             tokens
                 .parse_string_key_type(TokenKind::Identifier)
                 .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?
-                .to_with_location(text_source),
+                .to_with_location(tokens.text_source),
         );
     }
 
@@ -635,7 +615,6 @@ fn parse_interfaces(
 
 fn parse_constant_directives(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
 ) -> ParseResult<Vec<GraphQLDirective<GraphQLConstantValue>>> {
     let mut directives = vec![];
     while tokens.parse_token_of_kind(TokenKind::At).is_ok() {
@@ -643,8 +622,8 @@ fn parse_constant_directives(
             name: tokens
                 .parse_string_key_type(TokenKind::Identifier)
                 .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?
-                .to_with_embedded_location(text_source),
-            arguments: parse_optional_constant_arguments(tokens, text_source)?,
+                .to_with_embedded_location(tokens.text_source),
+            arguments: parse_optional_constant_arguments(tokens)?,
         })
     }
     Ok(directives)
@@ -653,23 +632,16 @@ fn parse_constant_directives(
 // Parse constant arguments passed to a directive used in a schema definition.
 fn parse_optional_constant_arguments<T: From<StringKey>>(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
 ) -> ParseResult<Vec<NameValuePair<T, GraphQLConstantValue>>> {
     if tokens.parse_token_of_kind(TokenKind::OpenParen).is_ok() {
-        let first_name_value_pair = parse_constant_name_value_pair(
-            tokens,
-            |tokens| parse_constant_value(tokens, text_source),
-            text_source,
-        )?;
+        let first_name_value_pair = parse_constant_name_value_pair(tokens, parse_constant_value)?;
 
         let mut arguments = vec![first_name_value_pair];
 
         while tokens.parse_token_of_kind(TokenKind::CloseParen).is_err() {
-            arguments.push(parse_constant_name_value_pair(
-                tokens,
-                |value| parse_constant_value(value, text_source),
-                text_source,
-            )?);
+            arguments.push(parse_constant_name_value_pair(tokens, |value| {
+                parse_constant_value(value)
+            })?);
         }
 
         Ok(arguments)
@@ -682,12 +654,11 @@ fn parse_optional_constant_arguments<T: From<StringKey>>(
 fn parse_constant_name_value_pair<T: From<StringKey>, TValue>(
     tokens: &mut PeekableLexer,
     parse_value: impl Fn(&mut PeekableLexer) -> ParseResult<WithLocation<TValue>>,
-    text_source: TextSource,
 ) -> ParseResult<NameValuePair<T, TValue>> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
         .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?
-        .to_with_location(text_source);
+        .to_with_location(tokens.text_source);
     tokens
         .parse_token_of_kind(TokenKind::Colon)
         .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?;
@@ -698,7 +669,6 @@ fn parse_constant_name_value_pair<T: From<StringKey>, TValue>(
 
 fn parse_constant_value(
     tokens: &mut PeekableLexer,
-    text_source: TextSource,
 ) -> ParseResult<WithLocation<GraphQLConstantValue>> {
     from_control_flow(|| {
         to_control_flow(|| {
@@ -717,7 +687,7 @@ fn parse_constant_value(
                         }
                     })
                 })
-                .map(|x| x.to_with_location(text_source))
+                .map(|x| x.to_with_location(tokens.text_source))
         })?;
 
         to_control_flow(|| {
@@ -736,7 +706,7 @@ fn parse_constant_value(
                         }
                     })
                 })
-                .map(|x| x.to_with_location(text_source))
+                .map(|x| x.to_with_location(tokens.text_source))
         })?;
 
         to_control_flow(|| {
@@ -752,27 +722,27 @@ fn parse_constant_value(
                     });
                     without_quotes.map(GraphQLConstantValue::String)
                 })
-                .map(|x| x.to_with_location(text_source))
+                .map(|x| x.to_with_location(tokens.text_source))
         })?;
 
         to_control_flow(|| {
             tokens
                 .parse_matching_identifier("true")
                 .map(|x| x.map(|_| GraphQLConstantValue::Boolean(true)))
-                .map(|x| x.to_with_location(text_source))
+                .map(|x| x.to_with_location(tokens.text_source))
         })?;
         to_control_flow(|| {
             tokens
                 .parse_matching_identifier("false")
                 .map(|x| x.map(|_| GraphQLConstantValue::Boolean(false)))
-                .map(|x| x.to_with_location(text_source))
+                .map(|x| x.to_with_location(tokens.text_source))
         })?;
 
         to_control_flow(|| {
             tokens
                 .parse_matching_identifier("null")
                 .map(|x| x.map(|_| GraphQLConstantValue::Null))
-                .map(|x| x.to_with_location(text_source))
+                .map(|x| x.to_with_location(tokens.text_source))
         })?;
 
         // All remaining identifiers are treated as enums. It is recommended, but not enforced,
@@ -781,7 +751,7 @@ fn parse_constant_value(
             tokens
                 .parse_string_key_type(TokenKind::Identifier)
                 .map(|x| x.map(GraphQLConstantValue::Enum))
-                .map(|x| x.to_with_location(text_source))
+                .map(|x| x.to_with_location(tokens.text_source))
         })?;
 
         to_control_flow(|| {
@@ -792,11 +762,11 @@ fn parse_constant_value(
                         .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?;
                     let mut values = vec![];
                     while tokens.parse_token_of_kind(TokenKind::CloseBracket).is_err() {
-                        values.push(parse_constant_value(tokens, text_source)?);
+                        values.push(parse_constant_value(tokens)?);
                     }
                     GraphQLConstantValue::List(values).ok()
                 })
-                .map(|x| x.to_with_location(text_source));
+                .map(|x| x.to_with_location(tokens.text_source));
             x
         })?;
 
@@ -812,17 +782,17 @@ fn parse_constant_value(
                         let name = tokens
                             .parse_string_key_type(TokenKind::Identifier)
                             .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?
-                            .to_with_location(text_source);
+                            .to_with_location(tokens.text_source);
                         tokens
                             .parse_token_of_kind(TokenKind::Colon)
                             .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?
-                            .to_with_location(text_source);
-                        let value = parse_constant_value(tokens, text_source)?;
+                            .to_with_location(tokens.text_source);
+                        let value = parse_constant_value(tokens)?;
                         values.push(NameValuePair { name, value });
                     }
                     GraphQLConstantValue::Object(values).ok()
                 })
-                .map(|x| x.to_with_location(text_source));
+                .map(|x| x.to_with_location(tokens.text_source));
             x
         })?;
 
@@ -848,25 +818,23 @@ fn from_control_flow<T, E>(control_flow: impl FnOnce() -> ControlFlow<T, E>) -> 
 
 fn parse_optional_fields(
     tokens: &mut PeekableLexer<'_>,
-    text_source: TextSource,
 ) -> ParseResult<Vec<WithLocation<GraphQLFieldDefinition>>> {
     let brace = tokens.parse_token_of_kind(TokenKind::OpenBrace);
     if brace.is_err() {
         return Ok(vec![]);
     }
 
-    let field = parse_field(tokens, text_source)?;
+    let field = parse_field(tokens)?;
     let mut fields = vec![field];
 
     while tokens.parse_token_of_kind(TokenKind::CloseBrace).is_err() {
-        fields.push(parse_field(tokens, text_source)?);
+        fields.push(parse_field(tokens)?);
     }
     fields.ok()
 }
 
 fn parse_field(
     tokens: &mut PeekableLexer<'_>,
-    text_source: TextSource,
 ) -> ParseResult<WithLocation<GraphQLFieldDefinition>> {
     tokens
         .with_span_result(|tokens| {
@@ -874,11 +842,10 @@ fn parse_field(
             let name = tokens
                 .parse_string_key_type(TokenKind::Identifier)
                 .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?
-                .to_with_location(text_source);
+                .to_with_location(tokens.text_source);
 
             let arguments = parse_optional_enclosed_items(
                 tokens,
-                text_source,
                 TokenKind::OpenParen,
                 TokenKind::CloseParen,
                 parse_argument_definition,
@@ -890,7 +857,7 @@ fn parse_field(
 
             let type_ = parse_type_annotation(tokens)?;
 
-            let directives = parse_constant_directives(tokens, text_source)?;
+            let directives = parse_constant_directives(tokens)?;
 
             GraphQLFieldDefinition {
                 name,
@@ -902,7 +869,7 @@ fn parse_field(
             }
             .ok()
         })?
-        .to_with_location(text_source)
+        .to_with_location(tokens.text_source)
         .ok()
 }
 
@@ -969,19 +936,18 @@ fn parse_type_annotation<T: From<StringKey>>(
 
 fn parse_optional_enclosed_items<'a, T>(
     tokens: &mut PeekableLexer<'a>,
-    text_source: TextSource,
     open_token: TokenKind,
     close_token: TokenKind,
-    mut parse: impl FnMut(&mut PeekableLexer<'a>, TextSource) -> ParseResult<WithSpan<T>>,
+    mut parse: impl FnMut(&mut PeekableLexer<'a>) -> ParseResult<WithSpan<T>>,
 ) -> ParseResult<Vec<WithLocation<T>>> {
     let paren = tokens.parse_token_of_kind(open_token);
 
     if paren.is_ok() {
-        let argument = parse(tokens, text_source)?.to_with_location(text_source);
+        let argument = parse(tokens)?.to_with_location(tokens.text_source);
         let mut arguments = vec![argument];
 
         while tokens.parse_token_of_kind(close_token).is_err() {
-            arguments.push(parse(tokens, text_source)?.to_with_location(text_source));
+            arguments.push(parse(tokens)?.to_with_location(tokens.text_source));
         }
         arguments.ok()
     } else {
@@ -991,20 +957,19 @@ fn parse_optional_enclosed_items<'a, T>(
 
 fn parse_argument_definition(
     tokens: &mut PeekableLexer<'_>,
-    text_source: TextSource,
 ) -> ParseResult<WithSpan<GraphQLInputValueDefinition>> {
     tokens.with_span_result(|tokens| {
         let description = parse_optional_description(tokens);
         let name = tokens
             .parse_string_key_type(TokenKind::Identifier)
             .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?
-            .to_with_location(text_source);
+            .to_with_location(tokens.text_source);
         tokens
             .parse_token_of_kind(TokenKind::Colon)
             .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?;
         let type_ = parse_type_annotation(tokens)?;
-        let default_value = parse_optional_constant_default_value(tokens, text_source)?;
-        let directives = parse_constant_directives(tokens, text_source)?;
+        let default_value = parse_optional_constant_default_value(tokens)?;
+        let directives = parse_constant_directives(tokens)?;
 
         GraphQLInputValueDefinition {
             description,
@@ -1019,14 +984,13 @@ fn parse_argument_definition(
 
 fn parse_optional_constant_default_value(
     tokens: &mut PeekableLexer<'_>,
-    text_source: TextSource,
 ) -> ParseResult<Option<WithLocation<GraphQLConstantValue>>> {
     let equal = tokens.parse_token_of_kind(TokenKind::Equals);
     if equal.is_err() {
         return Ok(None);
     }
 
-    parse_constant_value(tokens, text_source)?.some().ok()
+    parse_constant_value(tokens)?.some().ok()
 }
 
 enum TypeSystemDocType {

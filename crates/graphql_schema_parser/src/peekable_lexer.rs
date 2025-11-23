@@ -4,8 +4,7 @@ use logos::Logos;
 use prelude::Postfix;
 
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, Location, Span, TextSource, WithLocation, WithSpan,
-    WithSpanPostfix,
+    Diagnostic, DiagnosticResult, Location, Span, TextSource, WithSpan, WithSpanPostfix,
 };
 
 pub(crate) struct PeekableLexer<'source> {
