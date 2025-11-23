@@ -88,23 +88,22 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
                         format!(
                             "{server_object_entity_name} is a scalar, but it should be an object"
                         ),
-                        Result::ok(
-                            entity_definition_location(db, server_object_entity_name.into())
-                                .as_ref(),
-                        )
-                        .cloned()
-                        .flatten(),
+                        entity_definition_location(db, server_object_entity_name.into())
+                            .as_ref()
+                            .ok()
+                            .cloned()
+                            .flatten(),
                     )
                     .wrap_err(),
                 }
             } else {
                 Diagnostic::new(
                     format!("Multiple definitions of {server_object_entity_name} were found."),
-                    Result::ok(
-                        entity_definition_location(db, server_object_entity_name.into()).as_ref(),
-                    )
-                    .cloned()
-                    .flatten(),
+                    entity_definition_location(db, server_object_entity_name.into())
+                        .as_ref()
+                        .ok()
+                        .cloned()
+                        .flatten(),
                 )
                 .wrap_err()
             }
@@ -131,23 +130,22 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
                         format!(
                             "{server_scalar_entity_name} is an object, but it should be a scalar"
                         ),
-                        Result::ok(
-                            entity_definition_location(db, server_scalar_entity_name.into())
-                                .as_ref(),
-                        )
-                        .cloned()
-                        .flatten(),
+                        entity_definition_location(db, server_scalar_entity_name.into())
+                            .as_ref()
+                            .ok()
+                            .cloned()
+                            .flatten(),
                     )
                     .wrap_err(),
                 }
             } else {
                 Diagnostic::new(
                     format!("Multiple definitions of {server_scalar_entity_name} were found"),
-                    Result::ok(
-                        entity_definition_location(db, server_scalar_entity_name.into()).as_ref(),
-                    )
-                    .cloned()
-                    .flatten(),
+                    entity_definition_location(db, server_scalar_entity_name.into())
+                        .as_ref()
+                        .ok()
+                        .cloned()
+                        .flatten(),
                 )
                 .wrap_err()
             }
@@ -247,7 +245,9 @@ pub fn defined_entity<TNetworkProtocol: NetworkProtocol>(
                     } else {
                         Diagnostic::new(
                             format!("Multiple definitions of {entity_name} were found"),
-                            Result::ok(entity_definition_location(db, entity_name).as_ref())
+                            entity_definition_location(db, entity_name)
+                                .as_ref()
+                                .ok()
                                 .cloned()
                                 .flatten(),
                         )
