@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crate::{
-    ClientObjectSelectable, ClientScalarSelectable, CreateAdditionalFieldsError, IsographDatabase,
-    NetworkProtocol, OwnedClientSelectable, ProcessClientFieldDeclarationError,
+    ClientObjectSelectable, ClientScalarSelectable, IsographDatabase, NetworkProtocol,
+    OwnedClientSelectable, ProcessClientFieldDeclarationError,
     UnprocessedClientScalarSelectableSelectionSet, create_new_exposed_field,
     create_type_system_schema_with_server_selectables, get_link_fields_map,
     process_client_field_declaration_inner, process_client_pointer_declaration_inner,
@@ -149,10 +149,7 @@ pub enum MemoizedIsoLiteralError {
     ProcessClientFieldDeclarationError(WithSpan<ProcessClientFieldDeclarationError>),
 
     #[error("{0}")]
-    CreateSchemaError(Diagnostic),
-
-    #[error("{0}")]
-    CreateAdditionalFieldsError(#[from] CreateAdditionalFieldsError),
+    Diagnostic(Diagnostic),
 }
 
 #[memo]
@@ -246,7 +243,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
             // selection_set_access.
             let link_fields = get_link_fields_map(db)
                 .as_ref()
-                .map_err(|e| MemoizedIsoLiteralError::CreateSchemaError(e.clone()))?;
+                .map_err(|e| MemoizedIsoLiteralError::Diagnostic(e.clone()))?;
 
             if let Some(link_field) = link_fields
                 .get(&(parent_object_entity_name, client_scalar_selectable_name))
@@ -373,13 +370,15 @@ pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
 > {
     let expose_as_field_queue = create_type_system_schema_with_server_selectables(db)
         .as_ref()
-        .map_err(|e| MemoizedIsoLiteralError::CreateSchemaError(e.clone()))?;
+        .map_err(|e| MemoizedIsoLiteralError::Diagnostic(e.clone()))?;
 
     let mut map = HashMap::new();
     for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
         for expose_as_field in expose_as_fields_to_insert {
             let (unprocessed_client_scalar_selection_set, exposed_field_client_scalar_selectable) =
-                create_new_exposed_field(db, expose_as_field, *parent_object_entity_name)?;
+                create_new_exposed_field(db, expose_as_field, *parent_object_entity_name)
+                    .clone()
+                    .map_err(MemoizedIsoLiteralError::Diagnostic)?;
 
             map.insert(
                 (
@@ -457,7 +456,7 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
         .chain(
             get_link_fields_map(db)
                 .clone()
-                .map_err(MemoizedIsoLiteralError::CreateSchemaError)?
+                .map_err(MemoizedIsoLiteralError::Diagnostic)?
                 .into_iter()
                 .map(|(key, value)| ((key.0, key.1.into()), Ok(value.scalar_selected()))),
         )

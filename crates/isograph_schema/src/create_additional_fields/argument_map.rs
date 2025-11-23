@@ -1,9 +1,8 @@
 use common_lang_types::{
-    SelectableName, ServerObjectEntityName, ServerSelectableName, StringLiteralValue, VariableName,
-    WithLocation, WithLocationPostfix,
+    Diagnostic, DiagnosticResult, SelectableName, ServerObjectEntityName, ServerSelectableName,
+    StringLiteralValue, VariableName, WithLocation, WithLocationPostfix,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
-use intern::Lookup;
 use isograph_lang_types::{SelectionType, SelectionTypePostfix, VariableDefinition};
 use prelude::Postfix;
 use std::collections::HashMap;
@@ -13,9 +12,7 @@ use crate::{
     ValidatedVariableDefinition, server_selectables_vec_for_entity,
 };
 
-use super::create_additional_fields_error::{
-    CreateAdditionalFieldsError, FieldMapItem, ProcessTypeDefinitionResult, ProcessedFieldMapItem,
-};
+use super::create_additional_fields_error::{FieldMapItem, ProcessedFieldMapItem};
 
 #[derive(Debug)]
 pub(crate) struct ArgumentMap {
@@ -40,7 +37,7 @@ pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol>(
     primary_object_entity_name: ServerObjectEntityName,
     mutation_object_entity_name: ServerObjectEntityName,
     mutation_selectable_name: SelectableName,
-) -> ProcessTypeDefinitionResult<ProcessedFieldMapItem> {
+) -> DiagnosticResult<ProcessedFieldMapItem> {
     let split_to_arg = field_map_item.split_to_arg();
     let (index_of_argument, argument) = argument_map
         .arguments
@@ -56,12 +53,18 @@ pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol>(
             name == split_to_arg.to_argument_name
         })
         .ok_or({
-            CreateAdditionalFieldsError::PrimaryDirectiveArgumentDoesNotExistOnField {
-                primary_object_entity_name,
-                mutation_object_entity_name,
-                mutation_selectable_name,
-                field_name: split_to_arg.to_argument_name,
-            }
+            let field_name = split_to_arg.to_argument_name;
+            Diagnostic::new(
+                format!(
+                    "Error when processing @exposeField directive on \
+                     type `{primary_object_entity_name}`. The field \
+                    `{mutation_object_entity_name}.{mutation_selectable_name}` \
+                    does not have argument `{field_name}`, \
+                    or it was previously processed by another field_map item."
+                ),
+                // TODO have a location
+                None,
+            )
         })?;
 
     // TODO avoid matching twice?
@@ -72,10 +75,16 @@ pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol>(
             match split_to_arg.to_field_names.split_first() {
                 None => {
                     if unmodified_argument.type_.inner().as_object().is_some() {
-                        return CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
-                            primary_object_entity_name,
-                            field_name: split_to_arg.to_argument_name.lookup().to_string(),
-                        }
+                        let to_arg = split_to_arg.to_argument_name;
+                        return Diagnostic::new(
+                            format!(
+                                "Error when processing @exposeField directive \
+                                on type `{primary_object_entity_name}`. \
+                                The field `{to_arg}` is an object, and cannot \
+                                be remapped. Remap scalars only."
+                            ),
+                            None,
+                        )
                         .err();
                     }
 
@@ -102,10 +111,17 @@ pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol>(
                     // TODO encode this in the type system.
                     // A modified argument will always have an object type, and cannot be remapped
                     // at the object level.
-                    return CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
-                        primary_object_entity_name,
-                        field_name: split_to_arg.to_argument_name.lookup().to_string(),
-                    }
+                    let field_name = split_to_arg.to_argument_name;
+                    return Diagnostic::new(
+                        format!(
+                            "Error when processing @exposeField directive \
+                            on type `{primary_object_entity_name}`. \
+                            The field `{field_name}` is an object, and cannot \
+                            be remapped. Remap scalars only."
+                        ),
+                        // TODO have a location
+                        None,
+                    )
                     .err();
                 }
                 Some((first, rest)) => {
@@ -224,7 +240,7 @@ impl ModifiedArgument {
         first: StringLiteralValue,
         rest: &[StringLiteralValue],
         primary_object_entity_name: ServerObjectEntityName,
-    ) -> ProcessTypeDefinitionResult<()> {
+    ) -> DiagnosticResult<()> {
         let argument_object = self.object.inner_mut();
 
         let key = first.unchecked_conversion();
@@ -245,10 +261,17 @@ impl ModifiedArgument {
                         match field {
                             PotentiallyModifiedField::Unmodified(field_id) => {
                                 if field_id.as_object().is_some() {
-                                    return CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
-                                        primary_object_entity_name,
-                                        field_name: key.lookup().to_string(),
-                                    }.err();
+                                    return Diagnostic::new(
+                                        format!(
+                                            "Error when processing @exposeField directive \
+                                            on type `{primary_object_entity_name}`. \
+                                            The field `{key}` is an object, and cannot \
+                                            be remapped. Remap scalars only."
+                                        ),
+                                        // TODO have a location
+                                        None,
+                                    )
+                                    .err();
                                 }
 
                                 // Cool! We found a scalar, we can remove it.
@@ -258,21 +281,32 @@ impl ModifiedArgument {
                                 );
                             }
                             PotentiallyModifiedField::Modified(_) => {
-                                // A field can only be modified if it has an object type
-                                return CreateAdditionalFieldsError::PrimaryDirectiveCannotRemapObject {
-                                    primary_object_entity_name,
-                                    field_name: key.to_string(),
-                                }.err();
+                                return Diagnostic::new(
+                                    format!(
+                                        "Error when processing @exposeField directive \
+                                            on type `{primary_object_entity_name}`. \
+                                            The field `{key}` is an object, and cannot \
+                                            be remapped. Remap scalars only."
+                                    ),
+                                    // TODO have a location
+                                    None,
+                                )
+                                .err();
                             }
                         }
                     }
                 }
             }
             None => {
-                return CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
-                    primary_object_entity_name,
-                    field_name: first,
-                }
+                return Diagnostic::new(
+                    format!(
+                        "Error when processing @exposeField directive on \
+                        type `{primary_object_entity_name}`. \
+                        The field `{first}` is not found."
+                    ),
+                    // TODO have a location
+                    None,
+                )
                 .err();
             }
         };

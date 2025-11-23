@@ -1,7 +1,7 @@
 use common_lang_types::{
-    ParentObjectEntityNameAndSelectableName, SelectableName, ServerObjectEntityName,
-    ServerObjectSelectableName, ServerSelectableName, StringLiteralValue, WithLocation,
-    WithSpanPostfix,
+    Diagnostic, DiagnosticResult, ParentObjectEntityNameAndSelectableName, SelectableName,
+    ServerObjectEntityName, ServerObjectSelectableName, ServerSelectableName, StringLiteralValue,
+    WithLocation, WithSpanPostfix,
 };
 use intern::{Lookup, string_key::Intern};
 use isograph_lang_types::{
@@ -24,10 +24,7 @@ use crate::{
 
 use super::{
     argument_map::ArgumentMap,
-    create_additional_fields_error::{
-        CreateAdditionalFieldsError, FieldMapItem, ProcessTypeDefinitionResult,
-        ProcessedFieldMapItem,
-    },
+    create_additional_fields_error::{FieldMapItem, ProcessedFieldMapItem},
 };
 
 // TODO move to graphql_network_protocol crate
@@ -61,13 +58,10 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     expose_field_to_insert: &ExposeFieldToInsert,
     parent_object_entity_name: ServerObjectEntityName,
-) -> Result<
-    (
-        UnprocessedClientScalarSelectableSelectionSet,
-        ClientScalarSelectable<TNetworkProtocol>,
-    ),
-    CreateAdditionalFieldsError,
-> {
+) -> DiagnosticResult<(
+    UnprocessedClientScalarSelectableSelectionSet,
+    ClientScalarSelectable<TNetworkProtocol>,
+)> {
     let ExposeFieldDirective {
         expose_as,
         field_map,
@@ -92,7 +86,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
     let mutation_field =
         server_selectable_named(db, parent_object_entity_name, mutation_subfield_name.into())
             .as_ref()
-            .map_err(|e| CreateAdditionalFieldsError::EntityAccessError(e.clone()))?
+            .map_err(|e| e.clone())?
             .as_ref()
             // TODO propagate this errors instead of panicking
             .expect(
@@ -100,11 +94,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
                 This is indicative of a bug in Isograph.",
             )
             .as_ref()
-            .map_err(
-                |e| CreateAdditionalFieldsError::FieldToInsertToServerSelectableError {
-                    error: e.clone(),
-                },
-            )?
+            .map_err(|e| e.clone())?
             .as_ref()
             .as_object()
             // TODO propagate this errors instead of panicking
@@ -138,7 +128,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
     let top_level_schema_field_concrete_type =
         server_object_entity_named(db, payload_object_entity_name)
             .as_ref()
-            .map_err(|e| CreateAdditionalFieldsError::EntityAccessError(e.clone()))?
+            .map_err(|e| e.clone())?
             .as_ref()
             .expect(
                 "Expected entity to exist. \
@@ -194,7 +184,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
         .iter()
         .map(|server_object_selectable| {
             // The server object selectable may represent a linked field or an inline fragment
-            let x = match server_object_selectable.object_selectable_variant {
+            match server_object_selectable.object_selectable_variant {
                 ServerObjectSelectableVariant::LinkedField => {
                     WrappedSelectionMapSelection::LinkedField {
                         parent_object_entity_name: server_object_selectable
@@ -211,7 +201,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
                             *server_object_selectable.target_object_entity.inner(),
                         )
                         .as_ref()
-                        .map_err(|e| CreateAdditionalFieldsError::EntityAccessError(e.clone()))?
+                        .map_err(|e| e.clone())?
                         .as_ref()
                         .expect(
                             "Expected entity to exist. \
@@ -220,8 +210,8 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
                         .name,
                     )
                 }
-            };
-            Ok::<_, CreateAdditionalFieldsError>(x)
+            }
+            .ok()
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -283,25 +273,25 @@ fn parse_mutation_subfield_id<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     field_arg: &str,
     mutation_object_entity_name: ServerObjectEntityName,
-) -> ProcessTypeDefinitionResult<(ServerObjectEntityName, ServerObjectSelectableName)> {
+) -> DiagnosticResult<(ServerObjectEntityName, ServerObjectSelectableName)> {
     let opt_field =
         server_selectable_named(db, mutation_object_entity_name, field_arg.intern().into())
             .as_ref()
-            .map_err(|e| CreateAdditionalFieldsError::EntityAccessError(e.clone()))?;
+            .map_err(|e| e.clone())?;
 
     match opt_field {
         Some(s) => {
             let server_object_selectable = s
                 .as_ref()
-                .map_err(
-                    |e| CreateAdditionalFieldsError::FieldToInsertToServerSelectableError {
-                        error: e.clone(),
-                    },
-                )?
+                .map_err(Clone::clone)?
                 .as_ref()
-                .as_object()
-                .ok_or_else(|| CreateAdditionalFieldsError::InvalidField {
-                    field_arg: field_arg.to_string(),
+                .as_object_result()
+                .map_err(|e| {
+                    Diagnostic::new(
+                        format!("Invalid field `{field_arg}` in @exposeField directive"),
+                        // TODO this is the wrong location
+                        e.name.location.some(),
+                    )
                 })?;
 
             (
@@ -310,9 +300,11 @@ fn parse_mutation_subfield_id<TNetworkProtocol: NetworkProtocol>(
             )
                 .ok()
         }
-        None => CreateAdditionalFieldsError::InvalidField {
-            field_arg: field_arg.to_string(),
-        }
+        None => Diagnostic::new(
+            format!("Invalid field `{field_arg}` in @exposeField directive"),
+            // TODO have a location
+            None,
+        )
         .err(),
     }
 }
@@ -324,7 +316,7 @@ fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol>(
     mutation_object_name: ServerObjectEntityName,
     mutation_field_name: SelectableName,
     field_map_items: Vec<FieldMapItem>,
-) -> ProcessTypeDefinitionResult<Vec<ProcessedFieldMapItem>> {
+) -> DiagnosticResult<Vec<ProcessedFieldMapItem>> {
     let mut processed_field_map_items = Vec::with_capacity(field_map_items.len());
     // TODO
     // We need to create entirely new arguments, which are the existing arguments minus
@@ -349,27 +341,25 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     root_object_name: ServerObjectEntityName,
     selections: &[ServerSelectableName],
-) -> Result<(ServerObjectEntityName, Option<ServerObjectEntityName>), CreateAdditionalFieldsError> {
+) -> DiagnosticResult<(ServerObjectEntityName, Option<ServerObjectEntityName>)> {
     let mut current_entity_name = root_object_name;
 
     for selection_name in selections {
         let current_selectable = server_selectable_named(db, current_entity_name, *selection_name)
             .as_ref()
-            .map_err(|e| CreateAdditionalFieldsError::EntityAccessError(e.clone()))?;
+            .map_err(Clone::clone)?;
 
         match current_selectable {
             Some(entity) => {
-                let entity = entity.as_ref().map_err(|e| {
-                    CreateAdditionalFieldsError::FieldToInsertToServerSelectableError {
-                        error: e.clone(),
-                    }
-                })?;
+                let entity = entity.as_ref().map_err(Clone::clone)?;
                 match entity {
                     SelectionType::Scalar(_) => {
-                        // TODO show a better error message
-                        return CreateAdditionalFieldsError::InvalidField {
-                            field_arg: selection_name.lookup().to_string(),
-                        }
+                        let field_arg = selection_name.lookup().to_string();
+                        return Diagnostic::new(
+                            format!("Invalid field `{field_arg}` in @exposeField directive"),
+                            // TODO have a location
+                            None,
+                        )
                         .err();
                     }
                     SelectionType::Object(object) => {
@@ -378,10 +368,15 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
                 }
             }
             None => {
-                return CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
-                    primary_object_entity_name: current_entity_name,
-                    field_name: selection_name.unchecked_conversion(),
-                }
+                return Diagnostic::new(
+                    format!(
+                        "Error when processing @exposeField directive \
+                        on type `{current_entity_name}`. \
+                        The field `{selection_name}` is not found."
+                    ),
+                    // TODO have a location
+                    None,
+                )
                 .err();
             }
         };
@@ -389,7 +384,7 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
 
     let current_entity_concrete_type = server_object_entity_named(db, current_entity_name)
         .as_ref()
-        .map_err(|e| CreateAdditionalFieldsError::EntityAccessError(e.clone()))?
+        .map_err(Clone::clone)?
         .as_ref()
         .expect(
             "Expected entity to exist. \

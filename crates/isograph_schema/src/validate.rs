@@ -7,11 +7,11 @@ use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
-    ContainsIsoStats, CreateAdditionalFieldsError, IsographDatabase, NetworkProtocol,
-    ProcessClientFieldDeclarationError, ValidateUseOfArgumentsError, ValidatedEntrypointError,
-    create_new_exposed_field, create_type_system_schema_with_server_selectables,
-    parse_iso_literals, process_iso_literals, server_id_selectable, server_object_entities,
-    server_selectables_map, validate_use_of_arguments, validated_entrypoints,
+    ContainsIsoStats, IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError,
+    ValidateUseOfArgumentsError, ValidatedEntrypointError, create_new_exposed_field,
+    create_type_system_schema_with_server_selectables, parse_iso_literals, process_iso_literals,
+    server_id_selectable, server_object_entities, server_selectables_map,
+    validate_use_of_arguments, validated_entrypoints,
 };
 
 /// In the world of pico, we minimally validate. For example, if the
@@ -81,7 +81,7 @@ fn validate_all_expose_as_fields<TNetworkProtocol: NetworkProtocol>(
             if let Err(e) =
                 create_new_exposed_field(db, expose_as_field, *parent_object_entity_name)
             {
-                errors.push(e.into());
+                errors.push(ValidationError::Diagnostic(e));
             }
         }
     }
@@ -140,9 +140,6 @@ pub enum ValidationError {
 
     #[error("{0}")]
     ValidatedEntrypointError(#[from] ValidatedEntrypointError),
-
-    #[error("{0}")]
-    CreateAdditionalFieldsError(#[from] CreateAdditionalFieldsError),
 
     #[error("{0}")]
     Diagnostic(Diagnostic),
