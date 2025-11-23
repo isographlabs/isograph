@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{
-    ExposeFieldToInsert, FieldToInsertToServerSelectableError, IsographDatabase, NetworkProtocol,
-};
+use crate::{ExposeFieldToInsert, IsographDatabase, NetworkProtocol};
 use common_lang_types::{Diagnostic, ServerObjectEntityName};
 use pico_macros::memo;
 use thiserror::Error;
@@ -31,7 +29,4 @@ pub fn create_type_system_schema_with_server_selectables<TNetworkProtocol: Netwo
 pub enum CreateSchemaError {
     #[error("{message}")]
     ParseAndProcessTypeSystemDocument { message: Diagnostic },
-
-    #[error("{0}")]
-    FieldToInsertToServerSelectableError(#[from] FieldToInsertToServerSelectableError),
 }
