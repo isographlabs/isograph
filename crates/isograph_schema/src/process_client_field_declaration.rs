@@ -58,10 +58,9 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     let parent_type_id =
         defined_entity(db, client_field_declaration.item.parent_type.item.0.into())
             .to_owned()
-            .expect(
-                "Expected parsing to have succeeded. \
-                This is indicative of a bug in Isograph.",
-            )
+            .map_err(|e| {
+                ProcessClientFieldDeclarationError::DefinedEntityError(e).with_generated_location()
+            })?
             .ok_or(
                 ProcessClientFieldDeclarationError::ParentTypeNotDefined {
                     parent_object_entity_name: client_field_declaration.item.parent_type.item,
@@ -103,10 +102,9 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
         client_pointer_declaration.item.parent_type.item.0.into(),
     )
     .to_owned()
-    .expect(
-        "Expected parsing to have succeeded. \
-        This is indicative of a bug in Isograph.",
-    )
+    .map_err(|e| {
+        ProcessClientFieldDeclarationError::DefinedEntityError(e).with_generated_location()
+    })?
     .ok_or(
         ProcessClientFieldDeclarationError::ParentTypeNotDefined {
             parent_object_entity_name: client_pointer_declaration.item.parent_type.item,
@@ -122,10 +120,9 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
         client_pointer_declaration.item.target_type.inner().0.into(),
     )
     .to_owned()
-    .expect(
-        "Expected parsing to have succeeded. \
-            This is indicative of a bug in Isograph.",
-    )
+    .map_err(|e| {
+        ProcessClientFieldDeclarationError::DefinedEntityError(e).with_generated_location()
+    })?
     .ok_or(
         ProcessClientFieldDeclarationError::ParentTypeNotDefined {
             parent_object_entity_name: *client_pointer_declaration.item.target_type.inner(),
