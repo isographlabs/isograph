@@ -519,16 +519,14 @@ function normalizeScalarField(
   }
 
   if (isScalarOrEmptyArray(networkResponseData)) {
-    targetStoreRecord[parentRecordKey] = networkResponseData as
-      | NetworkResponseScalarValue
-      | (NetworkResponseScalarValue | null)[]; // have to cast array to mutable
+    targetStoreRecord[parentRecordKey] = networkResponseData;
     return existingValue !== networkResponseData;
   } else {
     throw new Error('Unexpected object array when normalizing scalar');
   }
 }
 
-function isArray(value: unknown): value is readonly unknown[] {
+export function isArray(value: unknown): value is readonly unknown[] {
   return Array.isArray(value);
 }
 

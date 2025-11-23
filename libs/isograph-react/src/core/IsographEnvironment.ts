@@ -17,6 +17,7 @@ import { type StoreLayer } from './optimisticProxy';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { WithEncounteredRecords } from './read';
 import type { ReaderAst, StartUpdate } from './reader';
+import { isArray } from './cache';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
@@ -112,7 +113,7 @@ export type DataTypeValue =
   // Singular linked fields:
   | StoreLink
   // Plural scalar and linked fields:
-  | DataTypeValue[];
+  | readonly DataTypeValue[];
 
 export type StoreRecord = {
   [index: DataId | string]: DataTypeValue;
@@ -179,7 +180,7 @@ export function createIsographStore(): BaseStoreLayerData {
 }
 
 export function assertLink(link: DataTypeValue): StoreLink | null | undefined {
-  if (Array.isArray(link)) {
+  if (isArray(link)) {
     throw new Error('Unexpected array');
   }
   if (link == null) {
