@@ -7,8 +7,8 @@ use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
-    ContainsIsoStats, IsographDatabase, NetworkProtocol, ProcessClientFieldDeclarationError,
-    ValidateUseOfArgumentsError, ValidatedEntrypointError, create_new_exposed_field,
+    ContainsIsoStats, IsographDatabase, NetworkProtocol, ValidateUseOfArgumentsError,
+    ValidatedEntrypointError, create_new_exposed_field,
     create_type_system_schema_with_server_selectables, parse_iso_literals, process_iso_literals,
     server_id_selectable, server_object_entities, server_selectables_map,
     validate_use_of_arguments, validated_entrypoints,
@@ -103,7 +103,7 @@ fn validate_all_iso_literals<TNetworkProtocol: NetworkProtocol>(
     if let Err(e) = process_iso_literals(db, contains_iso) {
         return e
             .into_iter()
-            .map(|e| ValidationError::ProcessClientFieldDeclarationError { error: e })
+            .map(ValidationError::Diagnostic)
             .collect::<Vec<_>>()
             .wrap_err();
     }
@@ -147,11 +147,6 @@ pub enum ValidationError {
     #[error("{}", message.for_display())]
     IsographLiteralParseError {
         message: WithLocation<IsographLiteralParseError>,
-    },
-
-    #[error("{}", error.for_display())]
-    ProcessClientFieldDeclarationError {
-        error: WithLocation<ProcessClientFieldDeclarationError>,
     },
 }
 

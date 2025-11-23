@@ -1,20 +1,18 @@
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, ConstExportName,
-    Diagnostic, IsographDirectiveName, Location, ParentObjectEntityNameAndSelectableName,
+    Diagnostic, DiagnosticResult, Location, ParentObjectEntityNameAndSelectableName,
     RelativePathToSourceFile, SelectableName, ServerObjectEntityName, TextSource,
-    UnvalidatedTypeName, VariableName, WithLocation, WithLocationPostfix, WithSpan,
-    WithSpanPostfix,
+    UnvalidatedTypeName, VariableName, WithSpan, WithSpanPostfix,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration,
     ClientScalarSelectionDirectiveSet, NonConstantValue, SelectionSet, SelectionType,
-    ServerObjectEntityNameWrapper, TypeAnnotation, UnvalidatedSelection, VariableDefinition,
+    TypeAnnotation, UnvalidatedSelection, VariableDefinition,
 };
 use prelude::Postfix;
 
 use pico_macros::memo;
-use thiserror::Error;
 
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, FieldMapItem, ID_FIELD_NAME, IsographDatabase,
@@ -50,38 +48,32 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_field_declaration: WithSpan<ClientFieldDeclaration>,
     text_source: TextSource,
-) -> Result<
-    UnprocessedClientScalarSelectableSelectionSet,
-    WithLocation<ProcessClientFieldDeclarationError>,
-> {
+) -> DiagnosticResult<UnprocessedClientScalarSelectableSelectionSet> {
     let parent_type_id =
         defined_entity(db, client_field_declaration.item.parent_type.item.0.into())
-            .to_owned()
-            .map_err(|e| {
-                ProcessClientFieldDeclarationError::DefinedEntityError(e).with_generated_location()
-            })?
-            .ok_or(
-                ProcessClientFieldDeclarationError::ParentTypeNotDefined {
-                    parent_object_entity_name: client_field_declaration.item.parent_type.item,
-                }
-                .with_location(Location::new(
-                    text_source,
-                    client_field_declaration.item.parent_type.span,
-                )),
-            )?;
+            .to_owned()?
+            .ok_or_else(|| {
+                let parent_object_entity_name = client_field_declaration.item.parent_type.item;
+                Diagnostic::new(
+                    format!("`{parent_object_entity_name}` is not a type that has been defined."),
+                    Location::new(text_source, client_field_declaration.item.parent_type.span)
+                        .wrap_some(),
+                )
+            })?;
 
     match parent_type_id {
-        ServerEntityName::Object(_) => add_client_field_to_object(db, client_field_declaration)
-            .map_err(|e| e.item.with_location(Location::new(text_source, e.span)))?,
+        ServerEntityName::Object(_) => add_client_field_to_object(db, client_field_declaration)?,
         ServerEntityName::Scalar(scalar_entity_name) => {
-            return ProcessClientFieldDeclarationError::InvalidParentType {
-                literal_type: "field",
-                parent_object_entity_name: scalar_entity_name.into(),
-            }
-            .with_location(Location::new(
-                text_source,
-                client_field_declaration.item.parent_type.span,
-            ))
+            return Diagnostic::new(
+                format!(
+                    "Invalid parent type. `{scalar_entity_name}` is a scalar. \
+                    You are attempting to define a client field on it. \
+                    In order to do so, the parent object must \
+                    be an object, interface or union."
+                ),
+                Location::new(text_source, client_field_declaration.item.parent_type.span)
+                    .wrap_some(),
+            )
             .wrap_err();
         }
     }
@@ -92,72 +84,73 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
     text_source: TextSource,
-) -> Result<
-    UnprocessedClientObjectSelectableSelectionSet,
-    WithLocation<ProcessClientFieldDeclarationError>,
-> {
+) -> DiagnosticResult<UnprocessedClientObjectSelectableSelectionSet> {
     let parent_type_id = defined_entity(
         db,
         client_pointer_declaration.item.parent_type.item.0.into(),
     )
-    .to_owned()
-    .map_err(|e| {
-        ProcessClientFieldDeclarationError::DefinedEntityError(e).with_generated_location()
-    })?
-    .ok_or(
-        ProcessClientFieldDeclarationError::ParentTypeNotDefined {
-            parent_object_entity_name: client_pointer_declaration.item.parent_type.item,
-        }
-        .with_location(Location::new(
-            text_source,
-            client_pointer_declaration.item.parent_type.span,
-        )),
-    )?;
+    .to_owned()?
+    .ok_or_else(|| {
+        let parent_object_entity_name = client_pointer_declaration.item.parent_type.item;
+        Diagnostic::new(
+            format!("`{parent_object_entity_name}` is not a type that has been defined."),
+            Location::new(
+                text_source,
+                client_pointer_declaration.item.parent_type.span,
+            )
+            .wrap_some(),
+        )
+    })?;
 
     let target_type_id = defined_entity(
         db,
         client_pointer_declaration.item.target_type.inner().0.into(),
     )
-    .to_owned()
-    .map_err(|e| {
-        ProcessClientFieldDeclarationError::DefinedEntityError(e).with_generated_location()
-    })?
-    .ok_or(
-        ProcessClientFieldDeclarationError::ParentTypeNotDefined {
-            parent_object_entity_name: *client_pointer_declaration.item.target_type.inner(),
-        }
-        .with_location(Location::new(
-            text_source,
-            client_pointer_declaration.item.target_type.span(),
-        )),
-    )?;
+    .to_owned()?
+    .ok_or_else(|| {
+        let target_type = client_pointer_declaration.item.target_type.inner();
+        Diagnostic::new(
+            format!("`{target_type}` is not a type that has been defined."),
+            Location::new(
+                text_source,
+                client_pointer_declaration.item.target_type.span(),
+            )
+            .wrap_some(),
+        )
+    })?;
 
     match parent_type_id {
         ServerEntityName::Object(_) => match target_type_id {
             ServerEntityName::Object(_to_object_entity_name) => {
-                add_client_pointer_to_object(db, client_pointer_declaration)
-                    .map_err(|e| e.item.with_location(Location::new(text_source, e.span)))?
+                add_client_pointer_to_object(db, client_pointer_declaration)?
             }
             ServerEntityName::Scalar(scalar_entity_name) => {
-                return ProcessClientFieldDeclarationError::ClientPointerInvalidTargetType {
-                    target_object_entity_name: scalar_entity_name.into(),
-                }
-                .with_location(Location::new(
-                    text_source,
-                    client_pointer_declaration.item.target_type.span(),
-                ))
+                return Diagnostic::new(
+                    format!(
+                        "Invalid client pointer target type. \
+                        `{scalar_entity_name}` is a scalar. \
+                        You are attempting to define a pointer to it. \
+                        In order to do so, the type must be \
+                        an object, interface or union."
+                    ),
+                    Location::new(
+                        text_source,
+                        client_pointer_declaration.item.target_type.span(),
+                    )
+                    .wrap_some(),
+                )
                 .wrap_err();
             }
         },
         ServerEntityName::Scalar(scalar_entity_name) => {
-            return ProcessClientFieldDeclarationError::InvalidParentType {
-                literal_type: "pointer",
-                parent_object_entity_name: scalar_entity_name.into(),
-            }
-            .with_location(Location::new(
-                text_source,
-                client_pointer_declaration.item.parent_type.span,
-            ))
+            return Diagnostic::new(
+                format!("`{scalar_entity_name}` is not a type that has been defined."),
+                Location::new(
+                    text_source,
+                    client_pointer_declaration.item.target_type.span(),
+                )
+                .wrap_some(),
+            )
             .wrap_err();
         }
     }
@@ -167,7 +160,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
 fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_field_declaration: WithSpan<ClientFieldDeclaration>,
-) -> ProcessClientFieldDeclarationResult<UnprocessedClientScalarSelectableSelectionSet> {
+) -> DiagnosticResult<UnprocessedClientScalarSelectableSelectionSet> {
     let (result, _) =
         process_client_field_declaration_inner(db, client_field_declaration.item).to_owned()?;
 
@@ -178,7 +171,7 @@ fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol>(
 pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_field_declaration: ClientFieldDeclaration,
-) -> ProcessClientFieldDeclarationResult<(
+) -> DiagnosticResult<(
     UnprocessedClientScalarSelectableSelectionSet,
     ClientScalarSelectable<TNetworkProtocol>,
 )> {
@@ -202,6 +195,10 @@ pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>
                     variable_definition,
                     client_field_declaration.parent_type.item.0,
                     client_scalar_selectable_name.0.into(),
+                    client_field_declaration
+                        .client_field_name
+                        .location
+                        .text_source,
                 )
             })
             .collect::<Result<_, _>>()?,
@@ -234,11 +231,8 @@ pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>
 pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
-) -> ProcessClientFieldDeclarationResult<Option<RefetchStrategy<(), ()>>> {
-    let fetchable_types_map = fetchable_types(db).as_ref().map_err(|e| {
-        ProcessClientFieldDeclarationError::ParseTypeSystemDocumentsError(e.clone())
-            .with_generated_span()
-    })?;
+) -> DiagnosticResult<Option<RefetchStrategy<(), ()>>> {
+    let fetchable_types_map = fetchable_types(db).as_ref().map_err(Clone::clone)?;
 
     let is_fetchable = fetchable_types_map.contains_key(&parent_object_entity_name);
 
@@ -248,18 +242,8 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
         let id_field =
             server_selectable_named(db, parent_object_entity_name, (*ID_FIELD_NAME).into())
                 // TODO don't call to_owned
-                .to_owned()
-                .map_err(|e| {
-                    ProcessClientFieldDeclarationError::ServerSelectableNamedError(e)
-                        .with_generated_span()
-                })?
-                .transpose()
-                .map_err(|e| {
-                    ProcessClientFieldDeclarationError::FieldToInsertToServerSelectableError {
-                        error: e,
-                    }
-                    .with_generated_span()
-                })?;
+                .to_owned()?
+                .transpose()?;
 
         let query_id = fetchable_types_map
             .iter()
@@ -293,7 +277,7 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
 fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
-) -> ProcessClientFieldDeclarationResult<UnprocessedClientObjectSelectableSelectionSet> {
+) -> DiagnosticResult<UnprocessedClientObjectSelectableSelectionSet> {
     let (unprocessed_fields, _) =
         process_client_pointer_declaration_inner(db, client_pointer_declaration.item).to_owned()?;
 
@@ -304,7 +288,7 @@ fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol>(
 pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_pointer_declaration: ClientPointerDeclaration,
-) -> ProcessClientFieldDeclarationResult<(
+) -> DiagnosticResult<(
     UnprocessedClientObjectSelectableSelectionSet,
     ClientObjectSelectable<TNetworkProtocol>,
 )> {
@@ -312,11 +296,16 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
     let client_pointer_name = client_pointer_declaration.client_pointer_name.item.0;
 
     if let Some(directive) = client_pointer_declaration.directives.into_iter().next() {
-        return Err(directive.map(|directive| {
-            ProcessClientFieldDeclarationError::DirectiveNotSupportedOnClientPointer {
-                directive_name: directive.name.item,
-            }
-        }));
+        let directive_name = directive.item.name;
+        return Diagnostic::new(
+            format!("Directive `@{directive_name}` is not supported on client pointers."),
+            client_pointer_declaration
+                .client_pointer_name
+                .location
+                .into_typed::<Location>()
+                .wrap_some(),
+        )
+        .wrap_err();
     }
 
     let unprocessed_fields = client_pointer_declaration.selection_set;
@@ -337,6 +326,10 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
                     variable_definition,
                     parent_object_entity_name,
                     client_pointer_name.into(),
+                    client_pointer_declaration
+                        .client_pointer_name
+                        .location
+                        .text_source,
                 )
             })
             .collect::<Result<_, _>>()?,
@@ -369,64 +362,6 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
         },
         client_object_selectable,
     ))
-}
-
-type ProcessClientFieldDeclarationResult<T> =
-    Result<T, WithSpan<ProcessClientFieldDeclarationError>>;
-
-#[derive(Error, Eq, PartialEq, Debug, Clone, PartialOrd, Ord)]
-pub enum ProcessClientFieldDeclarationError {
-    #[error("`{parent_object_entity_name}` is not a type that has been defined.")]
-    ParentTypeNotDefined {
-        parent_object_entity_name: ServerObjectEntityNameWrapper,
-    },
-
-    #[error("Directive `@{directive_name}` is not supported on client pointers.")]
-    DirectiveNotSupportedOnClientPointer {
-        directive_name: IsographDirectiveName,
-    },
-
-    #[error(
-        "Invalid parent type. `{parent_object_entity_name}` is a scalar. \
-        You are attempting to define a {literal_type} on it. \
-        In order to do so, the parent object must be an object, interface or union."
-    )]
-    InvalidParentType {
-        literal_type: &'static str,
-        parent_object_entity_name: UnvalidatedTypeName,
-    },
-
-    #[error(
-        "Invalid client pointer target type. `{target_object_entity_name}` is a scalar. \
-        You are attempting to define a pointer to it. \
-        In order to do so, the type must be an object, interface or union."
-    )]
-    ClientPointerInvalidTargetType {
-        target_object_entity_name: UnvalidatedTypeName,
-    },
-
-    #[error(
-        "The argument `{argument_name}` on field `{parent_object_entity_name}.{selectable_name}` \
-        has inner type `{argument_type}`, which does not exist."
-    )]
-    FieldArgumentTypeDoesNotExist {
-        argument_name: VariableName,
-        parent_object_entity_name: ServerObjectEntityName,
-        selectable_name: SelectableName,
-        argument_type: UnvalidatedTypeName,
-    },
-
-    #[error("{0}")]
-    ServerSelectableNamedError(Diagnostic),
-
-    #[error("{}", error)]
-    FieldToInsertToServerSelectableError { error: Diagnostic },
-
-    #[error("{0}")]
-    DefinedEntityError(Diagnostic),
-
-    #[error("{0}")]
-    ParseTypeSystemDocumentsError(Diagnostic),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -486,25 +421,26 @@ pub fn validate_variable_definition<TNetworkProtocol: NetworkProtocol>(
     variable_definition: WithSpan<VariableDefinition<UnvalidatedTypeName>>,
     parent_object_entity_name: ServerObjectEntityName,
     selectable_name: SelectableName,
-) -> ProcessClientFieldDeclarationResult<WithSpan<VariableDefinition<ServerEntityName>>> {
+    // TODO this is hacky
+    text_source: TextSource,
+) -> DiagnosticResult<WithSpan<VariableDefinition<ServerEntityName>>> {
     let type_ = variable_definition
         .item
         .type_
         .clone()
         .and_then(|input_type_name| {
             defined_entity(db, *variable_definition.item.type_.inner())
-                .to_owned()
-                .map_err(|e| {
-                    ProcessClientFieldDeclarationError::DefinedEntityError(e).with_generated_span()
-                })?
+                .to_owned()?
                 .ok_or_else(|| {
-                    ProcessClientFieldDeclarationError::FieldArgumentTypeDoesNotExist {
-                        argument_type: input_type_name,
-                        argument_name: variable_definition.item.name.item,
-                        parent_object_entity_name,
-                        selectable_name,
-                    }
-                    .with_span(variable_definition.span)
+                    let argument_name = variable_definition.item.name.item;
+                    Diagnostic::new(
+                        format!(
+                            "The argument `{argument_name}` on field \
+                            `{parent_object_entity_name}.{selectable_name}` \
+                            has inner type `{input_type_name}`, which does not exist."
+                        ),
+                        Location::new(text_source, variable_definition.span).wrap_some(),
+                    )
                 })
         })?;
 

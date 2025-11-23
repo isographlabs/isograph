@@ -35,3 +35,5 @@ impl Display for Diagnostic {
 impl std::error::Error for Diagnostic {}
 
 pub type DiagnosticResult<T> = Result<T, Diagnostic>;
+// TODO we should not do this
+pub type DiagnosticVecResult<T> = Result<T, Vec<Diagnostic>>;

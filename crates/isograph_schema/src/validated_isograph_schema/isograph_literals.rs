@@ -1,11 +1,10 @@
 use crate::{
     IsoLiteralsSource, IsographDatabase, NetworkProtocol, ParsedIsoLiteralsMap,
-    ProcessClientFieldDeclarationError, UnprocessedSelectionSet, process_client_field_declaration,
-    process_client_pointer_declaration,
+    UnprocessedSelectionSet, process_client_field_declaration, process_client_pointer_declaration,
 };
 use common_lang_types::{
-    CurrentWorkingDirectory, Location, RelativePathToSourceFile, Span, TextSource, WithLocation,
-    WithLocationPostfix, WithSpan,
+    CurrentWorkingDirectory, DiagnosticVecResult, Location, RelativePathToSourceFile, Span,
+    TextSource, WithLocation, WithLocationPostfix, WithSpan,
 };
 use isograph_lang_parser::{
     IsoLiteralExtractionResult, IsographLiteralParseError, parse_iso_literal,
@@ -114,13 +113,10 @@ pub fn read_iso_literals_source<TNetworkProtocol: NetworkProtocol>(
 pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     contains_iso: ParsedIsoLiteralsMap,
-) -> Result<
-    (
-        Vec<UnprocessedSelectionSet>,
-        Vec<(TextSource, WithSpan<EntrypointDeclaration>)>,
-    ),
-    Vec<WithLocation<ProcessClientFieldDeclarationError>>,
-> {
+) -> DiagnosticVecResult<(
+    Vec<UnprocessedSelectionSet>,
+    Vec<(TextSource, WithSpan<EntrypointDeclaration>)>,
+)> {
     let mut errors = vec![];
     let mut unprocess_client_field_items = vec![];
     let mut unprocessed_entrypoints = vec![];

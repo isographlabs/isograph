@@ -1,8 +1,8 @@
 use std::collections::{HashMap, hash_map::Entry};
 
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName,
-    ParentObjectEntityNameAndSelectableName, ServerObjectEntityName, WithLocation, WithSpan,
+    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, Diagnostic,
+    ParentObjectEntityNameAndSelectableName, ServerObjectEntityName, WithLocation,
 };
 use isograph_lang_types::{SelectionType, SelectionTypePostfix};
 use pico_macros::memo;
@@ -11,7 +11,7 @@ use thiserror::Error;
 
 use crate::{
     AddSelectionSetsError, IsographDatabase, MemoizedIsoLiteralError, NetworkProtocol,
-    ObjectSelectableId, ProcessClientFieldDeclarationError, RefetchStrategy, ScalarSelectableId,
+    ObjectSelectableId, RefetchStrategy, ScalarSelectableId,
     client_selectable_declaration_map_from_iso_literals, expose_field_map,
     get_unvalidated_refetch_stategy, get_validated_refetch_strategy,
 };
@@ -50,9 +50,7 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                 Entry::Vacant(vacant_entry) => match item {
                     SelectionType::Scalar(_) => {
                         let refetch_strategy = get_unvalidated_refetch_stategy(db, key.0)
-                            .map_err(|e| {
-                                RefetchStrategyAccessError::ProcessClientFieldDeclarationError(e)
-                            })
+                            .map_err(RefetchStrategyAccessError::Diagnostic)
                             .map(SelectionType::Scalar);
                         vacant_entry.insert(refetch_strategy);
                     }
@@ -62,11 +60,7 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                         // This is extremely weird, and we should fix this!
                         let refetch_strategy =
                             get_unvalidated_refetch_stategy(db, o.target_type.inner().0)
-                                .map_err(|e| {
-                                    RefetchStrategyAccessError::ProcessClientFieldDeclarationError(
-                                        e,
-                                    )
-                                })
+                                .map_err(RefetchStrategyAccessError::Diagnostic)
                                 .map(|item| {
                                     item.expect(
                                 "Expected client object selectable to have a refetch strategy. \
@@ -238,7 +232,7 @@ pub fn validated_refetch_strategy_for_object_scalar_selectable_named<
 #[derive(Clone, Error, Eq, PartialEq, Debug)]
 pub enum RefetchStrategyAccessError {
     #[error("{0}")]
-    ProcessClientFieldDeclarationError(WithSpan<ProcessClientFieldDeclarationError>),
+    Diagnostic(Diagnostic),
 
     #[error("{0}")]
     MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError),

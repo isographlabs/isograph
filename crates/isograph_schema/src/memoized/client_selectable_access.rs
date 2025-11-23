@@ -2,14 +2,13 @@ use std::collections::HashMap;
 
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, IsographDatabase, NetworkProtocol,
-    OwnedClientSelectable, ProcessClientFieldDeclarationError,
-    UnprocessedClientScalarSelectableSelectionSet, create_new_exposed_field,
+    OwnedClientSelectable, UnprocessedClientScalarSelectableSelectionSet, create_new_exposed_field,
     create_type_system_schema_with_server_selectables, get_link_fields_map,
     process_client_field_declaration_inner, process_client_pointer_declaration_inner,
 };
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, Diagnostic,
-    ServerObjectEntityName, WithSpan,
+    ServerObjectEntityName,
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{
@@ -146,9 +145,6 @@ pub enum MemoizedIsoLiteralError {
     },
 
     #[error("{0}")]
-    ProcessClientFieldDeclarationError(WithSpan<ProcessClientFieldDeclarationError>),
-
-    #[error("{0}")]
     Diagnostic(Diagnostic),
 }
 
@@ -265,7 +261,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
 
     let (_, scalar_selectable) = process_client_field_declaration_inner(db, declaration)
         .as_ref()
-        .map_err(|e| MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(e.clone()))?;
+        .map_err(|e| MemoizedIsoLiteralError::Diagnostic(e.clone()))?;
 
     scalar_selectable.clone().wrap_some().wrap_ok()
 }
@@ -288,7 +284,7 @@ pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
 
     let (_, object_selectable) = process_client_pointer_declaration_inner(db, declaration)
         .as_ref()
-        .map_err(|e| MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(e.clone()))?;
+        .map_err(|e| MemoizedIsoLiteralError::Diagnostic(e.clone()))?;
 
     object_selectable.clone().wrap_some().wrap_ok()
 }
@@ -422,22 +418,14 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
                                 process_client_field_declaration_inner(db, scalar_declaration)
                                     .clone()
                                     .map(|(_, selectable)| selectable)
-                                    .map_err(|e| {
-                                        MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(
-                                            e,
-                                        )
-                                    })?
+                                    .map_err(MemoizedIsoLiteralError::Diagnostic)?
                                     .scalar_selected()
                             }
                             SelectionType::Object(object_declaration) => {
                                 process_client_pointer_declaration_inner(db, object_declaration)
                                     .clone()
                                     .map(|(_, selectable)| selectable)
-                                    .map_err(|e| {
-                                        MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(
-                                            e,
-                                        )
-                                    })?
+                                    .map_err(MemoizedIsoLiteralError::Diagnostic)?
                                     .object_selected()
                             }
                         })
