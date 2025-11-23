@@ -65,6 +65,9 @@ export type IsographEntrypoint<
     | ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
     | ReaderWithRefetchQueriesLoader<TReadFromStore, TClientFieldValue>;
   readonly concreteType: TypeName;
+  /**
+   * This field exists solely for typechecking, and will not exist at runtime.
+   */
   readonly '~TRawResponseType'?: PhantomData<Contravariant<TRawResponseType>>;
 };
 

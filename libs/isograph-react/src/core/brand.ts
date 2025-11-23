@@ -22,15 +22,12 @@ declare const PhantomDataBrand: unique symbol;
  * A phantom data type is one that shouldn't show up at runtime, but is checked statically (and only) at compile time.
  * Data types can use extra properties to act as markers or to perform type checking at compile time. These extra properties should hold no storage values, and have no runtime behavior.
  *
- *
  * ```tsx
  * type MyType<T> = {
  *   readonly value: number;
  *   readonly '~T'?: PhantomData<T>;
  * }
  * ```
- *
- *
  */
 export type PhantomData<T> = Brand<T, typeof PhantomDataBrand>;
 
