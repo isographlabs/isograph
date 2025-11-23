@@ -28,6 +28,14 @@ where
     }
 
     #[inline(always)]
+    fn into_typed<T>(self) -> T
+    where
+        Self: Into<T>,
+    {
+        self.into()
+    }
+
+    #[inline(always)]
     fn dbg(self) -> Self
     where
         Self: std::fmt::Debug,
