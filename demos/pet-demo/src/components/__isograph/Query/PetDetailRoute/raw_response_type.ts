@@ -1,4 +1,4 @@
-export type Query__PetDetailRoute__rawResponse = {
+export type Query__PetDetailRoute__raw_response_type = {
   pet____id___v_id?: ({
     id: string,
     age: number,

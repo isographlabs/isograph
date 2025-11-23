@@ -1,4 +1,4 @@
-export type Viewer__NewsfeedPaginationComponent__rawResponse = {
+export type Viewer__NewsfeedPaginationComponent__raw_response_type = {
   node____id___v_id?: ({
     __typename: "Viewer",
     id: string,

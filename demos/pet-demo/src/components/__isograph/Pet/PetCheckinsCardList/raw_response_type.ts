@@ -1,4 +1,4 @@
-export type Pet__PetCheckinsCardList__rawResponse = {
+export type Pet__PetCheckinsCardList__raw_response_type = {
   node____id___v_id?: ({
     __typename: "Pet",
     id: string,

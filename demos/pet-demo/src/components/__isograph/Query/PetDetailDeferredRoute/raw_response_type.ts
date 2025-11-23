@@ -1,4 +1,4 @@
-export type Query__PetDetailDeferredRoute__rawResponse = {
+export type Query__PetDetailDeferredRoute__raw_response_type = {
   pet____id___v_id?: ({
     id: string,
     firstName: string,

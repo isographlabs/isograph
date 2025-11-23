@@ -1,4 +1,4 @@
-export type Query__HomePage__rawResponse = {
+export type Query__HomePage__raw_response_type = {
   getAllPokemon____take___l_232____offset___l_93: ReadonlyArray<{
     bulbapediaPage: string,
     forme?: (string | null),

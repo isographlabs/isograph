@@ -1,4 +1,4 @@
-export type Query__PullRequest__rawResponse = {
+export type Query__PullRequest__raw_response_type = {
   repository____owner___v_repositoryOwner____name___v_repositoryName?: ({
     id: string,
     pullRequest____number___v_pullRequestNumber?: ({

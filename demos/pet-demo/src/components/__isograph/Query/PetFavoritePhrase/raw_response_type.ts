@@ -1,4 +1,4 @@
-export type Query__PetFavoritePhrase__rawResponse = {
+export type Query__PetFavoritePhrase__raw_response_type = {
   pet____id___v_id?: ({
     id: string,
     favorite_phrase?: (string | null),

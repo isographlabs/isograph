@@ -1,4 +1,4 @@
-export type Query__UserPage__rawResponse = {
+export type Query__UserPage__raw_response_type = {
   user____login___v_userLogin?: ({
     id: string,
     name?: (string | null),

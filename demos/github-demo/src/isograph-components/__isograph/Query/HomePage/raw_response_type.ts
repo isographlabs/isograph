@@ -1,4 +1,4 @@
-export type Query__HomePage__rawResponse = {
+export type Query__HomePage__raw_response_type = {
   viewer: {
     id: string,
     avatarUrl: string,

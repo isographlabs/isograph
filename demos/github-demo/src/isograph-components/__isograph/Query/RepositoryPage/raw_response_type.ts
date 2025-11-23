@@ -1,4 +1,4 @@
-export type Query__RepositoryPage__rawResponse = {
+export type Query__RepositoryPage__raw_response_type = {
   repository____name___v_repositoryName____owner___v_repositoryOwner?: ({
     id: string,
     nameWithOwner: string,

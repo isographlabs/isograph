@@ -1,4 +1,4 @@
-export type User__RepositoryConnection__rawResponse = {
+export type User__RepositoryConnection__raw_response_type = {
   node____id___v_id?: ({
     __typename: "User",
     id: string,

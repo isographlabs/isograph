@@ -318,7 +318,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     });
     path_and_contents.push(ArtifactPathAndContent {
         file_content: format!(
-            "export type {}__{}__rawResponse = {raw_response_type}\n",
+            "export type {}__{}__raw_response_type = {raw_response_type}\n",
             type_name, field_name,
         ),
         file_name: *RAW_RESPONSE_TYPE,
