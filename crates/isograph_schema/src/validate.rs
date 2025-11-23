@@ -81,7 +81,7 @@ fn validate_all_expose_as_fields<TNetworkProtocol: NetworkProtocol>(
             if let Err(e) =
                 create_new_exposed_field(db, expose_as_field, *parent_object_entity_name)
             {
-                errors.push(ValidationError::Diagnostic(e));
+                errors.push(e.wrap(ValidationError::Diagnostic));
             }
         }
     }
