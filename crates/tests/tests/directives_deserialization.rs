@@ -24,8 +24,7 @@ fn parse_mutation(source: &str) -> Result<Vec<ExposeFieldDirective>, Box<dyn Err
         span: None,
         current_working_directory: "cwd".intern().into(),
     };
-    let document =
-        graphql_schema_parser::parse_schema_extensions(source, text_source).map_err(|e| e.item)?;
+    let document = graphql_schema_parser::parse_schema_extensions(source, text_source)?;
     let directives = document
         .0
         .into_iter()
