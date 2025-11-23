@@ -1,5 +1,10 @@
 import { ItemCleanupPair } from '@isograph/disposable-types';
-import { callSubscriptions, normalizeData, type EncounteredIds } from './cache';
+import {
+  callSubscriptions,
+  normalizeData,
+  type EncounteredIds,
+  type NetworkResponseObject,
+} from './cache';
 import { check, DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
 import { getOrCreateCachedComponent } from './componentCache';
 import {
@@ -37,13 +42,18 @@ let networkRequestId = 0;
 export function maybeMakeNetworkRequest<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
-  TArtifact extends
-    | RefetchQueryNormalizationArtifact
-    | IsographEntrypoint<TReadFromStore, TClientFieldValue, TNormalizationAst>,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
+  TRawResponseType extends NetworkResponseObject,
 >(
   environment: IsographEnvironment,
-  artifact: TArtifact,
+  artifact:
+    | RefetchQueryNormalizationArtifact
+    | IsographEntrypoint<
+        TReadFromStore,
+        TClientFieldValue,
+        TNormalizationAst,
+        TRawResponseType
+      >,
   variables: ExtractParameters<TReadFromStore>,
   readerWithRefetchQueries: PromiseWrapper<
     ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
@@ -108,6 +118,7 @@ export function maybeMakeNetworkRequest<
 function retainQueryWithoutMakingNetworkRequest<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
+  TRawResponseType extends NetworkResponseObject,
 >(
   environment: IsographEnvironment,
   artifact:
@@ -115,7 +126,8 @@ function retainQueryWithoutMakingNetworkRequest<
     | IsographEntrypoint<
         TReadFromStore,
         TClientFieldValue,
-        NormalizationAst | NormalizationAstLoader
+        NormalizationAst | NormalizationAstLoader,
+        TRawResponseType
       >,
   variables: ExtractParameters<TReadFromStore>,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
@@ -143,13 +155,18 @@ function retainQueryWithoutMakingNetworkRequest<
 export function makeNetworkRequest<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
-  TArtifact extends
-    | RefetchQueryNormalizationArtifact
-    | IsographEntrypoint<TReadFromStore, TClientFieldValue, TNormalizationAst>,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
+  TRawResponseType extends NetworkResponseObject,
 >(
   environment: IsographEnvironment,
-  artifact: TArtifact,
+  artifact:
+    | RefetchQueryNormalizationArtifact
+    | IsographEntrypoint<
+        TReadFromStore,
+        TClientFieldValue,
+        TNormalizationAst,
+        TRawResponseType
+      >,
   variables: ExtractParameters<TReadFromStore>,
   readerWithRefetchQueries: PromiseWrapper<
     ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
@@ -284,12 +301,17 @@ type NetworkRequestStatus =
 function readDataForOnComplete<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
-  TArtifact extends
-    | RefetchQueryNormalizationArtifact
-    | IsographEntrypoint<TReadFromStore, TClientFieldValue, TNormalizationAst>,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
+  TRawResponseType extends NetworkResponseObject,
 >(
-  artifact: TArtifact,
+  artifact:
+    | RefetchQueryNormalizationArtifact
+    | IsographEntrypoint<
+        TReadFromStore,
+        TClientFieldValue,
+        TNormalizationAst,
+        TRawResponseType
+      >,
   environment: IsographEnvironment,
   root: StoreLink,
   variables: ExtractParameters<TReadFromStore>,
@@ -386,6 +408,7 @@ function readDataForOnComplete<
 function fetchNormalizationAstAndRetainArtifact<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
+  TRawResponseType extends NetworkResponseObject,
 >(
   environment: IsographEnvironment,
   artifact:
@@ -393,7 +416,8 @@ function fetchNormalizationAstAndRetainArtifact<
     | IsographEntrypoint<
         TReadFromStore,
         TClientFieldValue,
-        NormalizationAst | NormalizationAstLoader
+        NormalizationAst | NormalizationAstLoader,
+        TRawResponseType
       >,
   variables: ExtractParameters<TReadFromStore>,
 ): RetainedQuery {

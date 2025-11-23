@@ -2,6 +2,7 @@ import {
   UNASSIGNED_STATE,
   useUpdatableDisposableState,
 } from '@isograph/react-disposable-state';
+import type { NetworkResponseObject } from '../core/cache';
 import { FetchOptions, type RequiredFetchOptions } from '../core/check';
 import {
   IsographEntrypoint,
@@ -39,11 +40,13 @@ export function useImperativeReference<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
+  TRawResponseType extends NetworkResponseObject,
 >(
   entrypoint: IsographEntrypoint<
     TReadFromStore,
     TClientFieldValue,
-    TNormalizationAst
+    TNormalizationAst,
+    TRawResponseType
   >,
 ): UseImperativeReferenceResult<
   TReadFromStore,
